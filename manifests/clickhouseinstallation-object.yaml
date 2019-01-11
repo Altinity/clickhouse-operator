@@ -13,7 +13,12 @@ spec:
 
   configuration:
     users:
-
+      profiles/readonly/readonly: 1
+#      <profiles>
+#        <readonly>
+#          <readonly>1</readonly>
+#        </readonly>
+#      </profiles>
 
     settings:
       profiles/default/max_memory_usage: 1000000000
