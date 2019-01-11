@@ -1,0 +1,100 @@
+apiVersion: "clickhouse.example.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: "clickhouse-installation-test"
+spec:
+
+  deployment:
+    zone:
+      matchLabels:
+        clickhouse.altinity.com/zone: zone1
+    podTemplateName: clickhouse-installation
+
+  configuration:
+    users:
+
+
+    settings:
+      profiles/default/max_memory_usage: 1000000000
+#      <profiles>
+#        <default>
+#          <max_memory_usage>1000000000</max_memory_usage>
+#        </default>
+#      </profiles>
+      compression/case/method: zstd
+#      <compression>
+#       <case>
+#         <method>zstd</method>
+#      </case>
+#      </compression>
+
+    clusters:
+    - name: sharded-replicated
+      layout:
+        type: Standard
+        shardsCount: 3
+        replicasCount: 2
+      deployment:
+        podTemplateName: clickhouse-server-v3.3.3
+
+    - name: sharded-non-replicated
+      layout:
+        type: Standard
+        shardsCount: 3 # replicasCount = 1, by default
+      deployment:
+        zone:
+          matchLabels:
+            clickhouse.altinity.com/zone: zone2
+
+    - name: replicated
+      layout:
+        type: Standard
+        replicasCount: 4 # shardsCount = 1, by default
+
+    - name: customized
+      layout:
+        type: Advanced
+
+        shards:
+        - definitionType: ReplicasCount
+          replicasCount: 2
+          weight: 1
+          internalReplication: Disabled
+          deployment:
+            podTemplateName: clickhouse-installation
+            zone:
+              matchLabels:
+                clickhouse.altinity.com/zone: zone3
+
+        - definitionType: ReplicasCount
+          replicasCount: 3
+
+        - definitionType: Replicas # replicasCount equals number of "replicas" elements
+          replicas:
+          - deployment:
+              scenario: Default
+          - deployment:
+              scenario: NodeMonopoly # 1 pod (CH server instance) per node (zone can be a set of n nodes) -> podAntiAffinity
+              zone:
+                matchLabels:
+                  clickhouse.altinity.com/zone: zone4
+              podTemplateName: clickhouse-installation
+
+  templates:
+    podTemplates:
+    - name: clickhouse-installation
+      containers:
+      - name: clickhouse
+        image: yandex/clickhouse-server:18.14.19-stable
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+      - name: client
+        image: yandex/clickhouse-client:18.14.19-stable
+      - name: logwatcher
+        image: path/tologwatcher:1.2.3
