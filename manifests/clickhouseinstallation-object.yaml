@@ -41,7 +41,7 @@ spec:
         shardsCount: 3
         replicasCount: 2
       deployment:
-        podTemplateName: clickhouse-server-v3.3.3
+        podTemplateName: clickhouse-installation
 
     - name: sharded-non-replicated
       layout:
