@@ -70,7 +70,7 @@ spec:
         - definitionType: ReplicasCount
           replicasCount: 3
 
-        - definitionType: Replicas # replicasCount equals number of "replicas" elements
+        - definitionType: Replicas
           replicas:
           - deployment:
               scenario: Default
