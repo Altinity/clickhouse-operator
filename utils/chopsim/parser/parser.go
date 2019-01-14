@@ -16,7 +16,7 @@ const (
 
 const (
 	deploymentScenarioDefault      = "Default"
-	deploymentScenarioZoneMonopoly = "NodeMonopoly"
+	deploymentScenarioNodeMonopoly = "NodeMonopoly"
 )
 
 // ClickHouseInstallation describes CRD object instance
