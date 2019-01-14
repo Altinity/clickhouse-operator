@@ -1,15 +1,22 @@
 package parser
 
-// .spec.clusters.layout.type variants
-const (
-	chiClusterLayoutTypeStandard = "Standard"
-	chiClusterLayoutTypeAdvanced = "Advanced"
+import (
+	"fmt"
 )
 
-//  *.deployment.scenario variants
 const (
-	chiDeploymentScenarioDefault      = "Default"
-	chiDeploymentScenarioZoneMonopoly = "NodeMonopoly"
+	clusterLayoutTypeStandard = "Standard"
+	clusterLayoutTypeAdvanced = "Advanced"
+)
+
+const (
+	shardDefinitionTypeReplicasCount = "ReplicasCount"
+	shardDefinitionTypeReplicas      = "Replicas"
+)
+
+const (
+	deploymentScenarioDefault      = "Default"
+	deploymentScenarioZoneMonopoly = "NodeMonopoly"
 )
 
 // ClickHouseInstallation describes CRD object instance
@@ -20,89 +27,142 @@ type ClickHouseInstallation struct {
 		Name string `yaml:"name"`
 	} `yaml:"metadata"`
 	Spec struct {
-		Deployment    ChiDeployment    `yaml:"deployment"`
-		Configuration ChiConfiguration `yaml:"configuration"`
-		Templates     ChiTemplates     `yaml:"templates"`
+		Deployment    chiDeployment    `yaml:"deployment"`
+		Configuration chiConfiguration `yaml:"configuration"`
+		Templates     chiTemplates     `yaml:"templates"`
 	} `yaml:"spec"`
 }
 
-// ChiConfiguration defines data structure which corresponds to .spec.configuration section
-type ChiConfiguration struct {
+type chiConfiguration struct {
 	Users    map[string]string `yaml:"users"`
 	Settings map[string]string `yaml:"settings"`
-	Clusters []ChiCluster      `yaml:"clusters"`
+	Clusters []chiCluster      `yaml:"clusters"`
 }
 
-// ChiDeployment defines data structure used for parsing *.deployment sections
-type ChiDeployment struct {
-	PodTemplateName string         `yaml:"podTemplateName"`
-	Zone            DeploymentZone `yaml:"zone"`
-	Scenario        string         `yaml:"scenario"`
+type chiDeployment struct {
+	PodTemplateName string            `yaml:"podTemplateName"`
+	Zone            chiDeploymentZone `yaml:"zone"`
+	Scenario        string            `yaml:"scenario"`
 }
 
-// DeploymentZone defines data structure used with ChiDeployment
-type DeploymentZone struct {
+type chiDeploymentZone struct {
 	MatchLabels map[string]string `yaml:"matchLabels"`
 }
 
-// ChiCluster defines data structure used as .spec.configuration.clusters item
-type ChiCluster struct {
+type chiCluster struct {
 	Name       string           `yaml:"name"`
-	Layout     ChiClusterLayout `yaml:"layout"`
-	Deployment ChiDeployment    `yaml:"deployment"`
+	Layout     chiClusterLayout `yaml:"layout"`
+	Deployment chiDeployment    `yaml:"deployment"`
 }
 
-// ChiClusterLayout defines data structure used as .spec.configuration.clusters.
-type ChiClusterLayout struct {
+type chiClusterLayout struct {
 	Type          string                  `yaml:"type"`
 	ShardsCount   int                     `yaml:"shardsCount"`
 	ReplicasCount int                     `yaml:"replicasCount"`
-	Shards        []ChiClusterLayoutShard `yaml:"shards"`
+	Shards        []chiClusterLayoutShard `yaml:"shards"`
 }
 
-// ChiClusterLayoutShard defines data structure used as .spec.configuration.cluster.layout.shards item
-type ChiClusterLayoutShard struct {
+type chiClusterLayoutShard struct {
 	DefinitionType      string                         `yaml:"definitionType"`
 	ReplicasCount       int                            `yaml:"replicasCount"`
 	Weight              int                            `yaml:"weight"`
 	InternalReplication string                         `yaml:"internalReplication"`
-	Deployment          ChiDeployment                  `yaml:"deployment"`
-	Replicas            []ChiClusterLayoutShardReplica `yaml:"replicas"`
+	Deployment          chiDeployment                  `yaml:"deployment"`
+	Replicas            []chiClusterLayoutShardReplica `yaml:"replicas"`
 }
 
-// ChiClusterLayoutShardReplica defines data structure used as .spec.configuration.cluster.layout.shards.replicas item
-type ChiClusterLayoutShardReplica struct {
-	Deployment ChiDeployment `yaml:"deployment"`
+type chiClusterLayoutShardReplica struct {
+	Deployment chiDeployment `yaml:"deployment"`
 }
 
-// ChiTemplates defines data structure used as .spec.templates item
-type ChiTemplates struct {
-	PodTemplates []ChiPodTemplate `yaml:"podTemplates"`
+type chiTemplates struct {
+	PodTemplates []chiPodTemplate `yaml:"podTemplates"`
 }
 
-// ChiPodTemplate defines data structure used as .spec.templates.podtemplates item
-type ChiPodTemplate struct {
+type chiPodTemplate struct {
 	Name       string `yaml:"name"`
-	Containers []ChiPodTemplatesContainerTemplate
+	Containers []chiPodTemplatesContainerTemplate
 }
 
-// ChiPodTemplatesContainerTemplate defines data structure used as .spec.templates.podtemplates.containers
-type ChiPodTemplatesContainerTemplate struct {
+type chiPodTemplatesContainerTemplate struct {
 	Name      string `yaml:"name"`
 	Image     string `yaml:"image"`
 	Resources struct {
-		Requests ChiContainerResourceParams `yaml:"requests"`
-		Limits   ChiContainerResourceParams `yaml:"limits"`
+		Requests chiContainerResourceParams `yaml:"requests"`
+		Limits   chiContainerResourceParams `yaml:"limits"`
 	} `yaml:"resources"`
 }
 
-// ChiContainerResourceParams defines "resources" data structure
-type ChiContainerResourceParams struct {
+type chiContainerResourceParams struct {
 	Memory string `yaml:"memory"`
 	CPU    string `yaml:"cpu"`
 }
 
+type chiClusterDataLink struct {
+	cluster     *chiCluster
+	deployments []*chiDeployment
+}
+
 // GenerateArtifacts creates resulting (composite) manifest based on ClickHouseInstallation data provided
-func GenerateArtifacts(chi *ClickHouseInstallation) (string, error) {
-	return "", nil
+func GenerateArtifacts(chi *ClickHouseInstallation) string {
+	chi.Spec.Deployment.setDefaults(nil)
+	clusters, deployments := chi.getNormalizedData()
+
+	// debug: start
+	fmt.Println(clusters, deployments)
+	// debug: end
+
+	return ""
+}
+
+func (chi *ClickHouseInstallation) getNormalizedData() ([]*chiCluster, []*chiDeployment) {
+	link := make(chan *chiClusterDataLink)
+	count := len(chi.Spec.Configuration.Clusters)
+	for _, cluster := range chi.Spec.Configuration.Clusters {
+		go func(c chiCluster, ch chan<- *chiClusterDataLink) {
+			ch <- c.getNormalized()
+		}(cluster, link)
+	}
+	cList := make([]*chiCluster, 0, count)
+	dList := make([]*chiDeployment, 0)
+	for i := 0; i < count; i++ {
+		data := <-link
+		cList = append(cList, data.cluster)
+		for _, d := range data.deployments {
+			dList = append(dList, d)
+		}
+	}
+	return cList, dList
+}
+
+func (c *chiCluster) getNormalized() *chiClusterDataLink {
+	normalizedCluster := &chiCluster{}
+	// get normalized cluster's data...
+
+	uniqDeployments := make([]*chiDeployment, 0, len(normalizedCluster.Layout.Shards))
+	// get uniq deployments from the normalized cluster's data...
+
+	return &chiClusterDataLink{
+		cluster:     normalizedCluster,
+		deployments: uniqDeployments,
+	}
+}
+
+func (d *chiDeployment) setDefaults(parent *chiDeployment) {
+	if d.Scenario == "" {
+		d.Scenario = deploymentScenarioDefault
+	}
+	if parent != nil {
+		d.PodTemplateName = parent.PodTemplateName
+		d.Scenario = parent.Scenario
+		d.Zone.copyFrom(&parent.Zone)
+	}
+}
+
+func (z *chiDeploymentZone) copyFrom(source *chiDeploymentZone) {
+	tmp := make(map[string]string)
+	for k, v := range source.MatchLabels {
+		tmp[k] = v
+	}
+	z.MatchLabels = tmp
 }

@@ -15,15 +15,9 @@ func main() {
 	if err != nil {
 		log.Fatal("Unable to read data from the standard input -> ", err)
 	}
-
 	chi := &parser.ClickHouseInstallation{}
 	if err := yaml.Unmarshal(data, chi); err != nil {
 		log.Fatal("Unable to unmarshal manifest data -> ", err)
 	}
-
-	output, err := parser.GenerateArtifacts(chi)
-	if err != nil {
-		log.Fatal("Unable to create resulting manifest", err)
-	}
-	fmt.Println(output)
+	fmt.Println(parser.GenerateArtifacts(chi))
 }
