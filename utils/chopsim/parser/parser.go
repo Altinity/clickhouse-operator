@@ -19,6 +19,11 @@ const (
 	deploymentScenarioNodeMonopoly = "NodeMonopoly"
 )
 
+const (
+	shardInternalReplicationEnabled  = "Enabled"
+	shardInternalReplicationDisabled = "Disabled"
+)
+
 // ClickHouseInstallation describes CRD object instance
 type ClickHouseInstallation struct {
 	APIVersion string `yaml:"apiVersion"`
@@ -98,63 +103,119 @@ type chiContainerResourceParams struct {
 	CPU    string `yaml:"cpu"`
 }
 
+type chiDeploymentRefs map[string]int8
+
 type chiClusterDataLink struct {
 	cluster     *chiCluster
-	deployments []*chiDeployment
+	deployments chiDeploymentRefs
 }
 
 // GenerateArtifacts creates resulting (composite) manifest based on ClickHouseInstallation data provided
 func GenerateArtifacts(chi *ClickHouseInstallation) string {
 	chi.Spec.Deployment.setDefaults(nil)
-	clusters, deployments := chi.getNormalizedData()
+	_, deploymentRefs := chi.getNormalizedClusters()
 
 	// debug: start
-	fmt.Println(clusters, deployments)
+	for k, v := range deploymentRefs {
+		fmt.Printf("%s -> %d\n", k, v)
+	}
 	// debug: end
 
 	return ""
 }
 
-func (chi *ClickHouseInstallation) getNormalizedData() ([]*chiCluster, []*chiDeployment) {
+func (chi *ClickHouseInstallation) getNormalizedClusters() ([]*chiCluster, chiDeploymentRefs) {
 	link := make(chan *chiClusterDataLink)
 	count := len(chi.Spec.Configuration.Clusters)
 	for _, cluster := range chi.Spec.Configuration.Clusters {
 		go func(c chiCluster, ch chan<- *chiClusterDataLink) {
-			ch <- c.getNormalized()
+			ch <- chi.getNormalizedClusterLayoutData(c)
 		}(cluster, link)
 	}
 	cList := make([]*chiCluster, 0, count)
-	dList := make([]*chiDeployment, 0)
+	dRefs := make(chiDeploymentRefs)
 	for i := 0; i < count; i++ {
 		data := <-link
 		cList = append(cList, data.cluster)
-		for _, d := range data.deployments {
-			dList = append(dList, d)
-		}
+		dRefs.mergeWith(data.deployments)
 	}
-	return cList, dList
+	return cList, dRefs
 }
 
-func (c *chiCluster) getNormalized() *chiClusterDataLink {
-	normalizedCluster := &chiCluster{}
-	// get normalized cluster's data...
+func (chi *ClickHouseInstallation) getNormalizedClusterLayoutData(c chiCluster) *chiClusterDataLink {
+	normalizedCluster := &chiCluster{
+		Name:       c.Name,
+		Deployment: c.Deployment,
+	}
+	normalizedCluster.Deployment.setDefaults(&chi.Spec.Deployment)
+	deploymentRefs := make(chiDeploymentRefs)
 
-	uniqDeployments := make([]*chiDeployment, 0, len(normalizedCluster.Layout.Shards))
-	// get uniq deployments from the normalized cluster's data...
+	switch c.Layout.Type {
+	case clusterLayoutTypeStandard:
+		if c.Layout.ReplicasCount == 0 {
+			c.Layout.ReplicasCount++
+		}
+		if c.Layout.ShardsCount == 0 {
+			c.Layout.ShardsCount++
+		}
+
+		normalizedCluster.Layout.Shards = make([]chiClusterLayoutShard, c.Layout.ShardsCount)
+		for i := 0; i < c.Layout.ShardsCount; i++ {
+			normalizedCluster.Layout.Shards[i].InternalReplication = shardInternalReplicationEnabled
+			normalizedCluster.Layout.Shards[i].Replicas = make([]chiClusterLayoutShardReplica, c.Layout.ReplicasCount)
+
+			for j := 0; j < c.Layout.ReplicasCount; j++ {
+				normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.setDefaults(&normalizedCluster.Deployment)
+				deploymentRefs[normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.toString()]++
+			}
+		}
+	case clusterLayoutTypeAdvanced:
+		normalizedCluster.Layout.Shards = c.Layout.Shards
+		for i := range normalizedCluster.Layout.Shards {
+			normalizedCluster.Layout.Shards[i].Deployment.setDefaults(&normalizedCluster.Deployment)
+
+			if normalizedCluster.Layout.Shards[i].DefinitionType == shardDefinitionTypeReplicasCount {
+				normalizedCluster.Layout.Shards[i].Replicas = make([]chiClusterLayoutShardReplica,
+					normalizedCluster.Layout.Shards[i].ReplicasCount)
+
+				for j := 0; j < normalizedCluster.Layout.Shards[i].ReplicasCount; j++ {
+					normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.
+						setDefaults(&normalizedCluster.Layout.Shards[i].Deployment)
+					deploymentRefs[normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.toString()]++
+				}
+				continue
+			}
+
+			for j := range normalizedCluster.Layout.Shards[i].Replicas {
+				normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.
+					setDefaults(&normalizedCluster.Layout.Shards[i].Deployment)
+				deploymentRefs[normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.toString()]++
+			}
+		}
+	}
 
 	return &chiClusterDataLink{
 		cluster:     normalizedCluster,
-		deployments: uniqDeployments,
+		deployments: deploymentRefs,
 	}
 }
 
+func (d *chiDeployment) toString() string {
+	return fmt.Sprintf("%v", d)
+}
+
 func (d *chiDeployment) setDefaults(parent *chiDeployment) {
-	if d.Scenario == "" {
+	if parent == nil && d.Scenario == "" {
 		d.Scenario = deploymentScenarioDefault
+		return
 	}
-	if parent != nil {
+	if d.PodTemplateName == "" {
 		d.PodTemplateName = parent.PodTemplateName
+	}
+	if d.Scenario == "" {
 		d.Scenario = parent.Scenario
+	}
+	if len(d.Zone.MatchLabels) == 0 {
 		d.Zone.copyFrom(&parent.Zone)
 	}
 }
@@ -165,4 +226,15 @@ func (z *chiDeploymentZone) copyFrom(source *chiDeploymentZone) {
 		tmp[k] = v
 	}
 	z.MatchLabels = tmp
+}
+
+func (d chiDeploymentRefs) mergeWith(another chiDeploymentRefs) {
+	for ak, av := range another {
+		dv, ok := d[ak]
+		if !ok {
+			d[ak] = av
+			continue
+		}
+		d[ak] = dv + av
+	}
 }
