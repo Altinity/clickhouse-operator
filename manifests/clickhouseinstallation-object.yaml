@@ -8,6 +8,10 @@ spec:
       matchLabels:
         clickhouse.altinity.com/zone: zone1
     podTemplateName: clickhouse-installation
+#   scenario: Default
+#
+#   default value
+# 
   configuration:
     users:
       profiles/readonly/readonly: 1
@@ -37,6 +41,13 @@ spec:
         replicasCount: 2
       deployment:
         podTemplateName: clickhouse-installation
+#       scanario: Default
+#       zone:
+#         matchLabels:
+#           clickhouse.altinity.com/zone: zone1
+# 
+#       values inherited from global .spec.deployment section
+#
     - name: sharded-non-replicated
       layout:
         type: Standard
@@ -45,34 +56,89 @@ spec:
         zone:
           matchLabels:
             clickhouse.altinity.com/zone: zone2
+#       scenario: Default
+#       podTemplateName: clickhouse-installation
+#
+#       values inherited from global .spec.deployment section
+#
     - name: replicated
       layout:
         type: Standard
         replicasCount: 4 # shardsCount = 1, by default
+#     deployment:
+#       podTemplateName: clickhouse-installation
+#       scanario: Default
+#       zone:
+#         matchLabels:
+#           clickhouse.altinity.com/zone: zone1
+# 
+#       values inherited from global .spec.deployment section
+#
     - name: customized
+#     deployment:
+#       scenario: Default
+#       zone:
+#         matchLabels:
+#           clickhouse.altinity.com/zone: zone1
+#       podTemplateName: clickhouse-installation
+#
+#       values inherited from global .spec.deployment section
+#
       layout:
         type: Advanced
         shards:
         - definitionType: ReplicasCount
           replicasCount: 2
           weight: 1
+#         weight - omitted by default
           internalReplication: Disabled
+#         internalReplication: Enabled - default value
           deployment:
             podTemplateName: clickhouse-installation
             zone:
               matchLabels:
                 clickhouse.altinity.com/zone: zone3
+#           scenario: Default
+#         
+#           values inherited from .spec.configuration.clusters[3].deployment section
+#
         - definitionType: ReplicasCount
           replicasCount: 3
+#         deployment:
+#           scenario: Default
+#           zone:
+#             matchLabels:
+#               clickhouse.altinity.com/zone: zone1
+#           podTemplateName: clickhouse-installation
+#  
+#         values inherited from .spec.configuration.clusters[3].deployment section
+#  
         - definitionType: Replicas
+#         deployment:
+#           scenario: Default
+#           zone:
+#             matchLabels:
+#               clickhouse.altinity.com/zone: zone1
+#           podTemplateName: clickhouse-installation
+#
+#         values inherited from .spec.configuration.clusters[3].deployment section
+#
           replicas:
           - deployment:
               scenario: Default
+#             zone:
+#               matchLabels:
+#                 clickhouse.altinity.com/zone: zone1
+#             podTemplateName: clickhouse-installation
+#  
+#           values inherited from .spec.configuration.clusters[3].shards[2].deployment section
+#           
           - deployment:
               scenario: NodeMonopoly # 1 pod (CH server instance) per node (zone can be a set of n nodes) -> podAntiAffinity
               zone:
                 matchLabels:
                   clickhouse.altinity.com/zone: zone4
+                  clickhouse.altinity.com/kind: ssd
               podTemplateName: clickhouse-installation
   templates:
     podTemplates:
