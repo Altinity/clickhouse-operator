@@ -56,7 +56,8 @@ spec:
         - definitionType: ReplicasCount
           replicasCount: 2
           weight: 1
-          internalReplication: Disabled
+          internalReplication: Enabled
+#         internalReplication: Disabled - default value
           deployment:
             podTemplateName: clickhouse-installation
             zone:
