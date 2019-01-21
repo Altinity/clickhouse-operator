@@ -38,15 +38,15 @@ const (
 )
 
 const (
-	ssNamePattern        = "chi-%s-i%d"
-	svcNamePattern       = "%s-service"
-	hostnamePattern      = "%s-0.%[1]s-service.%s.svc.cluster.local"
-	configMapNamePattern = "chi-%s-configd"
-	vmClickHouseData     = "chi-%s-data"
+	ssNamePattern           = "chi-%s-i%d"
+	svcNamePattern          = "%s-service"
+	hostnamePattern         = "%s-0.%[1]s-service.%s.svc.cluster.local"
+	configMapNamePattern    = "chi-%s-configd"
+	vmClickHouseDataPattern = "chi-%s-data"
 )
 
 const (
-	objectsConfigMaps objectKinds = iota + 1
+	objectsConfigMaps objectKind = iota + 1
 	objectsStatefulSets
 	objectsServices
 )
@@ -266,8 +266,8 @@ type genOptions struct {
 	dRefsMax      chiDeploymentRefs
 }
 
-type objectKinds uint8
-type objectsMap map[objectKinds]interface{}
+type objectKind uint8
+type objectsMap map[objectKind]interface{}
 type configMapList []*configMap
 type statefulSetList []*statefullSet
 type serviceList []*service
@@ -387,7 +387,7 @@ func (chi *ClickHouseInstallation) createServiceObjects(o *genOptions) serviceLi
 func (chi *ClickHouseInstallation) createStatefulSetObjects(o *genOptions) statefulSetList {
 	ssList := make(statefulSetList, 0, len(o.ssNames))
 	cmName := fmt.Sprintf(configMapNamePattern, chi.Metadata.Name)
-	vmName := fmt.Sprintf(vmClickHouseData, chi.Metadata.Name)
+	vmName := fmt.Sprintf(vmClickHouseDataPattern, chi.Metadata.Name)
 	for ssName := range o.ssNames {
 		svcName := fmt.Sprintf(svcNamePattern, ssName)
 		ssList = append(ssList, &statefullSet{
