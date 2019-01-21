@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -9,6 +10,16 @@ import (
 	"github.com/altinity/clickhouse-operator/utils/chopsim/parser"
 	"gopkg.in/yaml.v2"
 )
+
+type dataYAML struct{}
+
+func (d dataYAML) Marshal(buffer *bytes.Buffer, object interface{}) {
+	b, err := yaml.Marshal(object)
+	if err != nil {
+		log.Fatal("Unable to marshal manifest data -> ", err)
+	}
+	buffer.Write(b)
+}
 
 func main() {
 	data, err := ioutil.ReadAll(os.Stdin)
@@ -19,5 +30,6 @@ func main() {
 	if err := yaml.Unmarshal(data, chi); err != nil {
 		log.Fatal("Unable to unmarshal manifest data -> ", err)
 	}
-	fmt.Println(parser.GenerateArtifacts(chi))
+	d := dataYAML{}
+	fmt.Println(parser.GenerateArtifacts(chi, d))
 }
