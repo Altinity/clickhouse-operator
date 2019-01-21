@@ -60,8 +60,7 @@ const (
 )
 
 const (
-	vmSubPathRemoteServersXML   = "remote_servers.xml"
-	vmMountPathRemoteServersXML = "/etc/clickhouse-server/config.d/" + vmSubPathRemoteServersXML
+	fullPathRemoteServersXML = "/etc/clickhouse-server/config.d/" + remoteServersXML
 )
 
 // ObjectMarshaller expresses common behaviour of the object marshaling
@@ -461,8 +460,8 @@ func (chi *ClickHouseInstallation) createStatefulSetObjects(o *genOptions) state
 									},
 									{
 										Name:      cmName,
-										MountPath: vmMountPathRemoteServersXML,
-										SubPath:   vmSubPathRemoteServersXML,
+										MountPath: fullPathRemoteServersXML,
+										SubPath:   remoteServersXML,
 									},
 								},
 							},
