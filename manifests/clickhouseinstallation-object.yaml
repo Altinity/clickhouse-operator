@@ -13,6 +13,15 @@ spec:
 #   default value
 # 
   configuration:
+    zookeeper:
+      nodes:
+        - host: zk-statefulset-0.zk-service.default.svc.cluster.local
+          port: 2181
+        - host: zk-statefulset-1.zk-service.default.svc.cluster.local
+          port: 2181
+        - host: zk-statefulset-2.zk-service.default.svc.cluster.local
+          port: 2181
+
     users:
       profiles/readonly/readonly: 1
 #      <profiles>
