@@ -1,0 +1,68 @@
+apiVersion: "clickhouse.example.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "clickhouse-installation-test"
+spec:
+  version: "3.14.15"
+  deployment:
+    zone:
+      matchLabels:
+        clickhouse.altinity.com/zone: zone1
+    containerTemplateName: clickhouse-server-v2.2.2
+  clusters:
+  - name: sharded-replicated
+    layout: Standard
+    deployment:
+      containerTemplateName: clickhouse-server-v3.3.3
+    rules:
+      shardsCount: 3
+      replicasCount: 2
+  - name: sharded-non-replicated
+    layout: Standard
+    deployment:
+      zone:
+        matchLabels:
+          clickhouse.altinity.com/zone: zone2
+    rules:
+      shardsCount: 3 # replicasCount = 1, by default
+  - name: replicated
+    layout: Standard
+    rules:
+      replicasCount: 4 # shardsCount = 1, by default
+  - name: customized
+    layout: Advanced
+    shards:
+    - replicasCount: 2
+      weight: 1
+      internalReplication: Disabled
+      deployment:
+        zone:
+          matchLabels:
+            clickhouse.altinity.com/zone: zone3
+        containerTemplateName: clickhouse-server-v3.3.3
+    - replicasCount: 3
+    - replicasCount: Inline # replicasCount equals number of "replicas" elements
+      replicas:
+      - deployment:
+          scenario: Default
+      - deployment:
+          scenario: NodeMonopoly # 1 pod (CH server instance) per node (zone can be a set of n nodes) -> podAntiAffinity
+          zone:
+            matchLabels:
+              clickhouse.altinity.com/zone: zone4
+          containerTemplateName: clickhouse-server-v2.2.2
+  templates:
+    containerTemplates:
+    - name: clickhouse-server-v1.2.3
+      image: altinity/clickhouse:1.2.3
+      resources:
+        requests:
+          memory: "64Mi"
+          cpu: "250m"
+        limits:
+          memory: "128Mi"
+          cpu: "500m"
+    - name: clickhouse-server-v2.2.2
+      image: altinity/clickhouse:2.2.2
+    - name: clickhouse-server-v3.3.3
+      image: altinity/clickhouse:3.3.3
