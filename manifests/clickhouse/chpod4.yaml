@@ -28,16 +28,31 @@ spec:
       tcpSocket:
         port: 8123
 #        port: 9000
+      # Number of seconds after the container has started before liveness or readiness probes are initiated
       initialDelaySeconds: 10
+      # How often (in seconds) to perform the probe. Default to 10 seconds. Minimum value is 1
       periodSeconds: 10
+      # Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1.
+      timeoutSeconds: 10
+      # Minimum consecutive successes for the probe to be considered successful after having failed. Defaults to 1. Must be 1 for liveness. Minimum value is 1
+      successThreshold: 1
+      # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+      failureThreshold: 3
     readinessProbe:
       exec:
+        # Try 5 times to access both native and http API entry points.
+        # In case of failure sleep for i*10 sec and retry
+        # This command can take long to to run, so adjust 'timeoutSeconds' accordingly
         command:
         - /bin/bash
         - -c
-        - clickhouse-client -q 'select version()' && [ $(wget localhost:8123 -q -O /dev/stdout) == 'Ok.' ]
+        - for i in 1 2 3 4 5; do echo "Attempt $i" && echo -n "version=" && clickhouse-client -q 'select version()' && HTTP=$(wget localhost:8123 -q -O /dev/stdout) && echo "HTTP=$HTTP" && [ $HTTP == 'Ok.' ] && exit 0; echo "Attempt $i FAILED with above output"; sleep $(($i * 10)); done; exit 1
       initialDelaySeconds: 20
-      periodSeconds: 20
+      periodSeconds: 60
+      # Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1.
+      timeoutSeconds: 200
+      # When a Pod starts and the probe fails, Kubernetes will try failureThreshold times before giving up
+      failureThreshold: 3
     volumeMounts:
     - name: etc-clickhouse-server-config-d-common-volume
       mountPath: /etc/clickhouse-server/config.d/remote_servers.xml
