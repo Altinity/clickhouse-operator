@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ch-2
+  labels:
+    app: ch
+spec:
+  containers:
+  - name: ch
+    image: yandex/clickhouse-server
+

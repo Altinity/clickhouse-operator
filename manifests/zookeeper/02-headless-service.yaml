@@ -1,0 +1,16 @@
+# Setup Headless Service for StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper-headless-service
+  labels:
+    app: zookeeper
+spec:
+  ports:
+  - port: 2888
+    name: server
+  - port: 3888
+    name: leader-election
+  clusterIP: None
+  selector:
+    app: zookeeper

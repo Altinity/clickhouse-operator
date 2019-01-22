@@ -1,0 +1,15 @@
+# Setup Service to provide access to Zookeeper for clients
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse-service-client
+  labels:
+    app: clickhouse
+spec:
+  ports:
+  - port: 9000
+    name: client
+  - port: 8123
+    name: http
+  selector:
+    dns: chi1
