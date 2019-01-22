@@ -24,6 +24,20 @@ spec:
   containers:
   - name: chpod4
     image: yandex/clickhouse-server
+    livenessProbe:
+      tcpSocket:
+        port: 8123
+#        port: 9000
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    readinessProbe:
+      exec:
+        command:
+        - /bin/bash
+        - -c
+        - clickhouse-client -q 'select version()' && [ $(wget localhost:8123 -q -O /dev/stdout) == 'Ok.' ]
+      initialDelaySeconds: 20
+      periodSeconds: 20
     volumeMounts:
     - name: etc-clickhouse-server-config-d-common-volume
       mountPath: /etc/clickhouse-server/config.d/remote_servers.xml
