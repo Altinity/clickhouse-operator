@@ -46,7 +46,7 @@ spec:
         command:
         - /bin/bash
         - -c
-        - for i in 1 2 3 4 5; do echo "Attempt $i" && echo -n "version=" && clickhouse-client -q 'select version()' && HTTP=$(wget localhost:8123 -q -O /dev/stdout) && echo "HTTP=$HTTP" && [ $HTTP == 'Ok.' ] && exit 0; echo "Attempt $i FAILED with above output"; sleep $(($i * 10)); done; exit 1
+        - for i in 1 2 3 4 5; do echo "Attempt $i" && echo -n "version=" && clickhouse-client -q 'select version()' && HTTP=$(wget localhost:8123 -q --tries=1 --timeout=5 -O /dev/stdout) && echo "HTTP=$HTTP" && [ $HTTP == 'Ok.' ] && exit 0; echo "Attempt $i FAILED with above output"; sleep $(($i * 10)); done; exit 1
       initialDelaySeconds: 20
       periodSeconds: 60
       # Number of seconds after which the probe times out. Defaults to 1 second. Minimum value is 1.
