@@ -1,1 +1,0 @@
-# ClickHouse Operator Simulator - ClickHouseInstallation CRD artifacts generator
