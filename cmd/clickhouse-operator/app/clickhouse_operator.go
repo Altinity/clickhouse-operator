@@ -97,13 +97,14 @@ func Run() {
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().Pods(),
 		kubeInformerFactory.Core().V1().Services())
-	kubeInformerFactory.Start(stop)
-	chiInformerFactory.Start(stop)
+	kubeInformerFactory.Start(ctx.Done())
+	chiInformerFactory.Start(ctx.Done())
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		chiController.Run(ctx, 10)
 	}()
-	select {}
+	<-ctx.Done()
+	wg.Wait()
 }
