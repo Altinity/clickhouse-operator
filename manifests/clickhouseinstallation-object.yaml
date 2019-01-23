@@ -23,20 +23,20 @@ spec:
           port: 2181
 
     users:
-      profiles/readonly/readonly: 1
+      profiles/readonly/readonly: "1"
 #      <profiles>
 #        <readonly>
 #          <readonly>1</readonly>
 #        </readonly>
 #      </profiles>
     settings:
-      profiles/default/max_memory_usage: 1000000000
+      profiles/default/max_memory_usage: "1000000000"
 #      <profiles>
 #        <default>
 #          <max_memory_usage>1000000000</max_memory_usage>
 #        </default>
 #      </profiles>
-      compression/case/method: zstd
+      compression/case/method: "zstd"
 #      <compression>
 #       <case>
 #         <method>zstd</method>
