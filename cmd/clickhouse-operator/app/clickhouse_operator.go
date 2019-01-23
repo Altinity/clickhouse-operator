@@ -94,7 +94,6 @@ func Run() {
 		chiClient, kubeClient,
 		chiInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
 		kubeInformerFactory.Apps().V1().StatefulSets(),
-		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().Pods(),
 		kubeInformerFactory.Core().V1().Services())
 	kubeInformerFactory.Start(ctx.Done())

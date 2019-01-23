@@ -55,7 +55,6 @@ func CreateController(
 	kubeClient kubernetes.Interface,
 	chiInformer informers.ClickHouseInstallationInformer,
 	ssInformer appsinformers.StatefulSetInformer,
-	statefulSetInformer appsinformers.StatefulSetInformer,
 	podInformer coreinformers.PodInformer,
 	serviceInformer coreinformers.ServiceInformer) *Controller {
 	eventBroadcaster := record.NewBroadcaster()
