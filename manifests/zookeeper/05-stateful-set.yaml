@@ -93,13 +93,15 @@ spec:
       securityContext:
         runAsUser: 1000
         fsGroup: 1000
-# Mount either emptyDir via volume or PV of 'storageclass-zookeeper' storageClass
-# Uncomment what is required
+## Mount either emptyDir via volume or PV of 'storageclass-zookeeper' storageClass
+## Uncomment what is required
       volumes:
       - name: datadir-volume
         emptyDir:
-          medium: "" #accepted avlues:  empty str (means node's default medium) or Memory
+          medium: "" #accepted values:  empty str (means node's default medium) or Memory
           sizeLimit: 1Gi
+## Mount either emptyDir via volume or PV of 'storageclass-zookeeper' storageClass
+## Uncomment what is required
 #  volumeClaimTemplates:
 #  - metadata:
 #      name: datadir-volume
