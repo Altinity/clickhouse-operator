@@ -12,7 +12,13 @@ import (
 type ClickHouseInstallation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              ChiSpec `json:"spec"`
+	Spec              ChiSpec   `json:"spec"`
+	Status            ChiStatus `json:"status"`
+}
+
+// ChiStatus defines status section of ClickHouseInstallation resource
+type ChiStatus struct {
+	ObjectPrefixes []string `json:"objectPrefixes"`
 }
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
@@ -27,7 +33,7 @@ type ChiDeployment struct {
 	PodTemplateName string            `json:"podTemplateName,omitempty"`
 	Zone            ChiDeploymentZone `json:"zone,omitempty"`
 	Scenario        string            `json:"scenario,omitempty"`
-	key             string
+	Key             string            // used internally by pkg/parser
 }
 
 // ChiDeploymentZone defines zone section of *.deployment
@@ -51,7 +57,7 @@ type ChiConfigurationZookeeper struct {
 // ChiConfigurationZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
 type ChiConfigurationZookeeperNode struct {
 	Host string `json:"host"`
-	Port string `json:"port,omitempty"`
+	Port int32  `json:"port,omitempty"`
 }
 
 // ChiCluster defines item of a clusters section of .configuration
@@ -123,3 +129,8 @@ type ClickHouseInstallationList struct {
 
 	Items []ClickHouseInstallation `json:"items"`
 }
+
+const (
+	// ClickHouseInstallationCRDResourceKind defines kind of CRD resource
+	ClickHouseInstallationCRDResourceKind = "ClickHouseInstallation"
+)
