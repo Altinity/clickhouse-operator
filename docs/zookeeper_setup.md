@@ -57,12 +57,12 @@ In case we'd prefer to go with [Persistent Volume](https://kubernetes.io/docs/co
 
 Shortly, [Storage Class](https://kubernetes.io/docs/concepts/storage/storage-classes/) is used to bind together [Persistent Volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/),
 which are created either by k8s admin manually or automatically by [Provisioner](https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/). In any case, Persistent Volumes are provided externally to an application to be deployed into k8s. So, this application has to know **Storage Class Name** to ask for from the k8s in application's claim for new persistent volume - [Persistent Volume Claim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims).
-This **Storage Class Name** should be asked from k8s admin and written as application's **Persistent Volume Claim** `.spec.volumeClaimTemplates.storgaeClassName` parameter in [05-stateful-set.yaml](../manifests/zookeeper/05-stateful-set.yaml). 
+This **Storage Class Name** should be asked from k8s admin and written as application's **Persistent Volume Claim** `.spec.volumeClaimTemplates.storageClassName` parameter in [05-stateful-set.yaml](../manifests/zookeeper/05-stateful-set.yaml). 
 
 ## Stateful Set
 Edit [05-stateful-set.yaml](../manifests/zookeeper/05-stateful-set.yaml) according to your Storage Preferences.
 
-In case we'd go with [Volume of type emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir), ensure `.spec.template.spec.containers.volumes` is in place and looke like the following:
+In case we'd go with [Volume of type emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir), ensure `.spec.template.spec.containers.volumes` is in place and look like the following:
 ```yaml
       volumes:
       - name: datadir-volume
@@ -83,9 +83,10 @@ In case we'd go with **Persistent Volume** storage, ensure `.spec.template.spec.
       resources:
         requests:
           storage: 1Gi
+## storageClassName has to be coordinated with k8s admin and has to be created as a `kind: StorageClass` resource
       storageClassName: storageclass-zookeeper
 ```
-and ensure **storgaeClassName** (`storageclass-zookeeper` in this example) is specified correctly, as described in [Storgae Class](#storage-class) section
+and ensure **storageClassName** (`storageclass-zookeeper` in this example) is specified correctly, as described in [Storgae Class](#storage-class) section
 
 As `.yaml` file is ready, just apply it with `kubectl`
 ```bash
@@ -95,6 +96,8 @@ Should have as a result
 ```text
 statefulset.apps/zookeeper-node created
 ```
+
+Now we can explore Zookeeper cluster deployed in k8s:
 
 ```bash
 kubectl get pod
