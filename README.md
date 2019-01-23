@@ -1,2 +1,3 @@
-# clickhouse-operator
-Create/Operate/Scale self-healing ClickHouse clusters in Kubernetes
+# Kubernetes Operator
+
+The ClickHouse Opearator creates, configures and manages ClickHouse clusters running on Kubernetes.
