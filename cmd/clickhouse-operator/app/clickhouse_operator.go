@@ -25,7 +25,7 @@ import (
 )
 
 // Version defines current build version
-const Version = "0.1.0"
+const Version = "0.1.0beta"
 
 var (
 	kubeconfig string
