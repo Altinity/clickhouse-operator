@@ -51,7 +51,7 @@ This part is not that straightforward and may require communication with k8s ins
 
 First of all, we need to deside, whether Zookeeper would use [Persistent Volume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) as a storage or just stick to more simple [Volume](https://kubernetes.io/docs/concepts/storage/volumes) (In doc [emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir) type is used)
 
-In case we'd prefer to stick with simpler solution and go with [Volume of type emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir), we need to adjust StatefulSet config accordingly and skip the rest of this unit.
+In case we'd prefer to stick with simpler solution and go with [Volume of type emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir), we are done here and need to adjust [StatefulSet config](../manifests/zookeeper/05-stateful-set.yaml) as described in next [Stateful Set unit](#stateful-set). Just move to [it](#stateful-set).
 
 In case we'd prefer to go with [Persistent Volume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) storage, some additional steps have to be done.
 
