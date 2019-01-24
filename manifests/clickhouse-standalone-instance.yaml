@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse-service-standalone
+  namespace: default
+spec:
+  ports:
+  - name: rpc
+    port: 9000
+  - name: interserver
+    port: 9009
+  - name: rest
+    port: 8123
+  clusterIP: None
+  selector:
+    app: clickhouse-standalone-instance
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-configd
+  namespace: default
+data:
+  remote_servers.xml: |-
+    <yandex>
+        <remote_servers>
+          <clicks_cluster>
+            <shard>
+              <internal_replication>true</internal_replication>
+              <replica>
+                  <default_database>default</default_database>
+                  <host>clickhouse-standalone-instance-0.clickhouse-service-standalone.default.svc.cluster.local</host>
+                  <port>9000</port>
+              </replica>
+            </shard>
+          </clicks_cluster>
+        </remote_servers>
+    </yandex>
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: clickhouse-standalone-instance
+  namespace: default
+spec:
+  replicas: 1
+  serviceName: "clickhouse-service-standalone"
+  selector:
+    matchLabels:
+      app: clickhouse-standalone-instance
+  template:
+    metadata:
+      labels:
+        app: clickhouse-standalone-instance
+    spec:
+      volumes:
+      - name: clickhouse-configd
+        configMap:
+          name: clickhouse-configd
+      containers:
+      - name: clickhouse-standalone-instance
+        image: yandex/clickhouse-server:18.16.1
+        ports:
+        - name: rpc
+          containerPort: 9000
+        - name: interserver
+          containerPort: 9009
+        - name: rest
+          containerPort: 8123
+        volumeMounts:
+        - name: clickhouse-data
+          mountPath: /clickhouse
+        - name: clickhouse-configd
+          mountPath: /etc/clickhouse-server/config.d/remote_servers.xml
+          subPath: remote_servers.xml
+  volumeClaimTemplates:
+  - metadata:
+      name: clickhouse-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Mi
