@@ -419,7 +419,7 @@ func deploymentToString(d *chiv1.ChiDeployment) string {
 }
 
 func setDeploymentDefaults(d, parent *chiv1.ChiDeployment) {
-	if parent == nil && d.Scenario == "" {
+	if parent == nil || d.Scenario == "" {
 		d.Scenario = deploymentScenarioDefault
 		return
 	}
