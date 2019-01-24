@@ -204,9 +204,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 							},
 							Resources: corev1.ResourceRequirements{
 								Requests: corev1.ResourceList{
-									"Storage": resource.Quantity{
-										Format: "1Gi",
-									},
+									corev1.ResourceStorage: resource.MustParse("100Mi"),
 								},
 							},
 						},
