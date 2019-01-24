@@ -44,7 +44,7 @@ const (
 )
 
 const (
-	ssNamePattern           = "chi-%s-i%d"
+	ssNamePattern           = "chi-%s-%s-i%d"
 	svcNamePattern          = "%s-service"
 	hostnamePattern         = "%s-0.%[1]s-service.%s.svc.cluster.local"
 	configMapNamePattern    = "chi-%s-configd"
@@ -304,7 +304,7 @@ func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, o *genOptions, c 
 					}
 				}
 				dRefIndex[k] = idx
-				prefix := fmt.Sprintf(ssNamePattern, dID[k], idx)
+				prefix := fmt.Sprintf(ssNamePattern, chi.Name, dID[k], idx)
 				o.ssNames[prefix] = struct{}{}
 				o.ssDeployments[k] = &r.Deployment
 				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", instanceHostname(chi, prefix))
