@@ -1,0 +1,12 @@
+# Setup Headless Service for StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: chpod-hs
+  labels:
+    app: chpod
+spec:
+  clusterIP: None
+  selector:
+    dns: chi1
+
