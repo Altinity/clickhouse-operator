@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ch-0
+  namespace: default
+spec:
+  ports:
+  - name: rpc
+    port: 9000
+  - name: interserver
+    port: 9009
+  - name: rest
+    port: 8123
+  selector:
+    app: ch-0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ch-0
+  labels:
+    app: ch-0
+spec:
+  containers:
+  - name: ch
+    image: yandex/clickhouse-server
+

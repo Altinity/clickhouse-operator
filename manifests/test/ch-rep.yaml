@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ch
+  namespace: default
+spec:
+  ports:
+  - name: rpc
+    port: 9000
+  - name: interserver
+    port: 9009
+  - name: rest
+    port: 8123
+  clusterIP: None
+  selector:
+    app: ch-rep-set
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ch-rep-set
+  namespace: default
+spec:
+  replicas: 1
+  serviceName: ch
+  selector:
+    matchLabels:
+      app: ch-rep-set
+  template:
+    metadata:
+      labels:
+        app: ch-rep-set
+    spec:
+      containers:
+      - name: ch-rep-set
+        image: yandex/clickhouse-server:18.16.1
+        ports:
+        - name: rpc
+          containerPort: 9000
+        - name: interserver
+          containerPort: 9009
+        - name: rest
+          containerPort: 8123
