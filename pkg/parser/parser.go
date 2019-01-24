@@ -78,6 +78,15 @@ type ObjectKind uint8
 // ObjectsMap defines map of generated k8s objects
 type ObjectsMap map[ObjectKind]interface{}
 
+// ConfigMapList defines list of a ConfigMap objects
+type ConfigMapList []*corev1.ConfigMap
+
+// StatefulSetList defines list of a StatefulSet objects
+type StatefulSetList []*apps.StatefulSet
+
+// ServiceList defines a list of Service objects
+type ServiceList []*corev1.Service
+
 type genOptions struct {
 	ssNames       map[string]struct{}
 	ssDeployments map[string]*chiv1.ChiDeployment
@@ -90,9 +99,6 @@ type chiClusterDataLink struct {
 }
 
 type chiDeploymentRefs map[string]int
-type configMapList []*corev1.ConfigMap
-type statefulSetList []*apps.StatefulSet
-type serviceList []*corev1.Service
 
 // CreateObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
 func CreateObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
@@ -121,8 +127,8 @@ func CreateObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
 	}, prefixes
 }
 
-func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]string) configMapList {
-	cmList := make(configMapList, 1)
+func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]string) ConfigMapList {
+	cmList := make(ConfigMapList, 1)
 	cmList[0] = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf(configMapNamePattern, chi.Name),
@@ -133,8 +139,8 @@ func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]s
 	return cmList
 }
 
-func createServiceObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) serviceList {
-	svcList := make(serviceList, 0, len(o.ssNames))
+func createServiceObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) ServiceList {
+	svcList := make(ServiceList, 0, len(o.ssNames))
 	for ssName := range o.ssNames {
 		svcName := fmt.Sprintf(svcNamePattern, ssName)
 		svcList = append(svcList, &corev1.Service{
@@ -167,9 +173,9 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) serv
 	return svcList
 }
 
-func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) statefulSetList {
+func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) StatefulSetList {
 	rNum := int32(1)
-	ssList := make(statefulSetList, 0, len(o.ssNames))
+	ssList := make(StatefulSetList, 0, len(o.ssNames))
 	cmName := fmt.Sprintf(configMapNamePattern, chi.Name)
 	vmName := fmt.Sprintf(vmClickHouseDataPattern, chi.Name)
 	for ssName := range o.ssNames {
