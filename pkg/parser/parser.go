@@ -425,18 +425,18 @@ func deploymentToString(d *chiv1.ChiDeployment) string {
 }
 
 func setDeploymentDefaults(d, parent *chiv1.ChiDeployment) {
-	if parent == nil || d.Scenario == "" {
-		d.Scenario = deploymentScenarioDefault
-		return
-	}
-	if d.PodTemplateName == "" {
-		d.PodTemplateName = parent.PodTemplateName
-	}
-	if d.Scenario == "" {
-		d.Scenario = parent.Scenario
-	}
-	if len(d.Zone.MatchLabels) == 0 {
-		zoneCopyFrom(&d.Zone, &parent.Zone)
+	if parent != nil {
+		if d.PodTemplateName == "" {
+			(*d).PodTemplateName = parent.PodTemplateName
+		}
+		if d.Scenario == "" {
+			(*d).Scenario = parent.Scenario
+		}
+		if len(d.Zone.MatchLabels) == 0 {
+			zoneCopyFrom(&d.Zone, &parent.Zone)
+		}
+	} else if d.Scenario == "" {
+		(*d).Scenario = deploymentScenarioDefault
 	}
 }
 
@@ -445,7 +445,7 @@ func zoneCopyFrom(z, source *chiv1.ChiDeploymentZone) {
 	for k, v := range source.MatchLabels {
 		tmp[k] = v
 	}
-	z.MatchLabels = tmp
+	(*z).MatchLabels = tmp
 }
 
 func (d chiDeploymentRefs) mergeWith(another chiDeploymentRefs) {
