@@ -40,8 +40,8 @@ type Controller struct {
 	chiListerSynced         cache.InformerSynced
 	statefulSetLister       appslisters.StatefulSetLister
 	statefulSetListerSynced cache.InformerSynced
-	podLister               corelisters.PodLister
-	podListerSynced         cache.InformerSynced
+	configMapLister         corelisters.ConfigMapLister
+	configMapListerSynced   cache.InformerSynced
 	serviceLister           corelisters.ServiceLister
 	serviceListerSynced     cache.InformerSynced
 	queue                   workqueue.RateLimitingInterface
@@ -59,7 +59,7 @@ const (
 func CreateController(
 	chiClient clientset.Interface, kubeClient kubernetes.Interface,
 	chiInformer informers.ClickHouseInstallationInformer, ssInformer appsinformers.StatefulSetInformer,
-	podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer) *Controller {
+	cmInformer coreinformers.ConfigMapInformer, serviceInformer coreinformers.ServiceInformer) *Controller {
 	clientscheme.AddToScheme(scheme.Scheme)
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -72,8 +72,8 @@ func CreateController(
 		chiListerSynced:         chiInformer.Informer().HasSynced,
 		statefulSetLister:       ssInformer.Lister(),
 		statefulSetListerSynced: ssInformer.Informer().HasSynced,
-		podLister:               podInformer.Lister(),
-		podListerSynced:         podInformer.Informer().HasSynced,
+		configMapLister:         cmInformer.Lister(),
+		configMapListerSynced:   cmInformer.Informer().HasSynced,
 		serviceLister:           serviceInformer.Lister(),
 		serviceListerSynced:     serviceInformer.Informer().HasSynced,
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
@@ -108,7 +108,7 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 	if !waitForCacheSync("ClickHouseInstallation", ctx.Done(),
 		c.chiListerSynced,
 		c.statefulSetListerSynced,
-		c.podListerSynced,
+		c.configMapListerSynced,
 		c.serviceListerSynced) {
 		return
 	}
@@ -166,13 +166,85 @@ func (c *Controller) syncHandler(key string) error {
 		}
 		return err
 	}
-	if len(chi.Status.ObjectPrefixes) == 0 {
-		_, prefixes := parser.CreateObjects(chi)
-		err = c.updateChiStatus(chi, prefixes)
-		if err != nil {
+	if chi.Status.ObjectPrefixes == nil || len(chi.Status.ObjectPrefixes) == 0 {
+		chiObjects, prefixes := parser.CreateObjects(chi)
+		if err := c.createControlledResources(chi, chiObjects); err != nil {
+			glog.V(2).Infof("ClickHouseInstallation (%q) unable to create controlled resources: %q", chi.Name, err)
 			return err
 		}
-		glog.V(2).Infof("ClickHouseInstallation (%q) prefixes of controlled resources : %v", chi.Name, prefixes)
+		if err := c.updateChiStatus(chi, prefixes); err != nil {
+			glog.V(2).Infof("ClickHouseInstallation (%q) unable to update status of CHI resource: %q", chi.Name, err)
+			return err
+		}
+		glog.V(2).Infof("ClickHouseInstallation (%q) controlled resources are synced (created/updated): %v", chi.Name, prefixes)
+	}
+	return nil
+}
+
+func (c *Controller) createControlledResources(chi *chiv1.ClickHouseInstallation, oMap parser.ObjectsMap) error {
+	for _, objList := range oMap {
+		switch v := objList.(type) {
+		case parser.ConfigMapList:
+			for _, obj := range v {
+				if err := c.createConfigMap(chi, obj); err != nil {
+					return err
+				}
+			}
+		case parser.ServiceList:
+			for _, obj := range v {
+				if err := c.createService(chi, obj); err != nil {
+					return err
+				}
+			}
+		case parser.StatefulSetList:
+			for _, obj := range v {
+				if err := c.createStatefulSet(chi, obj); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (c *Controller) createConfigMap(chi *chiv1.ClickHouseInstallation, newConfigMap *corev1.ConfigMap) error {
+	res, err := c.configMapLister.ConfigMaps(chi.Namespace).Get(newConfigMap.Name)
+	if res != nil {
+		return nil
+	}
+	if apierrors.IsNotFound(err) {
+		_, err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Create(newConfigMap)
+	}
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Controller) createService(chi *chiv1.ClickHouseInstallation, newService *corev1.Service) error {
+	res, err := c.serviceLister.Services(chi.Namespace).Get(newService.Name)
+	if res != nil {
+		return nil
+	}
+	if apierrors.IsNotFound(err) {
+		_, err = c.kubeClient.CoreV1().Services(chi.Namespace).Create(newService)
+	}
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Controller) createStatefulSet(chi *chiv1.ClickHouseInstallation, newStatefulSet *apps.StatefulSet) error {
+	res, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
+	if res != nil {
+		return nil
+	}
+	if apierrors.IsNotFound(err) {
+		_, err = c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Create(newStatefulSet)
+	}
+	if err != nil {
+		return err
 	}
 	return nil
 }
