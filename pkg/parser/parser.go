@@ -52,11 +52,11 @@ const (
 )
 
 const (
-	// ObjectsConfigMaps defines a list of ConfigMap objects
+	// ObjectsConfigMaps defines a category of the ConfigMap objects list
 	ObjectsConfigMaps ObjectKind = iota + 1
-	// ObjectsStatefulSets defines a list of StatefulSet objects
+	// ObjectsStatefulSets defines a category of the StatefulSet objects list
 	ObjectsStatefulSets
-	// ObjectsServices defines a list of Service objects
+	// ObjectsServices defines a category of the Service objects list
 	ObjectsServices
 )
 
@@ -72,19 +72,19 @@ const (
 	fullPathRemoteServersXML = "/etc/clickhouse-server/config.d/" + remoteServersXML
 )
 
-// ObjectKind defines k8s object list kind
+// ObjectKind defines k8s objects list kind
 type ObjectKind uint8
 
-// ObjectsMap defines map of generated k8s objects
+// ObjectsMap defines map of a generated k8s objects
 type ObjectsMap map[ObjectKind]interface{}
 
-// ConfigMapList defines list of a ConfigMap objects
+// ConfigMapList defines a list of the ConfigMap objects
 type ConfigMapList []*corev1.ConfigMap
 
-// StatefulSetList defines list of a StatefulSet objects
+// StatefulSetList defines a list of the StatefulSet objects
 type StatefulSetList []*apps.StatefulSet
 
-// ServiceList defines a list of Service objects
+// ServiceList defines a list of the Service objects
 type ServiceList []*corev1.Service
 
 type genOptions struct {
@@ -271,6 +271,19 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 
 func genZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 	b := &bytes.Buffer{}
+	c := len(chi.Spec.Configuration.Zookeeper.Nodes)
+	if c == 0 {
+		return ""
+	}
+	fmt.Fprintf(b, "<yandex>\n%4s<zookeeper>\n", " ")
+	for i := 0; i < c; i++ {
+		fmt.Fprintf(b, "%8s<node>\n%12[1]s<host>%s</host>\n", " ", chi.Spec.Configuration.Zookeeper.Nodes[i].Host)
+		if chi.Spec.Configuration.Zookeeper.Nodes[i].Port > 0 {
+			fmt.Fprintf(b, "%12s<port>%d</port>\n", " ", chi.Spec.Configuration.Zookeeper.Nodes[i].Port)
+		}
+		fmt.Fprintf(b, "%8s</node>\n", " ")
+	}
+	fmt.Fprintf(b, "%4s</zookeeper>\n</yandex>\n", " ")
 	return b.String()
 }
 
