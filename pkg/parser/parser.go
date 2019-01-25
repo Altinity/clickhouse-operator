@@ -72,6 +72,10 @@ const (
 	fullPathRemoteServersXML = "/etc/clickhouse-server/config.d/" + remoteServersXML
 )
 
+const (
+	chiLabel = "clickhouse.altinity.com/chi"
+)
+
 // ObjectKind defines k8s objects list kind
 type ObjectKind uint8
 
@@ -199,6 +203,11 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 							Name: vmName,
 						},
 						Spec: corev1.PersistentVolumeClaimSpec{
+							Selector: &metav1.LabelSelector{
+								MatchLabels: map[string]string{
+									chiLabel: chi.Name,
+								},
+							},
 							AccessModes: []corev1.PersistentVolumeAccessMode{
 								"ReadWriteOnce",
 							},
