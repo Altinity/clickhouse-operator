@@ -8,6 +8,7 @@ spec:
       matchLabels:
         clickhouse.altinity.com/zone: zone1
     podTemplateName: clickhouse-installation
+    volumeClaimTemplate: default
 #   scenario: Default
 #
 #   default value
@@ -150,8 +151,20 @@ spec:
                   clickhouse.altinity.com/kind: ssd
               podTemplateName: clickhouse-installation
   templates:
+    volumeClaimTemplates:
+    - name: default
+      template:
+        metadata:
+          name: clickhouse-data
+        spec:
+          resources:
+            requests:
+              storage: 100Mi
     podTemplates:
     - name: clickhouse-installation
+      volumes:
+        - name: clickhouse-data
+          mountPath: /clickhouse
       containers:
       - name: clickhouse
         image: yandex/clickhouse-server:18.14.19-stable
