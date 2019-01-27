@@ -3,15 +3,16 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "clickhouse-installation-test"
 spec:
-  deployment:
-    zone:
-      matchLabels:
-        clickhouse.altinity.com/zone: zone1
-    podTemplateName: clickhouse-installation
-    volumeClaimTemplate: default
-#   scenario: Default
+  defaults:
+    deployment:
+      zone:
+        matchLabels:
+          clickhouse.altinity.com/zone: zone1
+      podTemplateName: clickhouse-installation
+      volumeClaimTemplate: default
+#     scenario: Default
 #
-#   default value
+#     default value
 # 
   configuration:
     zookeeper:
@@ -134,7 +135,8 @@ spec:
 #         values inherited from .spec.configuration.clusters[3].deployment section
 #
           replicas:
-          - deployment:
+          - port: 9000
+            deployment:
               scenario: Default
 #             zone:
 #               matchLabels:
@@ -164,7 +166,7 @@ spec:
     - name: clickhouse-installation
       volumes:
         - name: clickhouse-data
-          mountPath: /clickhouse
+          mountPath: /var/lib/clickhouse
       containers:
       - name: clickhouse
         image: yandex/clickhouse-server:18.14.19-stable

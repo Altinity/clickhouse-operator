@@ -1,6 +1,7 @@
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -23,17 +24,23 @@ type ChiStatus struct {
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
-	Deployment    ChiDeployment    `json:"deployment,omitempty"`
+	Defaults      ChiDefaults      `json:"defaults,omitempty"`
 	Configuration ChiConfiguration `json:"configuration"`
 	Templates     ChiTemplates     `json:"templates,omitempty"`
 }
 
+// ChiDefaults defines defaults section of .spec
+type ChiDefaults struct {
+	Deployment ChiDeployment `json:"deployment,omitempty"`
+}
+
 // ChiDeployment defines deployment section of .spec
 type ChiDeployment struct {
-	PodTemplateName string            `json:"podTemplateName,omitempty"`
-	Zone            ChiDeploymentZone `json:"zone,omitempty"`
-	Scenario        string            `json:"scenario,omitempty"`
-	Key             string            // used internally by pkg/parser
+	PodTemplateName     string            `json:"podTemplateName,omitempty"`
+	VolumeClaimTemplate string            `json:"volumeClaimTemplate,omitempty"`
+	Zone                ChiDeploymentZone `json:"zone,omitempty"`
+	Scenario            string            `json:"scenario,omitempty"`
+	Key                 string            // used internally by pkg/parser
 }
 
 // ChiDeploymentZone defines zone section of *.deployment
@@ -87,12 +94,20 @@ type ChiClusterLayoutShard struct {
 
 // ChiClusterLayoutShardReplica defines item of a replicas section of .spec.configuration.clusters[n].shards[m]
 type ChiClusterLayoutShardReplica struct {
+	Port       int32         `json:"port,omitempty"`
 	Deployment ChiDeployment `json:"deployment,omitempty"`
 }
 
 // ChiTemplates defines templates section of .spec
 type ChiTemplates struct {
-	PodTemplates []ChiPodTemplate `json:"podTemplates,omitempty"`
+	PodTemplates         []ChiPodTemplate         `json:"podTemplates,omitempty"`
+	VolumeClaimTemplates []ChiVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+}
+
+// ChiVolumeClaimTemplate defines item of .spec.templates.volumeClaimTemplates
+type ChiVolumeClaimTemplate struct {
+	Name     string                       `json:"name"`
+	Template corev1.PersistentVolumeClaim `json:"template"`
 }
 
 // ChiPodTemplate defines item of a podTemplates section of .spec.templates
