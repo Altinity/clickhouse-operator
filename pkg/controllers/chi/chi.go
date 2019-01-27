@@ -167,8 +167,8 @@ func (c *Controller) syncHandler(key string) error {
 		return err
 	}
 	if chi.Status.ObjectPrefixes == nil || len(chi.Status.ObjectPrefixes) == 0 {
-		chiObjects, prefixes := parser.CreateObjects(chi)
-		if err := c.createControlledResources(chi, chiObjects); err != nil {
+		prefixes, err := c.createControlledResources(chi)
+		if err != nil {
 			glog.V(2).Infof("ClickHouseInstallation (%q) unable to create controlled resources: %q", chi.Name, err)
 			return err
 		}
@@ -181,30 +181,32 @@ func (c *Controller) syncHandler(key string) error {
 	return nil
 }
 
-func (c *Controller) createControlledResources(chi *chiv1.ClickHouseInstallation, oMap parser.ObjectsMap) error {
-	for _, objList := range oMap {
+func (c *Controller) createControlledResources(chi *chiv1.ClickHouseInstallation) ([]string, error) {
+	chiCopy := chi.DeepCopy()
+	chiObjects, prefixes := parser.CreateObjects(chiCopy)
+	for _, objList := range chiObjects {
 		switch v := objList.(type) {
 		case parser.ConfigMapList:
 			for _, obj := range v {
-				if err := c.createConfigMap(chi, obj); err != nil {
-					return err
+				if err := c.createConfigMap(chiCopy, obj); err != nil {
+					return nil, err
 				}
 			}
 		case parser.ServiceList:
 			for _, obj := range v {
-				if err := c.createService(chi, obj); err != nil {
-					return err
+				if err := c.createService(chiCopy, obj); err != nil {
+					return nil, err
 				}
 			}
 		case parser.StatefulSetList:
 			for _, obj := range v {
-				if err := c.createStatefulSet(chi, obj); err != nil {
-					return err
+				if err := c.createStatefulSet(chiCopy, obj); err != nil {
+					return nil, err
 				}
 			}
 		}
 	}
-	return nil
+	return prefixes, nil
 }
 
 func (c *Controller) createConfigMap(chi *chiv1.ClickHouseInstallation, newConfigMap *corev1.ConfigMap) error {
