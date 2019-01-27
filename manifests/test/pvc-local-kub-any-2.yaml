@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-local-kub-any-2
+spec:
+  accessModes:
+    - ReadWriteOnce
+#  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-storage
+#  selector:
+#    matchLabels:
+#      name: pv-local-kub1
+#    matchExpressions:
+#    - key: kubernetes.io/hostname
+#      operator: In
+#      values:
+#      - kub1
+

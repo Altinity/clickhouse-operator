@@ -1,0 +1,55 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhouseinstallations.clickhouse.altinity.com
+spec:
+  group: clickhouse.altinity.com
+  version: v1
+  scope: Namespaced
+  names:
+    kind: ClickHouseInstallation
+    singular: clickhouseinstallation
+    plural: clickhouseinstallations
+    shortNames:
+    - chi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: clickhouse-operator
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: clickhouse-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: clickhouse-operator
+    namespace: kube-system
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: clickhouse-operator
+  namespace: kube-system
+  labels:
+    app: clickhouse-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clickhouse-operator
+  template:
+    metadata:
+      labels:
+        app: clickhouse-operator
+    spec:
+      serviceAccountName: clickhouse-operator
+      containers:
+      - image: altinity/clickhouse-operator:latest
+        name: clickhouse-operator
