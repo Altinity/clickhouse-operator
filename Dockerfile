@@ -1,4 +1,4 @@
-FROM golang:1.11.4 as builder
+FROM golang:1.11.5 as builder
 
 WORKDIR /go/src/github.com/altinity/clickhouse-operator
 
