@@ -159,6 +159,8 @@ spec:
         metadata:
           name: clickhouse-data
         spec:
+          accessModes:
+          - ReadWriteOnce
           resources:
             requests:
               storage: 100Mi
