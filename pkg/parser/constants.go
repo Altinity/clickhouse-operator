@@ -68,6 +68,5 @@ const (
 )
 
 const (
-	templateDefaultsServiceClusterIP      = "None"
-	templateDefaultsVolumeClaimAccessMode = "ReadWriteOnce"
+	templateDefaultsServiceClusterIP = "None"
 )
