@@ -9,12 +9,13 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: zookeeper-node
+  # nodes would be named as zookeeper-0, zookeeper-1, zookeeper-2
+  name: zookeeper
 spec:
   selector:
     matchLabels:
       app: zookeeper
-  serviceName: zookeeper-headless-service
+  serviceName: zookeepers
   replicas: 3
   updateStrategy:
     type: RollingUpdate
@@ -23,6 +24,7 @@ spec:
     metadata:
       labels:
         app: zookeeper
+        what: node
     spec:
       affinity:
         podAntiAffinity:

@@ -2,7 +2,8 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: zookeeper-nodes
+  # DNS would be like zookeeper-0.zookeepers.etc
+  name: zookeepers
   labels:
     app: zookeeper
 spec:
@@ -14,3 +15,4 @@ spec:
   clusterIP: None
   selector:
     app: zookeeper
+    what: node
