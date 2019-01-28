@@ -17,7 +17,6 @@ AME                                   READY   STATUS    RESTARTS   AGE
 clickhouse-operator-5c46dfc7bd-7cz5l   1/1     Running   0          43m
 ```
 
-## Resources Description
 The following results are expected:
 ```text
 customresourcedefinition.apiextensions.k8s.io/clickhouseinstallations.clickhouse.altinity.com created
@@ -25,6 +24,8 @@ serviceaccount/clickhouse-operator created
 clusterrolebinding.rbac.authorization.k8s.io/clickhouse-operator created
 deployment.apps/clickhouse-operator configured
 ```
+
+## Resources Description
 
 Let's walk over this line-by-line:
 ```text
