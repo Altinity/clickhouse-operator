@@ -4,23 +4,29 @@ We are going to setup Zookeeper in k8s environment.
 This document assumes k8s cluster already setup and `kubectl` has access to it.
 
 What we'll need here:
-1. Create k8s components:
+1. [OPTIONAL] Create separate namespace to run Zookeeper in 
+1. Create k8s resoirces:
   * [Service](https://kubernetes.io/docs/concepts/services-networking/service/) - used to provide central access point to Zookeeper
   * [Headless Service](https://kubernetes.io/docs/concepts/services-networking/service/#headless-services) - used to provide DNS namings
   * [Disruption Balance](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/) - used to specify max number of offline pods
   * [Storage Class](https://kubernetes.io/docs/concepts/workloads/pods/disruptions/) - used to specify storage class to be used by Zookeeper for data storage
   * [Stateful Set](https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/) - used to manage and scale sets of pods    
   
- All files are located in [manifests/zookeeper](../manifests/zookeeper) folder
+All files are located in [manifests/zookeeper](../manifests/zookeeper) folder
+
+## Namespace
+```bash
+kubectl create namespace zoons
+```
  
- ## Zookeeper Service
- This service provides DNS name for client access to all Zookeeper nodes.
- Create service.
- ```bash
- kubectl apply -f 01-service-client-access.yaml
- ```
- Should have as a result
- ```text
+## Zookeeper Service
+This service provides DNS name for client access to all Zookeeper nodes.
+Create service.
+```bash
+kubectl apply -f 01-service-client-access.yaml -n zoons
+```
+Should have as a result
+```text
 service/zookeeper created
 ```
 
@@ -28,7 +34,7 @@ service/zookeeper created
 This service provides DNS names for all Zookeeper nodes
 Create service.
 ```bash
-kubectl apply -f 02-headless-service.yaml
+kubectl apply -f 02-headless-service.yaml -n zoons
 ```
 Should have as a result
 ```text
@@ -39,7 +45,7 @@ service/zookeeper-nodes created
 Disruption Budget instructs k8s on how many offline Zookeeper nodes can be at any time
 Create budget.
 ```bash
-kubectl apply -f 03-pod-disruption-budget.yaml
+kubectl apply -f 03-pod-disruption-budget.yaml -n zoons
 ``` 
 Should have as a result
 ```text
@@ -90,7 +96,7 @@ and ensure **storageClassName** (`storageclass-zookeeper` in this example) is sp
 
 As `.yaml` file is ready, just apply it with `kubectl`
 ```bash
-kubectl apply -f 05-stateful-set.yaml
+kubectl apply -f 05-stateful-set.yaml -n zoons
 ```
 Should have as a result
 ```text
@@ -100,7 +106,7 @@ statefulset.apps/zookeeper-node created
 Now we can explore Zookeeper cluster deployed in k8s:
 
 ```bash
-kubectl get pod
+kubectl get pod -n zoons
 ```
 
 ```text
@@ -111,7 +117,7 @@ zookeeper-node-2      1/1     Running   0          9m2s
 ```
 
 ```bash
-kubectl get service
+kubectl get service -n zoons
 ```
 
 ```text
@@ -121,7 +127,7 @@ zookeeper-nodes             ClusterIP   None           <none>        2888/TCP,38
 ```
 
 ```bash
-kubectl get statefulset
+kubectl get statefulset -n zoons
 ```
 
 ```text

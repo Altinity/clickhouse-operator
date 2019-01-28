@@ -1,0 +1,16 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "ch-test-zk-repl"
+spec:
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper.zoons
+          port: 2181
+    clusters:
+    - name: sharded-replicated
+      layout:
+        type: Standard
+        shardsCount: 3
+        replicasCount: 2
