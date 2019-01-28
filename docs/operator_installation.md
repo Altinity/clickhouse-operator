@@ -6,9 +6,9 @@ In is located in `manifests/operator` folder inside `clickhouse-operator` source
 ## Install
 Operator installation process is quite straightforward and consists of one main step - **apply ClickHOuse operator manifest** with k8s.
 We'll apply operator manifest directly from github repo
-``bash
+```bash
 kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator/clickhouse-operator-install.yaml
-``
+```
 
 ## Verify operator is up and running
 ```bash
