@@ -63,7 +63,9 @@ const (
 )
 
 const (
-	fullPathRemoteServersXML = "/etc/clickhouse-server/config.d/" + remoteServersXML
+	configdPath              = "/etc/clickhouse-server/config.d/"
+	fullPathRemoteServersXML = configdPath + remoteServersXML
+	fullPathZookeeperXML     = configdPath + zookeeperXML
 	fullPathClickHouseData   = "/var/lib/clickhouse"
 )
 

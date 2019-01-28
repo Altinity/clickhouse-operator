@@ -121,6 +121,11 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 										MountPath: fullPathRemoteServersXML,
 										SubPath:   remoteServersXML,
 									},
+									{
+										Name:      cmName,
+										MountPath: fullPathZookeeperXML,
+										SubPath:   zookeeperXML,
+									},
 								},
 							},
 						},
