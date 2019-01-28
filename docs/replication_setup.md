@@ -8,23 +8,22 @@
 
 Create namespace where all replication cluster would live
 ```bash
-kubectl create namespace repl-cluster-test
+kubectl create namespace replcluster
 ```
 
 Create ClickHouse installation object inside namespace
 ```bash
-kubectl apply -f chi-example-03-zk-replication.yaml -n repl-cluster-test
+kubectl apply -f chi-example-03-zk-replication.yaml -n replcluster
 ```
 
 
 Verify cluster - show available ClickHouse cluster from within ClickHouse node instance
 ```bash
-kubectl exec -it -n repl-cluster-test chi-ch-test-zk-repl-1fc6da13bdaf98d-i1-0 -- clickhouse-client -q "select cluster, shard_num, replica_num, host_name, host_address from system.clusters where cluster='repl_cluster'"
+kubectl exec -it -n replcluster chi-replcluster-7b6a5caf28493899-i1-0 -- clickhouse-client -q "select cluster, shard_num, replica_num, host_name, host_address from system.clusters where cluster='replcluster'"
 ```
 
 ```bash
-
-kubectl exec -it -n repl-cluster-test chi-ch-test-zk-repl-63daace7b1480089-i1-0 -- clickhouse-client
+kubectl exec -it -n replcluster chi-replcluster-7b6a5caf28493899-i1-0 -- clickhouse-client
 CREATE DATABASE articles_repl;
 CREATE TABLE articles_repl.events_repl_local (
     event_date  Date,
@@ -35,9 +34,9 @@ CREATE TABLE articles_repl.events_repl_local (
 
 CREATE TABLE IF NOT EXISTS  
    articles_repl.events_replicated AS articles_repl.events_repl_local
-ENGINE = Distributed( repl_cluster, articles_repl, events_repl_local, rand());
+ENGINE = Distributed( replcluster, articles_repl, events_repl_local, rand());
 ======
-kubectl exec -it -n repl-cluster-test chi-ch-test-zk-repl-63daace7b1480089-i2-0 -- clickhouse-client
+kubectl exec -it -n replcluster chi-replcluster-7b6a5caf28493899-i2-0 -- clickhouse-client
 CREATE DATABASE articles_repl;
 CREATE TABLE articles_repl.events_repl_local (
     event_date  Date,
@@ -48,9 +47,9 @@ CREATE TABLE articles_repl.events_repl_local (
 
 CREATE TABLE IF NOT EXISTS  
    articles_repl.events_replicated AS articles_repl.events_repl_local
-ENGINE = Distributed( repl_cluster, articles_repl, events_repl_local, rand());
+ENGINE = Distributed( replcluster, articles_repl, events_repl_local, rand());
 ======
-kubectl exec -it -n repl-cluster-test chi-ch-test-zk-repl-63daace7b1480089-i3-0 -- clickhouse-client
+kubectl exec -it -n replcluster chi-replcluster-7b6a5caf28493899-i3-0 -- clickhouse-client
 CREATE DATABASE articles_repl;
 CREATE TABLE articles_repl.events_repl_local (
     event_date  Date,
@@ -61,9 +60,9 @@ CREATE TABLE articles_repl.events_repl_local (
 
 CREATE TABLE IF NOT EXISTS  
    articles_repl.events_replicated AS articles_repl.events_repl_local
-ENGINE = Distributed( repl_cluster, articles_repl, events_repl_local, rand());
+ENGINE = Distributed( replcluster, articles_repl, events_repl_local, rand());
 ======
-kubectl exec -it -n repl-cluster-test chi-ch-test-zk-repl-63daace7b1480089-i4-0 -- clickhouse-client
+kubectl exec -it -n replcluster chi-replcluster-7b6a5caf28493899-i4-0 -- clickhouse-client
 CREATE DATABASE articles_repl;
 CREATE TABLE articles_repl.events_repl_local (
     event_date  Date,
@@ -74,9 +73,9 @@ CREATE TABLE articles_repl.events_repl_local (
 
 CREATE TABLE IF NOT EXISTS  
    articles_repl.events_replicated AS articles_repl.events_repl_local
-ENGINE = Distributed( repl_cluster, articles_repl, events_repl_local, rand());
+ENGINE = Distributed( replcluster, articles_repl, events_repl_local, rand());
 ======
-kubectl exec -it -n repl-cluster-test chi-ch-test-zk-repl-63daace7b1480089-i5-0 -- clickhouse-client
+kubectl exec -it -n replcluster chi-replcluster-7b6a5caf28493899-i5-0 -- clickhouse-client
 CREATE DATABASE articles_repl;
 CREATE TABLE articles_repl.events_repl_local (
     event_date  Date,
@@ -87,9 +86,9 @@ CREATE TABLE articles_repl.events_repl_local (
 
 CREATE TABLE IF NOT EXISTS  
    articles_repl.events_replicated AS articles_repl.events_repl_local
-ENGINE = Distributed( repl_cluster, articles_repl, events_repl_local, rand());
+ENGINE = Distributed( replcluster, articles_repl, events_repl_local, rand());
 ======
-kubectl exec -it -n repl-cluster-test chi-ch-test-zk-repl-63daace7b1480089-i6-0 -- clickhouse-client
+kubectl exec -it -n replcluster chi-replcluster-7b6a5caf28493899-i6-0 -- clickhouse-client
 CREATE DATABASE articles_repl;
 CREATE TABLE articles_repl.events_repl_local (
     event_date  Date,
@@ -100,6 +99,6 @@ CREATE TABLE articles_repl.events_repl_local (
 
 CREATE TABLE IF NOT EXISTS  
    articles_repl.events_replicated AS articles_repl.events_repl_local
-ENGINE = Distributed( repl_cluster, articles_repl, events_repl_local, rand());
+ENGINE = Distributed( replcluster, articles_repl, events_repl_local, rand());
 
 ```
