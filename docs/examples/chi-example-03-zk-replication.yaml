@@ -6,10 +6,14 @@ spec:
   configuration:
     zookeeper:
       nodes:
-        - host: zookeeper.zoons
+        - host: zookeeper-0.zookeepers.zoons
+          port: 2181
+        - host: zookeeper-1.zookeepers.zoons
+          port: 2181
+        - host: zookeeper-2.zookeepers.zoons
           port: 2181
     clusters:
-    - name: sharded-replicated
+    - name: repl_cluster
       layout:
         type: Standard
         shardsCount: 3
