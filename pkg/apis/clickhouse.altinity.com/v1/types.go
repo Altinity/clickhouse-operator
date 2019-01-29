@@ -31,7 +31,8 @@ type ChiSpec struct {
 
 // ChiDefaults defines defaults section of .spec
 type ChiDefaults struct {
-	Deployment ChiDeployment `json:"deployment,omitempty"`
+	ReplicasUseFQDN int           `json:"replicasUseFQDN,omitempty"`
+	Deployment      ChiDeployment `json:"deployment,omitempty"`
 }
 
 // ChiDeployment defines deployment section of .spec

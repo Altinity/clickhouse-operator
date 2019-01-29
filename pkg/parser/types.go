@@ -23,8 +23,7 @@ type StatefulSetList []*apps.StatefulSet
 type ServiceList []*corev1.Service
 
 type genOptions struct {
-	ssNames       map[string]struct{}
-	ssIndex       map[string]string
+	ssNames       map[string]string
 	ssDeployments map[string]*chiv1.ChiDeployment
 	dRefsMax      chiDeploymentRefs
 }
