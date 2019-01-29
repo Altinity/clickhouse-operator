@@ -31,11 +31,15 @@ func genZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 }
 
 func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, o *genOptions, c []*chiv1.ChiCluster) string {
+	var hostDomain string
 	b := &bytes.Buffer{}
 	dRefIndex := make(map[string]int)
 	dID := make(map[string]string)
 	for k := range o.dRefsMax {
 		dID[k] = randomString()
+	}
+	if chi.Spec.Defaults.ReplicasUseFQDN == 1 {
+		hostDomain = fmt.Sprintf(domainPattern, chi.Namespace)
 	}
 	fmt.Fprintf(b, "<yandex>\n%4s<remote_servers>\n", " ")
 	for i := range c {
@@ -58,11 +62,10 @@ func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, o *genOptions, c 
 					}
 				}
 				dRefIndex[k] = idx
-				prefix := fmt.Sprintf(ssNamePattern, chi.Name, dID[k], idx)
-				o.ssNames[prefix] = struct{}{}
-				o.ssIndex[prefix] = k
+				ssNameID := fmt.Sprintf(ssNameIDPattern, dID[k], idx)
+				o.ssNames[ssNameID] = k
 				o.ssDeployments[k] = &r.Deployment
-				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", instanceHostname(chi, prefix))
+				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", fmt.Sprintf(hostnamePattern, ssNameID, hostDomain))
 				rPort := 9000
 				if r.Port > 0 {
 					rPort = int(r.Port)
@@ -75,8 +78,4 @@ func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, o *genOptions, c 
 	}
 	fmt.Fprintf(b, "%4s</remote_servers>\n</yandex>\n", " ")
 	return b.String()
-}
-
-func instanceHostname(chi *chiv1.ClickHouseInstallation, prefix string) string {
-	return fmt.Sprintf(hostnamePattern, prefix, chi.Namespace)
 }

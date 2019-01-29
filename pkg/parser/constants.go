@@ -37,9 +37,11 @@ const (
 )
 
 const (
-	ssNamePattern        = "chi-%s-%s-i%d"
-	svcNamePattern       = "%s-service"
-	hostnamePattern      = "%s-0.%[1]s-service.%s.svc.cluster.local"
+	ssNameIDPattern      = "d%si%d"
+	ssNamePattern        = "ch-%s"
+	svcNamePattern       = "%ss"
+	domainPattern        = ".%s.svc.cluster.local"
+	hostnamePattern      = ssNamePattern + "-0.%[1]ss%s"
 	configMapNamePattern = "chi-%s-configd"
 )
 

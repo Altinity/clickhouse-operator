@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -16,12 +17,11 @@ func CreateObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
 		clusters []*chiv1.ChiCluster
 		options  genOptions
 	)
-
+	setDefaults(chi)
 	setDeploymentDefaults(&chi.Spec.Defaults.Deployment, nil)
 	clusters, options.dRefsMax = getNormalizedClusters(chi)
 
-	options.ssNames = make(map[string]struct{})
-	options.ssIndex = make(map[string]string)
+	options.ssNames = make(map[string]string)
 	options.ssDeployments = make(map[string]*chiv1.ChiDeployment)
 
 	cmData := make(map[string]string)
@@ -140,6 +140,12 @@ func deploymentToString(d *chiv1.ChiDeployment) string {
 	return strings.Join(a, "::")
 }
 
+func setDefaults(chi *chiv1.ClickHouseInstallation) {
+	if chi.Spec.Defaults.ReplicasUseFQDN != 1 {
+		chi.Spec.Defaults.ReplicasUseFQDN = 0
+	}
+}
+
 func setDeploymentDefaults(d, parent *chiv1.ChiDeployment) {
 	if parent != nil {
 		if d.PodTemplateName == "" {
@@ -177,7 +183,9 @@ func (d chiDeploymentRefs) mergeWith(another chiDeploymentRefs) {
 }
 
 func randomString() string {
-	return fmt.Sprintf("%x", rand.New(rand.NewSource(time.Now().UnixNano())).Int())
+	b := make([]byte, 3)
+	rand.New(rand.NewSource(time.Now().UnixNano())).Read(b)
+	return hex.EncodeToString(b)
 }
 
 func includeIfNotEmpty(dest map[string]string, key, src string) {

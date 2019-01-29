@@ -24,8 +24,9 @@ func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]s
 
 func createServiceObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) ServiceList {
 	svcList := make(ServiceList, 0, len(o.ssNames))
-	for ssName := range o.ssNames {
-		svcName := fmt.Sprintf(svcNamePattern, ssName)
+	for ssNameID := range o.ssNames {
+		ssName := fmt.Sprintf(ssNamePattern, ssNameID)
+		svcName := fmt.Sprintf(svcNamePattern, ssNameID)
 		svcList = append(svcList, &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      svcName,
@@ -61,9 +62,10 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 	cmName := fmt.Sprintf(configMapNamePattern, chi.Name)
 	ssList := make(StatefulSetList, 0, len(o.ssNames))
 	index := createVolumeClaimTemplatesIndex(chi)
-	for ssName := range o.ssNames {
-		templateName := o.ssDeployments[o.ssIndex[ssName]].VolumeClaimTemplate
-		svcName := fmt.Sprintf(svcNamePattern, ssName)
+	for ssNameID, key := range o.ssNames {
+		ssName := fmt.Sprintf(ssNamePattern, ssNameID)
+		templateName := o.ssDeployments[key].VolumeClaimTemplate
+		svcName := fmt.Sprintf(svcNamePattern, ssNameID)
 		statefulSetObject := &apps.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ssName,
