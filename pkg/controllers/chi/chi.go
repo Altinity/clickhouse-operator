@@ -100,56 +100,39 @@ func CreateController(
 	return controller
 }
 
-// Run syncs caches, starts threadiness number of workers
-// and waits until context done()
+// Run syncs caches, starts workers
 func (c *Controller) Run(ctx context.Context, threadiness int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
-
 	glog.V(1).Info("Starting ClickHouseInstallation controller")
-
-	if !waitForCacheSync(
-		"ClickHouseInstallation",
-		ctx.Done(),
+	if !waitForCacheSync("ClickHouseInstallation", ctx.Done(),
 		c.chiListerSynced,
 		c.statefulSetListerSynced,
 		c.configMapListerSynced,
 		c.serviceListerSynced) {
-		// Unable to sync cache - abort
 		return
 	}
-
-	// Start threadiness number of workers
 	glog.V(1).Info("ClickHouseInstallation controller: starting workers")
 	for i := 0; i < threadiness; i++ {
 		go wait.Until(c.runWorker, time.Second, ctx.Done())
 	}
 	glog.V(1).Info("ClickHouseInstallation controller: workers started")
-
-	// Wait for context Done()
 	defer glog.V(1).Info("ClickHouseInstallation controller: shutting down workers")
 	<-ctx.Done()
 }
 
-// runWorker is being concurrently launched and is main Run() entry point
 func (c *Controller) runWorker() {
 	for c.processNextWorkItem() {
 	}
 }
 
-// processNextWorkItem is main worker function which is called concurrently from  main Run() entry point
-// returns true in case work continue, false in case of shutdown
 func (c *Controller) processNextWorkItem() bool {
 	obj, shutdown := c.queue.Get()
 	if shutdown {
-		// time to shutdown
 		return false
 	}
-
-	// process obj
 	err := func(obj interface{}) error {
 		defer c.queue.Done(obj)
-		// Interpet fetched object as a string key
 		key, ok := obj.(string)
 		if !ok {
 			c.queue.Forget(obj)
@@ -157,20 +140,15 @@ func (c *Controller) processNextWorkItem() bool {
 			return nil
 		}
 		if err := c.syncHandler(key); err != nil {
-			// Sync failed
 			return fmt.Errorf("unable to sync an object '%s': %s", key, err.Error())
 		}
-		// Sync successed, obj is processed
 		c.queue.Forget(obj)
 		return nil
 	}(obj)
 	if err != nil {
-		// obj processing failed, but we still continue to run queue processing cycle
 		utilruntime.HandleError(err)
 		return true
 	}
-
-	// obj processing success, we continue to run queue processing cycle
 	return true
 }
 

@@ -40,18 +40,7 @@ func init() {
 	flag.Parse()
 }
 
-// getConfig builds rest.Config out of either:
-// 1. CLI-provided config file path
-// 2. env var
-// 3. in-cluster
-// 4. /home/user/.kube/config
 func getConfig() (*rest.Config, error) {
-	// 1. --kubeconfig=/path/to/config option has top-priority
-	// 2. KUBECONFIG=/path/to/config env var has second priority
-	// 3. Try to fetch in-cluster config
-	// 4. If still no config - try to find /home/user/.kube/config file
-	// still no success - return error
-
 	if len(kubeconfig) > 0 {
 		return clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	}
@@ -62,20 +51,14 @@ func getConfig() (*rest.Config, error) {
 		return conf, nil
 	}
 	if usr, err := user.Current(); err == nil {
-		// Try to build config from /home/user/.kube/config
-		conf, err := clientcmd.BuildConfigFromFlags(
-			"", filepath.Join(usr.HomeDir, ".kube", "config"))
-		if err == nil {
-			// .kube/config found, config produced
+		if conf, err := clientcmd.BuildConfigFromFlags(
+			"", filepath.Join(usr.HomeDir, ".kube", "config")); err == nil {
 			return conf, nil
 		}
 	}
 	return nil, fmt.Errorf("kubeconfig not found")
 }
 
-// createClientsets creates two clientsets:
-// 1. kubernetes clientset
-// 2. clickhouse clientset
 func createClientsets() (*kubernetes.Clientset, *clientset.Clientset) {
 	config, err := getConfig()
 	if err != nil {
@@ -95,8 +78,6 @@ func createClientsets() (*kubernetes.Clientset, *clientset.Clientset) {
 // Run is an entry point of the application
 func Run() {
 	glog.V(1).Infof("Starting clickhouse-operator version '%s'\n", Version)
-
-	// Prepare context with cancel function
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	stop := make(chan os.Signal, 2)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
@@ -106,26 +87,17 @@ func Run() {
 		<-stop
 		os.Exit(1)
 	}()
-
-	// Create kube and chi clientsets out of proviede config
 	kubeClient, chiClient := createClientsets()
-	// Create kube and chi informer factories out of clientsets
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
 	chiInformerFactory := informers.NewSharedInformerFactory(chiClient, time.Second*30)
-
 	chiController := chi.CreateController(
-		chiClient,
-		kubeClient,
+		chiClient, kubeClient,
 		chiInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),
 		kubeInformerFactory.Core().V1().Services())
-
-	// Start informers
 	kubeInformerFactory.Start(ctx.Done())
 	chiInformerFactory.Start(ctx.Done())
-
-	// Main function
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
