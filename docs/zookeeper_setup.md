@@ -137,6 +137,32 @@ Now we can take a look into Zookeeper cluster deployed in k8s:
 
 ## Explore Zookeeper cluster
 
+### DNS names
+We are expecting to have ZooKeeper cluster of 3 pods inside `zoons` namespace, named as:
+```text
+zookeeper-0
+zookeeper-1
+zookeeper-2
+```
+Those pods are expected to have short DNS names as:
+
+```text
+zookeeper-0.zookeepers.zoons
+zookeeper-1.zookeepers.zoons
+zookeeper-2.zookeepers.zoons
+```
+
+where `zookeepers` is name of [Zookeeper headless service](#zookeeper-headless-service) and `zoons` is name of [Zookeeper namespace](#namespace).
+
+and full DNS names (FQDN) as:
+```text
+zookeeper-0.zookeepers.zoons.svc.cluster.local
+zookeeper-1.zookeepers.zoons.svc.cluster.local
+zookeeper-2.zookeepers.zoons.svc.cluster.local
+```
+
+### Resources
+
 List pods in Zookeeper's namespace
 ```bash
 kubectl get pod -n zoons
@@ -144,10 +170,10 @@ kubectl get pod -n zoons
 
 Expected output is like the following
 ```text
-NAME                  READY   STATUS    RESTARTS   AGE
-zookeeper-node-0      1/1     Running   0          9m2s
-zookeeper-node-1      1/1     Running   0          9m2s
-zookeeper-node-2      1/1     Running   0          9m2s
+NAME             READY   STATUS    RESTARTS   AGE
+zookeeper-0      1/1     Running   0          9m2s
+zookeeper-1      1/1     Running   0          9m2s
+zookeeper-2      1/1     Running   0          9m2s
 ```
 
 List services
@@ -157,9 +183,9 @@ kubectl get service -n zoons
 
 Expected output is like the following
 ```text
-NAME                        TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)                      AGE
-zookeeper                   ClusterIP   10.108.36.44   <none>        2181/TCP                     168m
-zookeeper-nodes             ClusterIP   None           <none>        2888/TCP,3888/TCP            31m
+NAME                   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)                      AGE
+zookeeper              ClusterIP   10.108.36.44   <none>        2181/TCP                     168m
+zookeepers             ClusterIP   None           <none>        2888/TCP,3888/TCP            31m
 ```
 
 List statefulsets
@@ -169,8 +195,8 @@ kubectl get statefulset -n zoons
 
 Expected output is like the following
 ```text
-NAME                READY   AGE
-zookeeper-node      3/3     10m
+NAME            READY   AGE
+zookeepers      3/3     10m
 ```
 
 In case all looks fine Zookeeper cluster is up and running
