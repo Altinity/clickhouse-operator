@@ -4,17 +4,10 @@ Verify [clickhouse-operator-install.yaml](../manifests/operator/clickhouse-opera
 In is located in `manifests/operator` folder inside `clickhouse-operator` sources.
 
 ## Install
-Operator installation process is quite straightforward and consists of one main step - **apply ClickHOuse operator manifest** with k8s.
+Operator installation process is quite straightforward and consists of one main step - deploy **ClickHouse operator**.
 We'll apply operator manifest directly from github repo
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator/clickhouse-operator-install.yaml
-```
-
-## Verify operator is up and running
-```bash
-kubectl get pods --namespace kube-system
-AME                                   READY   STATUS    RESTARTS   AGE
-clickhouse-operator-5c46dfc7bd-7cz5l   1/1     Running   0          43m
 ```
 
 The following results are expected:
@@ -25,15 +18,38 @@ clusterrolebinding.rbac.authorization.k8s.io/clickhouse-operator created
 deployment.apps/clickhouse-operator configured
 ```
 
+## Verify operator is up and running
+Operator is deployed in **kube-system** namespace 
+```bash
+kubectl get pods --namespace kube-system
+```
+
+Expected results:
+```text
+NAME                                   READY   STATUS    RESTARTS   AGE
+...
+clickhouse-operator-5c46dfc7bd-7cz5l   1/1     Running   0          43m
+...
+```
+
+
 ## Resources Description
 
-Let's walk over this line-by-line:
+Let's walk over all resources created along with ClickHouse operator, which are:
+1. Custom Resource Definition
+1. Service account
+1. Cluster Role Binding
+1. Deployment
+
+
+### Custom Resource Definition
 ```text
 customresourcedefinition.apiextensions.k8s.io/clickhouseinstallations.clickhouse.altinity.com created
 ```
 New [Custom Resource Definition](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions) named **ClickHouseInstallation** is created.
-k8s API is extended with new `kind: ClickHouseInstallation` and we'll be able to manage k8s object of `kind: ClickHouseInstallation`
+k8s API is extended with new kind `ClickHouseInstallation` and we'll be able to manage k8s resource of `kind: ClickHouseInstallation`
 
+### Service Account
 ```text
 serviceaccount/clickhouse-operator created
 ```
@@ -41,6 +57,7 @@ New [Service Account](https://kubernetes.io/docs/tasks/configure-pod-container/c
 A service account provides an identity used to contact the `apiserver` by the processes that run in a Pod. 
 Processes in containers inside pods can contact the `apiserver`, and when they do, they are authenticated as a particular `Service Account` - `clickhouse-operator` in this case.
 
+### Cluster Role Binding
 ```text
 clusterrolebinding.rbac.authorization.k8s.io/clickhouse-operator created
 ```
@@ -64,6 +81,7 @@ subjects:
 `clickhouse-operator` Service Account created earlier.
 Permissions are granted cluster-wide with a `ClusterRoleBinding`.
 
+### Deployment
 ```text
 deployment.apps/clickhouse-operator configured
 ```
@@ -71,31 +89,52 @@ New [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deplo
 ClickHouse operator app would be run by this deployment in `kube-system` namespace.
 
 ## Verify Resources
+
+Check Custom Resource Definition
 ```bash
 kubectl get customresourcedefinitions
 ```
+Expected result
 ```text
 NAME                                              CREATED AT
+...
 clickhouseinstallations.clickhouse.altinity.com   2019-01-25T10:17:57Z
+...
 ```
+
+Check Service Account
 ```bash
-kubectl get customresourcedefinitions
+kubectl get serviceaccounts -n kube-system
 ```
+Expected result
 ```text
-NAME                                              CREATED AT
-clickhouseinstallations.clickhouse.altinity.com   2019-01-25T10:17:57Z
+NAME                                 SECRETS   AGE
+...
+clickhouse-operator                  1         27h
+...
 ```
+
+Check Cluster Role Binding
 ```bash
 kubectl get clusterrolebinding
 ```
+Expected result
 ```text
 NAME                                                   AGE
+...
 clickhouse-operator                                    31m
+...
+
 ```
+Check deployment
 ```bash
 kubectl get deployments --namespace kube-system
 ```
+Expected result
 ```text
 NAME                   READY   UP-TO-DATE   AVAILABLE   AGE
+...
 clickhouse-operator    1/1     1            1           31m
+...
+
 ```

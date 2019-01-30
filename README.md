@@ -36,9 +36,13 @@ NAME                                        READY   STATUS    RESTARTS   AGE
 clickhouse-operator-ddc6fd499-fhxqs         1/1     Running   0          5m22s
 ```
 
-## Getting started
+## Documentation
 
-See the [introduction][2] and [quick-start][3] for usage examples.
+1. [Introduction][2] 
+1. [Quick-start guide][3]
+1. [More detailed operator installation instructions][4]
+1. [How to setup ClickHouse cluster with replication][5]
+1. [Zookeeper setup][6]
 
 ## License
 
@@ -48,6 +52,9 @@ Copyright (c) 2018, Altinity Ltd and/or its affiliates. All rights reserved.
 
 See [LICENSE](LICENSE) for more details.
  
- [1]: https://github.com/Altinity/clickhouse-operator/blob/master/docs/examples/clickhouseinstallation-object.yaml
- [2]: https://github.com/Altinity/clickhouse-operator/blob/master/docs/introduction.md
- [3]: https://github.com/Altinity/clickhouse-operator/blob/master/docs/quick-start.md
+ [1]: docs/examples/clickhouseinstallation-object.yaml
+ [2]: docs/introduction.md
+ [3]: docs/quick-start.md
+ [4]: docs/operator_installation_details.md
+ [5]: docs/replication_setup.md
+ [6]: docs/zookeeper_setup.md
