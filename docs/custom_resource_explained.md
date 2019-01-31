@@ -24,6 +24,9 @@ clickhouse-installation-test   23h
 ## .spec.defaults
 ```yaml
   defaults:
+    replicasUseFQDN: 0 # 0 - by default, 1 - enabled
+    distributedDDL:
+      profile: default
     deployment:
       zone:
         matchLabels:
@@ -31,8 +34,10 @@ clickhouse-installation-test   23h
       podTemplateName: clickhouse-installation
       volumeClaimTemplate: default
 ```
-`.spec.defaults` section represents default values for sections below. 
-In provided example, default `.spec.defaults.deployment` would be used everywhere where `deployment` is needed.  
+`.spec.defaults` section represents default values for sections below.
+  - `.spec.defaults.replicasUseFQDN` - should replicas be specified by FQDN in `<host></host>`
+  - `.spec.defaults.distributedDDL` - referense to `<yandex><distributed_ddl></distributed_ddl></yandex>`
+  - `.spec.defaults.deployment` would be used everywhere where `deployment` is needed.  
 
 ## .spec.configuration
 ```yaml
@@ -44,11 +49,11 @@ In provided example, default `.spec.defaults.deployment` would be used everywher
 ```yaml
     zookeeper:
       nodes:
-        - host: zookeeper-0.zookeepers.zoons.svc.cluster.local
+        - host: zk-statefulset-0.zk-service.default.svc.cluster.local
           port: 2181
-        - host: zookeeper-1.zookeepers.zoons.svc.cluster.local
+        - host: zk-statefulset-1.zk-service.default.svc.cluster.local
           port: 2181
-        - host: zookeeper-2.zookeepers.zoons.svc.cluster.local
+        - host: zk-statefulset-2.zk-service.default.svc.cluster.local
           port: 2181
 ```
 `.spec.configuration.zookeeper` refers to [&lt;yandex&gt;&lt;zookeeper&gt;&lt;/zookeeper&gt;&lt;/yandex&gt;](https://clickhouse.yandex/docs/en/operations/table_engines/replication/) config section

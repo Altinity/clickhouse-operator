@@ -4,7 +4,7 @@ metadata:
   name: "clickhouse-installation-test"
 spec:
   defaults:
-    replicasUseFQDN: 0 # 0 - by defaut, 1 - enabled
+    replicasUseFQDN: 0 # 0 - by default, 1 - enabled
     distributedDDL:
       profile: default
     deployment:
