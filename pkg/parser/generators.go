@@ -92,10 +92,10 @@ func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, o *genOptions, c 
 
 func generateHostMacros(chiName, ssName string, dataIndex shardsIndex) string {
 	b := &bytes.Buffer{}
-	fmt.Fprintf(b, "<macros>\n%4s<installation>%s</installation>\n", " ", chiName)
+	fmt.Fprintf(b, "<yandex>\n%4s<macros>\n%8[1]s<installation>%s</installation>\n", " ", chiName)
 	for i := range dataIndex {
-		fmt.Fprintf(b, "%4s<%s>%[2]s</%[2]s>\n%4[1]s<%[2]s-shard>%d</%[2]s-shard>\n", " ", dataIndex[i].cluster, dataIndex[i].index)
+		fmt.Fprintf(b, "%8s<%s>%[2]s</%[2]s>\n%8[1]s<%[2]s-shard>%d</%[2]s-shard>\n", " ", dataIndex[i].cluster, dataIndex[i].index)
 	}
-	fmt.Fprintf(b, "%4s<replica>%s</replica>\n</macros>\n", " ", ssName)
+	fmt.Fprintf(b, "%8s<replica>%s</replica>\n%4[1]s</macros>\n</yandex>\n", " ", ssName)
 	return b.String()
 }

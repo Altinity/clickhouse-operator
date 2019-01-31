@@ -71,6 +71,7 @@ const (
 	configdPath              = "/etc/clickhouse-server/config.d/"
 	fullPathRemoteServersXML = configdPath + remoteServersXML
 	fullPathZookeeperXML     = configdPath + zookeeperXML
+	fullPathMacrosXML        = configdPath + macrosXML
 	fullPathClickHouseData   = "/var/lib/clickhouse"
 )
 
