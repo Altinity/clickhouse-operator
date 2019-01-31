@@ -76,6 +76,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 	index := createVolumeClaimTemplatesIndex(chi)
 	for ssNameID, key := range o.ssNames {
 		ssName := fmt.Sprintf(ssNamePattern, ssNameID)
+		cmMacros := fmt.Sprintf(configMapMacrosNamePattern, chi.Name, ssNameID)
 		templateName := o.ssDeployments[key].VolumeClaimTemplate
 		svcName := fmt.Sprintf(svcNamePattern, ssNameID)
 		statefulSetObject := &apps.StatefulSet{
@@ -110,6 +111,16 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 									},
 								},
 							},
+							{
+								Name: cmMacros,
+								VolumeSource: corev1.VolumeSource{
+									ConfigMap: &corev1.ConfigMapVolumeSource{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: cmMacros,
+										},
+									},
+								},
+							},
 						},
 						Containers: []corev1.Container{
 							{
@@ -139,6 +150,11 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 										Name:      cmName,
 										MountPath: fullPathZookeeperXML,
 										SubPath:   zookeeperXML,
+									},
+									{
+										Name:      cmMacros,
+										MountPath: fullPathMacrosXML,
+										SubPath:   macrosXML,
 									},
 								},
 							},
