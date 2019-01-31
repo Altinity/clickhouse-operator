@@ -30,4 +30,4 @@ There is no requirement to have Zookeeper instance dedicated to serve ClickHouse
 However, in case we'd like to have high-available ClickHouse installation, we need to have Zookeeper cluster of at least 3 nodes.
 So, we can either use
 1. Already existing Zookeeper instance, or
-1. Setup our own Zookeeper - in most cases inside the same k8s installation.
+1. [Setup](zookeeper_setup.md) our own Zookeeper - in most cases inside the same k8s installation.

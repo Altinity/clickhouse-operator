@@ -3,8 +3,12 @@
 
 ## Prerequisites
 
-1. ClickHouse operator [installed](operator_installation.md)
+1. ClickHouse operator [installed](operator_installation_details.md)
 1. Zookeeper installed as described in [Zookeeper Setup](zookeeper_setup.md)
+
+## Installation
+Let's create ClickHouse installation with replication cluster. Example manifest is located in [examples/chi-example-03-zk-replication.yaml](examples/chi-example-03-zk-replication.yaml)
+We'd like to create all resources inside separated namespace, which is convenient to manage.
 
 Create namespace where all replication cluster would live
 ```bash
@@ -15,6 +19,22 @@ Create ClickHouse installation object inside namespace
 ```bash
 kubectl apply -f chi-example-03-zk-replication.yaml -n replcluster
 ```
+
+## Manifest
+
+```yaml
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper-0.zookeepers.zoons
+          port: 2181
+        - host: zookeeper-1.zookeepers.zoons
+          port: 2181
+        - host: zookeeper-2.zookeepers.zoons
+          port: 2181
+```
+
+Zookeeper nodes are DNS names [assigned to Zookeeper](zookeeper_setup.md#dns-names) cluster as described in details in [Zookeeper Setup](zookeeper_setup.md) docs
 
 
 Verify cluster - show available ClickHouse cluster from within ClickHouse node instance
