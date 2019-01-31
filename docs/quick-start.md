@@ -99,7 +99,7 @@ ch-d3ce483i3-0   1/1     Running   0          2m44s
 ```
 9. Connecting to the clickhouse database using clickhouse-client
 ```console
-$ kubectl exec -it -n test chi-test3-20c3b0712b0937ac-i1-0 clickhouse-client
+$ kubectl exec -it -n test ch-d3ce483i1-0 clickhouse-client
 ClickHouse client version 19.1.6.
 Connecting to localhost:9000.
 Connected to ClickHouse server version 19.1.6 revision 54413.
