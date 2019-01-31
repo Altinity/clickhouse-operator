@@ -21,7 +21,6 @@ func CreateObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
 	setDeploymentDefaults(&chi.Spec.Defaults.Deployment, nil)
 	clusters, options.dRefsMax = getNormalizedClusters(chi)
 
-	options.hostNames = make(map[string]string)
 	options.ssNames = make(map[string]string)
 	options.ssDeployments = make(map[string]*chiv1.ChiDeployment)
 	options.macrosDataIndex = make(map[string]shardsIndex)

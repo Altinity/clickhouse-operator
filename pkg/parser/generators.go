@@ -69,9 +69,8 @@ func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, o *genOptions, c 
 				dRefIndex[k] = idx
 				ssNameID := fmt.Sprintf(ssNameIDPattern, dID[k], idx)
 				o.ssNames[ssNameID] = k
-				o.hostNames[ssNameID] = fmt.Sprintf(hostnamePattern, ssNameID, hostDomain)
 				o.ssDeployments[k] = &r.Deployment
-				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", o.hostNames[ssNameID])
+				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", fmt.Sprintf(hostnamePattern, ssNameID, hostDomain))
 				o.macrosDataIndex[ssNameID] = append(o.macrosDataIndex[ssNameID], &shardsIndexItem{
 					cluster: c[i].Name,
 					index:   j + 1,
