@@ -43,6 +43,7 @@ clickhouse-operator-ddc6fd499-fhxqs         1/1     Running   0          5m22s
 1. [More detailed operator installation instructions][4]
 1. [How to setup ClickHouse cluster with replication][5]
 1. [Zookeeper setup][6]
+1. [ClickHouse Installation Custom Resource explained][7]
 
 ## License
 
@@ -52,9 +53,10 @@ Copyright (c) 2018, Altinity Ltd and/or its affiliates. All rights reserved.
 
 See [LICENSE](LICENSE) for more details.
  
- [1]: docs/examples/clickhouseinstallation-object.yaml
- [2]: docs/introduction.md
- [3]: docs/quick-start.md
- [4]: docs/operator_installation_details.md
- [5]: docs/replication_setup.md
- [6]: docs/zookeeper_setup.md
+[1]: docs/examples/clickhouseinstallation-object.yaml
+[2]: docs/introduction.md
+[3]: docs/quick-start.md
+[4]: docs/operator_installation_details.md
+[5]: docs/replication_setup.md
+[6]: docs/zookeeper_setup.md
+[7]: docs/custom_resource_explained.md
