@@ -26,7 +26,12 @@ func genZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 		}
 		fmt.Fprintf(b, "%8s</node>\n", " ")
 	}
-	fmt.Fprintf(b, "%4s</zookeeper>\n</yandex>\n", " ")
+	fmt.Fprintf(b, "%4s</zookeeper>\n", " ")
+	fmt.Fprintf(b, "%4s<distributed_ddl>\n%8[1]s<path>%s</path>\n", " ", fmt.Sprintf(distributedDDLPattern, chi.Name))
+	if chi.Spec.Defaults.DistributedDDL.Profile != "" {
+		fmt.Fprintf(b, "%8s<profile>%s</profile>\n", " ", chi.Spec.Defaults.DistributedDDL.Profile)
+	}
+	fmt.Fprintf(b, "%4[1]s</distributed_ddl>\n</yandex>\n", " ")
 	return b.String()
 }
 
@@ -64,8 +69,13 @@ func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, o *genOptions, c 
 				dRefIndex[k] = idx
 				ssNameID := fmt.Sprintf(ssNameIDPattern, dID[k], idx)
 				o.ssNames[ssNameID] = k
+				o.hostNames[ssNameID] = fmt.Sprintf(hostnamePattern, ssNameID, hostDomain)
 				o.ssDeployments[k] = &r.Deployment
-				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", fmt.Sprintf(hostnamePattern, ssNameID, hostDomain))
+				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", o.hostNames[ssNameID])
+				o.macrosDataIndex[ssNameID] = append(o.macrosDataIndex[ssNameID], &shardsIndexItem{
+					cluster: c[i].Name,
+					index:   j + 1,
+				})
 				rPort := 9000
 				if r.Port > 0 {
 					rPort = int(r.Port)
@@ -77,5 +87,15 @@ func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, o *genOptions, c 
 		fmt.Fprintf(b, "%8s</%s>\n", " ", c[i].Name)
 	}
 	fmt.Fprintf(b, "%4s</remote_servers>\n</yandex>\n", " ")
+	return b.String()
+}
+
+func generateHostMacros(chiName, ssName string, dataIndex shardsIndex) string {
+	b := &bytes.Buffer{}
+	fmt.Fprintf(b, "<macros>\n%4s<installation>%s</installation>\n", " ", chiName)
+	for i := range dataIndex {
+		fmt.Fprintf(b, "%4s<%s>%[2]s</%[2]s>\n%4[1]s<%[2]s-shard>%d</%[2]s-shard>\n", " ", dataIndex[i].cluster, dataIndex[i].index)
+	}
+	fmt.Fprintf(b, "%4s<replica>%s</replica>\n</macros>\n", " ", ssName)
 	return b.String()
 }

@@ -34,15 +34,18 @@ const (
 	remoteServersXML = "remote_servers.xml"
 	zookeeperXML     = "zookeeper.xml"
 	usersXML         = "users.xml"
+	macrosXML        = "macros.xml"
 )
 
 const (
-	ssNameIDPattern      = "d%si%d"
-	ssNamePattern        = "ch-%s"
-	svcNamePattern       = "%ss"
-	domainPattern        = ".%s.svc.cluster.local"
-	hostnamePattern      = ssNamePattern + "-0.%[1]ss%s"
-	configMapNamePattern = "chi-%s-configd"
+	ssNameIDPattern            = "d%si%d"
+	ssNamePattern              = "ch-%s"
+	svcNamePattern             = "%ss"
+	domainPattern              = ".%s.svc.cluster.local"
+	hostnamePattern            = ssNamePattern + "-0.%[1]ss%s"
+	configMapNamePattern       = "chi-%s-configd"
+	configMapMacrosNamePattern = configMapNamePattern + "-%s"
+	distributedDDLPattern      = "/clickhouse/%s/task_queue/ddl"
 )
 
 const (

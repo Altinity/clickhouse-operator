@@ -23,9 +23,18 @@ type StatefulSetList []*apps.StatefulSet
 type ServiceList []*corev1.Service
 
 type genOptions struct {
-	ssNames       map[string]string
-	ssDeployments map[string]*chiv1.ChiDeployment
-	dRefsMax      chiDeploymentRefs
+	hostNames       map[string]string
+	ssNames         map[string]string
+	ssDeployments   map[string]*chiv1.ChiDeployment
+	dRefsMax        chiDeploymentRefs
+	macrosDataIndex map[string]shardsIndex
+}
+
+type shardsIndex []*shardsIndexItem
+
+type shardsIndexItem struct {
+	cluster string
+	index   int
 }
 
 type chiClusterDataLink struct {

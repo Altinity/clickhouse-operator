@@ -10,14 +10,26 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]string) ConfigMapList {
-	cmList := make(ConfigMapList, 1)
+func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]string, o *genOptions) ConfigMapList {
+	c := len(o.ssNames)
+	cmList := make(ConfigMapList, 1, c+1)
 	cmList[0] = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf(configMapNamePattern, chi.Name),
 			Namespace: chi.Namespace,
 		},
 		Data: data,
+	}
+	for ssName := range o.ssNames {
+		cmList = append(cmList, &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf(configMapMacrosNamePattern, chi.Name, ssName),
+				Namespace: chi.Namespace,
+			},
+			Data: map[string]string{
+				macrosXML: generateHostMacros(chi.Name, ssName, o.macrosDataIndex[ssName]),
+			},
+		})
 	}
 	return cmList
 }

@@ -21,8 +21,10 @@ func CreateObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
 	setDeploymentDefaults(&chi.Spec.Defaults.Deployment, nil)
 	clusters, options.dRefsMax = getNormalizedClusters(chi)
 
+	options.hostNames = make(map[string]string)
 	options.ssNames = make(map[string]string)
 	options.ssDeployments = make(map[string]*chiv1.ChiDeployment)
+	options.macrosDataIndex = make(map[string]shardsIndex)
 
 	cmData := make(map[string]string)
 	cmData[remoteServersXML] = genRemoteServersConfig(chi, &options, clusters)
@@ -36,7 +38,7 @@ func CreateObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
 	}
 
 	return ObjectsMap{
-		ObjectsConfigMaps:   createConfigMapObjects(chi, cmData),
+		ObjectsConfigMaps:   createConfigMapObjects(chi, cmData, &options),
 		ObjectsServices:     createServiceObjects(chi, &options),
 		ObjectsStatefulSets: createStatefulSetObjects(chi, &options),
 	}, prefixes
