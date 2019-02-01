@@ -129,16 +129,11 @@ spec:
                     type: string
                 zookeeper:
                   type: object
-                  required:
-                  - nodes
                   properties:
                     nodes:
                       type: array
                       items:
                         type: object
-                        required:
-                        - host
-                        - port
                         properties:
                           host:
                             type: string
@@ -154,8 +149,6 @@ spec:
                   maximum: 1
                 distributedDDL:
                   type: object
-                  required:
-                  - profile
                   properties:
                     profile:
                       type: string
