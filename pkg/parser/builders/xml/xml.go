@@ -76,11 +76,7 @@ func GenerateXML(w io.Writer, input map[string]string, depth, step uint8, exclud
 		}
 	}
 	// building XML document
-	err := xmlTree.buildXML(w, depth, step)
-	if err != nil {
-		return err
-	}
-	return nil
+	return xmlTree.buildXML(w, depth, step)
 }
 
 // addChild checks list of xmlNode childs in order to match corresponding tags,
