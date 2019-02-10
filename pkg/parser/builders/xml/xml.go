@@ -39,10 +39,7 @@ func GenerateXML(w io.Writer, input map[string]string, depth, step uint8, exclud
 	data := make(map[string]string)
 	for k, v := range input {
 		nk := re.ReplaceAllString(strings.Trim(k, "/"), "/")
-		if nk == "" {
-			continue
-		}
-		if checkExcludes(nk, excludes) {
+		if nk == "" || checkExcludes(nk, excludes) {
 			continue
 		}
 		keys = append(keys, nk)
