@@ -13,8 +13,9 @@ The ClickHouse Operator creates, configures and manages ClickHouse clusters runn
 The ClickHouse Operator for Kubernetes currently provides the following:
 
 - Creates cluster of the ClickHouse database based on Custom Resource [specification][1] provided
-- Supports Zookeeper integration
-- Supports storage customization via PVC templates
+- Supports Storage customization (VolumeClaim templates)
+- Supports Pod template customization (Volume and Container templates)
+- Supports ClickHouse configuration customization (including Zookeeper integration)
 
 ## Requirements
 
@@ -39,7 +40,7 @@ clickhouse-operator-ddc6fd499-fhxqs         1/1     Running   0          5m22s
 ## Documentation
 
 1. [Introduction][2] 
-1. [Quick-start guide][3]
+1. [Quick Start Guides][3]
 1. [More detailed operator installation instructions][4]
 1. [How to setup ClickHouse cluster with replication][5]
 1. [Zookeeper setup][6]
@@ -47,7 +48,7 @@ clickhouse-operator-ddc6fd499-fhxqs         1/1     Running   0          5m22s
 
 ## License
 
-Copyright (c) 2018, Altinity Ltd and/or its affiliates. All rights reserved.
+Copyright (c) 2019, Altinity Ltd and/or its affiliates. All rights reserved.
 
 `clickhouse-operator` is licensed under the Apache License 2.0.
 
