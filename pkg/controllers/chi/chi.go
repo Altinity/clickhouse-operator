@@ -1,3 +1,17 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package chi
 
 import (
@@ -126,6 +140,7 @@ func (c *Controller) runWorker() {
 	}
 }
 
+// processNextWorkItem processes objects from the workqueue
 func (c *Controller) processNextWorkItem() bool {
 	obj, shutdown := c.queue.Get()
 	if shutdown {
@@ -152,12 +167,14 @@ func (c *Controller) processNextWorkItem() bool {
 	return true
 }
 
+// syncHandler applies reconciliation actions to watched objects
 func (c *Controller) syncHandler(key string) error {
 	ns, n, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("incorrect resource key: %s", key))
 		return nil
 	}
+	// Listing all CHI resources
 	chi, err := c.chiLister.ClickHouseInstallations(ns).Get(n)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -166,6 +183,7 @@ func (c *Controller) syncHandler(key string) error {
 		}
 		return err
 	}
+	// Checking the CHI object already in sync
 	if chi.Status.ObjectPrefixes == nil || len(chi.Status.ObjectPrefixes) == 0 {
 		prefixes, err := c.createControlledResources(chi)
 		if err != nil {
@@ -181,6 +199,7 @@ func (c *Controller) syncHandler(key string) error {
 	return nil
 }
 
+// createControlledResources creates k8s resouces based on ClickHouseInstallation object specification
 func (c *Controller) createControlledResources(chi *chiv1.ClickHouseInstallation) ([]string, error) {
 	chiCopy := chi.DeepCopy()
 	chiObjects, prefixes := parser.CreateObjects(chiCopy)
@@ -209,6 +228,7 @@ func (c *Controller) createControlledResources(chi *chiv1.ClickHouseInstallation
 	return prefixes, nil
 }
 
+// createConfigMap creates corev1.ConfigMap resource
 func (c *Controller) createConfigMap(chi *chiv1.ClickHouseInstallation, newConfigMap *corev1.ConfigMap) error {
 	res, err := c.configMapLister.ConfigMaps(chi.Namespace).Get(newConfigMap.Name)
 	if res != nil {
@@ -223,6 +243,7 @@ func (c *Controller) createConfigMap(chi *chiv1.ClickHouseInstallation, newConfi
 	return nil
 }
 
+// createService creates corev1.Service resource
 func (c *Controller) createService(chi *chiv1.ClickHouseInstallation, newService *corev1.Service) error {
 	res, err := c.serviceLister.Services(chi.Namespace).Get(newService.Name)
 	if res != nil {
@@ -237,6 +258,7 @@ func (c *Controller) createService(chi *chiv1.ClickHouseInstallation, newService
 	return nil
 }
 
+// createStatefulSet creates apps.StatefulSet resource
 func (c *Controller) createStatefulSet(chi *chiv1.ClickHouseInstallation, newStatefulSet *apps.StatefulSet) error {
 	res, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
 	if res != nil {
@@ -251,6 +273,7 @@ func (c *Controller) createStatefulSet(chi *chiv1.ClickHouseInstallation, newSta
 	return nil
 }
 
+// updateChiStatus updates .status section of ClickHouseInstallation resource
 func (c *Controller) updateChiStatus(chi *chiv1.ClickHouseInstallation, objectPrefixes []string) error {
 	chiCopy := chi.DeepCopy()
 	chiCopy.Status = chiv1.ChiStatus{
@@ -260,6 +283,7 @@ func (c *Controller) updateChiStatus(chi *chiv1.ClickHouseInstallation, objectPr
 	return err
 }
 
+// enqueueChi adds ClickHouseInstallation object to the workqueue
 func (c *Controller) enqueueChi(obj interface{}) {
 	key, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
@@ -269,6 +293,7 @@ func (c *Controller) enqueueChi(obj interface{}) {
 	c.queue.AddRateLimited(key)
 }
 
+// handleObject applies actiones related to objects modifications (created, updated, deleted)
 func (c *Controller) handleObject(obj interface{}) {
 	object, ok := obj.(metav1.Object)
 	if !ok {
@@ -298,6 +323,7 @@ func (c *Controller) handleObject(obj interface{}) {
 	}
 }
 
+// waitForCacheSync syncs informers cache
 func waitForCacheSync(n string, ch <-chan struct{}, syncs ...cache.InformerSynced) bool {
 	glog.V(1).Infof("Syncing caches for %s controller", n)
 	if !cache.WaitForCacheSync(ch, syncs...) {

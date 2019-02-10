@@ -3,6 +3,9 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "clickhouse-installation-test"
 spec:
+# actions:
+#   upgrade:
+#     useImage: yandex/clickhouse-server:latest
   defaults:
     replicasUseFQDN: 0 # 0 - by default, 1 - enabled
     distributedDDL:
@@ -20,28 +23,45 @@ spec:
   configuration:
     zookeeper:
       nodes:
-        - host: zk-statefulset-0.zk-service.default.svc.cluster.local
-          port: 2181
-        - host: zk-statefulset-1.zk-service.default.svc.cluster.local
-          port: 2181
-        - host: zk-statefulset-2.zk-service.default.svc.cluster.local
-          port: 2181
-
+      - host: zk-statefulset-0.zk-service.default.svc.cluster.local
+        port: 2181
+      - host: zk-statefulset-1.zk-service.default.svc.cluster.local
+        port: 2181
+      - host: zk-statefulset-2.zk-service.default.svc.cluster.local
+        port: 2181
     users:
-      profiles/readonly/readonly: "1"
+      test/profile: default
+      test/quotas: default
+      readonly/profile: readonly
+#     <users>
+#        <readonly>
+#          <profile>readonly</profile>
+#        </readonly>
+#     </users>
+    profiles:
+      readonly/readonly: "1"
 #      <profiles>
 #        <readonly>
 #          <readonly>1</readonly>
 #        </readonly>
 #      </profiles>
-    settings:
-      profiles/default/max_memory_usage: "1000000000"
+      default/max_memory_usage: "1000000000"
 #      <profiles>
 #        <default>
 #          <max_memory_usage>1000000000</max_memory_usage>
 #        </default>
 #      </profiles>
-      compression/case/method: "zstd"
+    quotas:
+      default/interval/duration: "3600"
+#     <quotas>
+#       <default>
+#         <interval>
+#           <duration>3600</duration>
+#         </interval>
+#       </default>
+#     </quotas>
+    settings:
+      compression/case/method: zstd
 #      <compression>
 #       <case>
 #         <method>zstd</method>
@@ -160,7 +180,7 @@ spec:
     - name: default
       template:
         metadata:
-          name: clickhouse-data
+          name: clickhouse-data-test
         spec:
           accessModes:
           - ReadWriteOnce
@@ -169,20 +189,16 @@ spec:
               storage: 100Mi
     podTemplates:
     - name: clickhouse-installation
-      volumes:
-        - name: clickhouse-data
-          mountPath: /var/lib/clickhouse
       containers:
       - name: clickhouse
-        image: yandex/clickhouse-server:18.14.19-stable
+        volumeMounts:
+        - name: clickhouse-data-test
+          mountPath: /var/lib/clickhouse
+        image: yandex/clickhouse-server:18.16.1
         resources:
           requests:
             memory: "64Mi"
-            cpu: "250m"
+            cpu: "100m"
           limits:
-            memory: "128Mi"
-            cpu: "500m"
-      - name: client
-        image: yandex/clickhouse-client:18.14.19-stable
-      - name: logwatcher
-        image: path/tologwatcher:1.2.3
+            memory: "64Mi"
+            cpu: "100m"

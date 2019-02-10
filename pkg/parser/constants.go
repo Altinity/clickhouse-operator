@@ -1,3 +1,17 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package parser
 
 const (
@@ -31,10 +45,28 @@ const (
 )
 
 const (
-	remoteServersXML = "remote_servers.xml"
-	zookeeperXML     = "zookeeper.xml"
-	usersXML         = "users.xml"
-	macrosXML        = "macros.xml"
+	xmlTagYandex = "yandex"
+)
+
+const (
+	configUsers         = "users"
+	configProfiles      = "profiles"
+	configQuotas        = "quotas"
+	configSettings      = "settings"
+	configRemoteServers = "remote_servers"
+	configZookeeper     = "zookeeper"
+	configMacros        = "macros"
+)
+
+const (
+	dotXML           = ".xml"
+	remoteServersXML = configRemoteServers + dotXML
+	zookeeperXML     = configZookeeper + dotXML
+	usersXML         = configUsers + dotXML
+	quotasXML        = configQuotas + dotXML
+	profilesXML      = configProfiles + dotXML
+	settingsXML      = configSettings + dotXML
+	macrosXML        = configMacros + dotXML
 )
 
 const (
@@ -72,6 +104,10 @@ const (
 	fullPathRemoteServersXML = configdPath + remoteServersXML
 	fullPathZookeeperXML     = configdPath + zookeeperXML
 	fullPathMacrosXML        = configdPath + macrosXML
+	fullPathUsersXML         = configdPath + usersXML
+	fullPathQuotasXML        = configdPath + quotasXML
+	fullPathProfilesXML      = configdPath + profilesXML
+	fullPathSettingsXML      = configdPath + settingsXML
 	fullPathClickHouseData   = "/var/lib/clickhouse"
 )
 
