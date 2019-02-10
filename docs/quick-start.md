@@ -139,46 +139,6 @@ FROM system.clusters
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "test4"
-spec:
-  configuration:
-    users:
-      readonly/profile: readonly
-      test/profile: default
-      test/quota: default
-    profiles:
-      default/max_memory_usage: "1000000000"
-      readonly/readonly: "1"
-    quotas:
-      default/interval/duration: "3600"
-    settings:
-      compression/case/method: zstd
-    clusters:
-      - name: "sharded-replicated"
-        layout:
-          type: Standard
-          shardsCount: 1
-          replicasCount: 2
-      - name: "sharded-non-replicated"
-        layout:
-          type: Standard
-          shardsCount: 2
-      - name: "replicated"
-        layout:
-          type: Standard
-          replicasCount: 2
-```
-```console
-$ kubectl apply -n test -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/chi-example-04-no-pv-custom-configuration.yaml
-clickhouseinstallation.clickhouse.altinity.com/test4 created
-```
-
-## Custom deployment using specific ClickHouse configuration
-### Creating a custom resource object
-```yaml
-apiVersion: "clickhouse.altinity.com/v1"
-kind: "ClickHouseInstallation"
-metadata:
   name: "test5"
 spec:
   defaults:
@@ -231,4 +191,44 @@ spec:
 ```console
 $ kubectl apply -n test -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/chi-example-05-custom-templates.yaml
 clickhouseinstallation.clickhouse.altinity.com/test5 created
+```
+
+## Custom deployment using specific ClickHouse configuration
+### Creating a custom resource object
+```yaml
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test4"
+spec:
+  configuration:
+    users:
+      readonly/profile: readonly
+      test/profile: default
+      test/quota: default
+    profiles:
+      default/max_memory_usage: "1000000000"
+      readonly/readonly: "1"
+    quotas:
+      default/interval/duration: "3600"
+    settings:
+      compression/case/method: zstd
+    clusters:
+      - name: "sharded-replicated"
+        layout:
+          type: Standard
+          shardsCount: 1
+          replicasCount: 2
+      - name: "sharded-non-replicated"
+        layout:
+          type: Standard
+          shardsCount: 2
+      - name: "replicated"
+        layout:
+          type: Standard
+          replicasCount: 2
+```
+```console
+$ kubectl apply -n test -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/chi-example-04-no-pv-custom-configuration.yaml
+clickhouseinstallation.clickhouse.altinity.com/test4 created
 ```
