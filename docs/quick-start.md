@@ -22,14 +22,14 @@ NAME                                        READY   STATUS    RESTARTS   AGE
 clickhouse-operator-ddc6fd499-fhxqs         1/1     Running   0          5m22s
 ```
 
-
-## Simple deployment with default storage
-
 ### Creating a custom namespace
 ```console
 $ kubectl create ns test
 namespace/test created
 ```
+
+
+## Simple deployment with default storage
 
 ### Creating a custom resource object
 ```yaml
