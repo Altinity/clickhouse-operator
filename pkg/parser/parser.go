@@ -61,7 +61,7 @@ func CreateObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
 	}, prefixes
 }
 
-// getNormalizedClusters returns list of "normalized" (converted to basic form) chiv1.ChiCluster pbjects with additional data
+// getNormalizedClusters returns list of "normalized" (converted to basic form) chiv1.ChiCluster objects with additional data
 func getNormalizedClusters(chi *chiv1.ClickHouseInstallation) ([]*chiv1.ChiCluster, chiDeploymentRefs) {
 	link := make(chan *chiClusterDataLink)
 	count := len(chi.Spec.Configuration.Clusters)
