@@ -127,6 +127,14 @@ spec:
                   type: object
                   additionalProperties:
                     type: string
+                profiles:
+                  type: object
+                  additionalProperties:
+                    type: string
+                quotas:
+                  type: object
+                  additionalProperties:
+                    type: string
                 zookeeper:
                   type: object
                   properties:
@@ -174,6 +182,7 @@ spec:
                     type: object
                     required:
                     - name
+                    - containers
                     properies:
                       name:
                         type: string
