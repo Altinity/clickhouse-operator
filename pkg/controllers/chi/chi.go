@@ -293,7 +293,7 @@ func (c *Controller) enqueueChi(obj interface{}) {
 	c.queue.AddRateLimited(key)
 }
 
-// handleObject applies actiones related to objects modifications (created, updated, deleted)
+// handleObject applies actions related to objects modifications (created, updated, deleted)
 func (c *Controller) handleObject(obj interface{}) {
 	object, ok := obj.(metav1.Object)
 	if !ok {
