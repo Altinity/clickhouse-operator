@@ -1,3 +1,17 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package app
 
 import (
@@ -25,7 +39,7 @@ import (
 )
 
 // Version defines current build version
-const Version = "0.1.2beta"
+const Version = "0.1.3beta"
 
 var (
 	kubeconfig string
@@ -40,6 +54,7 @@ func init() {
 	flag.Parse()
 }
 
+// getConfig creates rest.Config object based on current environment
 func getConfig() (*rest.Config, error) {
 	if len(kubeconfig) > 0 {
 		return clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
@@ -59,6 +74,7 @@ func getConfig() (*rest.Config, error) {
 	return nil, fmt.Errorf("kubeconfig not found")
 }
 
+// createClientsets creates Clientset objects
 func createClientsets() (*kubernetes.Clientset, *clientset.Clientset) {
 	config, err := getConfig()
 	if err != nil {
@@ -78,6 +94,7 @@ func createClientsets() (*kubernetes.Clientset, *clientset.Clientset) {
 // Run is an entry point of the application
 func Run() {
 	glog.V(1).Infof("Starting clickhouse-operator version '%s'\n", Version)
+	// Setting OS signals and termination context
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	stop := make(chan os.Signal, 2)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
@@ -87,17 +104,21 @@ func Run() {
 		<-stop
 		os.Exit(1)
 	}()
+	// Initializing ClientSets and Informers
 	kubeClient, chiClient := createClientsets()
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
 	chiInformerFactory := informers.NewSharedInformerFactory(chiClient, time.Second*30)
+	// Creating resource Controller
 	chiController := chi.CreateController(
 		chiClient, kubeClient,
 		chiInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),
 		kubeInformerFactory.Core().V1().Services())
+	// Starting Informers
 	kubeInformerFactory.Start(ctx.Done())
 	chiInformerFactory.Start(ctx.Done())
+	// Starting resource Controller
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {

@@ -1,3 +1,17 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package parser
 
 import (
@@ -17,25 +31,29 @@ func CreateObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
 		clusters []*chiv1.ChiCluster
 		options  genOptions
 	)
+	// Setting defaults for CHI object properties
 	setDefaults(chi)
 	setDeploymentDefaults(&chi.Spec.Defaults.Deployment, nil)
 	clusters, options.dRefsMax = getNormalizedClusters(chi)
-
+	// Allocating data structures
 	options.ssNames = make(map[string]string)
 	options.ssDeployments = make(map[string]*chiv1.ChiDeployment)
 	options.macrosDataIndex = make(map[string]shardsIndex)
-
+	options.includes = make(map[string]bool)
 	cmData := make(map[string]string)
+	// Generating XMLs
 	cmData[remoteServersXML] = genRemoteServersConfig(chi, &options, clusters)
-
-	includeIfNotEmpty(cmData, zookeeperXML, genZookeeperConfig(chi))
-	includeIfNotEmpty(cmData, usersXML, genUsersConfig(chi))
-
+	options.includes[zookeeperXML] = includeIfNotEmpty(cmData, zookeeperXML, genZookeeperConfig(chi))
+	options.includes[usersXML] = includeIfNotEmpty(cmData, usersXML, genUsersConfig(chi))
+	options.includes[profilesXML] = includeIfNotEmpty(cmData, profilesXML, genProfilesConfig(chi))
+	options.includes[quotasXML] = includeIfNotEmpty(cmData, quotasXML, genQuotasConfig(chi))
+	options.includes[settingsXML] = includeIfNotEmpty(cmData, settingsXML, genSettingsConfig(chi))
+	// Creating objects index
 	prefixes := make([]string, 0, len(options.ssNames))
 	for p := range options.ssNames {
 		prefixes = append(prefixes, p)
 	}
-
+	// Creating k8s objects (data structures)
 	return ObjectsMap{
 		ObjectsConfigMaps:   createConfigMapObjects(chi, cmData, &options),
 		ObjectsServices:     createServiceObjects(chi, &options),
@@ -43,6 +61,7 @@ func CreateObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
 	}, prefixes
 }
 
+// getNormalizedClusters returns list of "normalized" (converted to basic form) chiv1.ChiCluster pbjects with additional data
 func getNormalizedClusters(chi *chiv1.ClickHouseInstallation) ([]*chiv1.ChiCluster, chiDeploymentRefs) {
 	link := make(chan *chiClusterDataLink)
 	count := len(chi.Spec.Configuration.Clusters)
@@ -61,6 +80,7 @@ func getNormalizedClusters(chi *chiv1.ClickHouseInstallation) ([]*chiv1.ChiClust
 	return cList, dRefs
 }
 
+// getNormalizedClusterLayoutData returns chiv1.ChiCluster object after normalization procedures
 func getNormalizedClusterLayoutData(chi *chiv1.ClickHouseInstallation, c chiv1.ChiCluster) *chiClusterDataLink {
 	n := &chiv1.ChiCluster{
 		Name:       c.Name,
@@ -127,9 +147,11 @@ func getNormalizedClusterLayoutData(chi *chiv1.ClickHouseInstallation, c chiv1.C
 	}
 }
 
+// deploymentToString creates string representation of chiv1.ChiDeployment object
 func deploymentToString(d *chiv1.ChiDeployment) string {
-	var keys []string
-	a := make([]string, 0, len(d.Zone.MatchLabels))
+	l := len(d.Zone.MatchLabels)
+	keys := make([]string, 0, l)
+	a := make([]string, 0, l+1)
 	a = append(a, fmt.Sprintf("%s::%s::%s::", d.Scenario, d.PodTemplateName, d.VolumeClaimTemplate))
 	for k := range d.Zone.MatchLabels {
 		keys = append(keys, k)
@@ -141,12 +163,14 @@ func deploymentToString(d *chiv1.ChiDeployment) string {
 	return strings.Join(a, "::")
 }
 
+// setDefaults updates chi.Spec.Defaults section with default values
 func setDefaults(chi *chiv1.ClickHouseInstallation) {
 	if chi.Spec.Defaults.ReplicasUseFQDN != 1 {
 		chi.Spec.Defaults.ReplicasUseFQDN = 0
 	}
 }
 
+// setDeploymentDefaults updates chiv1.ChiDeployment with default values
 func setDeploymentDefaults(d, parent *chiv1.ChiDeployment) {
 	if parent != nil {
 		if d.PodTemplateName == "" {
@@ -166,6 +190,7 @@ func setDeploymentDefaults(d, parent *chiv1.ChiDeployment) {
 	}
 }
 
+// zoneCopyFrom copies one chiv1.ChiDeploymentZone object into another
 func zoneCopyFrom(z, source *chiv1.ChiDeploymentZone) {
 	tmp := make(map[string]string)
 	for k, v := range source.MatchLabels {
@@ -174,6 +199,7 @@ func zoneCopyFrom(z, source *chiv1.ChiDeploymentZone) {
 	(*z).MatchLabels = tmp
 }
 
+// mergeWith combines chiDeploymentRefs object with another one
 func (d chiDeploymentRefs) mergeWith(another chiDeploymentRefs) {
 	for ak, av := range another {
 		_, ok := d[ak]
@@ -183,15 +209,18 @@ func (d chiDeploymentRefs) mergeWith(another chiDeploymentRefs) {
 	}
 }
 
+// randomString generates random string
 func randomString() string {
 	b := make([]byte, 3)
 	rand.New(rand.NewSource(time.Now().UnixNano())).Read(b)
 	return hex.EncodeToString(b)
 }
 
-func includeIfNotEmpty(dest map[string]string, key, src string) {
+// includeIfNotEmpty inserts data into map object using specified key, if not empty value provided
+func includeIfNotEmpty(dest map[string]string, key, src string) bool {
 	if src == "" {
-		return
+		return false
 	}
 	dest[key] = src
+	return true
 }

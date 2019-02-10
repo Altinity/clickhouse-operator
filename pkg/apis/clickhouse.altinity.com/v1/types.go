@@ -1,3 +1,17 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package v1
 
 import (
@@ -57,21 +71,23 @@ type ChiDeploymentZone struct {
 
 // ChiConfiguration defines configuration section of .spec
 type ChiConfiguration struct {
-	Zookeeper ChiConfigurationZookeeper `json:"zookeeper"`
+	Zookeeper ChiConfigurationZookeeper `json:"zookeeper,omitempty"`
 	Users     map[string]string         `json:"users,omitempty"`
+	Profiles  map[string]string         `json:"profiles,omitempty"`
+	Quotas    map[string]string         `json:"quotas,omitempty"`
 	Settings  map[string]string         `json:"settings,omitempty"`
 	Clusters  []ChiCluster              `json:"clusters,omitempty"`
 }
 
 // ChiConfigurationZookeeper defines zookeeper section of .spec.configuration
 type ChiConfigurationZookeeper struct {
-	Nodes []ChiConfigurationZookeeperNode `json:"nodes"`
+	Nodes []ChiConfigurationZookeeperNode `json:"nodes,omitempty"`
 }
 
 // ChiConfigurationZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
 type ChiConfigurationZookeeperNode struct {
 	Host string `json:"host"`
-	Port int32  `json:"port,omitempty"`
+	Port int32  `json:"port"`
 }
 
 // ChiCluster defines item of a clusters section of .configuration
@@ -119,27 +135,9 @@ type ChiVolumeClaimTemplate struct {
 
 // ChiPodTemplate defines item of a podTemplates section of .spec.templates
 type ChiPodTemplate struct {
-	Name       string                             `json:"name"`
-	Containers []ChiPodTemplatesContainerTemplate `json:"containers"`
-}
-
-// ChiPodTemplatesContainerTemplate defines item of a containers section of .spec.templates
-type ChiPodTemplatesContainerTemplate struct {
-	Name      string                              `json:"name"`
-	Image     string                              `json:"image,omitempty"`
-	Resources ChiPodTemplatesContainerTemplateRes `json:"resources,omitempty"`
-}
-
-// ChiPodTemplatesContainerTemplateRes defines resources section of .spec.templates.podTemplates[n]
-type ChiPodTemplatesContainerTemplateRes struct {
-	Requests ChiPodTemplatesContainerTemplateResParams `json:"requests,omitempty"`
-	Limits   ChiPodTemplatesContainerTemplateResParams `json:"limits,omitempty"`
-}
-
-// ChiPodTemplatesContainerTemplateResParams defines requests/limit sections of .spec.templates.podTemplates[n].resources
-type ChiPodTemplatesContainerTemplateResParams struct {
-	Memory string `json:"memory,omitempty"`
-	CPU    string `json:"cpu,omitempty"`
+	Name       string             `json:"name"`
+	Containers []corev1.Container `json:"containers"`
+	Volumes    []corev1.Volume    `json:"volumes"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -148,8 +146,7 @@ type ChiPodTemplatesContainerTemplateResParams struct {
 type ClickHouseInstallationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
-
-	Items []ClickHouseInstallation `json:"items"`
+	Items           []ClickHouseInstallation `json:"items"`
 }
 
 const (
