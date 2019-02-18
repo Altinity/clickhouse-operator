@@ -14,6 +14,10 @@
 
 package parser
 
+import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
+)
+
 const (
 	// ObjectsConfigMaps defines a category of the ConfigMap objects list
 	ObjectsConfigMaps ObjectKind = iota + 1
@@ -21,6 +25,11 @@ const (
 	ObjectsStatefulSets
 	// ObjectsServices defines a category of the Service objects list
 	ObjectsServices
+)
+
+const (
+	// ClusterwideLabel applied to all objects created by the ClickHouse Operator
+	ClusterwideLabel = clickhousealtinitycom.GroupName + "/chi"
 )
 
 const (
@@ -96,7 +105,7 @@ const (
 	chDefaultInterServerPortNumber = 9009
 	chDefaultRestPortName          = "rest"
 	chDefaultRestPortNumber        = 8123
-	chDefaultAppLabel              = "app"
+	chDefaultAppLabel              = clickhousealtinitycom.GroupName + "/app"
 )
 
 const (
