@@ -32,6 +32,9 @@ func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]s
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf(configMapNamePattern, chi.Name),
 			Namespace: chi.Namespace,
+			Labels: map[string]string{
+				ClusterwideLabel: chi.Name,
+			},
 		},
 		Data: data,
 	}
@@ -41,6 +44,9 @@ func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]s
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf(configMapMacrosNamePattern, chi.Name, ssName),
 				Namespace: chi.Namespace,
+				Labels: map[string]string{
+					ClusterwideLabel: chi.Name,
+				},
 			},
 			Data: map[string]string{
 				macrosXML: generateHostMacros(chi.Name, ssName, o.macrosDataIndex[ssName]),
@@ -61,6 +67,9 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) Serv
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      svcName,
 				Namespace: chi.Namespace,
+				Labels: map[string]string{
+					ClusterwideLabel: chi.Name,
+				},
 			},
 			Spec: corev1.ServiceSpec{
 				ClusterIP: templateDefaultsServiceClusterIP,
@@ -157,6 +166,9 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ssName,
 				Namespace: chi.Namespace,
+				Labels: map[string]string{
+					ClusterwideLabel: chi.Name,
+				},
 			},
 			Spec: apps.StatefulSetSpec{
 				Replicas:    &rNum,
@@ -171,6 +183,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 						Name: ssName,
 						Labels: map[string]string{
 							chDefaultAppLabel: ssName,
+							ClusterwideLabel:  chi.Name,
 						},
 					},
 					Spec: corev1.PodSpec{
