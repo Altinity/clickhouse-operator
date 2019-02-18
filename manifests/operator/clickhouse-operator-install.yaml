@@ -121,20 +121,12 @@ spec:
                                         type: object
                 settings:
                   type: object
-                  additionalProperties:
-                    type: string
                 users:
                   type: object
-                  additionalProperties:
-                    type: string
                 profiles:
                   type: object
-                  additionalProperties:
-                    type: string
                 quotas:
                   type: object
-                  additionalProperties:
-                    type: string
                 zookeeper:
                   type: object
                   properties:
