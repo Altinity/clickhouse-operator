@@ -84,6 +84,7 @@ const (
 	svcNamePattern             = "%ss"
 	domainPattern              = ".%s.svc.cluster.local"
 	hostnamePattern            = ssNamePattern + "-0.%[1]ss%s"
+	fqdnPattern                = "%s-0.%s%s"
 	configMapNamePattern       = "chi-%s-configd"
 	configMapMacrosNamePattern = configMapNamePattern + "-%s"
 	distributedDDLPattern      = "/clickhouse/%s/task_queue/ddl"

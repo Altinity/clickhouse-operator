@@ -20,6 +20,7 @@ import (
 	"time"
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	metrics "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	clientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	clientscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	informers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/clickhouse.altinity.com/v1"
@@ -30,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	labels "k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	wait "k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -60,25 +62,35 @@ type Controller struct {
 	serviceListerSynced     cache.InformerSynced
 	queue                   workqueue.RateLimitingInterface
 	recorder                record.EventRecorder
+	metricsExporter         *metrics.Exporter
 }
 
 const (
+	componentName = "clickhouse-operator"
+)
+
+const (
 	successSynced         = "Synced"
-	messageResourceSynced = "ClickHouseInstallation synced successfully"
 	errResourceExists     = "ErrResourceExists"
+	messageResourceSynced = "ClickHouseInstallation synced successfully"
 	messageResourceExists = "Resource %q already exists and is not managed by ClickHouseInstallation"
+	messageUnableToDecode = "Unable to decode object (invalid type)"
+	messageUnableToSync   = "Unable to sync caches for %s controller"
 )
 
 // CreateController creates instance of Controller
 func CreateController(
 	chiClient clientset.Interface, kubeClient kubernetes.Interface,
 	chiInformer informers.ClickHouseInstallationInformer, ssInformer appsinformers.StatefulSetInformer,
-	cmInformer coreinformers.ConfigMapInformer, serviceInformer coreinformers.ServiceInformer) *Controller {
+	cmInformer coreinformers.ConfigMapInformer, serviceInformer coreinformers.ServiceInformer,
+	pMetricsExporter *metrics.Exporter) *Controller {
+	// Initializations
 	clientscheme.AddToScheme(scheme.Scheme)
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: "clickhouse-operator"})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: componentName})
+	// Creating Controller instance
 	controller := &Controller{
 		kubeClient:              kubeClient,
 		chiClient:               chiClient,
@@ -92,6 +104,7 @@ func CreateController(
 		serviceListerSynced:     serviceInformer.Informer().HasSynced,
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
 		recorder:                recorder,
+		metricsExporter:         pMetricsExporter,
 	}
 	chiInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controller.enqueueChi,
@@ -174,7 +187,7 @@ func (c *Controller) syncHandler(key string) error {
 		utilruntime.HandleError(fmt.Errorf("incorrect resource key: %s", key))
 		return nil
 	}
-	// Listing all CHI resources
+	// Checking CHI object against the cache
 	chi, err := c.chiLister.ClickHouseInstallations(ns).Get(n)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -183,18 +196,35 @@ func (c *Controller) syncHandler(key string) error {
 		}
 		return err
 	}
-	// Checking the CHI object already in sync
+	// Checking that CHI object already in sync
 	if chi.Status.ObjectPrefixes == nil || len(chi.Status.ObjectPrefixes) == 0 {
 		prefixes, err := c.createControlledResources(chi)
 		if err != nil {
-			glog.V(2).Infof("ClickHouseInstallation (%q) unable to create controlled resources: %q", chi.Name, err)
+			glog.V(2).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
 			return err
 		}
 		if err := c.updateChiStatus(chi, prefixes); err != nil {
-			glog.V(2).Infof("ClickHouseInstallation (%q) unable to update status of CHI resource: %q", chi.Name, err)
+			glog.V(2).Infof("ClickHouseInstallation (%q): unable to update status of CHI resource: %q", chi.Name, err)
 			return err
 		}
-		glog.V(2).Infof("ClickHouseInstallation (%q) controlled resources are synced (created/updated): %v", chi.Name, prefixes)
+		glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created): %v", chi.Name, prefixes)
+	} else { // Checking consistency of existent resources controlled by the CHI object
+		totalPrefixes := len(chi.Status.ObjectPrefixes)
+		chInstances := make([]string, totalPrefixes)
+		for i, prefix := range chi.Status.ObjectPrefixes {
+			ssName := parser.CreateStatefulSetName(prefix)
+			_, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(ssName)
+			if err == nil { // To-Do: check all controlled objects
+				glog.V(2).Infof("ClickHouseInstallation (%q) controlls StatefulSet: %q", chi.Name, ssName)
+				// Preparing hostnames list for the metrics.Exporter state storage
+				chInstances[i] = parser.CreatePodHostname(chi.Namespace, prefix)
+			}
+		}
+		// Checking that hostnames of the Pods from current CHI object included into metrics.Exporter state
+		if !c.metricsExporter.ControlledValuesExist(chi.Name, chInstances) {
+			glog.V(2).Infof("ClickHouseInstallation (%q): including hostnames into metrics.Exporter", chi.Name)
+			c.metricsExporter.UpdateControlledState(chi.Name, chInstances)
+		}
 	}
 	return nil
 }
@@ -299,25 +329,27 @@ func (c *Controller) handleObject(obj interface{}) {
 	if !ok {
 		ts, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unable to decode object (invalid type)"))
+			utilruntime.HandleError(fmt.Errorf(messageUnableToDecode))
 			return
 		}
 		object, ok = ts.Obj.(metav1.Object)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("unable to decode object (invalid type)"))
+			utilruntime.HandleError(fmt.Errorf(messageUnableToDecode))
 			return
 		}
 	}
-	glog.V(2).Infof("Processing object: %s", object.GetName())
+	// Checking that we control current StatefulSet Object
 	if ownerRef := metav1.GetControllerOf(object); ownerRef != nil {
 		if ownerRef.Kind != chiv1.ClickHouseInstallationCRDResourceKind {
 			return
 		}
+		glog.V(2).Infof("Processing object: %s", object.GetName())
 		chi, err := c.chiLister.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
 		if err != nil {
 			glog.V(2).Infof("ignoring orphaned object '%s' of ClickHouseInstallation '%s'", object.GetSelfLink(), ownerRef.Name)
 			return
 		}
+		// Adding CHI object reference for reconcilation checks
 		c.enqueueChi(chi)
 		return
 	}
@@ -327,9 +359,27 @@ func (c *Controller) handleObject(obj interface{}) {
 func waitForCacheSync(n string, ch <-chan struct{}, syncs ...cache.InformerSynced) bool {
 	glog.V(1).Infof("Syncing caches for %s controller", n)
 	if !cache.WaitForCacheSync(ch, syncs...) {
-		utilruntime.HandleError(fmt.Errorf("Unable to sync caches for %s controller", n))
+		utilruntime.HandleError(fmt.Errorf(messageUnableToSync, n))
 		return false
 	}
 	glog.V(1).Infof("Caches are synced for %s controller", n)
 	return true
+}
+
+// clusterWideSelector returns labels.Selector object
+func clusterWideSelector(name string) labels.Selector {
+	return labels.SelectorFromSet(labels.Set{
+		parser.ClusterwideLabel: name,
+	})
+	/*
+		glog.V(2).Infof("ClickHouseInstallation (%q) listing controlled resources", chi.Name)
+		ssList, err := c.statefulSetLister.StatefulSets(chi.Namespace).List(clusterWideSelector(chi.Name))
+		if err != nil {
+			return err
+		}
+		// Listing controlled resources
+		for i := range ssList {
+			glog.V(2).Infof("ClickHouseInstallation (%q) controlls StatefulSet: %q", chi.Name, ssList[i].Name)
+		}
+	*/
 }
