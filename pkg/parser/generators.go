@@ -104,7 +104,7 @@ func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, o *genOptions, c 
 		dID[k] = randomString()
 	}
 	if chi.Spec.Defaults.ReplicasUseFQDN == 1 {
-		hostDomain = fmt.Sprintf(domainPattern, chi.Namespace)
+		hostDomain = CreateDomainName(chi.Namespace)
 	}
 	fmt.Fprintf(b, "<%s>\n%4s<remote_servers>\n", xmlTagYandex, " ")
 	for i := range c {
