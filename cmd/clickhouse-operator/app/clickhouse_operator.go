@@ -18,6 +18,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"os/user"
@@ -26,31 +27,39 @@ import (
 	"syscall"
 	"time"
 
+	metrics "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	clientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	informers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
-
-	"github.com/altinity/clickhouse-operator/pkg/controllers/chi"
-	"github.com/golang/glog"
+	chi "github.com/altinity/clickhouse-operator/pkg/controllers/chi"
 
 	kubeinformers "k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
+	kubernetes "k8s.io/client-go/kubernetes"
+	rest "k8s.io/client-go/rest"
+	clientcmd "k8s.io/client-go/tools/clientcmd"
+
+	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Version defines current build version
-const Version = "0.1.3beta"
+const Version = "0.1.4beta"
+
+// Prometheus exporter defaults
+const (
+	defaultMetricsEndpoint = ":8888"
+	metricsPath            = "/metrics"
+)
 
 var (
 	kubeconfig string
 	masterURL  string
+	metricsEP  string
 )
 
 func init() {
-	flag.StringVar(&kubeconfig, "kubeconfig", "",
-		"Paths to kubeconfig. Only required if called outside of the cluster.")
-	flag.StringVar(&masterURL, "master", "",
-		"The address of the Kubernetes API server. Only required if called outside of the cluster.")
+	flag.StringVar(&kubeconfig, "kubeconfig", "", "Paths to kubeconfig. Only required if called outside of the cluster.")
+	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Only required if called outside of the cluster.")
+	flag.StringVar(&metricsEP, "metrics-endpoint", defaultMetricsEndpoint, "The Prometheus exporter endpoint")
 	flag.Parse()
 }
 
@@ -94,6 +103,13 @@ func createClientsets() (*kubernetes.Clientset, *clientset.Clientset) {
 // Run is an entry point of the application
 func Run() {
 	glog.V(1).Infof("Starting clickhouse-operator version '%s'\n", Version)
+
+	// Initializing Prometheus Metrics Exporter
+	metricsExporter := metrics.CreateExporter()
+	prometheus.MustRegister(metricsExporter)
+	http.Handle(metricsPath, prometheus.Handler())
+	go http.ListenAndServe(metricsEP, nil)
+
 	// Setting OS signals and termination context
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	stop := make(chan os.Signal, 2)
@@ -104,20 +120,25 @@ func Run() {
 		<-stop
 		os.Exit(1)
 	}()
+
 	// Initializing ClientSets and Informers
 	kubeClient, chiClient := createClientsets()
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
 	chiInformerFactory := informers.NewSharedInformerFactory(chiClient, time.Second*30)
+
 	// Creating resource Controller
 	chiController := chi.CreateController(
 		chiClient, kubeClient,
 		chiInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),
-		kubeInformerFactory.Core().V1().Services())
+		kubeInformerFactory.Core().V1().Services(),
+		metricsExporter)
+
 	// Starting Informers
 	kubeInformerFactory.Start(ctx.Done())
 	chiInformerFactory.Start(ctx.Done())
+
 	// Starting resource Controller
 	wg := &sync.WaitGroup{}
 	wg.Add(1)

@@ -30,7 +30,7 @@ func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]s
 	cmList := make(ConfigMapList, 1, c+1)
 	cmList[0] = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf(configMapNamePattern, chi.Name),
+			Name:      CreateConfigMapName(chi.Name),
 			Namespace: chi.Namespace,
 			Labels: map[string]string{
 				ClusterwideLabel: chi.Name,
@@ -38,18 +38,18 @@ func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]s
 		},
 		Data: data,
 	}
-	for ssName := range o.ssNames {
+	for ssNameID := range o.ssNames {
 		// adding corev1.ConfigMap object to the list
 		cmList = append(cmList, &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf(configMapMacrosNamePattern, chi.Name, ssName),
+				Name:      CreateConfigMapMacrosName(chi.Name, ssNameID),
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
 					ClusterwideLabel: chi.Name,
 				},
 			},
 			Data: map[string]string{
-				macrosXML: generateHostMacros(chi.Name, ssName, o.macrosDataIndex[ssName]),
+				macrosXML: generateHostMacros(chi.Name, ssNameID, o.macrosDataIndex[ssNameID]),
 			},
 		})
 	}
@@ -60,8 +60,8 @@ func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]s
 func createServiceObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) ServiceList {
 	svcList := make(ServiceList, 0, len(o.ssNames))
 	for ssNameID := range o.ssNames {
-		ssName := fmt.Sprintf(ssNamePattern, ssNameID)
-		svcName := fmt.Sprintf(svcNamePattern, ssNameID)
+		ssName := CreateStatefulSetName(ssNameID)
+		svcName := CreateServiceName(ssNameID)
 		// adding corev1.Service object to the list
 		svcList = append(svcList, &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -99,7 +99,7 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) Serv
 // createStatefulSetObjects returns a list of apps.StatefulSet objects
 func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) StatefulSetList {
 	rNum := int32(1)
-	cmName := fmt.Sprintf(configMapNamePattern, chi.Name)
+	cmName := CreateConfigMapName(chi.Name)
 	ssList := make(StatefulSetList, 0, len(o.ssNames))
 	// Populating templates indexes
 	vcTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
@@ -146,11 +146,11 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 	}
 	// Creating list of apps.StatefulSet objects
 	for ssNameID, key := range o.ssNames {
-		ssName := fmt.Sprintf(ssNamePattern, ssNameID)
-		cmMacros := fmt.Sprintf(configMapMacrosNamePattern, chi.Name, ssNameID)
+		ssName := CreateStatefulSetName(ssNameID)
+		cmMacros := CreateConfigMapMacrosName(chi.Name, ssNameID)
 		vcTemplate := o.ssDeployments[key].VolumeClaimTemplate
 		podTemplate := o.ssDeployments[key].PodTemplateName
-		svcName := fmt.Sprintf(svcNamePattern, ssNameID)
+		svcName := CreateServiceName(ssNameID)
 		// Coping list of shared corev1.VolumeMount objects into new slice
 		l := len(sharedVolumeMounts)
 		currentVolumeMounts := make([]corev1.VolumeMount, l, l+1)
@@ -302,4 +302,37 @@ func createPodTemplatesIndex(chi *chiv1.ClickHouseInstallation) podTemplatesInde
 		}
 	}
 	return index
+}
+
+// CreateConfigMapMacrosName returns a name for a ConfigMap (CH macros) resource based on predefined pattern
+func CreateConfigMapMacrosName(chiName, prefix string) string {
+	return fmt.Sprintf(configMapMacrosNamePattern, chiName, prefix)
+}
+
+// CreateConfigMapName returns a name for a ConfigMap resource based on predefined pattern
+func CreateConfigMapName(chiName string) string {
+	return fmt.Sprintf(configMapNamePattern, chiName)
+}
+
+// CreateServiceName returns a name for a Service resource based on predefined pattern
+func CreateServiceName(prefix string) string {
+	return fmt.Sprintf(svcNamePattern, prefix)
+}
+
+// CreateStatefulSetName returns a name for a StatefulSet resource based on predefined pattern
+func CreateStatefulSetName(prefix string) string {
+	return fmt.Sprintf(ssNamePattern, prefix)
+}
+
+// CreateDomainName creates domain part of Pod's name
+func CreateDomainName(chiNamespace string) string {
+	return fmt.Sprintf(domainPattern, chiNamespace)
+}
+
+// CreatePodHostname returns a hostname of the Pod based on predefined pattern
+func CreatePodHostname(chiNamespace, prefix string) string {
+	return fmt.Sprintf(fqdnPattern,
+		CreateStatefulSetName(prefix),
+		CreateServiceName(prefix),
+		CreateDomainName(chiNamespace))
 }
