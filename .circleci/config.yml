@@ -1,0 +1,26 @@
+version: 2
+jobs:
+  build:
+    branches:
+      only:
+        - master
+    machine:
+      enabled: true
+      docker_layer_caching: true
+    steps:
+      - checkout
+      - run:
+          name: Building Docker image
+          command: |
+            echo 'export CHO_RELEASE=$(cat release)' >> $BASH_ENV
+            docker build -t $CHO_NAME:latest .
+      - run:
+          name: Pushing Docker image
+          command: |
+            docker tag $CHO_NAME:latest $COMPANY_REPO/$CHO_NAME:latest
+            docker tag $CHO_NAME:latest $COMPANY_REPO/$CHO_NAME:current
+            docker tag $CHO_NAME:latest $COMPANY_REPO/$CHO_NAME:$CHO_RELEASE
+            docker login -u $DOCKER_USER -p $DOCKER_PASS
+            docker push $COMPANY_REPO/$CHO_NAME:latest
+            docker push $COMPANY_REPO/$CHO_NAME:current
+            docker push $COMPANY_REPO/$CHO_NAME:$CHO_RELEASE
