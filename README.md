@@ -16,6 +16,7 @@ The ClickHouse Operator for Kubernetes currently provides the following:
 - Supports Storage customization (VolumeClaim templates)
 - Supports Pod template customization (Volume and Container templates)
 - Supports ClickHouse configuration customization (including Zookeeper integration)
+- Supports ClickHouse metrics export to Prometheus
 
 ## Requirements
 
