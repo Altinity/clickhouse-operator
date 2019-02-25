@@ -20,7 +20,7 @@ jobs:
             docker tag $CHO_NAME:latest $COMPANY_REPO/$CHO_NAME:latest
             docker tag $CHO_NAME:latest $COMPANY_REPO/$CHO_NAME:current
             docker tag $CHO_NAME:latest $COMPANY_REPO/$CHO_NAME:$CHO_RELEASE
-            docker login -u $DOCKER_USER -p $DOCKER_PASS
+            echo $DOCKER_PWD | docker login -u $DOCKER_LOGIN --password-stdin
             docker push $COMPANY_REPO/$CHO_NAME:latest
             docker push $COMPANY_REPO/$CHO_NAME:current
             docker push $COMPANY_REPO/$CHO_NAME:$CHO_RELEASE
