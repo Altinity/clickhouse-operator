@@ -35,6 +35,7 @@ const (
 
 // Exporter implements prometheus.Collector interface
 type Exporter struct {
+	// chInstallations maps CHI name to list of hostnames (of string type) of this installation
 	chInstallations map[string]*chInstallationData
 	mutex           sync.RWMutex
 	cleanup         sync.Map
@@ -46,8 +47,12 @@ type chInstallationData struct {
 
 // newDescription creates a new prometheus.Desc object
 func newDescription(name, help string) *prometheus.Desc {
-	return prometheus.NewDesc(prometheus.BuildFQName(namespace, subsystem, name), help,
-		[]string{chiLabel, instanceLabel}, nil)
+	return prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, subsystem, name),
+		help,
+		[]string{chiLabel, instanceLabel},
+		nil,
+	)
 }
 
 // CreateExporter returns a new instance of Exporter type
@@ -57,7 +62,7 @@ func CreateExporter() *Exporter {
 	}
 }
 
-// Describe implements prometheus.Collector Descirbe method
+// Describe implements prometheus.Collector Describe method
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	for key := range clickhouseMetricsDescriptions {
 		ch <- clickhouseMetricsDescriptions[key]
@@ -78,44 +83,58 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			return true
 		})
 	}()
+
 	wg := &sync.WaitGroup{}
 	// Getting hostnames of Pods and requesting the metrics data from ClickHouse instances within
 	for chiName := range e.chInstallations {
+		// Loop over all hostnames of this installation
 		for i := range e.chInstallations[chiName].hostnames {
 			wg.Add(1)
 			go func(name, hostname string, c chan<- prometheus.Metric) {
 				defer wg.Done()
+
 				metricsData := make(map[string]string)
-				if err := clickhouse.QueryDataFrom(metricsData, hostname); err != nil {
+				if err := clickhouse.QueryMetricsFromCH(metricsData, hostname); err != nil {
+					// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 					e.cleanup.Store(name, struct{}{})
 					return
 				}
-				parseMetricsData(c, metricsData, name, hostname)
+
+				// Data collected from clickhouse successfully
+				writeMetricsDataToPrometheus(c, metricsData, name, hostname)
 			}(chiName, e.chInstallations[chiName].hostnames[i], ch)
 		}
 	}
 	wg.Wait()
 }
 
-// parseMetricsData pushes set of prometheus.Metric objects created from the ClickHouse system data
-func parseMetricsData(out chan<- prometheus.Metric, data map[string]string, name, hostname string) {
+// writeMetricsDataToPrometheus pushes set of prometheus.Metric objects created from the ClickHouse system data
+func writeMetricsDataToPrometheus(out chan<- prometheus.Metric, data map[string]string, chiname, hostname string) {
 	for metric := range metricsNames {
-		value, ok := data[metricsNames[metric]]
+		// Data extracted from clickhouse is of type "string" - need to convert to float, expected by Prometheus
 		var floatValue float64
+		stringValue, ok := data[metricsNames[metric]]
 		if ok {
-			floatValue, _ = strconv.ParseFloat(value, 64)
+			// Value reported by clickhouse
+			floatValue, _ = strconv.ParseFloat(stringValue, 64)
 		} else {
+			// Value is not reported by clickhouse
 			continue
 		}
+
+		// Push metric into Prometheus's chan
 		m, _ := prometheus.NewConstMetric(
-			clickhouseMetricsDescriptions[metric], prometheus.GaugeValue, floatValue,
-			name, hostname,
+			clickhouseMetricsDescriptions[metric],
+			prometheus.GaugeValue,
+			floatValue,
+			chiname,	// labelValues ...string
+			hostname,	// labelValues ...string
 		)
 		out <- m
 	}
 }
 
-// removeInstallationReference deletes record from Exporter.chInstallation map identifed by chiName key
+// removeInstallationReference deletes record from Exporter.chInstallation map identified by chiName key
 func (e *Exporter) removeInstallationReference(chiName string) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
@@ -123,31 +142,41 @@ func (e *Exporter) removeInstallationReference(chiName string) {
 }
 
 // UpdateControlledState updates Exporter.chInstallation map with values from chInstances slice
-func (e *Exporter) UpdateControlledState(chiName string, chInstances []string) {
+func (e *Exporter) UpdateControlledState(chiName string, hostnames []string) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
+
 	e.chInstallations[chiName] = &chInstallationData{
-		hostnames: make([]string, len(chInstances)),
+		hostnames: make([]string, len(hostnames)),
 	}
-	copy(e.chInstallations[chiName].hostnames, chInstances)
+	copy(e.chInstallations[chiName].hostnames, hostnames)
 }
 
 // ControlledValuesExist returns true if Exporter.chInstallation map contains chiName key
-// and chInstances are correspond to chInstallation.hostnames
-func (e *Exporter) ControlledValuesExist(chiName string, chInstances []string) bool {
+// and `hostnames` correspond to Exporter.chInstallations[chiName].hostnames
+func (e *Exporter) ControlledValuesExist(chiName string, hostnames []string) bool {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
+
 	_, ok := e.chInstallations[chiName]
-	if ok {
-		if len(chInstances) != len(e.chInstallations[chiName].hostnames) {
+	if !ok {
+		return false
+	}
+
+	// chiName exists
+
+	// Must have the same number of items
+	if len(hostnames) != len(e.chInstallations[chiName].hostnames) {
+		return false
+	}
+
+	// Must have the same items
+	for i := range hostnames {
+		if hostnames[i] != e.chInstallations[chiName].hostnames[i] {
 			return false
 		}
-		for i := range chInstances {
-			if chInstances[i] != e.chInstallations[chiName].hostnames[i] {
-				return false
-			}
-		}
-		return true
 	}
-	return false
+
+	// All checks passed
+	return true
 }

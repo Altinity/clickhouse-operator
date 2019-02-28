@@ -331,8 +331,10 @@ func CreateDomainName(chiNamespace string) string {
 
 // CreatePodHostname returns a hostname of the Pod based on predefined pattern
 func CreatePodHostname(chiNamespace, prefix string) string {
-	return fmt.Sprintf(fqdnPattern,
+	return fmt.Sprintf(
+		fqdnPattern,
 		CreateStatefulSetName(prefix),
 		CreateServiceName(prefix),
-		CreateDomainName(chiNamespace))
+		CreateDomainName(chiNamespace),
+	)
 }

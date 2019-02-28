@@ -31,29 +31,34 @@ func CreateObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
 		clusters []*chiv1.ChiCluster
 		options  genOptions
 	)
-	// Setting defaults for CHI object properties
+
+	// Set defaults for CHI object properties
 	setDefaults(chi)
 	setDeploymentDefaults(&chi.Spec.Defaults.Deployment, nil)
 	clusters, options.dRefsMax = getNormalizedClusters(chi)
-	// Allocating data structures
+
+	// Allocate data structures
 	options.ssNames = make(map[string]string)
 	options.ssDeployments = make(map[string]*chiv1.ChiDeployment)
 	options.macrosDataIndex = make(map[string]shardsIndex)
 	options.includes = make(map[string]bool)
 	cmData := make(map[string]string)
-	// Generating XMLs
+
+	// Generate XMLs
 	cmData[remoteServersXML] = genRemoteServersConfig(chi, &options, clusters)
 	options.includes[zookeeperXML] = includeIfNotEmpty(cmData, zookeeperXML, genZookeeperConfig(chi))
 	options.includes[usersXML] = includeIfNotEmpty(cmData, usersXML, genUsersConfig(chi))
 	options.includes[profilesXML] = includeIfNotEmpty(cmData, profilesXML, genProfilesConfig(chi))
 	options.includes[quotasXML] = includeIfNotEmpty(cmData, quotasXML, genQuotasConfig(chi))
 	options.includes[settingsXML] = includeIfNotEmpty(cmData, settingsXML, genSettingsConfig(chi))
-	// Creating objects index
+
+	// Create objects index
 	prefixes := make([]string, 0, len(options.ssNames))
 	for p := range options.ssNames {
 		prefixes = append(prefixes, p)
 	}
-	// Creating k8s objects (data structures)
+
+	// Create k8s objects (data structures)
 	return ObjectsMap{
 		ObjectsConfigMaps:   createConfigMapObjects(chi, cmData, &options),
 		ObjectsServices:     createServiceObjects(chi, &options),
