@@ -50,7 +50,7 @@ We can either run [create-prometheus-operator.sh](../manifests/prometheus/create
   kubectl apply -f prometheus-clickhouse-operator-service-monitor.yaml -n prometheus
   ```
 
-Now we should have Prometheus up and running/ Let's check it out.
+Now we should have Prometheus up and running. Let's check it out.
 Port-forward Prometheus to `localhost` as:
 ```bash
 kubectl --namespace prometheus port-forward service/prometheus 9090
