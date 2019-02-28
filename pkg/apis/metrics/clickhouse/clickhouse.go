@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
+	neturl "net/url"
 	"strings"
 	"time"
 )
@@ -29,46 +29,48 @@ const (
 )
 
 const (
-	uriPattern     = "http://%s:8123/"
-	qParam         = "query"
-	defaultTimeout = 10 // seconds
+	chQueryUrlPattern     = "http://%s:8123/"
+	chQueryUrlParam       = "query"
+	chQueryDefaultTimeout = 10 * time.Second
 )
 
-// QueryDataFrom requests data from the ClickHouse database using REST interface
-func QueryDataFrom(data map[string]string, hostname string) error {
-	uri, err := url.Parse(fmt.Sprintf(uriPattern, hostname))
+// QueryMetricsFromCH requests metrics data from the ClickHouse database using REST interface
+// data is a concealed output
+func QueryMetricsFromCH(data map[string]string, hostname string) error {
+	url, err := neturl.Parse(fmt.Sprintf(chQueryUrlPattern, hostname))
 	if err != nil {
 		return err
 	}
-	encodeQuery(uri, queryMetricsSQL)
-	return httpCall(data, uri.String())
+	encodeQuery(url, queryMetricsSQL)
+	return httpCall(data, url.String())
 }
 
 // encodeQuery injects SQL command into url.URL query
-func encodeQuery(uri *url.URL, sql string) {
-	query := uri.Query()
-	query.Set(qParam, sql)
-	uri.RawQuery = query.Encode()
+func encodeQuery(url *neturl.URL, sql string) {
+	query := url.Query()
+	query.Set(chQueryUrlParam, sql)
+	url.RawQuery = query.Encode()
 }
 
 // httpCall runs HTTP request using provided URL
 func httpCall(results map[string]string, url string) (err error) {
 	client := &http.Client{
-		Timeout: time.Duration(defaultTimeout * time.Second),
+		Timeout: time.Duration(chQueryDefaultTimeout),
 	}
-	req, err := http.NewRequest("GET", url, nil)
+	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
 	}
-	resp, err := client.Do(req)
+	response, err := client.Do(request)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	defer response.Body.Close()
+	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}
+
 	for _, line := range strings.Split(string(body), "\n") {
 		pairs := strings.Split(line, "\t")
 		if len(pairs) < 2 {
@@ -76,5 +78,6 @@ func httpCall(results map[string]string, url string) (err error) {
 		}
 		results[pairs[0]] = pairs[1]
 	}
+
 	return nil
 }

@@ -19,6 +19,7 @@ import (
 )
 
 const (
+	// system.metrics
 	chSystemMetricQuery                                    = "query"
 	chSystemMetricMerge                                    = "merge"
 	chSystemMetricPartMutation                             = "part_mutation"
@@ -64,6 +65,7 @@ const (
 )
 
 const (
+	// system.asynchronous_metrics
 	chSystemAsyncMetricJemallocBackgroundThreadRunInterval = "jemalloc_background_thread_run_interval"
 	chSystemAsyncMetricJemallocBackgroundThreadNumRuns     = "jemalloc_background_thread_num_runs"
 	chSystemAsyncMetricJemallocBackgroundThreadNumThreads  = "jemalloc_background_thread_num_threads"
@@ -92,7 +94,22 @@ const (
 )
 
 var (
+	// clickhouseMetricsDescriptions keeps description of mertics.
+	// Those descriptions are copy+pasted from system.metrics and system.asynchronous_metrics
+	// SELECT description
+	// FROM system.metrics
+	// LIMIT 5
+	//
+	// ┌─description────────────────────────────────┐
+	// │ Number of executing queries                │
+	// │ Number of executing background merges      │
+	// │ Number of mutations (ALTER DELETE/UPDATE)  │
+	// │ Number of data parts fetching from replica │
+	// │ Number of data parts sending to replicas   │
+	// └────────────────────────────────────────────┘
 	clickhouseMetricsDescriptions = map[string]*prometheus.Desc{
+
+		// system.metrics
 		chSystemMetricQuery: newDescription(chSystemMetricQuery,
 			"Number of executing queries"),
 		chSystemMetricMerge: newDescription(chSystemMetricMerge,
@@ -177,6 +194,8 @@ var (
 			"Number of threads holding read lock in a table RWLock."),
 		chSystemMetricRWLockActiveWriters: newDescription(chSystemMetricRWLockActiveWriters,
 			"Number of threads holding write lock in a table RWLock."),
+
+		// system.asynchronous_metrics
 		chSystemAsyncMetricJemallocBackgroundThreadRunInterval: newDescription(chSystemAsyncMetricJemallocBackgroundThreadRunInterval,
 			"jemalloc: background_thread.run_interval"),
 		chSystemAsyncMetricJemallocBackgroundThreadNumRuns: newDescription(chSystemAsyncMetricJemallocBackgroundThreadNumRuns,
@@ -229,7 +248,23 @@ var (
 			"Max part count for partition"),
 	}
 
+	// metricsNames keeps exact (case-sensitive) metric names copy+pasted
+	// from system.metrics and system.asynchronous_metrics tables.
+	//
+	// SELECT metric
+	// FROM system.metrics
+	// LIMIT 5
+	//
+	// ┌─metric──────────┐
+	// │ Query           │
+	// │ Merge           │
+	// │ PartMutation    │
+	// │ ReplicatedFetch │
+	// │ ReplicatedSend  │
+	// └─────────────────┘
 	metricsNames = map[string]string{
+
+		// system.metrics
 		chSystemMetricQuery:                                    "Query",
 		chSystemMetricMerge:                                    "Merge",
 		chSystemMetricPartMutation:                             "PartMutation",
@@ -273,6 +308,7 @@ var (
 		chSystemMetricRWLockActiveReaders:                      "RWLockActiveReaders",
 		chSystemMetricRWLockActiveWriters:                      "RWLockActiveWriters",
 
+		// system.asynchronous_metrics
 		chSystemAsyncMetricJemallocBackgroundThreadRunInterval: "jemalloc.background_thread.run_interval",
 		chSystemAsyncMetricJemallocBackgroundThreadNumRuns:     "jemalloc.background_thread.num_runs",
 		chSystemAsyncMetricJemallocBackgroundThreadNumThreads:  "jemalloc.background_thread.num_threads",
