@@ -45,7 +45,8 @@ clickhouse-operator-ddc6fd499-fhxqs         1/1     Running   0          5m22s
 1. [More detailed operator installation instructions][4]
 1. [How to setup ClickHouse cluster with replication][5]
 1. [Zookeeper setup][6]
-1. [ClickHouse Installation Custom Resource explained][7]
+1. [Prometheus setup][7]
+1. [ClickHouse Installation Custom Resource explained][8]
 
 ## License
 
@@ -61,4 +62,5 @@ See [LICENSE](LICENSE) for more details.
 [4]: docs/operator_installation_details.md
 [5]: docs/replication_setup.md
 [6]: docs/zookeeper_setup.md
-[7]: docs/custom_resource_explained.md
+[7]: docs/prometheus_setup.md
+[8]: docs/custom_resource_explained.md
