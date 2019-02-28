@@ -1,0 +1,102 @@
+# Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
+# ClusterRoleBinding is namespace-less and must have unique name
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+# IMPORTANT
+# Specify namespace where ServiceAccount located
+#  namespace: default
+  namespace: prometheus
+---
+# Setup ClusterRole
+# ClusterRole is namespace-less and must have unique name
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources:
+  - configmaps
+  verbs: ["get"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+---
+# Setup ServiceAccount
+# ServiceAccount would be created in kubectl-specified namespace
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+---
+# Setup Prometheus
+# Prometheus would be created in kubectl-specified namespace
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus
+  labels:
+    prometheus: prometheus
+spec:
+  replicas: 2
+  serviceAccountName: prometheus
+  serviceMonitorSelector:
+    matchLabels:
+      service: clickhouse-operator
+  enableAdminAPI: false
+#  alerting:
+#    alertmanagers:
+#    - namespace: default
+#      name: alertmanager
+#      port: web
+---
+# Setup ClusterIP Service
+# Service would be created in kubectl-specified namespace
+# In order to get access outside of k8s it should be exposed as:
+# kubectl --namespace prometheus port-forward service/prometheus 9090
+# and point browser to localhost:9090
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 9090
+    protocol: TCP
+    targetPort: web
+  selector:
+    prometheus: prometheus
+---
+# Setup NodePort Service
+# Service would be created in kubectl-specified namespace
+#apiVersion: v1
+#kind: Service
+#metadata:
+#  name: prometheus-main
+#spec:
+#  type: NodePort
+#  ports:
+#  - name: web
+#    nodePort: 30900
+#    port: 9090
+#    protocol: TCP
+#    targetPort: web
+#  selector:
+#    prometheus: main

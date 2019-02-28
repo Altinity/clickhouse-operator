@@ -1,0 +1,22 @@
+# Setup ServiceMonitor to monitor clickhouse-operator metrics end-point by Prometheus
+# ServiceMonitor would be created in kubectl-specified namespace
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: clickhouse-operator
+  labels:
+    app: prometheus
+    service: clickhouse-operator
+spec:
+  selector:
+    matchLabels:
+      app: clickhouse-operator
+# IMPORTANT
+# Specify namespace where clickhouse-operator service is located
+  namespaceSelector:
+    matchNames:
+    - kube-system
+# IMPORTANT
+# Specify service name where clickhouse-operator reports metrics
+  endpoints:
+  - port: clickhouse-operator-metrics
