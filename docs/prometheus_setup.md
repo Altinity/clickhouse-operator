@@ -55,4 +55,3 @@ Port-forward Prometheus to `localhost` as:
 kubectl --namespace prometheus port-forward service/prometheus 9090
 ```
 and navigate browser to `http://localhost:9090` Prometheus should appear.
-
