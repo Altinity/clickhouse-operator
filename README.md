@@ -51,8 +51,8 @@ Replication cluster
 1. [Zookeeper setup][zookeeper_setup]
 
 Monitoring
-1. [Prometheus setup][prometheus_setup]
-1. [Grafana setup][grafana_setup]
+1. [Prometheus & clickhouse-operator integration][prometheus_setup]
+1. [Grafana & Prometheus integration][grafana_setup]
 
 ## License
 
