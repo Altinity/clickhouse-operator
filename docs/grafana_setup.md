@@ -44,7 +44,8 @@ Login credentials:
  - password: **admin**
 
 Login credentials are specified in [grafana.yaml](../manifests/grafana/grafana.yaml) as resource of **kind: Secret** and `base64`-encoded.
-Grafana is installed by now
+
+Grafana is installed by now.
 
 ## Setup Grafana & Prometheus integration
 In Grafana, navigate to **Data Sources** page with menu or directly as 
