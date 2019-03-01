@@ -20,7 +20,7 @@ clickhouse-operator-metrics   ClusterIP   10.105.15.167   <none>        8888/TCP
 
 For debug purposes, we can port-forward it into our local OS as
 ```bash
-kubectl --namespace kube-system port-forward service/clickhouse-operator-metrics 8888
+kubectl --namespace=kube-system port-forward service/clickhouse-operator-metrics 8888
 ```
 and access raw data with browser by navigating to `http://localhost:8888/metrics`
 
@@ -44,25 +44,25 @@ We can either run [create-prometheus.sh](../manifests/prometheus/create-promethe
      
   - Setup `prometheus-operator` into dedicated namespace
   ```bash
-  kubectl apply -f prometheus-operator.yaml -n prometheus
+  kubectl apply --namespace=prometheus -f prometheus-operator.yaml
   ```
     
   - Setup `prometheus` into dedicated namespace. `prometheus-operator` would be used to create `prometheus` instance
   ```bash
-  kubectl apply -f prometheus.yaml -n prometheus
+  kubectl apply --namespace=prometheus -f prometheus.yaml
   ```
 
 At this point Prometheus is up and running. What we need to do - setup integration with `clickhouse-operator`
   
   - Point `prometheus` to gather metrics from `clickhouse-operator`
   ```bash
-  kubectl apply -f prometheus-clickhouse-operator-service-monitor.yaml -n prometheus
+  kubectl apply --namespace=prometheus -f prometheus-clickhouse-operator-service-monitor.yaml
   ```
 
 Now we should have Prometheus gathering metrics from `clickhouse-operator`. Let's check it out.
 Let's get access to Prometheus. Port-forward Prometheus to `localhost` as:
 ```bash
-kubectl --namespace prometheus port-forward service/prometheus 9090
+kubectl --namespace=prometheus port-forward service/prometheus 9090
 ```
 and navigate browser to `http://localhost:9090` Prometheus should appear.
 

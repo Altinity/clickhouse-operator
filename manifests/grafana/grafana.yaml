@@ -58,6 +58,7 @@ metadata:
   name: grafana
 type: Opaque
 data:
+  # IMPORTANT you may want to modify this
   # admin:admin
   admin-username: YWRtaW4=
   admin-password: YWRtaW4=
