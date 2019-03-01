@@ -1,0 +1,80 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: grafana
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:4.2.0
+        ports:
+        - containerPort: 3000
+          name: web
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        env:
+        - name: GF_AUTH_BASIC_ENABLED
+          value: "true"
+        - name: GF_AUTH_ANONYMOUS_ENABLED
+          value: "false"
+        - name: GF_SECURITY_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: grafana
+              key: admin-username
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana
+              key: admin-password
+        readinessProbe:
+          httpGet:
+            path: /login
+            port: 3000
+          initialDelaySeconds: 60
+          timeoutSeconds: 10
+        volumeMounts:
+        - name: grafana-persistent-storage
+          mountPath: /var/lib/grafana
+      volumes:
+      - name: grafana-persistent-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana
+type: Opaque
+data:
+  # IMPORTANT you may want to modify this
+  # admin:admin
+  admin-username: YWRtaW4=
+  admin-password: YWRtaW4=
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  labels:
+    app: grafana
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 3000
+    protocol: TCP
+    targetPort: web
+  selector:
+    app: grafana
