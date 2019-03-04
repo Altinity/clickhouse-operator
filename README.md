@@ -12,9 +12,11 @@ The ClickHouse Operator creates, configures and manages ClickHouse clusters runn
 
 The ClickHouse Operator for Kubernetes currently provides the following:
 
-- Creates cluster of the ClickHouse database based on Custom Resource [specification][1] provided
-- Supports Zookeeper integration
-- Supports storage customization via PVC templates
+- Creates cluster of the ClickHouse database based on Custom Resource [specification][crd_spec] provided
+- Supports Storage customization (VolumeClaim templates)
+- Supports Pod template customization (Volume and Container templates)
+- Supports ClickHouse configuration customization (including Zookeeper integration)
+- Supports ClickHouse metrics export to Prometheus
 
 ## Requirements
 
@@ -38,23 +40,34 @@ clickhouse-operator-ddc6fd499-fhxqs         1/1     Running   0          5m22s
 
 ## Documentation
 
-1. [Introduction][2] 
-1. [Quick-start guide][3]
-1. [More detailed operator installation instructions][4]
-1. [How to setup ClickHouse cluster with replication][5]
-1. [Zookeeper setup][6]
+Start
+1. [Introduction][intro] 
+1. [Quick Start Guides][quick_start]
+1. [More detailed operator installation instructions][detailed]
+1. [ClickHouse Installation Custom Resource explained][crd_explained]
+
+Replication cluster
+1. [How to setup ClickHouse cluster with replication][replication_setup]
+1. [Zookeeper setup][zookeeper_setup]
+
+Monitoring
+1. [Prometheus & clickhouse-operator integration][prometheus_setup]
+1. [Grafana & Prometheus integration][grafana_setup]
 
 ## License
 
-Copyright (c) 2018, Altinity Ltd and/or its affiliates. All rights reserved.
+Copyright (c) 2019, Altinity Ltd and/or its affiliates. All rights reserved.
 
 `clickhouse-operator` is licensed under the Apache License 2.0.
 
-See [LICENSE](LICENSE) for more details.
+See [LICENSE](./LICENSE) for more details.
  
- [1]: docs/examples/clickhouseinstallation-object.yaml
- [2]: docs/introduction.md
- [3]: docs/quick-start.md
- [4]: docs/operator_installation_details.md
- [5]: docs/replication_setup.md
- [6]: docs/zookeeper_setup.md
+[crd_spec]: ./docs/examples/clickhouseinstallation-object.yaml
+[intro]: ./docs/introduction.md
+[quick_start]: ./docs/quick-start.md
+[detailed]: ./docs/operator_installation_details.md
+[replication_setup]: ./docs/replication_setup.md
+[crd_explained]: ./docs/custom_resource_explained.md
+[zookeeper_setup]: ./docs/zookeeper_setup.md
+[prometheus_setup]: ./docs/prometheus_setup.md
+[grafana_setup]: ./docs/grafana_setup.md

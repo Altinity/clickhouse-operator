@@ -1,9 +1,24 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package app
 
 import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"os/user"
@@ -12,92 +27,143 @@ import (
 	"syscall"
 	"time"
 
-	clientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-	informers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
-
-	"github.com/altinity/clickhouse-operator/pkg/controllers/chi"
-	"github.com/golang/glog"
+	chopmetrics "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
+	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
+	chi "github.com/altinity/clickhouse-operator/pkg/controllers/chi"
 
 	kubeinformers "k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
+	kube "k8s.io/client-go/kubernetes"
+	kuberest "k8s.io/client-go/rest"
+	kubeclientcmd "k8s.io/client-go/tools/clientcmd"
+
+	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Version defines current build version
-const Version = "0.1.0beta"
+const Version = "0.1.4beta"
+
+// Prometheus exporter defaults
+const (
+	defaultMetricsEndpoint = ":8888"
+	metricsPath            = "/metrics"
+	informerFactoryResync  = 30 * time.Second
+)
 
 var (
-	kubeconfig string
-	masterURL  string
+	// kubeConfig defines path to kube config file to be used
+	kubeConfig string
+
+	// masterURL defines URL of kubernetes master to be used
+	masterURL string
+
+	// metricsEP defines metrics end-point IP address
+	metricsEP string
 )
 
 func init() {
-	flag.StringVar(&kubeconfig, "kubeconfig", "",
-		"Paths to kubeconfig. Only required if called outside of the cluster.")
-	flag.StringVar(&masterURL, "master", "",
-		"The address of the Kubernetes API server. Only required if called outside of the cluster.")
+	flag.StringVar(&kubeConfig, "kubeconfig", "", "Paths to kubernetes config file. Only required if called outside of the cluster.")
+	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Only required if called outside of the cluster and not being specified in kube config file.")
+	flag.StringVar(&metricsEP, "metrics-endpoint", defaultMetricsEndpoint, "The Prometheus exporter endpoint")
 	flag.Parse()
 }
 
-func getConfig() (*rest.Config, error) {
-	if len(kubeconfig) > 0 {
-		return clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
+// getConfig creates kuberest.Config object based on current environment
+func getConfig() (*kuberest.Config, error) {
+	if len(kubeConfig) > 0 {
+		// kube config file specified as CLI flag
+		return kubeclientcmd.BuildConfigFromFlags(masterURL, kubeConfig)
 	}
+
 	if len(os.Getenv("KUBECONFIG")) > 0 {
-		return clientcmd.BuildConfigFromFlags(masterURL, os.Getenv("KUBECONFIG"))
+		// kube config file specified as ENV var
+		return kubeclientcmd.BuildConfigFromFlags(masterURL, os.Getenv("KUBECONFIG"))
 	}
-	if conf, err := rest.InClusterConfig(); err == nil {
+
+	if conf, err := kuberest.InClusterConfig(); err == nil {
+		// in-cluster configuration found
 		return conf, nil
 	}
-	if usr, err := user.Current(); err == nil {
-		if conf, err := clientcmd.BuildConfigFromFlags(
-			"", filepath.Join(usr.HomeDir, ".kube", "config")); err == nil {
-			return conf, nil
-		}
+
+	usr, err := user.Current()
+	if err != nil {
+		return nil, fmt.Errorf("user not found")
 	}
-	return nil, fmt.Errorf("kubeconfig not found")
+
+	// OS user found. Parse ~/.kube/config file
+	conf, err := kubeclientcmd.BuildConfigFromFlags("", filepath.Join(usr.HomeDir, ".kube", "config"))
+	if err != nil {
+		return nil, fmt.Errorf("~/.kube/config not found")
+	}
+
+	// ~/.kube/config found
+	return conf, nil
 }
 
-func createClientsets() (*kubernetes.Clientset, *clientset.Clientset) {
+// createClientsets creates Clientset objects
+func createClientsets() (*kube.Clientset, *chopclientset.Clientset) {
+
 	config, err := getConfig()
 	if err != nil {
 		glog.Fatalf("Unable to initialize cluster configuration: %s", err.Error())
 	}
-	kubeClientset, err := kubernetes.NewForConfig(config)
+
+	kubeClientset, err := kube.NewForConfig(config)
 	if err != nil {
 		glog.Fatalf("Unable to initialize kubernetes API clientset: %s", err.Error())
 	}
-	customClientset, err := clientset.NewForConfig(config)
+
+	chopClientset, err := chopclientset.NewForConfig(config)
 	if err != nil {
-		glog.Fatalf("Unable to initialize Custom Resource API clientset: %s", err.Error())
+		glog.Fatalf("Unable to initialize CHI Custom Resource API clientset: %s", err.Error())
 	}
-	return kubeClientset, customClientset
+
+	return kubeClientset, chopClientset
 }
 
 // Run is an entry point of the application
 func Run() {
 	glog.V(1).Infof("Starting clickhouse-operator version '%s'\n", Version)
+
+	// Initializing Prometheus Metrics Exporter
+	metricsExporter := chopmetrics.CreateExporter()
+	prometheus.MustRegister(metricsExporter)
+	http.Handle(metricsPath, prometheus.Handler())
+	go http.ListenAndServe(metricsEP, nil)
+
+	// Setting OS signals and termination context
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	stop := make(chan os.Signal, 2)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	stopChan := make(chan os.Signal, 2)
+	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		<-stop
+		<-stopChan
 		cancelFunc()
-		<-stop
+		<-stopChan
 		os.Exit(1)
 	}()
-	kubeClient, chiClient := createClientsets()
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
-	chiInformerFactory := informers.NewSharedInformerFactory(chiClient, time.Second*30)
+
+	// Initializing ClientSets and Informers
+	kubeClient, chopClient := createClientsets()
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, informerFactoryResync)
+	chopInformerFactory := chopinformers.NewSharedInformerFactory(chopClient, informerFactoryResync)
+
+	// Creating resource Controller
 	chiController := chi.CreateController(
-		chiClient, kubeClient,
-		chiInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
+		chopClient,
+		kubeClient,
+		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),
-		kubeInformerFactory.Core().V1().Services())
+		kubeInformerFactory.Core().V1().Services(),
+		metricsExporter,
+	)
+
+	// Starting Informers
 	kubeInformerFactory.Start(ctx.Done())
-	chiInformerFactory.Start(ctx.Done())
+	chopInformerFactory.Start(ctx.Done())
+
+	// Starting resource Controller
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {

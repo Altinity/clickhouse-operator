@@ -1,3 +1,5 @@
+# Setup CustomResourceDefinition
+# CustomResourceDefinition is namespace-less and must have unique name
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -12,13 +14,203 @@ spec:
     plural: clickhouseinstallations
     shortNames:
     - chi
+  validation:
+    openAPIV3Schema:
+      properties:
+        spec:
+          type: object
+          required:
+          - configuration
+          properties:
+            configuration:
+              type: object
+              required:
+              - clusters
+              properties:
+                clusters:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                    - name
+                    - layout
+                    properties:
+                      deployment:
+                        type: object
+                        properties:
+                          scenario:
+                            enum:
+                            - Default
+                            - NodeMonopoly
+                          volumeClaimTemplate:
+                            type: string
+                          podTemplateName:
+                            type: string
+                          zone:
+                            type: object
+                      name:
+                        type: string
+                      shardsCount:
+                        type: integer
+                        minimum: 1
+                      replicasCount:
+                        type: integer
+                        minimum: 1
+                      layout:
+                        type: object
+                        required:
+                        - type
+                        properties:
+                          type:
+                            enum:
+                            - Standard
+                            - Advanced
+                      shards:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                          - definitionType
+                          properties:
+                            deployment:
+                              type: object
+                              properties:
+                                scenario:
+                                  enum:
+                                  - Default
+                                  - NodeMonopoly
+                                volumeClaimTemplate:
+                                  type: string
+                                podTemplateName:
+                                  type: string
+                                zone:
+                                  type: object
+                            definitionType:
+                              enum:
+                              - ReplicasCount
+                              - Replicas
+                            replicasCount:
+                              type: integer
+                              minimum: 1
+                            weight:
+                              type: integer
+                            internalReplication:
+                              enum:
+                              - Disabled
+                              - Enabled
+                            replicas:
+                              type: array
+                              items:
+                                type: object
+                                required:
+                                - deployment
+                                properties:
+                                  port:
+                                    type: integer
+                                    minimum: 1
+                                  deployment:
+                                    type: object
+                                    properties:
+                                      scenario:
+                                        enum:
+                                        - Default
+                                        - NodeMonopoly
+                                      volumeClaimTemplate:
+                                        type: string
+                                      podTemplateName:
+                                        type: string
+                                      zone:
+                                        type: object
+                settings:
+                  type: object
+                users:
+                  type: object
+                profiles:
+                  type: object
+                quotas:
+                  type: object
+                zookeeper:
+                  type: object
+                  properties:
+                    nodes:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          host:
+                            type: string
+                          port:
+                            type: integer
+                            minimum: 1
+            defaults:
+              type: object
+              properties:
+                replicasUseFQDN:
+                  type: integer
+                  minimum: 0
+                  maximum: 1
+                distributedDDL:
+                  type: object
+                  properties:
+                    profile:
+                      type: string
+                deployment:
+                  type: object
+                  properties:
+                    scenario:
+                      enum:
+                      - Default
+                      - NodeMonopoly
+                    volumeClaimTemplate:
+                      type: string
+                    podTemplateName:
+                      type: string
+                    zone:
+                      type: object
+            templates:
+              type: object
+              properties:
+                podTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                    - name
+                    - containers
+                    properies:
+                      name:
+                        type: string
+                      volumes:
+                        type: array
+                        items:
+                          type: object
+                      containers:
+                        type: array
+                        items:
+                          type: object
+                volumeClaimTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                    - name
+                    - template
+                    properties:
+                      name:
+                        type: string
+                      template:
+                        type: object
 ---
+# Setup ServiceAccount
+# ServiceAccount would be created in kubectl-specified namespace
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: clickhouse-operator
   namespace: kube-system
 ---
+# Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
+# ClusterRoleBinding is namespace-less and must have unique name
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -32,6 +224,8 @@ subjects:
     name: clickhouse-operator
     namespace: kube-system
 ---
+# Setup Deployment for clickhouse-operator
+# Deployment would be created in kubectl-specified namespace
 kind: Deployment
 apiVersion: apps/v1
 metadata:
@@ -53,3 +247,22 @@ spec:
       containers:
       - image: altinity/clickhouse-operator:latest
         name: clickhouse-operator
+---
+# Setup ClusterIP Service to provide monitoring metrics for Prometheus
+# Service would be created in kubectl-specified namespace
+# In order to get access outside of k8s it should be exposed as:
+# kubectl --namespace prometheus port-forward service/prometheus 9090
+# and point browser to localhost:9090
+kind: Service
+apiVersion: v1
+metadata:
+  name: clickhouse-operator-metrics
+  namespace: kube-system
+  labels:
+    app: clickhouse-operator
+spec:
+  ports:
+  - port: 8888
+    name: clickhouse-operator-metrics
+  selector:
+    app: clickhouse-operator
