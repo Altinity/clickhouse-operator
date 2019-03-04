@@ -45,8 +45,8 @@ type ChiSpec struct {
 
 // ChiDefaults defines defaults section of .spec
 type ChiDefaults struct {
-	DistributedDDL  ChiDistributedDDL `json:"distributedDDL,omitempty"`
 	ReplicasUseFQDN int               `json:"replicasUseFQDN,omitempty"`
+	DistributedDDL  ChiDistributedDDL `json:"distributedDDL,omitempty"`
 	Deployment      ChiDeployment     `json:"deployment,omitempty"`
 }
 
@@ -57,11 +57,14 @@ type ChiDistributedDDL struct {
 
 // ChiDeployment defines deployment section of .spec
 type ChiDeployment struct {
+	Zone                ChiDeploymentZone `json:"zone,omitempty"`
 	PodTemplateName     string            `json:"podTemplateName,omitempty"`
 	VolumeClaimTemplate string            `json:"volumeClaimTemplate,omitempty"`
-	Zone                ChiDeploymentZone `json:"zone,omitempty"`
 	Scenario            string            `json:"scenario,omitempty"`
-	Key                 string            // used internally by pkg/parser
+	// Fingerprint is a string fingerprint of the ChiDeployment.
+	// Used to find equal deployments
+	// TODO replace with hash
+	Fingerprint         string
 }
 
 // ChiDeploymentZone defines zone section of *.deployment

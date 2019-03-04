@@ -45,13 +45,19 @@ func genConfigXML(data map[string]string, section string) string {
 	if c == 0 {
 		return ""
 	}
+
+	// += <yandex>
+	//      <SECTION>
 	fmt.Fprintf(b, "<%s>\n%4s<%s>\n", xmlTagYandex, " ", section)
 	err := xmlbuilder.GenerateXML(b, data, 4, 4)
 	if err != nil {
 		glog.V(2).Infof(err.Error())
 		return ""
 	}
+	// += <SECTION>
+	//  <yandex>
 	fmt.Fprintf(b, "%4s</%s>\n</%s>\n", " ", section, xmlTagYandex)
+
 	return b.String()
 }
 
@@ -62,102 +68,168 @@ func genSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
 	if c == 0 {
 		return ""
 	}
+
+	// += <yandex>
 	fmt.Fprintf(b, "<%s>\n", xmlTagYandex)
 	err := xmlbuilder.GenerateXML(b, chi.Spec.Configuration.Settings, 0, 4, configUsers, configProfiles, configQuotas)
 	if err != nil {
 		glog.V(2).Infof(err.Error())
 		return ""
 	}
+	// += </yandex>
 	fmt.Fprintf(b, "</%s>\n", xmlTagYandex)
+
 	return b.String()
 }
 
 // genZookeeperConfig creates data for "zookeeper.xml"
 func genZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 	b := &bytes.Buffer{}
-	c := len(chi.Spec.Configuration.Zookeeper.Nodes)
-	if c == 0 {
+	zkNodesNum := len(chi.Spec.Configuration.Zookeeper.Nodes)
+	if zkNodesNum == 0 {
 		return ""
 	}
+
+	// += <yandex>
+	//      <zookeeper>
 	fmt.Fprintf(b, "<%s>\n%4s<zookeeper>\n", xmlTagYandex, " ")
-	for i := 0; i < c; i++ {
+	// Append Zookeeper nodes
+	for i := 0; i < zkNodesNum; i++ {
+		// += <node>
+		//      <host>HOST</host>
+		//      <port>PORT</port>
+		//    </node>
 		fmt.Fprintf(b, "%8s<node>\n%12[1]s<host>%s</host>\n", " ", chi.Spec.Configuration.Zookeeper.Nodes[i].Host)
 		fmt.Fprintf(b, "%12s<port>%d</port>\n", " ", chi.Spec.Configuration.Zookeeper.Nodes[i].Port)
 		fmt.Fprintf(b, "%8s</node>\n", " ")
 	}
+	// += </zookeeper>
 	fmt.Fprintf(b, "%4s</zookeeper>\n", " ")
+
+	// += <distributed_ddl>
+	//      <path>/x/y/chi.name/z</path>
+	//      <profile>X</prpfile>
 	fmt.Fprintf(b, "%4s<distributed_ddl>\n%8[1]s<path>%s</path>\n", " ", fmt.Sprintf(distributedDDLPattern, chi.Name))
 	if chi.Spec.Defaults.DistributedDDL.Profile != "" {
 		fmt.Fprintf(b, "%8s<profile>%s</profile>\n", " ", chi.Spec.Defaults.DistributedDDL.Profile)
 	}
+	// += </distributed_ddl>
+	//  </yandex>
 	fmt.Fprintf(b, "%4[1]s</distributed_ddl>\n</%s>\n", " ", xmlTagYandex)
+
 	return b.String()
 }
 
-// genRemoteServersConfig creates data for "remote_servers.xml" and calculates data generation parametes for other sections
-func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, o *genOptions, c []*chiv1.ChiCluster) string {
-	var hostDomain string
+// genRemoteServersConfig creates data for "remote_servers.xml" and calculates data generation parameters for other sections
+func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOptions, clusters []*chiv1.ChiCluster) string {
+	var domainName string
 	b := &bytes.Buffer{}
 	dRefIndex := make(map[string]int)
 	dID := make(map[string]string)
-	for k := range o.dRefsMax {
+
+	for k := range opts.deploymentCountMax {
 		dID[k] = randomString()
 	}
 	if chi.Spec.Defaults.ReplicasUseFQDN == 1 {
-		hostDomain = CreateDomainName(chi.Namespace)
+		domainName = CreateDomainName(chi.Namespace)
 	}
+
+	// += <yandex>
+	// 		<remote_servers>
 	fmt.Fprintf(b, "<%s>\n%4s<remote_servers>\n", xmlTagYandex, " ")
-	for i := range c {
-		fmt.Fprintf(b, "%8s<%s>\n", " ", c[i].Name)
-		for j := range c[i].Layout.Shards {
-			fmt.Fprintf(b, "%12s<shard>\n%16[1]s<internal_replication>%s</internal_replication>\n",
-				" ", c[i].Layout.Shards[j].InternalReplication)
-			if c[i].Layout.Shards[j].Weight > 0 {
-				fmt.Fprintf(b, "%16s<weight>%d</weight>\n", " ", c[i].Layout.Shards[j].Weight)
+	// Build each cluster XML
+	for i := range clusters {
+
+		// += <my_cluster_name>
+		fmt.Fprintf(b, "%8s<%s>\n", " ", clusters[i].Name)
+
+		// Build each shard XML
+		for j := range clusters[i].Layout.Shards {
+
+			// += <shard>
+			//		<internal_replication>yes</internal_replication>
+			fmt.Fprintf(b,
+				"%12s<shard>\n%16[1]s<internal_replication>%s</internal_replication>\n",
+				" ",
+				clusters[i].Layout.Shards[j].InternalReplication,
+			)
+
+			// += <weight>X</weight>
+			if clusters[i].Layout.Shards[j].Weight > 0 {
+				fmt.Fprintf(b, "%16s<weight>%d</weight>\n", " ", clusters[i].Layout.Shards[j].Weight)
 			}
-			for _, r := range c[i].Layout.Shards[j].Replicas {
-				k := r.Deployment.Key
-				idx, ok := dRefIndex[k]
+
+			// Build each replica XML
+			for _, replica := range clusters[i].Layout.Shards[j].Replicas {
+				fingerprint := replica.Deployment.Fingerprint
+				idx, ok := dRefIndex[fingerprint]
 				if !ok {
 					idx = 1
 				} else {
 					idx++
-					if idx > o.dRefsMax[k] {
+					if idx > opts.deploymentCountMax[fingerprint] {
 						idx = 1
 					}
 				}
-				dRefIndex[k] = idx
-				ssNameID := fmt.Sprintf(ssNameIDPattern, dID[k], idx)
-				o.ssNames[ssNameID] = k
-				o.ssDeployments[k] = &r.Deployment
-				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", fmt.Sprintf(hostnamePattern, ssNameID, hostDomain))
-				o.macrosDataIndex[ssNameID] = append(o.macrosDataIndex[ssNameID], &shardsIndexItem{
-					cluster: c[i].Name,
-					index:   j + 1,
-				})
-				rPort := 9000
-				if r.Port > 0 {
-					rPort = int(r.Port)
+				dRefIndex[fingerprint] = idx
+				ssNameID := fmt.Sprintf(ssNameIDPattern, dID[fingerprint], idx)
+				opts.ssNames[ssNameID] = fingerprint
+				opts.ssDeployments[fingerprint] = &replica.Deployment
+
+				// += <replica>
+				//		<host>XXX</host>
+				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", fmt.Sprintf(hostnamePattern, ssNameID, domainName))
+
+				opts.macrosDataIndex[ssNameID] = append(
+					opts.macrosDataIndex[ssNameID],
+					&shardsIndexItem{
+						cluster: clusters[i].Name,
+						index:   j + 1,
+					},
+				)
+
+				port := 9000
+				if replica.Port > 0 {
+					port = int(replica.Port)
 				}
-				fmt.Fprintf(b, "%20s<port>%d</port>\n%16[1]s</replica>\n", " ", rPort)
+				// +=	<port>XXX</port>
+				//	</replica>
+				fmt.Fprintf(b, "%20s<port>%d</port>\n%16[1]s</replica>\n", " ", port)
 			}
+			// += </shard>
 			fmt.Fprintf(b, "%12s</shard>\n", " ")
 		}
-		fmt.Fprintf(b, "%8s</%s>\n", " ", c[i].Name)
+		// += </my_cluster_name>
+		fmt.Fprintf(b, "%8s</%s>\n", " ", clusters[i].Name)
 	}
+	// += </remote_servers>
+	// </yandex>
 	fmt.Fprintf(b, "%4s</remote_servers>\n</%s>\n", " ", xmlTagYandex)
+
 	return b.String()
 }
 
 // generateHostMacros creates data for particular "macros.xml"
 func generateHostMacros(chiName, ssName string, dataIndex shardsIndex) string {
 	b := &bytes.Buffer{}
+
+	// += <yandex>
 	fmt.Fprintf(b, "<%s>\n", xmlTagYandex)
+
+	// += <macros>
+	//      <installation>CHI name</installation>
 	fmt.Fprintf(b, "%4s<macros>\n%8[1]s<installation>%s</installation>\n", " ", chiName)
 	for i := range dataIndex {
+		// += <CLUSTER_NAME>CLUSTER_NAME</CLUSTER_NAME>
+		//    <CLUSTER_NAMEs-shard>SHARD_NAME</CLUSTER_NAMEs-shard>
 		fmt.Fprintf(b, "%8s<%s>%[2]s</%[2]s>\n%8[1]s<%[2]s-shard>%d</%[2]s-shard>\n", " ", dataIndex[i].cluster, dataIndex[i].index)
 	}
+
+	// += <replica>DNS name</replica>
+	//   </macros>
 	fmt.Fprintf(b, "%8s<replica>%s</replica>\n%4[1]s</macros>\n", " ", ssName)
+	// += </yandex>
 	fmt.Fprintf(b, "</%s>\n", xmlTagYandex)
+
 	return b.String()
 }

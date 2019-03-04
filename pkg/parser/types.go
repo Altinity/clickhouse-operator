@@ -37,11 +37,15 @@ type StatefulSetList []*apps.StatefulSet
 type ServiceList []*corev1.Service
 
 type genOptions struct {
-	ssNames         map[string]string
-	ssDeployments   map[string]*chiv1.ChiDeployment
-	dRefsMax        chiDeploymentRefs
-	macrosDataIndex map[string]shardsIndex
-	includes        map[string]bool
+	ssNames            map[string]string
+	ssDeployments      map[string]*chiv1.ChiDeployment
+
+	// chiDeploymentCount struct with max values from all clusters
+	deploymentCountMax chiDeploymentCount
+	macrosDataIndex    map[string]shardsIndex
+
+	// includeConfigSection specifies whether additional config files (such as zookeeper, macros) are configuared
+	includeConfigSection map[string]bool
 }
 
 type includesObjects []struct {
@@ -56,12 +60,13 @@ type shardsIndexItem struct {
 	index   int
 }
 
-type chiClusterDataLink struct {
-	cluster     *chiv1.ChiCluster
-	deployments chiDeploymentRefs
+type chiClusterAndDeploymentCount struct {
+	cluster         *chiv1.ChiCluster
+	deploymentCount chiDeploymentCount
 }
 
-type chiDeploymentRefs map[string]int
+// chiDeploymentCount maps Deployment fingerprint to its usage count
+type chiDeploymentCount map[string]int
 
 type vcTemplatesIndex map[string]*vcTemplatesIndexData
 

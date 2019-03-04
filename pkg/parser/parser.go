@@ -18,39 +18,41 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
-	"sort"
 	"strings"
 	"time"
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"sort"
 )
 
-// CreateObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
-func CreateObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
+// CreateChiObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
+func CreateChiObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
 	var (
 		clusters []*chiv1.ChiCluster
 		options  genOptions
 	)
 
 	// Set defaults for CHI object properties
-	setDefaults(chi)
-	setDeploymentDefaults(&chi.Spec.Defaults.Deployment, nil)
-	clusters, options.dRefsMax = getNormalizedClusters(chi)
+	setSpecDefaultsReplicationFQDN(chi)
+	inheritDeploymentAndSetDefaults(&chi.Spec.Defaults.Deployment, nil)
+	clusters, options.deploymentCountMax = getNormalizedClusters(chi)
 
 	// Allocate data structures
 	options.ssNames = make(map[string]string)
 	options.ssDeployments = make(map[string]*chiv1.ChiDeployment)
 	options.macrosDataIndex = make(map[string]shardsIndex)
-	options.includes = make(map[string]bool)
-	cmData := make(map[string]string)
+	options.includeConfigSection = make(map[string]bool)
+
+	// configSections maps section name to section XML config <yandex><macros>...</macros><yandex>
+	configSections := make(map[string]string)
 
 	// Generate XMLs
-	cmData[remoteServersXML] = genRemoteServersConfig(chi, &options, clusters)
-	options.includes[zookeeperXML] = includeIfNotEmpty(cmData, zookeeperXML, genZookeeperConfig(chi))
-	options.includes[usersXML] = includeIfNotEmpty(cmData, usersXML, genUsersConfig(chi))
-	options.includes[profilesXML] = includeIfNotEmpty(cmData, profilesXML, genProfilesConfig(chi))
-	options.includes[quotasXML] = includeIfNotEmpty(cmData, quotasXML, genQuotasConfig(chi))
-	options.includes[settingsXML] = includeIfNotEmpty(cmData, settingsXML, genSettingsConfig(chi))
+	configSections[remoteServersXML] = genRemoteServersConfig(chi, &options, clusters)
+	options.includeConfigSection[zookeeperXML] = includeIfNotEmpty(configSections, zookeeperXML, genZookeeperConfig(chi))
+	options.includeConfigSection[usersXML] = includeIfNotEmpty(configSections, usersXML, genUsersConfig(chi))
+	options.includeConfigSection[profilesXML] = includeIfNotEmpty(configSections, profilesXML, genProfilesConfig(chi))
+	options.includeConfigSection[quotasXML] = includeIfNotEmpty(configSections, quotasXML, genQuotasConfig(chi))
+	options.includeConfigSection[settingsXML] = includeIfNotEmpty(configSections, settingsXML, genSettingsConfig(chi))
 
 	// Create objects index
 	prefixes := make([]string, 0, len(options.ssNames))
@@ -60,124 +62,170 @@ func CreateObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
 
 	// Create k8s objects (data structures)
 	return ObjectsMap{
-		ObjectsConfigMaps:   createConfigMapObjects(chi, cmData, &options),
+		ObjectsConfigMaps:   createConfigMapObjects(chi, configSections, &options),
 		ObjectsServices:     createServiceObjects(chi, &options),
 		ObjectsStatefulSets: createStatefulSetObjects(chi, &options),
 	}, prefixes
 }
 
-// getNormalizedClusters returns list of "normalized" (converted to basic form) chiv1.ChiCluster objects with additional data
-func getNormalizedClusters(chi *chiv1.ClickHouseInstallation) ([]*chiv1.ChiCluster, chiDeploymentRefs) {
-	link := make(chan *chiClusterDataLink)
-	count := len(chi.Spec.Configuration.Clusters)
+// getNormalizedClusters returns list of "normalized" (converted to basic form) chiv1.ChiCluster objects
+// with each deployment usage counters
+func getNormalizedClusters(chi *chiv1.ClickHouseInstallation) ([]*chiv1.ChiCluster, chiDeploymentCount) {
+	link := make(chan *chiClusterAndDeploymentCount)
+	clusterCount := len(chi.Spec.Configuration.Clusters)
+
 	for _, cluster := range chi.Spec.Configuration.Clusters {
-		go func(chin *chiv1.ClickHouseInstallation, c chiv1.ChiCluster, ch chan<- *chiClusterDataLink) {
-			ch <- getNormalizedClusterLayoutData(chin, c)
+		go func(chin *chiv1.ClickHouseInstallation, c chiv1.ChiCluster, ch chan<- *chiClusterAndDeploymentCount) {
+			ch <- getNormalizedClusterLayoutData(chi, cluster)
 		}(chi, cluster, link)
 	}
-	cList := make([]*chiv1.ChiCluster, 0, count)
-	dRefs := make(chiDeploymentRefs)
-	for i := 0; i < count; i++ {
-		data := <-link
-		cList = append(cList, data.cluster)
-		dRefs.mergeWith(data.deployments)
+
+	clusterList := make([]*chiv1.ChiCluster, 0, clusterCount)
+	deploymentCount := make(chiDeploymentCount)
+	for i := 0; i < clusterCount; i++ {
+		clusterAndDeploymentCount := <-link
+		clusterList = append(clusterList, clusterAndDeploymentCount.cluster)
+		deploymentCount.mergeWithAndReplaceBiggerValues(clusterAndDeploymentCount.deploymentCount)
 	}
-	return cList, dRefs
+
+	return clusterList, deploymentCount
 }
 
 // getNormalizedClusterLayoutData returns chiv1.ChiCluster object after normalization procedures
-func getNormalizedClusterLayoutData(chi *chiv1.ClickHouseInstallation, c chiv1.ChiCluster) *chiClusterDataLink {
-	n := &chiv1.ChiCluster{
-		Name:       c.Name,
-		Deployment: c.Deployment,
+func getNormalizedClusterLayoutData(
+	chi *chiv1.ClickHouseInstallation,
+	originalCluster chiv1.ChiCluster,
+) *chiClusterAndDeploymentCount {
+	normalizedCluster := &chiv1.ChiCluster{
+		Name:       originalCluster.Name,
+		Deployment: originalCluster.Deployment,
 	}
-	setDeploymentDefaults(&n.Deployment, &chi.Spec.Defaults.Deployment)
-	d := make(chiDeploymentRefs)
+	inheritDeploymentAndSetDefaults(&normalizedCluster.Deployment, &chi.Spec.Defaults.Deployment)
+	deploymentCount := make(chiDeploymentCount)
 
-	switch c.Layout.Type {
+	switch originalCluster.Layout.Type {
 	case clusterLayoutTypeStandard:
-		if c.Layout.ReplicasCount == 0 {
-			c.Layout.ReplicasCount++
+		// Standard layout assumes to have 1 replica and 1 shard by default - in case not specified explicitly
+		if originalCluster.Layout.ReplicasCount == 0 {
+			originalCluster.Layout.ReplicasCount = 1
 		}
-		if c.Layout.ShardsCount == 0 {
-			c.Layout.ShardsCount++
+		if originalCluster.Layout.ShardsCount == 0 {
+			originalCluster.Layout.ShardsCount = 1
 		}
 
-		n.Layout.Shards = make([]chiv1.ChiClusterLayoutShard, c.Layout.ShardsCount)
-		for i := 0; i < c.Layout.ShardsCount; i++ {
-			n.Layout.Shards[i].InternalReplication = stringTrue
-			n.Layout.Shards[i].Replicas = make([]chiv1.ChiClusterLayoutShardReplica, c.Layout.ReplicasCount)
+		// Handle .layout.shards
+		normalizedCluster.Layout.Shards = make([]chiv1.ChiClusterLayoutShard, originalCluster.Layout.ShardsCount)
+		for i := 0; i < originalCluster.Layout.ShardsCount; i++ {
+			normalizedCluster.Layout.Shards[i].InternalReplication = stringTrue
+			normalizedCluster.Layout.Shards[i].Replicas = make([]chiv1.ChiClusterLayoutShardReplica, originalCluster.Layout.ReplicasCount)
 
-			for j := 0; j < c.Layout.ReplicasCount; j++ {
-				setDeploymentDefaults(&n.Layout.Shards[i].Replicas[j].Deployment, &n.Deployment)
-				n.Layout.Shards[i].Replicas[j].Deployment.Key = deploymentToString(&n.Layout.Shards[i].Replicas[j].Deployment)
-				d[n.Layout.Shards[i].Replicas[j].Deployment.Key]++
+			for j := 0; j < originalCluster.Layout.ReplicasCount; j++ {
+				// For each replica of this normalized cluster inherit cluster's Deployment
+				inheritDeploymentAndSetDefaults(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Deployment)
+				normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = deploymentToString(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
+				// and calculate count of each replica deployment usage
+				deploymentCount[normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint]++
 			}
 		}
+
 	case clusterLayoutTypeAdvanced:
-		n.Layout.Shards = c.Layout.Shards
-		for i := range n.Layout.Shards {
-			setDeploymentDefaults(&n.Layout.Shards[i].Deployment, &n.Deployment)
+		// Advanced layout assumes detailed shards definition
+		normalizedCluster.Layout.Shards = originalCluster.Layout.Shards
 
-			switch n.Layout.Shards[i].InternalReplication {
+		for i := range normalizedCluster.Layout.Shards {
+			// For each shard of this normalized cluster inherit cluster's Deployment
+			inheritDeploymentAndSetDefaults(&normalizedCluster.Layout.Shards[i].Deployment, &normalizedCluster.Deployment)
+
+			// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
+			// with default value set to "true"
+			switch normalizedCluster.Layout.Shards[i].InternalReplication {
 			case shardInternalReplicationDisabled:
-				n.Layout.Shards[i].InternalReplication = stringFalse
+				normalizedCluster.Layout.Shards[i].InternalReplication = stringFalse
 			default:
-				n.Layout.Shards[i].InternalReplication = stringTrue
+				normalizedCluster.Layout.Shards[i].InternalReplication = stringTrue
 			}
 
-			if n.Layout.Shards[i].DefinitionType == shardDefinitionTypeReplicasCount {
-				n.Layout.Shards[i].Replicas = make([]chiv1.ChiClusterLayoutShardReplica,
-					n.Layout.Shards[i].ReplicasCount)
+			if normalizedCluster.Layout.Shards[i].DefinitionType == shardDefinitionTypeReplicasCount {
+				// Define shards by replicas count:
+				//      layout:
+				//        type: Advanced
+				//        shards:
+				//
+				//        - definitionType: ReplicasCount
+				//          replicasCount: 2
+				normalizedCluster.Layout.Shards[i].Replicas = make(
+					[]chiv1.ChiClusterLayoutShardReplica,
+					normalizedCluster.Layout.Shards[i].ReplicasCount,
+				)
 
-				for j := 0; j < n.Layout.Shards[i].ReplicasCount; j++ {
-					setDeploymentDefaults(&n.Layout.Shards[i].Replicas[j].Deployment, &n.Layout.Shards[i].Deployment)
-					n.Layout.Shards[i].Replicas[j].Deployment.Key = deploymentToString(&n.Layout.Shards[i].Replicas[j].Deployment)
-					d[n.Layout.Shards[i].Replicas[j].Deployment.Key]++
+				for j := 0; j < normalizedCluster.Layout.Shards[i].ReplicasCount; j++ {
+					inheritDeploymentAndSetDefaults(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Layout.Shards[i].Deployment)
+					normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = deploymentToString(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
+					deploymentCount[normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint]++
 				}
-				continue
-			}
-
-			for j := range n.Layout.Shards[i].Replicas {
-				setDeploymentDefaults(&n.Layout.Shards[i].Replicas[j].Deployment, &n.Layout.Shards[i].Deployment)
-				n.Layout.Shards[i].Replicas[j].Deployment.Key = deploymentToString(&n.Layout.Shards[i].Replicas[j].Deployment)
-				d[n.Layout.Shards[i].Replicas[j].Deployment.Key]++
+			} else {
+				// Define shards by replicas explicitly:
+				//        - definitionType: Replicas
+				//          replicas:
+				//          - port: 9000
+				//            deployment:
+				//              scenario: Default
+				//          - deployment:
+				//              scenario: NodeMonopoly # 1 pod (CH server instance) per node (zone can be a set of n nodes) -> podAntiAffinity
+				//              zone:
+				//                matchLabels:
+				//                  clickhouse.altinity.com/zone: zone4
+				//                  clickhouse.altinity.com/kind: ssd
+				//              podTemplateName: clickhouse-v18.16.1
+				for j := range normalizedCluster.Layout.Shards[i].Replicas {
+					inheritDeploymentAndSetDefaults(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Layout.Shards[i].Deployment)
+					normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = deploymentToString(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
+					deploymentCount[normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint]++
+				}
 			}
 		}
 	}
 
-	return &chiClusterDataLink{
-		cluster:     n,
-		deployments: d,
+	return &chiClusterAndDeploymentCount{
+		cluster:         normalizedCluster,
+		deploymentCount: deploymentCount,
 	}
 }
 
 // deploymentToString creates string representation of chiv1.ChiDeployment object
+// of the following form:
+// "PodTemplateName::VolumeClaimTemplate::Scenario::Zone.MatchLabels.Key1=Zone.MatchLabels.Val1::Zone.MatchLabels.Key2=Zone.MatchLabels.Val2"
 func deploymentToString(d *chiv1.ChiDeployment) string {
 	l := len(d.Zone.MatchLabels)
+
 	keys := make([]string, 0, l)
-	a := make([]string, 0, l+1)
-	a = append(a, fmt.Sprintf("%s::%s::%s::", d.Scenario, d.PodTemplateName, d.VolumeClaimTemplate))
-	for k := range d.Zone.MatchLabels {
-		keys = append(keys, k)
+	for key := range d.Zone.MatchLabels {
+		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	for _, k := range keys {
-		a = append(a, d.Zone.MatchLabels[k])
+
+	a := make([]string, 0, l+1)
+	a = append(a, fmt.Sprintf("%s::%s::%s::", d.PodTemplateName, d.VolumeClaimTemplate, d.Scenario))
+	// Loop over sorted d.Zone.MatchLabels keys
+	for _, key := range keys {
+		// Append d.Zone.MatchLabels values
+		a = append(a, fmt.Sprintf("%s=%s", key, d.Zone.MatchLabels[key]))
 	}
+
 	return strings.Join(a, "::")
 }
 
-// setDefaults updates chi.Spec.Defaults section with default values
-func setDefaults(chi *chiv1.ClickHouseInstallation) {
+// setSpecDefaultsReplicationFQDN updates chi.Spec.Defaults section with default values
+func setSpecDefaultsReplicationFQDN(chi *chiv1.ClickHouseInstallation) {
 	if chi.Spec.Defaults.ReplicasUseFQDN != 1 {
 		chi.Spec.Defaults.ReplicasUseFQDN = 0
 	}
 }
 
-// setDeploymentDefaults updates chiv1.ChiDeployment with default values
-func setDeploymentDefaults(d, parent *chiv1.ChiDeployment) {
+// inheritDeploymentAndSetDefaults updates chiv1.ChiDeployment with default values
+func inheritDeploymentAndSetDefaults(d, parent *chiv1.ChiDeployment) {
 	if parent != nil {
+		// Have parent - copy (a.k.a inherit) unassigned values from parent
 		if d.PodTemplateName == "" {
 			(*d).PodTemplateName = parent.PodTemplateName
 		}
@@ -191,25 +239,34 @@ func setDeploymentDefaults(d, parent *chiv1.ChiDeployment) {
 			zoneCopyFrom(&d.Zone, &parent.Zone)
 		}
 	} else if d.Scenario == "" {
+		// Have no parent, but have Scenario
 		(*d).Scenario = deploymentScenarioDefault
 	}
 }
 
 // zoneCopyFrom copies one chiv1.ChiDeploymentZone object into another
-func zoneCopyFrom(z, source *chiv1.ChiDeploymentZone) {
+func zoneCopyFrom(dst, src *chiv1.ChiDeploymentZone) {
 	tmp := make(map[string]string)
-	for k, v := range source.MatchLabels {
+	for k, v := range src.MatchLabels {
 		tmp[k] = v
 	}
-	(*z).MatchLabels = tmp
+	(*dst).MatchLabels = tmp
 }
 
-// mergeWith combines chiDeploymentRefs object with another one
-func (d chiDeploymentRefs) mergeWith(another chiDeploymentRefs) {
-	for ak, av := range another {
-		_, ok := d[ak]
-		if !ok || av > d[ak] {
-			d[ak] = av
+// mergeWithAndReplaceBiggerValues combines chiDeploymentCount object with another one
+// and replaces local values with another one's values in case another value is bigger
+func (d chiDeploymentCount) mergeWithAndReplaceBiggerValues(another chiDeploymentCount) {
+
+	// Loop over another struct and bring in new and bigger values
+	for key, value := range another {
+		_, ok := d[key]
+
+		if !ok {
+			// No such value - just include it
+			d[key] = value
+		} else if value > d[key] {
+			// new value is bigger, overwrite local value
+			d[key] = value
 		}
 	}
 }
@@ -222,10 +279,14 @@ func randomString() string {
 }
 
 // includeIfNotEmpty inserts data into map object using specified key, if not empty value provided
-func includeIfNotEmpty(dest map[string]string, key, src string) bool {
+func includeIfNotEmpty(dst map[string]string, key, src string) bool {
+	// Do not include empty value
 	if src == "" {
 		return false
 	}
-	dest[key] = src
+
+	// Include value by specified key
+	dst[key] = src
+
 	return true
 }

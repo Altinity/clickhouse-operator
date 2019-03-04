@@ -25,50 +25,59 @@ import (
 )
 
 // createConfigMapObjects returns a list of corev1.ConfigMap objects
-func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]string, o *genOptions) ConfigMapList {
-	c := len(o.ssNames)
+func createConfigMapObjects(
+	chi *chiv1.ClickHouseInstallation,
+	configSections map[string]string,
+	options *genOptions,
+) ConfigMapList {
+
+	c := len(options.ssNames)
 	cmList := make(ConfigMapList, 1, c+1)
 	cmList[0] = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapName(chi.Name),
 			Namespace: chi.Namespace,
 			Labels: map[string]string{
-				ClusterwideLabel: chi.Name,
+				ChopGeneratedLabel: chi.Name,
 			},
 		},
-		Data: data,
+		Data: configSections,
 	}
-	for ssNameID := range o.ssNames {
-		// adding corev1.ConfigMap object to the list
+
+	for ssNameID := range options.ssNames {
+		// Add corev1.ConfigMap object to the list
 		cmList = append(cmList, &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      CreateConfigMapMacrosName(chi.Name, ssNameID),
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
-					ClusterwideLabel: chi.Name,
+					ChopGeneratedLabel: chi.Name,
 				},
 			},
 			Data: map[string]string{
-				macrosXML: generateHostMacros(chi.Name, ssNameID, o.macrosDataIndex[ssNameID]),
+				macrosXML: generateHostMacros(chi.Name, ssNameID, options.macrosDataIndex[ssNameID]),
 			},
 		})
 	}
+
 	return cmList
 }
 
 // createServiceObjects returns a list of corev1.Service objects
-func createServiceObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) ServiceList {
-	svcList := make(ServiceList, 0, len(o.ssNames))
-	for ssNameID := range o.ssNames {
+func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions) ServiceList {
+	svcList := make(ServiceList, 0, len(options.ssNames))
+
+	for ssNameID := range options.ssNames {
 		ssName := CreateStatefulSetName(ssNameID)
 		svcName := CreateServiceName(ssNameID)
-		// adding corev1.Service object to the list
+
+		// Add corev1.Service object to the list
 		svcList = append(svcList, &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      svcName,
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
-					ClusterwideLabel: chi.Name,
+					ChopGeneratedLabel: chi.Name,
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -93,15 +102,17 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) Serv
 			},
 		})
 	}
+
 	return svcList
 }
 
 // createStatefulSetObjects returns a list of apps.StatefulSet objects
-func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) StatefulSetList {
+func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOptions) StatefulSetList {
 	rNum := int32(1)
 	cmName := CreateConfigMapName(chi.Name)
-	ssList := make(StatefulSetList, 0, len(o.ssNames))
-	// Populating templates indexes
+	ssList := make(StatefulSetList, 0, len(options.ssNames))
+
+	// Populate templates indexes
 	vcTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
 	podTemplatesIndex := createPodTemplatesIndex(chi)
 	// Defining list of shared volume mounts
@@ -127,7 +138,8 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 			fullpath: fullPathSettingsXML,
 		},
 	}
-	// Populating corev1.VolumeMount list with actual values
+
+	// Populate corev1.VolumeMount list with actual values
 	sharedVolumeMounts := make([]corev1.VolumeMount, 1)
 	sharedVolumeMounts[0] = corev1.VolumeMount{
 		Name:      cmName,
@@ -135,7 +147,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 		SubPath:   remoteServersXML,
 	}
 	for i := range includes {
-		if o.includes[includes[i].filename] {
+		if options.includeConfigSection[includes[i].filename] {
 			sharedVolumeMounts = append(
 				sharedVolumeMounts, corev1.VolumeMount{
 					Name:      cmName,
@@ -144,14 +156,16 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 				})
 		}
 	}
-	// Creating list of apps.StatefulSet objects
-	for ssNameID, key := range o.ssNames {
+
+	// Create list of apps.StatefulSet objects
+	for ssNameID, key := range options.ssNames {
 		ssName := CreateStatefulSetName(ssNameID)
 		cmMacros := CreateConfigMapMacrosName(chi.Name, ssNameID)
-		vcTemplate := o.ssDeployments[key].VolumeClaimTemplate
-		podTemplate := o.ssDeployments[key].PodTemplateName
+		vcTemplate := options.ssDeployments[key].VolumeClaimTemplate
+		podTemplate := options.ssDeployments[key].PodTemplateName
 		svcName := CreateServiceName(ssNameID)
-		// Coping list of shared corev1.VolumeMount objects into new slice
+
+		// Copy list of shared corev1.VolumeMount objects into new slice
 		l := len(sharedVolumeMounts)
 		currentVolumeMounts := make([]corev1.VolumeMount, l, l+1)
 		copy(currentVolumeMounts, sharedVolumeMounts)
@@ -161,13 +175,14 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 			MountPath: fullPathMacrosXML,
 			SubPath:   macrosXML,
 		})
+
 		// Creating apps.StatefulSet object
 		statefulSetObject := &apps.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      ssName,
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
-					ClusterwideLabel: chi.Name,
+					ChopGeneratedLabel: chi.Name,
 				},
 			},
 			Spec: apps.StatefulSetSpec{
@@ -182,8 +197,8 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 					ObjectMeta: metav1.ObjectMeta{
 						Name: ssName,
 						Labels: map[string]string{
-							chDefaultAppLabel: ssName,
-							ClusterwideLabel:  chi.Name,
+							chDefaultAppLabel:  ssName,
+							ChopGeneratedLabel: chi.Name,
 						},
 					},
 					Spec: corev1.PodSpec{

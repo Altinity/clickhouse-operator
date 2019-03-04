@@ -28,8 +28,8 @@ const (
 )
 
 const (
-	// ClusterwideLabel applied to all objects created by the ClickHouse Operator
-	ClusterwideLabel = clickhousealtinitycom.GroupName + "/chi"
+	// ChopGeneratedLabel applied to all objects created by the ClickHouse Operator
+	ChopGeneratedLabel = clickhousealtinitycom.GroupName + "/chop"
 )
 
 const (
