@@ -124,23 +124,40 @@ func CreateController(
 		recorder:                recorder,
 		metricsExporter:         chopMetricsExporter,
 	}
+
 	chopInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controller.enqueueObject,
-		UpdateFunc: func(old, new interface{}) {
-			controller.enqueueObject(new)
+		AddFunc: func(obj interface{}) {
+			glog.V(1).Info("chopInformer.AddFunc")
+			controller.enqueueObject(obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			glog.V(1).Info("chopInformer.UpdateFunc")
+			controller.enqueueObject(newObj)
+		},
+		DeleteFunc: func(obj interface{}) {
+			glog.V(1).Info("chopInformer.DeleteFunc")
 		},
 	})
+
 	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controller.handleObject,
-		UpdateFunc: func(old, new interface{}) {
-			newStatefulSet := new.(*apps.StatefulSet)
-			oldStatefulSet := old.(*apps.StatefulSet)
+		AddFunc: func(obj interface{}) {
+			glog.V(1).Info("statefulSetInformer.AddFunc")
+			controller.handleObject(obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			glog.V(1).Info("statefulSetInformer.UpdateFunc")
+			newStatefulSet := newObj.(*apps.StatefulSet)
+			oldStatefulSet := oldObj.(*apps.StatefulSet)
 			if newStatefulSet.ResourceVersion == oldStatefulSet.ResourceVersion {
+				glog.V(1).Info("statefulSetInformer.UpdateFunc - no update required")
 				return
 			}
-			controller.handleObject(new)
+			controller.handleObject(newObj)
 		},
-		DeleteFunc: controller.handleObject,
+		DeleteFunc: func(obj interface{}) {
+			glog.V(1).Info("statefulSetInformer.DeleteFunc")
+			controller.handleObject(obj)
+		},
 	})
 
 	return controller
@@ -166,10 +183,12 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 
 	glog.V(1).Info("ClickHouseInstallation controller: starting workers")
 	for i := 0; i < threadiness; i++ {
+		glog.V(1).Infof("ClickHouseInstallation controller: starting worker %d with poll period %d", i+1, runWorkerPeriod)
 		go wait.Until(c.runWorker, runWorkerPeriod, ctx.Done())
 	}
-	glog.V(1).Info("ClickHouseInstallation controller: workers started")
 	defer glog.V(1).Info("ClickHouseInstallation controller: shutting down workers")
+
+	glog.V(1).Info("ClickHouseInstallation controller: workers started")
 	<-ctx.Done()
 }
 
@@ -183,9 +202,10 @@ func (c *Controller) runWorker() {
 func (c *Controller) processNextWorkItem() bool {
 	item, shutdown := c.queue.Get()
 	if shutdown {
-		// Stop iteration
+		glog.V(1).Info("processNextWorkItem(): shutdown request")
 		return false
 	}
+
 	err := func(item interface{}) error {
 		defer c.queue.Done(item)
 
@@ -219,6 +239,9 @@ func (c *Controller) processNextWorkItem() bool {
 // syncItem is the main reconcile loop function - reconcile CHI object identified by `key`
 func (c *Controller) syncItem(key string) error {
 	// Here we assume that `key` identifies CHI object
+
+	glog.V(1).Infof("syncItem(%s) start", key)
+
 	// Extract namespace and name from key - action
 	// opposite to <key, err := cache.MetaNamespaceKeyFunc(obj)> in enqueueObject function
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -227,10 +250,11 @@ func (c *Controller) syncItem(key string) error {
 		utilruntime.HandleError(fmt.Errorf("incorrect resource key: %s", key))
 		return nil
 	}
+	glog.V(1).Infof("syncItem(%s/%s) namespace/name extracted", namespace, name)
 
-	// We have `namespace` and `name` which points to a CHI instance
+	// We have `namespace` and `name` which are expected to point to a CHI instance
 
-	// Check CHI object in cache cache
+	// Find CHI specified by namespace/name
 	chi, err := c.chopLister.ClickHouseInstallations(namespace).Get(name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -241,58 +265,90 @@ func (c *Controller) syncItem(key string) error {
 		return err
 	}
 
+	// And sync this CHI
+	return c.syncChi(chi)
+}
+
+// syncChi sync CHI to desired state
+func (c *Controller) syncChi(chi *chop.ClickHouseInstallation) error {
 	// Check CHI object already in sync
 	if chi.Status.ObjectPrefixes == nil || len(chi.Status.ObjectPrefixes) == 0 {
 		// CHI is a new one - need to create all its objects
-		prefixes, err := c.createControlledResources(chi)
-		if err != nil {
-			glog.V(2).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
-			return err
-		}
-
-		err = c.updateChiStatus(chi, prefixes)
-		if err != nil {
-			glog.V(2).Infof("ClickHouseInstallation (%q): unable to update status of CHI resource: %q", chi.Name, err)
-			return err
-		}
-
-		glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created): %v", chi.Name, prefixes)
+		return c.syncNewChi(chi)
 	} else {
 		// Check consistency of existent resources controlled by the CHI object
+		return c.syncKnownChi(chi)
+	}
+}
 
-		// Number of prefixes - -which is number of Stateful Sets and number of Pods
-		prefixesNum := len(chi.Status.ObjectPrefixes)
-		// Pod hostnames of CH
-		chHostnames := make([]string, prefixesNum)
+// syncNewChi sync new CHI - creates all its resources
+func (c *Controller) syncNewChi(chi *chop.ClickHouseInstallation) error {
+	// CHI is a new one - need to create all its objects
+	// Operator receives CHI struct partially filled by data from .yaml file provided by user
+	// We need to create all resources that are needed to run user's .yaml specification
+	glog.V(1).Infof("syncNewChi(%s/%s)", chi.Namespace, chi.Name)
 
-		for i, prefix := range chi.Status.ObjectPrefixes {
-			// Verify we have Stateful Set with such a name
-			statefulSetName := chopparser.CreateStatefulSetName(prefix)
-			_, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(statefulSetName)
-			if err == nil {
-				// TODO: check all controlled objects
-				glog.V(2).Infof("ClickHouseInstallation (%q) controls StatefulSet: %q", chi.Name, statefulSetName)
+	prefixes, err := c.createControlledResources(chi)
+	if err != nil {
+		glog.V(2).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
+		return err
+	}
 
-				// Prepare hostnames list for the chopmetrics.Exporter state storage
-				chHostnames[i] = chopparser.CreatePodHostname(chi.Namespace, prefix)
-			}
+	// Some debug
+	for i :=range prefixes {
+		glog.V(1).Infof("syncNewChi(%s/%s) - created prefix %s", chi.Namespace, chi.Name, prefixes[i])
+	}
+
+	// Update CHI status in k8s
+	err = c.updateChi(chi, prefixes)
+	if err != nil {
+		glog.V(2).Infof("ClickHouseInstallation (%q): unable to update status of CHI resource: %q", chi.Name, err)
+		return err
+	}
+
+	glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created): %v", chi.Name, prefixes)
+
+	return nil
+}
+
+// syncKnownChi sync CHI which was already created earlier
+func (c *Controller) syncKnownChi(chi *chop.ClickHouseInstallation) error {
+	glog.V(1).Infof("syncKnownChi(%s/%s)", chi.Namespace, chi.Name)
+
+	// Number of prefixes - which is number of Stateful Sets and number of Pods
+	prefixesNum := len(chi.Status.ObjectPrefixes)
+	// Pod hostnames of CH
+	chHostnames := make([]string, prefixesNum)
+
+	for i, prefix := range chi.Status.ObjectPrefixes {
+		// Verify we have Stateful Set with such a name
+		statefulSetName := chopparser.CreateStatefulSetName(prefix)
+		_, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(statefulSetName)
+		if err == nil {
+			// TODO: check all controlled objects
+			glog.V(2).Infof("ClickHouseInstallation (%q) controls StatefulSet: %q", chi.Name, statefulSetName)
+
+			// Prepare hostnames list for the chopmetrics.Exporter state storage
+			chHostnames[i] = chopparser.CreatePodHostname(chi.Namespace, prefix)
 		}
+	}
 
-		// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
+	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
 
-		if !c.metricsExporter.ControlledValuesExist(chi.Name, chHostnames) {
-			glog.V(2).Infof("ClickHouseInstallation (%q): including hostnames into chopmetrics.Exporter", chi.Name)
-			c.metricsExporter.UpdateControlledState(chi.Name, chHostnames)
-		}
+	if !c.metricsExporter.ControlledValuesExist(chi.Name, chHostnames) {
+		glog.V(2).Infof("ClickHouseInstallation (%q): including hostnames into chopmetrics.Exporter", chi.Name)
+		c.metricsExporter.UpdateControlledState(chi.Name, chHostnames)
 	}
 
 	return nil
 }
 
+
 // createControlledResources creates k8s resources based on ClickHouseInstallation object specification
 func (c *Controller) createControlledResources(chi *chop.ClickHouseInstallation) ([]string, error) {
 	chiCopy := chi.DeepCopy()
 	chiObjects, prefixes := chopparser.CreateChiObjects(chiCopy)
+
 	for _, objList := range chiObjects {
 		switch v := objList.(type) {
 		case chopparser.ConfigMapList:
@@ -386,8 +442,8 @@ func (c *Controller) createStatefulSet(chi *chop.ClickHouseInstallation, newStat
 	return nil
 }
 
-// updateChiStatus updates .status section of ClickHouseInstallation resource
-func (c *Controller) updateChiStatus(chi *chop.ClickHouseInstallation, objectPrefixes []string) error {
+// updateChi updates .status section of ClickHouseInstallation resource
+func (c *Controller) updateChi(chi *chop.ClickHouseInstallation, objectPrefixes []string) error {
 	chiCopy := chi.DeepCopy()
 	chiCopy.Status = chop.ChiStatus{
 		ObjectPrefixes: objectPrefixes,
@@ -454,14 +510,14 @@ func (c *Controller) handleObject(obj interface{}) {
 	c.enqueueObject(chi)
 }
 
-// waitForCacheSync syncs informers cache
-func waitForCacheSync(n string, ch <-chan struct{}, syncs ...cache.InformerSynced) bool {
-	glog.V(1).Infof("Syncing caches for %s controller", n)
-	if !cache.WaitForCacheSync(ch, syncs...) {
-		utilruntime.HandleError(fmt.Errorf(messageUnableToSync, n))
+// waitForCacheSync is a logger-wrapper over cache.WaitForCacheSync() and it waits for caches to populate
+func waitForCacheSync(name string, stopCh <-chan struct{}, cacheSyncs ...cache.InformerSynced) bool {
+	glog.V(1).Infof("Syncing caches for %s controller", name)
+	if !cache.WaitForCacheSync(stopCh, cacheSyncs...) {
+		utilruntime.HandleError(fmt.Errorf(messageUnableToSync, name))
 		return false
 	}
-	glog.V(1).Infof("Caches are synced for %s controller", n)
+	glog.V(1).Infof("Caches are synced for %s controller", name)
 	return true
 }
 

@@ -72,30 +72,34 @@ func CreateChiObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) 
 // with each deployment usage counters
 func getNormalizedClusters(chi *chiv1.ClickHouseInstallation) ([]*chiv1.ChiCluster, chiDeploymentCount) {
 	link := make(chan *chiClusterAndDeploymentCount)
-	clusterCount := len(chi.Spec.Configuration.Clusters)
-
+	// Loop over all clusters
 	for _, cluster := range chi.Spec.Configuration.Clusters {
 		go func(chin *chiv1.ClickHouseInstallation, c chiv1.ChiCluster, ch chan<- *chiClusterAndDeploymentCount) {
-			ch <- getNormalizedClusterLayoutData(chi, cluster)
+			// and normalize each cluster
+			ch <- getNormalizedClusterLayoutStruct(chi, cluster)
 		}(chi, cluster, link)
 	}
 
+	clusterCount := len(chi.Spec.Configuration.Clusters)
 	clusterList := make([]*chiv1.ChiCluster, 0, clusterCount)
+	// deploymentCount maps deployment fingerprint to max among all clusters usage number of this deployment
 	deploymentCount := make(chiDeploymentCount)
 	for i := 0; i < clusterCount; i++ {
 		clusterAndDeploymentCount := <-link
 		clusterList = append(clusterList, clusterAndDeploymentCount.cluster)
-		deploymentCount.mergeWithAndReplaceBiggerValues(clusterAndDeploymentCount.deploymentCount)
+		// Accumulate deployments usage count. Find each deployment max usage number among all clusters
+		deploymentCount.mergeInAndReplaceBiggerValues(clusterAndDeploymentCount.deploymentCount)
 	}
 
 	return clusterList, deploymentCount
 }
 
-// getNormalizedClusterLayoutData returns chiv1.ChiCluster object after normalization procedures
-func getNormalizedClusterLayoutData(
+// getNormalizedClusterLayoutStruct returns chiv1.ChiCluster object after normalization procedures
+func getNormalizedClusterLayoutStruct(
 	chi *chiv1.ClickHouseInstallation,
 	originalCluster chiv1.ChiCluster,
 ) *chiClusterAndDeploymentCount {
+
 	normalizedCluster := &chiv1.ChiCluster{
 		Name:       originalCluster.Name,
 		Deployment: originalCluster.Deployment,
@@ -105,26 +109,30 @@ func getNormalizedClusterLayoutData(
 
 	switch originalCluster.Layout.Type {
 	case clusterLayoutTypeStandard:
-		// Standard layout assumes to have 1 replica and 1 shard by default - in case not specified explicitly
-		if originalCluster.Layout.ReplicasCount == 0 {
-			originalCluster.Layout.ReplicasCount = 1
-		}
+		// Standard layout assumes to have 1 shard and 1 replica by default - in case not specified explicitly
 		if originalCluster.Layout.ShardsCount == 0 {
 			originalCluster.Layout.ShardsCount = 1
+		}
+		if originalCluster.Layout.ReplicasCount == 0 {
+			originalCluster.Layout.ReplicasCount = 1
 		}
 
 		// Handle .layout.shards
 		normalizedCluster.Layout.Shards = make([]chiv1.ChiClusterLayoutShard, originalCluster.Layout.ShardsCount)
+		// Loop over all shards and replicas inside shards and fill structure
 		for i := 0; i < originalCluster.Layout.ShardsCount; i++ {
+			// Create replicas for each shard
 			normalizedCluster.Layout.Shards[i].InternalReplication = stringTrue
 			normalizedCluster.Layout.Shards[i].Replicas = make([]chiv1.ChiClusterLayoutShardReplica, originalCluster.Layout.ReplicasCount)
 
+			// Fill each replica
 			for j := 0; j < originalCluster.Layout.ReplicasCount; j++ {
 				// For each replica of this normalized cluster inherit cluster's Deployment
 				inheritDeploymentAndSetDefaults(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Deployment)
-				normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = deploymentToString(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
-				// and calculate count of each replica deployment usage
-				deploymentCount[normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint]++
+				// And count how many times this deployment is used
+				fingerprint := deploymentToString(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
+				normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = fingerprint
+				deploymentCount[fingerprint]++
 			}
 		}
 
@@ -132,6 +140,7 @@ func getNormalizedClusterLayoutData(
 		// Advanced layout assumes detailed shards definition
 		normalizedCluster.Layout.Shards = originalCluster.Layout.Shards
 
+		// Loop over all shards and replicas inside shards and fill structure
 		for i := range normalizedCluster.Layout.Shards {
 			// For each shard of this normalized cluster inherit cluster's Deployment
 			inheritDeploymentAndSetDefaults(&normalizedCluster.Layout.Shards[i].Deployment, &normalizedCluster.Deployment)
@@ -153,15 +162,20 @@ func getNormalizedClusterLayoutData(
 				//
 				//        - definitionType: ReplicasCount
 				//          replicasCount: 2
+				// This means no replicas provided explicitly, let's create replicas
 				normalizedCluster.Layout.Shards[i].Replicas = make(
 					[]chiv1.ChiClusterLayoutShardReplica,
 					normalizedCluster.Layout.Shards[i].ReplicasCount,
 				)
 
+				// Fill each newly created replica
 				for j := 0; j < normalizedCluster.Layout.Shards[i].ReplicasCount; j++ {
+					// Inherit deployment
 					inheritDeploymentAndSetDefaults(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Layout.Shards[i].Deployment)
-					normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = deploymentToString(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
-					deploymentCount[normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint]++
+					// And count how many times this deployment is used
+					fingerprint := deploymentToString(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
+					normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = fingerprint
+					deploymentCount[fingerprint]++
 				}
 			} else {
 				// Define shards by replicas explicitly:
@@ -177,10 +191,15 @@ func getNormalizedClusterLayoutData(
 				//                  clickhouse.altinity.com/zone: zone4
 				//                  clickhouse.altinity.com/kind: ssd
 				//              podTemplateName: clickhouse-v18.16.1
+				// This means replicas provided explicitly, no need to create, just to normalize
+				// Fill each replica
 				for j := range normalizedCluster.Layout.Shards[i].Replicas {
+					// Inherit deployment
 					inheritDeploymentAndSetDefaults(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Layout.Shards[i].Deployment)
-					normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = deploymentToString(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
-					deploymentCount[normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint]++
+					// And count how many times this deployment is used
+					fingerprint := deploymentToString(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
+					normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = fingerprint
+					deploymentCount[fingerprint]++
 				}
 			}
 		}
@@ -253,19 +272,19 @@ func zoneCopyFrom(dst, src *chiv1.ChiDeploymentZone) {
 	(*dst).MatchLabels = tmp
 }
 
-// mergeWithAndReplaceBiggerValues combines chiDeploymentCount object with another one
-// and replaces local values with another one's values in case another value is bigger
-func (d chiDeploymentCount) mergeWithAndReplaceBiggerValues(another chiDeploymentCount) {
+// mergeInAndReplaceBiggerValues combines chiDeploymentCount object with another one
+// and replaces local values with another one's values in case another's value is bigger
+func (d chiDeploymentCount) mergeInAndReplaceBiggerValues(another chiDeploymentCount) {
 
-	// Loop over another struct and bring in new and bigger values
+	// Loop over another struct and bring in new OR bigger values
 	for key, value := range another {
 		_, ok := d[key]
 
 		if !ok {
-			// No such value - just include it
+			// No such key - new key/value pair just - include/merge it in
 			d[key] = value
 		} else if value > d[key] {
-			// new value is bigger, overwrite local value
+			// Have such key, but "another"'s value is bigger, overwrite local value
 			d[key] = value
 		}
 	}

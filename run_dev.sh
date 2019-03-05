@@ -1,10 +1,13 @@
 #!/bin/bash
 
-mkdir -p log
-./clickhouse-operator \
-	-alsologtostderr=true \
-	-log_dir=log \
-	-v=1
+if ./build_binary.sh; then
+    echo "Successfully built clickhouse-operator. Starting"
+
+    mkdir -p log
+    ./clickhouse-operator \
+    	-alsologtostderr=true \
+    	-log_dir=log \
+    	-v=1
 #	-logtostderr=true \
 #	-stderrthreshold=FATAL \
 
@@ -12,3 +15,9 @@ mkdir -p log
 # -alsologtostderr=true Logs are written to standard error as well as to files
 # -logtostderr=true  Logs are written to standard error instead of to files
 # -stderrthreshold=FATAL Log events at or above this severity are logged to standard	error as well as to files
+
+    # And clean binary after run. It'll be rebuilt next time
+    rm -f ./clickhouse-operator
+else
+    echo "Unable to build clickhouse-operator"
+fi
