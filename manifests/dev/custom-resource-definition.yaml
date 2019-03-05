@@ -1,0 +1,201 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhouseinstallations.clickhouse.altinity.com
+  namespace: dev
+spec:
+  group: clickhouse.altinity.com
+  version: v1
+  scope: Namespaced
+  names:
+    kind: ClickHouseInstallation
+    singular: clickhouseinstallation
+    plural: clickhouseinstallations
+    shortNames:
+    - chi
+  validation:
+    openAPIV3Schema:
+      properties:
+        spec:
+          type: object
+          required:
+          - configuration
+          properties:
+            configuration:
+              type: object
+              required:
+              - clusters
+              properties:
+                clusters:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                    - name
+                    - layout
+                    properties:
+                      deployment:
+                        type: object
+                        properties:
+                          scenario:
+                            enum:
+                            - Default
+                            - NodeMonopoly
+                          volumeClaimTemplate:
+                            type: string
+                          podTemplateName:
+                            type: string
+                          zone:
+                            type: object
+                      name:
+                        type: string
+                      shardsCount:
+                        type: integer
+                        minimum: 1
+                      replicasCount:
+                        type: integer
+                        minimum: 1
+                      layout:
+                        type: object
+                        required:
+                        - type
+                        properties:
+                          type:
+                            enum:
+                            - Standard
+                            - Advanced
+                      shards:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                          - definitionType
+                          properties:
+                            deployment:
+                              type: object
+                              properties:
+                                scenario:
+                                  enum:
+                                  - Default
+                                  - NodeMonopoly
+                                volumeClaimTemplate:
+                                  type: string
+                                podTemplateName:
+                                  type: string
+                                zone:
+                                  type: object
+                            definitionType:
+                              enum:
+                              - ReplicasCount
+                              - Replicas
+                            replicasCount:
+                              type: integer
+                              minimum: 1
+                            weight:
+                              type: integer
+                            internalReplication:
+                              enum:
+                              - Disabled
+                              - Enabled
+                            replicas:
+                              type: array
+                              items:
+                                type: object
+                                required:
+                                - deployment
+                                properties:
+                                  port:
+                                    type: integer
+                                    minimum: 1
+                                  deployment:
+                                    type: object
+                                    properties:
+                                      scenario:
+                                        enum:
+                                        - Default
+                                        - NodeMonopoly
+                                      volumeClaimTemplate:
+                                        type: string
+                                      podTemplateName:
+                                        type: string
+                                      zone:
+                                        type: object
+                settings:
+                  type: object
+                users:
+                  type: object
+                profiles:
+                  type: object
+                quotas:
+                  type: object
+                zookeeper:
+                  type: object
+                  properties:
+                    nodes:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          host:
+                            type: string
+                          port:
+                            type: integer
+                            minimum: 1
+            defaults:
+              type: object
+              properties:
+                replicasUseFQDN:
+                  type: integer
+                  minimum: 0
+                  maximum: 1
+                distributedDDL:
+                  type: object
+                  properties:
+                    profile:
+                      type: string
+                deployment:
+                  type: object
+                  properties:
+                    scenario:
+                      enum:
+                      - Default
+                      - NodeMonopoly
+                    volumeClaimTemplate:
+                      type: string
+                    podTemplateName:
+                      type: string
+                    zone:
+                      type: object
+            templates:
+              type: object
+              properties:
+                podTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                    - name
+                    - containers
+                    properies:
+                      name:
+                        type: string
+                      volumes:
+                        type: array
+                        items:
+                          type: object
+                      containers:
+                        type: array
+                        items:
+                          type: object
+                volumeClaimTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                    - name
+                    - template
+                    properties:
+                      name:
+                        type: string
+                      template:
+                        type: object
