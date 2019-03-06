@@ -60,11 +60,6 @@ type shardsIndexItem struct {
 	index   int
 }
 
-type chiClusterAndDeploymentCount struct {
-	cluster         *chiv1.ChiCluster
-	deploymentCount chiDeploymentCount
-}
-
 // chiDeploymentCount maps Deployment fingerprint to its usage count
 type chiDeploymentCount map[string]int
 

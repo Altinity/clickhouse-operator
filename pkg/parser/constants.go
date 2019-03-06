@@ -79,11 +79,34 @@ const (
 )
 
 const (
-	ssNameIDPattern            = "d%si%d"
-	ssNamePattern              = "ch-%s"
-	svcNamePattern             = "%ss"
+	// Full Deployment ID consists of two parts:
+	// 1. "deployment id" (it should be derived from fingerprint) of each deployment in ClickHouseInstallation object.
+	//    Some deployments may be the same and thus have the same "deployment id" (because of the same fingerprint)
+	// 2. Sequential index of this "deployment id" in ClickHouseInstallation object.
+	//    Some deployments may be the same and thus have the same "deployment id" (because of the same fingerprint),
+	//    but they will have different sequentially increasing index of this "deployment id" in ClickHouseInstallation object
+	// Ex.: two running instances of the same deployment
+	// 1eb454-1
+	// 1eb454-2
+	fullDeploymentIDPattern = "%s-%d"
+
+	// NAME                           READY   AGE   CONTAINERS    IMAGES
+	// statefulset.apps/ss-1eb454-1   0/1     2s    ss-1eb454-1   yandex/clickhouse-server:latest
+	statefulSetNamePattern     = "ss-%s"
+
+	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
+	// service/svc-1eb454-1  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-1
+	// service/svc-1eb454-2  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-2
+	serviceNamePattern         = "svc-%s"
+
 	domainPattern              = ".%s.svc.cluster.local"
-	hostnamePattern            = ssNamePattern + "-0.%[1]ss%s"
+
+	// ss-1eb454-1-0.1eb454-1s
+	// ss-1eb454-1-0.svc-1eb454-1.dev.svc.cluster.local
+	// TODO FIX IT
+	// TODO WTF IS THIS?
+	hostnamePattern            = statefulSetNamePattern + "-0.%[1]ss%s"
+
 	fqdnPattern                = "%s-0.%s%s"
 	configMapNamePattern       = "chi-%s-configd"
 	configMapMacrosNamePattern = configMapNamePattern + "-%s"

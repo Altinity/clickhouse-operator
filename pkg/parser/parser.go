@@ -15,12 +15,8 @@
 package parser
 
 import (
-	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"strings"
-	"time"
-
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"sort"
 )
@@ -33,8 +29,8 @@ func CreateChiObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) 
 	)
 
 	// Set defaults for CHI object properties
-	setSpecDefaultsReplicationFQDN(chi)
-	inheritDeploymentAndSetDefaults(&chi.Spec.Defaults.Deployment, nil)
+	ensureSpecDefaultsReplicasUseFQDN(chi)
+	ensureScenario(&chi.Spec.Defaults.Deployment)
 	clusters, options.deploymentCountMax = getNormalizedClusters(chi)
 
 	// Allocate data structures
@@ -43,11 +39,11 @@ func CreateChiObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) 
 	options.macrosDataIndex = make(map[string]shardsIndex)
 	options.includeConfigSection = make(map[string]bool)
 
-	// configSections maps section name to section XML config <yandex><macros>...</macros><yandex>
+	// configSections maps section name to section XML config such as "<yandex><macros>...</macros><yandex>"
 	configSections := make(map[string]string)
 
 	// Generate XMLs
-	configSections[remoteServersXML] = genRemoteServersConfig(chi, &options, clusters)
+	configSections[remoteServersXML] = generateRemoteServersConfig(chi, &options, clusters)
 	options.includeConfigSection[zookeeperXML] = includeIfNotEmpty(configSections, zookeeperXML, genZookeeperConfig(chi))
 	options.includeConfigSection[usersXML] = includeIfNotEmpty(configSections, usersXML, genUsersConfig(chi))
 	options.includeConfigSection[profilesXML] = includeIfNotEmpty(configSections, profilesXML, genProfilesConfig(chi))
@@ -69,44 +65,40 @@ func CreateChiObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) 
 }
 
 // getNormalizedClusters returns list of "normalized" (converted to basic form) chiv1.ChiCluster objects
-// with each deployment usage counters
+// with each cluster all deployments usage counters
 func getNormalizedClusters(chi *chiv1.ClickHouseInstallation) ([]*chiv1.ChiCluster, chiDeploymentCount) {
-	link := make(chan *chiClusterAndDeploymentCount)
-	// Loop over all clusters
-	for _, cluster := range chi.Spec.Configuration.Clusters {
-		go func(chin *chiv1.ClickHouseInstallation, c chiv1.ChiCluster, ch chan<- *chiClusterAndDeploymentCount) {
-			// and normalize each cluster
-			ch <- getNormalizedClusterLayoutStruct(chi, cluster)
-		}(chi, cluster, link)
-	}
-
-	clusterCount := len(chi.Spec.Configuration.Clusters)
-	clusterList := make([]*chiv1.ChiCluster, 0, clusterCount)
-	// deploymentCount maps deployment fingerprint to max among all clusters usage number of this deployment
+	// deploymentCount maps deployment fingerprint to max among all normalizedClusters usage number of this deployment
 	deploymentCount := make(chiDeploymentCount)
-	for i := 0; i < clusterCount; i++ {
-		clusterAndDeploymentCount := <-link
-		clusterList = append(clusterList, clusterAndDeploymentCount.cluster)
-		// Accumulate deployments usage count. Find each deployment max usage number among all clusters
-		deploymentCount.mergeInAndReplaceBiggerValues(clusterAndDeploymentCount.deploymentCount)
+
+	// Loop over all clusters and get normalized copy
+	normalizedClusters := make([]*chiv1.ChiCluster, 0, len(chi.Spec.Configuration.Clusters))
+	for _, cluster := range chi.Spec.Configuration.Clusters {
+		normalizedCluster, normalizedClusterDeploymentCount := getNormalizedCluster(chi, cluster)
+		normalizedClusters = append(normalizedClusters, normalizedCluster)
+
+		// Accumulate deployments usage count. Find each deployment max usage number among all normalizedClusters
+		deploymentCount.mergeInAndReplaceBiggerValues(normalizedClusterDeploymentCount)
 	}
 
-	return clusterList, deploymentCount
+	return normalizedClusters, deploymentCount
 }
 
-// getNormalizedClusterLayoutStruct returns chiv1.ChiCluster object after normalization procedures
-func getNormalizedClusterLayoutStruct(
+// getNormalizedCluster returns chiv1.ChiCluster object after normalization procedures
+func getNormalizedCluster(
 	chi *chiv1.ClickHouseInstallation,
 	originalCluster chiv1.ChiCluster,
-) *chiClusterAndDeploymentCount {
-
-	normalizedCluster := &chiv1.ChiCluster{
-		Name:       originalCluster.Name,
-		Deployment: originalCluster.Deployment,
-	}
-	inheritDeploymentAndSetDefaults(&normalizedCluster.Deployment, &chi.Spec.Defaults.Deployment)
+) (*chiv1.ChiCluster, chiDeploymentCount) {
 	deploymentCount := make(chiDeploymentCount)
 
+	// Prepare partially normalized cluster - no Layout
+	normalizedCluster := &chiv1.ChiCluster{
+		Name:       originalCluster.Name,
+		// no Layout field filled here
+		Deployment: originalCluster.Deployment,
+	}
+	mergeDeployment(&normalizedCluster.Deployment, &chi.Spec.Defaults.Deployment)
+
+	// Fill Layout field
 	switch originalCluster.Layout.Type {
 	case clusterLayoutTypeStandard:
 		// Standard layout assumes to have 1 shard and 1 replica by default - in case not specified explicitly
@@ -128,9 +120,10 @@ func getNormalizedClusterLayoutStruct(
 			// Fill each replica
 			for j := 0; j < originalCluster.Layout.ReplicasCount; j++ {
 				// For each replica of this normalized cluster inherit cluster's Deployment
-				inheritDeploymentAndSetDefaults(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Deployment)
+				mergeDeployment(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Deployment)
+
 				// And count how many times this deployment is used
-				fingerprint := deploymentToString(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
+				fingerprint := generateDeploymentFingerprint(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
 				normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = fingerprint
 				deploymentCount[fingerprint]++
 			}
@@ -142,9 +135,6 @@ func getNormalizedClusterLayoutStruct(
 
 		// Loop over all shards and replicas inside shards and fill structure
 		for i := range normalizedCluster.Layout.Shards {
-			// For each shard of this normalized cluster inherit cluster's Deployment
-			inheritDeploymentAndSetDefaults(&normalizedCluster.Layout.Shards[i].Deployment, &normalizedCluster.Deployment)
-
 			// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
 			// with default value set to "true"
 			switch normalizedCluster.Layout.Shards[i].InternalReplication {
@@ -153,6 +143,9 @@ func getNormalizedClusterLayoutStruct(
 			default:
 				normalizedCluster.Layout.Shards[i].InternalReplication = stringTrue
 			}
+
+			// For each shard of this normalized cluster inherit cluster's Deployment
+			mergeDeployment(&normalizedCluster.Layout.Shards[i].Deployment, &normalizedCluster.Deployment)
 
 			if normalizedCluster.Layout.Shards[i].DefinitionType == shardDefinitionTypeReplicasCount {
 				// Define shards by replicas count:
@@ -171,9 +164,10 @@ func getNormalizedClusterLayoutStruct(
 				// Fill each newly created replica
 				for j := 0; j < normalizedCluster.Layout.Shards[i].ReplicasCount; j++ {
 					// Inherit deployment
-					inheritDeploymentAndSetDefaults(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Layout.Shards[i].Deployment)
+					mergeDeployment(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Layout.Shards[i].Deployment)
+
 					// And count how many times this deployment is used
-					fingerprint := deploymentToString(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
+					fingerprint := generateDeploymentFingerprint(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
 					normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = fingerprint
 					deploymentCount[fingerprint]++
 				}
@@ -195,9 +189,10 @@ func getNormalizedClusterLayoutStruct(
 				// Fill each replica
 				for j := range normalizedCluster.Layout.Shards[i].Replicas {
 					// Inherit deployment
-					inheritDeploymentAndSetDefaults(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Layout.Shards[i].Deployment)
+					mergeDeployment(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Layout.Shards[i].Deployment)
+
 					// And count how many times this deployment is used
-					fingerprint := deploymentToString(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
+					fingerprint := generateDeploymentFingerprint(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
 					normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = fingerprint
 					deploymentCount[fingerprint]++
 				}
@@ -205,25 +200,25 @@ func getNormalizedClusterLayoutStruct(
 		}
 	}
 
-	return &chiClusterAndDeploymentCount{
-		cluster:         normalizedCluster,
-		deploymentCount: deploymentCount,
-	}
+	return normalizedCluster, deploymentCount
 }
 
-// deploymentToString creates string representation of chiv1.ChiDeployment object
-// of the following form:
+// generateDeploymentFingerprint creates string representation
+// of chiv1.ChiDeployment object of the following form:
 // "PodTemplateName::VolumeClaimTemplate::Scenario::Zone.MatchLabels.Key1=Zone.MatchLabels.Val1::Zone.MatchLabels.Key2=Zone.MatchLabels.Val2"
-func deploymentToString(d *chiv1.ChiDeployment) string {
-	l := len(d.Zone.MatchLabels)
+// IMPORTANT there can be the same deployments inside ClickHouseInstallation object
+// and they will have the same deployment fingerprint
+func generateDeploymentFingerprint(d *chiv1.ChiDeployment) string {
+	zoneMatchLabelsNum := len(d.Zone.MatchLabels)
 
-	keys := make([]string, 0, l)
+	// Labels should be sorted key keys
+	keys := make([]string, 0, zoneMatchLabelsNum)
 	for key := range d.Zone.MatchLabels {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
 
-	a := make([]string, 0, l+1)
+	a := make([]string, 0, zoneMatchLabelsNum+1)
 	a = append(a, fmt.Sprintf("%s::%s::%s::", d.PodTemplateName, d.VolumeClaimTemplate, d.Scenario))
 	// Loop over sorted d.Zone.MatchLabels keys
 	for _, key := range keys {
@@ -234,32 +229,71 @@ func deploymentToString(d *chiv1.ChiDeployment) string {
 	return strings.Join(a, "::")
 }
 
-// setSpecDefaultsReplicationFQDN updates chi.Spec.Defaults section with default values
-func setSpecDefaultsReplicationFQDN(chi *chiv1.ClickHouseInstallation) {
-	if chi.Spec.Defaults.ReplicasUseFQDN != 1 {
-		chi.Spec.Defaults.ReplicasUseFQDN = 0
+// generateDeploymentID generates short-printable deployment ID out of long deployment fingerprint
+// Generally, fingerprint is perfectly OK - it is unique for each unique deployment inside ClickHouseInstallation object,
+// but it is extremely long and thus can not be used in k8s resources names.
+// So we need to produce another - much shorter - unique id for each unique deployment inside ClickHouseInstallation object.
+// IMPORTANT there can be the same deployments inside ClickHouseInstallation object and they will have the same
+// deployment fingerprint and thus deployment id. This is addressed by FullDeploymentID, which is unique for each
+// deployment inside ClickHouseInstallation object
+func generateDeploymentID(_ /* fingerprint */ string) string {
+	return randomString()
+}
+
+// generateFullDeploymentID generates full deployment ID out of deployment ID
+// Full Deployment ID is unique for each deployment inside ClickHouseInstallation object and can be used for naming.
+// IMPORTANT there can be the same deployments inside ClickHouseInstallation object and they will have the same
+// deployment fingerprint and thus deployment id. This is addressed by FullDeploymentID, which is unique for each
+// deployment inside ClickHouseInstallation object
+func generateFullDeploymentID(deploymentID string, index int) string {
+	// 1eb454-2 (deployment id - sequential index of this deployment id)
+	return fmt.Sprintf(fullDeploymentIDPattern, deploymentID, index)
+
+}
+
+// ensureSpecDefaultsReplicasUseFQDN ensures chi.Spec.Defaults.ReplicasUseFQDN section has proper values
+func ensureSpecDefaultsReplicasUseFQDN(chi *chiv1.ClickHouseInstallation) {
+	// Acceptable values are 0 and 1
+	// So if it is 1 - it is ok and assign 0 for any other values
+	if chi.Spec.Defaults.ReplicasUseFQDN == 1 {
+		// Acceptable value
+		return
+	}
+
+	// Assign 0 for any other values (including 0 - rewrite is unimportant)
+	chi.Spec.Defaults.ReplicasUseFQDN = 0
+}
+
+// ensureScenario ensures deployment has scenario specified
+func ensureScenario(d *chiv1.ChiDeployment) {
+	if d.Scenario == "" {
+		// Have no scenario specified - specify default one
+		(*d).Scenario = deploymentScenarioDefault
 	}
 }
 
-// inheritDeploymentAndSetDefaults updates chiv1.ChiDeployment with default values
-func inheritDeploymentAndSetDefaults(d, parent *chiv1.ChiDeployment) {
-	if parent != nil {
-		// Have parent - copy (a.k.a inherit) unassigned values from parent
-		if d.PodTemplateName == "" {
-			(*d).PodTemplateName = parent.PodTemplateName
-		}
-		if d.VolumeClaimTemplate == "" {
-			(*d).VolumeClaimTemplate = parent.VolumeClaimTemplate
-		}
-		if d.Scenario == "" {
-			(*d).Scenario = parent.Scenario
-		}
-		if len(d.Zone.MatchLabels) == 0 {
-			zoneCopyFrom(&d.Zone, &parent.Zone)
-		}
-	} else if d.Scenario == "" {
-		// Have no parent, but have Scenario
-		(*d).Scenario = deploymentScenarioDefault
+// mergeDeployment updates empty fields of chiv1.ChiDeployment with values from src deployment
+func mergeDeployment(dst, src *chiv1.ChiDeployment) {
+	if src == nil {
+		return
+	}
+
+	// Have source to merge from - copy locally unassigned values
+
+	if len(dst.Zone.MatchLabels) == 0 {
+		zoneCopyFrom(&dst.Zone, &src.Zone)
+	}
+
+	if dst.PodTemplateName == "" {
+		(*dst).PodTemplateName = src.PodTemplateName
+	}
+
+	if dst.VolumeClaimTemplate == "" {
+		(*dst).VolumeClaimTemplate = src.VolumeClaimTemplate
+	}
+
+	if dst.Scenario == "" {
+		(*dst).Scenario = src.Scenario
 	}
 }
 
@@ -288,24 +322,4 @@ func (d chiDeploymentCount) mergeInAndReplaceBiggerValues(another chiDeploymentC
 			d[key] = value
 		}
 	}
-}
-
-// randomString generates random string
-func randomString() string {
-	b := make([]byte, 3)
-	rand.New(rand.NewSource(time.Now().UnixNano())).Read(b)
-	return hex.EncodeToString(b)
-}
-
-// includeIfNotEmpty inserts data into map object using specified key, if not empty value provided
-func includeIfNotEmpty(dst map[string]string, key, src string) bool {
-	// Do not include empty value
-	if src == "" {
-		return false
-	}
-
-	// Include value by specified key
-	dst[key] = src
-
-	return true
 }

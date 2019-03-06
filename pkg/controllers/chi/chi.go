@@ -54,8 +54,8 @@ import (
 type Controller struct {
 	kubeClient              kube.Interface
 	chopClient              chopclientset.Interface
-	chopLister              choplisters.ClickHouseInstallationLister
-	chopListerSynced        cache.InformerSynced
+	chiLister               choplisters.ClickHouseInstallationLister
+	chiListerSynced         cache.InformerSynced
 	statefulSetLister       appslisters.StatefulSetLister
 	statefulSetListerSynced cache.InformerSynced
 	configMapLister         corelisters.ConfigMapLister
@@ -85,7 +85,7 @@ const (
 func CreateController(
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
-	chopInformer chopinformers.ClickHouseInstallationInformer,
+	chiInformer chopinformers.ClickHouseInstallationInformer,
 	statefulSetInformer appsinformers.StatefulSetInformer,
 	configMapInformer coreinformers.ConfigMapInformer,
 	serviceInformer coreinformers.ServiceInformer,
@@ -110,32 +110,60 @@ func CreateController(
 
 	// Create Controller instance
 	controller := &Controller{
+		// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 		kubeClient:              kubeClient,
+		// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
 		chopClient:              chopClient,
-		chopLister:              chopInformer.Lister(),
-		chopListerSynced:        chopInformer.Informer().HasSynced,
+
+		// chiLister used as chiLister.ClickHouseInstallations(namespace).Get(name)
+		chiLister: chiInformer.Lister(),
+		// chiListerSynced used in waitForCacheSync()
+		chiListerSynced: chiInformer.Informer().HasSynced,
+
+		// statefulSetLister used as statefulSetLister.StatefulSets(namespace).Get(name)
 		statefulSetLister:       statefulSetInformer.Lister(),
+		// statefulSetListerSynced used in waitForCacheSync()
 		statefulSetListerSynced: statefulSetInformer.Informer().HasSynced,
+
+		// configMapLister used as configMapLister.ConfigMaps(namespace).Get(name)
 		configMapLister:         configMapInformer.Lister(),
+		// configMapListerSynced used in waitForCacheSync()
 		configMapListerSynced:   configMapInformer.Informer().HasSynced,
+
+		// serviceLister used as serviceLister.Services(namespace).Get(name)
 		serviceLister:           serviceInformer.Lister(),
+		// serviceListerSynced used in waitForCacheSync()
 		serviceListerSynced:     serviceInformer.Informer().HasSynced,
+
+		// queue used to organize events queue processed by operator
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
+
+		// not used explicitly
 		recorder:                recorder,
+
+		// export metrics to Prometheus
 		metricsExporter:         chopMetricsExporter,
 	}
 
-	chopInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	chiInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			glog.V(1).Info("chopInformer.AddFunc")
+			glog.V(1).Info("chiInformer.AddFunc")
 			controller.enqueueObject(obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			glog.V(1).Info("chopInformer.UpdateFunc")
+			glog.V(1).Info("chiInformer.UpdateFunc")
+			newChi := newObj.(*chop.ClickHouseInstallation)
+			oldChi := oldObj.(*chop.ClickHouseInstallation)
+			if newChi.ResourceVersion == oldChi.ResourceVersion {
+				glog.V(1).Info("chiInformer.UpdateFunc - no update required")
+				return
+			}
+
+			glog.V(1).Info("chiInformer.UpdateFunc - UPDATE REQUIRED")
 			controller.enqueueObject(newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
-			glog.V(1).Info("chopInformer.DeleteFunc")
+			glog.V(1).Info("chiInformer.DeleteFunc")
 		},
 	})
 
@@ -152,6 +180,8 @@ func CreateController(
 				glog.V(1).Info("statefulSetInformer.UpdateFunc - no update required")
 				return
 			}
+
+			glog.V(1).Info("statefulSetInformer.UpdateFunc - UPDATE REQUIRED")
 			controller.handleObject(newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -172,7 +202,7 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 	if !waitForCacheSync(
 		"ClickHouseInstallation",
 		ctx.Done(),
-		c.chopListerSynced,
+		c.chiListerSynced,
 		c.statefulSetListerSynced,
 		c.configMapListerSynced,
 		c.serviceListerSynced,
@@ -255,11 +285,11 @@ func (c *Controller) syncItem(key string) error {
 	// We have `namespace` and `name` which are expected to point to a CHI instance
 
 	// Find CHI specified by namespace/name
-	chi, err := c.chopLister.ClickHouseInstallations(namespace).Get(name)
+	chi, err := c.chiLister.ClickHouseInstallations(namespace).Get(name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			utilruntime.HandleError(fmt.Errorf("ClickHouseInstallation object '%s' no longer exists in the work queue", key))
-			// Not found is not an error on higher level - return nil
+			// Not found is not an error on higher level - return "all is ok"
 			return nil
 		}
 		return err
@@ -499,7 +529,7 @@ func (c *Controller) handleObject(obj interface{}) {
 	glog.V(2).Infof("Processing object: %s", object.GetName())
 
 	// Get owner - it is expected to be CHI
-	chi, err := c.chopLister.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
+	chi, err := c.chiLister.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
 
 	if err != nil {
 		glog.V(2).Infof("ignoring orphaned object '%s' of ClickHouseInstallation '%s'", object.GetSelfLink(), ownerRef.Name)

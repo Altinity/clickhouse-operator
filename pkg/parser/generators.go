@@ -120,17 +120,20 @@ func genZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 	return b.String()
 }
 
-// genRemoteServersConfig creates data for "remote_servers.xml" and calculates data generation parameters for other sections
-func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOptions, clusters []*chiv1.ChiCluster) string {
+// generateRemoteServersConfig creates data for "remote_servers.xml" and calculates data generation parameters for other sections
+func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOptions, clusters []*chiv1.ChiCluster) string {
 	var domainName string
 	b := &bytes.Buffer{}
 	dRefIndex := make(map[string]int)
-	dID := make(map[string]string)
 
-	for k := range opts.deploymentCountMax {
-		dID[k] = randomString()
+	// Prepare deployment IDs out of deployment fingerprints
+	deploymentID := make(map[string]string)
+	for deploymentFingerprint := range opts.deploymentCountMax {
+		deploymentID[deploymentFingerprint] = generateDeploymentID(deploymentFingerprint)
 	}
+
 	if chi.Spec.Defaults.ReplicasUseFQDN == 1 {
+		// .%s.svc.cluster.local
 		domainName = CreateDomainName(chi.Namespace)
 	}
 
@@ -163,25 +166,29 @@ func genRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOptions,
 			for _, replica := range clusters[i].Layout.Shards[j].Replicas {
 				fingerprint := replica.Deployment.Fingerprint
 				idx, ok := dRefIndex[fingerprint]
-				if !ok {
-					idx = 1
-				} else {
+				if ok {
+					// fingerprint listed - deployment known
 					idx++
 					if idx > opts.deploymentCountMax[fingerprint] {
 						idx = 1
 					}
+				} else {
+					// new fingerprint
+					idx = 1
 				}
 				dRefIndex[fingerprint] = idx
-				ssNameID := fmt.Sprintf(ssNameIDPattern, dID[fingerprint], idx)
-				opts.ssNames[ssNameID] = fingerprint
+
+				// 1eb454-2 (deployment id - sequential index of this deployment id)
+				fullDeploymentID := generateFullDeploymentID(deploymentID[fingerprint], idx)
+				opts.ssNames[fullDeploymentID] = fingerprint
 				opts.ssDeployments[fingerprint] = &replica.Deployment
 
 				// += <replica>
 				//		<host>XXX</host>
-				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", fmt.Sprintf(hostnamePattern, ssNameID, domainName))
+				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", CreateHostname(fullDeploymentID, domainName))
 
-				opts.macrosDataIndex[ssNameID] = append(
-					opts.macrosDataIndex[ssNameID],
+				opts.macrosDataIndex[fullDeploymentID] = append(
+					opts.macrosDataIndex[fullDeploymentID],
 					&shardsIndexItem{
 						cluster: clusters[i].Name,
 						index:   j + 1,

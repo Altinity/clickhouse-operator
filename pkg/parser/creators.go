@@ -331,17 +331,22 @@ func CreateConfigMapName(chiName string) string {
 
 // CreateServiceName returns a name for a Service resource based on predefined pattern
 func CreateServiceName(prefix string) string {
-	return fmt.Sprintf(svcNamePattern, prefix)
+	return fmt.Sprintf(serviceNamePattern, prefix)
 }
 
 // CreateStatefulSetName returns a name for a StatefulSet resource based on predefined pattern
 func CreateStatefulSetName(prefix string) string {
-	return fmt.Sprintf(ssNamePattern, prefix)
+	return fmt.Sprintf(statefulSetNamePattern, prefix)
 }
 
 // CreateDomainName creates domain part of Pod's name
 func CreateDomainName(chiNamespace string) string {
 	return fmt.Sprintf(domainPattern, chiNamespace)
+}
+
+// CreateHostname creates FQDN of a host
+func CreateHostname(fullDeploymentID, domainName string) string {
+	return fmt.Sprintf(hostnamePattern, fullDeploymentID, domainName)
 }
 
 // CreatePodHostname returns a hostname of the Pod based on predefined pattern

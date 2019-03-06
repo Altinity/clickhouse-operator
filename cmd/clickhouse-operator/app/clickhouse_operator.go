@@ -116,7 +116,7 @@ func createClientsets() (*kube.Clientset, *chopclientset.Clientset) {
 
 	chopClientset, err := chopclientset.NewForConfig(config)
 	if err != nil {
-		glog.Fatalf("Unable to initialize CHI Custom Resource API clientset: %s", err.Error())
+		glog.Fatalf("Unable to initialize clickhouse-operator clientset: %s", err.Error())
 	}
 
 	return kubeClientset, chopClientset
