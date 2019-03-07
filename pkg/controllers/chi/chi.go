@@ -159,7 +159,7 @@ func CreateController(
 				return
 			}
 
-			glog.V(1).Info("chiInformer.UpdateFunc - UPDATE REQUIRED")
+			glog.V(1).Infof("chiInformer.UpdateFunc - UPDATE REQUIRED chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
 			controller.enqueueObject(newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -302,7 +302,7 @@ func (c *Controller) syncItem(key string) error {
 // syncChi sync CHI to desired state
 func (c *Controller) syncChi(chi *chop.ClickHouseInstallation) error {
 	// Check CHI object already in sync
-	if chi.Status.ObjectPrefixes == nil || len(chi.Status.ObjectPrefixes) == 0 {
+	if chi.IsNew() {
 		// CHI is a new one - need to create all its objects
 		return c.syncNewChi(chi)
 	} else {
@@ -318,25 +318,25 @@ func (c *Controller) syncNewChi(chi *chop.ClickHouseInstallation) error {
 	// We need to create all resources that are needed to run user's .yaml specification
 	glog.V(1).Infof("syncNewChi(%s/%s)", chi.Namespace, chi.Name)
 
-	prefixes, err := c.createCHIResources(chi)
+	fullDeploymentIDs, err := c.createCHIResources(chi)
 	if err != nil {
 		glog.V(2).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
 		return err
 	}
 
 	// Some debug
-	for i := range prefixes {
-		glog.V(1).Infof("syncNewChi(%s/%s) - created prefix %s", chi.Namespace, chi.Name, prefixes[i])
+	for i := range fullDeploymentIDs {
+		glog.V(1).Infof("syncNewChi(%s/%s) - created prefix %s", chi.Namespace, chi.Name, fullDeploymentIDs[i])
 	}
 
-	// Update CHI status in k8s
-	err = c.updateCHIResource(chi, prefixes)
+	// Update CHI status in k8s with fullDeploymentIDs
+	err = c.updateCHIResource(chi, fullDeploymentIDs)
 	if err != nil {
 		glog.V(2).Infof("ClickHouseInstallation (%q): unable to update status of CHI resource: %q", chi.Name, err)
 		return err
 	}
 
-	glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created): %v", chi.Name, prefixes)
+	glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created): %v", chi.Name, fullDeploymentIDs)
 
 	return nil
 }
@@ -346,20 +346,20 @@ func (c *Controller) syncKnownChi(chi *chop.ClickHouseInstallation) error {
 	glog.V(1).Infof("syncKnownChi(%s/%s)", chi.Namespace, chi.Name)
 
 	// Number of prefixes - which is number of Stateful Sets and number of Pods
-	prefixesNum := len(chi.Status.ObjectPrefixes)
+	prefixesNum := len(chi.Status.FullDeploymentIDs)
 	// Pod hostnames of CH
 	chHostnames := make([]string, prefixesNum)
 
-	for i, prefix := range chi.Status.ObjectPrefixes {
+	for i, fullDeploymentID := range chi.Status.FullDeploymentIDs {
 		// Verify we have Stateful Set with such a name
-		statefulSetName := chopparser.CreateStatefulSetName(prefix)
+		statefulSetName := chopparser.CreateStatefulSetName(fullDeploymentID)
 		_, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(statefulSetName)
 		if err == nil {
 			// TODO: check all controlled objects
 			glog.V(2).Infof("ClickHouseInstallation (%q) controls StatefulSet: %q", chi.Name, statefulSetName)
 
 			// Prepare hostnames list for the chopmetrics.Exporter state storage
-			chHostnames[i] = chopparser.CreatePodFQDN(chi.Namespace, prefix)
+			chHostnames[i] = chopparser.CreatePodFQDN(chi.Namespace, fullDeploymentID)
 		}
 	}
 
@@ -377,7 +377,7 @@ func (c *Controller) syncKnownChi(chi *chop.ClickHouseInstallation) error {
 func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) ([]string, error) {
 	chiCopy := chi.DeepCopy()
 	clusters, deploymentCountMax := chopparser.NormalizeCHI(chiCopy)
-	chiObjectsMap, prefixes := chopparser.CreateCHIObjects(chiCopy, clusters, deploymentCountMax)
+	chiObjectsMap, fullDeploymentIDs := chopparser.CreateCHIObjects(chiCopy, clusters, deploymentCountMax)
 
 	for _, objList := range chiObjectsMap {
 		switch v := objList.(type) {
@@ -402,7 +402,7 @@ func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) ([]str
 		}
 	}
 
-	return prefixes, nil
+	return fullDeploymentIDs, nil
 }
 
 // createConfigMapResource creates core.ConfigMap resource
@@ -473,10 +473,10 @@ func (c *Controller) createStatefulSetResource(chi *chop.ClickHouseInstallation,
 }
 
 // updateCHIResource updates .status section of ClickHouseInstallation resource
-func (c *Controller) updateCHIResource(chi *chop.ClickHouseInstallation, objectPrefixes []string) error {
+func (c *Controller) updateCHIResource(chi *chop.ClickHouseInstallation, fullDeploymentIDs []string) error {
 	chiCopy := chi.DeepCopy()
 	chiCopy.Status = chop.ChiStatus{
-		ObjectPrefixes: objectPrefixes,
+		FullDeploymentIDs: fullDeploymentIDs,
 	}
 	_, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
 

@@ -95,14 +95,14 @@ const (
 
 	// NAME                           READY   AGE   CONTAINERS    IMAGES
 	// statefulset.apps/ss-1eb454-1   0/1     2s    ss-1eb454-1   yandex/clickhouse-server:latest
-	statefulSetNamePattern = "ss-%s"
+	statefulSetNamePattern = "chi-%s"
 
 	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
 	// service/svc-1eb454-1  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-1
 	// service/svc-1eb454-2  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-2
 	// In this pattern "%s" is substituted with fullDeploymentIDPattern-generated value
 	// Ex.: svc-1eb454-2
-	serviceNamePattern = "svc-%s"
+	serviceNamePattern = "chi-%s"
 
 	// namespaceDomainPattern presents Domain Name pattern of a namespace
 	// In this pattern "%s" is substituted namespace name's value

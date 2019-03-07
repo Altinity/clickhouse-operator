@@ -33,7 +33,7 @@ type ClickHouseInstallation struct {
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	ObjectPrefixes []string `json:"objectPrefixes"`
+	FullDeploymentIDs []string `json:"fullDeploymentIDs"`
 }
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
@@ -61,10 +61,9 @@ type ChiDeployment struct {
 	PodTemplateName     string            `json:"podTemplateName,omitempty"`
 	VolumeClaimTemplate string            `json:"volumeClaimTemplate,omitempty"`
 	Scenario            string            `json:"scenario,omitempty"`
-	// Fingerprint is a string fingerprint of the ChiDeployment.
-	// Used to find equal deployments
-	// TODO replace with hash
-	Fingerprint string
+
+	// Fingerprint is a fingerprint of the ChiDeployment. Used to find equal deployments
+	Fingerprint string `json:"fingerprint,omitempty"`
 }
 
 // ChiDeploymentZone defines zone section of *.deployment
@@ -156,3 +155,9 @@ const (
 	// ClickHouseInstallationCRDResourceKind defines kind of CRD resource
 	ClickHouseInstallationCRDResourceKind = "ClickHouseInstallation"
 )
+
+// IsNew checks whether CHI is a new one or already known and was processed/created earlier
+func (chi *ClickHouseInstallation) IsNew() bool {
+	// New CHI does not have FullDeploymentIDs specified
+	return chi.Status.FullDeploymentIDs == nil || len(chi.Status.FullDeploymentIDs) == 0
+}

@@ -19,6 +19,8 @@ import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"sort"
 	"strings"
+	"encoding/hex"
+	"crypto/sha1"
 )
 
 // NormalizedCHI returns list of "normalized" (converted to basic form) chiv1.ChiCluster objects
@@ -150,7 +152,7 @@ func getNormalizedCluster(
 				mergeDeployment(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Deployment)
 
 				// And count how many times this deployment is used
-				fingerprint := generateDeploymentFingerprint(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
+				fingerprint := generateDeploymentFingerprint(chi, &normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
 				normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = fingerprint
 				deploymentCount[fingerprint]++
 			}
@@ -189,7 +191,7 @@ func getNormalizedCluster(
 					mergeDeployment(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Layout.Shards[i].Deployment)
 
 					// And count how many times this deployment is used
-					fingerprint := generateDeploymentFingerprint(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
+					fingerprint := generateDeploymentFingerprint(chi, &normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
 					normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = fingerprint
 					deploymentCount[fingerprint]++
 				}
@@ -214,7 +216,7 @@ func getNormalizedCluster(
 					mergeDeployment(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Layout.Shards[i].Deployment)
 
 					// And count how many times this deployment is used
-					fingerprint := generateDeploymentFingerprint(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
+					fingerprint := generateDeploymentFingerprint(chi, &normalizedCluster.Layout.Shards[i].Replicas[j].Deployment)
 					normalizedCluster.Layout.Shards[i].Replicas[j].Deployment.Fingerprint = fingerprint
 					deploymentCount[fingerprint]++
 				}
@@ -225,12 +227,12 @@ func getNormalizedCluster(
 	return normalizedCluster, deploymentCount
 }
 
-// generateDeploymentFingerprint creates string representation
+// generateDeploymentString creates string representation
 // of chiv1.ChiDeployment object of the following form:
 // "PodTemplateName::VolumeClaimTemplate::Scenario::Zone.MatchLabels.Key1=Zone.MatchLabels.Val1::Zone.MatchLabels.Key2=Zone.MatchLabels.Val2"
 // IMPORTANT there can be the same deployments inside ClickHouseInstallation object
-// and they will have the same deployment fingerprint
-func generateDeploymentFingerprint(d *chiv1.ChiDeployment) string {
+// and they will have the same deployment string representation
+func generateDeploymentString(d *chiv1.ChiDeployment) string {
 	zoneMatchLabelsNum := len(d.Zone.MatchLabels)
 
 	// Labels should be sorted key keys
@@ -251,6 +253,16 @@ func generateDeploymentFingerprint(d *chiv1.ChiDeployment) string {
 	return strings.Join(a, "::")
 }
 
+// generateDeploymentFingerprint creates fingerprint
+// of chiv1.ChiDeployment object located inside chiv1.ClickHouseInstallation
+// IMPORTANT there can be the same deployments inside ClickHouseInstallation object
+// and they will have the same fingerprint
+func generateDeploymentFingerprint(chi *chiv1.ClickHouseInstallation, d *chiv1.ChiDeployment) string {
+	hasher := sha1.New()
+	hasher.Write([]byte(chi.Namespace + chi.Name + generateDeploymentString(d)))
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
 // generateDeploymentID generates short-printable deployment ID out of long deployment fingerprint
 // Generally, fingerprint is perfectly OK - it is unique for each unique deployment inside ClickHouseInstallation object,
 // but it is extremely long and thus can not be used in k8s resources names.
@@ -258,8 +270,10 @@ func generateDeploymentFingerprint(d *chiv1.ChiDeployment) string {
 // IMPORTANT there can be the same deployments inside ClickHouseInstallation object and they will have the same
 // deployment fingerprint and thus deployment id. This is addressed by FullDeploymentID, which is unique for each
 // deployment inside ClickHouseInstallation object
-func generateDeploymentID(_ /* fingerprint */ string) string {
-	return randomString()
+func generateDeploymentID( fingerprint string) string {
+	// Extract last 10 chars of fingerprint
+	return fingerprint[len(fingerprint)-10:]
+	//return randomString()
 }
 
 // generateFullDeploymentID generates full deployment ID out of deployment ID
