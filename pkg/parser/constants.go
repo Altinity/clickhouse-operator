@@ -68,14 +68,17 @@ const (
 )
 
 const (
-	dotXML           = ".xml"
-	remoteServersXML = configRemoteServers + dotXML
-	zookeeperXML     = configZookeeper + dotXML
-	usersXML         = configUsers + dotXML
-	quotasXML        = configQuotas + dotXML
-	profilesXML      = configProfiles + dotXML
-	settingsXML      = configSettings + dotXML
-	macrosXML        = configMacros + dotXML
+	dotXML                   = ".xml"
+
+	// Filenames of the config files in /etc/clickhouse-server/config.d
+	// These files would be created as ConfigMaps mapping if necessary
+	remoteServersXMLFilename = configRemoteServers + dotXML
+	zookeeperXMLFilename     = configZookeeper + dotXML
+	usersXMLFilename         = configUsers + dotXML
+	quotasXMLFilename        = configQuotas + dotXML
+	profilesXMLFilename      = configProfiles + dotXML
+	settingsXMLFilename      = configSettings + dotXML
+	macrosXMLFilename        = configMacros + dotXML
 )
 
 const (
@@ -85,7 +88,7 @@ const (
 	// 2. Sequential index of this "deployment id" in ClickHouseInstallation object.
 	//    Some deployments may be the same and thus have the same "deployment id" (because of the same fingerprint),
 	//    but they will have different sequentially increasing index of this "deployment id" in ClickHouseInstallation object
-	// Ex.: two running instances of the same deployment
+	// Ex.: two running instances of the same deployment will have full deployments ids
 	// 1eb454-1
 	// 1eb454-2
 	fullDeploymentIDPattern = "%s-%d"
@@ -97,17 +100,36 @@ const (
 	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
 	// service/svc-1eb454-1  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-1
 	// service/svc-1eb454-2  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-2
+	// In this pattern "%s" is substituted with fullDeploymentIDPattern-generated value
+	// Ex.: svc-1eb454-2
 	serviceNamePattern         = "svc-%s"
 
-	domainPattern              = ".%s.svc.cluster.local"
+	// namespaceDomainPattern presents Domain Name pattern of a namespace
+	// In this pattern "%s" is substituted namespace name's value
+	// Ex.: my-dev-namespace.svc.cluster.local
+	namespaceDomainPattern = "%s.svc.cluster.local"
 
-	// ss-1eb454-1-0.1eb454-1s
-	// ss-1eb454-1-0.svc-1eb454-1.dev.svc.cluster.local
-	// TODO FIX IT
-	// TODO WTF IS THIS?
-	hostnamePattern            = statefulSetNamePattern + "-0.%[1]ss%s"
+	// NAME                READY   STATUS    RESTARTS   AGE   IP            NODE   NOMINATED NODE   READINESS GATES
+	// pod/ss-1eb454-2-0   1/1     Running   0          11h   10.244.1.17   kub2   <none>           <none>
+	// Ex.: ss-1eb454-2-0
+	hostnamePattern            = statefulSetNamePattern + "-0"
 
-	fqdnPattern                = "%s-0.%s%s"
+	// hostnamePlusServicePattern consists of 2 parts
+	// 1. pod hostname
+	// 2. nameless service of of stateful set
+	// Ex.: ss-1eb454-2-0.svc-1eb454-2
+	hostnamePlusServicePattern = hostnamePattern + "." + serviceNamePattern
+
+	// podFQDNPattern consists of 3 parts:
+	// 1. pod hostname
+	// 2. nameless service of of stateful set
+	// 3. namespace name
+	// ss-1eb454-2-0.svc-1eb454-2.my-dev-domain.svc.cluster.local
+	podFQDNPattern = hostnamePlusServicePattern + "." + namespaceDomainPattern
+
+	// configMapNamePattern is a .meta.name of a kind:CongifMap object
+	// based on .meta.name of a CHI object
+	// Ex.: chi-example02-configd for chi named as 'example02'
 	configMapNamePattern       = "chi-%s-configd"
 	configMapMacrosNamePattern = configMapNamePattern + "-%s"
 	distributedDDLPattern      = "/clickhouse/%s/task_queue/ddl"
@@ -134,13 +156,13 @@ const (
 
 const (
 	configdPath              = "/etc/clickhouse-server/config.d/"
-	fullPathRemoteServersXML = configdPath + remoteServersXML
-	fullPathZookeeperXML     = configdPath + zookeeperXML
-	fullPathMacrosXML        = configdPath + macrosXML
-	fullPathUsersXML         = configdPath + usersXML
-	fullPathQuotasXML        = configdPath + quotasXML
-	fullPathProfilesXML      = configdPath + profilesXML
-	fullPathSettingsXML      = configdPath + settingsXML
+	fullPathRemoteServersXML = configdPath + remoteServersXMLFilename
+	fullPathZookeeperXML     = configdPath + zookeeperXMLFilename
+	fullPathMacrosXML        = configdPath + macrosXMLFilename
+	fullPathUsersXML         = configdPath + usersXMLFilename
+	fullPathQuotasXML        = configdPath + quotasXMLFilename
+	fullPathProfilesXML      = configdPath + profilesXMLFilename
+	fullPathSettingsXML      = configdPath + settingsXMLFilename
 	fullPathClickHouseData   = "/var/lib/clickhouse"
 )
 

@@ -37,12 +37,15 @@ type StatefulSetList []*apps.StatefulSet
 type ServiceList []*corev1.Service
 
 type genOptions struct {
-	ssNames            map[string]string
+	// fullDeploymentIDToFingerprint[fullDeploymentID] = fingerprint
+	fullDeploymentIDToFingerprint map[string]string
+
+	// ssDeployments[fingerprint] = &replica.Deployment
 	ssDeployments      map[string]*chiv1.ChiDeployment
 
 	// chiDeploymentCount struct with max values from all clusters
 	deploymentCountMax chiDeploymentCount
-	macrosDataIndex    map[string]shardsIndex
+	macrosData         map[string]shardsIndex
 
 	// includeConfigSection specifies whether additional config files (such as zookeeper, macros) are configuared
 	includeConfigSection map[string]bool
@@ -53,11 +56,23 @@ type includesObjects []struct {
 	fullpath string
 }
 
-type shardsIndex []*shardsIndexItem
+type shardsIndex []*macrosDataShardDescription
 
-type shardsIndexItem struct {
-	cluster string
-	index   int
+// macrosDataShardDescription is used in generating macros config file
+// and describes which cluster this shard belongs to and
+// index (1-based, human-friendly and XML-config usable) of this shard within cluster
+// Used to build this:
+//<yandex>
+//    <macros>
+//        <installation>example-02</installation>
+//        <2shard-1repl>example-02-2shard-1repl</02-2shard-1repl>
+//        <2shard-1repl-shard>1 [OWN UNIQUE SHARD ID]</02-2shard-1repl-shard>
+//        <replica>1eb454-1 [OWN UNIQUE ID]</replica>
+//    </macros>
+//</yandex>
+type macrosDataShardDescription struct {
+	clusterName string
+	index   	int
 }
 
 // chiDeploymentCount maps Deployment fingerprint to its usage count

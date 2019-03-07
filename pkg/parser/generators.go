@@ -120,9 +120,21 @@ func genZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 	return b.String()
 }
 
-// generateRemoteServersConfig creates data for "remote_servers.xml" and calculates data generation parameters for other sections
+// generateRemoteServersConfigReplicaHostname creates hostname (podhostname + service or FQDN) for "remote_servers.xml"
+// based on .Spec.Defaults.ReplicasUseFQDN
+func generateRemoteServersConfigReplicaHostname(chi *chiv1.ClickHouseInstallation, fullDeploymentID string) string {
+	var namespaceDomainName string
+	if chi.Spec.Defaults.ReplicasUseFQDN == 1 {
+		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
+		// otherwise hostname+service name (unique within namespace) would be used
+		// .my-dev-namespace.svc.cluster.local
+		namespaceDomainName = "." + CreateNamespaceDomainName(chi.Namespace)
+	}
+	return CreatePodHostnamePlusService(fullDeploymentID) + namespaceDomainName
+}
+
+// generateRemoteServersConfig creates "remote_servers.xml" content and calculates data generation parameters for other sections
 func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOptions, clusters []*chiv1.ChiCluster) string {
-	var domainName string
 	b := &bytes.Buffer{}
 	dRefIndex := make(map[string]int)
 
@@ -132,38 +144,33 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOpt
 		deploymentID[deploymentFingerprint] = generateDeploymentID(deploymentFingerprint)
 	}
 
-	if chi.Spec.Defaults.ReplicasUseFQDN == 1 {
-		// .%s.svc.cluster.local
-		domainName = CreateDomainName(chi.Namespace)
-	}
-
 	// += <yandex>
 	// 		<remote_servers>
 	fmt.Fprintf(b, "<%s>\n%4s<remote_servers>\n", xmlTagYandex, " ")
 	// Build each cluster XML
-	for i := range clusters {
+	for clusterIndex := range clusters {
 
 		// += <my_cluster_name>
-		fmt.Fprintf(b, "%8s<%s>\n", " ", clusters[i].Name)
+		fmt.Fprintf(b, "%8s<%s>\n", " ", clusters[clusterIndex].Name)
 
 		// Build each shard XML
-		for j := range clusters[i].Layout.Shards {
+		for shardIndex := range clusters[clusterIndex].Layout.Shards {
 
 			// += <shard>
 			//		<internal_replication>yes</internal_replication>
 			fmt.Fprintf(b,
 				"%12s<shard>\n%16[1]s<internal_replication>%s</internal_replication>\n",
 				" ",
-				clusters[i].Layout.Shards[j].InternalReplication,
+				clusters[clusterIndex].Layout.Shards[shardIndex].InternalReplication,
 			)
 
 			// += <weight>X</weight>
-			if clusters[i].Layout.Shards[j].Weight > 0 {
-				fmt.Fprintf(b, "%16s<weight>%d</weight>\n", " ", clusters[i].Layout.Shards[j].Weight)
+			if clusters[clusterIndex].Layout.Shards[shardIndex].Weight > 0 {
+				fmt.Fprintf(b, "%16s<weight>%d</weight>\n", " ", clusters[clusterIndex].Layout.Shards[shardIndex].Weight)
 			}
 
 			// Build each replica XML
-			for _, replica := range clusters[i].Layout.Shards[j].Replicas {
+			for _, replica := range clusters[clusterIndex].Layout.Shards[shardIndex].Replicas {
 				fingerprint := replica.Deployment.Fingerprint
 				idx, ok := dRefIndex[fingerprint]
 				if ok {
@@ -180,18 +187,18 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOpt
 
 				// 1eb454-2 (deployment id - sequential index of this deployment id)
 				fullDeploymentID := generateFullDeploymentID(deploymentID[fingerprint], idx)
-				opts.ssNames[fullDeploymentID] = fingerprint
+				opts.fullDeploymentIDToFingerprint[fullDeploymentID] = fingerprint
 				opts.ssDeployments[fingerprint] = &replica.Deployment
 
 				// += <replica>
 				//		<host>XXX</host>
-				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", CreateHostname(fullDeploymentID, domainName))
+				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", generateRemoteServersConfigReplicaHostname(chi, fullDeploymentID))
 
-				opts.macrosDataIndex[fullDeploymentID] = append(
-					opts.macrosDataIndex[fullDeploymentID],
-					&shardsIndexItem{
-						cluster: clusters[i].Name,
-						index:   j + 1,
+				opts.macrosData[fullDeploymentID] = append(
+					opts.macrosData[fullDeploymentID],
+					&macrosDataShardDescription{
+						clusterName: clusters[clusterIndex].Name,
+						index:   	 shardIndex + 1,
 					},
 				)
 
@@ -207,7 +214,7 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOpt
 			fmt.Fprintf(b, "%12s</shard>\n", " ")
 		}
 		// += </my_cluster_name>
-		fmt.Fprintf(b, "%8s</%s>\n", " ", clusters[i].Name)
+		fmt.Fprintf(b, "%8s</%s>\n", " ", clusters[clusterIndex].Name)
 	}
 	// += </remote_servers>
 	// </yandex>
@@ -216,25 +223,39 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOpt
 	return b.String()
 }
 
-// generateHostMacros creates data for particular "macros.xml"
-func generateHostMacros(chiName, ssName string, dataIndex shardsIndex) string {
+// generateHostMacros creates "macros.xml" content
+func generateHostMacros(chiName, fullDeploymentID string, shardDescriptions shardsIndex) string {
 	b := &bytes.Buffer{}
 
 	// += <yandex>
 	fmt.Fprintf(b, "<%s>\n", xmlTagYandex)
-
 	// += <macros>
-	//      <installation>CHI name</installation>
-	fmt.Fprintf(b, "%4s<macros>\n%8[1]s<installation>%s</installation>\n", " ", chiName)
-	for i := range dataIndex {
-		// += <CLUSTER_NAME>CLUSTER_NAME</CLUSTER_NAME>
-		//    <CLUSTER_NAMEs-shard>SHARD_NAME</CLUSTER_NAMEs-shard>
-		fmt.Fprintf(b, "%8s<%s>%[2]s</%[2]s>\n%8[1]s<%[2]s-shard>%d</%[2]s-shard>\n", " ", dataIndex[i].cluster, dataIndex[i].index)
+	fmt.Fprintf(b, "%4s<macros>\n", " ")
+
+	// +=     <installation>CHI name</installation>
+	fmt.Fprintf(b, "%8s<installation>%s</installation>\n", " ", chiName)
+
+	for i := range shardDescriptions {
+		// += <CLUSTER_NAME>cluster name</CLUSTER_NAME>
+		fmt.Fprintf(b,
+			"%8s<%s>%[2]s</%[2]s>\n",
+			" ",
+			shardDescriptions[i].clusterName,
+		)
+		// += <CLUSTER_NAME-shard>1-based shard index within cluster</CLUSTER_NAME-shard>
+		fmt.Fprintf(b,
+			"%8s<%s-shard>%d</%[2]s-shard>\n",
+			" ",
+			shardDescriptions[i].clusterName,
+			shardDescriptions[i].index,
+		)
 	}
 
-	// += <replica>DNS name</replica>
-	//   </macros>
-	fmt.Fprintf(b, "%8s<replica>%s</replica>\n%4[1]s</macros>\n", " ", ssName)
+	// += <replica>replica id</replica>
+	fmt.Fprintf(b, "%8s<replica>%s</replica>\n", " ", fullDeploymentID)
+
+	// += </macros>
+	fmt.Fprintf(b, "%4s</macros>\n", " ")
 	// += </yandex>
 	fmt.Fprintf(b, "</%s>\n", xmlTagYandex)
 

@@ -22,6 +22,7 @@ import (
 )
 
 // CreateChiObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
+// and slice of all full deployment ids
 func CreateChiObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
 	var (
 		clusters []*chiv1.ChiCluster
@@ -34,25 +35,25 @@ func CreateChiObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) 
 	clusters, options.deploymentCountMax = getNormalizedClusters(chi)
 
 	// Allocate data structures
-	options.ssNames = make(map[string]string)
+	options.fullDeploymentIDToFingerprint = make(map[string]string)
 	options.ssDeployments = make(map[string]*chiv1.ChiDeployment)
-	options.macrosDataIndex = make(map[string]shardsIndex)
+	options.macrosData = make(map[string]shardsIndex)
 	options.includeConfigSection = make(map[string]bool)
 
 	// configSections maps section name to section XML config such as "<yandex><macros>...</macros><yandex>"
 	configSections := make(map[string]string)
 
 	// Generate XMLs
-	configSections[remoteServersXML] = generateRemoteServersConfig(chi, &options, clusters)
-	options.includeConfigSection[zookeeperXML] = includeIfNotEmpty(configSections, zookeeperXML, genZookeeperConfig(chi))
-	options.includeConfigSection[usersXML] = includeIfNotEmpty(configSections, usersXML, genUsersConfig(chi))
-	options.includeConfigSection[profilesXML] = includeIfNotEmpty(configSections, profilesXML, genProfilesConfig(chi))
-	options.includeConfigSection[quotasXML] = includeIfNotEmpty(configSections, quotasXML, genQuotasConfig(chi))
-	options.includeConfigSection[settingsXML] = includeIfNotEmpty(configSections, settingsXML, genSettingsConfig(chi))
+	configSections[remoteServersXMLFilename] = generateRemoteServersConfig(chi, &options, clusters)
+	options.includeConfigSection[zookeeperXMLFilename] = includeIfNotEmpty(configSections, zookeeperXMLFilename, genZookeeperConfig(chi))
+	options.includeConfigSection[usersXMLFilename] = includeIfNotEmpty(configSections, usersXMLFilename, genUsersConfig(chi))
+	options.includeConfigSection[profilesXMLFilename] = includeIfNotEmpty(configSections, profilesXMLFilename, genProfilesConfig(chi))
+	options.includeConfigSection[quotasXMLFilename] = includeIfNotEmpty(configSections, quotasXMLFilename, genQuotasConfig(chi))
+	options.includeConfigSection[settingsXMLFilename] = includeIfNotEmpty(configSections, settingsXMLFilename, genSettingsConfig(chi))
 
-	// Create objects index
-	prefixes := make([]string, 0, len(options.ssNames))
-	for p := range options.ssNames {
+	// slice of full deployment ID's
+	prefixes := make([]string, 0, len(options.fullDeploymentIDToFingerprint))
+	for p := range options.fullDeploymentIDToFingerprint {
 		prefixes = append(prefixes, p)
 	}
 

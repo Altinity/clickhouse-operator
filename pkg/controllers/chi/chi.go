@@ -359,7 +359,7 @@ func (c *Controller) syncKnownChi(chi *chop.ClickHouseInstallation) error {
 			glog.V(2).Infof("ClickHouseInstallation (%q) controls StatefulSet: %q", chi.Name, statefulSetName)
 
 			// Prepare hostnames list for the chopmetrics.Exporter state storage
-			chHostnames[i] = chopparser.CreatePodHostname(chi.Namespace, prefix)
+			chHostnames[i] = chopparser.CreatePodFQDN(chi.Namespace, prefix)
 		}
 	}
 
