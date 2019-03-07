@@ -41,11 +41,11 @@ type genOptions struct {
 	fullDeploymentIDToFingerprint map[string]string
 
 	// ssDeployments[fingerprint] = &replica.Deployment
-	ssDeployments      map[string]*chiv1.ChiDeployment
+	ssDeployments map[string]*chiv1.ChiDeployment
 
-	// chiDeploymentCount struct with max values from all clusters
-	deploymentCountMax chiDeploymentCount
-	macrosData         map[string]shardsIndex
+	// chiDeploymentCountMap struct with max values from all clusters
+	deploymentCountMax chiDeploymentCountMap
+	macrosData         map[string]macrosDataShardDescriptionList
 
 	// includeConfigSection specifies whether additional config files (such as zookeeper, macros) are configuared
 	includeConfigSection map[string]bool
@@ -56,7 +56,8 @@ type includesObjects []struct {
 	fullpath string
 }
 
-type shardsIndex []*macrosDataShardDescription
+// macrosDataShardDescriptionList is a list of all shards descriptions
+type macrosDataShardDescriptionList []*macrosDataShardDescription
 
 // macrosDataShardDescription is used in generating macros config file
 // and describes which cluster this shard belongs to and
@@ -72,11 +73,11 @@ type shardsIndex []*macrosDataShardDescription
 //</yandex>
 type macrosDataShardDescription struct {
 	clusterName string
-	index   	int
+	index       int
 }
 
-// chiDeploymentCount maps Deployment fingerprint to its usage count
-type chiDeploymentCount map[string]int
+// chiDeploymentCountMap maps Deployment fingerprint to its usage count
+type chiDeploymentCountMap map[string]int
 
 type vcTemplatesIndex map[string]*vcTemplatesIndexData
 

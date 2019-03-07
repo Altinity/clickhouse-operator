@@ -15,9 +15,9 @@
 package parser
 
 import (
+	"encoding/hex"
 	"math/rand"
 	"time"
-	"encoding/hex"
 )
 
 // randomString generates random string

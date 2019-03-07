@@ -198,7 +198,7 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOpt
 					opts.macrosData[fullDeploymentID],
 					&macrosDataShardDescription{
 						clusterName: clusters[clusterIndex].Name,
-						index:   	 shardIndex + 1,
+						index:       shardIndex + 1,
 					},
 				)
 
@@ -224,7 +224,7 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOpt
 }
 
 // generateHostMacros creates "macros.xml" content
-func generateHostMacros(chiName, fullDeploymentID string, shardDescriptions shardsIndex) string {
+func generateHostMacros(chiName, fullDeploymentID string, shardDescriptions macrosDataShardDescriptionList) string {
 	b := &bytes.Buffer{}
 
 	// += <yandex>

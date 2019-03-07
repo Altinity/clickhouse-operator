@@ -16,45 +16,49 @@ package parser
 
 import (
 	"fmt"
-	"strings"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"sort"
+	"strings"
 )
 
-// CreateChiObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
-// and slice of all full deployment ids
-func CreateChiObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) {
-	var (
-		clusters []*chiv1.ChiCluster
-		options  genOptions
-	)
-
+// NormalizedCHI returns list of "normalized" (converted to basic form) chiv1.ChiCluster objects
+// with each cluster all deployments usage counters
+func NormalizeCHI(chi *chiv1.ClickHouseInstallation) ([]*chiv1.ChiCluster, chiDeploymentCountMap) {
 	// Set defaults for CHI object properties
 	ensureSpecDefaultsReplicasUseFQDN(chi)
 	ensureScenario(&chi.Spec.Defaults.Deployment)
-	clusters, options.deploymentCountMax = getNormalizedClusters(chi)
+
+	return getNormalizedClusters(chi)
+}
+
+// CreateCHIObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
+// and slice of all full deployment ids
+func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, clusters []*chiv1.ChiCluster, deploymentCountMax chiDeploymentCountMap) (ObjectsMap, []string) {
+	var options genOptions
+
+	options.deploymentCountMax = deploymentCountMax
 
 	// Allocate data structures
 	options.fullDeploymentIDToFingerprint = make(map[string]string)
 	options.ssDeployments = make(map[string]*chiv1.ChiDeployment)
-	options.macrosData = make(map[string]shardsIndex)
+	options.macrosData = make(map[string]macrosDataShardDescriptionList)
 	options.includeConfigSection = make(map[string]bool)
 
 	// configSections maps section name to section XML config such as "<yandex><macros>...</macros><yandex>"
 	configSections := make(map[string]string)
 
 	// Generate XMLs
-	configSections[remoteServersXMLFilename] = generateRemoteServersConfig(chi, &options, clusters)
-	options.includeConfigSection[zookeeperXMLFilename] = includeIfNotEmpty(configSections, zookeeperXMLFilename, genZookeeperConfig(chi))
-	options.includeConfigSection[usersXMLFilename] = includeIfNotEmpty(configSections, usersXMLFilename, genUsersConfig(chi))
-	options.includeConfigSection[profilesXMLFilename] = includeIfNotEmpty(configSections, profilesXMLFilename, genProfilesConfig(chi))
-	options.includeConfigSection[quotasXMLFilename] = includeIfNotEmpty(configSections, quotasXMLFilename, genQuotasConfig(chi))
-	options.includeConfigSection[settingsXMLFilename] = includeIfNotEmpty(configSections, settingsXMLFilename, genSettingsConfig(chi))
+	configSections[filenameRemoteServersXML] = generateRemoteServersConfig(chi, &options, clusters)
+	options.includeConfigSection[filenameZookeeperXML] = includeIfNotEmpty(configSections, filenameZookeeperXML, genZookeeperConfig(chi))
+	options.includeConfigSection[filenameUsersXML] = includeIfNotEmpty(configSections, filenameUsersXML, genUsersConfig(chi))
+	options.includeConfigSection[filenameProfilesXML] = includeIfNotEmpty(configSections, filenameProfilesXML, genProfilesConfig(chi))
+	options.includeConfigSection[filenameQuotasXML] = includeIfNotEmpty(configSections, filenameQuotasXML, genQuotasConfig(chi))
+	options.includeConfigSection[filenameSettingsXML] = includeIfNotEmpty(configSections, filenameSettingsXML, genSettingsConfig(chi))
 
 	// slice of full deployment ID's
-	prefixes := make([]string, 0, len(options.fullDeploymentIDToFingerprint))
+	fullDeploymentIDs := make([]string, 0, len(options.fullDeploymentIDToFingerprint))
 	for p := range options.fullDeploymentIDToFingerprint {
-		prefixes = append(prefixes, p)
+		fullDeploymentIDs = append(fullDeploymentIDs, p)
 	}
 
 	// Create k8s objects (data structures)
@@ -62,14 +66,14 @@ func CreateChiObjects(chi *chiv1.ClickHouseInstallation) (ObjectsMap, []string) 
 		ObjectsConfigMaps:   createConfigMapObjects(chi, configSections, &options),
 		ObjectsServices:     createServiceObjects(chi, &options),
 		ObjectsStatefulSets: createStatefulSetObjects(chi, &options),
-	}, prefixes
+	}, fullDeploymentIDs
 }
 
 // getNormalizedClusters returns list of "normalized" (converted to basic form) chiv1.ChiCluster objects
 // with each cluster all deployments usage counters
-func getNormalizedClusters(chi *chiv1.ClickHouseInstallation) ([]*chiv1.ChiCluster, chiDeploymentCount) {
+func getNormalizedClusters(chi *chiv1.ClickHouseInstallation) ([]*chiv1.ChiCluster, chiDeploymentCountMap) {
 	// deploymentCount maps deployment fingerprint to max among all normalizedClusters usage number of this deployment
-	deploymentCount := make(chiDeploymentCount)
+	deploymentCount := make(chiDeploymentCountMap)
 
 	// Loop over all clusters and get normalized copy
 	normalizedClusters := make([]*chiv1.ChiCluster, 0, len(chi.Spec.Configuration.Clusters))
@@ -84,42 +88,64 @@ func getNormalizedClusters(chi *chiv1.ClickHouseInstallation) ([]*chiv1.ChiClust
 	return normalizedClusters, deploymentCount
 }
 
+// normalizeClusterStandardLayoutCounts ensures at least 1 shard and 1 replica counters
+func normalizeClusterStandardLayoutCounts(layout *chiv1.ChiClusterLayout) error {
+	// Standard layout assumes to have 1 shard and 1 replica by default - in case not specified explicitly
+	if layout.ShardsCount == 0 {
+		layout.ShardsCount = 1
+	}
+	if layout.ReplicasCount == 0 {
+		layout.ReplicasCount = 1
+	}
+
+	return nil
+}
+
+// normalizeClusterAdvancedLayoutShardsInternalReplication ensures reasonable values in
+// .spec.configuration.clusters.layout.shards.internalReplication
+func normalizeClusterAdvancedLayoutShardsInternalReplication(shard *chiv1.ChiClusterLayoutShard) error {
+	// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
+	// with default value set to "true"
+	if shard.InternalReplication == shardInternalReplicationDisabled {
+		shard.InternalReplication = stringFalse
+	} else {
+		shard.InternalReplication = stringTrue
+	}
+
+	return nil
+}
+
 // getNormalizedCluster returns chiv1.ChiCluster object after normalization procedures
 func getNormalizedCluster(
 	chi *chiv1.ClickHouseInstallation,
-	originalCluster chiv1.ChiCluster,
-) (*chiv1.ChiCluster, chiDeploymentCount) {
-	deploymentCount := make(chiDeploymentCount)
+	cluster chiv1.ChiCluster,
+) (*chiv1.ChiCluster, chiDeploymentCountMap) {
+	deploymentCount := make(chiDeploymentCountMap)
 
 	// Prepare partially normalized cluster - no Layout
 	normalizedCluster := &chiv1.ChiCluster{
-		Name:       originalCluster.Name,
+		Name: cluster.Name,
 		// no Layout field filled here
-		Deployment: originalCluster.Deployment,
+		Deployment: cluster.Deployment,
 	}
 	mergeDeployment(&normalizedCluster.Deployment, &chi.Spec.Defaults.Deployment)
 
 	// Fill Layout field
-	switch originalCluster.Layout.Type {
+	switch cluster.Layout.Type {
 	case clusterLayoutTypeStandard:
 		// Standard layout assumes to have 1 shard and 1 replica by default - in case not specified explicitly
-		if originalCluster.Layout.ShardsCount == 0 {
-			originalCluster.Layout.ShardsCount = 1
-		}
-		if originalCluster.Layout.ReplicasCount == 0 {
-			originalCluster.Layout.ReplicasCount = 1
-		}
+		normalizeClusterStandardLayoutCounts(&cluster.Layout)
 
 		// Handle .layout.shards
-		normalizedCluster.Layout.Shards = make([]chiv1.ChiClusterLayoutShard, originalCluster.Layout.ShardsCount)
+		normalizedCluster.Layout.Shards = make([]chiv1.ChiClusterLayoutShard, cluster.Layout.ShardsCount)
 		// Loop over all shards and replicas inside shards and fill structure
-		for i := 0; i < originalCluster.Layout.ShardsCount; i++ {
+		for i := 0; i < cluster.Layout.ShardsCount; i++ {
 			// Create replicas for each shard
 			normalizedCluster.Layout.Shards[i].InternalReplication = stringTrue
-			normalizedCluster.Layout.Shards[i].Replicas = make([]chiv1.ChiClusterLayoutShardReplica, originalCluster.Layout.ReplicasCount)
+			normalizedCluster.Layout.Shards[i].Replicas = make([]chiv1.ChiClusterLayoutShardReplica, cluster.Layout.ReplicasCount)
 
 			// Fill each replica
-			for j := 0; j < originalCluster.Layout.ReplicasCount; j++ {
+			for j := 0; j < cluster.Layout.ReplicasCount; j++ {
 				// For each replica of this normalized cluster inherit cluster's Deployment
 				mergeDeployment(&normalizedCluster.Layout.Shards[i].Replicas[j].Deployment, &normalizedCluster.Deployment)
 
@@ -132,18 +158,13 @@ func getNormalizedCluster(
 
 	case clusterLayoutTypeAdvanced:
 		// Advanced layout assumes detailed shards definition
-		normalizedCluster.Layout.Shards = originalCluster.Layout.Shards
+		normalizedCluster.Layout.Shards = cluster.Layout.Shards
 
 		// Loop over all shards and replicas inside shards and fill structure
 		for i := range normalizedCluster.Layout.Shards {
 			// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
 			// with default value set to "true"
-			switch normalizedCluster.Layout.Shards[i].InternalReplication {
-			case shardInternalReplicationDisabled:
-				normalizedCluster.Layout.Shards[i].InternalReplication = stringFalse
-			default:
-				normalizedCluster.Layout.Shards[i].InternalReplication = stringTrue
-			}
+			normalizeClusterAdvancedLayoutShardsInternalReplication(&normalizedCluster.Layout.Shards[i])
 
 			// For each shard of this normalized cluster inherit cluster's Deployment
 			mergeDeployment(&normalizedCluster.Layout.Shards[i].Deployment, &normalizedCluster.Deployment)
@@ -307,9 +328,9 @@ func zoneCopyFrom(dst, src *chiv1.ChiDeploymentZone) {
 	(*dst).MatchLabels = tmp
 }
 
-// mergeInAndReplaceBiggerValues combines chiDeploymentCount object with another one
+// mergeInAndReplaceBiggerValues combines chiDeploymentCountMap object with another one
 // and replaces local values with another one's values in case another's value is bigger
-func (d chiDeploymentCount) mergeInAndReplaceBiggerValues(another chiDeploymentCount) {
+func (d chiDeploymentCountMap) mergeInAndReplaceBiggerValues(another chiDeploymentCountMap) {
 
 	// Loop over another struct and bring in new OR bigger values
 	for key, value := range another {

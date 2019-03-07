@@ -64,7 +64,7 @@ type ChiDeployment struct {
 	// Fingerprint is a string fingerprint of the ChiDeployment.
 	// Used to find equal deployments
 	// TODO replace with hash
-	Fingerprint         string
+	Fingerprint string
 }
 
 // ChiDeploymentZone defines zone section of *.deployment

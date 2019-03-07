@@ -127,8 +127,8 @@ func writeMetricsDataToPrometheus(out chan<- prometheus.Metric, data map[string]
 			clickhouseMetricsDescriptions[metric],
 			prometheus.GaugeValue,
 			floatValue,
-			chiname,	// labelValues ...string
-			hostname,	// labelValues ...string
+			chiname,  // labelValues ...string
+			hostname, // labelValues ...string
 		)
 		out <- m
 	}

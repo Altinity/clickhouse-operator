@@ -68,17 +68,17 @@ const (
 )
 
 const (
-	dotXML                   = ".xml"
+	dotXML = ".xml"
 
 	// Filenames of the config files in /etc/clickhouse-server/config.d
 	// These files would be created as ConfigMaps mapping if necessary
-	remoteServersXMLFilename = configRemoteServers + dotXML
-	zookeeperXMLFilename     = configZookeeper + dotXML
-	usersXMLFilename         = configUsers + dotXML
-	quotasXMLFilename        = configQuotas + dotXML
-	profilesXMLFilename      = configProfiles + dotXML
-	settingsXMLFilename      = configSettings + dotXML
-	macrosXMLFilename        = configMacros + dotXML
+	filenameRemoteServersXML = configRemoteServers + dotXML
+	filenameZookeeperXML     = configZookeeper + dotXML
+	filenameUsersXML         = configUsers + dotXML
+	filenameQuotasXML        = configQuotas + dotXML
+	filenameProfilesXML      = configProfiles + dotXML
+	filenameSettingsXML      = configSettings + dotXML
+	filenameMacrosXML        = configMacros + dotXML
 )
 
 const (
@@ -95,14 +95,14 @@ const (
 
 	// NAME                           READY   AGE   CONTAINERS    IMAGES
 	// statefulset.apps/ss-1eb454-1   0/1     2s    ss-1eb454-1   yandex/clickhouse-server:latest
-	statefulSetNamePattern     = "ss-%s"
+	statefulSetNamePattern = "ss-%s"
 
 	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
 	// service/svc-1eb454-1  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-1
 	// service/svc-1eb454-2  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-2
 	// In this pattern "%s" is substituted with fullDeploymentIDPattern-generated value
 	// Ex.: svc-1eb454-2
-	serviceNamePattern         = "svc-%s"
+	serviceNamePattern = "svc-%s"
 
 	// namespaceDomainPattern presents Domain Name pattern of a namespace
 	// In this pattern "%s" is substituted namespace name's value
@@ -112,7 +112,7 @@ const (
 	// NAME                READY   STATUS    RESTARTS   AGE   IP            NODE   NOMINATED NODE   READINESS GATES
 	// pod/ss-1eb454-2-0   1/1     Running   0          11h   10.244.1.17   kub2   <none>           <none>
 	// Ex.: ss-1eb454-2-0
-	hostnamePattern            = statefulSetNamePattern + "-0"
+	hostnamePattern = statefulSetNamePattern + "-0"
 
 	// hostnamePlusServicePattern consists of 2 parts
 	// 1. pod hostname
@@ -155,14 +155,14 @@ const (
 )
 
 const (
-	configdPath              = "/etc/clickhouse-server/config.d/"
-	fullPathRemoteServersXML = configdPath + remoteServersXMLFilename
-	fullPathZookeeperXML     = configdPath + zookeeperXMLFilename
-	fullPathMacrosXML        = configdPath + macrosXMLFilename
-	fullPathUsersXML         = configdPath + usersXMLFilename
-	fullPathQuotasXML        = configdPath + quotasXMLFilename
-	fullPathProfilesXML      = configdPath + profilesXMLFilename
-	fullPathSettingsXML      = configdPath + settingsXMLFilename
+	fullPathConfigd          = "/etc/clickhouse-server/config.d/"
+	fullPathRemoteServersXML = fullPathConfigd + filenameRemoteServersXML
+	fullPathZookeeperXML     = fullPathConfigd + filenameZookeeperXML
+	fullPathMacrosXML        = fullPathConfigd + filenameMacrosXML
+	fullPathUsersXML         = fullPathConfigd + filenameUsersXML
+	fullPathQuotasXML        = fullPathConfigd + filenameQuotasXML
+	fullPathProfilesXML      = fullPathConfigd + filenameProfilesXML
+	fullPathSettingsXML      = fullPathConfigd + filenameSettingsXML
 	fullPathClickHouseData   = "/var/lib/clickhouse"
 )
 

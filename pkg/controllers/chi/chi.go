@@ -111,9 +111,9 @@ func CreateController(
 	// Create Controller instance
 	controller := &Controller{
 		// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
-		kubeClient:              kubeClient,
+		kubeClient: kubeClient,
 		// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
-		chopClient:              chopClient,
+		chopClient: chopClient,
 
 		// chiLister used as chiLister.ClickHouseInstallations(namespace).Get(name)
 		chiLister: chiInformer.Lister(),
@@ -121,28 +121,28 @@ func CreateController(
 		chiListerSynced: chiInformer.Informer().HasSynced,
 
 		// statefulSetLister used as statefulSetLister.StatefulSets(namespace).Get(name)
-		statefulSetLister:       statefulSetInformer.Lister(),
+		statefulSetLister: statefulSetInformer.Lister(),
 		// statefulSetListerSynced used in waitForCacheSync()
 		statefulSetListerSynced: statefulSetInformer.Informer().HasSynced,
 
 		// configMapLister used as configMapLister.ConfigMaps(namespace).Get(name)
-		configMapLister:         configMapInformer.Lister(),
+		configMapLister: configMapInformer.Lister(),
 		// configMapListerSynced used in waitForCacheSync()
-		configMapListerSynced:   configMapInformer.Informer().HasSynced,
+		configMapListerSynced: configMapInformer.Informer().HasSynced,
 
 		// serviceLister used as serviceLister.Services(namespace).Get(name)
-		serviceLister:           serviceInformer.Lister(),
+		serviceLister: serviceInformer.Lister(),
 		// serviceListerSynced used in waitForCacheSync()
-		serviceListerSynced:     serviceInformer.Informer().HasSynced,
+		serviceListerSynced: serviceInformer.Informer().HasSynced,
 
 		// queue used to organize events queue processed by operator
-		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
 
 		// not used explicitly
-		recorder:                recorder,
+		recorder: recorder,
 
 		// export metrics to Prometheus
-		metricsExporter:         chopMetricsExporter,
+		metricsExporter: chopMetricsExporter,
 	}
 
 	chiInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -318,19 +318,19 @@ func (c *Controller) syncNewChi(chi *chop.ClickHouseInstallation) error {
 	// We need to create all resources that are needed to run user's .yaml specification
 	glog.V(1).Infof("syncNewChi(%s/%s)", chi.Namespace, chi.Name)
 
-	prefixes, err := c.createControlledResources(chi)
+	prefixes, err := c.createCHIResources(chi)
 	if err != nil {
 		glog.V(2).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
 		return err
 	}
 
 	// Some debug
-	for i :=range prefixes {
+	for i := range prefixes {
 		glog.V(1).Infof("syncNewChi(%s/%s) - created prefix %s", chi.Namespace, chi.Name, prefixes[i])
 	}
 
 	// Update CHI status in k8s
-	err = c.updateChi(chi, prefixes)
+	err = c.updateCHIResource(chi, prefixes)
 	if err != nil {
 		glog.V(2).Infof("ClickHouseInstallation (%q): unable to update status of CHI resource: %q", chi.Name, err)
 		return err
@@ -373,29 +373,29 @@ func (c *Controller) syncKnownChi(chi *chop.ClickHouseInstallation) error {
 	return nil
 }
 
-
-// createControlledResources creates k8s resources based on ClickHouseInstallation object specification
-func (c *Controller) createControlledResources(chi *chop.ClickHouseInstallation) ([]string, error) {
+// createCHIResources creates k8s resources based on ClickHouseInstallation object specification
+func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) ([]string, error) {
 	chiCopy := chi.DeepCopy()
-	chiObjects, prefixes := chopparser.CreateChiObjects(chiCopy)
+	clusters, deploymentCountMax := chopparser.NormalizeCHI(chiCopy)
+	chiObjectsMap, prefixes := chopparser.CreateCHIObjects(chiCopy, clusters, deploymentCountMax)
 
-	for _, objList := range chiObjects {
+	for _, objList := range chiObjectsMap {
 		switch v := objList.(type) {
 		case chopparser.ConfigMapList:
 			for _, obj := range v {
-				if err := c.createConfigMap(chiCopy, obj); err != nil {
+				if err := c.createConfigMapResource(chiCopy, obj); err != nil {
 					return nil, err
 				}
 			}
 		case chopparser.ServiceList:
 			for _, obj := range v {
-				if err := c.createService(chiCopy, obj); err != nil {
+				if err := c.createServiceResource(chiCopy, obj); err != nil {
 					return nil, err
 				}
 			}
 		case chopparser.StatefulSetList:
 			for _, obj := range v {
-				if err := c.createStatefulSet(chiCopy, obj); err != nil {
+				if err := c.createStatefulSetResource(chiCopy, obj); err != nil {
 					return nil, err
 				}
 			}
@@ -405,8 +405,8 @@ func (c *Controller) createControlledResources(chi *chop.ClickHouseInstallation)
 	return prefixes, nil
 }
 
-// createConfigMap creates core.ConfigMap resource
-func (c *Controller) createConfigMap(chi *chop.ClickHouseInstallation, newConfigMap *core.ConfigMap) error {
+// createConfigMapResource creates core.ConfigMap resource
+func (c *Controller) createConfigMapResource(chi *chop.ClickHouseInstallation, newConfigMap *core.ConfigMap) error {
 	// Check whether object with such name already exists in k8s
 	res, err := c.configMapLister.ConfigMaps(chi.Namespace).Get(newConfigMap.Name)
 	if res != nil {
@@ -428,8 +428,8 @@ func (c *Controller) createConfigMap(chi *chop.ClickHouseInstallation, newConfig
 	return nil
 }
 
-// createService creates core.Service resource
-func (c *Controller) createService(chi *chop.ClickHouseInstallation, newService *core.Service) error {
+// createServiceResource creates core.Service resource
+func (c *Controller) createServiceResource(chi *chop.ClickHouseInstallation, newService *core.Service) error {
 	// Check whether object with such name already exists in k8s
 	res, err := c.serviceLister.Services(chi.Namespace).Get(newService.Name)
 	if res != nil {
@@ -451,8 +451,8 @@ func (c *Controller) createService(chi *chop.ClickHouseInstallation, newService 
 	return nil
 }
 
-// createStatefulSet creates apps.StatefulSet resource
-func (c *Controller) createStatefulSet(chi *chop.ClickHouseInstallation, newStatefulSet *apps.StatefulSet) error {
+// createStatefulSetResource creates apps.StatefulSet resource
+func (c *Controller) createStatefulSetResource(chi *chop.ClickHouseInstallation, newStatefulSet *apps.StatefulSet) error {
 	// Check whether object with such name already exists in k8s
 	res, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
 	if res != nil {
@@ -472,8 +472,8 @@ func (c *Controller) createStatefulSet(chi *chop.ClickHouseInstallation, newStat
 	return nil
 }
 
-// updateChi updates .status section of ClickHouseInstallation resource
-func (c *Controller) updateChi(chi *chop.ClickHouseInstallation, objectPrefixes []string) error {
+// updateCHIResource updates .status section of ClickHouseInstallation resource
+func (c *Controller) updateCHIResource(chi *chop.ClickHouseInstallation, objectPrefixes []string) error {
 	chiCopy := chi.DeepCopy()
 	chiCopy.Status = chop.ChiStatus{
 		ObjectPrefixes: objectPrefixes,
@@ -521,7 +521,7 @@ func (c *Controller) handleObject(obj interface{}) {
 		return
 	}
 
-	// Ensure owner is of a propoer kind
+	// Ensure owner is of a proper kind
 	if ownerRef.Kind != chop.ClickHouseInstallationCRDResourceKind {
 		return
 	}
