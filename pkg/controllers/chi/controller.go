@@ -77,8 +77,8 @@ const (
 	errResourceExists     = "ErrResourceExists"
 	messageResourceSynced = "ClickHouseInstallation synced successfully"
 	messageResourceExists = "Resource %q already exists and is not managed by ClickHouseInstallation"
-	messageUnableToDecode = "Unable to decode object (invalid type)"
-	messageUnableToSync   = "Unable to sync caches for %s controller"
+	messageUnableToDecode = "unable to decode object (invalid type)"
+	messageUnableToSync   = "unable to sync caches for %s controller"
 )
 
 // CreateController creates instance of Controller
@@ -369,7 +369,7 @@ func (c *Controller) syncKnownChi(chi *chop.ClickHouseInstallation) error {
 			// TODO: check all controlled objects
 			glog.V(2).Infof("ClickHouseInstallation (%q) controls StatefulSet: %q", chi.Name, statefulSetName)
 
-			// Prepare hostnames list for the chopmetrics.Exporter state storage
+			// Prepare hostname list for the chopmetrics.Exporter state storage
 			chHostnames[i] = chopparser.CreatePodFQDN(chi.Namespace, fullDeploymentID)
 		}
 	}
