@@ -32,20 +32,20 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	labels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	wait "k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	kube "k8s.io/client-go/kubernetes"
-	scheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/kubernetes/scheme"
 	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	cache "k8s.io/client-go/tools/cache"
-	record "k8s.io/client-go/tools/record"
-	workqueue "k8s.io/client-go/util/workqueue"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 
 	"github.com/golang/glog"
 )
@@ -147,7 +147,8 @@ func CreateController(
 
 	chiInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			glog.V(1).Info("chiInformer.AddFunc")
+			chi := obj.(*chop.ClickHouseInstallation)
+			glog.V(1).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
 			controller.enqueueObject(obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
@@ -173,13 +174,15 @@ func CreateController(
 			controller.enqueueObject(newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
-			glog.V(1).Info("chiInformer.DeleteFunc")
+			chi := obj.(*chop.ClickHouseInstallation)
+			glog.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
 		},
 	})
 
 	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			glog.V(1).Info("statefulSetInformer.AddFunc")
+			statefulSet := obj.(*apps.StatefulSet)
+			glog.V(1).Infof("statefulSetInformer.AddFunc - %s/%s added", statefulSet.Namespace, statefulSet.Name)
 			controller.handleObject(obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
@@ -187,15 +190,20 @@ func CreateController(
 			newStatefulSet := newObj.(*apps.StatefulSet)
 			oldStatefulSet := oldObj.(*apps.StatefulSet)
 			if newStatefulSet.ResourceVersion == oldStatefulSet.ResourceVersion {
-				glog.V(1).Info("statefulSetInformer.UpdateFunc - no update required")
+				glog.V(1).Infof("statefulSetInformer.UpdateFunc - no update required, no ResourceVersion change %s", newStatefulSet.ResourceVersion)
 				return
+			}
+
+			if newStatefulSet.Status.ReadyReplicas == newStatefulSet.Status.Replicas {
+				glog.V(1).Infof("statefulSetInformer.UpdateFunc - %s/%s is Ready", newStatefulSet.Namespace, newStatefulSet.Name)
 			}
 
 			glog.V(1).Info("statefulSetInformer.UpdateFunc - UPDATE REQUIRED")
 			controller.handleObject(newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
-			glog.V(1).Info("statefulSetInformer.DeleteFunc")
+			statefulSet := obj.(*apps.StatefulSet)
+			glog.V(1).Infof("statefulSetInformer.DeleteFunc - %s/%s deleted", statefulSet.Namespace, statefulSet.Name)
 			controller.handleObject(obj)
 		},
 	})
