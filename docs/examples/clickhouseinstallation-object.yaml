@@ -14,7 +14,7 @@ spec:
       zone:
         matchLabels:
           clickhouse.altinity.com/zone: zone1
-      podTemplateName: clickhouse-v18.16.1
+      podTemplate: clickhouse-v18.16.1
       volumeClaimTemplate: default
 #     scenario: Default
 #
@@ -75,7 +75,7 @@ spec:
         shardsCount: 3
         replicasCount: 2
       deployment:
-        podTemplateName: clickhouse-v18.16.1
+        podTemplate: clickhouse-v18.16.1
 #       scanario: Default
 #       zone:
 #         matchLabels:
@@ -93,7 +93,7 @@ spec:
           matchLabels:
             clickhouse.altinity.com/zone: zone2
 #       scenario: Default
-#       podTemplateName: clickhouse-v18.16.1
+#       podTemplate: clickhouse-v18.16.1
 #
 #       values inherited from global .spec.deployment section
 #
@@ -103,7 +103,7 @@ spec:
         replicasCount: 4
         # shardsCount not specified, assumed = 1, by default
 #     deployment:
-#       podTemplateName: clickhouse-v18.16.1
+#       podTemplate: clickhouse-v18.16.1
 #       scanario: Default
 #       zone:
 #         matchLabels:
@@ -117,7 +117,7 @@ spec:
 #       zone:
 #         matchLabels:
 #           clickhouse.altinity.com/zone: zone1
-#       podTemplateName: clickhouse-v18.16.1
+#       podTemplate: clickhouse-v18.16.1
 #
 #       values inherited from global .spec.deployment section
 #
@@ -132,7 +132,7 @@ spec:
           internalReplication: Disabled
 #         internalReplication: Enabled - default value
           deployment:
-            podTemplateName: clickhouse-v18.16.1
+            podTemplate: clickhouse-v18.16.1
             zone:
               matchLabels:
                 clickhouse.altinity.com/zone: zone3
@@ -147,7 +147,7 @@ spec:
 #           zone:
 #             matchLabels:
 #               clickhouse.altinity.com/zone: zone1
-#           podTemplateName: clickhouse-v18.16.1
+#           podTemplate: clickhouse-v18.16.1
 #  
 #         values inherited from .spec.configuration.clusters[3].deployment section
 #  
@@ -157,7 +157,7 @@ spec:
 #           zone:
 #             matchLabels:
 #               clickhouse.altinity.com/zone: zone1
-#           podTemplateName: clickhouse-v18.16.1
+#           podTemplate: clickhouse-v18.16.1
 #
 #         values inherited from .spec.configuration.clusters[3].deployment section
 #
@@ -168,7 +168,7 @@ spec:
 #             zone:
 #               matchLabels:
 #                 clickhouse.altinity.com/zone: zone1
-#             podTemplateName: clickhouse-v18.16.1
+#             podTemplate: clickhouse-v18.16.1
 #  
 #           values inherited from .spec.configuration.clusters[3].shards[2].deployment section
 #           
@@ -178,7 +178,7 @@ spec:
                 matchLabels:
                   clickhouse.altinity.com/zone: zone4
                   clickhouse.altinity.com/kind: ssd
-              podTemplateName: clickhouse-v18.16.1
+              podTemplate: clickhouse-v18.16.1
 
   templates:
     volumeClaimTemplates:

@@ -208,7 +208,7 @@ func getNormalizedCluster(
 				//                matchLabels:
 				//                  clickhouse.altinity.com/zone: zone4
 				//                  clickhouse.altinity.com/kind: ssd
-				//              podTemplateName: clickhouse-v18.16.1
+				//              podTemplate: clickhouse-v18.16.1
 				// This means replicas provided explicitly, no need to create, just to normalize
 				// Fill each replica
 				for j := range normalizedCluster.Layout.Shards[i].Replicas {
@@ -229,7 +229,7 @@ func getNormalizedCluster(
 
 // generateDeploymentString creates string representation
 // of chiv1.ChiDeployment object of the following form:
-// "PodTemplateName::VolumeClaimTemplate::Scenario::Zone.MatchLabels.Key1=Zone.MatchLabels.Val1::Zone.MatchLabels.Key2=Zone.MatchLabels.Val2"
+// "PodTemplate::VolumeClaimTemplate::Scenario::Zone.MatchLabels.Key1=Zone.MatchLabels.Val1::Zone.MatchLabels.Key2=Zone.MatchLabels.Val2"
 // IMPORTANT there can be the same deployments inside ClickHouseInstallation object
 // and they will have the same deployment string representation
 func generateDeploymentString(d *chiv1.ChiDeployment) string {
@@ -243,7 +243,7 @@ func generateDeploymentString(d *chiv1.ChiDeployment) string {
 	sort.Strings(keys)
 
 	a := make([]string, 0, zoneMatchLabelsNum+1)
-	a = append(a, fmt.Sprintf("%s::%s::%s::", d.PodTemplateName, d.VolumeClaimTemplate, d.Scenario))
+	a = append(a, fmt.Sprintf("%s::%s::%s::", d.PodTemplate, d.VolumeClaimTemplate, d.Scenario))
 	// Loop over sorted d.Zone.MatchLabels keys
 	for _, key := range keys {
 		// Append d.Zone.MatchLabels values
@@ -320,8 +320,8 @@ func mergeDeployment(dst, src *chiv1.ChiDeployment) {
 		zoneCopyFrom(&dst.Zone, &src.Zone)
 	}
 
-	if dst.PodTemplateName == "" {
-		(*dst).PodTemplateName = src.PodTemplateName
+	if dst.PodTemplate == "" {
+		(*dst).PodTemplate = src.PodTemplate
 	}
 
 	if dst.VolumeClaimTemplate == "" {

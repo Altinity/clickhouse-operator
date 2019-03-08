@@ -167,7 +167,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 		statefulSetName := CreateStatefulSetName(fullDeploymentID)
 		configMapMacrosName := CreateConfigMapMacrosName(chi.Name, fullDeploymentID)
 		volumeClaimTemplate := options.ssDeployments[fingerprint].VolumeClaimTemplate
-		podTemplateName := options.ssDeployments[fingerprint].PodTemplateName
+		podTemplate := options.ssDeployments[fingerprint].PodTemplate
 		serviceName := CreateServiceName(fullDeploymentID)
 
 		// Copy list of shared corev1.VolumeMount objects into new slice
@@ -215,7 +215,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 		}
 
 		// Check custom pod templates has been defined
-		if data, ok := podTemplatesIndex[podTemplateName]; ok {
+		if data, ok := podTemplatesIndex[podTemplate]; ok {
 			statefulSetObject.Spec.Template.Spec.Containers = make([]corev1.Container, len(data.containers))
 			copy(statefulSetObject.Spec.Template.Spec.Containers, data.containers)
 			statefulSetObject.Spec.Template.Spec.Volumes = make([]corev1.Volume, len(data.volumes))

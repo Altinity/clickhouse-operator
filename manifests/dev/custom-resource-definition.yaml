@@ -43,7 +43,7 @@ spec:
                             - NodeMonopoly
                           volumeClaimTemplate:
                             type: string
-                          podTemplateName:
+                          podTemplate:
                             type: string
                           zone:
                             type: object
@@ -80,7 +80,7 @@ spec:
                                   - NodeMonopoly
                                 volumeClaimTemplate:
                                   type: string
-                                podTemplateName:
+                                podTemplate:
                                   type: string
                                 zone:
                                   type: object
@@ -116,7 +116,7 @@ spec:
                                         - NodeMonopoly
                                       volumeClaimTemplate:
                                         type: string
-                                      podTemplateName:
+                                      podTemplate:
                                         type: string
                                       zone:
                                         type: object
@@ -162,7 +162,7 @@ spec:
                       - NodeMonopoly
                     volumeClaimTemplate:
                       type: string
-                    podTemplateName:
+                    podTemplate:
                       type: string
                     zone:
                       type: object
