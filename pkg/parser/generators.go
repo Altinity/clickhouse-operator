@@ -40,15 +40,17 @@ func genUsersConfig(chi *chiv1.ClickHouseInstallation) string {
 
 // genConfigXML creates XML using map[string]string definitions
 func genConfigXML(data map[string]string, section string) string {
-	b := &bytes.Buffer{}
-	c := len(data)
-	if c == 0 {
+	if len(data) == 0 {
 		return ""
 	}
 
+	b := &bytes.Buffer{}
+
 	// += <yandex>
 	//      <SECTION>
-	fmt.Fprintf(b, "<%s>\n%4s<%s>\n", xmlTagYandex, " ", section)
+	fmt.Fprintf(b, "<%s>\n", xmlTagYandex)
+	fmt.Fprintf(b, "%4s<%s>\n", " ", section)
+
 	err := xmlbuilder.GenerateXML(b, data, 4, 4)
 	if err != nil {
 		glog.V(2).Infof(err.Error())
@@ -56,19 +58,19 @@ func genConfigXML(data map[string]string, section string) string {
 	}
 	// += <SECTION>
 	//  <yandex>
-	fmt.Fprintf(b, "%4s</%s>\n</%s>\n", " ", section, xmlTagYandex)
+	fmt.Fprintf(b, "%4s</%s>\n", " ", section)
+	fmt.Fprintf(b, "</%s>\n", xmlTagYandex)
 
 	return b.String()
 }
 
 // genSettingsConfig creates data for "settings.xml"
 func genSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
-	b := &bytes.Buffer{}
-	c := len(chi.Spec.Configuration.Settings)
-	if c == 0 {
+	if len(chi.Spec.Configuration.Settings) == 0 {
 		return ""
 	}
 
+	b := &bytes.Buffer{}
 	// += <yandex>
 	fmt.Fprintf(b, "<%s>\n", xmlTagYandex)
 	err := xmlbuilder.GenerateXML(b, chi.Spec.Configuration.Settings, 0, 4, configUsers, configProfiles, configQuotas)
@@ -84,23 +86,27 @@ func genSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
 
 // genZookeeperConfig creates data for "zookeeper.xml"
 func genZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
-	b := &bytes.Buffer{}
-	zkNodesNum := len(chi.Spec.Configuration.Zookeeper.Nodes)
-	if zkNodesNum == 0 {
+	if len(chi.Spec.Configuration.Zookeeper.Nodes) == 0 {
+		// No Zookeeper nodes provided
 		return ""
 	}
 
+	b := &bytes.Buffer{}
 	// += <yandex>
 	//      <zookeeper>
-	fmt.Fprintf(b, "<%s>\n%4s<zookeeper>\n", xmlTagYandex, " ")
+	fmt.Fprintf(b, "<%s>\n", xmlTagYandex)
+	fmt.Fprintf(b, "%4s<zookeeper>\n", " ")
 	// Append Zookeeper nodes
-	for i := 0; i < zkNodesNum; i++ {
+	for i := range chi.Spec.Configuration.Zookeeper.Nodes {
+		// Convenience wrapper
+		node := &chi.Spec.Configuration.Zookeeper.Nodes[i]
 		// += <node>
 		//      <host>HOST</host>
 		//      <port>PORT</port>
 		//    </node>
-		fmt.Fprintf(b, "%8s<node>\n%12[1]s<host>%s</host>\n", " ", chi.Spec.Configuration.Zookeeper.Nodes[i].Host)
-		fmt.Fprintf(b, "%12s<port>%d</port>\n", " ", chi.Spec.Configuration.Zookeeper.Nodes[i].Port)
+		fmt.Fprintf(b, "%8s<node>\n", " ")
+		fmt.Fprintf(b, "%12s<host>%s</host>\n", " ", node.Host)
+		fmt.Fprintf(b, "%12s<port>%d</port>\n", " ", node.Port)
 		fmt.Fprintf(b, "%8s</node>\n", " ")
 	}
 	// += </zookeeper>
@@ -109,13 +115,15 @@ func genZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 	// += <distributed_ddl>
 	//      <path>/x/y/chi.name/z</path>
 	//      <profile>X</prpfile>
-	fmt.Fprintf(b, "%4s<distributed_ddl>\n%8[1]s<path>%s</path>\n", " ", fmt.Sprintf(distributedDDLPattern, chi.Name))
+	fmt.Fprintf(b, "%4s<distributed_ddl>\n", " ")
+	fmt.Fprintf(b, "%8s<path>%s</path>\n", " ", fmt.Sprintf(distributedDDLPattern, chi.Name))
 	if chi.Spec.Defaults.DistributedDDL.Profile != "" {
 		fmt.Fprintf(b, "%8s<profile>%s</profile>\n", " ", chi.Spec.Defaults.DistributedDDL.Profile)
 	}
 	// += </distributed_ddl>
 	//  </yandex>
-	fmt.Fprintf(b, "%4[1]s</distributed_ddl>\n</%s>\n", " ", xmlTagYandex)
+	fmt.Fprintf(b, "%4s</distributed_ddl>\n", " ")
+	fmt.Fprintf(b, "</%s>\n", xmlTagYandex)
 
 	return b.String()
 }
@@ -134,7 +142,7 @@ func generateRemoteServersConfigReplicaHostname(chi *chiv1.ClickHouseInstallatio
 }
 
 // generateRemoteServersConfig creates "remote_servers.xml" content and calculates data generation parameters for other sections
-func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOptions, clusters []*chiv1.ChiCluster) string {
+func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOptions) string {
 	b := &bytes.Buffer{}
 	dRefIndex := make(map[string]int)
 
@@ -146,31 +154,37 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOpt
 
 	// += <yandex>
 	// 		<remote_servers>
-	fmt.Fprintf(b, "<%s>\n%4s<remote_servers>\n", xmlTagYandex, " ")
+	fmt.Fprintf(b, "<%s>\n", xmlTagYandex)
+	fmt.Fprintf(b, "%4s<remote_servers>\n", " ")
+
 	// Build each cluster XML
-	for clusterIndex := range clusters {
+	for clusterIndex := range chi.Spec.Configuration.Clusters {
+		// Convenience wrapper
+		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
 
 		// += <my_cluster_name>
-		fmt.Fprintf(b, "%8s<%s>\n", " ", clusters[clusterIndex].Name)
+		fmt.Fprintf(b, "%8s<%s>\n", " ", cluster.Name)
 
 		// Build each shard XML
-		for shardIndex := range clusters[clusterIndex].Layout.Shards {
+		for shardIndex := range cluster.Layout.Shards {
+			// Convenience wrapper
+			shard := &cluster.Layout.Shards[shardIndex]
 
 			// += <shard>
-			//		<internal_replication>yes</internal_replication>
-			fmt.Fprintf(b,
-				"%12s<shard>\n%16[1]s<internal_replication>%s</internal_replication>\n",
-				" ",
-				clusters[clusterIndex].Layout.Shards[shardIndex].InternalReplication,
-			)
+			//		<internal_replication>VALUE(yes/no)</internal_replication>
+			fmt.Fprintf(b, "%12s<shard>\n", " ")
+			fmt.Fprintf(b, "%16s<internal_replication>%s</internal_replication>\n", " ", shard.InternalReplication)
 
 			// += <weight>X</weight>
-			if clusters[clusterIndex].Layout.Shards[shardIndex].Weight > 0 {
-				fmt.Fprintf(b, "%16s<weight>%d</weight>\n", " ", clusters[clusterIndex].Layout.Shards[shardIndex].Weight)
+			if shard.Weight > 0 {
+				fmt.Fprintf(b, "%16s<weight>%d</weight>\n", " ", shard.Weight)
 			}
 
-			// Build each replica XML
-			for _, replica := range clusters[clusterIndex].Layout.Shards[shardIndex].Replicas {
+			// Build each replica's XML
+			for replicaIndex := range shard.Replicas {
+				// Convenience wrapper
+				replica := &shard.Replicas[replicaIndex]
+
 				fingerprint := replica.Deployment.Fingerprint
 				idx, ok := dRefIndex[fingerprint]
 				if ok {
@@ -192,12 +206,13 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOpt
 
 				// += <replica>
 				//		<host>XXX</host>
-				fmt.Fprintf(b, "%16s<replica>\n%20[1]s<host>%s</host>\n", " ", generateRemoteServersConfigReplicaHostname(chi, fullDeploymentID))
+				fmt.Fprintf(b, "%16s<replica>\n", " ")
+				fmt.Fprintf(b, "%20s<host>%s</host>\n", " ", generateRemoteServersConfigReplicaHostname(chi, fullDeploymentID))
 
 				opts.macrosData[fullDeploymentID] = append(
 					opts.macrosData[fullDeploymentID],
 					&macrosDataShardDescription{
-						clusterName: clusters[clusterIndex].Name,
+						clusterName: cluster.Name,
 						index:       shardIndex + 1,
 					},
 				)
@@ -208,17 +223,19 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOpt
 				}
 				// +=	<port>XXX</port>
 				//	</replica>
-				fmt.Fprintf(b, "%20s<port>%d</port>\n%16[1]s</replica>\n", " ", port)
+				fmt.Fprintf(b, "%20s<port>%d</port>\n", " ", port)
+				fmt.Fprintf(b, "%16s</replica>\n", " ")
 			}
 			// += </shard>
 			fmt.Fprintf(b, "%12s</shard>\n", " ")
 		}
 		// += </my_cluster_name>
-		fmt.Fprintf(b, "%8s</%s>\n", " ", clusters[clusterIndex].Name)
+		fmt.Fprintf(b, "%8s</%s>\n", " ", cluster.Name)
 	}
 	// += </remote_servers>
 	// </yandex>
-	fmt.Fprintf(b, "%4s</remote_servers>\n</%s>\n", " ", xmlTagYandex)
+	fmt.Fprintf(b, "%4s</remote_servers>\n", " ")
+	fmt.Fprintf(b, "</%s>\n", xmlTagYandex)
 
 	return b.String()
 }
@@ -255,8 +272,8 @@ func generateHostMacros(chiName, fullDeploymentID string, shardDescriptions macr
 	fmt.Fprintf(b, "%8s<replica>%s</replica>\n", " ", fullDeploymentID)
 
 	// += </macros>
+	// </yandex>
 	fmt.Fprintf(b, "%4s</macros>\n", " ")
-	// += </yandex>
 	fmt.Fprintf(b, "</%s>\n", xmlTagYandex)
 
 	return b.String()

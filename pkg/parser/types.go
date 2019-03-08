@@ -47,8 +47,8 @@ type genOptions struct {
 	deploymentCountMax chiDeploymentCountMap
 	macrosData         map[string]macrosDataShardDescriptionList
 
-	// includeConfigSection specifies whether additional config files (such as zookeeper, macros) are configuared
-	includeConfigSection map[string]bool
+	// configSection specifies whether additional config files (such as zookeeper, macros) are configuared
+	configSection map[string]bool
 }
 
 type includesObjects []struct {
@@ -78,6 +78,24 @@ type macrosDataShardDescription struct {
 
 // chiDeploymentCountMap maps Deployment fingerprint to its usage count
 type chiDeploymentCountMap map[string]int
+
+// mergeInAndReplaceBiggerValues combines chiDeploymentCountMap object with another one
+// and replaces local values with another one's values in case another's value is bigger
+func (d chiDeploymentCountMap) mergeInAndReplaceBiggerValues(another chiDeploymentCountMap) {
+
+	// Loop over another struct and bring in new OR bigger values
+	for key, value := range another {
+		_, ok := d[key]
+
+		if !ok {
+			// No such key - new key/value pair just - include/merge it in
+			d[key] = value
+		} else if value > d[key] {
+			// Have such key, but "another"'s value is bigger, overwrite local value
+			d[key] = value
+		}
+	}
+}
 
 type vcTemplatesIndex map[string]*vcTemplatesIndexData
 

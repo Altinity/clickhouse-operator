@@ -57,13 +57,16 @@ type ChiDistributedDDL struct {
 
 // ChiDeployment defines deployment section of .spec
 type ChiDeployment struct {
-	// PodTemplate specifies which Pod template from .spec.templates.podTemplates should be used
-	PodTemplate         string `json:"podTemplate,omitempty"`
-	// VolumeClaimTemplate specifies which VolumeClaim template from .spec.templates.volumeClaimTemplates should be used
-	VolumeClaimTemplate string            `json:"volumeClaimTemplate,omitempty"`
+	// PodTemplate specifies which Pod template from
+	// .spec.templates.podTemplates should be used
+	PodTemplate string `json:"podTemplate,omitempty"`
 
-	Zone                ChiDeploymentZone `json:"zone,omitempty"`
-	Scenario            string            `json:"scenario,omitempty"`
+	// VolumeClaimTemplate specifies which VolumeClaim template
+	// from .spec.templates.volumeClaimTemplates should be used
+	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty"`
+
+	Zone     ChiDeploymentZone `json:"zone,omitempty"`
+	Scenario string            `json:"scenario,omitempty"`
 
 	// Fingerprint is a fingerprint of the ChiDeployment. Used to find equal deployments
 	Fingerprint string `json:"fingerprint,omitempty"`

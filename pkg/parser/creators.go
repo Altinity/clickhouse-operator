@@ -24,6 +24,44 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// CreateCHIObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
+// and slice of all full deployment ids
+func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentCountMax chiDeploymentCountMap) (ObjectsMap, []string) {
+	var options genOptions
+
+	options.deploymentCountMax = deploymentCountMax
+
+	// Allocate data structures
+	options.fullDeploymentIDToFingerprint = make(map[string]string)
+	options.ssDeployments = make(map[string]*chiv1.ChiDeployment)
+	options.macrosData = make(map[string]macrosDataShardDescriptionList)
+	options.configSection = make(map[string]bool)
+
+	// configSections maps section name to section XML config such as "<yandex><macros>...</macros><yandex>"
+	configSections := make(map[string]string)
+
+	// Generate XMLs
+	configSections[filenameRemoteServersXML] = generateRemoteServersConfig(chi, &options)
+	options.configSection[filenameZookeeperXML] = includeIfNotEmpty(configSections, filenameZookeeperXML, genZookeeperConfig(chi))
+	options.configSection[filenameUsersXML] = includeIfNotEmpty(configSections, filenameUsersXML, genUsersConfig(chi))
+	options.configSection[filenameProfilesXML] = includeIfNotEmpty(configSections, filenameProfilesXML, genProfilesConfig(chi))
+	options.configSection[filenameQuotasXML] = includeIfNotEmpty(configSections, filenameQuotasXML, genQuotasConfig(chi))
+	options.configSection[filenameSettingsXML] = includeIfNotEmpty(configSections, filenameSettingsXML, genSettingsConfig(chi))
+
+	// slice of full deployment ID's
+	fullDeploymentIDs := make([]string, 0, len(options.fullDeploymentIDToFingerprint))
+	for p := range options.fullDeploymentIDToFingerprint {
+		fullDeploymentIDs = append(fullDeploymentIDs, p)
+	}
+
+	// Create k8s objects (data structures)
+	return ObjectsMap{
+		ObjectsConfigMaps:   createConfigMapObjects(chi, configSections, &options),
+		ObjectsServices:     createServiceObjects(chi, &options),
+		ObjectsStatefulSets: createStatefulSetObjects(chi, &options),
+	}, fullDeploymentIDs
+}
+
 // createConfigMapObjects returns a list of corev1.ConfigMap objects
 func createConfigMapObjects(
 	chi *chiv1.ClickHouseInstallation,
@@ -150,7 +188,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 	}
 
 	for i := range includes {
-		if options.includeConfigSection[includes[i].filename] {
+		if options.configSection[includes[i].filename] {
 			sharedVolumeMounts = append(
 				sharedVolumeMounts, corev1.VolumeMount{
 					Name:      configMapName,

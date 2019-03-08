@@ -152,13 +152,23 @@ func CreateController(
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			glog.V(1).Info("chiInformer.UpdateFunc")
+
 			newChi := newObj.(*chop.ClickHouseInstallation)
 			oldChi := oldObj.(*chop.ClickHouseInstallation)
+
+			// Update is called periodically, don't know why
 			if newChi.ResourceVersion == oldChi.ResourceVersion {
-				glog.V(1).Info("chiInformer.UpdateFunc - no update required")
+				glog.V(1).Info("chiInformer.UpdateFunc - no update required - ResourceVersion is the same")
 				return
 			}
 
+			// Update is called on after each Update() call on k8s resource
+			if oldChi.IsNew() && !newChi.IsNew() {
+				glog.V(1).Infof("chiInformer.UpdateFunc - no update required - switch from new to known chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
+				return
+			}
+
+			// Looks like real update has happened
 			glog.V(1).Infof("chiInformer.UpdateFunc - UPDATE REQUIRED chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
 			controller.enqueueObject(newObj)
 		},
@@ -318,26 +328,19 @@ func (c *Controller) syncNewChi(chi *chop.ClickHouseInstallation) error {
 	// We need to create all resources that are needed to run user's .yaml specification
 	glog.V(1).Infof("syncNewChi(%s/%s)", chi.Namespace, chi.Name)
 
-	fullDeploymentIDs, err := c.createCHIResources(chi)
+	chi, err := c.createCHIResources(chi)
 	if err != nil {
 		glog.V(2).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
 		return err
 	}
 
-	// Some debug
-	for i := range fullDeploymentIDs {
-		glog.V(1).Infof("syncNewChi(%s/%s) - created prefix %s", chi.Namespace, chi.Name, fullDeploymentIDs[i])
-	}
-
-	// Update CHI status in k8s with fullDeploymentIDs
-	err = c.updateCHIResource(chi, fullDeploymentIDs)
-	if err != nil {
+	// Update CHI status in k8s
+	if err := c.updateCHIResource(chi); err != nil {
 		glog.V(2).Infof("ClickHouseInstallation (%q): unable to update status of CHI resource: %q", chi.Name, err)
 		return err
 	}
 
-	glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created): %v", chi.Name, fullDeploymentIDs)
-
+	glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
 	return nil
 }
 
@@ -374,10 +377,10 @@ func (c *Controller) syncKnownChi(chi *chop.ClickHouseInstallation) error {
 }
 
 // createCHIResources creates k8s resources based on ClickHouseInstallation object specification
-func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) ([]string, error) {
+func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) (*chop.ClickHouseInstallation, error) {
 	chiCopy := chi.DeepCopy()
-	clusters, deploymentCountMax := chopparser.NormalizeCHI(chiCopy)
-	chiObjectsMap, fullDeploymentIDs := chopparser.CreateCHIObjects(chiCopy, clusters, deploymentCountMax)
+	deploymentCountMax := chopparser.NormalizeCHI(chiCopy)
+	chiObjectsMap, fullDeploymentIDs := chopparser.CreateCHIObjects(chiCopy, deploymentCountMax)
 
 	for _, objList := range chiObjectsMap {
 		switch v := objList.(type) {
@@ -402,7 +405,11 @@ func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) ([]str
 		}
 	}
 
-	return fullDeploymentIDs, nil
+	chiCopy.Status = chop.ChiStatus{
+		FullDeploymentIDs: fullDeploymentIDs,
+	}
+
+	return chiCopy, nil
 }
 
 // createConfigMapResource creates core.ConfigMap resource
@@ -472,13 +479,9 @@ func (c *Controller) createStatefulSetResource(chi *chop.ClickHouseInstallation,
 	return nil
 }
 
-// updateCHIResource updates .status section of ClickHouseInstallation resource
-func (c *Controller) updateCHIResource(chi *chop.ClickHouseInstallation, fullDeploymentIDs []string) error {
-	chiCopy := chi.DeepCopy()
-	chiCopy.Status = chop.ChiStatus{
-		FullDeploymentIDs: fullDeploymentIDs,
-	}
-	_, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
+// updateCHIResource updates ClickHouseInstallation resource
+func (c *Controller) updateCHIResource(chi *chop.ClickHouseInstallation) error {
+	_, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
 
 	return err
 }

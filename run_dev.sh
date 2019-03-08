@@ -1,7 +1,8 @@
 #!/bin/bash
 
+echo -n "Need to build binary, please wait..."
 if ./build_binary.sh; then
-    echo "Successfully built clickhouse-operator. Starting"
+    echo "successfully built clickhouse-operator. Starting"
 
     mkdir -p log
     ./clickhouse-operator \
@@ -19,5 +20,5 @@ if ./build_binary.sh; then
     # And clean binary after run. It'll be rebuilt next time
     rm -f ./clickhouse-operator
 else
-    echo "Unable to build clickhouse-operator"
+    echo "unable to build clickhouse-operator"
 fi
