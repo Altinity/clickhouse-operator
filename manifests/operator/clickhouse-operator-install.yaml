@@ -194,11 +194,11 @@ spec:
                     type: object
                     required:
                     - name
-                    - template
+                    - persistentVolumeClaim
                     properties:
                       name:
                         type: string
-                      template:
+                      persistentVolumeClaim:
                         type: object
 ---
 # Setup ServiceAccount
