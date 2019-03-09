@@ -130,7 +130,7 @@ const (
 	// configMapNameXXXPattern is set of constants to describe
 	// a .meta.name of a kind:ConfigMap based on .meta.name of a CHI object
 	// configMapNamePattern is a common ConfigMap name prefix
-	configMapNamePattern       = "chi-%s-configd"
+	configMapNamePattern = "chi-%s-configd"
 	// configMapCommonNamePattern is a template of common for the CHI ConfigMap
 	// Ex.: chi-example02-configd-common for chi named as 'example02'
 	configMapCommonNamePattern = configMapNamePattern + "-common"

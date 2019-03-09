@@ -97,6 +97,9 @@ func (d chiDeploymentCountMap) mergeInAndReplaceBiggerValues(another chiDeployme
 	}
 }
 
+// vcTemplatesIndex maps volume claim template name - which is .spec.templates.volumeClaimTemplates.name
+// to "Volume Claim Template"-like structure (simplified).
+// Used to provide dictionary/index for templates
 type vcTemplatesIndex map[string]*vcTemplatesIndexData
 
 type vcTemplatesIndexData struct {
@@ -104,6 +107,9 @@ type vcTemplatesIndexData struct {
 	persistentVolumeClaim *corev1.PersistentVolumeClaim
 }
 
+// podTemplatesIndex maps pod template name - which is .spec.templates.podTemplates.name
+// to "Pod Template"-like structure (simplified).
+// Used to provide dictionary/index for templates
 type podTemplatesIndex map[string]*podTemplatesIndexData
 
 type podTemplatesIndexData struct {

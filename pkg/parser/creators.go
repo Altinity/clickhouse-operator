@@ -22,6 +22,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/golang/glog"
 )
 
 // CreateCHIObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
@@ -34,20 +35,20 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentCountMax chiD
 	// Allocate data structures
 	options.fullDeploymentIDToFingerprint = make(map[string]string)
 	options.ssDeployments = make(map[string]*chiv1.ChiDeployment)
+
 	options.macrosData = make(map[string]macrosDataShardDescriptionList)
 	options.configSection = make(map[string]bool)
 
 	// commonConfigSections maps section name to section XML config such as "<yandex><macros>...</macros><yandex>"
+	// Bring in all sections into commonConfigSections[config file name]
+	// and specify options.configSection[]bool of what sections are provided
 	commonConfigSections := make(map[string]string)
-
-	// Generate XMLs
-	commonConfigSections[filenameRemoteServersXML] = generateRemoteServersConfig(chi, &options)
-
-	options.configSection[filenameZookeeperXML] = includeIfNotEmpty(commonConfigSections, filenameZookeeperXML, genZookeeperConfig(chi))
-	options.configSection[filenameUsersXML] = includeIfNotEmpty(commonConfigSections, filenameUsersXML, genUsersConfig(chi))
-	options.configSection[filenameProfilesXML] = includeIfNotEmpty(commonConfigSections, filenameProfilesXML, genProfilesConfig(chi))
-	options.configSection[filenameQuotasXML] = includeIfNotEmpty(commonConfigSections, filenameQuotasXML, genQuotasConfig(chi))
-	options.configSection[filenameSettingsXML] = includeIfNotEmpty(commonConfigSections, filenameSettingsXML, genSettingsConfig(chi))
+	options.configSection[filenameRemoteServersXML] = includeIfNotEmpty(commonConfigSections, filenameRemoteServersXML, generateRemoteServersConfig(chi, &options))
+	options.configSection[filenameZookeeperXML] = includeIfNotEmpty(commonConfigSections, filenameZookeeperXML, generateZookeeperConfig(chi))
+	options.configSection[filenameUsersXML] = includeIfNotEmpty(commonConfigSections, filenameUsersXML, generateUsersConfig(chi))
+	options.configSection[filenameProfilesXML] = includeIfNotEmpty(commonConfigSections, filenameProfilesXML, generateProfilesConfig(chi))
+	options.configSection[filenameQuotasXML] = includeIfNotEmpty(commonConfigSections, filenameQuotasXML, generateQuotasConfig(chi))
+	options.configSection[filenameSettingsXML] = includeIfNotEmpty(commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
 
 	// slice of full deployment ID's
 	fullDeploymentIDs := make([]string, 0, len(options.fullDeploymentIDToFingerprint))
@@ -57,8 +58,10 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentCountMax chiD
 
 	// Create k8s objects (data structures)
 	return ObjectsMap{
-		ObjectsConfigMaps:   createConfigMapObjects(chi, commonConfigSections, &options),
-		ObjectsServices:     createServiceObjects(chi, &options),
+		ObjectsServices: createServiceObjects(chi, &options),
+		// Config Maps are of two types - common and personal
+		ObjectsConfigMaps: createConfigMapObjects(chi, commonConfigSections, &options),
+		// Config Maps are mapped as config files in Stateful Set objects
 		ObjectsStatefulSets: createStatefulSetObjects(chi, &options),
 	}, fullDeploymentIDs
 }
@@ -72,13 +75,15 @@ func createConfigMapObjects(
 
 	deploymentsCount := len(options.fullDeploymentIDToFingerprint)
 
-	// There are two types of ConfigMaps:
-	// 1. Common configs - for all resources in the CHI
-	// 2. Personal configs
-	// configMapList contains all ConfigMaps
+	// There are two types configs, kept in ConfigMaps:
+	// 1. Common configs - for all resources in the CHI (remote servers, zookeeper setup, etc)
+	// 2. Personal configs - macros config
+	// configMapList contains all configs
 	configMapList := make(ConfigMapList, 1, deploymentsCount+1) // deploymentsCount for personal configs and +1 for common
 
 	// ConfigMap common for all resources in CHI
+	// contains several sections, mapped as separated config files, such as
+	// remote servers, zookeeper setup, etc
 	configMapList[0] = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonName(chi.Name),
@@ -87,6 +92,7 @@ func createConfigMapObjects(
 				ChopGeneratedLabel: chi.Name,
 			},
 		},
+		// Data contains several sections which are to be several xml configs
 		Data: commonConfigSections,
 	}
 
@@ -159,12 +165,17 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 	configMapCommonName := CreateConfigMapCommonName(chi.Name)
 	statefulSetList := make(StatefulSetList, 0, len(options.fullDeploymentIDToFingerprint))
 
-	// Populate templates indexes
+	// Templates index maps template name to (simplified) template itself
+	// Used to provide names access to templates
 	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
 	podTemplatesIndex := createPodTemplatesIndex(chi)
 
 	// Defining list of shared volume mounts
 	includes := includesObjects{
+		{
+			filename: filenameRemoteServersXML,
+			fullpath: fullPathRemoteServersXML,
+		},
 		{
 			filename: filenameZookeeperXML,
 			fullpath: fullPathZookeeperXML,
@@ -187,16 +198,13 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 		},
 	}
 
-	// Populate corev1.VolumeMount list with actual values
-	commonVolumeMounts := make([]corev1.VolumeMount, 1)
-	commonVolumeMounts[0] = corev1.VolumeMount{
-		Name:      configMapCommonName,
-		MountPath: fullPathRemoteServersXML,
-		SubPath:   filenameRemoteServersXML,
-	}
-
+	// List of mount points - do not allocate any items, they'll be appended
+	commonVolumeMounts := make([]corev1.VolumeMount, 0)
+	// Add common config volume mount at first
+	// Personal macros would be added later
 	for i := range includes {
 		if options.configSection[includes[i].filename] {
+			glog.Infof("commonVolumeMounts %s\n", includes[i].filename)
 			commonVolumeMounts = append(
 				commonVolumeMounts, corev1.VolumeMount{
 					Name:      configMapCommonName,
@@ -206,20 +214,21 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 			)
 		}
 	}
+	glog.Infof("commonVolumeMounts total len %d\n", len(commonVolumeMounts))
 
 	// Create list of apps.StatefulSet objects
 	for fullDeploymentID, fingerprint := range options.fullDeploymentIDToFingerprint {
 
-		serviceName := CreateServiceName(fullDeploymentID)
 		statefulSetName := CreateStatefulSetName(fullDeploymentID)
+		serviceName := CreateServiceName(fullDeploymentID)
 		configMapMacrosName := CreateConfigMapMacrosName(chi.Name, fullDeploymentID)
 		volumeClaimTemplate := options.ssDeployments[fingerprint].VolumeClaimTemplate
 		podTemplate := options.ssDeployments[fingerprint].PodTemplate
 
 		// Copy list of shared corev1.VolumeMount objects into new slice
-		l := len(commonVolumeMounts)
-		currentVolumeMounts := make([]corev1.VolumeMount, l, l+1)
-		// Common volume mounts
+		commonVolumeMountsNum := len(commonVolumeMounts)
+		currentVolumeMounts := make([]corev1.VolumeMount, commonVolumeMountsNum)
+		// Prepare volume mount for current deployment as common mounts + personal mounts
 		copy(currentVolumeMounts, commonVolumeMounts)
 		// Personal volume mounts
 		// Appending "macros.xml" section
@@ -228,6 +237,8 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 			MountPath: fullPathMacrosXML,
 			SubPath:   filenameMacrosXML,
 		})
+
+		glog.Infof("Deployment %s has %d current volume mounts\n", fullDeploymentID, len(currentVolumeMounts))
 
 		// Create apps.StatefulSet object
 		statefulSetObject := &apps.StatefulSet{
@@ -262,42 +273,52 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 			},
 		}
 
-		// Check custom pod templates has been defined
-		if data, ok := podTemplatesIndex[podTemplate]; ok {
-			statefulSetObject.Spec.Template.Spec.Containers = make([]corev1.Container, len(data.containers))
-			copy(statefulSetObject.Spec.Template.Spec.Containers, data.containers)
+		// Specify pod templates - either explicitly defined or default
+		if podTemplateData, ok := podTemplatesIndex[podTemplate]; ok {
+			// Prepare .statefulSetObject.Spec.Template.Spec - fill with template's data
 
-			statefulSetObject.Spec.Template.Spec.Volumes = make([]corev1.Volume, len(data.volumes))
-			copy(statefulSetObject.Spec.Template.Spec.Volumes, data.volumes)
+			statefulSetObject.Spec.Template.Spec.Volumes = make([]corev1.Volume, len(podTemplateData.volumes))
+			copy(statefulSetObject.Spec.Template.Spec.Volumes, podTemplateData.volumes)
+
+			statefulSetObject.Spec.Template.Spec.Containers = make([]corev1.Container, len(podTemplateData.containers))
+			copy(statefulSetObject.Spec.Template.Spec.Containers, podTemplateData.containers)
 
 			// Append current VolumeMounts set to custom containers
 			for i := range statefulSetObject.Spec.Template.Spec.Containers {
 				for j := range currentVolumeMounts {
 					statefulSetObject.Spec.Template.Spec.Containers[i].VolumeMounts = append(
 						statefulSetObject.Spec.Template.Spec.Containers[i].VolumeMounts,
-						currentVolumeMounts[j])
+						currentVolumeMounts[j],
+					)
 				}
 			}
 		} else {
-			// Add default container template
+			// No pod template specified for this deployment - use default container template
 			statefulSetObject.Spec.Template.Spec.Containers = append(
 				statefulSetObject.Spec.Template.Spec.Containers,
 				createDefaultContainerTemplate(chi, statefulSetName, currentVolumeMounts),
 			)
 		}
 
-		// Adding default configMaps as Pod's volumes
+		// Add configMaps as Pod's volumes
+		// Both common and personal
 		statefulSetObject.Spec.Template.Spec.Volumes = append(
-			statefulSetObject.Spec.Template.Spec.Volumes, createVolume(configMapCommonName))
+			statefulSetObject.Spec.Template.Spec.Volumes,
+			createVolume(configMapCommonName),
+		)
 		statefulSetObject.Spec.Template.Spec.Volumes = append(
-			statefulSetObject.Spec.Template.Spec.Volumes, createVolume(configMapMacrosName))
-		// Checking that corev1.PersistentVolumeClaim template has been defined
-		if data, ok := volumeClaimTemplatesIndex[volumeClaimTemplate]; ok {
+			statefulSetObject.Spec.Template.Spec.Volumes,
+			createVolume(configMapMacrosName),
+		)
+
+		// Specify volume claim templates - either explicitly defined or default
+		if volumeClaimTemplateData, ok := volumeClaimTemplatesIndex[volumeClaimTemplate]; ok {
 			statefulSetObject.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 				*volumeClaimTemplatesIndex[volumeClaimTemplate].persistentVolumeClaim,
 			}
-			// Adding default corev1.VolumeMount section for ClickHouse data
-			if data.useDefaultName {
+
+			// Add default corev1.VolumeMount section for ClickHouse data
+			if volumeClaimTemplateData.useDefaultName {
 				statefulSetObject.Spec.Template.Spec.Containers[0].VolumeMounts = append(
 					statefulSetObject.Spec.Template.Spec.Containers[0].VolumeMounts,
 					corev1.VolumeMount{
@@ -306,7 +327,8 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 					})
 			}
 		}
-		// Appending apps.StatefulSet to the resulting list
+
+		// Append apps.StatefulSet to the list of stateful sets
 		statefulSetList = append(statefulSetList, statefulSetObject)
 	}
 
@@ -327,9 +349,13 @@ func createVolume(name string) corev1.Volume {
 }
 
 // createDefaultContainerTemplate returns default corev1.Container object
-func createDefaultContainerTemplate(chi *chiv1.ClickHouseInstallation, n string, vm []corev1.VolumeMount) corev1.Container {
+func createDefaultContainerTemplate(
+	chi *chiv1.ClickHouseInstallation,
+	name string,
+	volumeMounts []corev1.VolumeMount,
+) corev1.Container {
 	return corev1.Container{
-		Name:  n,
+		Name:  name,
 		Image: chDefaultDockerImage,
 		Ports: []corev1.ContainerPort{
 			{
@@ -345,7 +371,7 @@ func createDefaultContainerTemplate(chi *chiv1.ClickHouseInstallation, n string,
 				ContainerPort: chDefaultRestPortNumber,
 			},
 		},
-		VolumeMounts: vm,
+		VolumeMounts: volumeMounts,
 	}
 }
 

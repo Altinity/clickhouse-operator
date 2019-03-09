@@ -23,18 +23,18 @@ import (
 	xmlbuilder "github.com/altinity/clickhouse-operator/pkg/parser/builders/xml"
 )
 
-// genProfilesConfig creates data for "profiles.xml"
-func genProfilesConfig(chi *chiv1.ClickHouseInstallation) string {
+// generateProfilesConfig creates data for "profiles.xml"
+func generateProfilesConfig(chi *chiv1.ClickHouseInstallation) string {
 	return genConfigXML(chi.Spec.Configuration.Profiles, configProfiles)
 }
 
-// genQuotasConfig creates data for "quotas.xml"
-func genQuotasConfig(chi *chiv1.ClickHouseInstallation) string {
+// generateQuotasConfig creates data for "quotas.xml"
+func generateQuotasConfig(chi *chiv1.ClickHouseInstallation) string {
 	return genConfigXML(chi.Spec.Configuration.Quotas, configQuotas)
 }
 
-// genUsersConfig creates data for "users.xml"
-func genUsersConfig(chi *chiv1.ClickHouseInstallation) string {
+// generateUsersConfig creates data for "users.xml"
+func generateUsersConfig(chi *chiv1.ClickHouseInstallation) string {
 	return genConfigXML(chi.Spec.Configuration.Users, configUsers)
 }
 
@@ -64,8 +64,8 @@ func genConfigXML(data map[string]string, section string) string {
 	return b.String()
 }
 
-// genSettingsConfig creates data for "settings.xml"
-func genSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
+// generateSettingsConfig creates data for "settings.xml"
+func generateSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
 	if len(chi.Spec.Configuration.Settings) == 0 {
 		return ""
 	}
@@ -84,8 +84,8 @@ func genSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
 	return b.String()
 }
 
-// genZookeeperConfig creates data for "zookeeper.xml"
-func genZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
+// generateZookeeperConfig creates data for "zookeeper.xml"
+func generateZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 	if len(chi.Spec.Configuration.Zookeeper.Nodes) == 0 {
 		// No Zookeeper nodes provided
 		return ""

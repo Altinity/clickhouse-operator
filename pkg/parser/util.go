@@ -34,7 +34,7 @@ func includeIfNotEmpty(dst map[string]string, key, src string) bool {
 		return false
 	}
 
-	// Include (anf overwrite) value by specified key
+	// Include (and overwrite) value by specified key
 	dst[key] = src
 
 	return true

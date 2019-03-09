@@ -58,7 +58,7 @@ func ListStatefulSetNames(chi *chiv1.ClickHouseInstallation) []string {
 	return names
 }
 
-func Yaml(chi *chiv1.ClickHouseInstallation) (string) {
+func Yaml(chi *chiv1.ClickHouseInstallation) string {
 	if data, err := yaml.Marshal(chi); err != nil {
 		return ""
 	} else {
