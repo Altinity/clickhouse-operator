@@ -142,13 +142,13 @@ func generateRemoteServersConfigReplicaHostname(chi *chiv1.ClickHouseInstallatio
 }
 
 // generateRemoteServersConfig creates "remote_servers.xml" content and calculates data generation parameters for other sections
-func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOptions) string {
+func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, options *genOptions) string {
 	b := &bytes.Buffer{}
 	dRefIndex := make(map[string]int)
 
 	// Prepare deployment IDs out of deployment fingerprints
 	deploymentID := make(map[string]string)
-	for deploymentFingerprint := range opts.deploymentCountMax {
+	for deploymentFingerprint := range options.deploymentCountMax {
 		deploymentID[deploymentFingerprint] = generateDeploymentID(deploymentFingerprint)
 	}
 
@@ -190,7 +190,7 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOpt
 				if ok {
 					// fingerprint listed - deployment known
 					idx++
-					if idx > opts.deploymentCountMax[fingerprint] {
+					if idx > options.deploymentCountMax[fingerprint] {
 						idx = 1
 					}
 				} else {
@@ -201,16 +201,16 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, opts *genOpt
 
 				// 1eb454-2 (deployment id - sequential index of this deployment id)
 				fullDeploymentID := generateFullDeploymentID(deploymentID[fingerprint], idx)
-				opts.fullDeploymentIDToFingerprint[fullDeploymentID] = fingerprint
-				opts.ssDeployments[fingerprint] = &replica.Deployment
+				options.fullDeploymentIDToFingerprint[fullDeploymentID] = fingerprint
+				options.ssDeployments[fingerprint] = &replica.Deployment
 
 				// += <replica>
 				//		<host>XXX</host>
 				fmt.Fprintf(b, "%16s<replica>\n", " ")
 				fmt.Fprintf(b, "%20s<host>%s</host>\n", " ", generateRemoteServersConfigReplicaHostname(chi, fullDeploymentID))
 
-				opts.macrosData[fullDeploymentID] = append(
-					opts.macrosData[fullDeploymentID],
+				options.macrosData[fullDeploymentID] = append(
+					options.macrosData[fullDeploymentID],
 					&macrosDataShardDescription{
 						clusterName: cluster.Name,
 						index:       shardIndex + 1,

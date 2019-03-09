@@ -127,10 +127,15 @@ const (
 	// ss-1eb454-2-0.svc-1eb454-2.my-dev-domain.svc.cluster.local
 	podFQDNPattern = hostnamePlusServicePattern + "." + namespaceDomainPattern
 
-	// configMapNamePattern is a .meta.name of a kind:CongifMap object
-	// based on .meta.name of a CHI object
-	// Ex.: chi-example02-configd for chi named as 'example02'
+	// configMapNameXXXPattern is set of constants to describe
+	// a .meta.name of a kind:ConfigMap based on .meta.name of a CHI object
+	// configMapNamePattern is a common ConfigMap name prefix
 	configMapNamePattern       = "chi-%s-configd"
+	// configMapCommonNamePattern is a template of common for the CHI ConfigMap
+	// Ex.: chi-example02-configd-common for chi named as 'example02'
+	configMapCommonNamePattern = configMapNamePattern + "-common"
+	// configMapMacrosNamePattern is a template of macros ConfigMap
+	// Ex.: chi-example02-configd-33260f1800-2 for chi named as 'example02'
 	configMapMacrosNamePattern = configMapNamePattern + "-%s"
 	distributedDDLPattern      = "/clickhouse/%s/task_queue/ddl"
 )

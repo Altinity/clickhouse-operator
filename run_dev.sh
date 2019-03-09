@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo -n "Need to build binary, please wait..."
+echo -n "Building binary, please wait..."
 if ./build_binary.sh; then
     echo "successfully built clickhouse-operator. Starting"
 

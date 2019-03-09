@@ -157,20 +157,21 @@ func CreateController(
 			newChi := newObj.(*chop.ClickHouseInstallation)
 			oldChi := oldObj.(*chop.ClickHouseInstallation)
 
-			// Update is called periodically, don't know why
-			if newChi.ResourceVersion == oldChi.ResourceVersion {
-				glog.V(1).Info("chiInformer.UpdateFunc - no update required - ResourceVersion is the same")
-				return
-			}
-
 			// Update is called on after each Update() call on k8s resource
 			if oldChi.IsNew() && !newChi.IsNew() {
 				glog.V(1).Infof("chiInformer.UpdateFunc - no update required - switch from new to known chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
 				return
 			}
 
-			// Looks like real update has happened
-			glog.V(1).Infof("chiInformer.UpdateFunc - UPDATE REQUIRED chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
+			// Update is called periodically, don't know why
+			if newChi.ResourceVersion == oldChi.ResourceVersion {
+				glog.V(1).Info("chiInformer.UpdateFunc - ResourceVersion is the same - periodical housekeeping")
+			} else {
+				// Looks like real update has happened
+				glog.V(1).Infof("chiInformer.UpdateFunc - UPDATE REQUIRED chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
+				glog.V(1).Infof("\n===old===:\n%s\n===new===:\n%s\n=========\n", chopparser.Yaml(oldChi), chopparser.Yaml(newChi))
+			}
+
 			controller.enqueueObject(newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -356,134 +357,15 @@ func (c *Controller) syncNewChi(chi *chop.ClickHouseInstallation) error {
 func (c *Controller) syncKnownChi(chi *chop.ClickHouseInstallation) error {
 	glog.V(1).Infof("syncKnownChi(%s/%s)", chi.Namespace, chi.Name)
 
-	// Number of prefixes - which is number of Stateful Sets and number of Pods
-	prefixesNum := len(chi.Status.FullDeploymentIDs)
-	// Pod hostnames of CH
-	chHostnames := make([]string, prefixesNum)
+	c.listStatefulSetResources(chi)
+	chi, _ = c.createCHIResources(chi)
+	c.updateCHIResource(chi)
 
-	for i, fullDeploymentID := range chi.Status.FullDeploymentIDs {
-		// Verify we have Stateful Set with such a name
-		statefulSetName := chopparser.CreateStatefulSetName(fullDeploymentID)
-		_, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(statefulSetName)
-		if err == nil {
-			// TODO: check all controlled objects
-			glog.V(2).Infof("ClickHouseInstallation (%q) controls StatefulSet: %q", chi.Name, statefulSetName)
-
-			// Prepare hostname list for the chopmetrics.Exporter state storage
-			chHostnames[i] = chopparser.CreatePodFQDN(chi.Namespace, fullDeploymentID)
-		}
-	}
+	podFQDNs := chopparser.ListPodFQDNs(chi)
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
+	c.metricsExporter.EnsureControlledValues(chi.Name, podFQDNs)
 
-	if !c.metricsExporter.ControlledValuesExist(chi.Name, chHostnames) {
-		glog.V(2).Infof("ClickHouseInstallation (%q): including hostnames into chopmetrics.Exporter", chi.Name)
-		c.metricsExporter.UpdateControlledState(chi.Name, chHostnames)
-	}
-
-	return nil
-}
-
-// createCHIResources creates k8s resources based on ClickHouseInstallation object specification
-func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) (*chop.ClickHouseInstallation, error) {
-	chiCopy := chi.DeepCopy()
-	deploymentCountMax := chopparser.NormalizeCHI(chiCopy)
-	chiObjectsMap, fullDeploymentIDs := chopparser.CreateCHIObjects(chiCopy, deploymentCountMax)
-
-	for _, objList := range chiObjectsMap {
-		switch v := objList.(type) {
-		case chopparser.ConfigMapList:
-			for _, obj := range v {
-				if err := c.createConfigMapResource(chiCopy, obj); err != nil {
-					return nil, err
-				}
-			}
-		case chopparser.ServiceList:
-			for _, obj := range v {
-				if err := c.createServiceResource(chiCopy, obj); err != nil {
-					return nil, err
-				}
-			}
-		case chopparser.StatefulSetList:
-			for _, obj := range v {
-				if err := c.createStatefulSetResource(chiCopy, obj); err != nil {
-					return nil, err
-				}
-			}
-		}
-	}
-
-	chiCopy.Status = chop.ChiStatus{
-		FullDeploymentIDs: fullDeploymentIDs,
-	}
-
-	return chiCopy, nil
-}
-
-// createConfigMapResource creates core.ConfigMap resource
-func (c *Controller) createConfigMapResource(chi *chop.ClickHouseInstallation, newConfigMap *core.ConfigMap) error {
-	// Check whether object with such name already exists in k8s
-	res, err := c.configMapLister.ConfigMaps(chi.Namespace).Get(newConfigMap.Name)
-	if res != nil {
-		// Object with such name already exists, this is not an error
-		return nil
-	}
-
-	// Object with such name does not exist or error happened
-
-	if apierrors.IsNotFound(err) {
-		// Object with such name not found - create it
-		_, err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Create(newConfigMap)
-	}
-	if err != nil {
-		return err
-	}
-
-	// Object created
-	return nil
-}
-
-// createServiceResource creates core.Service resource
-func (c *Controller) createServiceResource(chi *chop.ClickHouseInstallation, newService *core.Service) error {
-	// Check whether object with such name already exists in k8s
-	res, err := c.serviceLister.Services(chi.Namespace).Get(newService.Name)
-	if res != nil {
-		// Object with such name already exists, this is not an error
-		return nil
-	}
-
-	// Object with such name does not exist or error happened
-
-	if apierrors.IsNotFound(err) {
-		// Object with such name not found - create it
-		_, err = c.kubeClient.CoreV1().Services(chi.Namespace).Create(newService)
-	}
-	if err != nil {
-		return err
-	}
-
-	// Object created
-	return nil
-}
-
-// createStatefulSetResource creates apps.StatefulSet resource
-func (c *Controller) createStatefulSetResource(chi *chop.ClickHouseInstallation, newStatefulSet *apps.StatefulSet) error {
-	// Check whether object with such name already exists in k8s
-	res, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
-	if res != nil {
-		// Object with such name already exists, this is not an error
-		return nil
-	}
-
-	if apierrors.IsNotFound(err) {
-		// Object with such name not found - create it
-		_, err = c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Create(newStatefulSet)
-	}
-	if err != nil {
-		return err
-	}
-
-	// Object created
 	return nil
 }
 

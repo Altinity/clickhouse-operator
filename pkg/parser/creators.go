@@ -37,16 +37,17 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentCountMax chiD
 	options.macrosData = make(map[string]macrosDataShardDescriptionList)
 	options.configSection = make(map[string]bool)
 
-	// configSections maps section name to section XML config such as "<yandex><macros>...</macros><yandex>"
-	configSections := make(map[string]string)
+	// commonConfigSections maps section name to section XML config such as "<yandex><macros>...</macros><yandex>"
+	commonConfigSections := make(map[string]string)
 
 	// Generate XMLs
-	configSections[filenameRemoteServersXML] = generateRemoteServersConfig(chi, &options)
-	options.configSection[filenameZookeeperXML] = includeIfNotEmpty(configSections, filenameZookeeperXML, genZookeeperConfig(chi))
-	options.configSection[filenameUsersXML] = includeIfNotEmpty(configSections, filenameUsersXML, genUsersConfig(chi))
-	options.configSection[filenameProfilesXML] = includeIfNotEmpty(configSections, filenameProfilesXML, genProfilesConfig(chi))
-	options.configSection[filenameQuotasXML] = includeIfNotEmpty(configSections, filenameQuotasXML, genQuotasConfig(chi))
-	options.configSection[filenameSettingsXML] = includeIfNotEmpty(configSections, filenameSettingsXML, genSettingsConfig(chi))
+	commonConfigSections[filenameRemoteServersXML] = generateRemoteServersConfig(chi, &options)
+
+	options.configSection[filenameZookeeperXML] = includeIfNotEmpty(commonConfigSections, filenameZookeeperXML, genZookeeperConfig(chi))
+	options.configSection[filenameUsersXML] = includeIfNotEmpty(commonConfigSections, filenameUsersXML, genUsersConfig(chi))
+	options.configSection[filenameProfilesXML] = includeIfNotEmpty(commonConfigSections, filenameProfilesXML, genProfilesConfig(chi))
+	options.configSection[filenameQuotasXML] = includeIfNotEmpty(commonConfigSections, filenameQuotasXML, genQuotasConfig(chi))
+	options.configSection[filenameSettingsXML] = includeIfNotEmpty(commonConfigSections, filenameSettingsXML, genSettingsConfig(chi))
 
 	// slice of full deployment ID's
 	fullDeploymentIDs := make([]string, 0, len(options.fullDeploymentIDToFingerprint))
@@ -56,7 +57,7 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentCountMax chiD
 
 	// Create k8s objects (data structures)
 	return ObjectsMap{
-		ObjectsConfigMaps:   createConfigMapObjects(chi, configSections, &options),
+		ObjectsConfigMaps:   createConfigMapObjects(chi, commonConfigSections, &options),
 		ObjectsServices:     createServiceObjects(chi, &options),
 		ObjectsStatefulSets: createStatefulSetObjects(chi, &options),
 	}, fullDeploymentIDs
@@ -65,21 +66,28 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentCountMax chiD
 // createConfigMapObjects returns a list of corev1.ConfigMap objects
 func createConfigMapObjects(
 	chi *chiv1.ClickHouseInstallation,
-	configSections map[string]string,
+	commonConfigSections map[string]string,
 	options *genOptions,
 ) ConfigMapList {
 
 	deploymentsCount := len(options.fullDeploymentIDToFingerprint)
-	configMapList := make(ConfigMapList, 1, deploymentsCount+1)
+
+	// There are two types of ConfigMaps:
+	// 1. Common configs - for all resources in the CHI
+	// 2. Personal configs
+	// configMapList contains all ConfigMaps
+	configMapList := make(ConfigMapList, 1, deploymentsCount+1) // deploymentsCount for personal configs and +1 for common
+
+	// ConfigMap common for all resources in CHI
 	configMapList[0] = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      CreateConfigMapName(chi.Name),
+			Name:      CreateConfigMapCommonName(chi.Name),
 			Namespace: chi.Namespace,
 			Labels: map[string]string{
 				ChopGeneratedLabel: chi.Name,
 			},
 		},
-		Data: configSections,
+		Data: commonConfigSections,
 	}
 
 	// Each deployment has to have macros.xml config file
@@ -148,7 +156,7 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions
 // createStatefulSetObjects returns a list of apps.StatefulSet objects
 func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOptions) StatefulSetList {
 	replicasNum := int32(1)
-	configMapName := CreateConfigMapName(chi.Name)
+	configMapCommonName := CreateConfigMapCommonName(chi.Name)
 	statefulSetList := make(StatefulSetList, 0, len(options.fullDeploymentIDToFingerprint))
 
 	// Populate templates indexes
@@ -180,18 +188,18 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 	}
 
 	// Populate corev1.VolumeMount list with actual values
-	sharedVolumeMounts := make([]corev1.VolumeMount, 1)
-	sharedVolumeMounts[0] = corev1.VolumeMount{
-		Name:      configMapName,
+	commonVolumeMounts := make([]corev1.VolumeMount, 1)
+	commonVolumeMounts[0] = corev1.VolumeMount{
+		Name:      configMapCommonName,
 		MountPath: fullPathRemoteServersXML,
 		SubPath:   filenameRemoteServersXML,
 	}
 
 	for i := range includes {
 		if options.configSection[includes[i].filename] {
-			sharedVolumeMounts = append(
-				sharedVolumeMounts, corev1.VolumeMount{
-					Name:      configMapName,
+			commonVolumeMounts = append(
+				commonVolumeMounts, corev1.VolumeMount{
+					Name:      configMapCommonName,
 					MountPath: includes[i].fullpath,
 					SubPath:   includes[i].filename,
 				},
@@ -202,16 +210,18 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 	// Create list of apps.StatefulSet objects
 	for fullDeploymentID, fingerprint := range options.fullDeploymentIDToFingerprint {
 
+		serviceName := CreateServiceName(fullDeploymentID)
 		statefulSetName := CreateStatefulSetName(fullDeploymentID)
 		configMapMacrosName := CreateConfigMapMacrosName(chi.Name, fullDeploymentID)
 		volumeClaimTemplate := options.ssDeployments[fingerprint].VolumeClaimTemplate
 		podTemplate := options.ssDeployments[fingerprint].PodTemplate
-		serviceName := CreateServiceName(fullDeploymentID)
 
 		// Copy list of shared corev1.VolumeMount objects into new slice
-		l := len(sharedVolumeMounts)
+		l := len(commonVolumeMounts)
 		currentVolumeMounts := make([]corev1.VolumeMount, l, l+1)
-		copy(currentVolumeMounts, sharedVolumeMounts)
+		// Common volume mounts
+		copy(currentVolumeMounts, commonVolumeMounts)
+		// Personal volume mounts
 		// Appending "macros.xml" section
 		currentVolumeMounts = append(currentVolumeMounts, corev1.VolumeMount{
 			Name:      configMapMacrosName,
@@ -256,6 +266,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 		if data, ok := podTemplatesIndex[podTemplate]; ok {
 			statefulSetObject.Spec.Template.Spec.Containers = make([]corev1.Container, len(data.containers))
 			copy(statefulSetObject.Spec.Template.Spec.Containers, data.containers)
+
 			statefulSetObject.Spec.Template.Spec.Volumes = make([]corev1.Volume, len(data.volumes))
 			copy(statefulSetObject.Spec.Template.Spec.Volumes, data.volumes)
 
@@ -277,7 +288,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 
 		// Adding default configMaps as Pod's volumes
 		statefulSetObject.Spec.Template.Spec.Volumes = append(
-			statefulSetObject.Spec.Template.Spec.Volumes, createVolume(configMapName))
+			statefulSetObject.Spec.Template.Spec.Volumes, createVolume(configMapCommonName))
 		statefulSetObject.Spec.Template.Spec.Volumes = append(
 			statefulSetObject.Spec.Template.Spec.Volumes, createVolume(configMapMacrosName))
 		// Checking that corev1.PersistentVolumeClaim template has been defined
@@ -359,11 +370,14 @@ func createVolumeClaimTemplatesIndex(chi *chiv1.ClickHouseInstallation) vcTempla
 func createPodTemplatesIndex(chi *chiv1.ClickHouseInstallation) podTemplatesIndex {
 	index := make(podTemplatesIndex)
 	for i := range chi.Spec.Templates.PodTemplates {
-		index[chi.Spec.Templates.PodTemplates[i].Name] = &podTemplatesIndexData{
-			containers: chi.Spec.Templates.PodTemplates[i].Containers,
-			volumes:    chi.Spec.Templates.PodTemplates[i].Volumes,
+		// Convenience wrapper
+		podTemplate := &chi.Spec.Templates.PodTemplates[i]
+		index[podTemplate.Name] = &podTemplatesIndexData{
+			containers: podTemplate.Containers,
+			volumes:    podTemplate.Volumes,
 		}
 	}
+
 	return index
 }
 
@@ -372,9 +386,9 @@ func CreateConfigMapMacrosName(chiName, prefix string) string {
 	return fmt.Sprintf(configMapMacrosNamePattern, chiName, prefix)
 }
 
-// CreateConfigMapName returns a name for a ConfigMap resource based on predefined pattern
-func CreateConfigMapName(chiName string) string {
-	return fmt.Sprintf(configMapNamePattern, chiName)
+// CreateConfigMapCommonName returns a name for a ConfigMap resource based on predefined pattern
+func CreateConfigMapCommonName(chiName string) string {
+	return fmt.Sprintf(configMapCommonNamePattern, chiName)
 }
 
 // CreateServiceName creates a name of a Service resource
