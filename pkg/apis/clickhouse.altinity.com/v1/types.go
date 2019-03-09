@@ -137,8 +137,8 @@ type ChiTemplates struct {
 
 // ChiVolumeClaimTemplate defines item of .spec.templates.volumeClaimTemplates
 type ChiVolumeClaimTemplate struct {
-	Name     string                       `json:"name"`
-	Template corev1.PersistentVolumeClaim `json:"template"`
+	Name                  string                       `json:"name"`
+	PersistentVolumeClaim corev1.PersistentVolumeClaim `json:"persistentVolumeClaim"`
 }
 
 // ChiPodTemplate defines item of a podTemplates section of .spec.templates

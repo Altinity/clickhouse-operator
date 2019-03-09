@@ -183,7 +183,7 @@ spec:
   templates:
     volumeClaimTemplates:
     - name: default
-      template:
+      persistentVolumeClaim:
         metadata:
           name: clickhouse-data-test
         spec:

@@ -100,8 +100,8 @@ func (d chiDeploymentCountMap) mergeInAndReplaceBiggerValues(another chiDeployme
 type vcTemplatesIndex map[string]*vcTemplatesIndexData
 
 type vcTemplatesIndexData struct {
-	useDefaultName bool
-	template       *corev1.PersistentVolumeClaim
+	useDefaultName        bool
+	persistentVolumeClaim *corev1.PersistentVolumeClaim
 }
 
 type podTemplatesIndex map[string]*podTemplatesIndexData

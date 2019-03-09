@@ -294,7 +294,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 		// Checking that corev1.PersistentVolumeClaim template has been defined
 		if data, ok := volumeClaimTemplatesIndex[volumeClaimTemplate]; ok {
 			statefulSetObject.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-				*volumeClaimTemplatesIndex[volumeClaimTemplate].template,
+				*volumeClaimTemplatesIndex[volumeClaimTemplate].persistentVolumeClaim,
 			}
 			// Adding default corev1.VolumeMount section for ClickHouse data
 			if data.useDefaultName {
@@ -353,14 +353,17 @@ func createDefaultContainerTemplate(chi *chiv1.ClickHouseInstallation, n string,
 func createVolumeClaimTemplatesIndex(chi *chiv1.ClickHouseInstallation) vcTemplatesIndex {
 	index := make(vcTemplatesIndex)
 	for i := range chi.Spec.Templates.VolumeClaimTemplates {
+		// Convenience wrapper
+		volumeClaimTemplate := &chi.Spec.Templates.VolumeClaimTemplates[i]
+
 		flag := false
-		if chi.Spec.Templates.VolumeClaimTemplates[i].Template.Name == useDefaultNamePlaceholder {
-			chi.Spec.Templates.VolumeClaimTemplates[i].Template.Name = chDefaultVolumeMountNameData
+		if volumeClaimTemplate.PersistentVolumeClaim.Name == useDefaultNamePlaceholder {
+			volumeClaimTemplate.PersistentVolumeClaim.Name = chDefaultVolumeMountNameData
 			flag = true
 		}
-		index[chi.Spec.Templates.VolumeClaimTemplates[i].Name] = &vcTemplatesIndexData{
-			template:       &chi.Spec.Templates.VolumeClaimTemplates[i].Template,
-			useDefaultName: flag,
+		index[volumeClaimTemplate.Name] = &vcTemplatesIndexData{
+			useDefaultName:        flag,
+			persistentVolumeClaim: &volumeClaimTemplate.PersistentVolumeClaim,
 		}
 	}
 	return index
