@@ -88,6 +88,7 @@ func createConfigMapObjects(
 			Namespace: chi.Namespace,
 			Labels: map[string]string{
 				ChopGeneratedLabel: chi.Name,
+				CHIGeneratedLabel:  chi.Name,
 			},
 		},
 		// Data contains several sections which are to be several xml configs
@@ -103,6 +104,7 @@ func createConfigMapObjects(
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
 					ChopGeneratedLabel: chi.Name,
+					CHIGeneratedLabel:  chi.Name,
 				},
 			},
 			Data: map[string]string{
@@ -129,6 +131,7 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
 					ChopGeneratedLabel: chi.Name,
+					CHIGeneratedLabel:  chi.Name,
 				},
 			},
 			Spec: corev1.ServiceSpec{
@@ -217,6 +220,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
 					ChopGeneratedLabel: chi.Name,
+					CHIGeneratedLabel:  chi.Name,
 				},
 			},
 			Spec: apps.StatefulSetSpec{
@@ -233,6 +237,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 						Labels: map[string]string{
 							chDefaultAppLabel:  statefulSetName,
 							ChopGeneratedLabel: chi.Name,
+							CHIGeneratedLabel:  chi.Name,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -247,13 +252,22 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 		if podTemplateData, ok := podTemplatesIndex[podTemplate]; ok {
 			// Prepare .statefulSetObject.Spec.Template.Spec - fill with template's data
 
+			// Copy volumes from pod template
 			statefulSetObject.Spec.Template.Spec.Volumes = make([]corev1.Volume, len(podTemplateData.volumes))
 			copy(statefulSetObject.Spec.Template.Spec.Volumes, podTemplateData.volumes)
 
+			// Copy containers from pod template
+			// ... snippet from .spec.templates.podTemplates
+			//       containers:
+			//      - name: clickhouse
+			//        volumeMounts:
+			//        - name: clickhouse-data-test
+			//          mountPath: /var/lib/clickhouse
+			//        image: yandex/clickhouse-server:18.16.2
 			statefulSetObject.Spec.Template.Spec.Containers = make([]corev1.Container, len(podTemplateData.containers))
 			copy(statefulSetObject.Spec.Template.Spec.Containers, podTemplateData.containers)
 
-			// Append current VolumeMounts set to custom containers
+			// And now loop over all containers in this template and append all current VolumeMounts
 			for i := range statefulSetObject.Spec.Template.Spec.Containers {
 				for j := range currentVolumeMounts {
 					statefulSetObject.Spec.Template.Spec.Containers[i].VolumeMounts = append(
@@ -265,6 +279,8 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 			glog.Infof("createStatefulSetObjects() for statefulSet %s - template: %s\n", statefulSetName, podTemplate)
 		} else {
 			// No pod template specified for this deployment - use default container template
+			// 1. No Volumes specified
+			// 2. Containers are specified
 			statefulSetObject.Spec.Template.Spec.Containers = append(
 				statefulSetObject.Spec.Template.Spec.Containers,
 				createDefaultContainerTemplate(chi, statefulSetName, currentVolumeMounts),
@@ -319,7 +335,8 @@ func createVolume(name string) corev1.Volume {
 					Name: name,
 				},
 			},
-		}}
+		},
+	}
 }
 
 // createDefaultContainerTemplate returns default corev1.Container object

@@ -30,6 +30,7 @@ const (
 const (
 	// ChopGeneratedLabel applied to all objects created by the ClickHouse Operator
 	ChopGeneratedLabel = clickhousealtinitycom.GroupName + "/chop"
+	CHIGeneratedLabel  = clickhousealtinitycom.GroupName + "/chi"
 )
 
 const (

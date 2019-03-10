@@ -249,7 +249,7 @@ func generateHostMacros(chiName, fullDeploymentID string, shardDescriptions macr
 	// += <macros>
 	fmt.Fprintf(b, "%4s<macros>\n", " ")
 
-	// +=     <installation>CHI name</installation>
+	// += <installation>CHI name</installation>
 	fmt.Fprintf(b, "%8s<installation>%s</installation>\n", " ", chiName)
 
 	for i := range shardDescriptions {
@@ -268,7 +268,8 @@ func generateHostMacros(chiName, fullDeploymentID string, shardDescriptions macr
 		)
 	}
 
-	// += <replica>replica id</replica>
+	// += <replica>replica id = full deployment id</replica>
+	// full deployment id is unique to identify replica within the cluster
 	fmt.Fprintf(b, "%8s<replica>%s</replica>\n", " ", fullDeploymentID)
 
 	// += </macros>

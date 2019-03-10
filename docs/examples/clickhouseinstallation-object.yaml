@@ -196,12 +196,13 @@ spec:
     # multiple pod templates makes possible to update version smoothly
     # pod template for ClickHouse v18.16.1
     - name: clickhouse-v18.16.1
+    # volumes: are missing
       containers:
       - name: clickhouse
+        image: yandex/clickhouse-server:18.16.1
         volumeMounts:
         - name: clickhouse-data-test
           mountPath: /var/lib/clickhouse
-        image: yandex/clickhouse-server:18.16.1
         resources:
           requests:
             memory: "64Mi"
@@ -211,12 +212,13 @@ spec:
             cpu: "100m"
     # pod template for ClickHouse v18.16.2
     - name: clickhouse-v18.16.2
+    # volumes: are missing
       containers:
       - name: clickhouse
+        image: yandex/clickhouse-server:18.16.2
         volumeMounts:
         - name: clickhouse-data-test
           mountPath: /var/lib/clickhouse
-        image: yandex/clickhouse-server:18.16.2
         resources:
           requests:
             memory: "64Mi"
