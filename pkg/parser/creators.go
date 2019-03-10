@@ -19,10 +19,10 @@ import (
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 
+	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"github.com/golang/glog"
 )
 
 // CreateCHIObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
@@ -36,19 +36,18 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentCountMax chiD
 	options.fullDeploymentIDToFingerprint = make(map[string]string)
 	options.ssDeployments = make(map[string]*chiv1.ChiDeployment)
 
+	// Config files section - macros and common config
 	options.macrosData = make(map[string]macrosDataShardDescriptionList)
-	options.configSection = make(map[string]bool)
 
 	// commonConfigSections maps section name to section XML config such as "<yandex><macros>...</macros><yandex>"
 	// Bring in all sections into commonConfigSections[config file name]
-	// and specify options.configSection[]bool of what sections are provided
-	commonConfigSections := make(map[string]string)
-	options.configSection[filenameRemoteServersXML] = includeIfNotEmpty(commonConfigSections, filenameRemoteServersXML, generateRemoteServersConfig(chi, &options))
-	options.configSection[filenameZookeeperXML] = includeIfNotEmpty(commonConfigSections, filenameZookeeperXML, generateZookeeperConfig(chi))
-	options.configSection[filenameUsersXML] = includeIfNotEmpty(commonConfigSections, filenameUsersXML, generateUsersConfig(chi))
-	options.configSection[filenameProfilesXML] = includeIfNotEmpty(commonConfigSections, filenameProfilesXML, generateProfilesConfig(chi))
-	options.configSection[filenameQuotasXML] = includeIfNotEmpty(commonConfigSections, filenameQuotasXML, generateQuotasConfig(chi))
-	options.configSection[filenameSettingsXML] = includeIfNotEmpty(commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
+	options.commonConfigSections = make(map[string]string)
+	includeNonEmpty(options.commonConfigSections, filenameRemoteServersXML, generateRemoteServersConfig(chi, &options))
+	includeNonEmpty(options.commonConfigSections, filenameZookeeperXML, generateZookeeperConfig(chi))
+	includeNonEmpty(options.commonConfigSections, filenameUsersXML, generateUsersConfig(chi))
+	includeNonEmpty(options.commonConfigSections, filenameProfilesXML, generateProfilesConfig(chi))
+	includeNonEmpty(options.commonConfigSections, filenameQuotasXML, generateQuotasConfig(chi))
+	includeNonEmpty(options.commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
 
 	// slice of full deployment ID's
 	fullDeploymentIDs := make([]string, 0, len(options.fullDeploymentIDToFingerprint))
@@ -60,7 +59,7 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentCountMax chiD
 	return ObjectsMap{
 		ObjectsServices: createServiceObjects(chi, &options),
 		// Config Maps are of two types - common and personal
-		ObjectsConfigMaps: createConfigMapObjects(chi, commonConfigSections, &options),
+		ObjectsConfigMaps: createConfigMapObjects(chi, &options),
 		// Config Maps are mapped as config files in Stateful Set objects
 		ObjectsStatefulSets: createStatefulSetObjects(chi, &options),
 	}, fullDeploymentIDs
@@ -69,7 +68,6 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentCountMax chiD
 // createConfigMapObjects returns a list of corev1.ConfigMap objects
 func createConfigMapObjects(
 	chi *chiv1.ClickHouseInstallation,
-	commonConfigSections map[string]string,
 	options *genOptions,
 ) ConfigMapList {
 
@@ -93,7 +91,7 @@ func createConfigMapObjects(
 			},
 		},
 		// Data contains several sections which are to be several xml configs
-		Data: commonConfigSections,
+		Data: options.commonConfigSections,
 	}
 
 	// Each deployment has to have macros.xml config file
@@ -154,6 +152,7 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions
 				},
 			},
 		})
+		glog.Infof("createServiceObjects() for service %s\n", serviceName)
 	}
 
 	return serviceList
@@ -161,7 +160,6 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions
 
 // createStatefulSetObjects returns a list of apps.StatefulSet objects
 func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOptions) StatefulSetList {
-	replicasNum := int32(1)
 	configMapCommonName := CreateConfigMapCommonName(chi.Name)
 	statefulSetList := make(StatefulSetList, 0, len(options.fullDeploymentIDToFingerprint))
 
@@ -170,53 +168,24 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
 	podTemplatesIndex := createPodTemplatesIndex(chi)
 
-	// Defining list of shared volume mounts
-	includes := includesObjects{
-		{
-			filename: filenameRemoteServersXML,
-			fullpath: fullPathRemoteServersXML,
-		},
-		{
-			filename: filenameZookeeperXML,
-			fullpath: fullPathZookeeperXML,
-		},
-		{
-			filename: filenameUsersXML,
-			fullpath: fullPathUsersXML,
-		},
-		{
-			filename: filenameProfilesXML,
-			fullpath: fullPathProfilesXML,
-		},
-		{
-			filename: filenameQuotasXML,
-			fullpath: fullPathQuotasXML,
-		},
-		{
-			filename: filenameSettingsXML,
-			fullpath: fullPathSettingsXML,
-		},
-	}
-
 	// List of mount points - do not allocate any items, they'll be appended
 	commonVolumeMounts := make([]corev1.VolumeMount, 0)
 	// Add common config volume mount at first
 	// Personal macros would be added later
-	for i := range includes {
-		if options.configSection[includes[i].filename] {
-			glog.Infof("commonVolumeMounts %s\n", includes[i].filename)
-			commonVolumeMounts = append(
-				commonVolumeMounts, corev1.VolumeMount{
-					Name:      configMapCommonName,
-					MountPath: includes[i].fullpath,
-					SubPath:   includes[i].filename,
-				},
-			)
-		}
+	for filename := range options.commonConfigSections {
+		glog.Infof("commonVolumeMounts %s\n", filename)
+		commonVolumeMounts = append(
+			commonVolumeMounts, corev1.VolumeMount{
+				Name:      configMapCommonName,
+				MountPath: CreateClickHouseConfigFullPath(filename),
+				SubPath:   filename,
+			},
+		)
 	}
 	glog.Infof("commonVolumeMounts total len %d\n", len(commonVolumeMounts))
 
 	// Create list of apps.StatefulSet objects
+	// StatefulSet is created for each Deployment
 	for fullDeploymentID, fingerprint := range options.fullDeploymentIDToFingerprint {
 
 		statefulSetName := CreateStatefulSetName(fullDeploymentID)
@@ -234,13 +203,14 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 		// Appending "macros.xml" section
 		currentVolumeMounts = append(currentVolumeMounts, corev1.VolumeMount{
 			Name:      configMapMacrosName,
-			MountPath: fullPathMacrosXML,
+			MountPath: CreateClickHouseConfigFullPath(filenameMacrosXML),
 			SubPath:   filenameMacrosXML,
 		})
 
 		glog.Infof("Deployment %s has %d current volume mounts\n", fullDeploymentID, len(currentVolumeMounts))
 
 		// Create apps.StatefulSet object
+		replicasNum := int32(1)
 		statefulSetObject := &apps.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      statefulSetName,
@@ -292,12 +262,14 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 					)
 				}
 			}
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - template: %s\n", statefulSetName, podTemplate)
 		} else {
 			// No pod template specified for this deployment - use default container template
 			statefulSetObject.Spec.Template.Spec.Containers = append(
 				statefulSetObject.Spec.Template.Spec.Containers,
 				createDefaultContainerTemplate(chi, statefulSetName, currentVolumeMounts),
 			)
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - default template\n", statefulSetName)
 		}
 
 		// Add configMaps as Pod's volumes
@@ -326,10 +298,12 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 						MountPath: fullPathClickHouseData,
 					})
 			}
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - vc template: %s\n", statefulSetName, volumeClaimTemplate)
 		}
 
 		// Append apps.StatefulSet to the list of stateful sets
 		statefulSetList = append(statefulSetList, statefulSetObject)
+		glog.Infof("createStatefulSetObjects() for statefulSet %s\n", statefulSetName)
 	}
 
 	return statefulSetList
@@ -462,4 +436,9 @@ func CreatePodFQDN(chiNamespace, prefix string) string {
 		prefix,
 		chiNamespace,
 	)
+}
+
+// CreateClickHouseConfigFullPath create full path to ClickHouse config file
+func CreateClickHouseConfigFullPath(filename string) string {
+	return fmt.Sprintf(fullPathConfigTemplate, filename)
 }

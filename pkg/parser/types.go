@@ -48,7 +48,7 @@ type genOptions struct {
 	macrosData         map[string]macrosDataShardDescriptionList
 
 	// configSection specifies whether additional config files (such as zookeeper, macros) are configuared
-	configSection map[string]bool
+	commonConfigSections map[string]string
 }
 
 type includesObjects []struct {

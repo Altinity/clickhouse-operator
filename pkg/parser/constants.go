@@ -82,6 +82,17 @@ const (
 )
 
 const (
+	// fullPathConfigd specifies full path to folder, where generated XML config files for ClickHouse would be placed
+	fullPathConfigd = "/etc/clickhouse-server/config.d/"
+
+	// fullPathConfigTemplate specifies template for full path of the XML config files for ClickHouse
+	fullPathConfigTemplate = fullPathConfigd + "%s"
+
+	// fullPathClickHouseData specifies full path of data folder where ClickHouse would place its datastorage
+	fullPathClickHouseData = "/var/lib/clickhouse"
+)
+
+const (
 	// Full Deployment ID consists of two parts:
 	// 1. "deployment id" (it should be derived from fingerprint) of each deployment in ClickHouseInstallation object.
 	//    Some deployments may be the same and thus have the same "deployment id" (because of the same fingerprint)
@@ -137,7 +148,8 @@ const (
 	// configMapMacrosNamePattern is a template of macros ConfigMap
 	// Ex.: chi-example02-configd-33260f1800-2 for chi named as 'example02'
 	configMapMacrosNamePattern = configMapNamePattern + "-%s"
-	distributedDDLPattern      = "/clickhouse/%s/task_queue/ddl"
+
+	distributedDDLPattern = "/clickhouse/%s/task_queue/ddl"
 )
 
 const (
@@ -157,18 +169,6 @@ const (
 	chDefaultRestPortName          = "rest"
 	chDefaultRestPortNumber        = 8123
 	chDefaultAppLabel              = clickhousealtinitycom.GroupName + "/app"
-)
-
-const (
-	fullPathConfigd          = "/etc/clickhouse-server/config.d/"
-	fullPathRemoteServersXML = fullPathConfigd + filenameRemoteServersXML
-	fullPathZookeeperXML     = fullPathConfigd + filenameZookeeperXML
-	fullPathMacrosXML        = fullPathConfigd + filenameMacrosXML
-	fullPathUsersXML         = fullPathConfigd + filenameUsersXML
-	fullPathQuotasXML        = fullPathConfigd + filenameQuotasXML
-	fullPathProfilesXML      = fullPathConfigd + filenameProfilesXML
-	fullPathSettingsXML      = fullPathConfigd + filenameSettingsXML
-	fullPathClickHouseData   = "/var/lib/clickhouse"
 )
 
 const (
