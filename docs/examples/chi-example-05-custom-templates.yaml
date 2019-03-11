@@ -10,7 +10,7 @@ spec:
   templates:
     volumeClaimTemplates:
     - name: customVolumeClaimTemplate
-      template:
+      persistentVolumeClaim:
         metadata:
           name: clickhouse-data-test
         spec:
