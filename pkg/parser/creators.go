@@ -19,62 +19,125 @@ import (
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 
+	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// CreateCHIObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
+// and slice of all full deployment ids
+func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentCountMax chiDeploymentCountMap) (ObjectsMap, []string) {
+	var options genOptions
+
+	options.deploymentCountMax = deploymentCountMax
+
+	// Allocate data structures
+	options.fullDeploymentIDToFingerprint = make(map[string]string)
+	options.ssDeployments = make(map[string]*chiv1.ChiDeployment)
+
+	// Config files section - macros and common config
+	options.macrosData = make(map[string]macrosDataShardDescriptionList)
+
+	// commonConfigSections maps section name to section XML config such as "<yandex><macros>...</macros><yandex>"
+	// Bring in all sections into commonConfigSections[config file name]
+	options.commonConfigSections = make(map[string]string)
+	includeNonEmpty(options.commonConfigSections, filenameRemoteServersXML, generateRemoteServersConfig(chi, &options))
+	includeNonEmpty(options.commonConfigSections, filenameZookeeperXML, generateZookeeperConfig(chi))
+	includeNonEmpty(options.commonConfigSections, filenameUsersXML, generateUsersConfig(chi))
+	includeNonEmpty(options.commonConfigSections, filenameProfilesXML, generateProfilesConfig(chi))
+	includeNonEmpty(options.commonConfigSections, filenameQuotasXML, generateQuotasConfig(chi))
+	includeNonEmpty(options.commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
+
+	// slice of full deployment ID's
+	fullDeploymentIDs := make([]string, 0, len(options.fullDeploymentIDToFingerprint))
+	for p := range options.fullDeploymentIDToFingerprint {
+		fullDeploymentIDs = append(fullDeploymentIDs, p)
+	}
+
+	// Create k8s objects (data structures)
+	return ObjectsMap{
+		ObjectsServices: createServiceObjects(chi, &options),
+		// Config Maps are of two types - common and personal
+		ObjectsConfigMaps: createConfigMapObjects(chi, &options),
+		// Config Maps are mapped as config files in Stateful Set objects
+		ObjectsStatefulSets: createStatefulSetObjects(chi, &options),
+	}, fullDeploymentIDs
+}
+
 // createConfigMapObjects returns a list of corev1.ConfigMap objects
-func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, data map[string]string, o *genOptions) ConfigMapList {
-	c := len(o.ssNames)
-	cmList := make(ConfigMapList, 1, c+1)
-	cmList[0] = &corev1.ConfigMap{
+func createConfigMapObjects(
+	chi *chiv1.ClickHouseInstallation,
+	options *genOptions,
+) ConfigMapList {
+
+	deploymentsCount := len(options.fullDeploymentIDToFingerprint)
+
+	// There are two types configs, kept in ConfigMaps:
+	// 1. Common configs - for all resources in the CHI (remote servers, zookeeper setup, etc)
+	// 2. Personal configs - macros config
+	// configMapList contains all configs
+	configMapList := make(ConfigMapList, 1, deploymentsCount+1) // deploymentsCount for personal configs and +1 for common
+
+	// ConfigMap common for all resources in CHI
+	// contains several sections, mapped as separated config files, such as
+	// remote servers, zookeeper setup, etc
+	configMapList[0] = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      CreateConfigMapName(chi.Name),
+			Name:      CreateConfigMapCommonName(chi.Name),
 			Namespace: chi.Namespace,
 			Labels: map[string]string{
-				ClusterwideLabel: chi.Name,
+				ChopGeneratedLabel: chi.Name,
+				CHIGeneratedLabel:  chi.Name,
 			},
 		},
-		Data: data,
+		// Data contains several sections which are to be several xml configs
+		Data: options.commonConfigSections,
 	}
-	for ssNameID := range o.ssNames {
-		// adding corev1.ConfigMap object to the list
-		cmList = append(cmList, &corev1.ConfigMap{
+
+	// Each deployment has to have macros.xml config file
+	for fullDeploymentID := range options.fullDeploymentIDToFingerprint {
+		// Add corev1.ConfigMap object to the list
+		configMapList = append(configMapList, &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      CreateConfigMapMacrosName(chi.Name, ssNameID),
+				Name:      CreateConfigMapMacrosName(chi.Name, fullDeploymentID),
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
-					ClusterwideLabel: chi.Name,
+					ChopGeneratedLabel: chi.Name,
+					CHIGeneratedLabel:  chi.Name,
 				},
 			},
 			Data: map[string]string{
-				macrosXML: generateHostMacros(chi.Name, ssNameID, o.macrosDataIndex[ssNameID]),
+				filenameMacrosXML: generateHostMacros(chi.Name, fullDeploymentID, options.macrosData[fullDeploymentID]),
 			},
 		})
 	}
-	return cmList
+
+	return configMapList
 }
 
 // createServiceObjects returns a list of corev1.Service objects
-func createServiceObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) ServiceList {
-	svcList := make(ServiceList, 0, len(o.ssNames))
-	for ssNameID := range o.ssNames {
-		ssName := CreateStatefulSetName(ssNameID)
-		svcName := CreateServiceName(ssNameID)
-		// adding corev1.Service object to the list
-		svcList = append(svcList, &corev1.Service{
+func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions) ServiceList {
+	serviceList := make(ServiceList, 0, len(options.fullDeploymentIDToFingerprint))
+
+	for fullDeploymentID := range options.fullDeploymentIDToFingerprint {
+		statefulSetName := CreateStatefulSetName(fullDeploymentID)
+		serviceName := CreateServiceName(fullDeploymentID)
+
+		// Add corev1.Service object to the list
+		serviceList = append(serviceList, &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      svcName,
+				Name:      serviceName,
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
-					ClusterwideLabel: chi.Name,
+					ChopGeneratedLabel: chi.Name,
+					CHIGeneratedLabel:  chi.Name,
 				},
 			},
 			Spec: corev1.ServiceSpec{
 				ClusterIP: templateDefaultsServiceClusterIP,
 				Selector: map[string]string{
-					chDefaultAppLabel: ssName,
+					chDefaultAppLabel: statefulSetName,
 				},
 				Ports: []corev1.ServicePort{
 					{
@@ -92,98 +155,89 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) Serv
 				},
 			},
 		})
+		glog.Infof("createServiceObjects() for service %s\n", serviceName)
 	}
-	return svcList
+
+	return serviceList
 }
 
 // createStatefulSetObjects returns a list of apps.StatefulSet objects
-func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) StatefulSetList {
-	rNum := int32(1)
-	cmName := CreateConfigMapName(chi.Name)
-	ssList := make(StatefulSetList, 0, len(o.ssNames))
-	// Populating templates indexes
-	vcTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
+func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOptions) StatefulSetList {
+	configMapCommonName := CreateConfigMapCommonName(chi.Name)
+	statefulSetList := make(StatefulSetList, 0, len(options.fullDeploymentIDToFingerprint))
+
+	// Templates index maps template name to (simplified) template itself
+	// Used to provide names access to templates
+	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
 	podTemplatesIndex := createPodTemplatesIndex(chi)
-	// Defining list of shared volume mounts
-	includes := includesObjects{
-		{
-			filename: zookeeperXML,
-			fullpath: fullPathZookeeperXML,
-		},
-		{
-			filename: usersXML,
-			fullpath: fullPathUsersXML,
-		},
-		{
-			filename: profilesXML,
-			fullpath: fullPathProfilesXML,
-		},
-		{
-			filename: quotasXML,
-			fullpath: fullPathQuotasXML,
-		},
-		{
-			filename: settingsXML,
-			fullpath: fullPathSettingsXML,
-		},
+
+	// List of mount points - do not allocate any items, they'll be appended
+	commonVolumeMounts := make([]corev1.VolumeMount, 0)
+	// Add common config volume mount at first
+	// Personal macros would be added later
+	for filename := range options.commonConfigSections {
+		glog.Infof("commonVolumeMounts %s\n", filename)
+		commonVolumeMounts = append(
+			commonVolumeMounts, corev1.VolumeMount{
+				Name:      configMapCommonName,
+				MountPath: CreateClickHouseConfigFullPath(filename),
+				SubPath:   filename,
+			},
+		)
 	}
-	// Populating corev1.VolumeMount list with actual values
-	sharedVolumeMounts := make([]corev1.VolumeMount, 1)
-	sharedVolumeMounts[0] = corev1.VolumeMount{
-		Name:      cmName,
-		MountPath: fullPathRemoteServersXML,
-		SubPath:   remoteServersXML,
-	}
-	for i := range includes {
-		if o.includes[includes[i].filename] {
-			sharedVolumeMounts = append(
-				sharedVolumeMounts, corev1.VolumeMount{
-					Name:      cmName,
-					MountPath: includes[i].fullpath,
-					SubPath:   includes[i].filename,
-				})
-		}
-	}
-	// Creating list of apps.StatefulSet objects
-	for ssNameID, key := range o.ssNames {
-		ssName := CreateStatefulSetName(ssNameID)
-		cmMacros := CreateConfigMapMacrosName(chi.Name, ssNameID)
-		vcTemplate := o.ssDeployments[key].VolumeClaimTemplate
-		podTemplate := o.ssDeployments[key].PodTemplateName
-		svcName := CreateServiceName(ssNameID)
-		// Coping list of shared corev1.VolumeMount objects into new slice
-		l := len(sharedVolumeMounts)
-		currentVolumeMounts := make([]corev1.VolumeMount, l, l+1)
-		copy(currentVolumeMounts, sharedVolumeMounts)
+	glog.Infof("commonVolumeMounts total len %d\n", len(commonVolumeMounts))
+
+	// Create list of apps.StatefulSet objects
+	// StatefulSet is created for each Deployment
+	for fullDeploymentID, fingerprint := range options.fullDeploymentIDToFingerprint {
+
+		statefulSetName := CreateStatefulSetName(fullDeploymentID)
+		serviceName := CreateServiceName(fullDeploymentID)
+		configMapMacrosName := CreateConfigMapMacrosName(chi.Name, fullDeploymentID)
+		volumeClaimTemplate := options.ssDeployments[fingerprint].VolumeClaimTemplate
+		podTemplate := options.ssDeployments[fingerprint].PodTemplate
+
+		// Copy list of shared corev1.VolumeMount objects into new slice
+		commonVolumeMountsNum := len(commonVolumeMounts)
+		currentVolumeMounts := make([]corev1.VolumeMount, commonVolumeMountsNum)
+		// Prepare volume mount for current deployment as common mounts + personal mounts
+		copy(currentVolumeMounts, commonVolumeMounts)
+		// Personal volume mounts
 		// Appending "macros.xml" section
 		currentVolumeMounts = append(currentVolumeMounts, corev1.VolumeMount{
-			Name:      cmMacros,
-			MountPath: fullPathMacrosXML,
-			SubPath:   macrosXML,
+			Name:      configMapMacrosName,
+			MountPath: CreateClickHouseConfigFullPath(filenameMacrosXML),
+			SubPath:   filenameMacrosXML,
 		})
-		// Creating apps.StatefulSet object
+
+		glog.Infof("Deployment %s has %d current volume mounts\n", fullDeploymentID, len(currentVolumeMounts))
+
+		// Create apps.StatefulSet object
+		replicasNum := int32(1)
 		statefulSetObject := &apps.StatefulSet{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      ssName,
+				Name:      statefulSetName,
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
-					ClusterwideLabel: chi.Name,
+					ChopGeneratedLabel: chi.Name,
+					CHIGeneratedLabel:  chi.Name,
 				},
 			},
 			Spec: apps.StatefulSetSpec{
-				Replicas:    &rNum,
-				ServiceName: svcName,
+				Replicas:    &replicasNum,
+				ServiceName: serviceName,
 				Selector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{
-						chDefaultAppLabel: ssName,
+						chDefaultAppLabel: statefulSetName,
 					},
 				},
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: ssName,
+						Name: statefulSetName,
 						Labels: map[string]string{
-							chDefaultAppLabel: ssName,
-							ClusterwideLabel:  chi.Name,
+							chDefaultAppLabel:  statefulSetName,
+							ChopGeneratedLabel: chi.Name,
+							CHIGeneratedLabel:  chi.Name,
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -193,38 +247,66 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 				},
 			},
 		}
-		// Checking that custom pod templates has been defined
-		if data, ok := podTemplatesIndex[podTemplate]; ok {
-			statefulSetObject.Spec.Template.Spec.Containers = make([]corev1.Container, len(data.containers))
-			copy(statefulSetObject.Spec.Template.Spec.Containers, data.containers)
-			statefulSetObject.Spec.Template.Spec.Volumes = make([]corev1.Volume, len(data.volumes))
-			copy(statefulSetObject.Spec.Template.Spec.Volumes, data.volumes)
-			// Appending current VolumeMounts set to custom containers
+
+		// Specify pod templates - either explicitly defined or default
+		if podTemplateData, ok := podTemplatesIndex[podTemplate]; ok {
+			// Prepare .statefulSetObject.Spec.Template.Spec - fill with template's data
+
+			// Copy volumes from pod template
+			statefulSetObject.Spec.Template.Spec.Volumes = make([]corev1.Volume, len(podTemplateData.volumes))
+			copy(statefulSetObject.Spec.Template.Spec.Volumes, podTemplateData.volumes)
+
+			// Copy containers from pod template
+			// ... snippet from .spec.templates.podTemplates
+			//       containers:
+			//      - name: clickhouse
+			//        volumeMounts:
+			//        - name: clickhouse-data-test
+			//          mountPath: /var/lib/clickhouse
+			//        image: yandex/clickhouse-server:18.16.2
+			statefulSetObject.Spec.Template.Spec.Containers = make([]corev1.Container, len(podTemplateData.containers))
+			copy(statefulSetObject.Spec.Template.Spec.Containers, podTemplateData.containers)
+
+			// And now loop over all containers in this template and append all current VolumeMounts
 			for i := range statefulSetObject.Spec.Template.Spec.Containers {
 				for j := range currentVolumeMounts {
 					statefulSetObject.Spec.Template.Spec.Containers[i].VolumeMounts = append(
 						statefulSetObject.Spec.Template.Spec.Containers[i].VolumeMounts,
-						currentVolumeMounts[j])
+						currentVolumeMounts[j],
+					)
 				}
 			}
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - template: %s\n", statefulSetName, podTemplate)
 		} else {
-			// Adding default container template
+			// No pod template specified for this deployment - use default container template
+			// 1. No Volumes specified
+			// 2. Containers are specified
 			statefulSetObject.Spec.Template.Spec.Containers = append(
 				statefulSetObject.Spec.Template.Spec.Containers,
-				createDefaultContainerTemplate(chi, ssName, currentVolumeMounts))
+				createDefaultContainerTemplate(chi, statefulSetName, currentVolumeMounts),
+			)
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - default template\n", statefulSetName)
 		}
-		// Adding default configMaps as Pod's volumes
+
+		// Add configMaps as Pod's volumes
+		// Both common and personal
 		statefulSetObject.Spec.Template.Spec.Volumes = append(
-			statefulSetObject.Spec.Template.Spec.Volumes, createVolume(cmName))
+			statefulSetObject.Spec.Template.Spec.Volumes,
+			createVolume(configMapCommonName),
+		)
 		statefulSetObject.Spec.Template.Spec.Volumes = append(
-			statefulSetObject.Spec.Template.Spec.Volumes, createVolume(cmMacros))
-		// Checking that corev1.PersistentVolumeClaim template has been defined
-		if data, ok := vcTemplatesIndex[vcTemplate]; ok {
+			statefulSetObject.Spec.Template.Spec.Volumes,
+			createVolume(configMapMacrosName),
+		)
+
+		// Specify volume claim templates - either explicitly defined or default
+		if volumeClaimTemplateData, ok := volumeClaimTemplatesIndex[volumeClaimTemplate]; ok {
 			statefulSetObject.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-				*vcTemplatesIndex[vcTemplate].template,
+				*volumeClaimTemplatesIndex[volumeClaimTemplate].persistentVolumeClaim,
 			}
-			// Adding default corev1.VolumeMount section for ClickHouse data
-			if data.useDefaultName {
+
+			// Add default corev1.VolumeMount section for ClickHouse data
+			if volumeClaimTemplateData.useDefaultName {
 				statefulSetObject.Spec.Template.Spec.Containers[0].VolumeMounts = append(
 					statefulSetObject.Spec.Template.Spec.Containers[0].VolumeMounts,
 					corev1.VolumeMount{
@@ -232,11 +314,15 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, o *genOptions) 
 						MountPath: fullPathClickHouseData,
 					})
 			}
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - vc template: %s\n", statefulSetName, volumeClaimTemplate)
 		}
-		// Appending apps.StatefulSet to the resulting list
-		ssList = append(ssList, statefulSetObject)
+
+		// Append apps.StatefulSet to the list of stateful sets
+		statefulSetList = append(statefulSetList, statefulSetObject)
+		glog.Infof("createStatefulSetObjects() for statefulSet %s\n", statefulSetName)
 	}
-	return ssList
+
+	return statefulSetList
 }
 
 // createVolume returns corev1.Volume object with defined name
@@ -249,13 +335,18 @@ func createVolume(name string) corev1.Volume {
 					Name: name,
 				},
 			},
-		}}
+		},
+	}
 }
 
 // createDefaultContainerTemplate returns default corev1.Container object
-func createDefaultContainerTemplate(chi *chiv1.ClickHouseInstallation, n string, vm []corev1.VolumeMount) corev1.Container {
+func createDefaultContainerTemplate(
+	chi *chiv1.ClickHouseInstallation,
+	name string,
+	volumeMounts []corev1.VolumeMount,
+) corev1.Container {
 	return corev1.Container{
-		Name:  n,
+		Name:  name,
 		Image: chDefaultDockerImage,
 		Ports: []corev1.ContainerPort{
 			{
@@ -271,7 +362,7 @@ func createDefaultContainerTemplate(chi *chiv1.ClickHouseInstallation, n string,
 				ContainerPort: chDefaultRestPortNumber,
 			},
 		},
-		VolumeMounts: vm,
+		VolumeMounts: volumeMounts,
 	}
 }
 
@@ -279,14 +370,17 @@ func createDefaultContainerTemplate(chi *chiv1.ClickHouseInstallation, n string,
 func createVolumeClaimTemplatesIndex(chi *chiv1.ClickHouseInstallation) vcTemplatesIndex {
 	index := make(vcTemplatesIndex)
 	for i := range chi.Spec.Templates.VolumeClaimTemplates {
+		// Convenience wrapper
+		volumeClaimTemplate := &chi.Spec.Templates.VolumeClaimTemplates[i]
+
 		flag := false
-		if chi.Spec.Templates.VolumeClaimTemplates[i].Template.Name == useDefaultNamePlaceholder {
-			chi.Spec.Templates.VolumeClaimTemplates[i].Template.Name = chDefaultVolumeMountNameData
+		if volumeClaimTemplate.PersistentVolumeClaim.Name == useDefaultNamePlaceholder {
+			volumeClaimTemplate.PersistentVolumeClaim.Name = chDefaultVolumeMountNameData
 			flag = true
 		}
-		index[chi.Spec.Templates.VolumeClaimTemplates[i].Name] = &vcTemplatesIndexData{
-			template:       &chi.Spec.Templates.VolumeClaimTemplates[i].Template,
-			useDefaultName: flag,
+		index[volumeClaimTemplate.Name] = &vcTemplatesIndexData{
+			useDefaultName:        flag,
+			persistentVolumeClaim: &volumeClaimTemplate.PersistentVolumeClaim,
 		}
 	}
 	return index
@@ -296,11 +390,14 @@ func createVolumeClaimTemplatesIndex(chi *chiv1.ClickHouseInstallation) vcTempla
 func createPodTemplatesIndex(chi *chiv1.ClickHouseInstallation) podTemplatesIndex {
 	index := make(podTemplatesIndex)
 	for i := range chi.Spec.Templates.PodTemplates {
-		index[chi.Spec.Templates.PodTemplates[i].Name] = &podTemplatesIndexData{
-			containers: chi.Spec.Templates.PodTemplates[i].Containers,
-			volumes:    chi.Spec.Templates.PodTemplates[i].Volumes,
+		// Convenience wrapper
+		podTemplate := &chi.Spec.Templates.PodTemplates[i]
+		index[podTemplate.Name] = &podTemplatesIndexData{
+			containers: podTemplate.Containers,
+			volumes:    podTemplate.Volumes,
 		}
 	}
+
 	return index
 }
 
@@ -309,32 +406,56 @@ func CreateConfigMapMacrosName(chiName, prefix string) string {
 	return fmt.Sprintf(configMapMacrosNamePattern, chiName, prefix)
 }
 
-// CreateConfigMapName returns a name for a ConfigMap resource based on predefined pattern
-func CreateConfigMapName(chiName string) string {
-	return fmt.Sprintf(configMapNamePattern, chiName)
+// CreateConfigMapCommonName returns a name for a ConfigMap resource based on predefined pattern
+func CreateConfigMapCommonName(chiName string) string {
+	return fmt.Sprintf(configMapCommonNamePattern, chiName)
 }
 
-// CreateServiceName returns a name for a Service resource based on predefined pattern
+// CreateServiceName creates a name of a Service resource
+// prefix is a fullDeploymentID
 func CreateServiceName(prefix string) string {
-	return fmt.Sprintf(svcNamePattern, prefix)
+	return fmt.Sprintf(serviceNamePattern, prefix)
 }
 
-// CreateStatefulSetName returns a name for a StatefulSet resource based on predefined pattern
+// CreateStatefulSetName creates a name of a StatefulSet resource
+// prefix is a fullDeploymentID
 func CreateStatefulSetName(prefix string) string {
-	return fmt.Sprintf(ssNamePattern, prefix)
+	return fmt.Sprintf(statefulSetNamePattern, prefix)
 }
 
-// CreateDomainName creates domain part of Pod's name
-func CreateDomainName(chiNamespace string) string {
-	return fmt.Sprintf(domainPattern, chiNamespace)
+// CreatePodHostname creates a name of a Pod resource
+// prefix is a fullDeploymentID
+// ss-1eb454-2-0
+func CreatePodHostname(prefix string) string {
+	return fmt.Sprintf(hostnamePattern, prefix)
 }
 
-// CreatePodHostname returns a hostname of the Pod based on predefined pattern
-func CreatePodHostname(chiNamespace, prefix string) string {
+// CreatePodHostnamePlusService creates a name of a Pod resource within namespace
+// prefix is a fullDeploymentID
+// ss-1eb454-2-0.svc-1eb454-2
+func CreatePodHostnamePlusService(prefix string) string {
+	return fmt.Sprintf(hostnamePlusServicePattern, prefix, prefix)
+}
+
+// CreateNamespaceDomainName creates domain name of a namespace
+// .my-dev-namespace.svc.cluster.local
+func CreateNamespaceDomainName(chiNamespace string) string {
+	return fmt.Sprintf(namespaceDomainPattern, chiNamespace)
+}
+
+// CreatePodFQDN creates a fully qualified domain name of a pod
+// prefix is a fullDeploymentID
+// ss-1eb454-2-0.svc-1eb454-2.my-dev-domain.svc.cluster.local
+func CreatePodFQDN(chiNamespace, prefix string) string {
 	return fmt.Sprintf(
-		fqdnPattern,
-		CreateStatefulSetName(prefix),
-		CreateServiceName(prefix),
-		CreateDomainName(chiNamespace),
+		podFQDNPattern,
+		prefix,
+		prefix,
+		chiNamespace,
 	)
+}
+
+// CreateClickHouseConfigFullPath create full path to ClickHouse config file
+func CreateClickHouseConfigFullPath(filename string) string {
+	return fmt.Sprintf(fullPathConfigTemplate, filename)
 }

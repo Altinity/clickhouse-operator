@@ -28,8 +28,9 @@ const (
 )
 
 const (
-	// ClusterwideLabel applied to all objects created by the ClickHouse Operator
-	ClusterwideLabel = clickhousealtinitycom.GroupName + "/chi"
+	// ChopGeneratedLabel applied to all objects created by the ClickHouse Operator
+	ChopGeneratedLabel = clickhousealtinitycom.GroupName + "/chop"
+	CHIGeneratedLabel  = clickhousealtinitycom.GroupName + "/chi"
 )
 
 const (
@@ -68,26 +69,88 @@ const (
 )
 
 const (
-	dotXML           = ".xml"
-	remoteServersXML = configRemoteServers + dotXML
-	zookeeperXML     = configZookeeper + dotXML
-	usersXML         = configUsers + dotXML
-	quotasXML        = configQuotas + dotXML
-	profilesXML      = configProfiles + dotXML
-	settingsXML      = configSettings + dotXML
-	macrosXML        = configMacros + dotXML
+	dotXML = ".xml"
+
+	// Filenames of the config files in /etc/clickhouse-server/config.d
+	// These files would be created as ConfigMaps mapping if necessary
+	filenameRemoteServersXML = configRemoteServers + dotXML
+	filenameZookeeperXML     = configZookeeper + dotXML
+	filenameUsersXML         = configUsers + dotXML
+	filenameQuotasXML        = configQuotas + dotXML
+	filenameProfilesXML      = configProfiles + dotXML
+	filenameSettingsXML      = configSettings + dotXML
+	filenameMacrosXML        = configMacros + dotXML
 )
 
 const (
-	ssNameIDPattern            = "d%si%d"
-	ssNamePattern              = "ch-%s"
-	svcNamePattern             = "%ss"
-	domainPattern              = ".%s.svc.cluster.local"
-	hostnamePattern            = ssNamePattern + "-0.%[1]ss%s"
-	fqdnPattern                = "%s-0.%s%s"
-	configMapNamePattern       = "chi-%s-configd"
+	// fullPathConfigd specifies full path to folder, where generated XML config files for ClickHouse would be placed
+	fullPathConfigd = "/etc/clickhouse-server/config.d/"
+
+	// fullPathConfigTemplate specifies template for full path of the XML config files for ClickHouse
+	fullPathConfigTemplate = fullPathConfigd + "%s"
+
+	// fullPathClickHouseData specifies full path of data folder where ClickHouse would place its datastorage
+	fullPathClickHouseData = "/var/lib/clickhouse"
+)
+
+const (
+	// Full Deployment ID consists of two parts:
+	// 1. "deployment id" (it should be derived from fingerprint) of each deployment in ClickHouseInstallation object.
+	//    Some deployments may be the same and thus have the same "deployment id" (because of the same fingerprint)
+	// 2. Sequential index of this "deployment id" in ClickHouseInstallation object.
+	//    Some deployments may be the same and thus have the same "deployment id" (because of the same fingerprint),
+	//    but they will have different sequentially increasing index of this "deployment id" in ClickHouseInstallation object
+	// Ex.: two running instances of the same deployment will have full deployments ids
+	// 1eb454-1
+	// 1eb454-2
+	fullDeploymentIDPattern = "%s-%d"
+
+	// NAME                           READY   AGE   CONTAINERS    IMAGES
+	// statefulset.apps/ss-1eb454-1   0/1     2s    ss-1eb454-1   yandex/clickhouse-server:latest
+	statefulSetNamePattern = "chi-%s"
+
+	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
+	// service/svc-1eb454-1  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-1
+	// service/svc-1eb454-2  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-2
+	// In this pattern "%s" is substituted with fullDeploymentIDPattern-generated value
+	// Ex.: svc-1eb454-2
+	serviceNamePattern = "chi-%s"
+
+	// namespaceDomainPattern presents Domain Name pattern of a namespace
+	// In this pattern "%s" is substituted namespace name's value
+	// Ex.: my-dev-namespace.svc.cluster.local
+	namespaceDomainPattern = "%s.svc.cluster.local"
+
+	// NAME                READY   STATUS    RESTARTS   AGE   IP            NODE   NOMINATED NODE   READINESS GATES
+	// pod/ss-1eb454-2-0   1/1     Running   0          11h   10.244.1.17   kub2   <none>           <none>
+	// Ex.: ss-1eb454-2-0
+	hostnamePattern = statefulSetNamePattern + "-0"
+
+	// hostnamePlusServicePattern consists of 2 parts
+	// 1. pod hostname
+	// 2. nameless service of of stateful set
+	// Ex.: ss-1eb454-2-0.svc-1eb454-2
+	hostnamePlusServicePattern = hostnamePattern + "." + serviceNamePattern
+
+	// podFQDNPattern consists of 3 parts:
+	// 1. pod hostname
+	// 2. nameless service of of stateful set
+	// 3. namespace name
+	// ss-1eb454-2-0.svc-1eb454-2.my-dev-domain.svc.cluster.local
+	podFQDNPattern = hostnamePlusServicePattern + "." + namespaceDomainPattern
+
+	// configMapNameXXXPattern is set of constants to describe
+	// a .meta.name of a kind:ConfigMap based on .meta.name of a CHI object
+	// configMapNamePattern is a common ConfigMap name prefix
+	configMapNamePattern = "chi-%s-configd"
+	// configMapCommonNamePattern is a template of common for the CHI ConfigMap
+	// Ex.: chi-example02-configd-common for chi named as 'example02'
+	configMapCommonNamePattern = configMapNamePattern + "-common"
+	// configMapMacrosNamePattern is a template of macros ConfigMap
+	// Ex.: chi-example02-configd-33260f1800-2 for chi named as 'example02'
 	configMapMacrosNamePattern = configMapNamePattern + "-%s"
-	distributedDDLPattern      = "/clickhouse/%s/task_queue/ddl"
+
+	distributedDDLPattern = "/clickhouse/%s/task_queue/ddl"
 )
 
 const (
@@ -107,18 +170,6 @@ const (
 	chDefaultRestPortName          = "rest"
 	chDefaultRestPortNumber        = 8123
 	chDefaultAppLabel              = clickhousealtinitycom.GroupName + "/app"
-)
-
-const (
-	configdPath              = "/etc/clickhouse-server/config.d/"
-	fullPathRemoteServersXML = configdPath + remoteServersXML
-	fullPathZookeeperXML     = configdPath + zookeeperXML
-	fullPathMacrosXML        = configdPath + macrosXML
-	fullPathUsersXML         = configdPath + usersXML
-	fullPathQuotasXML        = configdPath + quotasXML
-	fullPathProfilesXML      = configdPath + profilesXML
-	fullPathSettingsXML      = configdPath + settingsXML
-	fullPathClickHouseData   = "/var/lib/clickhouse"
 )
 
 const (

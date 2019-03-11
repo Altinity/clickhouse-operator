@@ -143,7 +143,7 @@ metadata:
 spec:
   defaults:
     deployment:
-      podTemplateName: customPodTemplate
+      podTemplate: customPodTemplate
       volumeClaimTemplate: customVolumeClaimTemplate
   templates:
     volumeClaimTemplates:

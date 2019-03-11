@@ -3,6 +3,10 @@
 # Let's setup all prometheus-related stuff into dedicated namespace called "prometheus"
 kubectl create namespace prometheus
 
+# Create CRD for kind:Prometheus and kind:PrometheusRule
+kubectl apply --namespace=prometheus -f prometheus.crd.yaml
+kubectl apply --namespace=prometheus -f prometheusrule.crd.yaml
+
 # Setup prometheus-operator into dedicated namespace
 kubectl apply --namespace=prometheus -f prometheus-operator.yaml
 
