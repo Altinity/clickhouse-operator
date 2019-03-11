@@ -1,0 +1,158 @@
+# Setup ClusterRoleBinding for prometheus-operator
+# ClusterRoleBinding is namespace-less and must have unique name
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus-operator
+  labels:
+    apps.kubernetes.io/component: controller
+    apps.kubernetes.io/name: prometheus-operator
+    apps.kubernetes.io/version: v0.29.0
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus-operator
+subjects:
+# IMPORTANT
+# Specify namespace where ServiceAccount located
+- kind: ServiceAccount
+  name: prometheus-operator
+#  namespace: default
+  namespace: prometheus
+---
+# Setup ClusterRole for prometheus-operator
+# ClusterRole is namespace-less and must have unique name
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus-operator
+  labels:
+    apps.kubernetes.io/component: controller
+    apps.kubernetes.io/name: prometheus-operator
+    apps.kubernetes.io/version: v0.29.0
+rules:
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - "*"
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - alertmanagers
+  - prometheuses
+  - prometheuses/finalizers
+  - alertmanagers/finalizers
+  - servicemonitors
+  - prometheusrules
+  verbs:
+  - "*"
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - "*"
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  verbs:
+  - "*"
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - services/finalizers
+  - endpoints
+  verbs:
+  - get
+  - create
+  - update
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+---
+# Setup Deployment for prometheus-operator
+# Deployment would be created in kubectl-specified namespace
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: prometheus-operator
+  labels:
+    apps.kubernetes.io/component: controller
+    apps.kubernetes.io/name: prometheus-operator
+    apps.kubernetes.io/version: v0.29.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      apps.kubernetes.io/component: controller
+      apps.kubernetes.io/name: prometheus-operator
+  template:
+    metadata:
+      labels:
+        apps.kubernetes.io/component: controller
+        apps.kubernetes.io/name: prometheus-operator
+        apps.kubernetes.io/version: v0.29.0
+    spec:
+      containers:
+      - args:
+        - --kubelet-service=kube-system/kubelet
+        - --logtostderr=true
+        - --config-reloader-image=quay.io/coreos/configmap-reload:v0.0.1
+        - --prometheus-config-reloader=quay.io/coreos/prometheus-config-reloader:v0.29.0
+        image: quay.io/coreos/prometheus-operator:v0.29.0
+        name: prometheus-operator
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          limits:
+            cpu: 200m
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      serviceAccountName: prometheus-operator
+---
+# Setup ServiceAccount for prometheus-operator
+# ServiceAccount would be created in kubectl-specified namespace
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus-operator
+  labels:
+    apps.kubernetes.io/component: controller
+    apps.kubernetes.io/name: prometheus-operator
+    apps.kubernetes.io/version: v0.29.0

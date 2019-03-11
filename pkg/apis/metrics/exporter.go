@@ -21,6 +21,7 @@ import (
 	clickhouse "github.com/altinity/clickhouse-operator/pkg/apis/metrics/clickhouse"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/golang/glog"
 )
 
 const (
@@ -127,8 +128,8 @@ func writeMetricsDataToPrometheus(out chan<- prometheus.Metric, data map[string]
 			clickhouseMetricsDescriptions[metric],
 			prometheus.GaugeValue,
 			floatValue,
-			chiname,	// labelValues ...string
-			hostname,	// labelValues ...string
+			chiname,  // labelValues ...string
+			hostname, // labelValues ...string
 		)
 		out <- m
 	}
@@ -179,4 +180,11 @@ func (e *Exporter) ControlledValuesExist(chiName string, hostnames []string) boo
 
 	// All checks passed
 	return true
+}
+
+func (e *Exporter) EnsureControlledValues(chiName string, hostnames []string) {
+	if !e.ControlledValuesExist(chiName, hostnames) {
+		glog.V(2).Infof("ClickHouseInstallation (%q): including hostnames into chopmetrics.Exporter", chiName)
+		e.UpdateControlledState(chiName, hostnames)
+	}
 }

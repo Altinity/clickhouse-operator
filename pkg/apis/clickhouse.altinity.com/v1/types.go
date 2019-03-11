@@ -33,7 +33,7 @@ type ClickHouseInstallation struct {
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	ObjectPrefixes []string `json:"objectPrefixes"`
+	FullDeploymentIDs []string `json:"fullDeploymentIDs"`
 }
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
@@ -45,8 +45,8 @@ type ChiSpec struct {
 
 // ChiDefaults defines defaults section of .spec
 type ChiDefaults struct {
-	DistributedDDL  ChiDistributedDDL `json:"distributedDDL,omitempty"`
 	ReplicasUseFQDN int               `json:"replicasUseFQDN,omitempty"`
+	DistributedDDL  ChiDistributedDDL `json:"distributedDDL,omitempty"`
 	Deployment      ChiDeployment     `json:"deployment,omitempty"`
 }
 
@@ -57,11 +57,19 @@ type ChiDistributedDDL struct {
 
 // ChiDeployment defines deployment section of .spec
 type ChiDeployment struct {
-	PodTemplateName     string            `json:"podTemplateName,omitempty"`
-	VolumeClaimTemplate string            `json:"volumeClaimTemplate,omitempty"`
-	Zone                ChiDeploymentZone `json:"zone,omitempty"`
-	Scenario            string            `json:"scenario,omitempty"`
-	Key                 string            // used internally by pkg/parser
+	// PodTemplate specifies which Pod template from
+	// .spec.templates.podTemplates should be used
+	PodTemplate string `json:"podTemplate,omitempty"`
+
+	// VolumeClaimTemplate specifies which VolumeClaim template
+	// from .spec.templates.volumeClaimTemplates should be used
+	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty"`
+
+	Zone     ChiDeploymentZone `json:"zone,omitempty"`
+	Scenario string            `json:"scenario,omitempty"`
+
+	// Fingerprint is a fingerprint of the ChiDeployment. Used to find equal deployments
+	Fingerprint string `json:"fingerprint,omitempty"`
 }
 
 // ChiDeploymentZone defines zone section of *.deployment
@@ -129,8 +137,8 @@ type ChiTemplates struct {
 
 // ChiVolumeClaimTemplate defines item of .spec.templates.volumeClaimTemplates
 type ChiVolumeClaimTemplate struct {
-	Name     string                       `json:"name"`
-	Template corev1.PersistentVolumeClaim `json:"template"`
+	Name                  string                       `json:"name"`
+	PersistentVolumeClaim corev1.PersistentVolumeClaim `json:"persistentVolumeClaim"`
 }
 
 // ChiPodTemplate defines item of a podTemplates section of .spec.templates
@@ -153,3 +161,9 @@ const (
 	// ClickHouseInstallationCRDResourceKind defines kind of CRD resource
 	ClickHouseInstallationCRDResourceKind = "ClickHouseInstallation"
 )
+
+// IsNew checks whether CHI is a new one or already known and was processed/created earlier
+func (chi *ClickHouseInstallation) IsNew() bool {
+	// New CHI does not have FullDeploymentIDs specified
+	return chi.Status.FullDeploymentIDs == nil || len(chi.Status.FullDeploymentIDs) == 0
+}
