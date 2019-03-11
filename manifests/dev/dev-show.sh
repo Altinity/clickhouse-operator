@@ -1,14 +1,14 @@
 #!/bin/bash
 
-echo "=== POD ==="
+echo "=== Dev Pods ==="
 kubectl -n dev -o wide get pod
 
-echo "=== SERVICE ==="
+echo "=== Dev Services ==="
 kubectl -n dev -o wide get service
 
-echo "=== STATEFULE SET ==="
+echo "=== Dev Statefule Sets ==="
 kubectl -n dev -o wide get statefulset
 
-echo "=== CONFIG MAP ==="
+echo "=== Dev Config Maps ==="
 kubectl -n dev -o wide get configmap
 
