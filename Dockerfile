@@ -1,6 +1,6 @@
 FROM golang:1.11.5 as builder
 
-WORKDIR /go/src/github.com/altinity/clickhouse-operator
+WORKDIR $GOPATH/src/github.com/altinity/clickhouse-operator
 
 ADD Gopkg.toml Gopkg.toml
 ADD Gopkg.lock Gopkg.lock

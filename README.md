@@ -6,7 +6,9 @@ The ClickHouse Operator creates, configures and manages ClickHouse clusters runn
 [![tags](https://img.shields.io/github/tag/altinity/clickhouse-operator.svg)](https://github.com/altinity/clickhouse-operator/tags)
 [![Go Report Card](https://goreportcard.com/badge/github.com/altinity/clickhouse-operator)](https://goreportcard.com/report/github.com/altinity/clickhouse-operator)
 
-**Warning! ClickHouse Operator is currently in early minor beta state. Its functionality is very limited, as well as its API in active development, so please keep in mind, that you are fully responsible for your data and the operation of your database clusters. There may be backwards incompatible changes up until the first major release.**
+**Warning! ClickHouse Operator is currently in early minor beta state. 
+Its functionality is very limited, as well as its API is in active development, so please keep in mind, that you are fully responsible for your data and the operation of your database clusters. 
+There may be backwards incompatible changes up until the first major release.**
 
 ## Features
 
@@ -22,35 +24,19 @@ The ClickHouse Operator for Kubernetes currently provides the following:
 
  * Kubernetes 1.9.0 +
  
-## Installation
-
-```console
-$ kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator/clickhouse-operator-install.yaml
-serviceaccount/clickhouse-operator created
-clusterrolebinding.rbac.authorization.k8s.io/clickhouse-operator created
-deployment.apps/clickhouse-operator created
-
-```
-
-```console
-$ kubectl get pods -n kube-system
-NAME                                        READY   STATUS    RESTARTS   AGE
-clickhouse-operator-ddc6fd499-fhxqs         1/1     Running   0          5m22s
-```
-
 ## Documentation
 
-Start
+**Start**
 1. [Introduction][intro] 
 1. [Quick Start Guides][quick_start]
 1. [More detailed operator installation instructions][detailed]
 1. [ClickHouse Installation Custom Resource explained][crd_explained]
 
-Replication cluster
+**Replication cluster**
 1. [How to setup ClickHouse cluster with replication][replication_setup]
 1. [Zookeeper setup][zookeeper_setup]
 
-Monitoring
+**Monitoring**
 1. [Prometheus & clickhouse-operator integration][prometheus_setup]
 1. [Grafana & Prometheus integration][grafana_setup]
 

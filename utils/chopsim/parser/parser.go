@@ -88,10 +88,10 @@ type chiConfiguration struct {
 }
 
 type chiDeployment struct {
-	PodTemplateName string            `yaml:"podTemplateName"`
-	Zone            chiDeploymentZone `yaml:"zone"`
-	Scenario        string            `yaml:"scenario"`
-	key             string
+	PodTemplate string            `yaml:"podTemplate"`
+	Zone        chiDeploymentZone `yaml:"zone"`
+	Scenario    string            `yaml:"scenario"`
+	key         string
 }
 
 type chiDeploymentZone struct {
@@ -619,7 +619,7 @@ func (chi *ClickHouseInstallation) setDefaults() {
 func (d *chiDeployment) toString() string {
 	var keys []string
 	a := make([]string, 0, len(d.Zone.MatchLabels))
-	a = append(a, fmt.Sprintf("%s::%s::", d.Scenario, d.PodTemplateName))
+	a = append(a, fmt.Sprintf("%s::%s::", d.Scenario, d.PodTemplate))
 	for k := range d.Zone.MatchLabels {
 		keys = append(keys, k)
 	}
@@ -635,8 +635,8 @@ func (d *chiDeployment) setDefaults(parent *chiDeployment) {
 		d.Scenario = deploymentScenarioDefault
 		return
 	}
-	if d.PodTemplateName == "" {
-		d.PodTemplateName = parent.PodTemplateName
+	if d.PodTemplate == "" {
+		d.PodTemplate = parent.PodTemplate
 	}
 	if d.Scenario == "" {
 		d.Scenario = parent.Scenario

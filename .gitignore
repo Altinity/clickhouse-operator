@@ -13,3 +13,6 @@
 
 # IDE folders
 .idea
+
+# Skip log folder
+log

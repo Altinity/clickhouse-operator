@@ -41,6 +41,12 @@ We can either run [create-prometheus.sh](../manifests/prometheus/create-promethe
   ```bash
   kubectl create namespace prometheus
   ```
+  
+  - Create CRD for kind:Prometheus and kind:PrometheusRule
+  ```bash
+  kubectl apply --namespace=prometheus -f prometheus.crd.yaml
+  kubectl apply --namespace=prometheus -f prometheusrule.crd.yaml
+  ```
      
   - Setup `prometheus-operator` into dedicated namespace
   ```bash

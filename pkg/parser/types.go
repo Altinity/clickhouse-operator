@@ -37,11 +37,18 @@ type StatefulSetList []*apps.StatefulSet
 type ServiceList []*corev1.Service
 
 type genOptions struct {
-	ssNames         map[string]string
-	ssDeployments   map[string]*chiv1.ChiDeployment
-	dRefsMax        chiDeploymentRefs
-	macrosDataIndex map[string]shardsIndex
-	includes        map[string]bool
+	// fullDeploymentIDToFingerprint[fullDeploymentID] = fingerprint
+	fullDeploymentIDToFingerprint map[string]string
+
+	// ssDeployments[fingerprint] = &replica.Deployment
+	ssDeployments map[string]*chiv1.ChiDeployment
+
+	// chiDeploymentCountMap struct with max values from all clusters
+	deploymentCountMax chiDeploymentCountMap
+	macrosData         map[string]macrosDataShardDescriptionList
+
+	// configSection specifies whether additional config files (such as zookeeper, macros) are configuared
+	commonConfigSections map[string]string
 }
 
 type includesObjects []struct {
@@ -49,27 +56,60 @@ type includesObjects []struct {
 	fullpath string
 }
 
-type shardsIndex []*shardsIndexItem
+// macrosDataShardDescriptionList is a list of all shards descriptions
+type macrosDataShardDescriptionList []*macrosDataShardDescription
 
-type shardsIndexItem struct {
-	cluster string
-	index   int
+// macrosDataShardDescription is used in generating macros config file
+// and describes which cluster this shard belongs to and
+// index (1-based, human-friendly and XML-config usable) of this shard within cluster
+// Used to build this:
+//<yandex>
+//    <macros>
+//        <installation>example-02</installation>
+//        <2shard-1repl>example-02-2shard-1repl</02-2shard-1repl>
+//        <2shard-1repl-shard>1 [OWN UNIQUE SHARD ID]</02-2shard-1repl-shard>
+//        <replica>1eb454-1 [OWN UNIQUE ID]</replica>
+//    </macros>
+//</yandex>
+type macrosDataShardDescription struct {
+	clusterName string
+	index       int
 }
 
-type chiClusterDataLink struct {
-	cluster     *chiv1.ChiCluster
-	deployments chiDeploymentRefs
+// chiDeploymentCountMap maps Deployment fingerprint to its usage count
+type chiDeploymentCountMap map[string]int
+
+// mergeInAndReplaceBiggerValues combines chiDeploymentCountMap object with another one
+// and replaces local values with another one's values in case another's value is bigger
+func (d chiDeploymentCountMap) mergeInAndReplaceBiggerValues(another chiDeploymentCountMap) {
+
+	// Loop over another struct and bring in new OR bigger values
+	for key, value := range another {
+		_, ok := d[key]
+
+		if !ok {
+			// No such key - new key/value pair just - include/merge it in
+			d[key] = value
+		} else if value > d[key] {
+			// Have such key, but "another"'s value is bigger, overwrite local value
+			d[key] = value
+		}
+	}
 }
 
-type chiDeploymentRefs map[string]int
-
+// vcTemplatesIndex maps volume claim template name - which is .spec.templates.volumeClaimTemplates.name
+// to "Volume Claim Template"-like structure (simplified).
+// Used to provide dictionary/index for templates
 type vcTemplatesIndex map[string]*vcTemplatesIndexData
 
 type vcTemplatesIndexData struct {
-	useDefaultName bool
-	template       *corev1.PersistentVolumeClaim
+	useDefaultName        bool
+	persistentVolumeClaim *corev1.PersistentVolumeClaim
 }
 
+// podTemplatesIndex maps pod template name - which is .spec.templates.podTemplates.name
+// to "Pod Template"-like structure (simplified).
+// Used to provide dictionary/index for templates
 type podTemplatesIndex map[string]*podTemplatesIndexData
 
 type podTemplatesIndexData struct {
