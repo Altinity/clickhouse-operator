@@ -40,6 +40,7 @@ const (
 const (
 	ssNamePattern           = "chi-%s-i%d"
 	svcNamePattern          = "%s-service"
+	chiSvcNamePattern       = "clickhouse-%s"
 	hostnamePattern         = "%s-0.%[1]s-service.%s.svc.cluster.local"
 	configMapNamePattern    = "chi-%s-configd"
 	vmClickHouseDataPattern = "chi-%s-data"
@@ -88,10 +89,10 @@ type chiConfiguration struct {
 }
 
 type chiDeployment struct {
-	PodTemplateName string            `yaml:"podTemplateName"`
-	Zone            chiDeploymentZone `yaml:"zone"`
-	Scenario        string            `yaml:"scenario"`
-	key             string
+	PodTemplate string            `yaml:"podTemplate"`
+	Zone        chiDeploymentZone `yaml:"zone"`
+	Scenario    string            `yaml:"scenario"`
+	key         string
 }
 
 type chiDeploymentZone struct {
@@ -347,15 +348,31 @@ func (chi *ClickHouseInstallation) createConfigMapObjects(data map[string]string
 	return cmList
 }
 
+// Returns list of services: 
+// one service per pod with internal name, and one service for installation itself that should finally bind to:
+// clickhouse-<installation_name>.<namespace>.svc.cluster.local
 func (chi *ClickHouseInstallation) createServiceObjects(o *genOptions) serviceList {
-	svcList := make(serviceList, 0, len(o.ssNames))
+	svcList := make(serviceList, 0, len(o.ssNames)+1)
+	ports := []serviceSpecPort{
+		{
+			Name: "rpc",
+			Port: 9000,
+		},
+		{
+			Name: "interserver",
+			Port: 9009,
+		},
+		{
+			Name: "rest",
+			Port: 8123,
+		},
+	}
 	for ssName := range o.ssNames {
-		svcName := fmt.Sprintf(svcNamePattern, ssName)
 		svcList = append(svcList, &service{
 			APIVersion: "v1",
 			Kind:       "Service",
 			Metadata: metaData{
-				Name:      svcName,
+				Name:      fmt.Sprintf(svcNamePattern, ssName),
 				Namespace: chi.Metadata.Namespace,
 			},
 			Spec: serviceSpec{
@@ -363,23 +380,25 @@ func (chi *ClickHouseInstallation) createServiceObjects(o *genOptions) serviceLi
 				Selector: map[string]string{
 					"app": ssName,
 				},
-				Ports: []serviceSpecPort{
-					{
-						Name: "rpc",
-						Port: 9000,
-					},
-					{
-						Name: "interserver",
-						Port: 9009,
-					},
-					{
-						Name: "rest",
-						Port: 8123,
-					},
-				},
+				Ports: ports,
 			},
 		})
 	}
+	svcList = append(svcList, &service{
+		APIVersion: "v1",
+		Kind:       "Service",
+		Metadata: metaData{
+			Name:      fmt.Sprintf(chiSvcNamePattern, chi.Metadata.Name),
+			Namespace: chi.Metadata.Namespace,
+		},
+		Spec: serviceSpec{
+			ClusterIP: "None",
+			Selector: map[string]string{
+				"chi": chi.Metadata.Name,
+			},
+			Ports: ports,
+		},
+	})
 	return svcList
 }
 
@@ -619,7 +638,7 @@ func (chi *ClickHouseInstallation) setDefaults() {
 func (d *chiDeployment) toString() string {
 	var keys []string
 	a := make([]string, 0, len(d.Zone.MatchLabels))
-	a = append(a, fmt.Sprintf("%s::%s::", d.Scenario, d.PodTemplateName))
+	a = append(a, fmt.Sprintf("%s::%s::", d.Scenario, d.PodTemplate))
 	for k := range d.Zone.MatchLabels {
 		keys = append(keys, k)
 	}
@@ -635,8 +654,8 @@ func (d *chiDeployment) setDefaults(parent *chiDeployment) {
 		d.Scenario = deploymentScenarioDefault
 		return
 	}
-	if d.PodTemplateName == "" {
-		d.PodTemplateName = parent.PodTemplateName
+	if d.PodTemplate == "" {
+		d.PodTemplate = parent.PodTemplate
 	}
 	if d.Scenario == "" {
 		d.Scenario = parent.Scenario

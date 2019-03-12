@@ -2,6 +2,7 @@ apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
+  namespace: dev
 spec:
   group: clickhouse.altinity.com
   version: v1
@@ -42,7 +43,7 @@ spec:
                             - NodeMonopoly
                           volumeClaimTemplate:
                             type: string
-                          podTemplateName:
+                          podTemplate:
                             type: string
                           zone:
                             type: object
@@ -79,7 +80,7 @@ spec:
                                   - NodeMonopoly
                                 volumeClaimTemplate:
                                   type: string
-                                podTemplateName:
+                                podTemplate:
                                   type: string
                                 zone:
                                   type: object
@@ -115,7 +116,7 @@ spec:
                                         - NodeMonopoly
                                       volumeClaimTemplate:
                                         type: string
-                                      podTemplateName:
+                                      podTemplate:
                                         type: string
                                       zone:
                                         type: object
@@ -161,7 +162,7 @@ spec:
                       - NodeMonopoly
                     volumeClaimTemplate:
                       type: string
-                    podTemplateName:
+                    podTemplate:
                       type: string
                     zone:
                       type: object
@@ -192,9 +193,9 @@ spec:
                     type: object
                     required:
                     - name
-                    - template
+                    - persistentVolumeClaim
                     properties:
                       name:
                         type: string
-                      template:
+                      persistentVolumeClaim:
                         type: object

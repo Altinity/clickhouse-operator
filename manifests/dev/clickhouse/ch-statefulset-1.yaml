@@ -11,9 +11,9 @@ spec:
   - port: 8123
     name: http
   - port: 9000
-    name: native
+    name: client
   - port: 9009
-    name: replication
+    name: interserver
   clusterIP: None
   selector:
     app: clickhouse
@@ -33,6 +33,7 @@ data:
         <macros>
             <shard>1</shard>
             <replica>1</replica>
+            <try>2</try>
         </macros>
     </yandex>
 ---
@@ -117,23 +118,25 @@ spec:
         - containerPort: 8123
           name: http
         - containerPort: 9000
-          name: native
+          name: client
         - containerPort: 9009
-          name: replication
+          name: interserver
         resources:
           requests:
             memory: "1Gi"
             cpu: "0.5"
         volumeMounts:
         - name: etc-clickhouse-server-config-d-common-volume
-          mountPath: /etc/clickhouse-server/config.d/remote_servers.xml
-          subPath: remote_servers.xml
-        - name: etc-clickhouse-server-config-d-common-volume
-          mountPath: /etc/clickhouse-server/config.d/zookeeper.xml
-          subPath: zookeeper.xml
+          mountPath: /etc/clickhouse-server/config.d
+#          mountPath: /etc/clickhouse-server/config.d/remote_servers.xml
+#          subPath: remote_servers.xml
+#        - name: etc-clickhouse-server-config-d-common-volume
+#          mountPath: /etc/clickhouse-server/config.d/zookeeper.xml
+#          subPath: zookeeper.xml
         - name: etc-clickhouse-server-config-d-macros-volume
-          mountPath: /etc/clickhouse-server/config.d/macros.xml
-          subPath: macros.xml
+          mountPath: /etc/clickhouse-server/conf.d
+#          mountPath: /etc/clickhouse-server/config.d/macros.xml
+#          subPath: macros.xml
       volumes:
       - name: etc-clickhouse-server-config-d-common-volume
         configMap:

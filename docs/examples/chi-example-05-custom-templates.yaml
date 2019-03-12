@@ -5,12 +5,12 @@ metadata:
 spec:
   defaults:
     deployment:
-      podTemplateName: customPodTemplate
+      podTemplate: customPodTemplate
       volumeClaimTemplate: customVolumeClaimTemplate
   templates:
     volumeClaimTemplates:
     - name: customVolumeClaimTemplate
-      template:
+      persistentVolumeClaim:
         metadata:
           name: clickhouse-data-test
         spec:

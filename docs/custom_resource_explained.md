@@ -31,7 +31,7 @@ clickhouse-installation-test   23h
       zone:
         matchLabels:
           clickhouse.altinity.com/zone: zone1
-      podTemplateName: clickhouse-installation
+      podTemplate: clickhouse-installation
       volumeClaimTemplate: default
 ```
 `.spec.defaults` section represents default values for sections below.
@@ -116,7 +116,7 @@ expands into
         shardsCount: 3
         replicasCount: 2
       deployment:
-        podTemplateName: clickhouse-installation
+        podTemplate: clickhouse-installation
 #       scanario: Default
 #       zone:
 #         matchLabels:
@@ -187,7 +187,7 @@ with full IP and DNS management provided by k8s and operator.
           matchLabels:
             clickhouse.altinity.com/zone: zone2
 #       scenario: Default
-#       podTemplateName: clickhouse-installation
+#       podTemplate: clickhouse-installation
 #
 #       values inherited from global .spec.deployment section
 #
@@ -234,7 +234,7 @@ In ClickHouse config file this would be represented as:
         type: Standard
         replicasCount: 4 # shardsCount = 1, by default
 #     deployment:
-#       podTemplateName: clickhouse-installation
+#       podTemplate: clickhouse-installation
 #       scanario: Default
 #       zone:
 #         matchLabels:
@@ -286,7 +286,7 @@ Advanced layout provides possibility to explicitly define each shard and replica
 #       zone:
 #         matchLabels:
 #           clickhouse.altinity.com/zone: zone1
-#       podTemplateName: clickhouse-installation
+#       podTemplate: clickhouse-installation
 #
 #       values inherited from global .spec.deployment section
 #
@@ -304,7 +304,7 @@ Provides possibility to specify custom replicas count for this shard
           internalReplication: Disabled
 #         internalReplication: Enabled - default value
           deployment:
-            podTemplateName: clickhouse-installation
+            podTemplate: clickhouse-installation
             zone:
               matchLabels:
                 clickhouse.altinity.com/zone: zone3
@@ -322,7 +322,7 @@ Another example with different number of replicas
 #           zone:
 #             matchLabels:
 #               clickhouse.altinity.com/zone: zone1
-#           podTemplateName: clickhouse-installation
+#           podTemplate: clickhouse-installation
 #  
 #         values inherited from .spec.configuration.clusters[3].deployment section
 #
@@ -337,7 +337,7 @@ Provides possibility to specify custom replicas as array `.spec.configuration.cl
 #           zone:
 #             matchLabels:
 #               clickhouse.altinity.com/zone: zone1
-#           podTemplateName: clickhouse-installation
+#           podTemplate: clickhouse-installation
 #
 #         values inherited from .spec.configuration.clusters[3].deployment section
 #
@@ -348,7 +348,7 @@ Provides possibility to specify custom replicas as array `.spec.configuration.cl
 #             zone:
 #               matchLabels:
 #                 clickhouse.altinity.com/zone: zone1
-#             podTemplateName: clickhouse-installation
+#             podTemplate: clickhouse-installation
 #  
 #           values inherited from .spec.configuration.clusters[3].shards[2].deployment section
 #           
@@ -358,7 +358,7 @@ Provides possibility to specify custom replicas as array `.spec.configuration.cl
                 matchLabels:
                   clickhouse.altinity.com/zone: zone4
                   clickhouse.altinity.com/kind: ssd
-              podTemplateName: clickhouse-installation
+              podTemplate: clickhouse-installation
 ```
 ClickHouse cluster named `customized` represented with `Advanced` layout with 3 shards of 2, 3 and 1 replicas each (6 pods total).
 Pods will be created and fully managed by the operator.

@@ -42,7 +42,7 @@ import (
 )
 
 // Version defines current build version
-const Version = "0.1.4beta"
+const Version = "0.1.6beta"
 
 // Prometheus exporter defaults
 const (
@@ -116,7 +116,7 @@ func createClientsets() (*kube.Clientset, *chopclientset.Clientset) {
 
 	chopClientset, err := chopclientset.NewForConfig(config)
 	if err != nil {
-		glog.Fatalf("Unable to initialize CHI Custom Resource API clientset: %s", err.Error())
+		glog.Fatalf("Unable to initialize clickhouse-operator clientset: %s", err.Error())
 	}
 
 	return kubeClientset, chopClientset
@@ -127,6 +127,7 @@ func Run() {
 	glog.V(1).Infof("Starting clickhouse-operator version '%s'\n", Version)
 
 	// Initializing Prometheus Metrics Exporter
+	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
 	metricsExporter := chopmetrics.CreateExporter()
 	prometheus.MustRegister(metricsExporter)
 	http.Handle(metricsPath, prometheus.Handler())
@@ -163,7 +164,8 @@ func Run() {
 	kubeInformerFactory.Start(ctx.Done())
 	chopInformerFactory.Start(ctx.Done())
 
-	// Starting resource Controller
+	// Starting CHI resource Controller
+	glog.V(1).Info("Starting waitgroup CHI controller\n")
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
