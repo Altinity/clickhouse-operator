@@ -114,7 +114,13 @@ const (
 	// service/svc-1eb454-2  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-2
 	// In this pattern "%s" is substituted with fullDeploymentIDPattern-generated value
 	// Ex.: svc-1eb454-2
-	serviceNamePattern = "chi-%s"
+	podServiceNamePattern = "chi-%s"
+	
+	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
+	// service/svc-1eb454-2  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/chi=test
+	// In this pattern "%s" is substituted with clickhouse installation name
+	// Ex.: test
+	chiServiceNamePattern = "clickhouse-%s"
 
 	// namespaceDomainPattern presents Domain Name pattern of a namespace
 	// In this pattern "%s" is substituted namespace name's value
@@ -130,7 +136,7 @@ const (
 	// 1. pod hostname
 	// 2. nameless service of of stateful set
 	// Ex.: ss-1eb454-2-0.svc-1eb454-2
-	hostnamePlusServicePattern = hostnamePattern + "." + serviceNamePattern
+	hostnamePlusServicePattern = hostnamePattern + "." + podServiceNamePattern
 
 	// podFQDNPattern consists of 3 parts:
 	// 1. pod hostname
