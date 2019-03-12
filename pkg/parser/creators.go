@@ -118,11 +118,45 @@ func createConfigMapObjects(
 
 // createServiceObjects returns a list of corev1.Service objects
 func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions) ServiceList {
-	serviceList := make(ServiceList, 0, len(options.fullDeploymentIDToFingerprint))
+	serviceList := make(ServiceList, 0, 1+len(options.fullDeploymentIDToFingerprint))
+	ports := []corev1.ServicePort{
+		{
+			Name: chDefaultRPCPortName,
+			Port: chDefaultRPCPortNumber,
+		},
+		{
+			Name: chDefaultInterServerPortName,
+			Port: chDefaultInterServerPortNumber,
+		},
+		{
+			Name: chDefaultRestPortName,
+			Port: chDefaultRestPortNumber,
+		},
+	}
+
+	serviceName := CreateChiServiceName(chi.Name)
+	serviceList = append(serviceList, &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: chi.Namespace,
+			Labels: map[string]string{
+				ChopGeneratedLabel: chi.Name,
+				CHIGeneratedLabel:  chi.Name,
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			ClusterIP: templateDefaultsServiceClusterIP,
+			Selector: map[string]string{
+				CHIGeneratedLabel: chi.Name,
+			},
+			Ports: ports,
+		},
+	})
+	glog.Infof("createServiceObjects() for service %s\n", serviceName)
 
 	for fullDeploymentID := range options.fullDeploymentIDToFingerprint {
 		statefulSetName := CreateStatefulSetName(fullDeploymentID)
-		serviceName := CreateServiceName(fullDeploymentID)
+		serviceName := CreatePodServiceName(fullDeploymentID)
 
 		// Add corev1.Service object to the list
 		serviceList = append(serviceList, &corev1.Service{
@@ -139,20 +173,7 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions
 				Selector: map[string]string{
 					chDefaultAppLabel: statefulSetName,
 				},
-				Ports: []corev1.ServicePort{
-					{
-						Name: chDefaultRPCPortName,
-						Port: chDefaultRPCPortNumber,
-					},
-					{
-						Name: chDefaultInterServerPortName,
-						Port: chDefaultInterServerPortNumber,
-					},
-					{
-						Name: chDefaultRestPortName,
-						Port: chDefaultRestPortNumber,
-					},
-				},
+				Ports: ports,
 			},
 		})
 		glog.Infof("createServiceObjects() for service %s\n", serviceName)
@@ -192,7 +213,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 	for fullDeploymentID, fingerprint := range options.fullDeploymentIDToFingerprint {
 
 		statefulSetName := CreateStatefulSetName(fullDeploymentID)
-		serviceName := CreateServiceName(fullDeploymentID)
+		serviceName := CreatePodServiceName(fullDeploymentID)
 		configMapMacrosName := CreateConfigMapMacrosName(chi.Name, fullDeploymentID)
 		volumeClaimTemplate := options.ssDeployments[fingerprint].VolumeClaimTemplate
 		podTemplate := options.ssDeployments[fingerprint].PodTemplate
@@ -411,10 +432,16 @@ func CreateConfigMapCommonName(chiName string) string {
 	return fmt.Sprintf(configMapCommonNamePattern, chiName)
 }
 
-// CreateServiceName creates a name of a Service resource
+// CreatePodServiceName creates a name of a pod Service resource
 // prefix is a fullDeploymentID
-func CreateServiceName(prefix string) string {
-	return fmt.Sprintf(serviceNamePattern, prefix)
+func CreatePodServiceName(prefix string) string {
+	return fmt.Sprintf(podServiceNamePattern, prefix)
+}
+
+// CreateInstServiceName creates a name of a Installation Service resource
+// prefix is a fullDeploymentID
+func CreateChiServiceName(prefix string) string {
+	return fmt.Sprintf(chiServiceNamePattern, prefix)
 }
 
 // CreateStatefulSetName creates a name of a StatefulSet resource
