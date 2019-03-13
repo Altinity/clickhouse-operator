@@ -57,6 +57,11 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect implements prometheus.Collector Collect method
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+	if (ch == nil) {
+		glog.Info("Prometheus channel is closed. Skipping")
+		return
+	}
+	
 	e.mutex.Lock()
 	defer func() {
 		e.mutex.Unlock()
@@ -117,7 +122,7 @@ func writeMetricsDataToPrometheus(out chan<- prometheus.Metric, data [][]string,
 	for _, metric := range data {
 		var metricType prometheus.ValueType
 		if metric[3] == "counter" { metricType = prometheus.CounterValue } else { metricType = prometheus.GaugeValue }
-		writeSingleMetricToPrometheus(out, metric[0], metric[1], metric[2], metricType,
+		writeSingleMetricToPrometheus(out, convertMetricName(metric[0]), metric[2], metric[1], metricType,
 			[]string{"chi","hostname"}, 
 			chiname, hostname)
 	}
@@ -147,11 +152,15 @@ func writeTableSizesDataToPrometheus(out chan<- prometheus.Metric, data [][]stri
 
 func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, desc string, value string, metricType prometheus.ValueType, labels []string, labelValues ...string) {
 	floatValue, _ := strconv.ParseFloat(value, 64)
-	m, _ := prometheus.NewConstMetric(
+	m, err := prometheus.NewConstMetric(
 			newDescription(name, desc, labels),
 			metricType,
 			floatValue,
 			labelValues...)
+	if (err != nil) {
+		glog.Infof("Error creating metric %s: %s", name, err)
+		return
+	}
 	select {
 		case out <- m:
 		
@@ -224,9 +233,9 @@ func newDescription(name, help string, labels []string) *prometheus.Desc {
 	)
 }
 
-// metricName converts the given string to snake case following the Golang format:
+// convertMetricName converts the given string to snake case following the Golang format:
 // acronyms are converted to lower-case and preceded by an underscore.
-func metricName(in string) string {
+func convertMetricName(in string) string {
 	runes := []rune(in)
 	length := len(runes)
 
