@@ -138,7 +138,7 @@ func generateRemoteServersConfigReplicaHostname(chi *chiv1.ClickHouseInstallatio
 		// .my-dev-namespace.svc.cluster.local
 		namespaceDomainName = "." + CreateNamespaceDomainName(chi.Namespace)
 	}
-	return CreatePodHostnamePlusService(fullDeploymentID) + namespaceDomainName
+	return CreatePodHostname(fullDeploymentID) + namespaceDomainName
 }
 
 // generateRemoteServersConfig creates "remote_servers.xml" content and calculates data generation parameters for other sections

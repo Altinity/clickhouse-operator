@@ -145,11 +145,12 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions
 			},
 		},
 		Spec: corev1.ServiceSpec{
-			ClusterIP: templateDefaultsServiceClusterIP,
+			// ClusterIP: templateDefaultsServiceClusterIP,
 			Selector: map[string]string{
 				CHIGeneratedLabel: chi.Name,
 			},
 			Ports: ports,
+			Type: "LoadBalancer",
 		},
 	})
 	glog.Infof("createServiceObjects() for service %s\n", serviceName)
@@ -169,11 +170,12 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions
 				},
 			},
 			Spec: corev1.ServiceSpec{
-				ClusterIP: templateDefaultsServiceClusterIP,
+				// ClusterIP: templateDefaultsServiceClusterIP,
 				Selector: map[string]string{
 					chDefaultAppLabel: statefulSetName,
 				},
 				Ports: ports,
+				Type: "LoadBalancer",
 			},
 		})
 		glog.Infof("createServiceObjects() for service %s\n", serviceName)
@@ -454,14 +456,7 @@ func CreateStatefulSetName(prefix string) string {
 // prefix is a fullDeploymentID
 // ss-1eb454-2-0
 func CreatePodHostname(prefix string) string {
-	return fmt.Sprintf(hostnamePattern, prefix)
-}
-
-// CreatePodHostnamePlusService creates a name of a Pod resource within namespace
-// prefix is a fullDeploymentID
-// ss-1eb454-2-0.svc-1eb454-2
-func CreatePodHostnamePlusService(prefix string) string {
-	return fmt.Sprintf(hostnamePlusServicePattern, prefix, prefix)
+	return fmt.Sprintf(podHostnamePattern, prefix)
 }
 
 // CreateNamespaceDomainName creates domain name of a namespace
@@ -472,11 +467,10 @@ func CreateNamespaceDomainName(chiNamespace string) string {
 
 // CreatePodFQDN creates a fully qualified domain name of a pod
 // prefix is a fullDeploymentID
-// ss-1eb454-2-0.svc-1eb454-2.my-dev-domain.svc.cluster.local
+// ss-1eb454-2-0.my-dev-domain.svc.cluster.local
 func CreatePodFQDN(chiNamespace, prefix string) string {
 	return fmt.Sprintf(
 		podFQDNPattern,
-		prefix,
 		prefix,
 		chiNamespace,
 	)
