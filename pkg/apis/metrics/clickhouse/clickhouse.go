@@ -21,11 +21,17 @@ import (
 	neturl "net/url"
 	"strings"
 	"time"
+	"github.com/golang/glog"
 )
 
 const (
-	queryMetricsSQL = "SELECT metric, cast(value as Float64) AS value FROM system.asynchronous_metrics " +
-		"UNION ALL SELECT metric, cast(value as Float64) AS value FROM system.metrics"
+	queryMetricsSQL = `
+	SELECT metric, toString(value), '' AS descriptio, 'gauge' as type FROM system.asynchronous_metrics
+	UNION ALL SELECT metric, toString(value), description, 'gauge' as type FROM system.metrics
+	UNION ALL SELECT event as metric, toString(value), description, 'counter' as type FROM system.events`
+	queryTableSizesSQL = `select database, table, 
+	uniq(partition) as partitions, count() as parts, sum(bytes) as bytes, sum(data_uncompressed_bytes) uncompressed_bytes, sum(rows) as rows 
+	from system.parts where active = 1 group by database, table`
 )
 
 const (
@@ -34,15 +40,28 @@ const (
 	chQueryDefaultTimeout = 10 * time.Second
 )
 
-// QueryMetricsFromCH requests metrics data from the ClickHouse database using REST interface
+// queryMetrics requests metrics data from the ClickHouse database using REST interface
 // data is a concealed output
-func QueryMetricsFromCH(data map[string]string, hostname string) error {
+func QueryMetrics(data *[][]string, hostname string) error {
+	return ClickHouseQuery(data, queryMetricsSQL, hostname)
+}
+
+// queryTableSizes requests data sizes from the ClickHouse database using REST interface
+// data is a concealed output
+func QueryTableSizes(data *[][]string, hostname string) error {
+	return ClickHouseQuery(data, queryTableSizesSQL, hostname)
+}
+
+// clickhouseQuery runs given sql and writes results into data
+func ClickHouseQuery(data *[][]string, sql string, hostname string) error {
 	url, err := neturl.Parse(fmt.Sprintf(chQueryUrlPattern, hostname))
 	if err != nil {
 		return err
 	}
-	encodeQuery(url, queryMetricsSQL)
-	return httpCall(data, url.String())
+	encodeQuery(url, sql)
+	httpCall(data, url.String())
+	// glog.Infof("Loaded %d rows", len(*data))
+	return nil
 }
 
 // encodeQuery injects SQL command into url.URL query
@@ -53,21 +72,25 @@ func encodeQuery(url *neturl.URL, sql string) {
 }
 
 // httpCall runs HTTP request using provided URL
-func httpCall(results map[string]string, url string) (err error) {
+func httpCall(results *[][]string, url string) (err error) {
+	// glog.Infof("HTTP GET %s\n", url)
 	client := &http.Client{
 		Timeout: time.Duration(chQueryDefaultTimeout),
 	}
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
+		glog.Error(err)
 		return err
 	}
 	response, err := client.Do(request)
 	if err != nil {
+		glog.Error(err)
 		return err
 	}
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
+		glog.Error(err)
 		return err
 	}
 
@@ -76,8 +99,9 @@ func httpCall(results map[string]string, url string) (err error) {
 		if len(pairs) < 2 {
 			continue
 		}
-		results[pairs[0]] = pairs[1]
+		*results = append(*results, pairs)
 	}
+	// glog.Infof("Loaded %d rows", len(*results))
 
 	return nil
 }

@@ -357,6 +357,10 @@ func (c *Controller) syncNewChi(chi *chop.ClickHouseInstallation) error {
 	}
 
 	glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
+	
+	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
+	c.metricsExporter.EnsureControlledValues(chi.Name, chopparser.ListPodFQDNs(chi))
+
 	return nil
 }
 
@@ -368,10 +372,8 @@ func (c *Controller) syncKnownChi(chi *chop.ClickHouseInstallation) error {
 	chi, _ = c.createCHIResources(chi)
 	c.updateCHIResource(chi)
 
-	podFQDNs := chopparser.ListPodFQDNs(chi)
-
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
-	c.metricsExporter.EnsureControlledValues(chi.Name, podFQDNs)
+	c.metricsExporter.EnsureControlledValues(chi.Name, chopparser.ListPodFQDNs(chi))
 
 	return nil
 }

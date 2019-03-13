@@ -17,6 +17,8 @@ package metrics
 import (
 	"strconv"
 	"sync"
+	"unicode"
+	"strings"
 
 	clickhouse "github.com/altinity/clickhouse-operator/pkg/apis/metrics/clickhouse"
 
@@ -27,11 +29,6 @@ import (
 const (
 	namespace = "chi"
 	subsystem = "clickhouse"
-)
-
-const (
-	chiLabel      = namespace
-	instanceLabel = "hostname"
 )
 
 // Exporter implements prometheus.Collector interface
@@ -46,16 +43,6 @@ type chInstallationData struct {
 	hostnames []string
 }
 
-// newDescription creates a new prometheus.Desc object
-func newDescription(name, help string) *prometheus.Desc {
-	return prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, subsystem, name),
-		help,
-		[]string{chiLabel, instanceLabel},
-		nil,
-	)
-}
-
 // CreateExporter returns a new instance of Exporter type
 func CreateExporter() *Exporter {
 	return &Exporter{
@@ -65,9 +52,7 @@ func CreateExporter() *Exporter {
 
 // Describe implements prometheus.Collector Describe method
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
-	for key := range clickhouseMetricsDescriptions {
-		ch <- clickhouseMetricsDescriptions[key]
-	}
+	prometheus.DescribeByCollect(e, ch)
 }
 
 // Collect implements prometheus.Collector Collect method
@@ -85,53 +70,93 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		})
 	}()
 
-	wg := &sync.WaitGroup{}
+	glog.Info("Starting Collect")
+	var wg = sync.WaitGroup{}
 	// Getting hostnames of Pods and requesting the metrics data from ClickHouse instances within
 	for chiName := range e.chInstallations {
 		// Loop over all hostnames of this installation
-		for i := range e.chInstallations[chiName].hostnames {
+		glog.Infof("Collecting metrics for %s\n", chiName)
+		for _, hostname := range e.chInstallations[chiName].hostnames {
 			wg.Add(1)
 			go func(name, hostname string, c chan<- prometheus.Metric) {
 				defer wg.Done()
 
-				metricsData := make(map[string]string)
-				if err := clickhouse.QueryMetricsFromCH(metricsData, hostname); err != nil {
+				glog.Infof("Querying metrics for %s\n", hostname)
+				metricsData := make([][]string,0)
+				if err := clickhouse.QueryMetrics(&metricsData, hostname); err != nil {
 					// In case of an error fetching data from clickhouse store CHI name in e.cleanup
+					glog.Infof("Error querying metrics for %s: %s\n", hostname, err)
 					e.cleanup.Store(name, struct{}{})
 					return
 				}
-
-				// Data collected from clickhouse successfully
+				glog.Infof("Extracted %d metrics for %s\n", len(metricsData), hostname)
 				writeMetricsDataToPrometheus(c, metricsData, name, hostname)
-			}(chiName, e.chInstallations[chiName].hostnames[i], ch)
+				
+				glog.Infof("Querying table sizes for %s\n", hostname)
+				tableSizes := make([][]string,0)
+				if err := clickhouse.QueryTableSizes(&tableSizes, hostname); err != nil {
+					// In case of an error fetching data from clickhouse store CHI name in e.cleanup
+					glog.Infof("Error querying table sizes for %s: %s\n", hostname, err)
+					e.cleanup.Store(name, struct{}{})
+					return
+				}
+				glog.Infof("Extracted %d table sizes for %s\n", len(tableSizes), hostname)
+				writeTableSizesDataToPrometheus(c, tableSizes, name, hostname)
+				
+			}(chiName, hostname, ch)
 		}
 	}
 	wg.Wait()
+	glog.Info("Finished Collect")
 }
 
-// writeMetricsDataToPrometheus pushes set of prometheus.Metric objects created from the ClickHouse system data
-func writeMetricsDataToPrometheus(out chan<- prometheus.Metric, data map[string]string, chiname, hostname string) {
-	for metric := range metricsNames {
-		// Data extracted from clickhouse is of type "string" - need to convert to float, expected by Prometheus
-		var floatValue float64
-		stringValue, ok := data[metricsNames[metric]]
-		if ok {
-			// Value reported by clickhouse
-			floatValue, _ = strconv.ParseFloat(stringValue, 64)
-		} else {
-			// Value is not reported by clickhouse
-			continue
-		}
 
-		// Push metric into Prometheus's chan
-		m, _ := prometheus.NewConstMetric(
-			clickhouseMetricsDescriptions[metric],
-			prometheus.GaugeValue,
+// writeMetricsDataToPrometheus pushes set of prometheus.Metric objects created from the ClickHouse system data
+// Expected data structure: metric, value, description, type (gauge|counter)
+func writeMetricsDataToPrometheus(out chan<- prometheus.Metric, data [][]string, chiname, hostname string) {
+	for _, metric := range data {
+		var metricType prometheus.ValueType
+		if metric[3] == "counter" { metricType = prometheus.CounterValue } else { metricType = prometheus.GaugeValue }
+		writeSingleMetricToPrometheus(out, metric[0], metric[1], metric[2], metricType,
+			[]string{"chi","hostname"}, 
+			chiname, hostname)
+	}
+}
+
+// writeTableSizesDataToPrometheus pushes set of prometheus.Metric objects created from the ClickHouse system data
+// Expected data structure: database, table, partitions, parts, bytes, uncompressed_bytes, rows
+func writeTableSizesDataToPrometheus(out chan<- prometheus.Metric, data [][]string, chiname, hostname string) {
+	for _, metric := range data {
+		writeSingleMetricToPrometheus(out, "table_partitions", "Number of partitions of the table", metric[2], prometheus.GaugeValue,
+			[]string{"chi","hostname","database","table"}, 
+			chiname, hostname, metric[0], metric[1])
+		writeSingleMetricToPrometheus(out, "table_parts", "Number of parts of the table", metric[3], prometheus.GaugeValue,
+			[]string{"chi","hostname","database","table"}, 
+			chiname, hostname, metric[0], metric[1])
+		writeSingleMetricToPrometheus(out, "table_parts_bytes", "Table size in bytes", metric[4], prometheus.GaugeValue,
+			[]string{"chi","hostname","database","table"}, 
+			chiname, hostname, metric[0], metric[1])
+		writeSingleMetricToPrometheus(out, "table_parts_bytes_uncompressed", "Table size in bytes uncompressed", metric[5], prometheus.GaugeValue, 
+			[]string{"chi","hostname","database","table"}, 
+			chiname, hostname, metric[0], metric[1])
+		writeSingleMetricToPrometheus(out, "table_parts_rows", "Number of rows in the table", metric[6], prometheus.GaugeValue,
+			[]string{"chi","hostname","database","table"}, 
+			chiname, hostname, metric[0], metric[1])
+	}
+}
+
+func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, desc string, value string, metricType prometheus.ValueType, labels []string, labelValues ...string) {
+	floatValue, _ := strconv.ParseFloat(value, 64)
+	m, _ := prometheus.NewConstMetric(
+			newDescription(name, desc, labels),
+			metricType,
 			floatValue,
-			chiname,  // labelValues ...string
-			hostname, // labelValues ...string
-		)
-		out <- m
+			labelValues...)
+	select {
+		case out <- m:
+		
+		default: 
+			glog.Infof("Error sending metric to the channel %s", name)
 	}
 }
 
@@ -187,4 +212,31 @@ func (e *Exporter) EnsureControlledValues(chiName string, hostnames []string) {
 		glog.V(2).Infof("ClickHouseInstallation (%q): including hostnames into chopmetrics.Exporter", chiName)
 		e.UpdateControlledState(chiName, hostnames)
 	}
+}
+
+// newDescription creates a new prometheus.Desc object
+func newDescription(name, help string, labels []string) *prometheus.Desc {
+	return prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, subsystem, name),
+		help,
+		labels,
+		nil,
+	)
+}
+
+// metricName converts the given string to snake case following the Golang format:
+// acronyms are converted to lower-case and preceded by an underscore.
+func metricName(in string) string {
+	runes := []rune(in)
+	length := len(runes)
+
+	var out []rune
+	for i := 0; i < length; i++ {
+		if i > 0 && unicode.IsUpper(runes[i]) && ((i+1 < length && unicode.IsLower(runes[i+1])) || unicode.IsLower(runes[i-1])) {
+			out = append(out, '_')
+		}
+		out = append(out, unicode.ToLower(runes[i]))
+	}
+
+	return strings.Replace(string(out), ".", "_", -1)
 }
