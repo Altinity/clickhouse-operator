@@ -3,6 +3,20 @@ kind: ConfigMap
 metadata:
   name: etc-clickhouse-server-config-d-common
 data:
+  docker_related_config.xml: |-
+    <yandex>
+         <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
+        <listen_host>::</listen_host>
+        <listen_host>0.0.0.0</listen_host>
+        <listen_try>1</listen_try>
+
+        <!--
+        <logger>
+            <console>1</console>
+        </logger>
+        -->
+    </yandex>
+
   zookeeper.xml: |-
     <yandex>
         <zookeeper>
@@ -21,14 +35,7 @@ data:
                 <shard>
                     <replica>
                         <!-- chpod1 -->
-                        <host>chpod1.chpod-hs.default.svc.cluster.local</host>
-                        <port>9000</port>
-                    </replica>
-                </shard>
-                <shard>
-                    <replica>
-                        <!-- chpod2 -->
-                        <host>chpod2.chpod-hs.default.svc.cluster.local</host>
+                        <host>ch-stateful-set-1-0.ch-node-hs-1</host>
                         <port>9000</port>
                     </replica>
                 </shard>
@@ -39,25 +46,15 @@ data:
                     <internal_replication>true</internal_replication>
                     <replica>
                         <!-- chpod1 -->
-                        <host>chpod1.chpod-hs.default.svc.cluster.local</host>
-                        <port>9000</port>
-                    </replica>
-                    <replica>
-                        <!-- chpod3 -->
-                        <host>chpod3.chpod-hs.default.svc.cluster.local</host>
+                        <host>ch-stateful-set-1-0.ch-node-hs-1</host>
                         <port>9000</port>
                     </replica>
                 </shard>
                 <shard>
                     <internal_replication>true</internal_replication>
                     <replica>
-                        <!-- chpod2 -->
-                        <host>chpod2.chpod-hs.default.svc.cluster.local</host>
-                        <port>9000</port>
-                    </replica>
-                    <replica>
-                        <!-- chpod4 -->
-                        <host>chpod4.chpod-hs.default.svc.cluster.local</host>
+                        <!-- chpod1 -->
+                        <host>ch-stateful-set-1-0.ch-node-hs-1</host>
                         <port>9000</port>
                     </replica>
                 </shard>

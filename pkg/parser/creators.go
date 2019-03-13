@@ -118,22 +118,27 @@ func createConfigMapObjects(
 
 // createServiceObjects returns a list of corev1.Service objects
 func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions) ServiceList {
+	// We'd like to create "number of deployments" + 1 number of service to provide access
+	// to each deployment separately and one common predictably-named access point - common service
 	serviceList := make(ServiceList, 0, 1+len(options.fullDeploymentIDToFingerprint))
 	ports := []corev1.ServicePort{
 		{
-			Name: chDefaultRPCPortName,
-			Port: chDefaultRPCPortNumber,
+			Name: chDefaultClientPortName,
+			Port: chDefaultClientPortNumber,
 		},
 		{
 			Name: chDefaultInterServerPortName,
 			Port: chDefaultInterServerPortNumber,
 		},
 		{
-			Name: chDefaultRestPortName,
-			Port: chDefaultRestPortNumber,
+			Name: chDefaultHTTPPortName,
+			Port: chDefaultHTTPPortNumber,
 		},
 	}
 
+	// Create one predictably-named service to access the whole installation
+	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
+	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
 	serviceName := CreateChiServiceName(chi.Name)
 	serviceList = append(serviceList, &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -155,6 +160,9 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions
 	})
 	glog.Infof("createServiceObjects() for service %s\n", serviceName)
 
+	// Create "number of deployments" service - one service for each stateful set
+	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
+	// service/chi-01a1ce7dce-2         ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
 	for fullDeploymentID := range options.fullDeploymentIDToFingerprint {
 		statefulSetName := CreateStatefulSetName(fullDeploymentID)
 		serviceName := CreatePodServiceName(fullDeploymentID)
@@ -191,10 +199,10 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 
 	// Templates index maps template name to (simplified) template itself
 	// Used to provide names access to templates
-	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
 	podTemplatesIndex := createPodTemplatesIndex(chi)
+	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
 
-	// List of mount points - do not allocate any items, they'll be appended
+	// List of volume mounts of the .container - do not allocate any items, they'll be appended
 	commonVolumeMounts := make([]corev1.VolumeMount, 0)
 	// Add common config volume mount at first
 	// Personal macros would be added later
@@ -217,8 +225,8 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 		statefulSetName := CreateStatefulSetName(fullDeploymentID)
 		serviceName := CreatePodServiceName(fullDeploymentID)
 		configMapMacrosName := CreateConfigMapMacrosName(chi.Name, fullDeploymentID)
-		volumeClaimTemplate := options.ssDeployments[fingerprint].VolumeClaimTemplate
 		podTemplate := options.ssDeployments[fingerprint].PodTemplate
+		volumeClaimTemplate := options.ssDeployments[fingerprint].VolumeClaimTemplate
 
 		// Copy list of shared corev1.VolumeMount objects into new slice
 		commonVolumeMountsNum := len(commonVolumeMounts)
@@ -336,8 +344,11 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 						Name:      chDefaultVolumeMountNameData,
 						MountPath: fullPathClickHouseData,
 					})
+				glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, volumeClaimTemplate)
 			}
-			glog.Infof("createStatefulSetObjects() for statefulSet %s - vc template: %s\n", statefulSetName, volumeClaimTemplate)
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template: %s\n", statefulSetName, volumeClaimTemplate)
+		} else {
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - no VC templates\n", statefulSetName)
 		}
 
 		// Append apps.StatefulSet to the list of stateful sets
@@ -373,16 +384,16 @@ func createDefaultContainerTemplate(
 		Image: chDefaultDockerImage,
 		Ports: []corev1.ContainerPort{
 			{
-				Name:          chDefaultRPCPortName,
-				ContainerPort: chDefaultRPCPortNumber,
+				Name:          chDefaultHTTPPortName,
+				ContainerPort: chDefaultHTTPPortNumber,
+			},
+			{
+				Name:          chDefaultClientPortName,
+				ContainerPort: chDefaultClientPortNumber,
 			},
 			{
 				Name:          chDefaultInterServerPortName,
 				ContainerPort: chDefaultInterServerPortNumber,
-			},
-			{
-				Name:          chDefaultRestPortName,
-				ContainerPort: chDefaultRestPortNumber,
 			},
 		},
 		VolumeMounts: volumeMounts,
@@ -396,13 +407,13 @@ func createVolumeClaimTemplatesIndex(chi *chiv1.ClickHouseInstallation) vcTempla
 		// Convenience wrapper
 		volumeClaimTemplate := &chi.Spec.Templates.VolumeClaimTemplates[i]
 
-		flag := false
-		if volumeClaimTemplate.PersistentVolumeClaim.Name == useDefaultNamePlaceholder {
+		useDefaultName := false
+		if volumeClaimTemplate.PersistentVolumeClaim.Name == useDefaultPersistentVolumeClaimMacro {
 			volumeClaimTemplate.PersistentVolumeClaim.Name = chDefaultVolumeMountNameData
-			flag = true
+			useDefaultName = true
 		}
 		index[volumeClaimTemplate.Name] = &vcTemplatesIndexData{
-			useDefaultName:        flag,
+			useDefaultName:        useDefaultName,
 			persistentVolumeClaim: &volumeClaimTemplate.PersistentVolumeClaim,
 		}
 	}

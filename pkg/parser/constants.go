@@ -117,8 +117,8 @@ const (
 	podServiceNamePattern = "chi-%s"
 	
 	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
-	// service/svc-1eb454-2  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/chi=test
-	// In this pattern "%s" is substituted with clickhouse installation name
+	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
+	// In this pattern "%s" is substituted with clickhouse installation name - 'replcluster' in this case
 	// Ex.: test
 	chiServiceNamePattern = "clickhouse-%s"
 
@@ -159,16 +159,16 @@ const (
 )
 
 const (
-	useDefaultNamePlaceholder = "USE_DEFAULT_NAME"
+	useDefaultPersistentVolumeClaimMacro = "USE_DEFAULT_NAME"
 )
 
 const (
-	chDefaultRPCPortName           = "rpc"
-	chDefaultRPCPortNumber         = 9000
+	chDefaultHTTPPortName          = "rest"
+	chDefaultHTTPPortNumber        = 8123
+	chDefaultClientPortName        = "rpc"
+	chDefaultClientPortNumber      = 9000
 	chDefaultInterServerPortName   = "interserver"
 	chDefaultInterServerPortNumber = 9009
-	chDefaultRestPortName          = "rest"
-	chDefaultRestPortNumber        = 8123
 	chDefaultAppLabel              = clickhousealtinitycom.GroupName + "/app"
 )
 
