@@ -75,11 +75,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	// Getting hostnames of Pods and requesting the metrics data from ClickHouse instances within
 	for chiName := range e.chInstallations {
 		// Loop over all hostnames of this installation
-<<<<<<< HEAD
 		glog.Infof("Collecting metrics for %s\n", chiName)
-=======
-		glog.Infof("Collect metrics for %s\n", chiName)
->>>>>>> branch 'master' of https://github.com/alex-zaitsev/clickhouse-operator
 		for _, hostname := range e.chInstallations[chiName].hostnames {
 			wg.Add(1)
 			go func(name, hostname string, c chan<- prometheus.Metric) {
