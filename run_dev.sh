@@ -18,7 +18,7 @@ if ./build_binary.sh; then
 # -stderrthreshold=FATAL Log events at or above this severity are logged to standard	error as well as to files
 
     # And clean binary after run. It'll be rebuilt next time
-    rm -f ./clickhouse-operator
+    ./clean_binary.sh
 else
     echo "unable to build clickhouse-operator"
 fi

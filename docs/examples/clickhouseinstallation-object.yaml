@@ -186,12 +186,19 @@ spec:
       persistentVolumeClaim:
         metadata:
           name: clickhouse-data-test
+          # namespace: testnamespace
         spec:
+          # 1. if  storageClassName is not specified, default StorageClass
+          # (must be specified by cluster administrator) would be used for provisioning
+          # 2. if storageClassName is set to an empty string (‘’), no storage class will be used
+          # dynamic provisioning is disabled for this PVC. Existing, “Available”, PVs
+          # (that do not have a specified storageClassName) will be considered for binding to the PVC
+          #storageClassName: gold
           accessModes:
           - ReadWriteOnce
           resources:
             requests:
-              storage: 100Mi
+              storage: 1Gi
     podTemplates:
     # multiple pod templates makes possible to update version smoothly
     # pod template for ClickHouse v18.16.1

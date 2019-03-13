@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1G
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+  - name: nginx
+    image: k8s.gcr.io/nginx-slim:0.8
+    ports:
+    - containerPort: 80
+      name: web
+    volumeMounts:
+    # references .spec.volumes[0]
+    - name: www
+      mountPath: /usr/share/nginx/html
+  volumes:
+    # references PersistentVolumeClaim
+  - name: www
+    persistentVolumeClaim:
+      claimName: myclaim
