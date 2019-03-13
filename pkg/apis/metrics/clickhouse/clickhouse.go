@@ -35,8 +35,7 @@ const (
 )
 
 const (
-	// chQueryUrlPattern     = "http://%s:8123/"
-	chQueryUrlPattern = "http://chdw1-1.sde378.mycmdb.net:8123/?user=dw&password=webamg2005&abc=def"
+	chQueryUrlPattern     = "http://%s:8123/"
 	chQueryUrlParam       = "query"
 	chQueryDefaultTimeout = 10 * time.Second
 )
