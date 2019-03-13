@@ -118,6 +118,8 @@ func createConfigMapObjects(
 
 // createServiceObjects returns a list of corev1.Service objects
 func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions) ServiceList {
+	// We'd like to create "number of deployments" + 1 number of service to provide access
+	// to each deployment separately and one common predictably-named access point - common service
 	serviceList := make(ServiceList, 0, 1+len(options.fullDeploymentIDToFingerprint))
 	ports := []corev1.ServicePort{
 		{
@@ -134,6 +136,9 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions
 		},
 	}
 
+	// Create one predictably-named service to access the whole installation
+	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
+	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
 	serviceName := CreateChiServiceName(chi.Name)
 	serviceList = append(serviceList, &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -154,6 +159,9 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions
 	})
 	glog.Infof("createServiceObjects() for service %s\n", serviceName)
 
+	// Create "number of deployments" service - one service for each stateful set
+	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
+	// service/chi-01a1ce7dce-2         ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
 	for fullDeploymentID := range options.fullDeploymentIDToFingerprint {
 		statefulSetName := CreateStatefulSetName(fullDeploymentID)
 		serviceName := CreatePodServiceName(fullDeploymentID)

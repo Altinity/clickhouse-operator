@@ -117,8 +117,8 @@ const (
 	podServiceNamePattern = "chi-%s"
 	
 	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
-	// service/svc-1eb454-2  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/chi=test
-	// In this pattern "%s" is substituted with clickhouse installation name
+	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
+	// In this pattern "%s" is substituted with clickhouse installation name - 'replcluster' in this case
 	// Ex.: test
 	chiServiceNamePattern = "clickhouse-%s"
 
