@@ -123,16 +123,16 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions
 	serviceList := make(ServiceList, 0, 1+len(options.fullDeploymentIDToFingerprint))
 	ports := []corev1.ServicePort{
 		{
-			Name: chDefaultRPCPortName,
-			Port: chDefaultRPCPortNumber,
+			Name: chDefaultClientPortName,
+			Port: chDefaultClientPortNumber,
 		},
 		{
 			Name: chDefaultInterServerPortName,
 			Port: chDefaultInterServerPortNumber,
 		},
 		{
-			Name: chDefaultRestPortName,
-			Port: chDefaultRestPortNumber,
+			Name: chDefaultHTTPPortName,
+			Port: chDefaultHTTPPortNumber,
 		},
 	}
 
@@ -197,10 +197,10 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 
 	// Templates index maps template name to (simplified) template itself
 	// Used to provide names access to templates
-	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
 	podTemplatesIndex := createPodTemplatesIndex(chi)
+	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
 
-	// List of mount points - do not allocate any items, they'll be appended
+	// List of volume mounts of the .container - do not allocate any items, they'll be appended
 	commonVolumeMounts := make([]corev1.VolumeMount, 0)
 	// Add common config volume mount at first
 	// Personal macros would be added later
@@ -223,8 +223,8 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 		statefulSetName := CreateStatefulSetName(fullDeploymentID)
 		serviceName := CreatePodServiceName(fullDeploymentID)
 		configMapMacrosName := CreateConfigMapMacrosName(chi.Name, fullDeploymentID)
-		volumeClaimTemplate := options.ssDeployments[fingerprint].VolumeClaimTemplate
 		podTemplate := options.ssDeployments[fingerprint].PodTemplate
+		volumeClaimTemplate := options.ssDeployments[fingerprint].VolumeClaimTemplate
 
 		// Copy list of shared corev1.VolumeMount objects into new slice
 		commonVolumeMountsNum := len(commonVolumeMounts)
@@ -342,8 +342,11 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genOpt
 						Name:      chDefaultVolumeMountNameData,
 						MountPath: fullPathClickHouseData,
 					})
+				glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, volumeClaimTemplate)
 			}
-			glog.Infof("createStatefulSetObjects() for statefulSet %s - vc template: %s\n", statefulSetName, volumeClaimTemplate)
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template: %s\n", statefulSetName, volumeClaimTemplate)
+		} else {
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - no VC templates\n", statefulSetName)
 		}
 
 		// Append apps.StatefulSet to the list of stateful sets
@@ -379,16 +382,16 @@ func createDefaultContainerTemplate(
 		Image: chDefaultDockerImage,
 		Ports: []corev1.ContainerPort{
 			{
-				Name:          chDefaultRPCPortName,
-				ContainerPort: chDefaultRPCPortNumber,
+				Name:          chDefaultHTTPPortName,
+				ContainerPort: chDefaultHTTPPortNumber,
+			},
+			{
+				Name:          chDefaultClientPortName,
+				ContainerPort: chDefaultClientPortNumber,
 			},
 			{
 				Name:          chDefaultInterServerPortName,
 				ContainerPort: chDefaultInterServerPortNumber,
-			},
-			{
-				Name:          chDefaultRestPortName,
-				ContainerPort: chDefaultRestPortNumber,
 			},
 		},
 		VolumeMounts: volumeMounts,
@@ -402,13 +405,13 @@ func createVolumeClaimTemplatesIndex(chi *chiv1.ClickHouseInstallation) vcTempla
 		// Convenience wrapper
 		volumeClaimTemplate := &chi.Spec.Templates.VolumeClaimTemplates[i]
 
-		flag := false
-		if volumeClaimTemplate.PersistentVolumeClaim.Name == useDefaultNamePlaceholder {
+		useDefaultName := false
+		if volumeClaimTemplate.PersistentVolumeClaim.Name == useDefaultPersistentVolumeClaimMacro {
 			volumeClaimTemplate.PersistentVolumeClaim.Name = chDefaultVolumeMountNameData
-			flag = true
+			useDefaultName = true
 		}
 		index[volumeClaimTemplate.Name] = &vcTemplatesIndexData{
-			useDefaultName:        flag,
+			useDefaultName:        useDefaultName,
 			persistentVolumeClaim: &volumeClaimTemplate.PersistentVolumeClaim,
 		}
 	}

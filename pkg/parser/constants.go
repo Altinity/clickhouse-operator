@@ -165,16 +165,16 @@ const (
 )
 
 const (
-	useDefaultNamePlaceholder = "USE_DEFAULT_NAME"
+	useDefaultPersistentVolumeClaimMacro = "USE_DEFAULT_NAME"
 )
 
 const (
-	chDefaultRPCPortName           = "rpc"
-	chDefaultRPCPortNumber         = 9000
+	chDefaultHTTPPortName          = "rest"
+	chDefaultHTTPPortNumber        = 8123
+	chDefaultClientPortName        = "rpc"
+	chDefaultClientPortNumber      = 9000
 	chDefaultInterServerPortName   = "interserver"
 	chDefaultInterServerPortNumber = 9009
-	chDefaultRestPortName          = "rest"
-	chDefaultRestPortNumber        = 8123
 	chDefaultAppLabel              = clickhousealtinitycom.GroupName + "/app"
 )
 

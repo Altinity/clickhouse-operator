@@ -175,6 +175,13 @@ func CreateController(
 			controller.enqueueObject(newObj)
 		},
 		DeleteFunc: func(obj interface{}) {
+
+			// TODO
+			// IMPORTANT
+			// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
+			// To achieve ordered and graceful termination of the pods in the StatefulSet,
+			// it is possible to scale the StatefulSet down to 0 prior to deletion.
+
 			chi := obj.(*chop.ClickHouseInstallation)
 			glog.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
 		},
