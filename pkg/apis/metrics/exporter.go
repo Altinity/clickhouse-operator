@@ -70,11 +70,12 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		})
 	}()
 
-	wg := &sync.WaitGroup{}
+	glog.Info("Starting Collect")
+	var wg = sync.WaitGroup{}
 	// Getting hostnames of Pods and requesting the metrics data from ClickHouse instances within
 	for chiName := range e.chInstallations {
 		// Loop over all hostnames of this installation
-		glog.Infof("Collect metrics for %s\n", chiName)
+		glog.Infof("Collecting metrics for %s\n", chiName)
 		for _, hostname := range e.chInstallations[chiName].hostnames {
 			wg.Add(1)
 			go func(name, hostname string, c chan<- prometheus.Metric) {
@@ -82,7 +83,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 				glog.Infof("Querying metrics for %s\n", hostname)
 				metricsData := make([][]string,0)
-				if err := clickhouse.QueryMetrics(metricsData, hostname); err != nil {
+				if err := clickhouse.QueryMetrics(&metricsData, hostname); err != nil {
 					// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 					glog.Infof("Error querying metrics for %s: %s\n", hostname, err)
 					e.cleanup.Store(name, struct{}{})
@@ -93,7 +94,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 				
 				glog.Infof("Querying table sizes for %s\n", hostname)
 				tableSizes := make([][]string,0)
-				if err := clickhouse.QueryTableSizes(tableSizes, hostname); err != nil {
+				if err := clickhouse.QueryTableSizes(&tableSizes, hostname); err != nil {
 					// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 					glog.Infof("Error querying table sizes for %s: %s\n", hostname, err)
 					e.cleanup.Store(name, struct{}{})
@@ -106,6 +107,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 	wg.Wait()
+	glog.Info("Finished Collect")
 }
 
 
@@ -114,8 +116,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 func writeMetricsDataToPrometheus(out chan<- prometheus.Metric, data [][]string, chiname, hostname string) {
 	for _, metric := range data {
 		var metricType prometheus.ValueType
-		if metric[4] == "counter" { metricType = prometheus.CounterValue } else { metricType = prometheus.GaugeValue }
-		writeSingleMetricToPrometheus(out, "table_partitions", "Number of partitions of the table", metric[3], metricType,
+		if metric[3] == "counter" { metricType = prometheus.CounterValue } else { metricType = prometheus.GaugeValue }
+		writeSingleMetricToPrometheus(out, metric[0], metric[1], metric[2], metricType,
 			[]string{"chi","hostname"}, 
 			chiname, hostname)
 	}
@@ -125,21 +127,21 @@ func writeMetricsDataToPrometheus(out chan<- prometheus.Metric, data [][]string,
 // Expected data structure: database, table, partitions, parts, bytes, uncompressed_bytes, rows
 func writeTableSizesDataToPrometheus(out chan<- prometheus.Metric, data [][]string, chiname, hostname string) {
 	for _, metric := range data {
-		writeSingleMetricToPrometheus(out, "table_partitions", "Number of partitions of the table", metric[3], prometheus.GaugeValue,
+		writeSingleMetricToPrometheus(out, "table_partitions", "Number of partitions of the table", metric[2], prometheus.GaugeValue,
 			[]string{"chi","hostname","database","table"}, 
-			chiname, hostname, metric[1], metric[2])
-		writeSingleMetricToPrometheus(out, "table_parts", "Number of parts of the table", metric[4], prometheus.GaugeValue,
+			chiname, hostname, metric[0], metric[1])
+		writeSingleMetricToPrometheus(out, "table_parts", "Number of parts of the table", metric[3], prometheus.GaugeValue,
 			[]string{"chi","hostname","database","table"}, 
-			chiname, hostname, metric[1], metric[2])
-		writeSingleMetricToPrometheus(out, "table_parts_bytes", "Table size in bytes", metric[5], prometheus.GaugeValue,
+			chiname, hostname, metric[0], metric[1])
+		writeSingleMetricToPrometheus(out, "table_parts_bytes", "Table size in bytes", metric[4], prometheus.GaugeValue,
 			[]string{"chi","hostname","database","table"}, 
-			chiname, hostname, metric[1], metric[2])
-		writeSingleMetricToPrometheus(out, "table_parts_bytes_uncompressed", "Table size in bytes uncompressed", metric[6], prometheus.GaugeValue, 
+			chiname, hostname, metric[0], metric[1])
+		writeSingleMetricToPrometheus(out, "table_parts_bytes_uncompressed", "Table size in bytes uncompressed", metric[5], prometheus.GaugeValue, 
 			[]string{"chi","hostname","database","table"}, 
-			chiname, hostname, metric[1], metric[2])
-		writeSingleMetricToPrometheus(out, "table_parts_rows", "Number of rows in the table", metric[7], prometheus.GaugeValue,
+			chiname, hostname, metric[0], metric[1])
+		writeSingleMetricToPrometheus(out, "table_parts_rows", "Number of rows in the table", metric[6], prometheus.GaugeValue,
 			[]string{"chi","hostname","database","table"}, 
-			chiname, hostname, metric[1], metric[2])
+			chiname, hostname, metric[0], metric[1])
 	}
 }
 
@@ -150,7 +152,12 @@ func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, de
 			metricType,
 			floatValue,
 			labelValues...)
-	out <- m
+	select {
+		case out <- m:
+		
+		default: 
+			glog.Infof("Error sending metric to the channel %s", name)
+	}
 }
 
 // removeInstallationReference deletes record from Exporter.chInstallation map identified by chiName key
