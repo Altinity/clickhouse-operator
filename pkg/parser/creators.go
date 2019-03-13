@@ -170,12 +170,12 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *genOptions
 				},
 			},
 			Spec: corev1.ServiceSpec{
-				// ClusterIP: templateDefaultsServiceClusterIP,
+				ClusterIP: templateDefaultsServiceClusterIP,
 				Selector: map[string]string{
 					chDefaultAppLabel: statefulSetName,
 				},
 				Ports: ports,
-				Type: "LoadBalancer",
+				Type: "ClusterIP",
 			},
 		})
 		glog.Infof("createServiceObjects() for service %s\n", serviceName)
