@@ -43,16 +43,6 @@ type chInstallationData struct {
 	hostnames []string
 }
 
-// newDescription creates a new prometheus.Desc object
-func newDescription(name, help string, labels []string) *prometheus.Desc {
-	return prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, subsystem, name),
-		help,
-		labels,
-		nil,
-	)
-}
-
 // CreateExporter returns a new instance of Exporter type
 func CreateExporter() *Exporter {
 	return &Exporter{
@@ -84,6 +74,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	// Getting hostnames of Pods and requesting the metrics data from ClickHouse instances within
 	for chiName := range e.chInstallations {
 		// Loop over all hostnames of this installation
+		glog.Infof("Collect metrics for %s\n", chiName)
 		for _, hostname := range e.chInstallations[chiName].hostnames {
 			wg.Add(1)
 			go func(name, hostname string, c chan<- prometheus.Metric) {
@@ -214,6 +205,16 @@ func (e *Exporter) EnsureControlledValues(chiName string, hostnames []string) {
 		glog.V(2).Infof("ClickHouseInstallation (%q): including hostnames into chopmetrics.Exporter", chiName)
 		e.UpdateControlledState(chiName, hostnames)
 	}
+}
+
+// newDescription creates a new prometheus.Desc object
+func newDescription(name, help string, labels []string) *prometheus.Desc {
+	return prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, subsystem, name),
+		help,
+		labels,
+		nil,
+	)
 }
 
 // metricName converts the given string to snake case following the Golang format:
