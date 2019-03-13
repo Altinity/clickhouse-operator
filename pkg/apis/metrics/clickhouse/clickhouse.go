@@ -26,9 +26,11 @@ import (
 
 const (
 	queryMetricsSQL = `
-	SELECT metric, toString(value), '' AS descriptio, 'gauge' as type FROM system.asynchronous_metrics
-	UNION ALL SELECT metric, toString(value), description, 'gauge' as type FROM system.metrics
-	UNION ALL SELECT event as metric, toString(value), description, 'counter' as type FROM system.events`
+	SELECT concat('metric.', metric) metric, toString(value), '' AS description, 'gauge' as type FROM system.asynchronous_metrics
+	UNION ALL 
+	SELECT concat('metric.', metric) metric, toString(value), description, 'gauge' as type FROM system.metrics
+	UNION ALL 
+	SELECT concat('event.', event) as metric, toString(value), description, 'counter' as type FROM system.events`
 	queryTableSizesSQL = `select database, table, 
 	uniq(partition) as partitions, count() as parts, sum(bytes) as bytes, sum(data_uncompressed_bytes) uncompressed_bytes, sum(rows) as rows 
 	from system.parts where active = 1 group by database, table`
