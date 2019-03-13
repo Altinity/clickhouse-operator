@@ -40,6 +40,9 @@ The ClickHouse Operator for Kubernetes currently provides the following:
 1. [Prometheus & clickhouse-operator integration][prometheus_setup]
 1. [Grafana & Prometheus integration][grafana_setup]
 
+**Storage**
+1. [Persistent storage options][storage]
+
 ## License
 
 Copyright (c) 2019, Altinity Ltd and/or its affiliates. All rights reserved.
@@ -57,3 +60,4 @@ See [LICENSE](./LICENSE) for more details.
 [zookeeper_setup]: ./docs/zookeeper_setup.md
 [prometheus_setup]: ./docs/prometheus_setup.md
 [grafana_setup]: ./docs/grafana_setup.md
+[storage]: ./docs/storage.md
