@@ -128,22 +128,16 @@ const (
 	namespaceDomainPattern = "%s.svc.cluster.local"
 
 	// NAME                READY   STATUS    RESTARTS   AGE   IP            NODE   NOMINATED NODE   READINESS GATES
-	// pod/ss-1eb454-2-0   1/1     Running   0          11h   10.244.1.17   kub2   <none>           <none>
-	// Ex.: ss-1eb454-2-0
-	hostnamePattern = statefulSetNamePattern + "-0"
-
-	// hostnamePlusServicePattern consists of 2 parts
-	// 1. pod hostname
-	// 2. nameless service of of stateful set
-	// Ex.: ss-1eb454-2-0.svc-1eb454-2
-	hostnamePlusServicePattern = hostnamePattern + "." + podServiceNamePattern
+	// pod/ss-1eb454-2   1/1     Running   0          11h   10.244.1.17   kub2   <none>           <none>
+	// Ex.: ss-1eb454-2
+	podHostnamePattern = podServiceNamePattern
 
 	// podFQDNPattern consists of 3 parts:
-	// 1. pod hostname
-	// 2. nameless service of of stateful set
-	// 3. namespace name
-	// ss-1eb454-2-0.svc-1eb454-2.my-dev-domain.svc.cluster.local
-	podFQDNPattern = hostnamePlusServicePattern + "." + namespaceDomainPattern
+	// 1. nameless service of of stateful set
+	// 2. namespace name
+	// 3. 
+	// ss-1eb454-2-0.my-dev-domain.svc.cluster.local
+	podFQDNPattern = podHostnamePattern + "." + namespaceDomainPattern
 
 	// configMapNameXXXPattern is set of constants to describe
 	// a .meta.name of a kind:ConfigMap based on .meta.name of a CHI object
