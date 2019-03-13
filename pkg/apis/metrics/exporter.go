@@ -17,7 +17,7 @@ package metrics
 import (
 	"strconv"
 	"sync"
-	"unicode"
+//	"unicode"
 	"strings"
 
 	clickhouse "github.com/altinity/clickhouse-operator/pkg/apis/metrics/clickhouse"
@@ -236,7 +236,7 @@ func newDescription(name, help string, labels []string) *prometheus.Desc {
 // convertMetricName converts the given string to snake case following the Golang format:
 // acronyms are converted to lower-case and preceded by an underscore.
 func convertMetricName(in string) string {
-	runes := []rune(in)
+	/*runes := []rune(in)
 	length := len(runes)
 
 	var out []rune
@@ -245,7 +245,7 @@ func convertMetricName(in string) string {
 			out = append(out, '_')
 		}
 		out = append(out, unicode.ToLower(runes[i]))
-	}
+	}*/
 
-	return strings.Replace(string(out), ".", "_", -1)
+	return strings.Replace(string(in), ".", "_", -1)
 }
