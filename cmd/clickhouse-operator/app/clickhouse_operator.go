@@ -42,7 +42,7 @@ import (
 )
 
 // Version defines current build version
-const Version = "0.1.6beta"
+const Version = "0.1.7beta"
 
 // Prometheus exporter defaults
 const (
