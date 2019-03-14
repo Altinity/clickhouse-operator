@@ -1,4 +1,5 @@
 #!/bin/bash
+echo "Setup Prometheus"
 
 # Let's setup all prometheus-related stuff into dedicated namespace called "prometheus"
 kubectl create namespace prometheus
@@ -19,6 +20,7 @@ kubectl apply --namespace=prometheus -f prometheus.yaml
 # otherwise Prometheus would not be able to setup integration with clickhouse-operator
 
 if kubectl --namespace=kube-system get service clickhouse-operator-metrics; then
+    echo "clickhouse-operator-metrics endpoint found. Configuring integration with clickhouse-operator"
     # clickhouse-operator-metrics service found, can setup integration
     kubectl apply --namespace=prometheus -f prometheus-clickhouse-operator-service-monitor.yaml
 else
