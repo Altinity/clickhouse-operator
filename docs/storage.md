@@ -1,6 +1,6 @@
 # Storage
 
-Example is [available here](example_aws_pv)
+Example is [available here][example_aws_pv]
 
 ## Persistent Volumes
 k8s cluster administrator provision storage with `PersistentVolume` objects to users. 
@@ -164,12 +164,12 @@ spec:
       mountPath: /usr/share/nginx/html
 ```
 Pay attention, that there is no `storageClassName` specified - meaning this `PersistentVolumeClaim` will claim `PersistentVolume` of explicilty specified `default` storage class.
-More details on [storageClassName](storageClassName)
-More details on [PersistentVolumeClaim](PersistentVolumeClaim)
+More details on [storageClassName][storageClassName]
+More details on [PersistentVolumeClaim][PersistentVolumeClaim]
 
 ## StatefulSet
 `StatefulSet` shortcuts the way, jumping from `volumeMounts` directly to `volumeClaimTemplates`, skipping `volume`.
-More details in [StatefulSet description](StatefulSet)
+More details in [StatefulSet description][StatefulSet]
 StatefulSet example:
 ```yaml
 apiVersion: v1
