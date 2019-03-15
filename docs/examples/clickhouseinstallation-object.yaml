@@ -3,9 +3,7 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "clickhouse-installation-test"
 spec:
-# actions:
-#   upgrade:
-#     useImage: yandex/clickhouse-server:latest
+
   defaults:
     replicasUseFQDN: 0 # 0 - by default, 1 - enabled
     distributedDDL:
@@ -17,9 +15,7 @@ spec:
       podTemplate: clickhouse-v18.16.1
       volumeClaimTemplate: default
 #     scenario: Default
-#
-#     default value
-# 
+
   configuration:
     zookeeper:
       nodes:
