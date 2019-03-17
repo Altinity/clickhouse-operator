@@ -5,35 +5,48 @@ import (
 	"gopkg.in/d4l3k/messagediff.v1"
 )
 
-type someStruct1 struct {
+type struct1 struct {
 	A int
 	// To ignore a field in a struct, just annotate it with testdiff:"ignore" like this:
 	B int `testdiff:"ignore"`
 }
 
-type someStruct2 struct {
-	A, b int
+type struct2 struct {
+	A int
+	b int
 	C []int
 }
 
+type struct3 struct {
+	s2 struct2
+}
+
+type struct4 struct {
+	s3 struct3
+}
+
+type struct5 struct {
+	s4 []struct4
+}
+
 func main() {
-	a := someStruct1{
+	a := struct1{
 		1,
 		2,
 	}
-	b := someStruct1{
+	b := struct1{
 		1,
 		3,
 	}
 	diff, equal := messagediff.PrettyDiff(a, b)
 	fmt.Printf("diff:%v \n equal: %v", diff, equal)
 
-	a1 := someStruct2{
+	a1 := struct2{
 		A:1,
 		b:2,
 		C:[]int{1},
 	}
-	b1 := someStruct2{
+	b1 := struct2{
 		A:1,
 		b:3,
 		C:[]int{1, 1, 2},
@@ -61,5 +74,108 @@ func main() {
 	fmt.Printf("\ndiff:%v \n equal: %v", detailedDiff, equal)
 
 	detailedDiff, equal = messagediff.DeepDiff(a1, b1)
-	fmt.Printf("\ndiff:%v \n equal: %v", detailedDiff, equal)
+	fmt.Printf("\ndiff:%v \n equal: %v", *detailedDiff, equal)
+
+	a5 := struct4 {
+		s3: struct3{
+			s2: struct2{
+				A:1,
+				b:2,
+				C:[]int{1},
+			},
+		},
+	}
+
+	b5 := struct4 {
+		s3: struct3{
+			s2: struct2{
+				A:1,
+				b:3,
+				C:[]int{1, 1, 2},
+			},
+		},
+	}
+
+	detailedDiff, equal = messagediff.DeepDiff(a5, b5)
+	fmt.Printf("\ndiff:%v \n equal: %v", *detailedDiff, equal)
+
+	a6 := struct5{
+		s4: []struct4{
+			{
+				s3: struct3{
+					s2: struct2{
+						A:1,
+						b:2,
+						C:[]int{1},
+					},
+				},
+			},
+		},
+	}
+
+	b6 := struct5{
+		s4: []struct4{
+			{
+				s3: struct3{
+					s2: struct2{
+						A: 1,
+						b: 3,
+						C: []int{1, 1, 2},
+					},
+				},
+			},
+			{
+				s3: struct3{
+					s2: struct2{
+						A:1,
+						b:2,
+						C:[]int{1},
+					},
+				},
+			},
+		},
+	}
+
+	detailedDiff, equal = messagediff.DeepDiff(a6, b6)
+	fmt.Printf("\ndiff:%v \n equal: %v", *detailedDiff, equal)
+
+	a7 := struct5{
+		s4: []struct4{
+			{
+				s3: struct3{
+					s2: struct2{
+						A:1,
+						b:2,
+						C:[]int{1},
+					},
+				},
+			},
+		},
+	}
+
+	b7 := struct5{
+		s4: []struct4{
+			{
+				s3: struct3{
+					s2: struct2{
+						A:1,
+						b:2,
+						C:[]int{1},
+					},
+				},
+			},
+			{
+				s3: struct3{
+					s2: struct2{
+						A: 1,
+						b: 3,
+						C: []int{1, 1, 2},
+					},
+				},
+			},
+		},
+	}
+
+	detailedDiff, equal = messagediff.DeepDiff(a7, b7)
+	fmt.Printf("\ndiff:%v \n equal: %v", *detailedDiff, equal)
 }
