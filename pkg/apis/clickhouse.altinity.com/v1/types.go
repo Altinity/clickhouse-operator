@@ -27,7 +27,7 @@ import (
 type ClickHouseInstallation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              ChiSpec   `json:"spec"`
+	Spec              ChiSpec   `json:"spec" diff:"spec"`
 	Status            ChiStatus `json:"status"`
 }
 
@@ -39,7 +39,7 @@ type ChiStatus struct {
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
 	Defaults      ChiDefaults      `json:"defaults,omitempty"`
-	Configuration ChiConfiguration `json:"configuration"`
+	Configuration ChiConfiguration `json:"configuration" diff:"configuration"`
 	Templates     ChiTemplates     `json:"templates,omitempty"`
 }
 
@@ -59,49 +59,49 @@ type ChiDistributedDDL struct {
 type ChiDeployment struct {
 	// PodTemplate specifies which Pod template from
 	// .spec.templates.podTemplates should be used
-	PodTemplate string `json:"podTemplate,omitempty"`
+	PodTemplate string `json:"podTemplate,omitempty" diff:"podTemplate"`
 
 	// VolumeClaimTemplate specifies which VolumeClaim template
 	// from .spec.templates.volumeClaimTemplates should be used
-	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty"`
+	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty" diff:"volumeClaimTemplate"`
 
-	Zone     ChiDeploymentZone `json:"zone,omitempty"`
-	Scenario string            `json:"scenario,omitempty"`
+	Zone     ChiDeploymentZone `json:"zone,omitempty" diff:"zone"`
+	Scenario string            `json:"scenario,omitempty" diff:"scenario"`
 
 	// Fingerprint is a fingerprint of the ChiDeployment. Used to find equal deployments
-	Fingerprint string `json:"fingerprint,omitempty"`
+	Fingerprint string `json:"fingerprint,omitempty" diff:"fingerprint"`
 }
 
 // ChiDeploymentZone defines zone section of *.deployment
 type ChiDeploymentZone struct {
-	MatchLabels map[string]string `json:"matchLabels"`
+	MatchLabels map[string]string `json:"matchLabels" diff:"matchLabels"`
 }
 
 // ChiConfiguration defines configuration section of .spec
 type ChiConfiguration struct {
-	Zookeeper ChiConfigurationZookeeper `json:"zookeeper,omitempty"`
-	Users     map[string]string         `json:"users,omitempty"`
-	Profiles  map[string]string         `json:"profiles,omitempty"`
-	Quotas    map[string]string         `json:"quotas,omitempty"`
-	Settings  map[string]string         `json:"settings,omitempty"`
-	Clusters  []ChiCluster              `json:"clusters,omitempty"`
+	Zookeeper ChiConfigurationZookeeper `json:"zookeeper,omitempty" diff:"zookeeper"`
+	Users     map[string]string         `json:"users,omitempty"     diff:"users"`
+	Profiles  map[string]string         `json:"profiles,omitempty"  diff:"profiles"`
+	Quotas    map[string]string         `json:"quotas,omitempty"    diff:"quotas"`
+	Settings  map[string]string         `json:"settings,omitempty"  diff:"settings"`
+	Clusters  []ChiCluster              `json:"clusters,omitempty"  diff:"clusters"`
 }
 
 // ChiConfigurationZookeeper defines zookeeper section of .spec.configuration
 type ChiConfigurationZookeeper struct {
-	Nodes []ChiConfigurationZookeeperNode `json:"nodes,omitempty"`
+	Nodes []ChiConfigurationZookeeperNode `json:"nodes,omitempty" diff:"nodes"`
 }
 
 // ChiConfigurationZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
 type ChiConfigurationZookeeperNode struct {
-	Host string `json:"host"`
-	Port int32  `json:"port"`
+	Host string `json:"host" diff:"host"`
+	Port int32  `json:"port" diff:"port"`
 }
 
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
-	Name       string           `json:"name"`
-	Layout     ChiClusterLayout `json:"layout"`
+	Name       string           `json:"name"   diff:"name"`
+	Layout     ChiClusterLayout `json:"layout" diff:"layout"`
 	Deployment ChiDeployment    `json:"deployment,omitempty"`
 }
 
@@ -110,23 +110,23 @@ type ChiClusterLayout struct {
 	Type          string                  `json:"type"`
 	ShardsCount   int                     `json:"shardsCount,omitempty"`
 	ReplicasCount int                     `json:"replicasCount,omitempty"`
-	Shards        []ChiClusterLayoutShard `json:"shards,omitempty"`
+	Shards        []ChiClusterLayoutShard `json:"shards,omitempty" diff:"shards"`
 }
 
 // ChiClusterLayoutShard defines item of a shard section of .spec.configuration.clusters[n].shards
 type ChiClusterLayoutShard struct {
 	DefinitionType      string                         `json:"definitionType"`
 	ReplicasCount       int                            `json:"replicasCount,omitempty"`
-	Weight              int                            `json:"weight,omitempty"`
-	InternalReplication string                         `json:"internalReplication,omitempty"`
+	Weight              int                            `json:"weight,omitempty" diff:"weight"`
+	InternalReplication string                         `json:"internalReplication,omitempty" diff:"internalReplication"`
 	Deployment          ChiDeployment                  `json:"deployment,omitempty"`
-	Replicas            []ChiClusterLayoutShardReplica `json:"replicas,omitempty"`
+	Replicas            []ChiClusterLayoutShardReplica `json:"replicas,omitempty" diff:"replicas"`
 }
 
 // ChiClusterLayoutShardReplica defines item of a replicas section of .spec.configuration.clusters[n].shards[m]
 type ChiClusterLayoutShardReplica struct {
-	Port       int32         `json:"port,omitempty"`
-	Deployment ChiDeployment `json:"deployment,omitempty"`
+	Port       int32         `json:"port,omitempty"       diff:"port"`
+	Deployment ChiDeployment `json:"deployment,omitempty" diff:"deployment"`
 }
 
 // ChiTemplates defines templates section of .spec
