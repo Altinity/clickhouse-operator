@@ -15,32 +15,36 @@ clusterrolebinding.rbac.authorization.k8s.io/clickhouse-operator created
 deployment.apps/clickhouse-operator created
 
 ```
-
+Check it is running:
 ```console
 $ kubectl get pods -n kube-system
 NAME                                        READY   STATUS    RESTARTS   AGE
 clickhouse-operator-ddc6fd499-fhxqs         1/1     Running   0          5m22s
 ```
 
-### Creating a custom namespace
+## Simple deployment with default storage
+
+### 1. Creating a custom namespace
 ```console
 $ kubectl create ns test
 namespace/test created
 ```
 
+### 2. Creating a ClickHouse installation custom resource object
 
-## Simple deployment with default storage
+You can use one of supplied examples:
+```
+$ kubectl apply -n test -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/chi-example-02-default-pv-no-replication.yaml
+clickhouseinstallation.clickhouse.altinity.com/test created
+```
 
-### Creating a custom resource object
+Installation specification is very simple and defined cluster with 3 shards:
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
   name: "test2-no-replication"
 spec:
-  defaults:
-    deployment:
-      volumeClaimTemplate: default
   configuration:
     clusters:
       - name: "sharded-non-replicated"
@@ -48,14 +52,9 @@ spec:
           type: Standard
           shardsCount: 3
 ```
-```console
-$ kubectl apply -n test -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/chi-example-02-default-pv-no-replication.yaml
-clickhouseinstallation.clickhouse.altinity.com/test created
-```
 
 Once cluster is created, there are two checks to be made.
 
-### Check that pods are running
 ```console
 $ kubectl get pods -n test
 NAME             READY   STATUS    RESTARTS   AGE
@@ -64,7 +63,8 @@ ch-d3ce483i2-0   1/1     Running   0          2m44s
 ch-d3ce483i3-0   1/1     Running   0          2m44s
 ```
 
-### Listing exposed services
+Watch out for 'Running' status. Also check services created by an operator:
+
 ```console
 $ kubectl get svc -n test
 NAME                  TYPE          CLUSTER-IP   EXTERNAL-IP    PORT(S)                      AGE
@@ -72,9 +72,10 @@ d3ce483i1s            ClusterIP     None         <none>         9000/TCP,9009/TC
 d3ce483i2s            ClusterIP     None         <none>         9000/TCP,9009/TCP,8123/TCP   2m32s
 test2-no-replication  LoadBalancer  None         10.101.227.182 9000/TCP,9009/TCP,8123/TCP   2m32s
 ```
+
 ClickHouse is up and running!
 
-### Connecting to the clickhouse database using clickhouse-client
+### 3. Connecting to the ClickHouse database using clickhouse-client
 
 The easiest way to connect to a cluster is to enter a pod and run clickhouse client.
 ```console
