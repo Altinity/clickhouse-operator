@@ -36,7 +36,7 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentNumber namedN
 	options.fullDeploymentIDToDeployment = make(map[string]*chiv1.ChiDeployment)
 
 	// Config files section - macros and common config
-	options.macrosData = make(map[string]macrosDataShardDescriptionList)
+	options.fullDeploymentIDToMacrosData = make(map[string]macrosDataShardDescriptionList)
 
 	// commonConfigSections maps section name to section XML config such as "<yandex><macros>...</macros><yandex>"
 	// Bring in all sections into commonConfigSections[config file name]
@@ -80,8 +80,8 @@ func generateOptions(chi *chiv1.ClickHouseInstallation, options *generatorOption
 				// 1eb454-2 (deployment id - sequential index of this deployment id)
 				fullDeploymentID := generateFullDeploymentID(replica)
 				options.fullDeploymentIDToDeployment[fullDeploymentID] = &replica.Deployment
-				options.macrosData[fullDeploymentID] = append(
-					options.macrosData[fullDeploymentID],
+				options.fullDeploymentIDToMacrosData[fullDeploymentID] = append(
+					options.fullDeploymentIDToMacrosData[fullDeploymentID],
 					&macrosDataShardDescription{
 						clusterName: cluster.Name,
 						index:       shardIndex + 1,
@@ -136,7 +136,7 @@ func createConfigMapObjects(
 				},
 			},
 			Data: map[string]string{
-				filenameMacrosXML: generateHostMacros(chi.Name, fullDeploymentID, options.macrosData[fullDeploymentID]),
+				filenameMacrosXML: generateHostMacros(chi.Name, fullDeploymentID, options.fullDeploymentIDToMacrosData[fullDeploymentID]),
 			},
 		})
 	}

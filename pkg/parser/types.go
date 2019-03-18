@@ -44,10 +44,10 @@ type generatorOptions struct {
 	// fullDeploymentIDToDeployment[fullDeploymentID] = &replica.Deployment
 	fullDeploymentIDToDeployment map[string]*chiv1.ChiDeployment
 
-	// macrosData[fullDeploymentID] = macrosDataShardDescriptionList
-	macrosData map[string]macrosDataShardDescriptionList
+	// fullDeploymentIDToMacrosData[fullDeploymentID] = macrosDataShardDescriptionList
+	fullDeploymentIDToMacrosData map[string]macrosDataShardDescriptionList
 
-	// configSection specifies whether additional config files (such as zookeeper, macros) are configuared
+	// commonConfigSections maps section name to section XML config
 	commonConfigSections map[string]string
 }
 
