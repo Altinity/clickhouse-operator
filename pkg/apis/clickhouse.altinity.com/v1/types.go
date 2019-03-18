@@ -70,6 +70,9 @@ type ChiDeployment struct {
 
 	// Fingerprint is a fingerprint of the ChiDeployment. Used to find equal deployments
 	Fingerprint string `json:"fingerprint,omitempty" diff:"fingerprint"`
+
+	// Index is an index of this Deployment within Cluster
+	Index int `json:"index,omitempty" diff:"fingerprint"`
 }
 
 // ChiDeploymentZone defines zone section of *.deployment
