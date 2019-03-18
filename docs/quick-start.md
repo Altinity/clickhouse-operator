@@ -36,7 +36,7 @@ namespace/test created
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "test3"
+  name: "test2-no-replication"
 spec:
   defaults:
     deployment:
@@ -47,57 +47,15 @@ spec:
         layout:
           type: Standard
           shardsCount: 3
-  templates:
-    volumeClaimTemplates:
-    - name: default
-      template:
-        metadata:
-          name: USE_DEFAULT_NAME
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          resources:
-            requests:
-              storage: 500Mi
 ```
 ```console
 $ kubectl apply -n test -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/chi-example-02-default-pv-no-replication.yaml
 clickhouseinstallation.clickhouse.altinity.com/test created
 ```
-### Listing all StatefulSets within "test" namespace
-```console
-$ kubectl get sts -n test
-NAME           DESIRED   CURRENT   AGE
-ch-d3ce483i1   1         1         4s
-ch-d3ce483i2   1         1         4s
-ch-d3ce483i3   1         1         4s
-```
-### Listing all PVC within "test" namespace
-```console
-$ kubectl get pvc -n test
-NAME                             STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-clickhouse-data-ch-d3ce483i1-0   Bound    pvc-ac34d202-2553-11e9-a0e6-08002744ab58   500Mi      RWO            standard       21s
-clickhouse-data-ch-d3ce483i2-0   Bound    pvc-ac4b7a45-2553-11e9-a0e6-08002744ab58   500Mi      RWO            standard       21s
-clickhouse-data-ch-d3ce483i3-0   Bound    pvc-ac655ce1-2553-11e9-a0e6-08002744ab58   500Mi      RWO            standard       21s
-```
-### Listing ConfigMaps within "test" namespace
-```console
-$ kubectl get cm -n test
-NAME                          DATA   AGE
-chi-test3-configd             1      47s
-chi-test3-configd-d3ce483i1   1      47s
-chi-test3-configd-d3ce483i2   1      47s
-chi-test3-configd-d3ce483i3   1      47s
-```
-### Listing all Services within "test" namespace
-```console
-$ kubectl get svc -n test
-NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
-d3ce483i1s   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   2m32s
-d3ce483i2s   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   2m32s
-d3ce483i3s   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   2m32s
-```
-### Listing all Pods within "test" namespace
+
+Once cluster is created, there are two checks to be made.
+
+### Check that pods are running
 ```console
 $ kubectl get pods -n test
 NAME             READY   STATUS    RESTARTS   AGE
@@ -105,33 +63,29 @@ ch-d3ce483i1-0   1/1     Running   0          2m44s
 ch-d3ce483i2-0   1/1     Running   0          2m44s
 ch-d3ce483i3-0   1/1     Running   0          2m44s
 ```
+
+### Listing exposed services
+```console
+$ kubectl get svc -n test
+NAME                  TYPE          CLUSTER-IP   EXTERNAL-IP    PORT(S)                      AGE
+d3ce483i1s            ClusterIP     None         <none>         9000/TCP,9009/TCP,8123/TCP   2m32s
+d3ce483i2s            ClusterIP     None         <none>         9000/TCP,9009/TCP,8123/TCP   2m32s
+test2-no-replication  LoadBalancer  None         10.101.227.182 9000/TCP,9009/TCP,8123/TCP   2m32s
+```
+ClickHouse is up and running!
+
 ### Connecting to the clickhouse database using clickhouse-client
+
+The easiest way to connect to a cluster is to enter a pod and run clickhouse client.
 ```console
 $ kubectl exec -it -n test ch-d3ce483i1-0 clickhouse-client
 ClickHouse client version 19.1.6.
 Connecting to localhost:9000.
 Connected to ClickHouse server version 19.1.6 revision 54413.
 
-ch-d3ce483i1-0.d3ce483i1s.test.svc.cluster.local :) select * from system.clusters;
-
-SELECT *
-FROM system.clusters 
-
-┌─cluster───────────────────────────┬─shard_num─┬─shard_weight─┬─replica_num─┬─host_name─────────────────┬─host_address─┬─port─┬─is_local─┬─user────┬─default_database─┐
-│ sharded-non-replicated            │         1 │            1 │           1 │ ch-d3ce483i1-0.d3ce483i1s │ 10.1.1.48    │ 9000 │        1 │ default │                  │
-│ sharded-non-replicated            │         2 │            1 │           1 │ ch-d3ce483i2-0.d3ce483i2s │ 10.1.1.50    │ 9000 │        0 │ default │                  │
-│ sharded-non-replicated            │         3 │            1 │           1 │ ch-d3ce483i3-0.d3ce483i3s │ 10.1.1.49    │ 9000 │        0 │ default │                  │
-│ test_cluster_two_shards_localhost │         1 │            1 │           1 │ localhost                 │ 127.0.0.1    │ 9000 │        1 │ default │                  │
-│ test_cluster_two_shards_localhost │         2 │            1 │           1 │ localhost                 │ 127.0.0.1    │ 9000 │        1 │ default │                  │
-│ test_shard_localhost              │         1 │            1 │           1 │ localhost                 │ 127.0.0.1    │ 9000 │        1 │ default │                  │
-│ test_shard_localhost_secure       │         1 │            1 │           1 │ localhost                 │ 127.0.0.1    │ 9440 │        0 │ default │                  │
-│ test_unavailable_shard            │         1 │            1 │           1 │ localhost                 │ 127.0.0.1    │ 9000 │        1 │ default │                  │
-│ test_unavailable_shard            │         2 │            1 │           1 │ localhost                 │ 127.0.0.1    │    1 │        0 │ default │                  │
-└───────────────────────────────────┴───────────┴──────────────┴─────────────┴───────────────────────────┴──────────────┴──────┴──────────┴─────────┴──────────────────┘
-
-9 rows in set. Elapsed: 0.014 sec. 
-
+ch-d3ce483i1-0.d3ce483i1s.test.svc.cluster.local :) 
 ```
+You can also access the cluster using service names or external IP.
 
 ## Custom deployment with Pod and VolumeClaim templates
 ### Creating a custom resource object
