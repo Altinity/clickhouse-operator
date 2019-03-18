@@ -149,7 +149,7 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation, options *gen
 	// Prepare deployment IDs out of deployment fingerprints
 	deploymentID := make(map[string]string)
 	for deploymentFingerprint := range options.deploymentCountMax {
-		deploymentID[deploymentFingerprint] = generateDeploymentID(deploymentFingerprint)
+		deploymentID[deploymentFingerprint] = deploymentGenerateID(deploymentFingerprint)
 	}
 
 	// += <yandex>
