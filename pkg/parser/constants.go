@@ -86,13 +86,33 @@ const (
 
 const (
 	// fullPathConfigd specifies full path to folder, where generated XML config files for ClickHouse would be placed
-	fullPathConfigd = "/etc/clickhouse-server/config.d/"
 
+	// dirPathConfigd specifies full path to folder, where generated XML config files for ClickHouse would be placed
+	// for the following sections:
+	// 1. remote servers
+	// 2. zookeeper
+	// 3. settings
+	// 4. listen
+	dirPathConfigd = "/etc/clickhouse-server/config.d/"
+
+	// dirPathUsersd specifies full path to folder, where generated XML config files for ClickHouse would be placed
+	// for the following sections:
+	// 1. users
+	// 2. quotas
+	// 3. profiles
+	dirPathUsersd = "/etc/clickhouse-server/users.d/"
+
+	// dirPathConfd specifies full path to folder, where generated XML config files for ClickHouse would be placed
+	// for the following sections:
+	// 1. macros
+	dirPathConfd = "/etc/clickhouse-server/conf.d/"
+
+	fullPathConfigd = "/etc/clickhouse-server/config.d/"
 	// fullPathConfigTemplate specifies template for full path of the XML config files for ClickHouse
 	fullPathConfigTemplate = fullPathConfigd + "%s"
 
-	// fullPathClickHouseData specifies full path of data folder where ClickHouse would place its datastorage
-	fullPathClickHouseData = "/var/lib/clickhouse"
+	// dirPathClickHouseData specifies full path of data folder where ClickHouse would place its datastorage
+	dirPathClickHouseData = "/var/lib/clickhouse"
 )
 
 const (
@@ -141,16 +161,17 @@ const (
 	// ss-1eb454-2-0.my-dev-domain.svc.cluster.local
 	podFQDNPattern = podHostnamePattern + "." + namespaceDomainPattern
 
-	// configMapNameXXXPattern is set of constants to describe
-	// a .meta.name of a kind:ConfigMap based on .meta.name of a CHI object
-	// configMapNamePattern is a common ConfigMap name prefix
-	configMapNamePattern = "chi-%s-configd"
-	// configMapCommonNamePattern is a template of common for the CHI ConfigMap
+	// configMapCommonNamePattern is a template of common settings for the CHI ConfigMap
 	// Ex.: chi-example02-configd-common for chi named as 'example02'
-	configMapCommonNamePattern = configMapNamePattern + "-common"
+	configMapCommonNamePattern = "chi-%s-common-configd"
+
+	// configMapCommonusersNamePattern is a template of common users settings for the CHI ConfigMap
+	// Ex.: chi-example02-configd-common-users for chi named as 'example02'
+	configMapCommonUsersNamePattern = "chi-%s-common-usersd"
+
 	// configMapMacrosNamePattern is a template of macros ConfigMap
 	// Ex.: chi-example02-configd-33260f1800-2 for chi named as 'example02'
-	configMapMacrosNamePattern = configMapNamePattern + "-%s"
+	configMapMacrosNamePattern = "chi-%s-deploy-confd-%s"
 
 	distributedDDLPattern = "/clickhouse/%s/task_queue/ddl"
 )
@@ -165,9 +186,9 @@ const (
 )
 
 const (
-	chDefaultHTTPPortName          = "rest"
+	chDefaultHTTPPortName          = "http"
 	chDefaultHTTPPortNumber        = 8123
-	chDefaultClientPortName        = "rpc"
+	chDefaultClientPortName        = "client"
 	chDefaultClientPortNumber      = 9000
 	chDefaultInterServerPortName   = "interserver"
 	chDefaultInterServerPortNumber = 9009

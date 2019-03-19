@@ -84,6 +84,7 @@ func generateSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
 	return b.String()
 }
 
+// generateListenConfig creates data for "listen.xml"
 func generateListenConfig(chi *chiv1.ClickHouseInstallation) string {
 	return `<yandex>
     <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->

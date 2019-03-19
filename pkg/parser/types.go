@@ -39,7 +39,7 @@ type generatorOptions struct {
 
 	// deploymentNumber contains number of each deployment required to satisfy clusters' infrastructure
 	// deploymentNumber[fingerprint] = int number of such deployments required
-	deploymentNumber namedNumber
+	deploymentNumber NamedNumber
 
 	// fullDeploymentIDToDeployment[fullDeploymentID] = &replica.Deployment
 	fullDeploymentIDToDeployment map[string]*chiv1.ChiDeployment
@@ -49,11 +49,9 @@ type generatorOptions struct {
 
 	// commonConfigSections maps section name to section XML config
 	commonConfigSections map[string]string
-}
 
-type includesObjects []struct {
-	filename string
-	fullpath string
+	// commonUsersConfigSections maps section name to section XML config
+	commonUsersConfigSections map[string]string
 }
 
 // macrosDataShardDescriptionList is a list of all shards descriptions
@@ -76,12 +74,12 @@ type macrosDataShardDescription struct {
 	index       int
 }
 
-// namedNumber maps Deployment fingerprint to its usage count
-type namedNumber map[string]int
+// NamedNumber maps Deployment fingerprint to its usage count
+type NamedNumber map[string]int
 
-// mergeAndReplaceWithBiggerValues combines namedNumber object with another one
+// mergeAndReplaceWithBiggerValues combines NamedNumber object with another one
 // and replaces local values with another one's values in case another's value is bigger
-func (d namedNumber) mergeAndReplaceWithBiggerValues(another namedNumber) {
+func (d NamedNumber) mergeAndReplaceWithBiggerValues(another NamedNumber) {
 
 	// Loop over another struct and bring in new OR bigger values
 	for key, value := range another {
