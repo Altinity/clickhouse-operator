@@ -84,6 +84,22 @@ func generateSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
 	return b.String()
 }
 
+func generateListenConfig(chi *chiv1.ClickHouseInstallation) string {
+	return `<yandex>
+    <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
+    <listen_host>::</listen_host>
+    <listen_host>0.0.0.0</listen_host>
+    <listen_try>1</listen_try>
+
+    <!--
+    <logger>
+        <console>1</console>
+    </logger>
+    -->
+</yandex>
+`
+}
+
 // generateZookeeperConfig creates data for "zookeeper.xml"
 func generateZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 	if len(chi.Spec.Configuration.Zookeeper.Nodes) == 0 {

@@ -50,6 +50,7 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentNumber namedN
 	includeNonEmpty(options.commonConfigSections, filenameProfilesXML, generateProfilesConfig(chi))
 	includeNonEmpty(options.commonConfigSections, filenameQuotasXML, generateQuotasConfig(chi))
 	includeNonEmpty(options.commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
+	includeNonEmpty(options.commonConfigSections, filenameListenXML, generateListenConfig(chi))
 
 	// slice of full deployment ID's
 	fullDeploymentIDs := make([]string, 0, len(options.fullDeploymentIDToDeployment))
@@ -240,16 +241,18 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genera
 	commonVolumeMounts := make([]corev1.VolumeMount, 0)
 	// Add common config volume mount at first
 	// Personal macros would be added later
-	for filename := range options.commonConfigSections {
-		glog.Infof("commonVolumeMounts %s\n", filename)
+//	for filename := range options.commonConfigSections {
+//	glog.Infof("commonVolumeMounts %s\n", filename)
+	glog.Infof("commonVolumeMounts %s\n")
 		commonVolumeMounts = append(
 			commonVolumeMounts, corev1.VolumeMount{
 				Name:      configMapCommonName,
-				MountPath: CreateClickHouseConfigFullPath(filename),
-				SubPath:   filename,
+				MountPath: "/etc/clickhouse-server/config.d/",
+//				MountPath: CreateClickHouseConfigFullPath(filename),
+//				SubPath:   filename,
 			},
 		)
-	}
+//	}
 	glog.Infof("commonVolumeMounts total len %d\n", len(commonVolumeMounts))
 
 	// Create list of apps.StatefulSet objects
@@ -271,8 +274,9 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genera
 		// Appending "macros.xml" section
 		currentVolumeMounts = append(currentVolumeMounts, corev1.VolumeMount{
 			Name:      configMapMacrosName,
-			MountPath: CreateClickHouseConfigFullPath(filenameMacrosXML),
-			SubPath:   filenameMacrosXML,
+			MountPath: "/etc/clickhouse-server/conf.d/",
+//			MountPath: CreateClickHouseConfigFullPath(filenameMacrosXML),
+//			SubPath:   filenameMacrosXML,
 		})
 
 		glog.Infof("Deployment %s has %d current volume mounts\n", fullDeploymentID, len(currentVolumeMounts))
@@ -332,7 +336,8 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genera
 			statefulSetObject.Spec.Template.Spec.Containers = make([]corev1.Container, len(podTemplateData.containers))
 			copy(statefulSetObject.Spec.Template.Spec.Containers, podTemplateData.containers)
 
-			// And now loop over all containers in this template and append all current VolumeMounts
+			// And now loop over all containers in this template and
+			// append all current VolumeMounts which are ConfigMap mounts
 			for i := range statefulSetObject.Spec.Template.Spec.Containers {
 				for j := range currentVolumeMounts {
 					statefulSetObject.Spec.Template.Spec.Containers[i].VolumeMounts = append(
