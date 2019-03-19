@@ -1,5 +1,7 @@
 #!/bin/bash
 
-kubectl create namespace zoo3ns
-kubectl --namespace=zoo3ns apply -f zookeeper-3-nodes.yaml
+ZK_NAMESPACE="${ZK_NAMESPACE:-zoo3ns}"
+
+kubectl create namespace "${ZK_NAMESPACE}"
+kubectl --namespace="${ZK_NAMESPACE}" apply -f zookeeper-3-nodes.yaml
 
