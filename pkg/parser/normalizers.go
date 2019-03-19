@@ -24,15 +24,15 @@ import (
 )
 
 // NormalizeCHI normalizes CHI.
-// Returns namedNumber of deployments number required to satisfy clusters' infrastructure
-func NormalizeCHI(chi *chiv1.ClickHouseInstallation) namedNumber {
+// Returns NamedNumber of deployments number required to satisfy clusters' infrastructure
+func NormalizeCHI(chi *chiv1.ClickHouseInstallation) NamedNumber {
 	// Set defaults for CHI object properties
 	normalizeSpecDefaultsReplicasUseFQDN(chi)
 	normalizeSpecDefaultsDeploymentScenario(chi)
 
 	// deploymentNumber maps deployment fingerprint to max among all clusters usage number of this deployment
 	// This number shows how many instances of this deployment are required to satisfy clusters' infrastructure
-	deploymentNumber := make(namedNumber)
+	deploymentNumber := make(NamedNumber)
 
 	// Normalize all clusters in this CHI
 	for i := range chi.Spec.Configuration.Clusters {
@@ -49,9 +49,9 @@ func NormalizeCHI(chi *chiv1.ClickHouseInstallation) namedNumber {
 func normalizeSpecConfigurationClustersCluster(
 	chi *chiv1.ClickHouseInstallation,
 	cluster *chiv1.ChiCluster,
-) namedNumber {
+) NamedNumber {
 	// How many times each deployment is used in this cluster
-	deploymentNumber := make(namedNumber)
+	deploymentNumber := make(NamedNumber)
 
 	// Apply default deployment for the whole cluster
 	deploymentMergeFrom(&cluster.Deployment, &chi.Spec.Defaults.Deployment)
@@ -143,7 +143,7 @@ func normalizeSpecConfigurationClustersCluster(
 func normalizeSpecConfigurationClustersLayoutShardsReplicas(
 	chi *chiv1.ClickHouseInstallation,
 	shard *chiv1.ChiClusterLayoutShard,
-	deploymentNumber *namedNumber,
+	deploymentNumber *NamedNumber,
 ) {
 	// Fill each replica
 	for replicaIndex := 0; replicaIndex < shard.ReplicasCount; replicaIndex++ {
@@ -166,9 +166,8 @@ func normalizeSpecConfigurationClustersLayoutShardsReplicas(
 	}
 }
 
-
 // normalizeClusterStandardLayoutCounts ensures at least 1 shard and 1 replica counters
-func normalizeClusterStandardLayoutCounts(layout *chiv1.ChiClusterLayout) error {
+func normalizeClusterStandardLayoutCounts(layout *chiv1.ChiClusterLayout) {
 	// Standard layout assumes to have 1 shard and 1 replica by default - in case not specified explicitly
 	if layout.ShardsCount == 0 {
 		layout.ShardsCount = 1
@@ -176,13 +175,11 @@ func normalizeClusterStandardLayoutCounts(layout *chiv1.ChiClusterLayout) error 
 	if layout.ReplicasCount == 0 {
 		layout.ReplicasCount = 1
 	}
-
-	return nil
 }
 
 // normalizeClusterAdvancedLayoutShardsInternalReplication ensures reasonable values in
 // .spec.configuration.clusters.layout.shards.internalReplication
-func normalizeClusterAdvancedLayoutShardsInternalReplication(shard *chiv1.ChiClusterLayoutShard) error {
+func normalizeClusterAdvancedLayoutShardsInternalReplication(shard *chiv1.ChiClusterLayoutShard) {
 	// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
 	// with default value set to "true"
 	if shard.InternalReplication == shardInternalReplicationDisabled {
@@ -190,8 +187,6 @@ func normalizeClusterAdvancedLayoutShardsInternalReplication(shard *chiv1.ChiClu
 	} else {
 		shard.InternalReplication = stringTrue
 	}
-
-	return nil
 }
 
 // deploymentGenerateString creates string representation
@@ -304,6 +299,10 @@ func deploymentMergeFrom(dst, src *chiv1.ChiDeployment) {
 
 // zoneCopyFrom copies one chiv1.ChiDeploymentZone object into another
 func zoneCopyFrom(dst, src *chiv1.ChiDeploymentZone) {
+	if src == nil {
+		return
+	}
+
 	tmp := make(map[string]string)
 	for k, v := range src.MatchLabels {
 		tmp[k] = v

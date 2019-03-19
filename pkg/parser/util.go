@@ -42,6 +42,7 @@ func includeNonEmpty(dst map[string]string, key, src string) {
 	return
 }
 
+// fprintf suppresses warning for unused returns of fmt.Fprintf()
 func fprintf(w io.Writer, format string, a ...interface{}) {
 	_, _ = fmt.Fprintf(w, format, a...)
 }

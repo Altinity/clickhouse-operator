@@ -1,13 +1,16 @@
 #!/bin/bash
 
-echo "Create dev namespace"
-kubectl create namespace dev
+DEV_NAMESPACE="dev"
+
+echo "Create ${DEV_NAMESPACE} namespace"
+kubectl create namespace "${DEV_NAMESPACE}"
 
 # Full dev install in k8s
-#kubectl -n dev apply -f ./clickhouse-operator-install.yaml
+#kubectl -n "${DEV_NAMESPACE}" apply -f ./clickhouse-operator-install.yaml
 
 # Partial dev install
 echo "Install operator requirements"
-kubectl -n dev apply -f ./custom-resource-definition.yaml
-kubectl -n dev apply -f ./rbac-service.yaml
-#kubectl -n dev apply -f ./deployment.yaml
+kubectl -n "${DEV_NAMESPACE}" apply -f ./custom-resource-definition.yaml
+kubectl -n "${DEV_NAMESPACE}" apply -f ./rbac-service.yaml
+#kubectl -n "${DEV_NAMESPACE}" apply -f ./deployment.yaml
+
