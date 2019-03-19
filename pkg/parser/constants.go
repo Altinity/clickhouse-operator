@@ -161,16 +161,21 @@ const (
 	// ss-1eb454-2-0.my-dev-domain.svc.cluster.local
 	podFQDNPattern = podHostnamePattern + "." + namespaceDomainPattern
 
+	// NAME                                       DATA   AGE
+	// chi-example-01-common-configd              2      2s
+	// chi-example-01-common-usersd               0      2s
+	// chi-example-01-deploy-confd-4a8ff63336-0   1      1s
+
 	// configMapCommonNamePattern is a template of common settings for the CHI ConfigMap
-	// Ex.: chi-example02-configd-common for chi named as 'example02'
+	// Ex.: chi-example02-common-configd for chi named as 'example02'
 	configMapCommonNamePattern = "chi-%s-common-configd"
 
 	// configMapCommonusersNamePattern is a template of common users settings for the CHI ConfigMap
-	// Ex.: chi-example02-configd-common-users for chi named as 'example02'
+	// Ex.: chi-example02-common-usersd for chi named as 'example02'
 	configMapCommonUsersNamePattern = "chi-%s-common-usersd"
 
 	// configMapMacrosNamePattern is a template of macros ConfigMap
-	// Ex.: chi-example02-configd-33260f1800-2 for chi named as 'example02'
+	// Ex.: chi-example02-deploy-confd-33260f1800-2 for chi named as 'example02'
 	configMapMacrosNamePattern = "chi-%s-deploy-confd-%s"
 
 	distributedDDLPattern = "/clickhouse/%s/task_queue/ddl"
