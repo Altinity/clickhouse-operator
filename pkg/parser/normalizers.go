@@ -166,7 +166,6 @@ func normalizeSpecConfigurationClustersLayoutShardsReplicas(
 	}
 }
 
-
 // normalizeClusterStandardLayoutCounts ensures at least 1 shard and 1 replica counters
 func normalizeClusterStandardLayoutCounts(layout *chiv1.ChiClusterLayout) error {
 	// Standard layout assumes to have 1 shard and 1 replica by default - in case not specified explicitly
@@ -304,6 +303,10 @@ func deploymentMergeFrom(dst, src *chiv1.ChiDeployment) {
 
 // zoneCopyFrom copies one chiv1.ChiDeploymentZone object into another
 func zoneCopyFrom(dst, src *chiv1.ChiDeploymentZone) {
+	if src == nil {
+		return
+	}
+
 	tmp := make(map[string]string)
 	for k, v := range src.MatchLabels {
 		tmp[k] = v

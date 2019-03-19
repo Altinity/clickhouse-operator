@@ -32,7 +32,7 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentNumber namedN
 
 	options.deploymentNumber = deploymentNumber
 
-	// Allocate data structures
+	// Deployments index - map full deployment ID to deployment itself
 	options.fullDeploymentIDToDeployment = make(map[string]*chiv1.ChiDeployment)
 
 	// Config files section - macros and common config
@@ -154,16 +154,16 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *generatorO
 	serviceList := make(ServiceList, 0, deploymentsNum+1)
 	ports := []corev1.ServicePort{
 		{
+			Name: chDefaultHTTPPortName,
+			Port: chDefaultHTTPPortNumber,
+		},
+		{
 			Name: chDefaultClientPortName,
 			Port: chDefaultClientPortNumber,
 		},
 		{
 			Name: chDefaultInterServerPortName,
 			Port: chDefaultInterServerPortNumber,
-		},
-		{
-			Name: chDefaultHTTPPortName,
-			Port: chDefaultHTTPPortNumber,
 		},
 	}
 
@@ -232,7 +232,7 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *genera
 	statefulSetList := make(StatefulSetList, 0, deploymentsNum)
 
 	// Templates index maps template name to (simplified) template itself
-	// Used to provide names access to templates
+	// Used to provide named access to templates
 	podTemplatesIndex := createPodTemplatesIndex(chi)
 	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
 
