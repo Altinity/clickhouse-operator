@@ -95,12 +95,12 @@ func (d NamedNumber) mergeAndReplaceWithBiggerValues(another NamedNumber) {
 	}
 }
 
-// vcTemplatesIndex maps volume claim template name - which is .spec.templates.volumeClaimTemplates.name
+// volumeClaimTemplatesIndex maps volume claim template name - which is .spec.templates.volumeClaimTemplates.name
 // to "Volume Claim Template"-like structure (simplified).
 // Used to provide dictionary/index for templates
-type vcTemplatesIndex map[string]*vcTemplatesIndexData
+type volumeClaimTemplatesIndex map[string]*volumeClaimTemplatesIndexData
 
-type vcTemplatesIndexData struct {
+type volumeClaimTemplatesIndexData struct {
 	useDefaultName        bool
 	persistentVolumeClaim *corev1.PersistentVolumeClaim
 }

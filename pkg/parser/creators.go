@@ -489,9 +489,9 @@ func createDefaultContainerTemplate(
 	}
 }
 
-// createVolumeClaimTemplatesIndex returns a map of vcTemplatesIndexData used as a reference storage for VolumeClaimTemplates
-func createVolumeClaimTemplatesIndex(chi *chiv1.ClickHouseInstallation) vcTemplatesIndex {
-	index := make(vcTemplatesIndex)
+// createVolumeClaimTemplatesIndex returns a map of volumeClaimTemplatesIndexData used as a reference storage for VolumeClaimTemplates
+func createVolumeClaimTemplatesIndex(chi *chiv1.ClickHouseInstallation) volumeClaimTemplatesIndex {
+	index := make(volumeClaimTemplatesIndex)
 	for i := range chi.Spec.Templates.VolumeClaimTemplates {
 		// Convenience wrapper
 		volumeClaimTemplate := &chi.Spec.Templates.VolumeClaimTemplates[i]
@@ -501,7 +501,7 @@ func createVolumeClaimTemplatesIndex(chi *chiv1.ClickHouseInstallation) vcTempla
 			volumeClaimTemplate.PersistentVolumeClaim.Name = chDefaultVolumeMountNameData
 			useDefaultName = true
 		}
-		index[volumeClaimTemplate.Name] = &vcTemplatesIndexData{
+		index[volumeClaimTemplate.Name] = &volumeClaimTemplatesIndexData{
 			useDefaultName:        useDefaultName,
 			persistentVolumeClaim: &volumeClaimTemplate.PersistentVolumeClaim,
 		}
