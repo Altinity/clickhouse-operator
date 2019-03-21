@@ -17,6 +17,7 @@ package chi
 import (
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopparser "github.com/altinity/clickhouse-operator/pkg/parser"
+	"github.com/golang/glog"
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -27,8 +28,8 @@ import (
 // createCHIResources creates k8s resources based on ClickHouseInstallation object specification
 func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) (*chop.ClickHouseInstallation, error) {
 	chiCopy := chi.DeepCopy()
-	deploymentCountMax := chopparser.NormalizeCHI(chiCopy)
-	chiObjectsMap, fullDeploymentIDs := chopparser.CreateCHIObjects(chiCopy, deploymentCountMax)
+	deploymentNumber := chopparser.NormalizeCHI(chiCopy)
+	chiObjectsMap, fullDeploymentIDs := chopparser.CreateCHIObjects(chiCopy, deploymentNumber)
 	chiCopy.Status = chop.ChiStatus{
 		FullDeploymentIDs: fullDeploymentIDs,
 	}
@@ -65,11 +66,11 @@ func (c *Controller) createConfigMapResource(chi *chop.ClickHouseInstallation, n
 	res, err := c.configMapLister.ConfigMaps(chi.Namespace).Get(newConfigMap.Name)
 	if res != nil {
 		// Object with such name already exists, this is not an error
-		//glog.Infof("Update ConfigMap %s/%s\n", newConfigMap.Namespace, newConfigMap.Name)
-		//_, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Update(newConfigMap)
-		//if err != nil {
-		//	return err
-		//}
+		glog.Infof("Update ConfigMap %s/%s\n", newConfigMap.Namespace, newConfigMap.Name)
+		_, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Update(newConfigMap)
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 

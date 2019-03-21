@@ -70,7 +70,10 @@ metadata:
   labels:
     app: grafana
 spec:
-  type: ClusterIP
+# ClusterIP - Exposes the service on a cluster-internal IP
+#  type: ClusterIP
+# LoadBalancer - Exposes the service externally using a cloud provider’s load balancer
+  type: LoadBalancer
   ports:
   - name: web
     port: 3000
