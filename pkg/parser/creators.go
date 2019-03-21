@@ -23,6 +23,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	intstr "k8s.io/apimachinery/pkg/util/intstr"
 )
 
 // CreateCHIObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
@@ -486,6 +487,15 @@ func createDefaultContainerTemplate(
 			},
 		},
 		VolumeMounts: volumeMounts,
+		ReadinessProbe: &corev1.Probe{
+			Handler: corev1.Handler {
+				HTTPGet: &corev1.HTTPGetAction{
+				Path: "/ping",
+				Port: intstr.Parse(chDefaultHTTPPortName),
+			}},
+			InitialDelaySeconds: 10,
+            PeriodSeconds: 10,
+		},
 	}
 }
 
