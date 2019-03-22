@@ -16,6 +16,8 @@ package parser
 
 import (
 	"encoding/hex"
+	"io"
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -38,4 +40,9 @@ func includeNonEmpty(dst map[string]string, key, src string) {
 	dst[key] = src
 
 	return
+}
+
+// fprintf suppresses warning for unused returns of fmt.Fprintf()
+func fprintf(w io.Writer, format string, a ...interface{}) {
+	_, _ = fmt.Fprintf(w, format, a...)
 }

@@ -6,11 +6,11 @@ spec:
   configuration:
     zookeeper:
       nodes:
-        - host: zookeeper-0.zookeepers.zoons
+        - host: zookeeper-0.zookeepers.zoo3ns
           port: 2181
-        - host: zookeeper-1.zookeepers.zoons
+        - host: zookeeper-1.zookeepers.zoo3ns
           port: 2181
-        - host: zookeeper-2.zookeepers.zoons
+        - host: zookeeper-2.zookeepers.zoo3ns
           port: 2181
     clusters:
     - name: replcluster

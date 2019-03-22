@@ -13,7 +13,7 @@ required = [
   revision = "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
 
 [[constraint]]
-  branch = "release-1.9"
+  branch = "release-1.10"
   name = "k8s.io/apimachinery"
 
 [[constraint]]

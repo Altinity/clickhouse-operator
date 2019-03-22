@@ -16,7 +16,6 @@ package parser
 
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -36,24 +35,23 @@ type StatefulSetList []*apps.StatefulSet
 // ServiceList defines a list of the Service objects
 type ServiceList []*corev1.Service
 
-type genOptions struct {
-	// fullDeploymentIDToFingerprint[fullDeploymentID] = fingerprint
-	fullDeploymentIDToFingerprint map[string]string
+type generatorOptions struct {
 
-	// ssDeployments[fingerprint] = &replica.Deployment
-	ssDeployments map[string]*chiv1.ChiDeployment
+	// deploymentNumber contains number of each deployment required to satisfy clusters' infrastructure
+	// deploymentNumber[fingerprint] = int number of such deployments required
+	deploymentNumber NamedNumber
 
-	// chiDeploymentCountMap struct with max values from all clusters
-	deploymentCountMax chiDeploymentCountMap
-	macrosData         map[string]macrosDataShardDescriptionList
+	// fullDeploymentIDToDeployment[fullDeploymentID] = &replica.Deployment
+	fullDeploymentIDToDeployment map[string]*chiv1.ChiDeployment
 
-	// configSection specifies whether additional config files (such as zookeeper, macros) are configuared
+	// fullDeploymentIDToMacrosData[fullDeploymentID] = macrosDataShardDescriptionList
+	fullDeploymentIDToMacrosData map[string]macrosDataShardDescriptionList
+
+	// commonConfigSections maps section name to section XML config
 	commonConfigSections map[string]string
-}
 
-type includesObjects []struct {
-	filename string
-	fullpath string
+	// commonUsersConfigSections maps section name to section XML config
+	commonUsersConfigSections map[string]string
 }
 
 // macrosDataShardDescriptionList is a list of all shards descriptions
@@ -76,12 +74,12 @@ type macrosDataShardDescription struct {
 	index       int
 }
 
-// chiDeploymentCountMap maps Deployment fingerprint to its usage count
-type chiDeploymentCountMap map[string]int
+// NamedNumber maps Deployment fingerprint to its usage count
+type NamedNumber map[string]int
 
-// mergeInAndReplaceBiggerValues combines chiDeploymentCountMap object with another one
+// mergeAndReplaceWithBiggerValues combines NamedNumber object with another one
 // and replaces local values with another one's values in case another's value is bigger
-func (d chiDeploymentCountMap) mergeInAndReplaceBiggerValues(another chiDeploymentCountMap) {
+func (d NamedNumber) mergeAndReplaceWithBiggerValues(another NamedNumber) {
 
 	// Loop over another struct and bring in new OR bigger values
 	for key, value := range another {
