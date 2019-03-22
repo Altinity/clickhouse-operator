@@ -22,26 +22,22 @@ The ClickHouse Operator for Kubernetes currently provides the following:
 
 ## Requirements
 
- * Kubernetes 1.9.0 +
+ * Kubernetes 1.10.0 +
  
 ## Documentation
 
-**Start**
-1. [Introduction][intro] 
-1. [Quick Start Guides][quick_start]
-1. [More detailed operator installation instructions][detailed]
-1. [ClickHouse Installation Custom Resource explained][crd_explained]
+[Quick Start Guide][quick_start]
 
-**Replication cluster**
-1. [How to setup ClickHouse cluster with replication][replication_setup]
-1. [Zookeeper setup][zookeeper_setup]
+**Adanced setups**
+ * [Detailed Operator Installation Instructions][detailed]
+ * [ClickHouse Installation Custom Resource specification][crd_explained]
+ * [How to setup ClickHouse cluster with replication][replication_setup]
+ * [Zookeeper Setup][zookeeper_setup]
+ * [Persistent Storage Configuration][storage]
 
 **Monitoring**
-1. [Prometheus & clickhouse-operator integration][prometheus_setup]
-1. [Grafana & Prometheus integration][grafana_setup]
-
-**Storage**
-1. [Persistent storage options][storage]
+ * [Prometheus & clickhouse-operator integration][prometheus_setup]
+ * [Grafana & Prometheus integration][grafana_setup]
 
 ## License
 
