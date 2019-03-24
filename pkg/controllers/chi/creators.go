@@ -30,32 +30,37 @@ func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) (*chop
 	chiCopy := chi.DeepCopy()
 	_ = chopparser.CHINormalize(chiCopy)
 	listOfLists := chopparser.CHICreateObjects(chiCopy)
+	err := c.createResources(chiCopy, listOfLists)
 	chiCopy.Status = chop.ChiStatus{}
 
+	return chiCopy, err
+}
+
+func (c *Controller) createResources(chi *chop.ClickHouseInstallation, listOfLists []interface{}) error {
 	for i := range listOfLists {
 		switch listOfLists[i].(type) {
 		case chopparser.ConfigMapList:
 			for j := range listOfLists[i].(chopparser.ConfigMapList) {
-				if err := c.createConfigMapResource(chiCopy, listOfLists[i].(chopparser.ConfigMapList)[j]); err != nil {
-					return nil, err
+				if err := c.createConfigMapResource(chi, listOfLists[i].(chopparser.ConfigMapList)[j]); err != nil {
+					return err
 				}
 			}
 		case chopparser.ServiceList:
 			for j := range listOfLists[i].(chopparser.ConfigMapList) {
-				if err := c.createServiceResource(chiCopy, listOfLists[i].(chopparser.ServiceList)[j]); err != nil {
-					return nil, err
+				if err := c.createServiceResource(chi, listOfLists[i].(chopparser.ServiceList)[j]); err != nil {
+					return err
 				}
 			}
 		case chopparser.StatefulSetList:
 			for j := range listOfLists[i].(chopparser.StatefulSetList) {
-				if err := c.createStatefulSetResource(chiCopy, listOfLists[i].(chopparser.StatefulSetList)[j]); err != nil {
-					return nil, err
+				if err := c.createStatefulSetResource(chi, listOfLists[i].(chopparser.StatefulSetList)[j]); err != nil {
+					return err
 				}
 			}
 		}
 	}
 
-	return chiCopy, nil
+	return nil
 }
 
 // createConfigMapResource creates core.ConfigMap resource
