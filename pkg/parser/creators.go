@@ -273,6 +273,11 @@ func createServiceObjectDeployment(replica *chiv1.ChiClusterLayoutShardReplica) 
 
 // createStatefulSetObjects returns a list of apps.StatefulSet objects
 func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation) StatefulSetList {
+	// Templates index maps template name to template itself
+	// Used to provide named access to templates
+	podTemplatesIndex := createPodTemplatesIndex(chi)
+	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
+
 	statefulSetList := make(StatefulSetList, 0)
 
 	// Create list of apps.StatefulSet objects
@@ -283,8 +288,8 @@ func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation) StatefulSetList
 
 		// Create and setup apps.StatefulSet object
 		statefulSetObject := createStatefulSetObject(replica)
-		setupStatefulSetPodTemplate(statefulSetObject, chi, replica)
-		setupStatefulSetVolumeClaimTemplate(statefulSetObject, chi, replica)
+		setupStatefulSetPodTemplate(statefulSetObject, podTemplatesIndex, replica)
+		setupStatefulSetVolumeClaimTemplate(statefulSetObject, volumeClaimTemplatesIndex, replica)
 
 		// Append apps.StatefulSet to the list of stateful sets
 		statefulSetList = append(statefulSetList, statefulSetObject)
@@ -339,23 +344,20 @@ func createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.
 
 func setupStatefulSetPodTemplate(
 	statefulSetObject *apps.StatefulSet,
-	chi *chiv1.ClickHouseInstallation,
+	podTemplatesIndex podTemplatesIndex,
 	replica *chiv1.ChiClusterLayoutShardReplica,
 ) {
 	statefulSetName := CreateStatefulSetName(replica)
 	configMapMacrosName := CreateConfigMapMacrosName(replica)
-
-	podTemplatesIndex := createPodTemplatesIndex(chi)
-	podTemplate := replica.Deployment.PodTemplate
-
 	configMapCommonName := CreateConfigMapCommonName(replica.Address.CHIName)
 	configMapCommonUsersName := CreateConfigMapCommonUsersName(replica.Address.CHIName)
+	podTemplateName := replica.Deployment.PodTemplate
 
 	// Specify pod templates - either explicitly defined or default
-	if podTemplateData, ok := podTemplatesIndex[podTemplate]; ok {
+	if podTemplate, ok := podTemplatesIndex[podTemplateName]; ok {
 		// Replica references known PodTemplate
-		copyPodTemplateFrom(statefulSetObject, podTemplateData)
-		glog.Infof("createStatefulSetObjects() for statefulSet %s - template: %s\n", statefulSetName, podTemplate)
+		copyPodTemplateFrom(statefulSetObject, podTemplate)
+		glog.Infof("createStatefulSetObjects() for statefulSet %s - template: %s\n", statefulSetName, podTemplateName)
 	} else {
 		// Replica references UNKNOWN PodTemplate
 		copyPodTemplateFrom(statefulSetObject, createDefaultPodTemplate(statefulSetName))
@@ -387,14 +389,10 @@ func setupStatefulSetPodTemplate(
 
 func setupStatefulSetVolumeClaimTemplate(
 	statefulSetObject *apps.StatefulSet,
-	chi *chiv1.ClickHouseInstallation,
+	volumeClaimTemplatesIndex volumeClaimTemplatesIndex,
 	replica *chiv1.ChiClusterLayoutShardReplica,
 ) {
 	statefulSetName := CreateStatefulSetName(replica)
-	// Templates index maps template name to (simplified) template itself
-	// Used to provide named access to templates
-	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
-
 	volumeClaimTemplateName := replica.Deployment.VolumeClaimTemplate
 
 	// Specify volume claim templates - either explicitly defined or default
