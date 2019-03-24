@@ -50,8 +50,6 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentNumber NamedN
 	// 3. profiles
 	options.commonUsersConfigSections = make(map[string]string)
 
-	generateOptions(chi, &options)
-
 	includeNonEmpty(options.commonConfigSections, filenameRemoteServersXML, generateRemoteServersConfig(chi))
 	includeNonEmpty(options.commonConfigSections, filenameZookeeperXML, generateZookeeperConfig(chi))
 	includeNonEmpty(options.commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
@@ -69,38 +67,12 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentNumber NamedN
 
 	// Create k8s objects (data structures)
 	return ObjectsMap{
-		ObjectsServices: createServiceObjects(chi, &options),
+		ObjectsServices: createServiceObjects(chi),
 		// Config Maps are of two types - common and personal
 		ObjectsConfigMaps: createConfigMapObjects(chi, &options),
 		// Config Maps are mapped as config files in Stateful Set objects
-		ObjectsStatefulSets: createStatefulSetObjects(chi, &options),
+		ObjectsStatefulSets: createStatefulSetObjects(chi),
 	}, fullDeploymentIDs
-}
-
-// generateOptions walk over CHI object and filla deployment-related mappings
-func generateOptions(chi *chiv1.ClickHouseInstallation, options *generatorOptions) {
-	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		// Convenience wrapper
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
-		for shardIndex := range cluster.Layout.Shards {
-			// Convenience wrapper
-			shard := &cluster.Layout.Shards[shardIndex]
-			for replicaIndex := range shard.Replicas {
-				// Convenience wrapper
-				replica := &shard.Replicas[replicaIndex]
-				// 1eb454-2 (deployment id - sequential index of this deployment id)
-				fullDeploymentID := generateFullDeploymentID(replica)
-				options.fullDeploymentIDToDeployment[fullDeploymentID] = &replica.Deployment
-				options.fullDeploymentIDToMacrosData[fullDeploymentID] = append(
-					options.fullDeploymentIDToMacrosData[fullDeploymentID],
-					&macrosDataShardDescription{
-						clusterName: cluster.Name,
-						index:       shardIndex + 1,
-					},
-				)
-			}
-		}
-	}
 }
 
 // createConfigMapObjects returns a list of corev1.ConfigMap objects
@@ -108,17 +80,13 @@ func createConfigMapObjects(
 	chi *chiv1.ClickHouseInstallation,
 	options *generatorOptions,
 ) ConfigMapList {
-
-	// Number of deployments to be deployed in this CHI
-	deploymentsNum := len(options.fullDeploymentIDToDeployment)
-
 	// There are two types of configs, kept in ConfigMaps:
 	// 1. Common configs - for all resources in the CHI (remote servers, zookeeper setup, etc)
 	//    consists of common configs and common users configs
 	// 2. Personal configs - macros config
 	// configMapList contains all configs so we need deploymentsNum+2 ConfigMap objects
 	// personal config for each deployment and +2 for common config + common user config
-	configMapList := make(ConfigMapList, 0, deploymentsNum+2)
+	configMapList := make(ConfigMapList, 0, chi.DeploymentsCount()+2)
 
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated config files,
@@ -156,14 +124,14 @@ func createConfigMapObjects(
 		},
 	)
 
-	// Each deployment has to have macros.xml config file
-	for fullDeploymentID := range options.fullDeploymentIDToDeployment {
+	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
+		// Add corev1.Service object to the list
 		// Add corev1.ConfigMap object to the list
 		configMapList = append(
 			configMapList,
 			&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      CreateConfigMapMacrosName(chi.Name, fullDeploymentID),
+					Name:      CreateConfigMapMacrosName(replica),
 					Namespace: chi.Namespace,
 					Labels: map[string]string{
 						ChopGeneratedLabel: chi.Name,
@@ -171,286 +139,343 @@ func createConfigMapObjects(
 					},
 				},
 				Data: map[string]string{
-					filenameMacrosXML: generateHostMacros(chi.Name, fullDeploymentID, options.fullDeploymentIDToMacrosData[fullDeploymentID]),
+					filenameMacrosXML: generateHostMacros(replica),
 				},
 			},
 		)
+
+		return nil
 	}
+	chi.WalkReplicas(replicaProcessor)
 
 	return configMapList
 }
 
 // createServiceObjects returns a list of corev1.Service objects
-func createServiceObjects(chi *chiv1.ClickHouseInstallation, options *generatorOptions) ServiceList {
-	// Number of deployments to be deployed in this CHI
-	deploymentsNum := len(options.fullDeploymentIDToDeployment)
+func createServiceObjects(chi *chiv1.ClickHouseInstallation) ServiceList {
 
-	// We'd like to create "number of deployments" + 1 number of service to provide access
+	// We'd like to create "number of deployments" + 1 kubernetes services in order to provide access
 	// to each deployment separately and one common predictably-named access point - common service
-	serviceList := make(ServiceList, 0, deploymentsNum+1)
-	ports := []corev1.ServicePort{
-		{
-			Name: chDefaultHTTPPortName,
-			Port: chDefaultHTTPPortNumber,
-		},
-		{
-			Name: chDefaultClientPortName,
-			Port: chDefaultClientPortNumber,
-		},
-		{
-			Name: chDefaultInterServerPortName,
-			Port: chDefaultInterServerPortNumber,
-		},
-	}
+	serviceList := make(ServiceList, 0, chi.DeploymentsCount()+1)
 
 	// Create one predictably-named service to access the whole installation
 	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
 	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
-	serviceName := CreateChiServiceName(chi.Name)
 	serviceList = append(
 		serviceList,
-		&corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      serviceName,
-				Namespace: chi.Namespace,
-				Labels: map[string]string{
-					ChopGeneratedLabel: chi.Name,
-					CHIGeneratedLabel:  chi.Name,
-				},
-			},
-			Spec: corev1.ServiceSpec{
-				// ClusterIP: templateDefaultsServiceClusterIP,
-				Selector: map[string]string{
-					CHIGeneratedLabel: chi.Name,
-				},
-				Ports: ports,
-				Type: "LoadBalancer",
-			},
-		},
+		createCHIServiceObject(chi, CreateCHIServiceName(chi.Name)),
 	)
-	glog.Infof("createServiceObjects() for service %s\n", serviceName)
 
 	// Create "number of deployments" service - one service for each stateful set
+	// Each replica has its stateful set and each statefule set has it service
 	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
 	// service/chi-01a1ce7dce-2         ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
-	for fullDeploymentID := range options.fullDeploymentIDToDeployment {
-		statefulSetName := CreateStatefulSetName(fullDeploymentID)
-		serviceName := CreatePodServiceName(fullDeploymentID)
-
+	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
 		// Add corev1.Service object to the list
 		serviceList = append(
 			serviceList,
-			&corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      serviceName,
-					Namespace: chi.Namespace,
-					Labels: map[string]string{
-						ChopGeneratedLabel: chi.Name,
-						CHIGeneratedLabel:  chi.Name,
-					},
-				},
-				Spec: corev1.ServiceSpec{
-					ClusterIP: templateDefaultsServiceClusterIP,
-					Selector: map[string]string{
-						chDefaultAppLabel: statefulSetName,
-					},
-					Ports: ports,
-					Type: "ClusterIP",
-				},
-			},
+			createDeploymentServiceObject(
+				chi,
+				CreateStatefulSetServiceName(replica),
+				CreateStatefulSetName(replica),
+			),
 		)
-		glog.Infof("createServiceObjects() for service %s\n", serviceName)
+
+		return nil
 	}
+	chi.WalkReplicas(replicaProcessor)
 
 	return serviceList
 }
 
+func createCHIServiceObject(
+	chi *chiv1.ClickHouseInstallation,
+	serviceName string,
+) *corev1.Service {
+	glog.Infof("createCHIServiceObject() for service %s\n", serviceName)
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: chi.Namespace,
+			Labels: map[string]string{
+				ChopGeneratedLabel: chi.Name,
+				CHIGeneratedLabel:  chi.Name,
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			// ClusterIP: templateDefaultsServiceClusterIP,
+			Ports: []corev1.ServicePort{
+				{
+					Name: chDefaultHTTPPortName,
+					Port: chDefaultHTTPPortNumber,
+				},
+				{
+					Name: chDefaultClientPortName,
+					Port: chDefaultClientPortNumber,
+				},
+				{
+					Name: chDefaultInterServerPortName,
+					Port: chDefaultInterServerPortNumber,
+				},
+			},
+			Selector: map[string]string{
+				CHIGeneratedLabel: chi.Name,
+			},
+			Type: "LoadBalancer",
+		},
+	}
+}
+
+func createDeploymentServiceObject(
+	chi *chiv1.ClickHouseInstallation,
+	serviceName string,
+	statefulSetName string,
+) *corev1.Service {
+	glog.Infof("createDeploymentServiceObject() for service %s %s\n", serviceName, statefulSetName)
+	return &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: chi.Namespace,
+			Labels: map[string]string{
+				ChopGeneratedLabel: chi.Name,
+				CHIGeneratedLabel:  chi.Name,
+			},
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name: chDefaultHTTPPortName,
+					Port: chDefaultHTTPPortNumber,
+				},
+				{
+					Name: chDefaultClientPortName,
+					Port: chDefaultClientPortNumber,
+				},
+				{
+					Name: chDefaultInterServerPortName,
+					Port: chDefaultInterServerPortNumber,
+				},
+			},
+			Selector: map[string]string{
+				chDefaultAppLabel: statefulSetName,
+			},
+			ClusterIP: templateDefaultsServiceClusterIP,
+			Type: "ClusterIP",
+		},
+	}
+}
+
 // createStatefulSetObjects returns a list of apps.StatefulSet objects
-func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation, options *generatorOptions) StatefulSetList {
-	// Number of deployments to be deployed in this CHI
-	deploymentsNum := len(options.fullDeploymentIDToDeployment)
-
-	statefulSetList := make(StatefulSetList, 0, deploymentsNum)
-
-	// Templates index maps template name to (simplified) template itself
-	// Used to provide named access to templates
-	podTemplatesIndex := createPodTemplatesIndex(chi)
-	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
-
-	// List of volume mounts of the .container - do not allocate any items, they'll be appended
-	configMapCommonName := CreateConfigMapCommonName(chi.Name)
-	configMapCommonUsersName := CreateConfigMapCommonUsersName(chi.Name)
-	commonVolumeMounts := make([]corev1.VolumeMount, 0)
-	// Add common config volume mount at first
-	glog.Infof("commonVolumeMounts %s %s\n", configMapCommonName, configMapCommonUsersName)
-	commonVolumeMounts = append(
-		commonVolumeMounts,
-		corev1.VolumeMount{
-			Name:      configMapCommonName,
-			MountPath: dirPathConfigd,
-		},
-	)
-	// Add common Users config volume mount
-	commonVolumeMounts = append(
-		commonVolumeMounts,
-		corev1.VolumeMount{
-			Name:      configMapCommonUsersName,
-			MountPath: dirPathUsersd,
-		},
-	)
-	// Personal macros would be added later
-	glog.Infof("commonVolumeMounts total len %d\n", len(commonVolumeMounts))
+func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation) StatefulSetList {
+	statefulSetList := make(StatefulSetList, 0, chi.DeploymentsCount())
 
 	// Create list of apps.StatefulSet objects
-	// StatefulSet is created for each Deployment
-	for fullDeploymentID, deployment := range options.fullDeploymentIDToDeployment {
+	// StatefulSet is created for each replica.Deployment
 
-		statefulSetName := CreateStatefulSetName(fullDeploymentID)
-		serviceName := CreatePodServiceName(fullDeploymentID)
-		configMapMacrosName := CreateConfigMapMacrosName(chi.Name, fullDeploymentID)
-		podTemplate := deployment.PodTemplate
-		volumeClaimTemplate := deployment.VolumeClaimTemplate
+	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
+		glog.Infof("createStatefulSetObjects() for statefulSet %s\n", CreateStatefulSetName(replica))
 
-		// Copy list of shared corev1.VolumeMount objects into new slice
-		commonVolumeMountsNum := len(commonVolumeMounts)
-		currentVolumeMounts := make([]corev1.VolumeMount, commonVolumeMountsNum)
-		// Prepare volume mount for current deployment as common mounts + personal mounts
-		copy(currentVolumeMounts, commonVolumeMounts)
-		// Personal volume mounts "macros.xml" section
-		currentVolumeMounts = append(
-			currentVolumeMounts,
-			corev1.VolumeMount{
-				Name:      configMapMacrosName,
-				MountPath: dirPathConfd,
-			},
-		)
-		glog.Infof("Deployment %s has %d current volume mounts\n", fullDeploymentID, len(currentVolumeMounts))
-
-		// Create apps.StatefulSet object
-		replicasNum := int32(1)
-		statefulSetObject := &apps.StatefulSet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      statefulSetName,
-				Namespace: chi.Namespace,
-				Labels: map[string]string{
-					ChopGeneratedLabel: chi.Name,
-					CHIGeneratedLabel:  chi.Name,
-				},
-			},
-			Spec: apps.StatefulSetSpec{
-				Replicas:    &replicasNum,
-				ServiceName: serviceName,
-				Selector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						chDefaultAppLabel: statefulSetName,
-					},
-				},
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: statefulSetName,
-						Labels: map[string]string{
-							chDefaultAppLabel:  statefulSetName,
-							ChopGeneratedLabel: chi.Name,
-							CHIGeneratedLabel:  chi.Name,
-						},
-					},
-					Spec: corev1.PodSpec{
-						Volumes:    []corev1.Volume{},
-						Containers: []corev1.Container{},
-					},
-				},
-			},
-		}
-
-		// Specify pod templates - either explicitly defined or default
-		if podTemplateData, ok := podTemplatesIndex[podTemplate]; ok {
-			// Prepare .statefulSetObject.Spec.Template.Spec - fill with template's data
-
-			// Copy volumes from pod template
-			statefulSetObject.Spec.Template.Spec.Volumes = make([]corev1.Volume, len(podTemplateData.volumes))
-			copy(statefulSetObject.Spec.Template.Spec.Volumes, podTemplateData.volumes)
-
-			// Copy containers from pod template
-			// ... snippet from .spec.templates.podTemplates
-			//       containers:
-			//      - name: clickhouse
-			//        volumeMounts:
-			//        - name: clickhouse-data-test
-			//          mountPath: /var/lib/clickhouse
-			//        image: yandex/clickhouse-server:18.16.2
-			statefulSetObject.Spec.Template.Spec.Containers = make([]corev1.Container, len(podTemplateData.containers))
-			copy(statefulSetObject.Spec.Template.Spec.Containers, podTemplateData.containers)
-
-			// And now loop over all containers in this template and
-			// append all current VolumeMounts which are ConfigMap mounts
-			for i := range statefulSetObject.Spec.Template.Spec.Containers {
-				// Convenience wrapper
-				container := &statefulSetObject.Spec.Template.Spec.Containers[i]
-				for j := range currentVolumeMounts {
-					container.VolumeMounts = append(
-						container.VolumeMounts,
-						currentVolumeMounts[j],
-					)
-				}
-			}
-			glog.Infof("createStatefulSetObjects() for statefulSet %s - template: %s\n", statefulSetName, podTemplate)
-		} else {
-			// No pod template specified for this deployment - use default container template
-			// 1. No Volumes specified
-			// 2. Containers are specified
-			statefulSetObject.Spec.Template.Spec.Containers = append(
-				statefulSetObject.Spec.Template.Spec.Containers,
-				createDefaultContainerTemplate(statefulSetName, currentVolumeMounts),
-			)
-			glog.Infof("createStatefulSetObjects() for statefulSet %s - default template\n", statefulSetName)
-		}
-
-		// Add configMaps as Pod's volumes
-		// Both common and personal
-		statefulSetObject.Spec.Template.Spec.Volumes = append(
-			statefulSetObject.Spec.Template.Spec.Volumes,
-			createConfigMapVolume(configMapCommonName),
-		)
-		statefulSetObject.Spec.Template.Spec.Volumes = append(
-			statefulSetObject.Spec.Template.Spec.Volumes,
-			createConfigMapVolume(configMapCommonUsersName),
-		)
-		statefulSetObject.Spec.Template.Spec.Volumes = append(
-			statefulSetObject.Spec.Template.Spec.Volumes,
-			createConfigMapVolume(configMapMacrosName),
-		)
-
-		// Specify volume claim templates - either explicitly defined or default
-		if volumeClaimTemplateData, ok := volumeClaimTemplatesIndex[volumeClaimTemplate]; ok {
-			statefulSetObject.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-				*volumeClaimTemplatesIndex[volumeClaimTemplate].persistentVolumeClaim,
-			}
-
-			// Add default corev1.VolumeMount section for ClickHouse data
-			if volumeClaimTemplateData.useDefaultName {
-				statefulSetObject.Spec.Template.Spec.Containers[0].VolumeMounts = append(
-					statefulSetObject.Spec.Template.Spec.Containers[0].VolumeMounts,
-					corev1.VolumeMount{
-						Name:      chDefaultVolumeMountNameData,
-						MountPath: dirPathClickHouseData,
-					})
-				glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, volumeClaimTemplate)
-			}
-			glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template: %s\n", statefulSetName, volumeClaimTemplate)
-		} else {
-			glog.Infof("createStatefulSetObjects() for statefulSet %s - no VC templates\n", statefulSetName)
-		}
+		// Create and setup apps.StatefulSet object
+		statefulSetObject := createStatefulSetObject(replica)
+		setupStatefulSetPodTemplate(statefulSetObject, chi, replica)
+		setupStatefulSetVolumeClaimTemplate(statefulSetObject, chi, replica)
 
 		// Append apps.StatefulSet to the list of stateful sets
 		statefulSetList = append(statefulSetList, statefulSetObject)
-		glog.Infof("createStatefulSetObjects() for statefulSet %s\n", statefulSetName)
+
+		return nil
 	}
+	chi.WalkReplicas(replicaProcessor)
 
 	return statefulSetList
 }
 
-// createConfigMapVolume returns corev1.Volume object with defined name
-func createConfigMapVolume(name string) corev1.Volume {
+func createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.StatefulSet {
+	statefulSetName := CreateStatefulSetName(replica)
+	serviceName := CreateStatefulSetServiceName(replica)
+
+	// Create apps.StatefulSet object
+	replicasNum := int32(1)
+	return &apps.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      statefulSetName,
+			Namespace: replica.Address.Namespace,
+			Labels: map[string]string{
+				ChopGeneratedLabel: replica.Address.CHIName,
+				CHIGeneratedLabel:  replica.Address.CHIName,
+			},
+		},
+		Spec: apps.StatefulSetSpec{
+			Replicas:    &replicasNum,
+			ServiceName: serviceName,
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					chDefaultAppLabel: statefulSetName,
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: statefulSetName,
+					Labels: map[string]string{
+						chDefaultAppLabel:  statefulSetName,
+						ChopGeneratedLabel: replica.Address.CHIName,
+						CHIGeneratedLabel:  replica.Address.CHIName,
+					},
+				},
+				Spec: corev1.PodSpec{
+					Volumes:    nil,
+					Containers: nil,
+				},
+			},
+		},
+	}
+}
+
+func setupStatefulSetPodTemplate(
+	statefulSetObject *apps.StatefulSet,
+	chi *chiv1.ClickHouseInstallation,
+	replica *chiv1.ChiClusterLayoutShardReplica,
+) {
+	statefulSetName := CreateStatefulSetName(replica)
+	configMapMacrosName := CreateConfigMapMacrosName(replica)
+
+	podTemplatesIndex := createPodTemplatesIndex(chi)
+	podTemplate := replica.Deployment.PodTemplate
+
+	configMapCommonName := CreateConfigMapCommonName(replica.Address.CHIName)
+	configMapCommonUsersName := CreateConfigMapCommonUsersName(replica.Address.CHIName)
+
+	// Specify pod templates - either explicitly defined or default
+	if podTemplateData, ok := podTemplatesIndex[podTemplate]; ok {
+		// Replica references known PodTemplate
+		copyPodTemplateFrom(statefulSetObject, podTemplateData)
+		glog.Infof("createStatefulSetObjects() for statefulSet %s - template: %s\n", statefulSetName, podTemplate)
+	} else {
+		// Replica references UNKNOWN PodTemplate
+		copyPodTemplateFrom(statefulSetObject, createDefaultPodTemplatesIndexData(statefulSetName))
+		glog.Infof("createStatefulSetObjects() for statefulSet %s - default template\n", statefulSetName)
+	}
+
+	// And now loop over all containers in this template and
+	// append all VolumeMounts which are ConfigMap mounts
+	for i := range statefulSetObject.Spec.Template.Spec.Containers {
+		// Convenience wrapper
+		container := &statefulSetObject.Spec.Template.Spec.Containers[i]
+		// Append to each Container current VolumeMount's to VolumeMount's declared in template
+		container.VolumeMounts = append(
+			container.VolumeMounts,
+			createVolumeMountObject(configMapCommonName, dirPathConfigd),
+			createVolumeMountObject(configMapCommonUsersName, dirPathUsersd),
+			createVolumeMountObject(configMapMacrosName, dirPathConfd),
+		)
+	}
+
+	// Add all ConfigMap objects as Pod's volumes
+	statefulSetObject.Spec.Template.Spec.Volumes = append(
+		statefulSetObject.Spec.Template.Spec.Volumes,
+		createVolumeObjectConfigMap(configMapCommonName),
+		createVolumeObjectConfigMap(configMapCommonUsersName),
+		createVolumeObjectConfigMap(configMapMacrosName),
+	)
+}
+
+func setupStatefulSetVolumeClaimTemplate(
+	statefulSetObject *apps.StatefulSet,
+	chi *chiv1.ClickHouseInstallation,
+	replica *chiv1.ChiClusterLayoutShardReplica,
+) {
+	statefulSetName := CreateStatefulSetName(replica)
+	// Templates index maps template name to (simplified) template itself
+	// Used to provide named access to templates
+	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
+
+	volumeClaimTemplate := replica.Deployment.VolumeClaimTemplate
+
+	// Specify volume claim templates - either explicitly defined or default
+	volumeClaimTemplateData, ok := volumeClaimTemplatesIndex[volumeClaimTemplate]
+	if !ok {
+		// Unknown VolumeClaimTemplate
+		glog.Infof("createStatefulSetObjects() for statefulSet %s - no VC templates\n", statefulSetName)
+		return
+	}
+
+	// Known VolumeClaimTemplate
+
+	statefulSetObject.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
+		*volumeClaimTemplateData.persistentVolumeClaim,
+	}
+
+	// Add default corev1.VolumeMount section for ClickHouse data
+	if volumeClaimTemplateData.useDefaultName {
+		statefulSetObject.Spec.Template.Spec.Containers[0].VolumeMounts = append(
+			statefulSetObject.Spec.Template.Spec.Containers[0].VolumeMounts,
+			corev1.VolumeMount{
+				Name:      chDefaultVolumeMountNameData,
+				MountPath: dirPathClickHouseData,
+			})
+		glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, volumeClaimTemplate)
+	}
+	glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template: %s\n", statefulSetName, volumeClaimTemplate)
+}
+
+func copyPodTemplateFrom(dst *apps.StatefulSet, src *podTemplatesIndexData) {
+	// Prepare .statefulSetObject.Spec.Template.Spec - fill with template's data
+
+	// Setup Container's
+
+	// Copy containers from pod template
+	// ... snippet from .spec.templates.podTemplates
+	//       containers:
+	//      - name: clickhouse
+	//        volumeMounts:
+	//        - name: clickhouse-data-test
+	//          mountPath: /var/lib/clickhouse
+	//        image: yandex/clickhouse-server:18.16.2
+	dst.Spec.Template.Spec.Containers = make([]corev1.Container, len(src.containers))
+	copy(dst.Spec.Template.Spec.Containers, src.containers)
+
+	// Setup Volume's
+	// Copy volumes from pod template
+	dst.Spec.Template.Spec.Volumes = make([]corev1.Volume, len(src.volumes))
+	copy(dst.Spec.Template.Spec.Volumes, src.volumes)
+}
+
+
+// createDefaultPodTemplatesIndexData returns default podTemplatesIndexData
+func createDefaultPodTemplatesIndexData(name string) *podTemplatesIndexData {
+	return &podTemplatesIndexData{
+		//	type ChiPodTemplate struct {
+		//		Name       string             `json:"name"`
+		//		Containers []corev1.Container `json:"containers"`
+		//		Volumes    []corev1.Volume    `json:"volumes"`
+		//	}
+
+		containers: []corev1.Container{
+			{
+				Name:  name,
+				Image: chDefaultDockerImage,
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          chDefaultHTTPPortName,
+						ContainerPort: chDefaultHTTPPortNumber,
+					},
+					{
+						Name:          chDefaultClientPortName,
+						ContainerPort: chDefaultClientPortNumber,
+					},
+					{
+						Name:          chDefaultInterServerPortName,
+						ContainerPort: chDefaultInterServerPortNumber,
+					},
+				},
+			},
+		},
+		volumes:    []corev1.Volume{},
+	}
+}
+
+// createVolumeObjectConfigMap returns corev1.Volume object with defined name
+func createVolumeObjectConfigMap(name string) corev1.Volume {
 	return corev1.Volume{
 		Name: name,
 		VolumeSource: corev1.VolumeSource{
@@ -463,29 +488,11 @@ func createConfigMapVolume(name string) corev1.Volume {
 	}
 }
 
-// createDefaultContainerTemplate returns default corev1.Container object
-func createDefaultContainerTemplate(
-	name string,
-	volumeMounts []corev1.VolumeMount,
-) corev1.Container {
-	return corev1.Container{
-		Name:  name,
-		Image: chDefaultDockerImage,
-		Ports: []corev1.ContainerPort{
-			{
-				Name:          chDefaultHTTPPortName,
-				ContainerPort: chDefaultHTTPPortNumber,
-			},
-			{
-				Name:          chDefaultClientPortName,
-				ContainerPort: chDefaultClientPortNumber,
-			},
-			{
-				Name:          chDefaultInterServerPortName,
-				ContainerPort: chDefaultInterServerPortNumber,
-			},
-		},
-		VolumeMounts: volumeMounts,
+// createVolumeMountObject returns corev1.VolumeMount object with name and mount path
+func createVolumeMountObject(name, mountPath string) corev1.VolumeMount {
+	return corev1.VolumeMount{
+		Name:      name,
+		MountPath: mountPath,
 	}
 }
 
@@ -503,6 +510,11 @@ func createVolumeClaimTemplatesIndex(chi *chiv1.ClickHouseInstallation) volumeCl
 		}
 		index[volumeClaimTemplate.Name] = &volumeClaimTemplatesIndexData{
 			useDefaultName:        useDefaultName,
+			// TODO join
+			//	type ChiVolumeClaimTemplate struct {
+			//		Name                  string                       `json:"name"`
+			//		PersistentVolumeClaim corev1.PersistentVolumeClaim `json:"persistentVolumeClaim"`
+			//	}
 			persistentVolumeClaim: &volumeClaimTemplate.PersistentVolumeClaim,
 		}
 	}
@@ -517,6 +529,12 @@ func createPodTemplatesIndex(chi *chiv1.ClickHouseInstallation) podTemplatesInde
 		// Convenience wrapper
 		podTemplate := &chi.Spec.Templates.PodTemplates[i]
 		index[podTemplate.Name] = &podTemplatesIndexData{
+			// TODO join
+			//	type ChiPodTemplate struct {
+			//		Name       string             `json:"name"`
+			//		Containers []corev1.Container `json:"containers"`
+			//		Volumes    []corev1.Volume    `json:"volumes"`
+			//	}
 			containers: podTemplate.Containers,
 			volumes:    podTemplate.Volumes,
 		}
@@ -526,8 +544,14 @@ func createPodTemplatesIndex(chi *chiv1.ClickHouseInstallation) podTemplatesInde
 }
 
 // CreateConfigMapMacrosName returns a name for a ConfigMap (CH macros) resource based on predefined pattern
-func CreateConfigMapMacrosName(chiName, prefix string) string {
-	return fmt.Sprintf(configMapMacrosNamePattern, chiName, prefix)
+func CreateConfigMapMacrosName(replica *chiv1.ChiClusterLayoutShardReplica) string {
+	return fmt.Sprintf(
+		configMapMacrosNamePattern,
+		replica.Address.CHIName,
+		replica.Address.ClusterIndex,
+		replica.Address.ShardIndex,
+		replica.Address.ReplicaIndex,
+	)
 }
 
 // CreateConfigMapCommonName returns a name for a ConfigMap resource based on predefined pattern
@@ -540,29 +564,47 @@ func CreateConfigMapCommonUsersName(chiName string) string {
 	return fmt.Sprintf(configMapCommonUsersNamePattern, chiName)
 }
 
-// CreatePodServiceName creates a name of a pod Service resource
-// prefix is a fullDeploymentID
-func CreatePodServiceName(prefix string) string {
-	return fmt.Sprintf(podServiceNamePattern, prefix)
-}
-
 // CreateInstServiceName creates a name of a Installation Service resource
 // prefix is a fullDeploymentID
-func CreateChiServiceName(prefix string) string {
+func CreateCHIServiceName(prefix string) string {
 	return fmt.Sprintf(chiServiceNamePattern, prefix)
 }
 
 // CreateStatefulSetName creates a name of a StatefulSet resource
 // prefix is a fullDeploymentID
-func CreateStatefulSetName(prefix string) string {
-	return fmt.Sprintf(statefulSetNamePattern, prefix)
+func CreateStatefulSetName(replica *chiv1.ChiClusterLayoutShardReplica) string {
+	return fmt.Sprintf(
+		statefulSetNamePattern,
+		replica.Address.CHIName,
+		replica.Address.ClusterIndex,
+		replica.Address.ShardIndex,
+		replica.Address.ReplicaIndex,
+	)
+}
+
+// CreateStatefulSetServiceName creates a name of a pod Service resource
+// prefix is a fullDeploymentID
+func CreateStatefulSetServiceName(replica *chiv1.ChiClusterLayoutShardReplica) string {
+	return fmt.Sprintf(
+		statefulSetServiceNamePattern,
+		replica.Address.CHIName,
+		replica.Address.ClusterIndex,
+		replica.Address.ShardIndex,
+		replica.Address.ReplicaIndex,
+	)
 }
 
 // CreatePodHostname creates a name of a Pod resource
 // prefix is a fullDeploymentID
 // ss-1eb454-2-0
-func CreatePodHostname(prefix string) string {
-	return fmt.Sprintf(podHostnamePattern, prefix)
+func CreatePodHostname(replica *chiv1.ChiClusterLayoutShardReplica) string {
+	return fmt.Sprintf(
+		podHostnamePattern,
+		replica.Address.CHIName,
+		replica.Address.ClusterIndex,
+		replica.Address.ShardIndex,
+		replica.Address.ReplicaIndex,
+	)
 }
 
 // CreateNamespaceDomainName creates domain name of a namespace
@@ -580,9 +622,4 @@ func CreatePodFQDN(chiNamespace, prefix string) string {
 		prefix,
 		chiNamespace,
 	)
-}
-
-// CreateClickHouseConfigFullPath create full path to ClickHouse config file
-func CreateClickHouseConfigFullPath(filename string) string {
-	return fmt.Sprintf(fullPathConfigTemplate, filename)
 }

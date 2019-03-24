@@ -102,6 +102,10 @@ type volumeClaimTemplatesIndex map[string]*volumeClaimTemplatesIndexData
 
 type volumeClaimTemplatesIndexData struct {
 	useDefaultName        bool
+	//	type ChiVolumeClaimTemplate struct {
+	//		Name                  string                       `json:"name"`
+	//		PersistentVolumeClaim corev1.PersistentVolumeClaim `json:"persistentVolumeClaim"`
+	//	}
 	persistentVolumeClaim *corev1.PersistentVolumeClaim
 }
 
@@ -111,6 +115,12 @@ type volumeClaimTemplatesIndexData struct {
 type podTemplatesIndex map[string]*podTemplatesIndexData
 
 type podTemplatesIndexData struct {
+	//	type ChiPodTemplate struct {
+	//		Name       string             `json:"name"`
+	//		Containers []corev1.Container `json:"containers"`
+	//		Volumes    []corev1.Volume    `json:"volumes"`
+	//	}
+
 	containers []corev1.Container
 	volumes    []corev1.Volume
 }

@@ -129,14 +129,14 @@ const (
 
 	// NAME                           READY   AGE   CONTAINERS    IMAGES
 	// statefulset.apps/ss-1eb454-1   0/1     2s    ss-1eb454-1   yandex/clickhouse-server:latest
-	statefulSetNamePattern = "chi-%s"
+	statefulSetNamePattern = "chi-%s-%d-%d-%d"
 
 	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
 	// service/svc-1eb454-1  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-1
 	// service/svc-1eb454-2  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-2
 	// In this pattern "%s" is substituted with fullDeploymentIDPattern-generated value
 	// Ex.: svc-1eb454-2
-	podServiceNamePattern = "chi-%s"
+	statefulSetServiceNamePattern = "chi-%s-%d-%d-%d"
 	
 	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
 	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
@@ -152,7 +152,7 @@ const (
 	// NAME                READY   STATUS    RESTARTS   AGE   IP            NODE   NOMINATED NODE   READINESS GATES
 	// pod/ss-1eb454-2   1/1     Running   0          11h   10.244.1.17   kub2   <none>           <none>
 	// Ex.: ss-1eb454-2
-	podHostnamePattern = podServiceNamePattern
+	podHostnamePattern = statefulSetServiceNamePattern
 
 	// podFQDNPattern consists of 3 parts:
 	// 1. nameless service of of stateful set
@@ -176,7 +176,7 @@ const (
 
 	// configMapMacrosNamePattern is a template of macros ConfigMap
 	// Ex.: chi-example02-deploy-confd-33260f1800-2 for chi named as 'example02'
-	configMapMacrosNamePattern = "chi-%s-deploy-confd-%s"
+	configMapMacrosNamePattern = "chi-%s-deploy-confd-%d-%d-%d"
 
 	distributedDDLPattern = "/clickhouse/%s/task_queue/ddl"
 )
