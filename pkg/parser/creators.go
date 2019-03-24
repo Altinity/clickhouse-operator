@@ -36,9 +36,20 @@ func CHICreateObjects(chi *chiv1.ClickHouseInstallation) ObjectsMap {
 }
 
 // createConfigMapObjects returns a list of corev1.ConfigMap objects
-func createConfigMapObjects(
-	chi *chiv1.ClickHouseInstallation,
-) ConfigMapList {
+func createConfigMapObjects(chi *chiv1.ClickHouseInstallation) ConfigMapList {
+	configMapList := make(ConfigMapList, 0)
+	configMapList = append(
+		configMapList,
+		createConfigMapObjectsCommon(chi)...,
+	)
+	configMapList = append(
+		configMapList,
+		createConfigMapObjectsDeployment(chi)...,
+	)
+	return configMapList
+}
+
+func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation) ConfigMapList {
 	var configs configSections
 
 	// commonConfigSections maps section name to section XML config of the following sections:
@@ -68,7 +79,7 @@ func createConfigMapObjects(
 	// 2. Personal configs - macros config
 	// configMapList contains all configs so we need deploymentsNum+2 ConfigMap objects
 	// personal config for each deployment and +2 for common config + common user config
-	configMapList := make(ConfigMapList, 0, chi.DeploymentsCount()+2)
+	configMapList := make(ConfigMapList, 0)
 
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated config files,
@@ -106,6 +117,11 @@ func createConfigMapObjects(
 		},
 	)
 
+	return configMapList
+}
+
+func createConfigMapObjectsDeployment(chi *chiv1.ClickHouseInstallation) ConfigMapList {
+	configMapList := make(ConfigMapList, 0)
 	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
 		// Add corev1.Service object to the list
 		// Add corev1.ConfigMap object to the list
@@ -114,10 +130,10 @@ func createConfigMapObjects(
 			&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      CreateConfigMapMacrosName(replica),
-					Namespace: chi.Namespace,
+					Namespace: replica.Address.Namespace,
 					Labels: map[string]string{
-						ChopGeneratedLabel: chi.Name,
-						CHIGeneratedLabel:  chi.Name,
+						ChopGeneratedLabel: replica.Address.CHIName,
+						CHIGeneratedLabel:  replica.Address.CHIName,
 					},
 				},
 				Data: map[string]string{
@@ -135,34 +151,43 @@ func createConfigMapObjects(
 
 // createServiceObjects returns a list of corev1.Service objects
 func createServiceObjects(chi *chiv1.ClickHouseInstallation) ServiceList {
-
 	// We'd like to create "number of deployments" + 1 kubernetes services in order to provide access
 	// to each deployment separately and one common predictably-named access point - common service
-	serviceList := make(ServiceList, 0, chi.DeploymentsCount()+1)
+	serviceList := make(ServiceList, 0)
+	serviceList = append(
+		serviceList,
+		createServiceObjectsCommon(chi)...,
+	)
+	serviceList = append(
+		serviceList,
+		createServiceObjectsDeployment(chi)...,
+	)
 
+	return serviceList
+}
+
+func createServiceObjectsCommon(chi *chiv1.ClickHouseInstallation) ServiceList {
 	// Create one predictably-named service to access the whole installation
 	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
 	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
-	serviceList = append(
-		serviceList,
-		createCHIServiceObject(chi, CreateCHIServiceName(chi.Name)),
-	)
+	return ServiceList{
+		createServiceObjectChi(chi, CreateCHIServiceName(chi.Name)),
+	}
+}
 
+func createServiceObjectsDeployment(chi *chiv1.ClickHouseInstallation) ServiceList {
 	// Create "number of deployments" service - one service for each stateful set
-	// Each replica has its stateful set and each statefule set has it service
+	// Each replica has its stateful set and each stateful set has it service
 	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
 	// service/chi-01a1ce7dce-2         ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
+	serviceList := make(ServiceList, 0)
+
 	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
 		// Add corev1.Service object to the list
 		serviceList = append(
 			serviceList,
-			createDeploymentServiceObject(
-				chi,
-				CreateStatefulSetServiceName(replica),
-				CreateStatefulSetName(replica),
-			),
+			createServiceObjectDeployment(replica),
 		)
-
 		return nil
 	}
 	chi.WalkReplicas(replicaProcessor)
@@ -170,11 +195,11 @@ func createServiceObjects(chi *chiv1.ClickHouseInstallation) ServiceList {
 	return serviceList
 }
 
-func createCHIServiceObject(
+func createServiceObjectChi(
 	chi *chiv1.ClickHouseInstallation,
 	serviceName string,
 ) *corev1.Service {
-	glog.Infof("createCHIServiceObject() for service %s\n", serviceName)
+	glog.Infof("createServiceObjectChi() for service %s\n", serviceName)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -208,19 +233,18 @@ func createCHIServiceObject(
 	}
 }
 
-func createDeploymentServiceObject(
-	chi *chiv1.ClickHouseInstallation,
-	serviceName string,
-	statefulSetName string,
-) *corev1.Service {
-	glog.Infof("createDeploymentServiceObject() for service %s %s\n", serviceName, statefulSetName)
+func createServiceObjectDeployment(replica *chiv1.ChiClusterLayoutShardReplica) *corev1.Service {
+	serviceName := CreateStatefulSetServiceName(replica)
+	statefulSetName := CreateStatefulSetName(replica)
+
+	glog.Infof("createServiceObjectDeployment() for service %s %s\n", serviceName, statefulSetName)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
-			Namespace: chi.Namespace,
+			Namespace: replica.Address.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel: chi.Name,
-				CHIGeneratedLabel:  chi.Name,
+				ChopGeneratedLabel: replica.Address.CHIName,
+				CHIGeneratedLabel:  replica.Address.CHIName,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -249,7 +273,7 @@ func createDeploymentServiceObject(
 
 // createStatefulSetObjects returns a list of apps.StatefulSet objects
 func createStatefulSetObjects(chi *chiv1.ClickHouseInstallation) StatefulSetList {
-	statefulSetList := make(StatefulSetList, 0, chi.DeploymentsCount())
+	statefulSetList := make(StatefulSetList, 0)
 
 	// Create list of apps.StatefulSet objects
 	// StatefulSet is created for each replica.Deployment
