@@ -35,43 +35,12 @@ type StatefulSetList []*apps.StatefulSet
 // ServiceList defines a list of the Service objects
 type ServiceList []*corev1.Service
 
-type generatorOptions struct {
-
-	// deploymentNumber contains number of each deployment required to satisfy clusters' infrastructure
-	// deploymentNumber[fingerprint] = int number of such deployments required
-	deploymentNumber NamedNumber
-
-	// fullDeploymentIDToDeployment[fullDeploymentID] = &replica.Deployment
-	fullDeploymentIDToDeployment map[string]*chiv1.ChiDeployment
-
-	// fullDeploymentIDToMacrosData[fullDeploymentID] = macrosDataShardDescriptionList
-	fullDeploymentIDToMacrosData map[string]macrosDataShardDescriptionList
-
+type configSections struct {
 	// commonConfigSections maps section name to section XML config
 	commonConfigSections map[string]string
 
 	// commonUsersConfigSections maps section name to section XML config
 	commonUsersConfigSections map[string]string
-}
-
-// macrosDataShardDescriptionList is a list of all shards descriptions
-type macrosDataShardDescriptionList []*macrosDataShardDescription
-
-// macrosDataShardDescription is used in generating macros config file
-// and describes which cluster this shard belongs to and
-// index (1-based, human-friendly and XML-config usable) of this shard within cluster
-// Used to build this:
-//<yandex>
-//    <macros>
-//        <installation>example-02</installation>
-//        <2shard-1repl>example-02-2shard-1repl</02-2shard-1repl>
-//        <2shard-1repl-shard>1 [OWN UNIQUE SHARD ID]</02-2shard-1repl-shard>
-//        <replica>1eb454-1 [OWN UNIQUE ID]</replica>
-//    </macros>
-//</yandex>
-type macrosDataShardDescription struct {
-	clusterName string
-	index       int
 }
 
 // NamedNumber maps Deployment fingerprint to its usage count

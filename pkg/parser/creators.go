@@ -27,58 +27,44 @@ import (
 
 // CreateCHIObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
 // and slice of all full deployment ids
-func CreateCHIObjects(chi *chiv1.ClickHouseInstallation, deploymentNumber NamedNumber) (ObjectsMap, []string) {
-	var options generatorOptions
-
-	options.deploymentNumber = deploymentNumber
-
-	// Deployments index - map full deployment ID to deployment itself
-	options.fullDeploymentIDToDeployment = make(map[string]*chiv1.ChiDeployment)
-
-	// Config files section - macros and common config
-	options.fullDeploymentIDToMacrosData = make(map[string]macrosDataShardDescriptionList)
+func CreateCHIObjects(chi *chiv1.ClickHouseInstallation) ObjectsMap {
+	var configs configSections
 
 	// commonConfigSections maps section name to section XML config of the following sections:
 	// 1. remote servers
 	// 2. zookeeper
 	// 3. settings
 	// 4. listen
-	options.commonConfigSections = make(map[string]string)
+	configs.commonConfigSections = make(map[string]string)
 	// commonConfigSections maps section name to section XML config of the following sections:
 	// 1. users
 	// 2. quotas
 	// 3. profiles
-	options.commonUsersConfigSections = make(map[string]string)
+	configs.commonUsersConfigSections = make(map[string]string)
 
-	includeNonEmpty(options.commonConfigSections, filenameRemoteServersXML, generateRemoteServersConfig(chi))
-	includeNonEmpty(options.commonConfigSections, filenameZookeeperXML, generateZookeeperConfig(chi))
-	includeNonEmpty(options.commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
-	includeNonEmpty(options.commonConfigSections, filenameListenXML, generateListenConfig(chi))
+	includeNonEmpty(configs.commonConfigSections, filenameRemoteServersXML, generateRemoteServersConfig(chi))
+	includeNonEmpty(configs.commonConfigSections, filenameZookeeperXML, generateZookeeperConfig(chi))
+	includeNonEmpty(configs.commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
+	includeNonEmpty(configs.commonConfigSections, filenameListenXML, generateListenConfig(chi))
 
-	includeNonEmpty(options.commonUsersConfigSections, filenameUsersXML, generateUsersConfig(chi))
-	includeNonEmpty(options.commonUsersConfigSections, filenameQuotasXML, generateQuotasConfig(chi))
-	includeNonEmpty(options.commonUsersConfigSections, filenameProfilesXML, generateProfilesConfig(chi))
-
-	// slice of full deployment ID's
-	fullDeploymentIDs := make([]string, 0, len(options.fullDeploymentIDToDeployment))
-	for p := range options.fullDeploymentIDToDeployment {
-		fullDeploymentIDs = append(fullDeploymentIDs, p)
-	}
+	includeNonEmpty(configs.commonUsersConfigSections, filenameUsersXML, generateUsersConfig(chi))
+	includeNonEmpty(configs.commonUsersConfigSections, filenameQuotasXML, generateQuotasConfig(chi))
+	includeNonEmpty(configs.commonUsersConfigSections, filenameProfilesXML, generateProfilesConfig(chi))
 
 	// Create k8s objects (data structures)
 	return ObjectsMap{
 		ObjectsServices: createServiceObjects(chi),
 		// Config Maps are of two types - common and personal
-		ObjectsConfigMaps: createConfigMapObjects(chi, &options),
+		ObjectsConfigMaps: createConfigMapObjects(chi, &configs),
 		// Config Maps are mapped as config files in Stateful Set objects
 		ObjectsStatefulSets: createStatefulSetObjects(chi),
-	}, fullDeploymentIDs
+	}
 }
 
 // createConfigMapObjects returns a list of corev1.ConfigMap objects
 func createConfigMapObjects(
 	chi *chiv1.ClickHouseInstallation,
-	options *generatorOptions,
+	configs *configSections,
 ) ConfigMapList {
 	// There are two types of configs, kept in ConfigMaps:
 	// 1. Common configs - for all resources in the CHI (remote servers, zookeeper setup, etc)
@@ -103,7 +89,7 @@ func createConfigMapObjects(
 				},
 			},
 			// Data contains several sections which are to be several xml configs
-			Data: options.commonConfigSections,
+			Data: configs.commonConfigSections,
 		},
 	)
 
@@ -120,7 +106,7 @@ func createConfigMapObjects(
 				},
 			},
 			// Data contains several sections which are to be several xml configs
-			Data: options.commonUsersConfigSections,
+			Data: configs.commonUsersConfigSections,
 		},
 	)
 
