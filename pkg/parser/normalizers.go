@@ -23,38 +23,27 @@ import (
 	"strings"
 )
 
-// NormalizeCHI normalizes CHI.
+// CHINormalize normalizes CHI.
 // Returns NamedNumber of deployments number required to satisfy clusters' infrastructure
-func NormalizeCHI(chi *chiv1.ClickHouseInstallation) NamedNumber {
+func CHINormalize(chi *chiv1.ClickHouseInstallation) error {
 	// Set defaults for CHI object properties
 	defaultsNormalizeReplicasUseFQDN(&chi.Spec.Defaults)
 	deploymentNormalizeScenario(&chi.Spec.Defaults.Deployment)
 
-	// deploymentNumber maps deployment fingerprint to max among all clusters usage number of this deployment
-	// This number shows how many instances of this deployment are required to satisfy clusters' infrastructure
-	deploymentNumber := make(NamedNumber)
-
 	// Normalize all clusters in this CHI
-	for i := range chi.Spec.Configuration.Clusters {
-		clusterDeploymentNumber := clusterNormalize(chi, &chi.Spec.Configuration.Clusters[i])
-
-		// Accumulate deployments max usage number among all clusters
-		deploymentNumber.mergeAndReplaceWithBiggerValues(clusterDeploymentNumber)
-	}
-
+	chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
+		return clusterNormalize(chi, cluster)
+	})
 	chi.FillAddressInfo()
 
-	return deploymentNumber
+	return nil
 }
 
 // clusterNormalize normalizes cluster and returns deployments usage counters for this cluster
 func clusterNormalize(
 	chi *chiv1.ClickHouseInstallation,
 	cluster *chiv1.ChiCluster,
-) NamedNumber {
-	// How many times each deployment is used in this cluster
-	deploymentNumber := make(NamedNumber)
-
+) error {
 	// Apply default deployment for the whole cluster
 	deploymentMergeFrom(&cluster.Deployment, &chi.Spec.Defaults.Deployment)
 
@@ -85,7 +74,7 @@ func clusterNormalize(
 			// Create replicas for the shard
 			// .Layout.ReplicasCount is provided
 			shard.Replicas = make([]chiv1.ChiClusterLayoutShardReplica, shard.ReplicasCount)
-			shardNormalizeReplicas(chi, shard, &deploymentNumber)
+			shardNormalizeReplicas(shard)
 		}
 
 	case clusterLayoutTypeAdvanced:
@@ -116,7 +105,7 @@ func clusterNormalize(
 				// Create replicas for the shard
 				// .Layout.ReplicasCount is provided
 				shard.Replicas = make([]chiv1.ChiClusterLayoutShardReplica, shard.ReplicasCount)
-				shardNormalizeReplicas(chi, shard, &deploymentNumber)
+				shardNormalizeReplicas(shard)
 
 			default:
 				// Define shards by replicas explicitly:
@@ -137,19 +126,15 @@ func clusterNormalize(
 				shard.ReplicasCount = len(shard.Replicas)
 				// Create replicas for the shard
 				// .Layout.ReplicasCount is provided
-				shardNormalizeReplicas(chi, shard, &deploymentNumber)
+				shardNormalizeReplicas(shard)
 			}
 		}
 	}
 
-	return deploymentNumber
+	return nil
 }
 
-func shardNormalizeReplicas(
-	chi *chiv1.ClickHouseInstallation,
-	shard *chiv1.ChiClusterLayoutShard,
-	deploymentNumber *NamedNumber,
-) {
+func shardNormalizeReplicas(shard *chiv1.ChiClusterLayoutShard) {
 	// Fill each replica
 	for replicaIndex := 0; replicaIndex < shard.ReplicasCount; replicaIndex++ {
 		// Convenience wrapper
@@ -159,17 +144,7 @@ func shardNormalizeReplicas(
 
 		// Inherit deployment
 		deploymentMergeFrom(&replica.Deployment, &shard.Deployment)
-
-		// Count how many times this deployment is used in this cluster
-		fingerprint := deploymentGenerateFingerprint(chi, &replica.Deployment)
-		// Increase number of usages of this deployment within current cluster
-		(*deploymentNumber)[fingerprint]++
-		// index is an index of this deployment within current cluster (among all replicas of this cluster)
-		// and it is one less than number of usages
-		index := (*deploymentNumber)[fingerprint]-1
-
-		replica.Deployment.Fingerprint = fingerprint
-		replica.Deployment.Index = index
+		replica.Deployment.Fingerprint = deploymentGenerateFingerprint(replica, &replica.Deployment)
 	}
 }
 
@@ -233,9 +208,9 @@ func deploymentGenerateString(d *chiv1.ChiDeployment) string {
 // of chiv1.ChiDeployment object located inside chiv1.ClickHouseInstallation
 // IMPORTANT there can be the same deployments inside ClickHouseInstallation object
 // and they will have the same fingerprint
-func deploymentGenerateFingerprint(chi *chiv1.ClickHouseInstallation, d *chiv1.ChiDeployment) string {
+func deploymentGenerateFingerprint(replica *chiv1.ChiClusterLayoutShardReplica, deployment *chiv1.ChiDeployment) string {
 	hasher := sha1.New()
-	hasher.Write([]byte(chi.Namespace + chi.Name + deploymentGenerateString(d)))
+	hasher.Write([]byte(replica.Address.CHIName + deploymentGenerateString(deployment)))
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 

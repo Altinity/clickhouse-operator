@@ -25,9 +25,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CreateCHIObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
-// and slice of all full deployment ids
-func CreateCHIObjects(chi *chiv1.ClickHouseInstallation) ObjectsMap {
+// CHICreateObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
+func CHICreateObjects(chi *chiv1.ClickHouseInstallation) ObjectsMap {
+	// Create k8s objects (data structures)
+	return ObjectsMap{
+		ObjectsServices:     createServiceObjects(chi),
+		ObjectsConfigMaps:   createConfigMapObjects(chi),
+		ObjectsStatefulSets: createStatefulSetObjects(chi),
+	}
+}
+
+// createConfigMapObjects returns a list of corev1.ConfigMap objects
+func createConfigMapObjects(
+	chi *chiv1.ClickHouseInstallation,
+) ConfigMapList {
 	var configs configSections
 
 	// commonConfigSections maps section name to section XML config of the following sections:
@@ -51,21 +62,6 @@ func CreateCHIObjects(chi *chiv1.ClickHouseInstallation) ObjectsMap {
 	includeNonEmpty(configs.commonUsersConfigSections, filenameQuotasXML, generateQuotasConfig(chi))
 	includeNonEmpty(configs.commonUsersConfigSections, filenameProfilesXML, generateProfilesConfig(chi))
 
-	// Create k8s objects (data structures)
-	return ObjectsMap{
-		ObjectsServices: createServiceObjects(chi),
-		// Config Maps are of two types - common and personal
-		ObjectsConfigMaps: createConfigMapObjects(chi, &configs),
-		// Config Maps are mapped as config files in Stateful Set objects
-		ObjectsStatefulSets: createStatefulSetObjects(chi),
-	}
-}
-
-// createConfigMapObjects returns a list of corev1.ConfigMap objects
-func createConfigMapObjects(
-	chi *chiv1.ClickHouseInstallation,
-	configs *configSections,
-) ConfigMapList {
 	// There are two types of configs, kept in ConfigMaps:
 	// 1. Common configs - for all resources in the CHI (remote servers, zookeeper setup, etc)
 	//    consists of common configs and common users configs

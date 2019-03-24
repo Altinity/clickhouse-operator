@@ -28,11 +28,9 @@ import (
 // createCHIResources creates k8s resources based on ClickHouseInstallation object specification
 func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) (*chop.ClickHouseInstallation, error) {
 	chiCopy := chi.DeepCopy()
-	deploymentNumber := chopparser.NormalizeCHI(chiCopy)
-	chiObjectsMap, fullDeploymentIDs := chopparser.CreateCHIObjects(chiCopy, deploymentNumber)
-	chiCopy.Status = chop.ChiStatus{
-		FullDeploymentIDs: fullDeploymentIDs,
-	}
+	_ = chopparser.CHINormalize(chiCopy)
+	chiObjectsMap := chopparser.CHICreateObjects(chiCopy)
+	chiCopy.Status = chop.ChiStatus{}
 
 	for _, objList := range chiObjectsMap {
 		switch v := objList.(type) {
