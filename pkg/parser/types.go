@@ -20,12 +20,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// ObjectKind defines k8s objects list kind
-type ObjectKind uint8
-
-// ObjectsMap defines map of a generated k8s objects
-type ObjectsMap map[ObjectKind]interface{}
-
 // ConfigMapList defines a list of the ConfigMap objects
 type ConfigMapList []*corev1.ConfigMap
 

@@ -26,13 +26,13 @@ import (
 )
 
 // CHICreateObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
-func CHICreateObjects(chi *chiv1.ClickHouseInstallation) ObjectsMap {
-	// Create k8s objects (data structures)
-	return ObjectsMap{
-		ObjectsServices:     createServiceObjects(chi),
-		ObjectsConfigMaps:   createConfigMapObjects(chi),
-		ObjectsStatefulSets: createStatefulSetObjects(chi),
-	}
+func CHICreateObjects(chi *chiv1.ClickHouseInstallation) []interface{} {
+	list := make([]interface{}, 0)
+	list = append(list, createServiceObjects(chi))
+	list = append(list, createConfigMapObjects(chi))
+	list = append(list, createStatefulSetObjects(chi))
+
+	return list
 }
 
 // createConfigMapObjects returns a list of corev1.ConfigMap objects
