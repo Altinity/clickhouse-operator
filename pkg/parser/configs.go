@@ -151,18 +151,14 @@ func generateRemoteServersConfigReplicaHostname(
 	chi *chiv1.ClickHouseInstallation,
 	replica *chiv1.ChiClusterLayoutShardReplica,
 ) string {
-
-	// 1eb454-2 (deployment id - sequential index of this deployment id)
-	fullDeploymentID := generateFullDeploymentID(replica)
-
-	var namespaceDomainName string
 	if chi.Spec.Defaults.ReplicasUseFQDN == 1 {
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local
-		namespaceDomainName = "." + CreateNamespaceDomainName(chi.Namespace)
+		return CreatePodHostname(replica) + "." + CreateNamespaceDomainName(chi.Namespace)
+	} else {
+		return CreatePodHostname(replica)
 	}
-	return CreatePodHostname(fullDeploymentID) + namespaceDomainName
 }
 
 // generateRemoteServersConfig creates "remote_servers.xml" content and calculates data generation parameters for other sections

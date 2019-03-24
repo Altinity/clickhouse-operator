@@ -95,32 +95,12 @@ func (d NamedNumber) mergeAndReplaceWithBiggerValues(another NamedNumber) {
 	}
 }
 
-// volumeClaimTemplatesIndex maps volume claim template name - which is .spec.templates.volumeClaimTemplates.name
-// to "Volume Claim Template"-like structure (simplified).
+// volumeClaimTemplatesIndex maps volume claim template name - which
+// is .spec.templates.volumeClaimTemplates.name to VolumeClaimTemplate itself
 // Used to provide dictionary/index for templates
-type volumeClaimTemplatesIndex map[string]*volumeClaimTemplatesIndexData
+type volumeClaimTemplatesIndex map[string]*chiv1.ChiVolumeClaimTemplate
 
-type volumeClaimTemplatesIndexData struct {
-	useDefaultName        bool
-	//	type ChiVolumeClaimTemplate struct {
-	//		Name                  string                       `json:"name"`
-	//		PersistentVolumeClaim corev1.PersistentVolumeClaim `json:"persistentVolumeClaim"`
-	//	}
-	persistentVolumeClaim *corev1.PersistentVolumeClaim
-}
-
-// podTemplatesIndex maps pod template name - which is .spec.templates.podTemplates.name
-// to "Pod Template"-like structure (simplified).
+// podTemplatesIndex maps pod template name - which
+// is .spec.templates.podTemplates.name to PodTemplate itself
 // Used to provide dictionary/index for templates
-type podTemplatesIndex map[string]*podTemplatesIndexData
-
-type podTemplatesIndexData struct {
-	//	type ChiPodTemplate struct {
-	//		Name       string             `json:"name"`
-	//		Containers []corev1.Container `json:"containers"`
-	//		Volumes    []corev1.Volume    `json:"volumes"`
-	//	}
-
-	containers []corev1.Container
-	volumes    []corev1.Volume
-}
+type podTemplatesIndex map[string]*chiv1.ChiPodTemplate

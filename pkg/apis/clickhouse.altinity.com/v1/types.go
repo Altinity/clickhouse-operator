@@ -71,7 +71,7 @@ type ChiCluster struct {
 }
 
 type ChiClusterAddress struct {
-	Namespace	string `json:"namespace"`
+	Namespace    string `json:"namespace"`
 	CHIName      string `json:"chiName"`
 	ClusterName  string `json:"clusterName"`
 	ClusterIndex int    `json:"clusterIndex"`
@@ -98,7 +98,7 @@ type ChiClusterLayoutShard struct {
 }
 
 type ChiClusterLayoutShardAddress struct {
-	Namespace	string `json:"namespace"`
+	Namespace    string `json:"namespace"`
 	CHIName      string `json:"chiName"`
 	ClusterName  string `json:"clusterName"`
 	ClusterIndex int    `json:"clusterIndex"`
@@ -114,7 +114,7 @@ type ChiClusterLayoutShardReplica struct {
 }
 
 type ChiClusterLayoutShardReplicaAddress struct {
-	Namespace	string `json:"namespace"`
+	Namespace    string `json:"namespace"`
 	CHIName      string `json:"chiName"`
 	ClusterName  string `json:"clusterName"`
 	ClusterIndex int    `json:"clusterIndex"`
@@ -125,7 +125,7 @@ type ChiClusterLayoutShardReplicaAddress struct {
 // ChiTemplates defines templates section of .spec
 type ChiTemplates struct {
 	// TODO refactor into [string]ChiPodTemplate
-	PodTemplates         []ChiPodTemplate         `json:"podTemplates,omitempty"`
+	PodTemplates []ChiPodTemplate `json:"podTemplates,omitempty"`
 	// TODO refactor into [string]ChiVolumeClaimTemplate
 	VolumeClaimTemplates []ChiVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
@@ -175,6 +175,7 @@ type ChiConfigurationZookeeperNode struct {
 type ChiVolumeClaimTemplate struct {
 	Name                  string                       `json:"name"`
 	PersistentVolumeClaim corev1.PersistentVolumeClaim `json:"persistentVolumeClaim"`
+	UseDefaultName        bool                         `json:"useDefaultName"`
 }
 
 // ChiPodTemplate defines item of a podTemplates section of .spec.templates

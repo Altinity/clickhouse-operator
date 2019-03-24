@@ -260,7 +260,7 @@ func createDeploymentServiceObject(
 				chDefaultAppLabel: statefulSetName,
 			},
 			ClusterIP: templateDefaultsServiceClusterIP,
-			Type: "ClusterIP",
+			Type:      "ClusterIP",
 		},
 	}
 }
@@ -352,7 +352,7 @@ func setupStatefulSetPodTemplate(
 		glog.Infof("createStatefulSetObjects() for statefulSet %s - template: %s\n", statefulSetName, podTemplate)
 	} else {
 		// Replica references UNKNOWN PodTemplate
-		copyPodTemplateFrom(statefulSetObject, createDefaultPodTemplatesIndexData(statefulSetName))
+		copyPodTemplateFrom(statefulSetObject, createDefaultPodTemplate(statefulSetName))
 		glog.Infof("createStatefulSetObjects() for statefulSet %s - default template\n", statefulSetName)
 	}
 
@@ -389,10 +389,10 @@ func setupStatefulSetVolumeClaimTemplate(
 	// Used to provide named access to templates
 	volumeClaimTemplatesIndex := createVolumeClaimTemplatesIndex(chi)
 
-	volumeClaimTemplate := replica.Deployment.VolumeClaimTemplate
+	volumeClaimTemplateName := replica.Deployment.VolumeClaimTemplate
 
 	// Specify volume claim templates - either explicitly defined or default
-	volumeClaimTemplateData, ok := volumeClaimTemplatesIndex[volumeClaimTemplate]
+	volumeClaimTemplate, ok := volumeClaimTemplatesIndex[volumeClaimTemplateName]
 	if !ok {
 		// Unknown VolumeClaimTemplate
 		glog.Infof("createStatefulSetObjects() for statefulSet %s - no VC templates\n", statefulSetName)
@@ -402,23 +402,23 @@ func setupStatefulSetVolumeClaimTemplate(
 	// Known VolumeClaimTemplate
 
 	statefulSetObject.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
-		*volumeClaimTemplateData.persistentVolumeClaim,
+		volumeClaimTemplate.PersistentVolumeClaim,
 	}
 
 	// Add default corev1.VolumeMount section for ClickHouse data
-	if volumeClaimTemplateData.useDefaultName {
+	if volumeClaimTemplate.UseDefaultName {
 		statefulSetObject.Spec.Template.Spec.Containers[0].VolumeMounts = append(
 			statefulSetObject.Spec.Template.Spec.Containers[0].VolumeMounts,
 			corev1.VolumeMount{
 				Name:      chDefaultVolumeMountNameData,
 				MountPath: dirPathClickHouseData,
 			})
-		glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, volumeClaimTemplate)
+		glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, volumeClaimTemplateName)
 	}
-	glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template: %s\n", statefulSetName, volumeClaimTemplate)
+	glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template: %s\n", statefulSetName, volumeClaimTemplateName)
 }
 
-func copyPodTemplateFrom(dst *apps.StatefulSet, src *podTemplatesIndexData) {
+func copyPodTemplateFrom(dst *apps.StatefulSet, src *chiv1.ChiPodTemplate) {
 	// Prepare .statefulSetObject.Spec.Template.Spec - fill with template's data
 
 	// Setup Container's
@@ -431,26 +431,20 @@ func copyPodTemplateFrom(dst *apps.StatefulSet, src *podTemplatesIndexData) {
 	//        - name: clickhouse-data-test
 	//          mountPath: /var/lib/clickhouse
 	//        image: yandex/clickhouse-server:18.16.2
-	dst.Spec.Template.Spec.Containers = make([]corev1.Container, len(src.containers))
-	copy(dst.Spec.Template.Spec.Containers, src.containers)
+	dst.Spec.Template.Spec.Containers = make([]corev1.Container, len(src.Containers))
+	copy(dst.Spec.Template.Spec.Containers, src.Containers)
 
 	// Setup Volume's
 	// Copy volumes from pod template
-	dst.Spec.Template.Spec.Volumes = make([]corev1.Volume, len(src.volumes))
-	copy(dst.Spec.Template.Spec.Volumes, src.volumes)
+	dst.Spec.Template.Spec.Volumes = make([]corev1.Volume, len(src.Volumes))
+	copy(dst.Spec.Template.Spec.Volumes, src.Volumes)
 }
 
-
-// createDefaultPodTemplatesIndexData returns default podTemplatesIndexData
-func createDefaultPodTemplatesIndexData(name string) *podTemplatesIndexData {
-	return &podTemplatesIndexData{
-		//	type ChiPodTemplate struct {
-		//		Name       string             `json:"name"`
-		//		Containers []corev1.Container `json:"containers"`
-		//		Volumes    []corev1.Volume    `json:"volumes"`
-		//	}
-
-		containers: []corev1.Container{
+// createDefaultPodTemplate returns default podTemplatesIndexData
+func createDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
+	return &chiv1.ChiPodTemplate{
+		Name: "createDefaultPodTemplate",
+		Containers: []corev1.Container{
 			{
 				Name:  name,
 				Image: chDefaultDockerImage,
@@ -470,7 +464,7 @@ func createDefaultPodTemplatesIndexData(name string) *podTemplatesIndexData {
 				},
 			},
 		},
-		volumes:    []corev1.Volume{},
+		Volumes: []corev1.Volume{},
 	}
 }
 
@@ -503,20 +497,11 @@ func createVolumeClaimTemplatesIndex(chi *chiv1.ClickHouseInstallation) volumeCl
 		// Convenience wrapper
 		volumeClaimTemplate := &chi.Spec.Templates.VolumeClaimTemplates[i]
 
-		useDefaultName := false
 		if volumeClaimTemplate.PersistentVolumeClaim.Name == useDefaultPersistentVolumeClaimMacro {
 			volumeClaimTemplate.PersistentVolumeClaim.Name = chDefaultVolumeMountNameData
-			useDefaultName = true
+			volumeClaimTemplate.UseDefaultName = true
 		}
-		index[volumeClaimTemplate.Name] = &volumeClaimTemplatesIndexData{
-			useDefaultName:        useDefaultName,
-			// TODO join
-			//	type ChiVolumeClaimTemplate struct {
-			//		Name                  string                       `json:"name"`
-			//		PersistentVolumeClaim corev1.PersistentVolumeClaim `json:"persistentVolumeClaim"`
-			//	}
-			persistentVolumeClaim: &volumeClaimTemplate.PersistentVolumeClaim,
-		}
+		index[volumeClaimTemplate.Name] = volumeClaimTemplate
 	}
 
 	return index
@@ -528,16 +513,7 @@ func createPodTemplatesIndex(chi *chiv1.ClickHouseInstallation) podTemplatesInde
 	for i := range chi.Spec.Templates.PodTemplates {
 		// Convenience wrapper
 		podTemplate := &chi.Spec.Templates.PodTemplates[i]
-		index[podTemplate.Name] = &podTemplatesIndexData{
-			// TODO join
-			//	type ChiPodTemplate struct {
-			//		Name       string             `json:"name"`
-			//		Containers []corev1.Container `json:"containers"`
-			//		Volumes    []corev1.Volume    `json:"volumes"`
-			//	}
-			containers: podTemplate.Containers,
-			volumes:    podTemplate.Volumes,
-		}
+		index[podTemplate.Name] = podTemplate
 	}
 
 	return index
