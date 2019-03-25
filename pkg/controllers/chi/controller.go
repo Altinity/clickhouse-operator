@@ -56,12 +56,14 @@ type Controller struct {
 	chopClient              chopclientset.Interface
 	chiLister               choplisters.ClickHouseInstallationLister
 	chiListerSynced         cache.InformerSynced
-	statefulSetLister       appslisters.StatefulSetLister
-	statefulSetListerSynced cache.InformerSynced
-	configMapLister         corelisters.ConfigMapLister
-	configMapListerSynced   cache.InformerSynced
 	serviceLister           corelisters.ServiceLister
 	serviceListerSynced     cache.InformerSynced
+	configMapLister         corelisters.ConfigMapLister
+	configMapListerSynced   cache.InformerSynced
+	statefulSetLister       appslisters.StatefulSetLister
+	statefulSetListerSynced cache.InformerSynced
+	podLister               corelisters.PodLister
+	podListerSynced         cache.InformerSynced
 	queue                   workqueue.RateLimitingInterface
 	recorder                record.EventRecorder
 	metricsExporter         *chopmetrics.Exporter
@@ -86,9 +88,10 @@ func CreateController(
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
 	chiInformer chopinformers.ClickHouseInstallationInformer,
-	statefulSetInformer appsinformers.StatefulSetInformer,
-	configMapInformer coreinformers.ConfigMapInformer,
 	serviceInformer coreinformers.ServiceInformer,
+	configMapInformer coreinformers.ConfigMapInformer,
+	statefulSetInformer appsinformers.StatefulSetInformer,
+	podInformer coreinformers.PodInformer,
 	chopMetricsExporter *chopmetrics.Exporter,
 ) *Controller {
 
@@ -120,20 +123,25 @@ func CreateController(
 		// chiListerSynced used in waitForCacheSync()
 		chiListerSynced: chiInformer.Informer().HasSynced,
 
-		// statefulSetLister used as statefulSetLister.StatefulSets(namespace).Get(name)
-		statefulSetLister: statefulSetInformer.Lister(),
-		// statefulSetListerSynced used in waitForCacheSync()
-		statefulSetListerSynced: statefulSetInformer.Informer().HasSynced,
+		// serviceLister used as serviceLister.Services(namespace).Get(name)
+		serviceLister: serviceInformer.Lister(),
+		// serviceListerSynced used in waitForCacheSync()
+		serviceListerSynced: serviceInformer.Informer().HasSynced,
 
 		// configMapLister used as configMapLister.ConfigMaps(namespace).Get(name)
 		configMapLister: configMapInformer.Lister(),
 		// configMapListerSynced used in waitForCacheSync()
 		configMapListerSynced: configMapInformer.Informer().HasSynced,
 
-		// serviceLister used as serviceLister.Services(namespace).Get(name)
-		serviceLister: serviceInformer.Lister(),
-		// serviceListerSynced used in waitForCacheSync()
-		serviceListerSynced: serviceInformer.Informer().HasSynced,
+		// statefulSetLister used as statefulSetLister.StatefulSets(namespace).Get(name)
+		statefulSetLister: statefulSetInformer.Lister(),
+		// statefulSetListerSynced used in waitForCacheSync()
+		statefulSetListerSynced: statefulSetInformer.Informer().HasSynced,
+
+		// podLister used as statefulSetLister.StatefulSets(namespace).Get(name)
+		podLister: podInformer.Lister(),
+		// podListerSynced used in waitForCacheSync()
+		podListerSynced: podInformer.Informer().HasSynced,
 
 		// queue used to organize events queue processed by operator
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
@@ -187,32 +195,80 @@ func CreateController(
 		},
 	})
 
+	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			service := obj.(*core.Service)
+			glog.V(1).Infof("serviceInformer AddFunc %s/%s", service.Namespace, service.Name)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			service := oldObj.(*core.Service)
+			glog.V(1).Infof("serviceInformer UpdateFunc %s/%s", service.Namespace, service.Name)
+		},
+		DeleteFunc: func(obj interface{}) {
+			service := obj.(*core.Service)
+			glog.V(1).Infof("serviceInformer DeleteFunc %s/%s", service.Namespace, service.Name)
+		},
+	})
+
+	configMapInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			configMap := obj.(*core.ConfigMap)
+			glog.V(1).Infof("configMapInformer AddFunc %s/%s", configMap.Namespace, configMap.Name)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			configMap := oldObj.(*core.ConfigMap)
+			glog.V(1).Infof("configMapInformer UpdateFunc %s/%s", configMap.Namespace, configMap.Name)
+		},
+		DeleteFunc: func(obj interface{}) {
+			configMap := obj.(*core.ConfigMap)
+			glog.V(1).Infof("configMapInformer DeleteFunc %s/%s", configMap.Namespace, configMap.Name)
+		},
+	})
+
 	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
-			glog.V(1).Infof("statefulSetInformer.AddFunc - %s/%s added", statefulSet.Namespace, statefulSet.Name)
-			controller.handleObject(obj)
+			glog.V(1).Infof("statefulSetInformer AddFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			//controller.handleObject(obj)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			glog.V(1).Info("statefulSetInformer.UpdateFunc")
-			newStatefulSet := newObj.(*apps.StatefulSet)
-			oldStatefulSet := oldObj.(*apps.StatefulSet)
-			if newStatefulSet.ResourceVersion == oldStatefulSet.ResourceVersion {
-				glog.V(1).Infof("statefulSetInformer.UpdateFunc - no update required, no ResourceVersion change %s", newStatefulSet.ResourceVersion)
-				return
-			}
+			statefulSet := oldObj.(*apps.StatefulSet)
+			glog.V(1).Infof("statefulSetInformer UpdateFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			/*
+				newStatefulSet := newObj.(*apps.StatefulSet)
+				oldStatefulSet := oldObj.(*apps.StatefulSet)
+				if newStatefulSet.ResourceVersion == oldStatefulSet.ResourceVersion {
+					glog.V(1).Infof("statefulSetInformer.UpdateFunc - no update required, no ResourceVersion change %s", newStatefulSet.ResourceVersion)
+					return
+				}
 
-			if newStatefulSet.Status.ReadyReplicas == newStatefulSet.Status.Replicas {
-				glog.V(1).Infof("statefulSetInformer.UpdateFunc - %s/%s is Ready", newStatefulSet.Namespace, newStatefulSet.Name)
-			}
+				if newStatefulSet.Status.ReadyReplicas == newStatefulSet.Status.Replicas {
+					glog.V(1).Infof("statefulSetInformer.UpdateFunc - %s/%s is Ready", newStatefulSet.Namespace, newStatefulSet.Name)
+				}
 
-			glog.V(1).Info("statefulSetInformer.UpdateFunc - UPDATE REQUIRED")
-			controller.handleObject(newObj)
+				glog.V(1).Info("statefulSetInformer.UpdateFunc - UPDATE REQUIRED")
+				controller.handleObject(newObj)
+			*/
 		},
 		DeleteFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
-			glog.V(1).Infof("statefulSetInformer.DeleteFunc - %s/%s deleted", statefulSet.Namespace, statefulSet.Name)
-			controller.handleObject(obj)
+			glog.V(1).Infof("statefulSetInformer DeleteFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			//controller.handleObject(obj)
+		},
+	})
+
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			pod := obj.(*core.Pod)
+			glog.V(1).Infof("podInformer AddFunc %s/%s", pod.Namespace, pod.Name)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			pod := oldObj.(*core.Pod)
+			glog.V(1).Infof("podInformer UpdateFunc %s/%s", pod.Namespace, pod.Name)
+		},
+		DeleteFunc: func(obj interface{}) {
+			pod := obj.(*core.Pod)
+			glog.V(1).Infof("podInformer DeleteFunc %s/%s", pod.Namespace, pod.Name)
 		},
 	})
 
@@ -357,7 +413,7 @@ func (c *Controller) syncNewChi(chi *chop.ClickHouseInstallation) error {
 	}
 
 	glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
-	
+
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
 	c.metricsExporter.EnsureControlledValues(chi.Name, chopparser.ListPodFQDNs(chi))
 
