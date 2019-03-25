@@ -28,11 +28,9 @@ import (
 
 // createCHIResources creates k8s resources based on ClickHouseInstallation object specification
 func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) (*chop.ClickHouseInstallation, error) {
-	chiCopy := chi.DeepCopy()
-	_ = chopparser.CHINormalize(chiCopy)
-	listOfLists := chopparser.CHICreateObjects(chiCopy)
-	err := c.createOrUpdateResources(chiCopy, listOfLists)
-	chiCopy.Status = chop.ChiStatus{}
+	chiCopy, err := chopparser.ChiCopyAndNormalize(chi)
+	listOfLists := chopparser.ChiCreateObjects(chiCopy)
+	err = c.createOrUpdateResources(chiCopy, listOfLists)
 
 	return chiCopy, err
 }
@@ -71,15 +69,15 @@ func (c *Controller) deleteShard(shard *chop.ChiClusterLayoutShard) {
 func (c *Controller) createOrUpdateResources(chi *chop.ClickHouseInstallation, listOfLists []interface{}) error {
 	for i := range listOfLists {
 		switch listOfLists[i].(type) {
-		case chopparser.ConfigMapList:
-			for j := range listOfLists[i].(chopparser.ConfigMapList) {
-				if err := c.createOrUpdateConfigMapResource(chi, listOfLists[i].(chopparser.ConfigMapList)[j]); err != nil {
+		case chopparser.ServiceList:
+			for j := range listOfLists[i].(chopparser.ServiceList) {
+				if err := c.createOrUpdateServiceResource(chi, listOfLists[i].(chopparser.ServiceList)[j]); err != nil {
 					return err
 				}
 			}
-		case chopparser.ServiceList:
+		case chopparser.ConfigMapList:
 			for j := range listOfLists[i].(chopparser.ConfigMapList) {
-				if err := c.createOrUpdateServiceResource(chi, listOfLists[i].(chopparser.ServiceList)[j]); err != nil {
+				if err := c.createOrUpdateConfigMapResource(chi, listOfLists[i].(chopparser.ConfigMapList)[j]); err != nil {
 					return err
 				}
 			}

@@ -40,7 +40,7 @@ type ChiSpec struct {
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	FullDeploymentIDs []string `json:"fullDeploymentIDs"`
+	IsFilled int `json:"isFilled"`
 }
 
 // ChiDefaults defines defaults section of .spec
@@ -200,9 +200,9 @@ const (
 )
 
 // IsNew checks whether CHI is a new one or already known and was processed/created earlier
-func (chi *ClickHouseInstallation) IsNew() bool {
+func (chi *ClickHouseInstallation) IsFilled() bool {
 	// New CHI does not have FullDeploymentIDs specified
-	return chi.Status.FullDeploymentIDs == nil || len(chi.Status.FullDeploymentIDs) == 0
+	return chi.Status.IsFilled > 0
 }
 
 func (chi *ClickHouseInstallation) DeploymentsCount() int {

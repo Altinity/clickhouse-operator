@@ -23,9 +23,13 @@ import (
 	"strings"
 )
 
-// CHINormalize normalizes CHI.
+func ChiCopyAndNormalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
+	return ChiNormalize(chi.DeepCopy())
+}
+
+// ChiNormalize normalizes CHI.
 // Returns NamedNumber of deployments number required to satisfy clusters' infrastructure
-func CHINormalize(chi *chiv1.ClickHouseInstallation) error {
+func ChiNormalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
 	// Set defaults for CHI object properties
 	defaultsNormalizeReplicasUseFQDN(&chi.Spec.Defaults)
 	deploymentNormalizeScenario(&chi.Spec.Defaults.Deployment)
@@ -35,8 +39,9 @@ func CHINormalize(chi *chiv1.ClickHouseInstallation) error {
 		return clusterNormalize(chi, cluster)
 	})
 	chi.FillAddressInfo()
+	chi.Status.IsFilled = 1
 
-	return nil
+	return chi, nil
 }
 
 // clusterNormalize normalizes cluster and returns deployments usage counters for this cluster

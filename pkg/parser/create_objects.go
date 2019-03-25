@@ -23,8 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// CHICreateObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
-func CHICreateObjects(chi *chiv1.ClickHouseInstallation) []interface{} {
+// ChiCreateObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
+func ChiCreateObjects(chi *chiv1.ClickHouseInstallation) []interface{} {
 	list := make([]interface{}, 0)
 	list = append(list, createServiceObjects(chi))
 	list = append(list, createConfigMapObjects(chi))
@@ -44,6 +44,7 @@ func createConfigMapObjects(chi *chiv1.ClickHouseInstallation) ConfigMapList {
 		configMapList,
 		createConfigMapObjectsDeployment(chi)...,
 	)
+
 	return configMapList
 }
 

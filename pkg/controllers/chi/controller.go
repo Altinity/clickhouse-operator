@@ -360,6 +360,12 @@ func (c *Controller) addChi(chi *chop.ClickHouseInstallation) error {
 func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
 	glog.V(1).Infof("updateChi(%s/%s)", old.Namespace, old.Name)
 
+	if !old.IsFilled() && new.IsFilled() {
+		// This `update` event triggered by `save` filled CHI action
+		// No need to react
+		return nil
+	}
+
 	//	c.listStatefulSetResources(chi)
 	chi, _ := c.createCHIResources(new)
 	c.updateCHIResource(chi)
