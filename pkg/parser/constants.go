@@ -19,15 +19,6 @@ import (
 )
 
 const (
-	// ObjectsConfigMaps defines a category of the ConfigMap objects list
-	ObjectsConfigMaps ObjectKind = iota + 1
-	// ObjectsStatefulSets defines a category of the StatefulSet objects list
-	ObjectsStatefulSets
-	// ObjectsServices defines a category of the Service objects list
-	ObjectsServices
-)
-
-const (
 	// ChopGeneratedLabel applied to all objects created by the ClickHouse Operator
 	ChopGeneratedLabel = clickhousealtinitycom.GroupName + "/chop"
 	CHIGeneratedLabel  = clickhousealtinitycom.GroupName + "/chi"
@@ -129,14 +120,14 @@ const (
 
 	// NAME                           READY   AGE   CONTAINERS    IMAGES
 	// statefulset.apps/ss-1eb454-1   0/1     2s    ss-1eb454-1   yandex/clickhouse-server:latest
-	statefulSetNamePattern = "chi-%s-%d-%d-%d"
+	statefulSetNamePattern = "chi-%s-%s-%d-%d"
 
 	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
 	// service/svc-1eb454-1  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-1
 	// service/svc-1eb454-2  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-2
 	// In this pattern "%s" is substituted with fullDeploymentIDPattern-generated value
 	// Ex.: svc-1eb454-2
-	statefulSetServiceNamePattern = "chi-%s-%d-%d-%d"
+	statefulSetServiceNamePattern = "chi-%s-%s-%d-%d"
 	
 	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
 	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
@@ -176,7 +167,7 @@ const (
 
 	// configMapDeploymentNamePattern is a template of macros ConfigMap
 	// Ex.: chi-example02-deploy-confd-33260f1800-2 for chi named as 'example02'
-	configMapDeploymentNamePattern = "chi-%s-deploy-confd-%d-%d-%d"
+	configMapDeploymentNamePattern = "chi-%s-deploy-confd-%s-%d-%d"
 
 	distributedDDLPattern = "/clickhouse/%s/task_queue/ddl"
 )

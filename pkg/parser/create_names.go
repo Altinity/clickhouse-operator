@@ -15,17 +15,34 @@
 package parser
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
+func createStringID(str string, hashLen int) string {
+	hasher := sha1.New()
+	hasher.Write([]byte(str))
+	hash := hex.EncodeToString(hasher.Sum(nil))
+	return hash[len(hash)-hashLen:]
+}
+
+func createChiNameID(name string) string {
+	return createStringID(name, 6)
+}
+
+func createClusterNameID(name string) string {
+	return createStringID(name, 4)
+}
+
 // CreateConfigMapDeploymentName returns a name for a ConfigMap for replica's deployment
 func CreateConfigMapDeploymentName(replica *chop.ChiClusterLayoutShardReplica) string {
 	return fmt.Sprintf(
 		configMapDeploymentNamePattern,
-		replica.Address.CHIName,
-		replica.Address.ClusterIndex,
+		createChiNameID(replica.Address.ChiName),
+		createClusterNameID(replica.Address.ClusterName),
 		replica.Address.ShardIndex,
 		replica.Address.ReplicaIndex,
 	)
@@ -33,25 +50,34 @@ func CreateConfigMapDeploymentName(replica *chop.ChiClusterLayoutShardReplica) s
 
 // CreateConfigMapCommonName returns a name for a ConfigMap for replica's common config
 func CreateConfigMapCommonName(chiName string) string {
-	return fmt.Sprintf(configMapCommonNamePattern, chiName)
+	return fmt.Sprintf(
+		configMapCommonNamePattern,
+		createChiNameID(chiName),
+	)
 }
 
 // CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common config
 func CreateConfigMapCommonUsersName(chiName string) string {
-	return fmt.Sprintf(configMapCommonUsersNamePattern, chiName)
+	return fmt.Sprintf(
+		configMapCommonUsersNamePattern,
+		createChiNameID(chiName),
+	)
 }
 
-// CreateCHIServiceName creates a name of a Installation Service resource
-func CreateCHIServiceName(prefix string) string {
-	return fmt.Sprintf(chiServiceNamePattern, prefix)
+// CreateChiServiceName creates a name of a Installation Service resource
+func CreateChiServiceName(chiName string) string {
+	return fmt.Sprintf(
+		chiServiceNamePattern,
+		chiName,
+	)
 }
 
 // CreateStatefulSetName creates a name of a StatefulSet for replica
 func CreateStatefulSetName(replica *chop.ChiClusterLayoutShardReplica) string {
 	return fmt.Sprintf(
 		statefulSetNamePattern,
-		replica.Address.CHIName,
-		replica.Address.ClusterIndex,
+		createChiNameID(replica.Address.ChiName),
+		createClusterNameID(replica.Address.ClusterName),
 		replica.Address.ShardIndex,
 		replica.Address.ReplicaIndex,
 	)
@@ -61,8 +87,8 @@ func CreateStatefulSetName(replica *chop.ChiClusterLayoutShardReplica) string {
 func CreateStatefulSetServiceName(replica *chop.ChiClusterLayoutShardReplica) string {
 	return fmt.Sprintf(
 		statefulSetServiceNamePattern,
-		replica.Address.CHIName,
-		replica.Address.ClusterIndex,
+		createClusterNameID(replica.Address.ChiName),
+		createClusterNameID(replica.Address.ClusterName),
 		replica.Address.ShardIndex,
 		replica.Address.ReplicaIndex,
 	)
@@ -73,8 +99,8 @@ func CreateStatefulSetServiceName(replica *chop.ChiClusterLayoutShardReplica) st
 func CreatePodHostname(replica *chop.ChiClusterLayoutShardReplica) string {
 	return fmt.Sprintf(
 		podHostnamePattern,
-		replica.Address.CHIName,
-		replica.Address.ClusterIndex,
+		createChiNameID(replica.Address.ChiName),
+		createClusterNameID(replica.Address.ClusterName),
 		replica.Address.ShardIndex,
 		replica.Address.ReplicaIndex,
 	)
@@ -89,10 +115,13 @@ func CreateNamespaceDomainName(chiNamespace string) string {
 // CreatePodFQDN creates a fully qualified domain name of a pod
 // prefix is a fullDeploymentID
 // ss-1eb454-2-0.my-dev-domain.svc.cluster.local
-func CreatePodFQDN(chiNamespace, prefix string) string {
+func CreatePodFQDN(replica *chop.ChiClusterLayoutShardReplica) string {
 	return fmt.Sprintf(
 		podFQDNPattern,
-		prefix,
-		chiNamespace,
+		createChiNameID(replica.Address.ChiName),
+		createClusterNameID(replica.Address.ClusterName),
+		replica.Address.ShardIndex,
+		replica.Address.ReplicaIndex,
+		replica.Address.Namespace,
 	)
 }

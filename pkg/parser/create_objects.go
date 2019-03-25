@@ -130,8 +130,8 @@ func createConfigMapObjectsDeployment(chi *chiv1.ClickHouseInstallation) ConfigM
 					Name:      CreateConfigMapDeploymentName(replica),
 					Namespace: replica.Address.Namespace,
 					Labels: map[string]string{
-						ChopGeneratedLabel: replica.Address.CHIName,
-						CHIGeneratedLabel:  replica.Address.CHIName,
+						ChopGeneratedLabel: replica.Address.ChiName,
+						CHIGeneratedLabel:  replica.Address.ChiName,
 					},
 				},
 				Data: map[string]string{
@@ -169,7 +169,7 @@ func createServiceObjectsCommon(chi *chiv1.ClickHouseInstallation) ServiceList {
 	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
 	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
 	return ServiceList{
-		createServiceObjectChi(chi, CreateCHIServiceName(chi.Name)),
+		createServiceObjectChi(chi, CreateChiServiceName(chi.Name)),
 	}
 }
 
@@ -241,8 +241,8 @@ func createServiceObjectDeployment(replica *chiv1.ChiClusterLayoutShardReplica) 
 			Name:      serviceName,
 			Namespace: replica.Address.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel: replica.Address.CHIName,
-				CHIGeneratedLabel:  replica.Address.CHIName,
+				ChopGeneratedLabel: replica.Address.ChiName,
+				CHIGeneratedLabel:  replica.Address.ChiName,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -310,8 +310,8 @@ func createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.
 			Name:      statefulSetName,
 			Namespace: replica.Address.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel: replica.Address.CHIName,
-				CHIGeneratedLabel:  replica.Address.CHIName,
+				ChopGeneratedLabel: replica.Address.ChiName,
+				CHIGeneratedLabel:  replica.Address.ChiName,
 			},
 		},
 		Spec: apps.StatefulSetSpec{
@@ -327,8 +327,8 @@ func createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.
 					Name: statefulSetName,
 					Labels: map[string]string{
 						chDefaultAppLabel:  statefulSetName,
-						ChopGeneratedLabel: replica.Address.CHIName,
-						CHIGeneratedLabel:  replica.Address.CHIName,
+						ChopGeneratedLabel: replica.Address.ChiName,
+						CHIGeneratedLabel:  replica.Address.ChiName,
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -347,8 +347,8 @@ func setupStatefulSetPodTemplate(
 ) {
 	statefulSetName := CreateStatefulSetName(replica)
 	configMapMacrosName := CreateConfigMapDeploymentName(replica)
-	configMapCommonName := CreateConfigMapCommonName(replica.Address.CHIName)
-	configMapCommonUsersName := CreateConfigMapCommonUsersName(replica.Address.CHIName)
+	configMapCommonName := CreateConfigMapCommonName(replica.Address.ChiName)
+	configMapCommonUsersName := CreateConfigMapCommonUsersName(replica.Address.ChiName)
 	podTemplateName := replica.Deployment.PodTemplate
 
 	// Specify pod templates - either explicitly defined or default

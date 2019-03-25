@@ -115,7 +115,7 @@ type ChiClusterLayoutShardReplica struct {
 
 type ChiClusterLayoutShardReplicaAddress struct {
 	Namespace    string `json:"namespace"`
-	CHIName      string `json:"chiName"`
+	ChiName      string `json:"chiName"`
 	ClusterName  string `json:"clusterName"`
 	ClusterIndex int    `json:"clusterIndex"`
 	ShardIndex   int    `json:"shardIndex"`
@@ -243,7 +243,7 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 		shard.Address.ShardIndex = shardIndex
 
 		replica.Address.Namespace = chi.Namespace
-		replica.Address.CHIName = chi.Name
+		replica.Address.ChiName = chi.Name
 		replica.Address.ClusterName = cluster.Name
 		replica.Address.ClusterIndex = clusterIndex
 		replica.Address.ShardIndex = shardIndex

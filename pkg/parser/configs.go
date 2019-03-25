@@ -155,7 +155,7 @@ func generateRemoteServersConfigReplicaHostname(
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local
-		return CreatePodHostname(replica) + "." + CreateNamespaceDomainName(chi.Namespace)
+		return CreatePodHostname(replica) + "." + CreateNamespaceDomainName(replica.Address.Namespace)
 	} else {
 		return CreatePodHostname(replica)
 	}
@@ -231,7 +231,7 @@ func generateHostMacros(replica *chiv1.ChiClusterLayoutShardReplica) string {
 	fprintf(b, "%4s<macros>\n", " ")
 
 	// <installation>CHI name</installation>
-	fprintf(b, "%8s<installation>%s</installation>\n", " ", replica.Address.CHIName)
+	fprintf(b, "%8s<installation>%s</installation>\n", " ", replica.Address.ChiName)
 
 	// <CLUSTER_NAME>cluster name</CLUSTER_NAME>
 	fprintf(b,

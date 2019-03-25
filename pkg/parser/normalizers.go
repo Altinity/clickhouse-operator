@@ -210,7 +210,7 @@ func deploymentGenerateString(d *chiv1.ChiDeployment) string {
 // and they will have the same fingerprint
 func deploymentGenerateFingerprint(replica *chiv1.ChiClusterLayoutShardReplica, deployment *chiv1.ChiDeployment) string {
 	hasher := sha1.New()
-	hasher.Write([]byte(replica.Address.CHIName + deploymentGenerateString(deployment)))
+	hasher.Write([]byte(replica.Address.ChiName + deploymentGenerateString(deployment)))
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
