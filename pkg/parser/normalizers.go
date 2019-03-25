@@ -39,7 +39,7 @@ func ChiNormalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallat
 		return clusterNormalize(chi, cluster)
 	})
 	chi.FillAddressInfo()
-	chi.Status.IsFilled = 1
+	chi.SetKnown()
 
 	return chi, nil
 }

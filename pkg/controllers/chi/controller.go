@@ -23,6 +23,7 @@ import (
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/clickhouse.altinity.com/v1"
 	chopparser "github.com/altinity/clickhouse-operator/pkg/parser"
+	"gopkg.in/d4l3k/messagediff.v1"
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -360,10 +361,34 @@ func (c *Controller) addChi(chi *chop.ClickHouseInstallation) error {
 func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
 	glog.V(1).Infof("updateChi(%s/%s)", old.Namespace, old.Name)
 
-	if !old.IsFilled() && new.IsFilled() {
+	if old.ObjectMeta.Generation == new.ObjectMeta.Generation {
+		// No need to react
+		return nil
+	}
+
+	if !old.IsKnown() && new.IsKnown() {
 		// This `update` event triggered by `save` filled CHI action
 		// No need to react
 		return nil
+	}
+
+	if !old.IsFilled() {
+		old, _ = chopparser.ChiCopyAndNormalize(new)
+	}
+
+	if !new.IsFilled() {
+		new, _ = chopparser.ChiCopyAndNormalize(new)
+	}
+
+	diff, equal := messagediff.DeepDiff(old, new)
+
+	if equal {
+		// No need tor react
+		return nil
+	}
+
+	for i := range diff.Removed {
+		glog.Infof("%d", i)
 	}
 
 	//	c.listStatefulSetResources(chi)
@@ -377,6 +402,14 @@ func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
 }
 
 func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) error {
+	c.deleteClusters(chi)
+	// Delete common ConfigMap's
+	// Delete CHI service
+	//
+	// chi-b3d29f-common-configd   2      61s
+	// chi-b3d29f-common-usersd    0      61s
+	// service/clickhouse-example-01         LoadBalancer   10.106.183.200   <pending>     8123:31607/TCP,9000:31492/TCP,9009:31357/TCP   33s   clickhouse.altinity.com/chi=example-01
+
 	return nil
 }
 

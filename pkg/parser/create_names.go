@@ -87,7 +87,7 @@ func CreateStatefulSetName(replica *chop.ChiClusterLayoutShardReplica) string {
 func CreateStatefulSetServiceName(replica *chop.ChiClusterLayoutShardReplica) string {
 	return fmt.Sprintf(
 		statefulSetServiceNamePattern,
-		createClusterNameID(replica.Address.ChiName),
+		createChiNameID(replica.Address.ChiName),
 		createClusterNameID(replica.Address.ClusterName),
 		replica.Address.ShardIndex,
 		replica.Address.ReplicaIndex,

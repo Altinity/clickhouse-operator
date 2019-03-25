@@ -39,14 +39,13 @@ func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) e
 
 	configMapName := chopparser.CreateConfigMapDeploymentName(replica)
 	statefulSetName := chopparser.CreateStatefulSetName(replica)
-	statefulSetServiceName := chopparser.CreateStatefulSetName(replica)
+	statefulSetServiceName := chopparser.CreateStatefulSetServiceName(replica)
 
 	// Delete StatefulSet
 	statefulSet, _ := c.statefulSetLister.StatefulSets(replica.Address.Namespace).Get(statefulSetName)
 	if statefulSet != nil {
 		// Delete StatefulSet
 		_ = c.kubeClient.AppsV1().StatefulSets(replica.Address.Namespace).Delete(statefulSetName, &metav1.DeleteOptions{})
-		return nil
 	}
 
 	// Delete ConfigMap
@@ -58,12 +57,19 @@ func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) e
 	return nil
 }
 
+func (c *Controller) deleteShard(shard *chop.ChiClusterLayoutShard) {
+	shard.WalkReplicas(c.deleteReplica)
+}
+
 func (c *Controller) deleteCluster(cluster *chop.ChiCluster) {
 	cluster.WalkReplicas(c.deleteReplica)
 }
 
-func (c *Controller) deleteShard(shard *chop.ChiClusterLayoutShard) {
-	shard.WalkReplicas(c.deleteReplica)
+func (c *Controller) deleteClusters(chi *chop.ClickHouseInstallation) {
+	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
+		c.deleteCluster(cluster)
+		return nil
+	})
 }
 
 func (c *Controller) createOrUpdateResources(chi *chop.ClickHouseInstallation, listOfLists []interface{}) error {
