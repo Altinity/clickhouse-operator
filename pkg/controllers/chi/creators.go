@@ -17,6 +17,7 @@ package chi
 import (
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopparser "github.com/altinity/clickhouse-operator/pkg/parser"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"github.com/golang/glog"
 
 	apps "k8s.io/api/apps/v1"
@@ -30,30 +31,61 @@ func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) (*chop
 	chiCopy := chi.DeepCopy()
 	_ = chopparser.CHINormalize(chiCopy)
 	listOfLists := chopparser.CHICreateObjects(chiCopy)
-	err := c.createResources(chiCopy, listOfLists)
+	err := c.createOrUpdateResources(chiCopy, listOfLists)
 	chiCopy.Status = chop.ChiStatus{}
 
 	return chiCopy, err
 }
 
-func (c *Controller) createResources(chi *chop.ClickHouseInstallation, listOfLists []interface{}) error {
+func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) error {
+
+	configMapName := chopparser.CreateConfigMapDeploymentName(replica)
+	statefulSetName := chopparser.CreateStatefulSetName(replica)
+	statefulSetServiceName := chopparser.CreateStatefulSetName(replica)
+
+	// Delete StatefulSet
+	statefulSet, _ := c.statefulSetLister.StatefulSets(replica.Address.Namespace).Get(statefulSetName)
+	if statefulSet != nil {
+		// Delete StatefulSet
+		_ = c.kubeClient.AppsV1().StatefulSets(replica.Address.Namespace).Delete(statefulSetName, &metav1.DeleteOptions{})
+		return nil
+	}
+
+	// Delete ConfigMap
+	_ = c.kubeClient.CoreV1().ConfigMaps(replica.Address.Namespace).Delete(configMapName, &metav1.DeleteOptions{})
+
+	// Delete Service
+	_ = c.kubeClient.CoreV1().Services(replica.Address.Namespace).Delete(statefulSetServiceName, &metav1.DeleteOptions{})
+
+	return nil
+}
+
+func (c *Controller) deleteCluster(cluster *chop.ChiCluster) {
+	cluster.WalkReplicas(c.deleteReplica)
+}
+
+func (c *Controller) deleteShard(shard *chop.ChiClusterLayoutShard) {
+	shard.WalkReplicas(c.deleteReplica)
+}
+
+func (c *Controller) createOrUpdateResources(chi *chop.ClickHouseInstallation, listOfLists []interface{}) error {
 	for i := range listOfLists {
 		switch listOfLists[i].(type) {
 		case chopparser.ConfigMapList:
 			for j := range listOfLists[i].(chopparser.ConfigMapList) {
-				if err := c.createConfigMapResource(chi, listOfLists[i].(chopparser.ConfigMapList)[j]); err != nil {
+				if err := c.createOrUpdateConfigMapResource(chi, listOfLists[i].(chopparser.ConfigMapList)[j]); err != nil {
 					return err
 				}
 			}
 		case chopparser.ServiceList:
 			for j := range listOfLists[i].(chopparser.ConfigMapList) {
-				if err := c.createServiceResource(chi, listOfLists[i].(chopparser.ServiceList)[j]); err != nil {
+				if err := c.createOrUpdateServiceResource(chi, listOfLists[i].(chopparser.ServiceList)[j]); err != nil {
 					return err
 				}
 			}
 		case chopparser.StatefulSetList:
 			for j := range listOfLists[i].(chopparser.StatefulSetList) {
-				if err := c.createStatefulSetResource(chi, listOfLists[i].(chopparser.StatefulSetList)[j]); err != nil {
+				if err := c.createOrUpdateStatefulSetResource(chi, listOfLists[i].(chopparser.StatefulSetList)[j]); err != nil {
 					return err
 				}
 			}
@@ -63,14 +95,14 @@ func (c *Controller) createResources(chi *chop.ClickHouseInstallation, listOfLis
 	return nil
 }
 
-// createConfigMapResource creates core.ConfigMap resource
-func (c *Controller) createConfigMapResource(chi *chop.ClickHouseInstallation, newConfigMap *core.ConfigMap) error {
+// createOrUpdateConfigMapResource creates core.ConfigMap resource
+func (c *Controller) createOrUpdateConfigMapResource(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
 	// Check whether object with such name already exists in k8s
-	res, err := c.configMapLister.ConfigMaps(chi.Namespace).Get(newConfigMap.Name)
+	res, err := c.configMapLister.ConfigMaps(chi.Namespace).Get(configMap.Name)
 	if res != nil {
 		// Object with such name already exists, this is not an error
-		glog.Infof("Update ConfigMap %s/%s\n", newConfigMap.Namespace, newConfigMap.Name)
-		_, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Update(newConfigMap)
+		glog.Infof("Update ConfigMap %s/%s\n", configMap.Namespace, configMap.Name)
+		_, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Update(configMap)
 		if err != nil {
 			return err
 		}
@@ -81,7 +113,7 @@ func (c *Controller) createConfigMapResource(chi *chop.ClickHouseInstallation, n
 
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found - create it
-		_, err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Create(newConfigMap)
+		_, err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Create(configMap)
 	}
 	if err != nil {
 		return err
@@ -91,10 +123,10 @@ func (c *Controller) createConfigMapResource(chi *chop.ClickHouseInstallation, n
 	return nil
 }
 
-// createServiceResource creates core.Service resource
-func (c *Controller) createServiceResource(chi *chop.ClickHouseInstallation, newService *core.Service) error {
+// createOrUpdateServiceResource creates core.Service resource
+func (c *Controller) createOrUpdateServiceResource(chi *chop.ClickHouseInstallation, service *core.Service) error {
 	// Check whether object with such name already exists in k8s
-	res, err := c.serviceLister.Services(chi.Namespace).Get(newService.Name)
+	res, err := c.serviceLister.Services(chi.Namespace).Get(service.Name)
 	if res != nil {
 		// Object with such name already exists, this is not an error
 		return nil
@@ -104,7 +136,7 @@ func (c *Controller) createServiceResource(chi *chop.ClickHouseInstallation, new
 
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found - create it
-		_, err = c.kubeClient.CoreV1().Services(chi.Namespace).Create(newService)
+		_, err = c.kubeClient.CoreV1().Services(chi.Namespace).Create(service)
 	}
 	if err != nil {
 		return err
@@ -114,23 +146,23 @@ func (c *Controller) createServiceResource(chi *chop.ClickHouseInstallation, new
 	return nil
 }
 
-// createStatefulSetResource creates apps.StatefulSet resource
-func (c *Controller) createStatefulSetResource(chi *chop.ClickHouseInstallation, newStatefulSet *apps.StatefulSet) error {
+// createOrUpdateStatefulSetResource creates apps.StatefulSet resource
+func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInstallation, statefulSet *apps.StatefulSet) error {
 	// Check whether object with such name already exists in k8s
-	res, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
+	res, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(statefulSet.Name)
 	if res != nil {
 		// Object with such name already exists, this is not an error
-		//		glog.Infof("Update StatefulSet %s/%s\n", newStatefulSet.Namespace, newStatefulSet.Name)
-		//		_, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Update(newStatefulSet)
-		//		if err != nil {
-		//			return err
-		//		}
+		glog.Infof("Update StatefulSet %s/%s\n", statefulSet.Namespace, statefulSet.Name)
+		_, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Update(statefulSet)
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found - create it
-		_, err = c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Create(newStatefulSet)
+		_, err = c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Create(statefulSet)
 	}
 	if err != nil {
 		return err

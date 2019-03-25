@@ -174,9 +174,9 @@ const (
 	// Ex.: chi-example02-common-usersd for chi named as 'example02'
 	configMapCommonUsersNamePattern = "chi-%s-common-usersd"
 
-	// configMapMacrosNamePattern is a template of macros ConfigMap
+	// configMapDeploymentNamePattern is a template of macros ConfigMap
 	// Ex.: chi-example02-deploy-confd-33260f1800-2 for chi named as 'example02'
-	configMapMacrosNamePattern = "chi-%s-deploy-confd-%d-%d-%d"
+	configMapDeploymentNamePattern = "chi-%s-deploy-confd-%d-%d-%d"
 
 	distributedDDLPattern = "/clickhouse/%s/task_queue/ddl"
 )

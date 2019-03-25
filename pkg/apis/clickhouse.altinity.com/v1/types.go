@@ -387,14 +387,34 @@ func (cluster *ChiCluster) WalkShards(
 	return res
 }
 
+func (cluster *ChiCluster) WalkReplicas(
+	f func(
+		replica *ChiClusterLayoutShardReplica,
+	) error,
+) []error {
+
+	res := make([]error, 0)
+
+	for shardIndex := range cluster.Layout.Shards {
+		shard := &cluster.Layout.Shards[shardIndex]
+		for replicaIndex := range shard.Replicas {
+			replica := &shard.Replicas[replicaIndex]
+			res = append(res, f(replica))
+		}
+	}
+
+	return res
+}
+
+
 func (shard *ChiClusterLayoutShard) WalkReplicas(
-	f func(replicaIndex int, replica *ChiClusterLayoutShardReplica) error,
+	f func(replica *ChiClusterLayoutShardReplica) error,
 ) []error {
 	res := make([]error, 0)
 
 	for replicaIndex := range shard.Replicas {
 		replica := &shard.Replicas[replicaIndex]
-		res = append(res, f(replicaIndex, replica))
+		res = append(res, f(replica))
 	}
 
 	return res

@@ -15,8 +15,6 @@
 package parser
 
 import (
-	"fmt"
-
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 
 	"github.com/golang/glog"
@@ -129,7 +127,7 @@ func createConfigMapObjectsDeployment(chi *chiv1.ClickHouseInstallation) ConfigM
 			configMapList,
 			&corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      CreateConfigMapMacrosName(replica),
+					Name:      CreateConfigMapDeploymentName(replica),
 					Namespace: replica.Address.Namespace,
 					Labels: map[string]string{
 						ChopGeneratedLabel: replica.Address.CHIName,
@@ -348,7 +346,7 @@ func setupStatefulSetPodTemplate(
 	replica *chiv1.ChiClusterLayoutShardReplica,
 ) {
 	statefulSetName := CreateStatefulSetName(replica)
-	configMapMacrosName := CreateConfigMapMacrosName(replica)
+	configMapMacrosName := CreateConfigMapDeploymentName(replica)
 	configMapCommonName := CreateConfigMapCommonName(replica.Address.CHIName)
 	configMapCommonUsersName := CreateConfigMapCommonUsersName(replica.Address.CHIName)
 	podTemplateName := replica.Deployment.PodTemplate
@@ -521,85 +519,4 @@ func createPodTemplatesIndex(chi *chiv1.ClickHouseInstallation) podTemplatesInde
 	}
 
 	return index
-}
-
-// CreateConfigMapMacrosName returns a name for a ConfigMap (CH macros) resource based on predefined pattern
-func CreateConfigMapMacrosName(replica *chiv1.ChiClusterLayoutShardReplica) string {
-	return fmt.Sprintf(
-		configMapMacrosNamePattern,
-		replica.Address.CHIName,
-		replica.Address.ClusterIndex,
-		replica.Address.ShardIndex,
-		replica.Address.ReplicaIndex,
-	)
-}
-
-// CreateConfigMapCommonName returns a name for a ConfigMap resource based on predefined pattern
-func CreateConfigMapCommonName(chiName string) string {
-	return fmt.Sprintf(configMapCommonNamePattern, chiName)
-}
-
-// CreateConfigMapCommonUsersName returns a name for a ConfigMap resource based on predefined pattern
-func CreateConfigMapCommonUsersName(chiName string) string {
-	return fmt.Sprintf(configMapCommonUsersNamePattern, chiName)
-}
-
-// CreateInstServiceName creates a name of a Installation Service resource
-// prefix is a fullDeploymentID
-func CreateCHIServiceName(prefix string) string {
-	return fmt.Sprintf(chiServiceNamePattern, prefix)
-}
-
-// CreateStatefulSetName creates a name of a StatefulSet resource
-// prefix is a fullDeploymentID
-func CreateStatefulSetName(replica *chiv1.ChiClusterLayoutShardReplica) string {
-	return fmt.Sprintf(
-		statefulSetNamePattern,
-		replica.Address.CHIName,
-		replica.Address.ClusterIndex,
-		replica.Address.ShardIndex,
-		replica.Address.ReplicaIndex,
-	)
-}
-
-// CreateStatefulSetServiceName creates a name of a pod Service resource
-// prefix is a fullDeploymentID
-func CreateStatefulSetServiceName(replica *chiv1.ChiClusterLayoutShardReplica) string {
-	return fmt.Sprintf(
-		statefulSetServiceNamePattern,
-		replica.Address.CHIName,
-		replica.Address.ClusterIndex,
-		replica.Address.ShardIndex,
-		replica.Address.ReplicaIndex,
-	)
-}
-
-// CreatePodHostname creates a name of a Pod resource
-// prefix is a fullDeploymentID
-// ss-1eb454-2-0
-func CreatePodHostname(replica *chiv1.ChiClusterLayoutShardReplica) string {
-	return fmt.Sprintf(
-		podHostnamePattern,
-		replica.Address.CHIName,
-		replica.Address.ClusterIndex,
-		replica.Address.ShardIndex,
-		replica.Address.ReplicaIndex,
-	)
-}
-
-// CreateNamespaceDomainName creates domain name of a namespace
-// .my-dev-namespace.svc.cluster.local
-func CreateNamespaceDomainName(chiNamespace string) string {
-	return fmt.Sprintf(namespaceDomainPattern, chiNamespace)
-}
-
-// CreatePodFQDN creates a fully qualified domain name of a pod
-// prefix is a fullDeploymentID
-// ss-1eb454-2-0.my-dev-domain.svc.cluster.local
-func CreatePodFQDN(chiNamespace, prefix string) string {
-	return fmt.Sprintf(
-		podFQDNPattern,
-		prefix,
-		chiNamespace,
-	)
 }
