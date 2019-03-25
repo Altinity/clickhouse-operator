@@ -261,6 +261,14 @@
   revision = "e4d4a2206da023361ed100d85c5f2cf9c8364e9f"
 
 [[projects]]
+  branch = "master"
+  digest = "1:8d94d0a0554c7f158e686c52012025a48f7d7090b4740b214a5eaabfaa13c042"
+  name = "github.com/r3labs/diff"
+  packages = ["."]
+  pruneopts = ""
+  revision = "85e103916027833f652237a2e7fa098e0779d791"
+
+[[projects]]
   digest = "1:cbaf13cdbfef0e4734ed8a7504f57fe893d471d62a35b982bf6fb3f036449a66"
   name = "github.com/spf13/pflag"
   packages = ["."]
@@ -352,6 +360,14 @@
   ]
   pruneopts = ""
   revision = "24cd39ecf74570612483b772d45cf9d53d908340"
+
+[[projects]]
+  digest = "1:e76640c183e487305c34442d248cf5c4bdeebee498b4ffe891bba0937eab340a"
+  name = "gopkg.in/d4l3k/messagediff.v1"
+  packages = ["."]
+  pruneopts = ""
+  revision = "29f32d820d112dbd66e58492a6ffb7cc3106312b"
+  version = "v1.2.1"
 
 [[projects]]
   digest = "1:75fb3fcfc73a8c723efde7777b40e8e8ff9babf30d8c56160d01beffea8a95a6"
@@ -650,6 +666,8 @@
   input-imports = [
     "github.com/golang/glog",
     "github.com/prometheus/client_golang/prometheus",
+    "github.com/r3labs/diff",
+    "gopkg.in/d4l3k/messagediff.v1",
     "gopkg.in/yaml.v2",
     "k8s.io/api/apps/v1",
     "k8s.io/api/core/v1",
