@@ -65,11 +65,29 @@ func (c *Controller) deleteCluster(cluster *chop.ChiCluster) {
 	cluster.WalkReplicas(c.deleteReplica)
 }
 
-func (c *Controller) deleteClusters(chi *chop.ClickHouseInstallation) {
+func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
 	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
 		c.deleteCluster(cluster)
 		return nil
 	})
+
+	// Delete common ConfigMap's
+	// Delete CHI service
+	//
+	// chi-b3d29f-common-configd   2      61s
+	// chi-b3d29f-common-usersd    0      61s
+	// service/clickhouse-example-01         LoadBalancer   10.106.183.200   <pending>     8123:31607/TCP,9000:31492/TCP,9009:31357/TCP   33s   clickhouse.altinity.com/chi=example-01
+
+	configMapCommon := chopparser.CreateConfigMapCommonName(chi.Name)
+	configMapCommonUsersName := chopparser.CreateConfigMapCommonUsersName(chi.Name)
+	// Delete ConfigMap
+	_ = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommon, &metav1.DeleteOptions{})
+	_ = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommonUsersName, &metav1.DeleteOptions{})
+
+
+	chiServiceName := chopparser.CreateChiServiceName(chi.Namespace)
+	// Delete Service
+	_ = c.kubeClient.CoreV1().Services(chi.Namespace).Delete(chiServiceName, &metav1.DeleteOptions{})
 }
 
 func (c *Controller) createOrUpdateResources(chi *chop.ClickHouseInstallation, listOfLists []interface{}) error {

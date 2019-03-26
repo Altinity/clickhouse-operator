@@ -320,22 +320,22 @@ func (c *Controller) syncChi(reconcile *ReconcileChi) error {
 	// Check CHI object already in sync
 	switch reconcile.cmd {
 	case reconcileAdd:
-		return c.addChi(reconcile.new)
+		return c.onAddChi(reconcile.new)
 	case reconcileUpdate:
-		return c.updateChi(reconcile.old, reconcile.new)
+		return c.onUpdateChi(reconcile.old, reconcile.new)
 	case reconcielDelete:
-		return c.deleteChi(reconcile.old)
+		return c.onDeleteChi(reconcile.old)
 	}
 
 	return nil
 }
 
-// syncNewChi sync new CHI - creates all its resources
-func (c *Controller) addChi(chi *chop.ClickHouseInstallation) error {
+// onAddChi sync new CHI - creates all its resources
+func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	// CHI is a new one - need to create all its objects
 	// Operator receives CHI struct partially filled by data from .yaml file provided by user
 	// We need to create all resources that are needed to run user's .yaml specification
-	glog.V(1).Infof("addChi(%s/%s)", chi.Namespace, chi.Name)
+	glog.V(1).Infof("onAddChi(%s/%s)", chi.Namespace, chi.Name)
 
 	chi, err := c.createCHIResources(chi)
 	if err != nil {
@@ -357,9 +357,9 @@ func (c *Controller) addChi(chi *chop.ClickHouseInstallation) error {
 	return nil
 }
 
-// syncKnownChi sync CHI which was already created earlier
-func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
-	glog.V(1).Infof("updateChi(%s/%s)", old.Namespace, old.Name)
+// onUpdateChi sync CHI which was already created earlier
+func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
+	glog.V(1).Infof("onUpdateChi(%s/%s)", old.Namespace, old.Name)
 
 	if old.ObjectMeta.Generation == new.ObjectMeta.Generation {
 		// No need to react
@@ -387,8 +387,18 @@ func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
-	for i := range diff.Removed {
-		glog.Infof("%d", i)
+	for path := range diff.Removed {
+		switch diff.Removed[path].(type) {
+		case chop.ChiCluster:
+			cluster := diff.Removed[path].(chop.ChiCluster)
+			c.deleteCluster(&cluster)
+		case chop.ChiClusterLayoutShard:
+			shard := diff.Removed[path].(chop.ChiClusterLayoutShard)
+			c.deleteShard(&shard)
+		case chop.ChiClusterLayoutShardReplica:
+			replica := diff.Removed[path].(chop.ChiClusterLayoutShardReplica)
+			c.deleteReplica(&replica)
+		}
 	}
 
 	//	c.listStatefulSetResources(chi)
@@ -401,14 +411,8 @@ func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
 	return nil
 }
 
-func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) error {
-	c.deleteClusters(chi)
-	// Delete common ConfigMap's
-	// Delete CHI service
-	//
-	// chi-b3d29f-common-configd   2      61s
-	// chi-b3d29f-common-usersd    0      61s
-	// service/clickhouse-example-01         LoadBalancer   10.106.183.200   <pending>     8123:31607/TCP,9000:31492/TCP,9009:31357/TCP   33s   clickhouse.altinity.com/chi=example-01
+func (c *Controller) onDeleteChi(chi *chop.ClickHouseInstallation) error {
+	c.deleteChi(chi)
 
 	return nil
 }
