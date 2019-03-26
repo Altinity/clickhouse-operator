@@ -19,44 +19,17 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func ListPodHostnames(chi *chiv1.ClickHouseInstallation) []string {
-	// Number of full deployment ids - which is number of Stateful Sets and number of Pods
-	fullDeploymentIDsNum := len(chi.Status.FullDeploymentIDs)
-
-	names := make([]string, fullDeploymentIDsNum)
-
-	for i, fullDeploymentID := range chi.Status.FullDeploymentIDs {
-		names[i] = CreatePodHostname(fullDeploymentID)
-	}
-
-	return names
-}
-
 func ListPodFQDNs(chi *chiv1.ClickHouseInstallation) []string {
-	// Number of full deployment ids - which is number of Stateful Sets and number of Pods
-	fullDeploymentIDsNum := len(chi.Status.FullDeploymentIDs)
 
-	names := make([]string, fullDeploymentIDsNum)
-
-	for i, fullDeploymentID := range chi.Status.FullDeploymentIDs {
-		names[i] = CreatePodFQDN(chi.Namespace, fullDeploymentID)
+	names := make([]string, 0)
+	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
+		names = append(names, CreatePodFQDN(replica))
+		return nil
 	}
-
+	chi.WalkReplicas(replicaProcessor)
 	return names
 }
 
-func ListStatefulSetNames(chi *chiv1.ClickHouseInstallation) []string {
-	// Number of full deployment ids - which is number of Stateful Sets and number of Pods
-	fullDeploymentIDsNum := len(chi.Status.FullDeploymentIDs)
-
-	names := make([]string, fullDeploymentIDsNum)
-
-	for i, fullDeploymentID := range chi.Status.FullDeploymentIDs {
-		names[i] = CreateStatefulSetName(fullDeploymentID)
-	}
-
-	return names
-}
 
 func Yaml(chi *chiv1.ClickHouseInstallation) string {
 	if data, err := yaml.Marshal(chi); err != nil {

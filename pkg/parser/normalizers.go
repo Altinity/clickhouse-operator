@@ -23,77 +23,76 @@ import (
 	"strings"
 )
 
-// NormalizeCHI normalizes CHI.
-// Returns NamedNumber of deployments number required to satisfy clusters' infrastructure
-func NormalizeCHI(chi *chiv1.ClickHouseInstallation) NamedNumber {
-	// Set defaults for CHI object properties
-	normalizeSpecDefaultsReplicasUseFQDN(chi)
-	normalizeSpecDefaultsDeploymentScenario(chi)
-
-	// deploymentNumber maps deployment fingerprint to max among all clusters usage number of this deployment
-	// This number shows how many instances of this deployment are required to satisfy clusters' infrastructure
-	deploymentNumber := make(NamedNumber)
-
-	// Normalize all clusters in this CHI
-	for i := range chi.Spec.Configuration.Clusters {
-		clusterDeploymentNumber := normalizeSpecConfigurationClustersCluster(chi, &chi.Spec.Configuration.Clusters[i])
-
-		// Accumulate deployments max usage number among all clusters
-		deploymentNumber.mergeAndReplaceWithBiggerValues(clusterDeploymentNumber)
-	}
-
-	return deploymentNumber
+func ChiCopyAndNormalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
+	return ChiNormalize(chi.DeepCopy())
 }
 
-// normalizeSpecConfigurationClustersCluster normalizes cluster and returns deployments usage counters for this cluster
-func normalizeSpecConfigurationClustersCluster(
+// ChiNormalize normalizes CHI.
+// Returns NamedNumber of deployments number required to satisfy clusters' infrastructure
+func ChiNormalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
+	// Set defaults for CHI object properties
+	defaultsNormalizeReplicasUseFQDN(&chi.Spec.Defaults)
+	deploymentNormalizeScenario(&chi.Spec.Defaults.Deployment)
+
+	// Normalize all clusters in this CHI
+	chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
+		return clusterNormalize(chi, cluster)
+	})
+	chi.FillAddressInfo()
+	chi.SetKnown()
+
+	return chi, nil
+}
+
+// clusterNormalize normalizes cluster and returns deployments usage counters for this cluster
+func clusterNormalize(
 	chi *chiv1.ClickHouseInstallation,
 	cluster *chiv1.ChiCluster,
-) NamedNumber {
-	// How many times each deployment is used in this cluster
-	deploymentNumber := make(NamedNumber)
-
+) error {
 	// Apply default deployment for the whole cluster
 	deploymentMergeFrom(&cluster.Deployment, &chi.Spec.Defaults.Deployment)
 
+	// Convenience wrapper
+	layout := &cluster.Layout
+
 	// Fill Layout field
-	switch cluster.Layout.Type {
+	switch layout.Type {
 	case clusterLayoutTypeStandard:
 		// Standard layout assumes to have 1 shard and 1 replica by default - in case not specified explicitly
-		normalizeClusterStandardLayoutCounts(&cluster.Layout)
+		layoutNormalizeCounts(layout)
 
 		// Handle .layout.shards
 		// cluster of type "Standard" does not have shards specified.
 		// So we need to build shards specification from the scratch
-		cluster.Layout.Shards = make([]chiv1.ChiClusterLayoutShard, cluster.Layout.ShardsCount)
+		layout.Shards = make([]chiv1.ChiClusterLayoutShard, layout.ShardsCount)
 		// Loop over all shards and replicas inside shards and fill structure
 		// .Layout.ShardsCount is provided
-		for shardIndex := 0; shardIndex < cluster.Layout.ShardsCount; shardIndex++ {
+		for shardIndex := 0; shardIndex < layout.ShardsCount; shardIndex++ {
 			// Convenience wrapper
-			shard := &cluster.Layout.Shards[shardIndex]
+			shard := &layout.Shards[shardIndex]
 
 			// Inherit ReplicasCount
-			shard.ReplicasCount = cluster.Layout.ReplicasCount
+			shard.ReplicasCount = layout.ReplicasCount
 			// For .cluster.Layout.Type = Standard internal replication is turned on
 			shard.InternalReplication = stringTrue
 
 			// Create replicas for the shard
 			// .Layout.ReplicasCount is provided
 			shard.Replicas = make([]chiv1.ChiClusterLayoutShardReplica, shard.ReplicasCount)
-			normalizeSpecConfigurationClustersLayoutShardsReplicas(chi, shard, &deploymentNumber)
+			shardNormalizeReplicas(shard)
 		}
 
 	case clusterLayoutTypeAdvanced:
 		// Advanced layout assumes detailed shards definition
 
 		// Loop over all shards and replicas inside shards and fill structure
-		for shardIndex := range cluster.Layout.Shards {
+		for shardIndex := range layout.Shards {
 			// Convenience wrapper
-			shard := &cluster.Layout.Shards[shardIndex]
+			shard := &layout.Shards[shardIndex]
 
 			// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
 			// with default value set to "true"
-			normalizeClusterAdvancedLayoutShardsInternalReplication(shard)
+			shardNormalizeInternalReplication(shard)
 
 			// For each shard of this normalized cluster inherit cluster's Deployment
 			deploymentMergeFrom(&shard.Deployment, &cluster.Deployment)
@@ -111,7 +110,7 @@ func normalizeSpecConfigurationClustersCluster(
 				// Create replicas for the shard
 				// .Layout.ReplicasCount is provided
 				shard.Replicas = make([]chiv1.ChiClusterLayoutShardReplica, shard.ReplicasCount)
-				normalizeSpecConfigurationClustersLayoutShardsReplicas(chi, shard, &deploymentNumber)
+				shardNormalizeReplicas(shard)
 
 			default:
 				// Define shards by replicas explicitly:
@@ -132,42 +131,37 @@ func normalizeSpecConfigurationClustersCluster(
 				shard.ReplicasCount = len(shard.Replicas)
 				// Create replicas for the shard
 				// .Layout.ReplicasCount is provided
-				normalizeSpecConfigurationClustersLayoutShardsReplicas(chi, shard, &deploymentNumber)
+				shardNormalizeReplicas(shard)
 			}
 		}
 	}
 
-	return deploymentNumber
+	return nil
 }
 
-func normalizeSpecConfigurationClustersLayoutShardsReplicas(
-	chi *chiv1.ClickHouseInstallation,
-	shard *chiv1.ChiClusterLayoutShard,
-	deploymentNumber *NamedNumber,
-) {
+func shardNormalizeReplicas(shard *chiv1.ChiClusterLayoutShard) {
 	// Fill each replica
 	for replicaIndex := 0; replicaIndex < shard.ReplicasCount; replicaIndex++ {
 		// Convenience wrapper
 		replica := &shard.Replicas[replicaIndex]
 
+		replicaNormalisePort(replica)
+
 		// Inherit deployment
 		deploymentMergeFrom(&replica.Deployment, &shard.Deployment)
-
-		// Count how many times this deployment is used in this cluster
-		fingerprint := deploymentGenerateFingerprint(chi, &replica.Deployment)
-		// Increase number of usages of this deployment within current cluster
-		(*deploymentNumber)[fingerprint]++
-		// index is an index of this deployment within current cluster (among all replicas of this cluster)
-		// and it is one less than number of usages
-		index := (*deploymentNumber)[fingerprint]-1
-
-		replica.Deployment.Fingerprint = fingerprint
-		replica.Deployment.Index = index
+		replica.Deployment.Fingerprint = deploymentGenerateFingerprint(replica, &replica.Deployment)
 	}
 }
 
-// normalizeClusterStandardLayoutCounts ensures at least 1 shard and 1 replica counters
-func normalizeClusterStandardLayoutCounts(layout *chiv1.ChiClusterLayout) {
+// replicaNormalisePort ensures chiv1.ChiClusterLayoutShardReplica.Port is reasonable
+func replicaNormalisePort(r *chiv1.ChiClusterLayoutShardReplica) {
+	if r.Port <= 0 {
+		r.Port = chDefaultClientPortNumber
+	}
+}
+
+// layoutNormalizeCounts ensures at least 1 shard and 1 replica counters
+func layoutNormalizeCounts(layout *chiv1.ChiClusterLayout) {
 	// Standard layout assumes to have 1 shard and 1 replica by default - in case not specified explicitly
 	if layout.ShardsCount == 0 {
 		layout.ShardsCount = 1
@@ -177,9 +171,9 @@ func normalizeClusterStandardLayoutCounts(layout *chiv1.ChiClusterLayout) {
 	}
 }
 
-// normalizeClusterAdvancedLayoutShardsInternalReplication ensures reasonable values in
+// shardNormalizeInternalReplication ensures reasonable values in
 // .spec.configuration.clusters.layout.shards.internalReplication
-func normalizeClusterAdvancedLayoutShardsInternalReplication(shard *chiv1.ChiClusterLayoutShard) {
+func shardNormalizeInternalReplication(shard *chiv1.ChiClusterLayoutShard) {
 	// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
 	// with default value set to "true"
 	if shard.InternalReplication == shardInternalReplicationDisabled {
@@ -219,9 +213,9 @@ func deploymentGenerateString(d *chiv1.ChiDeployment) string {
 // of chiv1.ChiDeployment object located inside chiv1.ClickHouseInstallation
 // IMPORTANT there can be the same deployments inside ClickHouseInstallation object
 // and they will have the same fingerprint
-func deploymentGenerateFingerprint(chi *chiv1.ClickHouseInstallation, d *chiv1.ChiDeployment) string {
+func deploymentGenerateFingerprint(replica *chiv1.ChiClusterLayoutShardReplica, deployment *chiv1.ChiDeployment) string {
 	hasher := sha1.New()
-	hasher.Write([]byte(chi.Namespace + chi.Name + deploymentGenerateString(d)))
+	hasher.Write([]byte(replica.Address.ChiName + deploymentGenerateString(deployment)))
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
@@ -250,24 +244,24 @@ func generateFullDeploymentID(replica *chiv1.ChiClusterLayoutShardReplica) strin
 	return fmt.Sprintf(fullDeploymentIDPattern, deploymentID, index)
 }
 
-// normalizeSpecDefaultsReplicasUseFQDN ensures chi.Spec.Defaults.ReplicasUseFQDN section has proper values
-func normalizeSpecDefaultsReplicasUseFQDN(chi *chiv1.ClickHouseInstallation) {
+// defaultsNormalizeReplicasUseFQDN ensures chiv1.ChiDefaults.ReplicasUseFQDN section has proper values
+func defaultsNormalizeReplicasUseFQDN(d *chiv1.ChiDefaults) {
 	// Acceptable values are 0 and 1
 	// So if it is 1 - it is ok and assign 0 for any other values
-	if chi.Spec.Defaults.ReplicasUseFQDN == 1 {
+	if d.ReplicasUseFQDN == 1 {
 		// Acceptable value
 		return
 	}
 
 	// Assign 0 for any other values (including 0 - rewrite is unimportant)
-	chi.Spec.Defaults.ReplicasUseFQDN = 0
+	d.ReplicasUseFQDN = 0
 }
 
-// normalizeSpecDefaultsDeploymentScenario ensures deployment has scenario specified
-func normalizeSpecDefaultsDeploymentScenario(chi *chiv1.ClickHouseInstallation) {
-	if chi.Spec.Defaults.Deployment.Scenario == "" {
+// deploymentNormalizeScenario normalizes chiv1.ChiDeployment.Scenario
+func deploymentNormalizeScenario(d *chiv1.ChiDeployment) {
+	if d.Scenario == "" {
 		// Have no default deployment scenario specified - specify default one
-		chi.Spec.Defaults.Deployment.Scenario = deploymentScenarioDefault
+		d.Scenario = deploymentScenarioDefault
 	}
 }
 

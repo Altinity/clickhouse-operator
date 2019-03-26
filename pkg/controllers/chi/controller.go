@@ -17,20 +17,17 @@ package chi
 import (
 	"context"
 	"fmt"
-	"time"
-
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmetrics "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/clickhouse.altinity.com/v1"
-	choplisters "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 	chopparser "github.com/altinity/clickhouse-operator/pkg/parser"
+	"gopkg.in/d4l3k/messagediff.v1"
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -41,8 +38,6 @@ import (
 	kube "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
-	appslisters "k8s.io/client-go/listers/apps/v1"
-	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -50,45 +45,15 @@ import (
 	"github.com/golang/glog"
 )
 
-// Controller defines CRO controller
-type Controller struct {
-	kubeClient              kube.Interface
-	chopClient              chopclientset.Interface
-	chiLister               choplisters.ClickHouseInstallationLister
-	chiListerSynced         cache.InformerSynced
-	statefulSetLister       appslisters.StatefulSetLister
-	statefulSetListerSynced cache.InformerSynced
-	configMapLister         corelisters.ConfigMapLister
-	configMapListerSynced   cache.InformerSynced
-	serviceLister           corelisters.ServiceLister
-	serviceListerSynced     cache.InformerSynced
-	queue                   workqueue.RateLimitingInterface
-	recorder                record.EventRecorder
-	metricsExporter         *chopmetrics.Exporter
-}
-
-const (
-	componentName   = "clickhouse-operator"
-	runWorkerPeriod = time.Second
-)
-
-const (
-	successSynced         = "Synced"
-	errResourceExists     = "ErrResourceExists"
-	messageResourceSynced = "ClickHouseInstallation synced successfully"
-	messageResourceExists = "Resource %q already exists and is not managed by ClickHouseInstallation"
-	messageUnableToDecode = "unable to decode object (invalid type)"
-	messageUnableToSync   = "unable to sync caches for %s controller"
-)
-
 // CreateController creates instance of Controller
 func CreateController(
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
 	chiInformer chopinformers.ClickHouseInstallationInformer,
-	statefulSetInformer appsinformers.StatefulSetInformer,
-	configMapInformer coreinformers.ConfigMapInformer,
 	serviceInformer coreinformers.ServiceInformer,
+	configMapInformer coreinformers.ConfigMapInformer,
+	statefulSetInformer appsinformers.StatefulSetInformer,
+	podInformer coreinformers.PodInformer,
 	chopMetricsExporter *chopmetrics.Exporter,
 ) *Controller {
 
@@ -120,20 +85,25 @@ func CreateController(
 		// chiListerSynced used in waitForCacheSync()
 		chiListerSynced: chiInformer.Informer().HasSynced,
 
-		// statefulSetLister used as statefulSetLister.StatefulSets(namespace).Get(name)
-		statefulSetLister: statefulSetInformer.Lister(),
-		// statefulSetListerSynced used in waitForCacheSync()
-		statefulSetListerSynced: statefulSetInformer.Informer().HasSynced,
+		// serviceLister used as serviceLister.Services(namespace).Get(name)
+		serviceLister: serviceInformer.Lister(),
+		// serviceListerSynced used in waitForCacheSync()
+		serviceListerSynced: serviceInformer.Informer().HasSynced,
 
 		// configMapLister used as configMapLister.ConfigMaps(namespace).Get(name)
 		configMapLister: configMapInformer.Lister(),
 		// configMapListerSynced used in waitForCacheSync()
 		configMapListerSynced: configMapInformer.Informer().HasSynced,
 
-		// serviceLister used as serviceLister.Services(namespace).Get(name)
-		serviceLister: serviceInformer.Lister(),
-		// serviceListerSynced used in waitForCacheSync()
-		serviceListerSynced: serviceInformer.Informer().HasSynced,
+		// statefulSetLister used as statefulSetLister.StatefulSets(namespace).Get(name)
+		statefulSetLister: statefulSetInformer.Lister(),
+		// statefulSetListerSynced used in waitForCacheSync()
+		statefulSetListerSynced: statefulSetInformer.Informer().HasSynced,
+
+		// podLister used as statefulSetLister.StatefulSets(namespace).Get(name)
+		podLister: podInformer.Lister(),
+		// podListerSynced used in waitForCacheSync()
+		podListerSynced: podInformer.Informer().HasSynced,
 
 		// queue used to organize events queue processed by operator
 		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
@@ -149,30 +119,32 @@ func CreateController(
 		AddFunc: func(obj interface{}) {
 			chi := obj.(*chop.ClickHouseInstallation)
 			glog.V(1).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
-			controller.enqueueObject(obj)
+			controller.enqueueObject(NewReconcileChi(reconcileAdd, nil, chi))
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(old, new interface{}) {
 			glog.V(1).Info("chiInformer.UpdateFunc")
 
-			newChi := newObj.(*chop.ClickHouseInstallation)
-			oldChi := oldObj.(*chop.ClickHouseInstallation)
+			newChi := new.(*chop.ClickHouseInstallation)
+			oldChi := old.(*chop.ClickHouseInstallation)
 
-			// Update is called on after each Update() call on k8s resource
-			if oldChi.IsNew() && !newChi.IsNew() {
-				glog.V(1).Infof("chiInformer.UpdateFunc - no update required - switch from new to known chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
-				return
-			}
+			/*
+				// Update is called on after each Update() call on k8s resource
+				if oldChi.IsNew() && !newChi.IsNew() {
+					glog.V(1).Infof("chiInformer.UpdateFunc - no update required - switch from new to known chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
+					return
+				}
 
-			// Update is called periodically, don't know why
-			if newChi.ResourceVersion == oldChi.ResourceVersion {
-				glog.V(1).Info("chiInformer.UpdateFunc - ResourceVersion is the same - periodical housekeeping")
-			} else {
-				// Looks like real update has happened
-				glog.V(1).Infof("chiInformer.UpdateFunc - UPDATE REQUIRED chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
-				glog.V(1).Infof("\n===old===:\n%s\n===new===:\n%s\n=========\n", chopparser.Yaml(oldChi), chopparser.Yaml(newChi))
-			}
+				// Update is called periodically, don't know why
+				if newChi.ResourceVersion == oldChi.ResourceVersion {
+					glog.V(1).Info("chiInformer.UpdateFunc - ResourceVersion is the same - periodical housekeeping")
+				} else {
+					// Looks like real update has happened
+					glog.V(1).Infof("chiInformer.UpdateFunc - UPDATE REQUIRED chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
+					glog.V(1).Infof("\n===old===:\n%s\n===new===:\n%s\n=========\n", chopparser.Yaml(oldChi), chopparser.Yaml(newChi))
+				}
+			*/
 
-			controller.enqueueObject(newObj)
+			controller.enqueueObject(NewReconcileChi(reconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: func(obj interface{}) {
 
@@ -184,35 +156,84 @@ func CreateController(
 
 			chi := obj.(*chop.ClickHouseInstallation)
 			glog.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
+			controller.enqueueObject(NewReconcileChi(reconcielDelete, chi, nil))
+		},
+	})
+
+	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			service := obj.(*core.Service)
+			glog.V(1).Infof("serviceInformer AddFunc %s/%s", service.Namespace, service.Name)
+		},
+		UpdateFunc: func(old, new interface{}) {
+			service := old.(*core.Service)
+			glog.V(1).Infof("serviceInformer UpdateFunc %s/%s", service.Namespace, service.Name)
+		},
+		DeleteFunc: func(obj interface{}) {
+			service := obj.(*core.Service)
+			glog.V(1).Infof("serviceInformer DeleteFunc %s/%s", service.Namespace, service.Name)
+		},
+	})
+
+	configMapInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			configMap := obj.(*core.ConfigMap)
+			glog.V(1).Infof("configMapInformer AddFunc %s/%s", configMap.Namespace, configMap.Name)
+		},
+		UpdateFunc: func(old, new interface{}) {
+			configMap := old.(*core.ConfigMap)
+			glog.V(1).Infof("configMapInformer UpdateFunc %s/%s", configMap.Namespace, configMap.Name)
+		},
+		DeleteFunc: func(obj interface{}) {
+			configMap := obj.(*core.ConfigMap)
+			glog.V(1).Infof("configMapInformer DeleteFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 	})
 
 	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
-			glog.V(1).Infof("statefulSetInformer.AddFunc - %s/%s added", statefulSet.Namespace, statefulSet.Name)
-			controller.handleObject(obj)
+			glog.V(1).Infof("statefulSetInformer AddFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			//controller.handleObject(obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			glog.V(1).Info("statefulSetInformer.UpdateFunc")
-			newStatefulSet := newObj.(*apps.StatefulSet)
-			oldStatefulSet := oldObj.(*apps.StatefulSet)
-			if newStatefulSet.ResourceVersion == oldStatefulSet.ResourceVersion {
-				glog.V(1).Infof("statefulSetInformer.UpdateFunc - no update required, no ResourceVersion change %s", newStatefulSet.ResourceVersion)
-				return
-			}
+		UpdateFunc: func(old, new interface{}) {
+			statefulSet := old.(*apps.StatefulSet)
+			glog.V(1).Infof("statefulSetInformer UpdateFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			/*
+				newStatefulSet := newObj.(*apps.StatefulSet)
+				oldStatefulSet := oldObj.(*apps.StatefulSet)
+				if newStatefulSet.ResourceVersion == oldStatefulSet.ResourceVersion {
+					glog.V(1).Infof("statefulSetInformer.UpdateFunc - no update required, no ResourceVersion change %s", newStatefulSet.ResourceVersion)
+					return
+				}
 
-			if newStatefulSet.Status.ReadyReplicas == newStatefulSet.Status.Replicas {
-				glog.V(1).Infof("statefulSetInformer.UpdateFunc - %s/%s is Ready", newStatefulSet.Namespace, newStatefulSet.Name)
-			}
+				if newStatefulSet.Status.ReadyReplicas == newStatefulSet.Status.Replicas {
+					glog.V(1).Infof("statefulSetInformer.UpdateFunc - %s/%s is Ready", newStatefulSet.Namespace, newStatefulSet.Name)
+				}
 
-			glog.V(1).Info("statefulSetInformer.UpdateFunc - UPDATE REQUIRED")
-			controller.handleObject(newObj)
+				glog.V(1).Info("statefulSetInformer.UpdateFunc - UPDATE REQUIRED")
+				controller.handleObject(newObj)
+			*/
 		},
 		DeleteFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
-			glog.V(1).Infof("statefulSetInformer.DeleteFunc - %s/%s deleted", statefulSet.Namespace, statefulSet.Name)
-			controller.handleObject(obj)
+			glog.V(1).Infof("statefulSetInformer DeleteFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			//controller.handleObject(obj)
+		},
+	})
+
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			pod := obj.(*core.Pod)
+			glog.V(1).Infof("podInformer AddFunc %s/%s", pod.Namespace, pod.Name)
+		},
+		UpdateFunc: func(old, new interface{}) {
+			pod := old.(*core.Pod)
+			glog.V(1).Infof("podInformer UpdateFunc %s/%s", pod.Namespace, pod.Name)
+		},
+		DeleteFunc: func(obj interface{}) {
+			pod := obj.(*core.Pod)
+			glog.V(1).Infof("podInformer DeleteFunc %s/%s", pod.Namespace, pod.Name)
 		},
 	})
 
@@ -265,7 +286,7 @@ func (c *Controller) processNextWorkItem() bool {
 	err := func(item interface{}) error {
 		defer c.queue.Done(item)
 
-		stringItem, ok := item.(string)
+		reconcile, ok := item.(*ReconcileChi)
 		if !ok {
 			// Item is impossible to process, no more retries
 			c.queue.Forget(item)
@@ -274,9 +295,9 @@ func (c *Controller) processNextWorkItem() bool {
 		}
 
 		// Main reconcile loop function sync an item
-		if err := c.syncItem(stringItem); err != nil {
+		if err := c.syncChi(reconcile); err != nil {
 			// Item will be retried later
-			return fmt.Errorf("unable to sync an object '%s': %s", stringItem, err.Error())
+			return fmt.Errorf("unable to sync an object %v\n", err.Error())
 		}
 
 		// Item is processed, no more retries
@@ -292,57 +313,29 @@ func (c *Controller) processNextWorkItem() bool {
 	return true
 }
 
-// syncItem is the main reconcile loop function - reconcile CHI object identified by `key`
-func (c *Controller) syncItem(key string) error {
-	// Here we assume that `key` identifies CHI object
+// syncChi is the main reconcile loop function - reconcile CHI object identified by `key`
+func (c *Controller) syncChi(reconcile *ReconcileChi) error {
+	glog.V(1).Infof("syncChi(%s) start", reconcile.cmd)
 
-	glog.V(1).Infof("syncItem(%s) start", key)
-
-	// Extract namespace and name from key - action
-	// opposite to <key, err := cache.MetaNamespaceKeyFunc(obj)> in enqueueObject function
-	namespace, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		// Unable to split key into parts
-		utilruntime.HandleError(fmt.Errorf("incorrect resource key: %s", key))
-		return nil
-	}
-	glog.V(1).Infof("syncItem(%s/%s) namespace/name extracted", namespace, name)
-
-	// We have `namespace` and `name` which are expected to point to a CHI instance
-
-	// Find CHI specified by namespace/name
-	chi, err := c.chiLister.ClickHouseInstallations(namespace).Get(name)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			utilruntime.HandleError(fmt.Errorf("ClickHouseInstallation object '%s' no longer exists in the work queue", key))
-			// Not found is not an error on higher level - return "all is ok"
-			return nil
-		}
-		return err
-	}
-
-	// And sync this CHI
-	return c.syncChi(chi)
-}
-
-// syncChi sync CHI to desired state
-func (c *Controller) syncChi(chi *chop.ClickHouseInstallation) error {
 	// Check CHI object already in sync
-	if chi.IsNew() {
-		// CHI is a new one - need to create all its objects
-		return c.syncNewChi(chi)
-	} else {
-		// Check consistency of existent resources controlled by the CHI object
-		return c.syncKnownChi(chi)
+	switch reconcile.cmd {
+	case reconcileAdd:
+		return c.onAddChi(reconcile.new)
+	case reconcileUpdate:
+		return c.onUpdateChi(reconcile.old, reconcile.new)
+	case reconcielDelete:
+		return c.onDeleteChi(reconcile.old)
 	}
+
+	return nil
 }
 
-// syncNewChi sync new CHI - creates all its resources
-func (c *Controller) syncNewChi(chi *chop.ClickHouseInstallation) error {
+// onAddChi sync new CHI - creates all its resources
+func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	// CHI is a new one - need to create all its objects
 	// Operator receives CHI struct partially filled by data from .yaml file provided by user
 	// We need to create all resources that are needed to run user's .yaml specification
-	glog.V(1).Infof("syncNewChi(%s/%s)", chi.Namespace, chi.Name)
+	glog.V(1).Infof("onAddChi(%s/%s)", chi.Namespace, chi.Name)
 
 	chi, err := c.createCHIResources(chi)
 	if err != nil {
@@ -357,23 +350,69 @@ func (c *Controller) syncNewChi(chi *chop.ClickHouseInstallation) error {
 	}
 
 	glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
-	
+
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
 	c.metricsExporter.EnsureControlledValues(chi.Name, chopparser.ListPodFQDNs(chi))
 
 	return nil
 }
 
-// syncKnownChi sync CHI which was already created earlier
-func (c *Controller) syncKnownChi(chi *chop.ClickHouseInstallation) error {
-	glog.V(1).Infof("syncKnownChi(%s/%s)", chi.Namespace, chi.Name)
+// onUpdateChi sync CHI which was already created earlier
+func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
+	glog.V(1).Infof("onUpdateChi(%s/%s)", old.Namespace, old.Name)
 
-	c.listStatefulSetResources(chi)
-	chi, _ = c.createCHIResources(chi)
+	if old.ObjectMeta.Generation == new.ObjectMeta.Generation {
+		// No need to react
+		return nil
+	}
+
+	if !old.IsKnown() && new.IsKnown() {
+		// This `update` event triggered by `save` filled CHI action
+		// No need to react
+		return nil
+	}
+
+	if !old.IsFilled() {
+		old, _ = chopparser.ChiCopyAndNormalize(new)
+	}
+
+	if !new.IsFilled() {
+		new, _ = chopparser.ChiCopyAndNormalize(new)
+	}
+
+	diff, equal := messagediff.DeepDiff(old, new)
+
+	if equal {
+		// No need tor react
+		return nil
+	}
+
+	for path := range diff.Removed {
+		switch diff.Removed[path].(type) {
+		case chop.ChiCluster:
+			cluster := diff.Removed[path].(chop.ChiCluster)
+			c.deleteCluster(&cluster)
+		case chop.ChiClusterLayoutShard:
+			shard := diff.Removed[path].(chop.ChiClusterLayoutShard)
+			c.deleteShard(&shard)
+		case chop.ChiClusterLayoutShardReplica:
+			replica := diff.Removed[path].(chop.ChiClusterLayoutShardReplica)
+			c.deleteReplica(&replica)
+		}
+	}
+
+	//	c.listStatefulSetResources(chi)
+	chi, _ := c.createCHIResources(new)
 	c.updateCHIResource(chi)
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
 	c.metricsExporter.EnsureControlledValues(chi.Name, chopparser.ListPodFQDNs(chi))
+
+	return nil
+}
+
+func (c *Controller) onDeleteChi(chi *chop.ClickHouseInstallation) error {
+	c.deleteChi(chi)
 
 	return nil
 }
@@ -387,15 +426,7 @@ func (c *Controller) updateCHIResource(chi *chop.ClickHouseInstallation) error {
 
 // enqueueObject adds ClickHouseInstallation object to the workqueue
 func (c *Controller) enqueueObject(obj interface{}) {
-	// Make a string key for an API object
-	// The key uses the format <namespace>/<name>
-	key, err := cache.MetaNamespaceKeyFunc(obj)
-	if err != nil {
-		utilruntime.HandleError(err)
-		return
-	}
-
-	c.queue.AddRateLimited(key)
+	c.queue.AddRateLimited(obj)
 }
 
 // handleObject enqueues CHI which is owner of `obj` into reconcile loop
