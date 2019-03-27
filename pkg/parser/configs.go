@@ -46,8 +46,8 @@ func genConfigXML(data map[string]string, section string) string {
 
 	b := &bytes.Buffer{}
 
-	// += <yandex>
-	//      <SECTION>
+	// <yandex>
+	//		<SECTION>
 	fprintf(b, "<%s>\n", xmlTagYandex)
 	fprintf(b, "%4s<%s>\n", " ", section)
 
@@ -56,8 +56,8 @@ func genConfigXML(data map[string]string, section string) string {
 		glog.V(2).Infof(err.Error())
 		return ""
 	}
-	// += <SECTION>
-	//  <yandex>
+	//		<SECTION>
+	// <yandex>
 	fprintf(b, "%4s</%s>\n", " ", section)
 	fprintf(b, "</%s>\n", xmlTagYandex)
 
@@ -71,14 +71,14 @@ func generateSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
 	}
 
 	b := &bytes.Buffer{}
-	// += <yandex>
+	// <yandex>
 	fprintf(b, "<%s>\n", xmlTagYandex)
 	err := xmlbuilder.GenerateXML(b, chi.Spec.Configuration.Settings, 0, 4, configUsers, configProfiles, configQuotas)
 	if err != nil {
 		glog.V(2).Infof(err.Error())
 		return ""
 	}
-	// += </yandex>
+	// </yandex>
 	fprintf(b, "</%s>\n", xmlTagYandex)
 
 	return b.String()
@@ -109,27 +109,27 @@ func generateZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 	}
 
 	b := &bytes.Buffer{}
-	// += <yandex>
-	//      <zookeeper>
+	// <yandex>
+	//		<zookeeper>
 	fprintf(b, "<%s>\n", xmlTagYandex)
 	fprintf(b, "%4s<zookeeper>\n", " ")
 	// Append Zookeeper nodes
 	for i := range chi.Spec.Configuration.Zookeeper.Nodes {
 		// Convenience wrapper
 		node := &chi.Spec.Configuration.Zookeeper.Nodes[i]
-		// += <node>
-		//      <host>HOST</host>
-		//      <port>PORT</port>
-		//    </node>
+		// <node>
+		//		<host>HOST</host>
+		//		<port>PORT</port>
+		// </node>
 		fprintf(b, "%8s<node>\n", " ")
 		fprintf(b, "%12s<host>%s</host>\n", " ", node.Host)
 		fprintf(b, "%12s<port>%d</port>\n", " ", node.Port)
 		fprintf(b, "%8s</node>\n", " ")
 	}
-	// += </zookeeper>
+	// </zookeeper>
 	fprintf(b, "%4s</zookeeper>\n", " ")
 
-	// += <distributed_ddl>
+	// <distributed_ddl>
 	//      <path>/x/y/chi.name/z</path>
 	//      <profile>X</prpfile>
 	fprintf(b, "%4s<distributed_ddl>\n", " ")
@@ -137,8 +137,8 @@ func generateZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 	if chi.Spec.Defaults.DistributedDDL.Profile != "" {
 		fprintf(b, "%8s<profile>%s</profile>\n", " ", chi.Spec.Defaults.DistributedDDL.Profile)
 	}
-	// += </distributed_ddl>
-	//  </yandex>
+	//		</distributed_ddl>
+	// </yandex>
 	fprintf(b, "%4s</distributed_ddl>\n", " ")
 	fprintf(b, "</%s>\n", xmlTagYandex)
 
@@ -147,23 +147,26 @@ func generateZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 
 // generateRemoteServersConfigReplicaHostname creates hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
-func generateRemoteServersConfigReplicaHostname(chi *chiv1.ClickHouseInstallation, fullDeploymentID string) string {
-	var namespaceDomainName string
+func generateRemoteServersConfigReplicaHostname(
+	chi *chiv1.ClickHouseInstallation,
+	replica *chiv1.ChiClusterLayoutShardReplica,
+) string {
 	if chi.Spec.Defaults.ReplicasUseFQDN == 1 {
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local
-		namespaceDomainName = "." + CreateNamespaceDomainName(chi.Namespace)
+		return CreatePodHostname(replica) + "." + CreateNamespaceDomainName(replica.Address.Namespace)
+	} else {
+		return CreatePodHostname(replica)
 	}
-	return CreatePodHostname(fullDeploymentID) + namespaceDomainName
 }
 
 // generateRemoteServersConfig creates "remote_servers.xml" content and calculates data generation parameters for other sections
 func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 	b := &bytes.Buffer{}
 
-	// += <yandex>
-	// 		<remote_servers>
+	// <yandex>
+	//		<remote_servers>
 	fprintf(b, "<%s>\n", xmlTagYandex)
 	fprintf(b, "%4s<remote_servers>\n", " ")
 
@@ -172,7 +175,7 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 		// Convenience wrapper
 		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
 
-		// += <my_cluster_name>
+		// <my_cluster_name>
 		fprintf(b, "%8s<%s>\n", " ", cluster.Name)
 
 		// Build each shard XML
@@ -180,12 +183,12 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 			// Convenience wrapper
 			shard := &cluster.Layout.Shards[shardIndex]
 
-			// += <shard>
+			// <shard>
 			//		<internal_replication>VALUE(yes/no)</internal_replication>
 			fprintf(b, "%12s<shard>\n", " ")
 			fprintf(b, "%16s<internal_replication>%s</internal_replication>\n", " ", shard.InternalReplication)
 
-			// += <weight>X</weight>
+			//		<weight>X</weight>
 			if shard.Weight > 0 {
 				fprintf(b, "%16s<weight>%d</weight>\n", " ", shard.Weight)
 			}
@@ -194,29 +197,23 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 			for replicaIndex := range shard.Replicas {
 				// Convenience wrapper
 				replica := &shard.Replicas[replicaIndex]
-				// 1eb454-2 (deployment id - sequential index of this deployment id)
-				fullDeploymentID := generateFullDeploymentID(replica)
-				// += <replica>
-				//		<host>XXX</host>
-				fprintf(b, "%16s<replica>\n", " ")
-				fprintf(b, "%20s<host>%s</host>\n", " ", generateRemoteServersConfigReplicaHostname(chi, fullDeploymentID))
 
-				port := chDefaultClientPortNumber
-				if replica.Port > 0 {
-					port = int(replica.Port)
-				}
-				// +=	<port>XXX</port>
-				//	</replica>
-				fprintf(b, "%20s<port>%d</port>\n", " ", port)
+				// <replica>
+				//		<host>XXX</host>
+				//		<port>XXX</port>
+				// </replica>
+				fprintf(b, "%16s<replica>\n", " ")
+				fprintf(b, "%20s<host>%s</host>\n", " ", generateRemoteServersConfigReplicaHostname(chi, replica))
+				fprintf(b, "%20s<port>%d</port>\n", " ", replica.Port)
 				fprintf(b, "%16s</replica>\n", " ")
 			}
-			// += </shard>
+			// </shard>
 			fprintf(b, "%12s</shard>\n", " ")
 		}
-		// += </my_cluster_name>
+		// </my_cluster_name>
 		fprintf(b, "%8s</%s>\n", " ", cluster.Name)
 	}
-	// += </remote_servers>
+	// 		</remote_servers>
 	// </yandex>
 	fprintf(b, "%4s</remote_servers>\n", " ")
 	fprintf(b, "</%s>\n", xmlTagYandex)
@@ -225,38 +222,36 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 }
 
 // generateHostMacros creates "macros.xml" content
-func generateHostMacros(chiName, fullDeploymentID string, shardDescriptions macrosDataShardDescriptionList) string {
+func generateHostMacros(replica *chiv1.ChiClusterLayoutShardReplica) string {
 	b := &bytes.Buffer{}
 
-	// += <yandex>
+	// <yandex>
 	fprintf(b, "<%s>\n", xmlTagYandex)
-	// += <macros>
+	// <macros>
 	fprintf(b, "%4s<macros>\n", " ")
 
-	// += <installation>CHI name</installation>
-	fprintf(b, "%8s<installation>%s</installation>\n", " ", chiName)
+	// <installation>CHI name</installation>
+	fprintf(b, "%8s<installation>%s</installation>\n", " ", replica.Address.ChiName)
 
-	for i := range shardDescriptions {
-		// += <CLUSTER_NAME>cluster name</CLUSTER_NAME>
-		fprintf(b,
-			"%8s<%s>%[2]s</%[2]s>\n",
-			" ",
-			shardDescriptions[i].clusterName,
-		)
-		// += <CLUSTER_NAME-shard>1-based shard index within cluster</CLUSTER_NAME-shard>
-		fprintf(b,
-			"%8s<%s-shard>%d</%[2]s-shard>\n",
-			" ",
-			shardDescriptions[i].clusterName,
-			shardDescriptions[i].index,
-		)
-	}
+	// <CLUSTER_NAME>cluster name</CLUSTER_NAME>
+	fprintf(b,
+		"%8s<%s>%[2]s</%[2]s>\n",
+		" ",
+		replica.Address.ClusterName,
+	)
+	// <CLUSTER_NAME-shard>1-based shard index within cluster</CLUSTER_NAME-shard>
+	fprintf(b,
+		"%8s<%s-shard>%d</%[2]s-shard>\n",
+		" ",
+		replica.Address.ClusterName,
+		replica.Address.ShardIndex,
+	)
 
-	// += <replica>replica id = full deployment id</replica>
+	// <replica>replica id = full deployment id</replica>
 	// full deployment id is unique to identify replica within the cluster
-	fprintf(b, "%8s<replica>%s</replica>\n", " ", fullDeploymentID)
+	fprintf(b, "%8s<replica>%s</replica>\n", " ", CreatePodHostname(replica))
 
-	// += </macros>
+	// 		</macros>
 	// </yandex>
 	fprintf(b, "%4s</macros>\n", " ")
 	fprintf(b, "</%s>\n", xmlTagYandex)

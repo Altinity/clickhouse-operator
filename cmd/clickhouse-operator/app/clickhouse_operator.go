@@ -154,9 +154,10 @@ func Run() {
 		chopClient,
 		kubeClient,
 		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
-		kubeInformerFactory.Apps().V1().StatefulSets(),
-		kubeInformerFactory.Core().V1().ConfigMaps(),
 		kubeInformerFactory.Core().V1().Services(),
+		kubeInformerFactory.Core().V1().ConfigMaps(),
+		kubeInformerFactory.Apps().V1().StatefulSets(),
+		kubeInformerFactory.Core().V1().Pods(),
 		metricsExporter,
 	)
 
