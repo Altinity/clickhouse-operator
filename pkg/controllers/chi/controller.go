@@ -337,7 +337,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	// We need to create all resources that are needed to run user's .yaml specification
 	glog.V(1).Infof("onAddChi(%s/%s)", chi.Namespace, chi.Name)
 
-	chi, err := c.createCHIResources(chi)
+	chi, err := c.createOrUpdateChiResources(chi)
 	if err != nil {
 		glog.V(2).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
 		return err
@@ -402,7 +402,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	}
 
 	//	c.listStatefulSetResources(chi)
-	chi, _ := c.createCHIResources(new)
+	chi, _ := c.createOrUpdateChiResources(new)
 	c.updateCHIResource(chi)
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state

@@ -444,7 +444,7 @@ func copyPodTemplateFrom(dst *apps.StatefulSet, src *chiv1.ChiPodTemplate) {
 	copy(dst.Spec.Template.Spec.Volumes, src.Volumes)
 }
 
-// createDefaultPodTemplate returns default podTemplatesIndexData
+// createDefaultPodTemplate returns default Pod Template to be used with StatefulSet
 func createDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 	return &chiv1.ChiPodTemplate{
 		Name: "createDefaultPodTemplate",
@@ -471,7 +471,8 @@ func createDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 						HTTPGet: &corev1.HTTPGetAction{
 							Path: "/ping",
 							Port: intstr.Parse(chDefaultHTTPPortName),
-						}},
+						},
+					},
 					InitialDelaySeconds: 10,
 					PeriodSeconds: 10,
 				},
