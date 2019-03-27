@@ -173,11 +173,12 @@ func (c *Controller) createOrUpdateServiceResource(chi *chop.ClickHouseInstallat
 // createOrUpdateStatefulSetResource creates apps.StatefulSet resource
 func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInstallation, newStatefulSet *apps.StatefulSet) error {
 	// Check whether object with such name already exists in k8s
-	preupdateStatefulSet, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
-	if preupdateStatefulSet != nil {
+	preUpdateStatefulSet, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
+	if preUpdateStatefulSet != nil {
+		preUpdateStatefulSet = preUpdateStatefulSet.DeepCopy()
 		// Object with such name already exists, this is not an error
-		glog.Infof("Update StatefulSet %s/%s\n", preupdateStatefulSet.Namespace, preupdateStatefulSet.Name)
-		generation := preupdateStatefulSet.Generation
+		glog.Infof("Update StatefulSet %s/%s\n", preUpdateStatefulSet.Namespace, preUpdateStatefulSet.Name)
+		preUpdateGeneration := preUpdateStatefulSet.Generation
 		updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Update(newStatefulSet)
 		// After calling "Update()"
 		// 1. ObjectMeta.Generation is target generation
@@ -186,12 +187,12 @@ func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInsta
 			return err
 		}
 
-		if updatedStatefulSet.Generation == generation {
+		if updatedStatefulSet.Generation == preUpdateGeneration {
 			glog.Infof("No generation change needed for StatefulSet %s/%s\n", updatedStatefulSet.Namespace, updatedStatefulSet.Name)
 			return nil
 		}
 
-		glog.Infof("Generation change %d=>%d required for StatefulSet %s/%s\n", generation, updatedStatefulSet.Generation, updatedStatefulSet.Namespace, updatedStatefulSet.Name)
+		glog.Infof("Generation change %d=>%d required for StatefulSet %s/%s\n", preUpdateGeneration, updatedStatefulSet.Generation, updatedStatefulSet.Namespace, updatedStatefulSet.Name)
 
 		// StatefulSet can be considered as ready when:
 		// 1. Status.ObservedGeneration ==
@@ -200,12 +201,7 @@ func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInsta
 		start := time.Now()
 		for {
 			curStatefulSet, _ := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
-			if (curStatefulSet.Status.ObservedGeneration == updatedStatefulSet.Generation) &&
-				(curStatefulSet.Status.ObservedGeneration == curStatefulSet.Generation) &&
-				(curStatefulSet.Status.ReadyReplicas == *curStatefulSet.Spec.Replicas) &&
-				(curStatefulSet.Status.CurrentReplicas == *curStatefulSet.Spec.Replicas) &&
-				(curStatefulSet.Status.UpdatedReplicas == *curStatefulSet.Spec.Replicas) &&
-				(curStatefulSet.Status.CurrentRevision == curStatefulSet.Status.UpdateRevision) {
+			if hasStatefulSetReachedGeneration(curStatefulSet, updatedStatefulSet.Generation) {
 				// StatefulSet ready
 				glog.Infof("Update completed up to Generation %v: status:%s\n", curStatefulSet.Generation, strStatefulSetStatus(&curStatefulSet.Status))
 				break // for
@@ -213,13 +209,12 @@ func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInsta
 				glog.Info("======================\n")
 				glog.Infof("%s\n", strStatefulSetStatus(&updatedStatefulSet.Status))
 				glog.Infof("%s\n", strStatefulSetStatus(&curStatefulSet.Status))
-				if time.Since(start) < 1*time.Minute {
+				if time.Since(start) < 30*time.Second {
 					// Wait some more time
 					time.Sleep(1 * time.Second)
 				} else {
-					// No more wait, revert back
-					glog.Errorf("Updated failed %s\n", strStatefulSetStatus(&curStatefulSet.Status))
-					return errors.New(fmt.Sprintf("Updated failed %s", strStatefulSetStatus(&curStatefulSet.Status)))
+					// No more wait, do something
+					return c.statefulSetUpdateFailed(curStatefulSet, preUpdateStatefulSet)
 				}
 			}
 		}
@@ -237,6 +232,46 @@ func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInsta
 
 	// Object created
 	return nil
+}
+
+// hasStatefulSetReachedGeneration returns has StatefulSet reached the expected generation after upgrade
+func hasStatefulSetReachedGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
+			// StatefulSet has .spec generation we are waiting for
+	return	(statefulSet.Generation == generation) &&
+		// and this .spec generation is being applied to replicas - it is observed right now
+		(statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
+		// and all replicas are in "Ready" status - meaning ready to be used - no failure inside
+		(statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas) &&
+		// and all replicas are of expected generation
+		(statefulSet.Status.CurrentReplicas == *statefulSet.Spec.Replicas) &&
+		// and all replicas are updated - meaning rolling update completed over all replicas
+		(statefulSet.Status.UpdatedReplicas == *statefulSet.Spec.Replicas) &&
+		// and current revision is an updated one - meaning rolling update completed over all replicas
+		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
+}
+
+func (c *Controller) statefulSetUpdateFailed(curStatefulSet, preUpdateStatefulSet *apps.StatefulSet) error {
+	var fail = false
+	if fail {
+		glog.Errorf("Updated failed %s\n", preUpdateStatefulSet.Name)
+		return errors.New(fmt.Sprintf("Updated failed %s", preUpdateStatefulSet.Name))
+	} else {
+		curStatefulSet.Spec = preUpdateStatefulSet.Spec
+		curStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(curStatefulSet.Namespace).Update(curStatefulSet)
+		err = c.statefulSetDeletePod(curStatefulSet)
+		return err
+	}
+}
+
+func (c *Controller) statefulSetDeletePod(statefulSet *apps.StatefulSet) error {
+	podName := fmt.Sprintf("%s-0", statefulSet.Name)
+	gracePeriodSeconds := int64(0)
+	propagationPolicy := metav1.DeletePropagationForeground
+	deleteOptions := metav1.DeleteOptions{
+		GracePeriodSeconds: &gracePeriodSeconds,
+		PropagationPolicy: &propagationPolicy,
+	}
+	return c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(podName, &deleteOptions)
 }
 
 func strStatefulSetStatus(status *apps.StatefulSetStatus) string {

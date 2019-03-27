@@ -307,6 +307,7 @@ func createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.
 
 	// Create apps.StatefulSet object
 	replicasNum := int32(1)
+	terminationGracePeriod := int64(0)
 	return &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      statefulSetName,
@@ -336,6 +337,7 @@ func createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.
 				Spec: corev1.PodSpec{
 					Volumes:    nil,
 					Containers: nil,
+					TerminationGracePeriodSeconds: &terminationGracePeriod,
 				},
 			},
 		},
