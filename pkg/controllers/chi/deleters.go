@@ -15,7 +15,6 @@
 package chi
 
 import (
-	"fmt"
 	"github.com/golang/glog"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -95,7 +94,7 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
 	}
 }
 
+// statefulSetDeletePod delete all pod of a StatefulSet. This requests StatefulSet to relaunch deleted pods
 func (c *Controller) statefulSetDeletePod(statefulSet *apps.StatefulSet) error {
-	podName := fmt.Sprintf("%s-0", statefulSet.Name)
-	return c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(podName, newDeleteOptions())
+	return c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(chopparser.CreatePodName(statefulSet), newDeleteOptions())
 }

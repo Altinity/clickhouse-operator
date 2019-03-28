@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	apps "k8s.io/api/apps/v1"
 )
 
 func createStringID(str string, hashLen int) string {
@@ -124,4 +125,10 @@ func CreatePodFQDN(replica *chop.ChiClusterLayoutShardReplica) string {
 		replica.Address.ReplicaIndex,
 		replica.Address.Namespace,
 	)
+}
+
+// CreatePodName create Pod Name for a Service
+func CreatePodName(statefulSet *apps.StatefulSet) string {
+	return fmt.Sprintf(podNamePattern, statefulSet.Name)
+
 }

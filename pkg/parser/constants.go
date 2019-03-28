@@ -152,6 +152,9 @@ const (
 	// ss-1eb454-2-0.my-dev-domain.svc.cluster.local
 	podFQDNPattern = podHostnamePattern + "." + namespaceDomainPattern
 
+	// podNamePattern is a name of a Pod as ServiceName-0
+	podNamePattern = "%s-0"
+
 	// NAME                                       DATA   AGE
 	// chi-example-01-common-configd              2      2s
 	// chi-example-01-common-usersd               0      2s
