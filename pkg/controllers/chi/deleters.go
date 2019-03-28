@@ -76,20 +76,28 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
 
 	configMapCommon := chopparser.CreateConfigMapCommonName(chi.Name)
 	configMapCommonUsersName := chopparser.CreateConfigMapCommonUsersName(chi.Name)
+
 	// Delete ConfigMap
 	err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommon, newDeleteOptions())
-	if err != nil {
+	if err == nil {
+		glog.Infof("OK delete ConfigMap %s %v\n", configMapCommon, err)
+	} else {
 		glog.Infof("FAIL delete ConfigMap %s %v\n", configMapCommon, err)
 	}
+
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommonUsersName, newDeleteOptions())
-	if err != nil {
+	if err == nil {
+		glog.Infof("OK delete ConfigMap %s %v\n", configMapCommonUsersName, err)
+	} else {
 		glog.Infof("FAIL delete ConfigMap %s %v\n", configMapCommonUsersName, err)
 	}
 
 	chiServiceName := chopparser.CreateChiServiceName(chi)
 	// Delete Service
 	err = c.kubeClient.CoreV1().Services(chi.Namespace).Delete(chiServiceName, newDeleteOptions())
-	if err != nil {
+	if err == nil {
+		glog.Infof("OK delete Service %s %v\n", chiServiceName, err)
+	} else {
 		glog.Infof("FAIL delete Service %s %v\n", chiServiceName, err)
 	}
 }

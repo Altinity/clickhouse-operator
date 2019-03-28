@@ -29,7 +29,8 @@ import (
 )
 
 var (
-	stopOnStatefulSetUpdate = true
+	stopOnStatefulSetUpdate = false
+	timeToWaitStatefulSetReachedGeneration = 30*time.Second
 )
 
 // createOrUpdateChiResources creates k8s resources based on ClickHouseInstallation object specification
@@ -158,7 +159,7 @@ func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInsta
 				glog.Info("======================\n")
 				glog.Infof("%s\n", strStatefulSetStatus(&updatedStatefulSet.Status))
 				glog.Infof("%s\n", strStatefulSetStatus(&curStatefulSet.Status))
-				if time.Since(start) < 30*time.Second {
+				if time.Since(start) < timeToWaitStatefulSetReachedGeneration {
 					// Wait some more time
 					time.Sleep(1 * time.Second)
 				} else {
