@@ -65,10 +65,10 @@ func CreateConfigMapCommonUsersName(chiName string) string {
 }
 
 // CreateChiServiceName creates a name of a Installation Service resource
-func CreateChiServiceName(chiName string) string {
+func CreateChiServiceName(chi *chop.ClickHouseInstallation) string {
 	return fmt.Sprintf(
 		chiServiceNamePattern,
-		chiName,
+		chi.Name,
 	)
 }
 

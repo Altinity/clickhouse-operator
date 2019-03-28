@@ -171,7 +171,7 @@ func createServiceObjectsCommon(chi *chiv1.ClickHouseInstallation) ServiceList {
 	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
 	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
 	return ServiceList{
-		createServiceObjectChi(chi, CreateChiServiceName(chi.Name)),
+		createServiceObjectChi(chi, CreateChiServiceName(chi)),
 	}
 }
 

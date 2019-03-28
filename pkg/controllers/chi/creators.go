@@ -15,18 +15,21 @@
 package chi
 
 import (
-	"fmt"
 	"errors"
+	"fmt"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopparser "github.com/altinity/clickhouse-operator/pkg/parser"
 	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+)
+
+var (
+	stopOnStatefulSetUpdate = true
 )
 
 // createOrUpdateChiResources creates k8s resources based on ClickHouseInstallation object specification
@@ -36,60 +39,6 @@ func (c *Controller) createOrUpdateChiResources(chi *chop.ClickHouseInstallation
 	err = c.createOrUpdateResources(chiCopy, listOfLists)
 
 	return chiCopy, err
-}
-
-func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) error {
-
-	configMapName := chopparser.CreateConfigMapDeploymentName(replica)
-	statefulSetName := chopparser.CreateStatefulSetName(replica)
-	statefulSetServiceName := chopparser.CreateStatefulSetServiceName(replica)
-
-	// Delete StatefulSet
-	statefulSet, _ := c.statefulSetLister.StatefulSets(replica.Address.Namespace).Get(statefulSetName)
-	if statefulSet != nil {
-		// Delete StatefulSet
-		_ = c.kubeClient.AppsV1().StatefulSets(replica.Address.Namespace).Delete(statefulSetName, &metav1.DeleteOptions{})
-	}
-
-	// Delete ConfigMap
-	_ = c.kubeClient.CoreV1().ConfigMaps(replica.Address.Namespace).Delete(configMapName, &metav1.DeleteOptions{})
-
-	// Delete Service
-	_ = c.kubeClient.CoreV1().Services(replica.Address.Namespace).Delete(statefulSetServiceName, &metav1.DeleteOptions{})
-
-	return nil
-}
-
-func (c *Controller) deleteShard(shard *chop.ChiClusterLayoutShard) {
-	shard.WalkReplicas(c.deleteReplica)
-}
-
-func (c *Controller) deleteCluster(cluster *chop.ChiCluster) {
-	cluster.WalkReplicas(c.deleteReplica)
-}
-
-func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
-	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
-		c.deleteCluster(cluster)
-		return nil
-	})
-
-	// Delete common ConfigMap's
-	// Delete CHI service
-	//
-	// chi-b3d29f-common-configd   2      61s
-	// chi-b3d29f-common-usersd    0      61s
-	// service/clickhouse-example-01         LoadBalancer   10.106.183.200   <pending>     8123:31607/TCP,9000:31492/TCP,9009:31357/TCP   33s   clickhouse.altinity.com/chi=example-01
-
-	configMapCommon := chopparser.CreateConfigMapCommonName(chi.Name)
-	configMapCommonUsersName := chopparser.CreateConfigMapCommonUsersName(chi.Name)
-	// Delete ConfigMap
-	_ = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommon, &metav1.DeleteOptions{})
-	_ = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommonUsersName, &metav1.DeleteOptions{})
-
-	chiServiceName := chopparser.CreateChiServiceName(chi.Namespace)
-	// Delete Service
-	_ = c.kubeClient.CoreV1().Services(chi.Namespace).Delete(chiServiceName, &metav1.DeleteOptions{})
 }
 
 func (c *Controller) createOrUpdateResources(chi *chop.ClickHouseInstallation, listOfLists []interface{}) error {
@@ -251,8 +200,7 @@ func hasStatefulSetReachedGeneration(statefulSet *apps.StatefulSet, generation i
 }
 
 func (c *Controller) statefulSetUpdateFailed(curStatefulSet, preUpdateStatefulSet *apps.StatefulSet) error {
-	var fail = false
-	if fail {
+	if stopOnStatefulSetUpdate {
 		glog.Errorf("Updated failed %s\n", preUpdateStatefulSet.Name)
 		return errors.New(fmt.Sprintf("Updated failed %s", preUpdateStatefulSet.Name))
 	} else {
@@ -261,17 +209,6 @@ func (c *Controller) statefulSetUpdateFailed(curStatefulSet, preUpdateStatefulSe
 		err = c.statefulSetDeletePod(curStatefulSet)
 		return err
 	}
-}
-
-func (c *Controller) statefulSetDeletePod(statefulSet *apps.StatefulSet) error {
-	podName := fmt.Sprintf("%s-0", statefulSet.Name)
-	gracePeriodSeconds := int64(0)
-	propagationPolicy := metav1.DeletePropagationForeground
-	deleteOptions := metav1.DeleteOptions{
-		GracePeriodSeconds: &gracePeriodSeconds,
-		PropagationPolicy: &propagationPolicy,
-	}
-	return c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(podName, &deleteOptions)
 }
 
 func strStatefulSetStatus(status *apps.StatefulSetStatus) string {
