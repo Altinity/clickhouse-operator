@@ -22,7 +22,7 @@ import (
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/clickhouse.altinity.com/v1"
-	chopparser "github.com/altinity/clickhouse-operator/pkg/parser"
+	chopmodels "github.com/altinity/clickhouse-operator/pkg/models"
 	"gopkg.in/d4l3k/messagediff.v1"
 
 	apps "k8s.io/api/apps/v1"
@@ -140,7 +140,7 @@ func CreateController(
 				} else {
 					// Looks like real update has happened
 					glog.V(1).Infof("chiInformer.UpdateFunc - UPDATE REQUIRED chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
-					glog.V(1).Infof("\n===old===:\n%s\n===new===:\n%s\n=========\n", chopparser.Yaml(oldChi), chopparser.Yaml(newChi))
+					glog.V(1).Infof("\n===old===:\n%s\n===new===:\n%s\n=========\n", chopmodels.Yaml(oldChi), chopmodels.Yaml(newChi))
 				}
 			*/
 
@@ -352,7 +352,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
-	c.metricsExporter.EnsureControlledValues(chi.Name, chopparser.ListPodFQDNs(chi))
+	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.ListPodFQDNs(chi))
 
 	return nil
 }
@@ -373,11 +373,11 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	}
 
 	if !old.IsFilled() {
-		old, _ = chopparser.ChiCopyAndNormalize(new)
+		old, _ = chopmodels.ChiCopyAndNormalize(new)
 	}
 
 	if !new.IsFilled() {
-		new, _ = chopparser.ChiCopyAndNormalize(new)
+		new, _ = chopmodels.ChiCopyAndNormalize(new)
 	}
 
 	diff, equal := messagediff.DeepDiff(old, new)
@@ -406,7 +406,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	c.updateCHIResource(chi)
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
-	c.metricsExporter.EnsureControlledValues(chi.Name, chopparser.ListPodFQDNs(chi))
+	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.ListPodFQDNs(chi))
 
 	return nil
 }
@@ -487,7 +487,7 @@ func waitForCacheSync(name string, stopCh <-chan struct{}, cacheSyncs ...cache.I
 // clusterWideSelector returns labels.Selector object
 func clusterWideSelector(name string) labels.Selector {
 	return labels.SelectorFromSet(labels.Set{
-		chopparser.ChopGeneratedLabel: name,
+		chopmodels.ChopGeneratedLabel: name,
 	})
 	/*
 		glog.V(2).Infof("ClickHouseInstallation (%q) listing controlled resources", chi.Name)

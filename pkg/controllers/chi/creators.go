@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopparser "github.com/altinity/clickhouse-operator/pkg/parser"
+	chopmodels "github.com/altinity/clickhouse-operator/pkg/models"
 	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -35,8 +35,8 @@ var (
 
 // createOrUpdateChiResources creates k8s resources based on ClickHouseInstallation object specification
 func (c *Controller) createOrUpdateChiResources(chi *chop.ClickHouseInstallation) (*chop.ClickHouseInstallation, error) {
-	chiCopy, err := chopparser.ChiCopyAndNormalize(chi)
-	listOfLists := chopparser.ChiCreateObjects(chiCopy)
+	chiCopy, err := chopmodels.ChiCopyAndNormalize(chi)
+	listOfLists := chopmodels.ChiCreateObjects(chiCopy)
 	err = c.createOrUpdateResources(chiCopy, listOfLists)
 
 	return chiCopy, err
@@ -45,21 +45,21 @@ func (c *Controller) createOrUpdateChiResources(chi *chop.ClickHouseInstallation
 func (c *Controller) createOrUpdateResources(chi *chop.ClickHouseInstallation, listOfLists []interface{}) error {
 	for i := range listOfLists {
 		switch listOfLists[i].(type) {
-		case chopparser.ServiceList:
-			for j := range listOfLists[i].(chopparser.ServiceList) {
-				if err := c.createOrUpdateServiceResource(chi, listOfLists[i].(chopparser.ServiceList)[j]); err != nil {
+		case chopmodels.ServiceList:
+			for j := range listOfLists[i].(chopmodels.ServiceList) {
+				if err := c.createOrUpdateServiceResource(chi, listOfLists[i].(chopmodels.ServiceList)[j]); err != nil {
 					return err
 				}
 			}
-		case chopparser.ConfigMapList:
-			for j := range listOfLists[i].(chopparser.ConfigMapList) {
-				if err := c.createOrUpdateConfigMapResource(chi, listOfLists[i].(chopparser.ConfigMapList)[j]); err != nil {
+		case chopmodels.ConfigMapList:
+			for j := range listOfLists[i].(chopmodels.ConfigMapList) {
+				if err := c.createOrUpdateConfigMapResource(chi, listOfLists[i].(chopmodels.ConfigMapList)[j]); err != nil {
 					return err
 				}
 			}
-		case chopparser.StatefulSetList:
-			for j := range listOfLists[i].(chopparser.StatefulSetList) {
-				if err := c.createOrUpdateStatefulSetResource(chi, listOfLists[i].(chopparser.StatefulSetList)[j]); err != nil {
+		case chopmodels.StatefulSetList:
+			for j := range listOfLists[i].(chopmodels.StatefulSetList) {
+				if err := c.createOrUpdateStatefulSetResource(chi, listOfLists[i].(chopmodels.StatefulSetList)[j]); err != nil {
 					return err
 				}
 			}
