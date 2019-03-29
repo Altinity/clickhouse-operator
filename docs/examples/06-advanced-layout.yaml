@@ -24,6 +24,7 @@ spec:
       # volumes:
       containers:
       - name: clickhouse-pod
+#        image: yandex/clickhouse-server:19.3.5
         image: yandex/clickhouse-server:19.3.7
 #        image: yandex/clickhouse-server:19.1.10
 #        image: yandex/clickhouse-server:19.1.105
@@ -39,7 +40,8 @@ spec:
       # volumes:
       containers:
       - name: clickhouse-pod
-        image: yandex/clickhouse-server:19.3.5
+#        image: yandex/clickhouse-server:19.3.5
+        image: yandex/clickhouse-server:19.3.7
 #        image: yandex/clickhouse-server:19.1.10
 #        image: yandex/clickhouse-server:19.1.105
         ports:
@@ -54,7 +56,9 @@ spec:
       # volumes:
       containers:
       - name: clickhouse-pod
-        image: yandex/clickhouse-server:19.1.10
+#        image: yandex/clickhouse-server:19.3.5
+        image: yandex/clickhouse-server:19.3.7
+#        image: yandex/clickhouse-server:19.1.10
 #        image: yandex/clickhouse-server:19.1.105
         ports:
         - name: http

@@ -29,7 +29,7 @@ import (
 )
 
 var (
-	stopOnStatefulSetUpdate = false
+	stopOnStatefulSetUpdate = true
 	timeToWaitStatefulSetReachedGeneration = 30*time.Second
 )
 
