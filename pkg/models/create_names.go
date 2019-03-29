@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package parser
+package models
 
 import (
 	"crypto/sha1"
@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	apps "k8s.io/api/apps/v1"
 )
 
 func createStringID(str string, hashLen int) string {
@@ -65,10 +66,10 @@ func CreateConfigMapCommonUsersName(chiName string) string {
 }
 
 // CreateChiServiceName creates a name of a Installation Service resource
-func CreateChiServiceName(chiName string) string {
+func CreateChiServiceName(chi *chop.ClickHouseInstallation) string {
 	return fmt.Sprintf(
 		chiServiceNamePattern,
-		chiName,
+		chi.Name,
 	)
 }
 
@@ -124,4 +125,10 @@ func CreatePodFQDN(replica *chop.ChiClusterLayoutShardReplica) string {
 		replica.Address.ReplicaIndex,
 		replica.Address.Namespace,
 	)
+}
+
+// CreatePodName create Pod Name for a Service
+func CreatePodName(statefulSet *apps.StatefulSet) string {
+	return fmt.Sprintf(podNamePattern, statefulSet.Name)
+
 }

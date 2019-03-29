@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package parser
+package models
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
@@ -151,6 +151,9 @@ const (
 	// 3. 
 	// ss-1eb454-2-0.my-dev-domain.svc.cluster.local
 	podFQDNPattern = podHostnamePattern + "." + namespaceDomainPattern
+
+	// podNamePattern is a name of a Pod as ServiceName-0
+	podNamePattern = "%s-0"
 
 	// NAME                                       DATA   AGE
 	// chi-example-01-common-configd              2      2s

@@ -15,99 +15,51 @@
 package chi
 
 import (
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopparser "github.com/altinity/clickhouse-operator/pkg/parser"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"github.com/golang/glog"
+	"errors"
+	"fmt"
 
+	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chopmodels "github.com/altinity/clickhouse-operator/pkg/models"
+	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-// createCHIResources creates k8s resources based on ClickHouseInstallation object specification
-func (c *Controller) createCHIResources(chi *chop.ClickHouseInstallation) (*chop.ClickHouseInstallation, error) {
-	chiCopy, err := chopparser.ChiCopyAndNormalize(chi)
-	listOfLists := chopparser.ChiCreateObjects(chiCopy)
+var (
+	stopOnStatefulSetUpdate = true
+	timeToWaitStatefulSetReachedGeneration = 30*time.Second
+)
+
+// createOrUpdateChiResources creates k8s resources based on ClickHouseInstallation object specification
+func (c *Controller) createOrUpdateChiResources(chi *chop.ClickHouseInstallation) (*chop.ClickHouseInstallation, error) {
+	chiCopy, err := chopmodels.ChiCopyAndNormalize(chi)
+	listOfLists := chopmodels.ChiCreateObjects(chiCopy)
 	err = c.createOrUpdateResources(chiCopy, listOfLists)
 
 	return chiCopy, err
 }
 
-func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) error {
-
-	configMapName := chopparser.CreateConfigMapDeploymentName(replica)
-	statefulSetName := chopparser.CreateStatefulSetName(replica)
-	statefulSetServiceName := chopparser.CreateStatefulSetServiceName(replica)
-
-	// Delete StatefulSet
-	statefulSet, _ := c.statefulSetLister.StatefulSets(replica.Address.Namespace).Get(statefulSetName)
-	if statefulSet != nil {
-		// Delete StatefulSet
-		_ = c.kubeClient.AppsV1().StatefulSets(replica.Address.Namespace).Delete(statefulSetName, &metav1.DeleteOptions{})
-	}
-
-	// Delete ConfigMap
-	_ = c.kubeClient.CoreV1().ConfigMaps(replica.Address.Namespace).Delete(configMapName, &metav1.DeleteOptions{})
-
-	// Delete Service
-	_ = c.kubeClient.CoreV1().Services(replica.Address.Namespace).Delete(statefulSetServiceName, &metav1.DeleteOptions{})
-
-	return nil
-}
-
-func (c *Controller) deleteShard(shard *chop.ChiClusterLayoutShard) {
-	shard.WalkReplicas(c.deleteReplica)
-}
-
-func (c *Controller) deleteCluster(cluster *chop.ChiCluster) {
-	cluster.WalkReplicas(c.deleteReplica)
-}
-
-func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
-	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
-		c.deleteCluster(cluster)
-		return nil
-	})
-
-	// Delete common ConfigMap's
-	// Delete CHI service
-	//
-	// chi-b3d29f-common-configd   2      61s
-	// chi-b3d29f-common-usersd    0      61s
-	// service/clickhouse-example-01         LoadBalancer   10.106.183.200   <pending>     8123:31607/TCP,9000:31492/TCP,9009:31357/TCP   33s   clickhouse.altinity.com/chi=example-01
-
-	configMapCommon := chopparser.CreateConfigMapCommonName(chi.Name)
-	configMapCommonUsersName := chopparser.CreateConfigMapCommonUsersName(chi.Name)
-	// Delete ConfigMap
-	_ = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommon, &metav1.DeleteOptions{})
-	_ = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommonUsersName, &metav1.DeleteOptions{})
-
-
-	chiServiceName := chopparser.CreateChiServiceName(chi.Namespace)
-	// Delete Service
-	_ = c.kubeClient.CoreV1().Services(chi.Namespace).Delete(chiServiceName, &metav1.DeleteOptions{})
-}
-
 func (c *Controller) createOrUpdateResources(chi *chop.ClickHouseInstallation, listOfLists []interface{}) error {
 	for i := range listOfLists {
 		switch listOfLists[i].(type) {
-		case chopparser.ServiceList:
-			for j := range listOfLists[i].(chopparser.ServiceList) {
-				if err := c.createOrUpdateServiceResource(chi, listOfLists[i].(chopparser.ServiceList)[j]); err != nil {
+		case chopmodels.ServiceList:
+			for j := range listOfLists[i].(chopmodels.ServiceList) {
+				if err := c.createOrUpdateServiceResource(chi, listOfLists[i].(chopmodels.ServiceList)[j]); err != nil {
 					return err
 				}
 			}
-		case chopparser.ConfigMapList:
-			for j := range listOfLists[i].(chopparser.ConfigMapList) {
-				if err := c.createOrUpdateConfigMapResource(chi, listOfLists[i].(chopparser.ConfigMapList)[j]); err != nil {
+		case chopmodels.ConfigMapList:
+			for j := range listOfLists[i].(chopmodels.ConfigMapList) {
+				if err := c.createOrUpdateConfigMapResource(chi, listOfLists[i].(chopmodels.ConfigMapList)[j]); err != nil {
 					return err
 				}
 			}
-		case chopparser.StatefulSetList:
-			for j := range listOfLists[i].(chopparser.StatefulSetList) {
-				if err := c.createOrUpdateStatefulSetResource(chi, listOfLists[i].(chopparser.StatefulSetList)[j]); err != nil {
+		case chopmodels.StatefulSetList:
+			for j := range listOfLists[i].(chopmodels.StatefulSetList) {
+				if err := c.createOrUpdateStatefulSetResource(chi, listOfLists[i].(chopmodels.StatefulSetList)[j]); err != nil {
 					return err
 				}
 			}
@@ -169,22 +121,60 @@ func (c *Controller) createOrUpdateServiceResource(chi *chop.ClickHouseInstallat
 }
 
 // createOrUpdateStatefulSetResource creates apps.StatefulSet resource
-func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInstallation, statefulSet *apps.StatefulSet) error {
+func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInstallation, newStatefulSet *apps.StatefulSet) error {
 	// Check whether object with such name already exists in k8s
-	res, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(statefulSet.Name)
-	if res != nil {
+	preUpdateStatefulSet, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
+	if preUpdateStatefulSet != nil {
+		preUpdateStatefulSet = preUpdateStatefulSet.DeepCopy()
 		// Object with such name already exists, this is not an error
-		glog.Infof("Update StatefulSet %s/%s\n", statefulSet.Namespace, statefulSet.Name)
-		_, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Update(statefulSet)
+		glog.Infof("Update StatefulSet %s/%s\n", preUpdateStatefulSet.Namespace, preUpdateStatefulSet.Name)
+		preUpdateGeneration := preUpdateStatefulSet.Generation
+		updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Update(newStatefulSet)
+		// After calling "Update()"
+		// 1. ObjectMeta.Generation is target generation
+		// 2. Status.ObservedGeneration may be <= ObjectMeta.Generation
 		if err != nil {
 			return err
 		}
+
+		if updatedStatefulSet.Generation == preUpdateGeneration {
+			glog.Infof("No generation change needed for StatefulSet %s/%s\n", updatedStatefulSet.Namespace, updatedStatefulSet.Name)
+			return nil
+		}
+
+		glog.Infof("Generation change %d=>%d required for StatefulSet %s/%s\n", preUpdateGeneration, updatedStatefulSet.Generation, updatedStatefulSet.Namespace, updatedStatefulSet.Name)
+
+		// StatefulSet can be considered as ready when:
+		// 1. Status.ObservedGeneration ==
+		// 		ObjectMeta.Generation ==
+		// 2. Status.ReadyReplicas == Spec.Replicas
+		start := time.Now()
+		for {
+			curStatefulSet, _ := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
+			if hasStatefulSetReachedGeneration(curStatefulSet, updatedStatefulSet.Generation) {
+				// StatefulSet ready
+				glog.Infof("Update completed up to Generation %v: status:%s\n", curStatefulSet.Generation, strStatefulSetStatus(&curStatefulSet.Status))
+				break // for
+			} else {
+				glog.Info("======================\n")
+				glog.Infof("%s\n", strStatefulSetStatus(&updatedStatefulSet.Status))
+				glog.Infof("%s\n", strStatefulSetStatus(&curStatefulSet.Status))
+				if time.Since(start) < timeToWaitStatefulSetReachedGeneration {
+					// Wait some more time
+					time.Sleep(1 * time.Second)
+				} else {
+					// No more wait, do something
+					return c.statefulSetUpdateFailed(curStatefulSet, preUpdateStatefulSet)
+				}
+			}
+		}
+
 		return nil
 	}
 
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found - create it
-		_, err = c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Create(statefulSet)
+		_, err = c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Create(newStatefulSet)
 	}
 	if err != nil {
 		return err
@@ -192,4 +182,45 @@ func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInsta
 
 	// Object created
 	return nil
+}
+
+// hasStatefulSetReachedGeneration returns has StatefulSet reached the expected generation after upgrade
+func hasStatefulSetReachedGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
+			// StatefulSet has .spec generation we are waiting for
+	return	(statefulSet.Generation == generation) &&
+		// and this .spec generation is being applied to replicas - it is observed right now
+		(statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
+		// and all replicas are in "Ready" status - meaning ready to be used - no failure inside
+		(statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas) &&
+		// and all replicas are of expected generation
+		(statefulSet.Status.CurrentReplicas == *statefulSet.Spec.Replicas) &&
+		// and all replicas are updated - meaning rolling update completed over all replicas
+		(statefulSet.Status.UpdatedReplicas == *statefulSet.Spec.Replicas) &&
+		// and current revision is an updated one - meaning rolling update completed over all replicas
+		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
+}
+
+func (c *Controller) statefulSetUpdateFailed(curStatefulSet, preUpdateStatefulSet *apps.StatefulSet) error {
+	if stopOnStatefulSetUpdate {
+		glog.Errorf("Updated failed %s\n", preUpdateStatefulSet.Name)
+		return errors.New(fmt.Sprintf("Updated failed %s", preUpdateStatefulSet.Name))
+	} else {
+		curStatefulSet.Spec = preUpdateStatefulSet.Spec
+		curStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(curStatefulSet.Namespace).Update(curStatefulSet)
+		err = c.statefulSetDeletePod(curStatefulSet)
+		return err
+	}
+}
+
+func strStatefulSetStatus(status *apps.StatefulSetStatus) string {
+	return fmt.Sprintf(
+		"ObservedGeneration:%d Replicas:%d ReadyReplicas:%d CurrentReplicas:%d UpdatedReplicas:%d CurrentRevision:%s UpdateRevision:%s",
+		status.ObservedGeneration,
+		status.Replicas,
+		status.ReadyReplicas,
+		status.CurrentReplicas,
+		status.UpdatedReplicas,
+		status.CurrentRevision,
+		status.UpdateRevision,
+	)
 }
