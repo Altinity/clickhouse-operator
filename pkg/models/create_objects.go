@@ -92,7 +92,7 @@ func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation) ConfigMapLi
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
 					ChopGeneratedLabel: chi.Name,
-					CHIGeneratedLabel:  chi.Name,
+					ChiGeneratedLabel:  chi.Name,
 				},
 			},
 			// Data contains several sections which are to be several xml configs
@@ -109,7 +109,7 @@ func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation) ConfigMapLi
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
 					ChopGeneratedLabel: chi.Name,
-					CHIGeneratedLabel:  chi.Name,
+					ChiGeneratedLabel:  chi.Name,
 				},
 			},
 			// Data contains several sections which are to be several xml configs
@@ -133,7 +133,7 @@ func createConfigMapObjectsDeployment(chi *chiv1.ClickHouseInstallation) ConfigM
 					Namespace: replica.Address.Namespace,
 					Labels: map[string]string{
 						ChopGeneratedLabel: replica.Address.ChiName,
-						CHIGeneratedLabel:  replica.Address.ChiName,
+						ChiGeneratedLabel:  replica.Address.ChiName,
 					},
 				},
 				Data: map[string]string{
@@ -206,7 +206,7 @@ func createServiceObjectChi(
 			Namespace: chi.Namespace,
 			Labels: map[string]string{
 				ChopGeneratedLabel: chi.Name,
-				CHIGeneratedLabel:  chi.Name,
+				ChiGeneratedLabel:  chi.Name,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -222,7 +222,7 @@ func createServiceObjectChi(
 				},
 			},
 			Selector: map[string]string{
-				CHIGeneratedLabel: chi.Name,
+				ChiGeneratedLabel: chi.Name,
 			},
 			Type: "LoadBalancer",
 		},
@@ -240,7 +240,7 @@ func createServiceObjectDeployment(replica *chiv1.ChiClusterLayoutShardReplica) 
 			Namespace: replica.Address.Namespace,
 			Labels: map[string]string{
 				ChopGeneratedLabel: replica.Address.ChiName,
-				CHIGeneratedLabel:  replica.Address.ChiName,
+				ChiGeneratedLabel:  replica.Address.ChiName,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -310,7 +310,8 @@ func createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.
 			Namespace: replica.Address.Namespace,
 			Labels: map[string]string{
 				ChopGeneratedLabel: replica.Address.ChiName,
-				CHIGeneratedLabel:  replica.Address.ChiName,
+				ChiGeneratedLabel:  replica.Address.ChiName,
+				ZkVersionLabel:     replica.Config.ZkFingerprint,
 			},
 		},
 		Spec: apps.StatefulSetSpec{
@@ -327,7 +328,8 @@ func createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.
 					Labels: map[string]string{
 						chDefaultAppLabel:  statefulSetName,
 						ChopGeneratedLabel: replica.Address.ChiName,
-						CHIGeneratedLabel:  replica.Address.ChiName,
+						ChiGeneratedLabel:  replica.Address.ChiName,
+						ZkVersionLabel:     replica.Config.ZkFingerprint,
 					},
 				},
 				Spec: corev1.PodSpec{

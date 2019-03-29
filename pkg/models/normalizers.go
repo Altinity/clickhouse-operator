@@ -39,6 +39,10 @@ func ChiNormalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallat
 		return clusterNormalize(chi, cluster)
 	})
 	chi.FillAddressInfo()
+	chi.WalkReplicas(func(replica *chiv1.ChiClusterLayoutShardReplica) error {
+		replica.Config.ZkFingerprint = fingerprint(chi.Spec.Configuration.Zookeeper)
+		return nil
+	})
 	chi.SetKnown()
 
 	return chi, nil
