@@ -111,6 +111,7 @@ type ChiClusterLayoutShardReplica struct {
 	Deployment ChiDeployment `json:"deployment,omitempty" diff:"deployment"`
 
 	Address ChiClusterLayoutShardReplicaAddress `json:"address"`
+	Config ChiClusterLayoutShardReplicaConfig `json:"config"`
 }
 
 type ChiClusterLayoutShardReplicaAddress struct {
@@ -120,6 +121,10 @@ type ChiClusterLayoutShardReplicaAddress struct {
 	ClusterIndex int    `json:"clusterIndex"`
 	ShardIndex   int    `json:"shardIndex"`
 	ReplicaIndex int    `json:"replicaIndex"`
+}
+
+type ChiClusterLayoutShardReplicaConfig struct {
+	ZkFingerprint string `json:"zkfingerprint"`
 }
 
 // ChiTemplates defines templates section of .spec
