@@ -37,27 +37,6 @@ type configSections struct {
 	commonUsersConfigSections map[string]string
 }
 
-// NamedNumber maps Deployment fingerprint to its usage count
-type NamedNumber map[string]int
-
-// mergeAndReplaceWithBiggerValues combines NamedNumber object with another one
-// and replaces local values with another one's values in case another's value is bigger
-func (d NamedNumber) mergeAndReplaceWithBiggerValues(another NamedNumber) {
-
-	// Loop over another struct and bring in new OR bigger values
-	for key, value := range another {
-		_, ok := d[key]
-
-		if !ok {
-			// No such key - new key/value pair just - include/merge it in
-			d[key] = value
-		} else if value > d[key] {
-			// Have such key, but "another"'s value is bigger, overwrite local value
-			d[key] = value
-		}
-	}
-}
-
 // volumeClaimTemplatesIndex maps volume claim template name - which
 // is .spec.templates.volumeClaimTemplates.name to VolumeClaimTemplate itself
 // Used to provide dictionary/index for templates
