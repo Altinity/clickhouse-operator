@@ -15,17 +15,28 @@
 package config
 
 type Config struct {
+	// Full path to the config file and folder where this Config originates from
+	ConfigFilePath   string
+	ConfigFolderPath string
+
+	// Namespaces where operator watches for events
 	Namespaces []string `yaml:"namespaces"`
 
+	// Paths where to look for additional ClickHouse config .xml files to be mounted into Pod
 	ConfigdPath string `yaml:"configdpath"`
-	ConfdPath string `yaml:"confdpath"`
-	UsersdPath string `yaml:"usersdpath"`
+	ConfdPath   string `yaml:"confdpath"`
+	UsersdPath  string `yaml:"usersdpath"`
 
+	// Rolling update behavior - for how long to wait for StatefulSet to reach new Generation
 	StatefulSetUpdateWaitTime int `yaml:"statefulsetupdatewaittime"`
+	// Rolling update behavior - what to do in case StatefulSet can't reach new Generation
 	OnStatefulSetUpdateFailureAction string `yaml:"onstatefulsetupdatefailureaction"`
 }
 
 const (
+	// What to do in case StatefulSet can't reach new Generation - abort rolling update
 	OnStatefulSetUpdateFailureActionAbort = "abort"
+
+	// What to do in case StatefulSet can't reach new Generation - delete Pod and revert StatefulSet to previous Generation
 	OnStatefulSetUpdateFailureActionRevert = "revert"
 )

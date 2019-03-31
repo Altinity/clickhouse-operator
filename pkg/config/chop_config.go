@@ -23,55 +23,114 @@ import (
 	"strings"
 )
 
-// getConfig creates kuberest.Config object based on current environment
+// GetConfig creates Config object based on current environment
 func GetConfig(configFilePath string) (*Config, error) {
 	if len(configFilePath) > 0 {
-		// config file specified as CLI flag
-		return buildConfigFromFile(configFilePath)
+		// Config file explicitly specified as CLI flag
+		if conf, err := buildConfigFromFile(configFilePath); err == nil {
+			return conf, nil
+		} else {
+			return nil, err
+		}
 	}
 
-	if len(os.Getenv("CHOPCONFIG")) > 0 {
-		// kube config file specified as ENV var
-		return buildConfigFromFile(os.Getenv("CHOPCONFIG"))
+	if len(os.Getenv("CHOP_CONFIG")) > 0 {
+		// Config file explicitly specified as ENV var
+		if conf, err := buildConfigFromFile(os.Getenv("CHOP_CONFIG")); err == nil {
+			return conf, nil
+		} else {
+			return nil, err
+		}
 	}
 
+	// Try to find ~/.clickhouse-operator/config.yaml
 	usr, err := user.Current()
 	if err == nil {
 		// OS user found. Parse ~/.clickhouse-operator/config.yaml file
-		conf, err := buildConfigFromFile(filepath.Join(usr.HomeDir, ".clickhouse-operator", "config.yaml"))
-		if err == nil {
+		if conf, err := buildConfigFromFile(filepath.Join(usr.HomeDir, ".clickhouse-operator", "config.yaml")); err == nil {
 			// Able to build config, all is fine
 			return conf, nil
 		}
 	}
 
-	return buildConfigFromFile("/etc/clickhouse-oprator/config.yaml")
+	// Try to find /etc/clickhouse-oprator/config.yaml
+	if conf, err := buildConfigFromFile("/etc/clickhouse-oprator/config.yaml"); err == nil {
+		// Able to build config, all is fine
+		return conf, nil
+	}
+
+	// No config file found, use default one
+	return buildDefaultConfig()
 }
 
+// buildConfigFromFile returns Config struct built out of specified file path
 func buildConfigFromFile(configFilePath string) (*Config, error) {
+	// Read config file content
 	yamlFile, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
 		return nil, err
 	}
 
+	// Parse config file content into Config struct
 	var config Config
 	err = yaml.Unmarshal(yamlFile, &config)
 	if err != nil {
 		return nil, err
 	}
 
+	// Fill Config/s paths
+	config.ConfigFilePath, err = filepath.Abs(configFilePath)
+	config.ConfigFolderPath = filepath.Dir(config.ConfigFilePath)
+
+	// Normalize Config struct into fully-and-correctly filled Config struct
+	if err = normalizeConfig(&config); err == nil {
+		return &config, nil
+	} else {
+		return nil, err
+	}
+}
+
+// buildDefaultConfig returns default Config
+func buildDefaultConfig() (*Config, error) {
+	var config Config
+	normalizeConfig(&config)
+	return &config, nil
+}
+
+// normalizeConfig returns fully-and-correctly filled Config
+func normalizeConfig(config *Config) error {
+	// Apply default paths in case nothing specified
 	if config.ConfigdPath == "" {
-
+		// Not specified, try to build it relative to config file
+		if config.ConfigFolderPath != "" {
+			config.ConfigdPath = config.ConfigFolderPath + "/config.d"
+		}
 	}
-
 	if config.ConfdPath == "" {
-
+		// Not specified, try to build it relative to config file
+		if config.ConfigFolderPath != "" {
+			config.ConfdPath = config.ConfigFolderPath + "/conf.d"
+		}
 	}
-
 	if config.UsersdPath == "" {
-
+		// Not specified, try to build it relative to config file
+		if config.ConfigFolderPath != "" {
+			config.UsersdPath = config.ConfigFolderPath + "/users.d"
+		}
 	}
 
+	// Check whether specified dirs really exist
+	if !isDirOk(config.ConfigdPath) {
+		config.ConfigdPath = ""
+	}
+	if !isDirOk(config.ConfdPath) {
+		config.ConfdPath = ""
+	}
+	if !isDirOk(config.UsersdPath) {
+		config.UsersdPath = ""
+	}
+
+	// Rolling update section
 	if config.StatefulSetUpdateWaitTime <= 0 {
 		config.StatefulSetUpdateWaitTime = 3600
 	}
@@ -81,6 +140,16 @@ func buildConfigFromFile(configFilePath string) (*Config, error) {
 	} else {
 		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionAbort
 	}
-	
-	return &config, nil
+
+	return nil
+}
+
+// isDirOk returns whether the given path exists and is a dir
+func isDirOk(path string) bool {
+	if stat, err := os.Stat(path); (err == nil) && stat.IsDir() {
+		// File object Stat-ed without errors - it exists and it is a dir
+		return true
+	}
+
+	return false
 }

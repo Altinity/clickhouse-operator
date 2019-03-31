@@ -18,6 +18,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/config"
 	"net/http"
 	"os"
 	"os/signal"
@@ -30,8 +31,7 @@ import (
 	chopmetrics "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
-	chi "github.com/altinity/clickhouse-operator/pkg/controllers/chi"
-
+	"github.com/altinity/clickhouse-operator/pkg/controllers/chi"
 	kubeinformers "k8s.io/client-go/informers"
 	kube "k8s.io/client-go/kubernetes"
 	kuberest "k8s.io/client-go/rest"
@@ -52,8 +52,11 @@ const (
 )
 
 var (
-	// kubeConfig defines path to kube config file to be used
-	kubeConfig string
+	// chopConfigFile defines path to clickhouse-operator config file to be used
+	chopConfigFile string
+
+	// kubeConfigFile defines path to kube config file to be used
+	kubeConfigFile string
 
 	// masterURL defines URL of kubernetes master to be used
 	masterURL string
@@ -63,22 +66,23 @@ var (
 )
 
 func init() {
-	flag.StringVar(&kubeConfig, "kubeconfig", "", "Paths to kubernetes config file. Only required if called outside of the cluster.")
+	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
+	flag.StringVar(&kubeConfigFile, "kube-config", "", "Path to kubernetes config file. Only required if called outside of the cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Only required if called outside of the cluster and not being specified in kube config file.")
-	flag.StringVar(&metricsEP, "metrics-endpoint", defaultMetricsEndpoint, "The Prometheus exporter endpoint")
+	flag.StringVar(&metricsEP, "metrics-endpoint", defaultMetricsEndpoint, "The Prometheus exporter endpoint.")
 	flag.Parse()
 }
 
 // getConfig creates kuberest.Config object based on current environment
 func getConfig() (*kuberest.Config, error) {
-	if len(kubeConfig) > 0 {
+	if len(kubeConfigFile) > 0 {
 		// kube config file specified as CLI flag
-		return kubeclientcmd.BuildConfigFromFlags(masterURL, kubeConfig)
+		return kubeclientcmd.BuildConfigFromFlags(masterURL, kubeConfigFile)
 	}
 
-	if len(os.Getenv("KUBECONFIG")) > 0 {
+	if len(os.Getenv("KUBE_CONFIG")) > 0 {
 		// kube config file specified as ENV var
-		return kubeclientcmd.BuildConfigFromFlags(masterURL, os.Getenv("KUBECONFIG"))
+		return kubeclientcmd.BuildConfigFromFlags(masterURL, os.Getenv("KUBE_CONFIG"))
 	}
 
 	if conf, err := kuberest.InClusterConfig(); err == nil {
@@ -125,6 +129,11 @@ func createClientsets() (*kube.Clientset, *chopclientset.Clientset) {
 // Run is an entry point of the application
 func Run() {
 	glog.V(1).Infof("Starting clickhouse-operator version '%s'\n", Version)
+	_, err := config.GetConfig(chopConfigFile)
+	if err != nil {
+		glog.Fatalf("Unable to build config file")
+		os.Exit(1)
+	}
 
 	// Initializing Prometheus Metrics Exporter
 	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
