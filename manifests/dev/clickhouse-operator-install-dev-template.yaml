@@ -1,8 +1,9 @@
+# Setup CustomResourceDefinition
+# CustomResourceDefinition is namespace-less and must have unique name
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
-  namespace: dev
 spec:
   group: clickhouse.altinity.com
   version: v1
@@ -199,3 +200,69 @@ spec:
                         type: string
                       persistentVolumeClaim:
                         type: object
+---
+# Setup ServiceAccount
+# ServiceAccount would be created in kubectl-specified namespace
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: clickhouse-operator
+  namespace: ${CHOPERATOR_NAMESPACE}
+---
+# Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
+# ClusterRoleBinding is namespace-less and must have unique name
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: clickhouse-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: clickhouse-operator
+    namespace: ${CHOPERATOR_NAMESPACE}
+---
+# Setup Deployment for clickhouse-operator
+# Deployment would be created in kubectl-specified namespace
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: clickhouse-operator
+  namespace: ${CHOPERATOR_NAMESPACE}
+  labels:
+    app: clickhouse-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clickhouse-operator
+  template:
+    metadata:
+      labels:
+        app: clickhouse-operator
+    spec:
+      serviceAccountName: clickhouse-operator
+      containers:
+      - image: altinity/clickhouse-operator:dev
+        name: clickhouse-operator
+---
+# Setup ClusterIP Service to provide monitoring metrics for Prometheus
+# Service would be created in kubectl-specified namespace
+# In order to get access outside of k8s it should be exposed as:
+# kubectl --namespace prometheus port-forward service/prometheus 9090
+# and point browser to localhost:9090
+kind: Service
+apiVersion: v1
+metadata:
+  name: clickhouse-operator-metrics
+  namespace: ${CHOPERATOR_NAMESPACE}
+  labels:
+    app: clickhouse-operator
+spec:
+  ports:
+  - port: 8888
+    name: clickhouse-operator-metrics
+  selector:
+    app: clickhouse-operator
