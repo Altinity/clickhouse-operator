@@ -100,33 +100,27 @@ func buildDefaultConfig() (*Config, error) {
 // normalizeConfig returns fully-and-correctly filled Config
 func normalizeConfig(config *Config) error {
 	// Apply default paths in case nothing specified
-	if config.ConfigdPath == "" {
+	if (config.ConfigdPath == "") && (config.ConfigFolderPath != "") {
 		// Not specified, try to build it relative to config file
-		if config.ConfigFolderPath != "" {
-			config.ConfigdPath = config.ConfigFolderPath + "/config.d"
-		}
+		config.ConfigdPath = config.ConfigFolderPath + "/config.d"
 	}
-	if config.ConfdPath == "" {
+	if (config.ConfdPath == "") && (config.ConfigFolderPath != "") {
 		// Not specified, try to build it relative to config file
-		if config.ConfigFolderPath != "" {
-			config.ConfdPath = config.ConfigFolderPath + "/conf.d"
-		}
+		config.ConfdPath = config.ConfigFolderPath + "/conf.d"
 	}
-	if config.UsersdPath == "" {
+	if (config.UsersdPath == "") && (config.ConfigFolderPath != "") {
 		// Not specified, try to build it relative to config file
-		if config.ConfigFolderPath != "" {
-			config.UsersdPath = config.ConfigFolderPath + "/users.d"
-		}
+		config.UsersdPath = config.ConfigFolderPath + "/users.d"
 	}
 
 	// Check whether specified dirs really exist
-	if !isDirOk(config.ConfigdPath) {
+	if (config.ConfigdPath != "") && !isDirOk(config.ConfigdPath) {
 		config.ConfigdPath = ""
 	}
-	if !isDirOk(config.ConfdPath) {
+	if (config.ConfdPath != "") && !isDirOk(config.ConfdPath) {
 		config.ConfdPath = ""
 	}
-	if !isDirOk(config.UsersdPath) {
+	if (config.UsersdPath != "") && !isDirOk(config.UsersdPath) {
 		config.UsersdPath = ""
 	}
 
@@ -151,5 +145,6 @@ func isDirOk(path string) bool {
 		return true
 	}
 
+	// Some kind of error has happened
 	return false
 }
