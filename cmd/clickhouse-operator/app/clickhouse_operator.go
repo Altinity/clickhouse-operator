@@ -74,7 +74,7 @@ func init() {
 }
 
 // getConfig creates kuberest.Config object based on current environment
-func getConfig() (*kuberest.Config, error) {
+func getConfig(kubeConfigFile, masterURL string) (*kuberest.Config, error) {
 	if len(kubeConfigFile) > 0 {
 		// kube config file specified as CLI flag
 		return kubeclientcmd.BuildConfigFromFlags(masterURL, kubeConfigFile)
@@ -106,12 +106,7 @@ func getConfig() (*kuberest.Config, error) {
 }
 
 // createClientsets creates Clientset objects
-func createClientsets() (*kube.Clientset, *chopclientset.Clientset) {
-
-	config, err := getConfig()
-	if err != nil {
-		glog.Fatalf("Unable to initialize cluster configuration: %s", err.Error())
-	}
+func createClientsets(config *kuberest.Config) (*kube.Clientset, *chopclientset.Clientset) {
 
 	kubeClientset, err := kube.NewForConfig(config)
 	if err != nil {
@@ -129,9 +124,9 @@ func createClientsets() (*kube.Clientset, *chopclientset.Clientset) {
 // Run is an entry point of the application
 func Run() {
 	glog.V(1).Infof("Starting clickhouse-operator version '%s'\n", Version)
-	_, err := config.GetConfig(chopConfigFile)
+	chopConfig, err := config.GetConfig(chopConfigFile)
 	if err != nil {
-		glog.Fatalf("Unable to build config file")
+		glog.Fatalf("Unable to build config file %v\n", err)
 		os.Exit(1)
 	}
 
@@ -154,12 +149,19 @@ func Run() {
 	}()
 
 	// Initializing ClientSets and Informers
-	kubeClient, chopClient := createClientsets()
+	kubeConfig, err := getConfig(kubeConfigFile, masterURL)
+	if err != nil {
+		glog.Fatalf("Unable to build kube conf: %s", err.Error())
+		os.Exit(1)
+	}
+
+	kubeClient, chopClient := createClientsets(kubeConfig)
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, informerFactoryResync)
 	chopInformerFactory := chopinformers.NewSharedInformerFactory(chopClient, informerFactoryResync)
 
 	// Creating resource Controller
 	chiController := chi.CreateController(
+		chopConfig,
 		chopClient,
 		kubeClient,
 		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
@@ -175,7 +177,7 @@ func Run() {
 	chopInformerFactory.Start(ctx.Done())
 
 	// Starting CHI resource Controller
-	glog.V(1).Info("Starting waitgroup CHI controller\n")
+	glog.V(1).Info("Starting CHI controller\n")
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {

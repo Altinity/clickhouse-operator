@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/config"
 	"time"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -31,6 +32,7 @@ import (
 
 // Controller defines CRO controller
 type Controller struct {
+	chopConfig              *config.Config
 	kubeClient              kube.Interface
 	chopClient              chopclientset.Interface
 	chiLister               choplisters.ClickHouseInstallationLister
@@ -65,7 +67,7 @@ const (
 const (
 	reconcileAdd    = "add"
 	reconcileUpdate = "update"
-	reconcielDelete = "delete"
+	reconcileDelete = "delete"
 )
 
 type ReconcileChi struct {

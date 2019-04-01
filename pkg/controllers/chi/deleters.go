@@ -23,44 +23,57 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// newDeleteOptions returns filled *metav1.DeleteOptions
 func newDeleteOptions() *metav1.DeleteOptions {
 	gracePeriodSeconds := int64(0)
 	propagationPolicy := metav1.DeletePropagationForeground
 	return &metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriodSeconds,
-		PropagationPolicy: &propagationPolicy,
+		PropagationPolicy:  &propagationPolicy,
 	}
 }
 
+// deleteReplica deletes all kubernetes resources related to replica *chop.ChiClusterLayoutShardReplica
 func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) error {
-	configMapName := chopmodels.CreateConfigMapDeploymentName(replica)
-	statefulSetName := chopmodels.CreateStatefulSetName(replica)
-	statefulSetServiceName := chopmodels.CreateStatefulSetServiceName(replica)
 
 	// Delete StatefulSet
-	statefulSet, _ := c.statefulSetLister.StatefulSets(replica.Address.Namespace).Get(statefulSetName)
-	if statefulSet != nil {
-		// Delete StatefulSet
-		_ = c.kubeClient.AppsV1().StatefulSets(replica.Address.Namespace).Delete(statefulSetName, newDeleteOptions())
+	statefulSetName := chopmodels.CreateStatefulSetName(replica)
+	if err := c.kubeClient.AppsV1().StatefulSets(replica.Address.Namespace).Delete(statefulSetName, newDeleteOptions()); err == nil {
+		glog.Infof("StatefulSet %s deleted", statefulSetName)
+	} else {
+		glog.Fatalf("%v\n", err)
 	}
 
 	// Delete ConfigMap
-	_ = c.kubeClient.CoreV1().ConfigMaps(replica.Address.Namespace).Delete(configMapName, newDeleteOptions())
+	configMapName := chopmodels.CreateConfigMapDeploymentName(replica)
+	if err := c.kubeClient.CoreV1().ConfigMaps(replica.Address.Namespace).Delete(configMapName, newDeleteOptions()); err == nil {
+		glog.Infof("ConfigMap %s deleted", configMapName)
+	} else {
+		glog.Fatalf("%v\n", err)
+	}
 
 	// Delete Service
-	_ = c.kubeClient.CoreV1().Services(replica.Address.Namespace).Delete(statefulSetServiceName, newDeleteOptions())
+	statefulSetServiceName := chopmodels.CreateStatefulSetServiceName(replica)
+	if err := c.kubeClient.CoreV1().Services(replica.Address.Namespace).Delete(statefulSetServiceName, newDeleteOptions()); err == nil {
+		glog.Infof("Service %s deleted", statefulSetServiceName)
+	} else {
+		glog.Fatalf("%v\n", err)
+	}
 
 	return nil
 }
 
+// deleteShard deletes all kubernetes resources related to shard *chop.ChiClusterLayoutShard
 func (c *Controller) deleteShard(shard *chop.ChiClusterLayoutShard) {
 	shard.WalkReplicas(c.deleteReplica)
 }
 
+// deleteCluster deletes all kubernetes resources related to cluster *chop.ChiCluster
 func (c *Controller) deleteCluster(cluster *chop.ChiCluster) {
 	cluster.WalkReplicas(c.deleteReplica)
 }
 
+// deleteChi deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
 func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
 	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
 		c.deleteCluster(cluster)

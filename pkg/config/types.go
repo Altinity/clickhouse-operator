@@ -28,7 +28,9 @@ type Config struct {
 	UsersdPath  string `yaml:"usersdpath"`
 
 	// Rolling update behavior - for how long to wait for StatefulSet to reach new Generation
-	StatefulSetUpdateWaitTime int `yaml:"statefulsetupdatewaittime"`
+	StatefulSetUpdateTimeout uint64 `yaml:"statefulsetupdatetimeout"`
+	// Rolling update behavior - for how long to sleep while polling StatefulSet to reach new Generation
+	StatefulSetUpdatePollPeriod uint64 `yaml:"statefulsetupdatepollperiod"`
 	// Rolling update behavior - what to do in case StatefulSet can't reach new Generation
 	OnStatefulSetUpdateFailureAction string `yaml:"onstatefulsetupdatefailureaction"`
 }

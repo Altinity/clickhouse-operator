@@ -17,6 +17,7 @@ package chi
 import (
 	"errors"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/config"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/models"
@@ -28,12 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-var (
-	stopOnStatefulSetUpdate = true
-	timeToWaitStatefulSetReachedGeneration = 30*time.Second
-)
-
-// createOrUpdateChiResources creates k8s resources based on ClickHouseInstallation object specification
+// createOrUpdateChiResources creates or updates kubernetes resources based on ClickHouseInstallation object specification
 func (c *Controller) createOrUpdateChiResources(chi *chop.ClickHouseInstallation) (*chop.ClickHouseInstallation, error) {
 	chiCopy, err := chopmodels.ChiCopyAndNormalize(chi)
 	listOfLists := chopmodels.ChiCreateObjects(chiCopy)
@@ -159,12 +155,12 @@ func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInsta
 				glog.Info("======================\n")
 				glog.Infof("%s\n", strStatefulSetStatus(&updatedStatefulSet.Status))
 				glog.Infof("%s\n", strStatefulSetStatus(&curStatefulSet.Status))
-				if time.Since(start) < timeToWaitStatefulSetReachedGeneration {
+				if time.Since(start) < time.Duration(c.chopConfig.StatefulSetUpdateTimeout)*time.Second {
 					// Wait some more time
-					time.Sleep(1 * time.Second)
+					time.Sleep(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second)
 				} else {
 					// No more wait, do something
-					return c.statefulSetUpdateFailed(curStatefulSet, preUpdateStatefulSet)
+					return c.onStatefulSetUpdateFailed(curStatefulSet, preUpdateStatefulSet)
 				}
 			}
 		}
@@ -184,10 +180,10 @@ func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInsta
 	return nil
 }
 
-// hasStatefulSetReachedGeneration returns has StatefulSet reached the expected generation after upgrade
+// hasStatefulSetReachedGeneration returns whether has StatefulSet reached the expected generation after upgrade or not
 func hasStatefulSetReachedGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
-			// StatefulSet has .spec generation we are waiting for
-	return	(statefulSet.Generation == generation) &&
+	// StatefulSet has .spec generation we are waiting for
+	return (statefulSet.Generation == generation) &&
 		// and this .spec generation is being applied to replicas - it is observed right now
 		(statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
 		// and all replicas are in "Ready" status - meaning ready to be used - no failure inside
@@ -200,16 +196,20 @@ func hasStatefulSetReachedGeneration(statefulSet *apps.StatefulSet, generation i
 		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
 }
 
-func (c *Controller) statefulSetUpdateFailed(curStatefulSet, preUpdateStatefulSet *apps.StatefulSet) error {
-	if stopOnStatefulSetUpdate {
+func (c *Controller) onStatefulSetUpdateFailed(curStatefulSet, preUpdateStatefulSet *apps.StatefulSet) error {
+	switch c.chopConfig.OnStatefulSetUpdateFailureAction {
+	case config.OnStatefulSetUpdateFailureActionAbort:
 		glog.Errorf("Updated failed %s\n", preUpdateStatefulSet.Name)
 		return errors.New(fmt.Sprintf("Updated failed %s", preUpdateStatefulSet.Name))
-	} else {
+	case config.OnStatefulSetUpdateFailureActionRevert:
 		curStatefulSet.Spec = preUpdateStatefulSet.Spec
 		curStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(curStatefulSet.Namespace).Update(curStatefulSet)
 		err = c.statefulSetDeletePod(curStatefulSet)
 		return err
+	default:
+		glog.Errorf("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s\n", c.chopConfig.OnStatefulSetUpdateFailureAction)
 	}
+	return nil
 }
 
 func strStatefulSetStatus(status *apps.StatefulSetStatus) string {

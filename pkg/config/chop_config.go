@@ -125,8 +125,12 @@ func normalizeConfig(config *Config) error {
 	}
 
 	// Rolling update section
-	if config.StatefulSetUpdateWaitTime <= 0 {
-		config.StatefulSetUpdateWaitTime = 3600
+	if config.StatefulSetUpdateTimeout == 0 {
+		config.StatefulSetUpdateTimeout = 3600
+	}
+
+	if config.StatefulSetUpdatePollPeriod == 0 {
+		config.StatefulSetUpdatePollPeriod = 1
 	}
 
 	if strings.ToLower(config.OnStatefulSetUpdateFailureAction) == "revert" {
