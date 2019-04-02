@@ -22,6 +22,7 @@ import (
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/config"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/models"
 	"gopkg.in/d4l3k/messagediff.v1"
 
@@ -47,6 +48,7 @@ import (
 
 // CreateController creates instance of Controller
 func CreateController(
+	chopConfig *config.Config,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
 	chiInformer chopinformers.ClickHouseInstallationInformer,
@@ -75,6 +77,9 @@ func CreateController(
 
 	// Create Controller instance
 	controller := &Controller{
+		// chopConfig used to keep clickhouse-oprator config
+		chopConfig: chopConfig,
+
 		// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 		kubeClient: kubeClient,
 		// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
@@ -156,7 +161,7 @@ func CreateController(
 
 			chi := obj.(*chop.ClickHouseInstallation)
 			glog.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
-			controller.enqueueObject(NewReconcileChi(reconcielDelete, chi, nil))
+			controller.enqueueObject(NewReconcileChi(reconcileDelete, chi, nil))
 		},
 	})
 
@@ -323,7 +328,7 @@ func (c *Controller) syncChi(reconcile *ReconcileChi) error {
 		return c.onAddChi(reconcile.new)
 	case reconcileUpdate:
 		return c.onUpdateChi(reconcile.old, reconcile.new)
-	case reconcielDelete:
+	case reconcileDelete:
 		return c.onDeleteChi(reconcile.old)
 	}
 
@@ -383,10 +388,11 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	diff, equal := messagediff.DeepDiff(old, new)
 
 	if equal {
-		// No need tor react
+		// No need to react
 		return nil
 	}
 
+	// Deal with removed items
 	for path := range diff.Removed {
 		switch diff.Removed[path].(type) {
 		case chop.ChiCluster:
@@ -401,6 +407,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		}
 	}
 
+	// Deal with added/updated items
 	//	c.listStatefulSetResources(chi)
 	chi, _ := c.createOrUpdateChiResources(new)
 	c.updateCHIResource(chi)
