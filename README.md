@@ -27,12 +27,13 @@ The ClickHouse Operator for Kubernetes currently provides the following:
 
 [Quick Start Guide][quick_start]
 
-**Adanced setups**
+**Advanced setups**
  * [Detailed Operator Installation Instructions][detailed]
  * [ClickHouse Installation Custom Resource specification][crd_explained]
  * [How to setup ClickHouse cluster with replication][replication_setup]
  * [Zookeeper Setup][zookeeper_setup]
  * [Persistent Storage Configuration][storage]
+ * [Update ClickHouseInstallation with **Rolling Update**][rolling_update]
 
 **Monitoring**
  * [Prometheus & clickhouse-operator integration][prometheus_setup]
@@ -56,3 +57,4 @@ See [LICENSE](./LICENSE) for more details.
 [prometheus_setup]: ./docs/prometheus_setup.md
 [grafana_setup]: ./docs/grafana_setup.md
 [storage]: ./docs/storage.md
+[rolling_update]: ./docs/rolling_update.md

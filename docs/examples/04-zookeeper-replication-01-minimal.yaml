@@ -1,0 +1,16 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "replcluster"
+spec:
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper.zoo1ns
+          port: 2181
+    clusters:
+    - name: replcluster
+      layout:
+        type: Standard
+        shardsCount: 3
+        replicasCount: 2
