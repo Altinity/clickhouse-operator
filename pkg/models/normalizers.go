@@ -59,102 +59,89 @@ func clusterNormalize(
 	// Convenience wrapper
 	layout := &cluster.Layout
 
-	// Fill Layout field
-	switch layout.Type {
-	case clusterLayoutTypeStandard:
-		// Standard layout assumes to have 1 shard and 1 replica by default - in case not specified explicitly
-		layoutNormalizeCounts(layout)
+	layoutNormalizeShardsAndReplicasCount(layout)
+	layoutEnsureShards(layout)
 
-		// Handle .layout.shards
-		// cluster of type "Standard" does not have shards specified.
-		// So we need to build shards specification from the scratch
-		layout.Shards = make([]chiv1.ChiClusterLayoutShard, layout.ShardsCount)
-		// Loop over all shards and replicas inside shards and fill structure
-		// .Layout.ShardsCount is provided
-		for shardIndex := 0; shardIndex < layout.ShardsCount; shardIndex++ {
-			// Convenience wrapper
-			shard := &layout.Shards[shardIndex]
+	// Loop over all shards and replicas inside shards and fill structure
+	// .Layout.ShardsCount is provided
+	for shardIndex := range layout.Shards {
+		// Convenience wrapper
+		shard := &layout.Shards[shardIndex]
 
-			// Inherit ReplicasCount
-			shard.ReplicasCount = layout.ReplicasCount
+		// For each shard of this normalized cluster inherit cluster's Deployment
+		deploymentMergeFrom(&shard.Deployment, &cluster.Deployment)
 
-			// Standard layout assumes .spec.configuration.clusters.layout.shards.internalReplication
-			// Default value set to "true"
-			shardNormalizeInternalReplication(shard)
+		// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
+		// Default value set to "true"
+		shardNormalizeInternalReplication(shard)
 
-			// For each shard of this normalized cluster inherit cluster's Deployment
-			deploymentMergeFrom(&shard.Deployment, &cluster.Deployment)
-
-			// Create replicas for the shard
-			// .Layout.ReplicasCount is provided
-			shard.Replicas = make([]chiv1.ChiClusterLayoutShardReplica, shard.ReplicasCount)
-			shardNormalizeReplicas(shard)
-		}
-
-	case clusterLayoutTypeAdvanced:
-		// Advanced layout assumes detailed shards definition
-
-		// Loop over all shards and replicas inside shards and fill structure
-		for shardIndex := range layout.Shards {
-			// Convenience wrapper
-			shard := &layout.Shards[shardIndex]
-
-			// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
-			// Default value set to "true"
-			shardNormalizeInternalReplication(shard)
-
-			// For each shard of this normalized cluster inherit cluster's Deployment
-			deploymentMergeFrom(&shard.Deployment, &cluster.Deployment)
-
-			switch shard.DefinitionType {
-			case shardDefinitionTypeReplicasCount:
-				// Define shards by replicas count:
-				//      layout:
-				//        type: Advanced
-				//        shards:
-				//
-				//        - definitionType: ReplicasCount
-				//          replicasCount: 2
-				// This means no replicas provided explicitly, let's create replicas
-				// Create replicas for the shard
-				// .Layout.ReplicasCount is provided
-				shard.Replicas = make([]chiv1.ChiClusterLayoutShardReplica, shard.ReplicasCount)
-				shardNormalizeReplicas(shard)
-
-			default:
-				// Define shards by replicas explicitly:
-				//        - definitionType: Replicas
-				//          replicas:
-				//          - port: 9000
-				//            deployment:
-				//              scenario: Default
-				//          - deployment:
-				//              scenario: NodeMonopoly # 1 pod (CH server instance) per node (zone can be a set of n nodes) -> podAntiAffinity
-				//              zone:
-				//                matchLabels:
-				//                  clickhouse.altinity.com/zone: zone4
-				//                  clickhouse.altinity.com/kind: ssd
-				//              podTemplate: clickhouse-v18.16.1
-				// This means replicas provided explicitly, no need to create, just to normalize
-
-				shard.ReplicasCount = len(shard.Replicas)
-				// Create replicas for the shard
-				// .Layout.ReplicasCount is provided
-				shardNormalizeReplicas(shard)
-			}
-		}
+		shardNormalizeReplicasCount(shard, layout.ReplicasCount)
+		shardEnsureReplicas(shard)
+		shardNormalizeReplicas(shard)
 	}
 
 	return nil
 }
 
+// layoutNormalizeShardsAndReplicasCount ensures at least 1 shard and 1 replica counters
+func layoutNormalizeShardsAndReplicasCount(layout *chiv1.ChiClusterLayout) {
+	if len(layout.Shards) > 0 {
+		// We have Shards specified - ok, this is to be exact ShardsCount
+		layout.ShardsCount = len(layout.Shards)
+	} else if layout.ShardsCount == 0 {
+		// Neither ShardsCount nor Shards specified, assume 1 as default value
+		layout.ShardsCount = 1
+	} else {
+		// ShardsCount specified explicitly, Just use it
+	}
+
+	if layout.ReplicasCount == 0 {
+		// In case no ReplicasCount specified use 1 as a default value - it will be used in Standard layout only
+		layout.ReplicasCount = 1
+	}
+}
+
+// shardNormalizeReplicasCount ensures shard.ReplicasCount filled properly
+func shardNormalizeReplicasCount(shard *chiv1.ChiClusterLayoutShard, layoutReplicasCount int) {
+	if len(shard.Replicas) > 0 {
+		// .layout.type: Advanced + definitionType: Replicas
+		// We have Replicas specified as slice
+		shard.ReplicasCount = len(shard.Replicas)
+	} else if shard.ReplicasCount == 0 {
+		// We do not have Replicas slice specified
+		// We do not have ReplicasCount specified
+		// Inherit ReplicasCount from layout
+		shard.ReplicasCount = layoutReplicasCount
+	} else {
+		// shard.ReplicasCount > 0 and is Already specified
+		// .layout.type: Advanced + definitionType: ReplicasCount
+		// We have Replicas specified as ReplicasCount
+		// Nothing to do here
+	}
+}
+
+// layoutEnsureShards ensures slice layout.Shards is in place
+func layoutEnsureShards(layout *chiv1.ChiClusterLayout) {
+	if (len(layout.Shards) == 0) && (layout.ShardsCount > 0) {
+		layout.Shards = make([]chiv1.ChiClusterLayoutShard, layout.ShardsCount)
+	}
+}
+
+// shardEnsureReplicas ensures slice shard.Replicas is in place
+func shardEnsureReplicas(shard *chiv1.ChiClusterLayoutShard) {
+	if (len(shard.Replicas) == 0) && (shard.ReplicasCount > 0) {
+		shard.Replicas = make([]chiv1.ChiClusterLayoutShardReplica, shard.ReplicasCount)
+	}
+}
+
+// shardNormalizeReplicas normalizes all replicas of specified shard
 func shardNormalizeReplicas(shard *chiv1.ChiClusterLayoutShard) {
 	// Fill each replica
-	for replicaIndex := 0; replicaIndex < shard.ReplicasCount; replicaIndex++ {
+	for replicaIndex := range shard.Replicas {
 		// Convenience wrapper
 		replica := &shard.Replicas[replicaIndex]
 
-		replicaNormalisePort(replica)
+		replicaNormalizePort(replica)
 
 		// Inherit deployment
 		deploymentMergeFrom(&replica.Deployment, &shard.Deployment)
@@ -162,21 +149,10 @@ func shardNormalizeReplicas(shard *chiv1.ChiClusterLayoutShard) {
 	}
 }
 
-// replicaNormalisePort ensures chiv1.ChiClusterLayoutShardReplica.Port is reasonable
-func replicaNormalisePort(r *chiv1.ChiClusterLayoutShardReplica) {
-	if r.Port <= 0 {
-		r.Port = chDefaultClientPortNumber
-	}
-}
-
-// layoutNormalizeCounts ensures at least 1 shard and 1 replica counters
-func layoutNormalizeCounts(layout *chiv1.ChiClusterLayout) {
-	// Standard layout assumes to have 1 shard and 1 replica by default - in case not specified explicitly
-	if layout.ShardsCount == 0 {
-		layout.ShardsCount = 1
-	}
-	if layout.ReplicasCount == 0 {
-		layout.ReplicasCount = 1
+// replicaNormalizePort ensures chiv1.ChiClusterLayoutShardReplica.Port is reasonable
+func replicaNormalizePort(replica *chiv1.ChiClusterLayoutShardReplica) {
+	if replica.Port <= 0 {
+		replica.Port = chDefaultClientPortNumber
 	}
 }
 
