@@ -282,9 +282,9 @@ func zoneCopyFrom(dst, src *chiv1.ChiDeploymentZone) {
 		return
 	}
 
-	tmp := make(map[string]string)
-	for k, v := range src.MatchLabels {
-		tmp[k] = v
+	copyMatchLabels := make(map[string]string)
+	for key, value := range src.MatchLabels {
+		copyMatchLabels[key] = value
 	}
-	(*dst).MatchLabels = tmp
+	(*dst).MatchLabels = copyMatchLabels
 }
