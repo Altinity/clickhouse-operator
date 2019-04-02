@@ -77,8 +77,13 @@ func clusterNormalize(
 
 			// Inherit ReplicasCount
 			shard.ReplicasCount = layout.ReplicasCount
-			// For .cluster.Layout.Type = Standard internal replication is turned on
-			shard.InternalReplication = stringTrue
+
+			// Standard layout assumes .spec.configuration.clusters.layout.shards.internalReplication
+			// Default value set to "true"
+			shardNormalizeInternalReplication(shard)
+
+			// For each shard of this normalized cluster inherit cluster's Deployment
+			deploymentMergeFrom(&shard.Deployment, &cluster.Deployment)
 
 			// Create replicas for the shard
 			// .Layout.ReplicasCount is provided
@@ -95,7 +100,7 @@ func clusterNormalize(
 			shard := &layout.Shards[shardIndex]
 
 			// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
-			// with default value set to "true"
+			// Default value set to "true"
 			shardNormalizeInternalReplication(shard)
 
 			// For each shard of this normalized cluster inherit cluster's Deployment
