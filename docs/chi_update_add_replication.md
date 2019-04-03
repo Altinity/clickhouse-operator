@@ -30,7 +30,7 @@ Check initial position. We should have cluster up and running:
 ```bash
 kubectl -n dev get all,configmap
 ```
-ClickHouse is installed, upa nd running, all 4 expected pods are running
+ClickHouse is installed, up and running, all 4 expected pods are running
 ```text
 NAME                                      READY   STATUS    RESTARTS   AGE
 pod/chi-d02eaa-347e-0-0-0                 1/1     Running   0          19s
@@ -42,7 +42,7 @@ service/chi-d02eaa-347e-0-0           ClusterIP      None            <none>     
 service/chi-d02eaa-347e-1-0           ClusterIP      None            <none>        8123/TCP,9000/TCP,9009/TCP      19s
 service/chi-d02eaa-347e-2-0           ClusterIP      None            <none>        8123/TCP,9000/TCP,9009/TCP      19s
 service/chi-d02eaa-347e-3-0           ClusterIP      None            <none>        8123/TCP,9000/TCP,9009/TCP      19s
-service/clickhouse-rolling-update     LoadBalancer   10.106.139.11   <pending>     8123:31328/TCP,9000:32091/TCP   19s
+service/update-setup-replication      LoadBalancer   10.106.139.11   <pending>     8123:31328/TCP,9000:32091/TCP   19s
 NAME                                   READY   AGE
 statefulset.apps/chi-d02eaa-347e-0-0   1/1     19s
 statefulset.apps/chi-d02eaa-347e-1-0   1/1     19s
@@ -73,9 +73,9 @@ All is well.
 
 ## Update ClickHouse Installation - add replication
 Let's run update and change `.yaml` manifest so we'll have replication available. 
+
 In order to have replication correctly setup, we need to specify `Zookeeper` (which is assumed to be running already) and specify replicas for ClickHouse.
 Manifest file with updates specified is [07-rolling-update-02-apply-update.yaml](./examples/07-rolling-update-02-apply-update.yaml):
-Apply update file available 
 ```bash
 kubectl -n dev apply -f 07-rolling-update-02-apply-update.yaml
 ```
@@ -127,7 +127,7 @@ root@chi-d02eaa-347e-0-0-0:/# cat /etc/clickhouse-server/config.d/zookeeper.xml
         </node>
     </zookeeper>
     <distributed_ddl>
-        <path>/clickhouse/rolling-update/task_queue/ddl</path>
+        <path>/clickhouse/update-setup-replication/task_queue/ddl</path>
     </distributed_ddl>
 </yandex>
 ```
