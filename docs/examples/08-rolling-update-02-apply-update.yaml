@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "rolling-update"
+  name: "update-setup-replication"
 spec:
   configuration:
     zookeeper: # Add Zookeeper
