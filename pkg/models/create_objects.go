@@ -16,6 +16,7 @@ package models
 
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/config"
 
 	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
@@ -25,31 +26,31 @@ import (
 )
 
 // ChiCreateObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
-func ChiCreateObjects(chi *chiv1.ClickHouseInstallation) []interface{} {
+func ChiCreateObjects(chi *chiv1.ClickHouseInstallation, config *config.Config) []interface{} {
 	list := make([]interface{}, 0)
 	list = append(list, createServiceObjects(chi))
-	list = append(list, createConfigMapObjects(chi))
+	list = append(list, createConfigMapObjects(chi, config))
 	list = append(list, createStatefulSetObjects(chi))
 
 	return list
 }
 
 // createConfigMapObjects returns a list of corev1.ConfigMap objects
-func createConfigMapObjects(chi *chiv1.ClickHouseInstallation) ConfigMapList {
+func createConfigMapObjects(chi *chiv1.ClickHouseInstallation, config *config.Config) ConfigMapList {
 	configMapList := make(ConfigMapList, 0)
 	configMapList = append(
 		configMapList,
-		createConfigMapObjectsCommon(chi)...,
+		createConfigMapObjectsCommon(chi, config)...,
 	)
 	configMapList = append(
 		configMapList,
-		createConfigMapObjectsDeployment(chi)...,
+		createConfigMapObjectsDeployment(chi, config)...,
 	)
 
 	return configMapList
 }
 
-func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation) ConfigMapList {
+func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation, config *config.Config) ConfigMapList {
 	var configs configSections
 
 	// commonConfigSections maps section name to section XML config of the following sections:
@@ -58,20 +59,27 @@ func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation) ConfigMapLi
 	// 3. settings
 	// 4. listen
 	configs.commonConfigSections = make(map[string]string)
+	includeNonEmpty(configs.commonConfigSections, filenameRemoteServersXML, generateRemoteServersConfig(chi))
+	includeNonEmpty(configs.commonConfigSections, filenameZookeeperXML, generateZookeeperConfig(chi))
+	includeNonEmpty(configs.commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
+	includeNonEmpty(configs.commonConfigSections, filenameListenXML, generateListenConfig(chi))
+	// Extra user-specified configs
+	for filename, content := range config.CommonConfigs {
+		includeNonEmpty(configs.commonConfigSections, filename, content)
+	}
+
 	// commonConfigSections maps section name to section XML config of the following sections:
 	// 1. users
 	// 2. quotas
 	// 3. profiles
 	configs.commonUsersConfigSections = make(map[string]string)
-
-	includeNonEmpty(configs.commonConfigSections, filenameRemoteServersXML, generateRemoteServersConfig(chi))
-	includeNonEmpty(configs.commonConfigSections, filenameZookeeperXML, generateZookeeperConfig(chi))
-	includeNonEmpty(configs.commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
-	includeNonEmpty(configs.commonConfigSections, filenameListenXML, generateListenConfig(chi))
-
 	includeNonEmpty(configs.commonUsersConfigSections, filenameUsersXML, generateUsersConfig(chi))
 	includeNonEmpty(configs.commonUsersConfigSections, filenameQuotasXML, generateQuotasConfig(chi))
 	includeNonEmpty(configs.commonUsersConfigSections, filenameProfilesXML, generateProfilesConfig(chi))
+	// Extra user-specified configs
+	for filename, content := range config.UsersConfigs {
+		includeNonEmpty(configs.commonUsersConfigSections, filename, content)
+	}
 
 	// There are two types of configs, kept in ConfigMaps:
 	// 1. Common configs - for all resources in the CHI (remote servers, zookeeper setup, etc)
@@ -120,10 +128,17 @@ func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation) ConfigMapLi
 	return configMapList
 }
 
-func createConfigMapObjectsDeployment(chi *chiv1.ClickHouseInstallation) ConfigMapList {
+func createConfigMapObjectsDeployment(chi *chiv1.ClickHouseInstallation, config *config.Config) ConfigMapList {
 	configMapList := make(ConfigMapList, 0)
 	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
-		// Add corev1.Service object to the list
+		// Prepare for this replica deployment config files map as filename->content
+		deploymentConfigSections := make(map[string]string)
+		includeNonEmpty(deploymentConfigSections, filenameMacrosXML, generateHostMacros(replica))
+		// Extra user-specified configs
+		for filename, content := range config.ReplicaConfigs {
+			includeNonEmpty(deploymentConfigSections, filename, content)
+		}
+
 		// Add corev1.ConfigMap object to the list
 		configMapList = append(
 			configMapList,
@@ -136,9 +151,7 @@ func createConfigMapObjectsDeployment(chi *chiv1.ClickHouseInstallation) ConfigM
 						ChiGeneratedLabel:  replica.Address.ChiName,
 					},
 				},
-				Data: map[string]string{
-					filenameMacrosXML: generateHostMacros(replica),
-				},
+				Data: deploymentConfigSections,
 			},
 		)
 

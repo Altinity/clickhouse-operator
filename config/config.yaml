@@ -1,0 +1,12 @@
+namespaces:
+  - dev
+  - info
+  - onemore
+
+commonconfigspath: config.d
+replicaconfigspath: conf.d
+usersconfigspath: users.d
+
+statefulsetupdatetimeout: 50
+statefulsetupdatepollperiod: 2
+onstatefulsetupdatefailureaction: abort
