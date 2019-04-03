@@ -32,7 +32,7 @@ import (
 // createOrUpdateChiResources creates or updates kubernetes resources based on ClickHouseInstallation object specification
 func (c *Controller) createOrUpdateChiResources(chi *chop.ClickHouseInstallation) (*chop.ClickHouseInstallation, error) {
 	chiCopy, err := chopmodels.ChiCopyAndNormalize(chi)
-	listOfLists := chopmodels.ChiCreateObjects(chiCopy)
+	listOfLists := chopmodels.ChiCreateObjects(chiCopy, c.chopConfig)
 	err = c.createOrUpdateResources(chiCopy, listOfLists)
 
 	return chiCopy, err

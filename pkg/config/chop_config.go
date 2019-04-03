@@ -15,6 +15,7 @@
 package config
 
 import (
+	"github.com/golang/glog"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
@@ -72,8 +73,8 @@ func buildConfigFromFile(configFilePath string) (*Config, error) {
 	}
 
 	// Parse config file content into Config struct
-	var config Config
-	err = yaml.Unmarshal(yamlFile, &config)
+	config := &Config{}
+	err = yaml.Unmarshal(yamlFile, config)
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +84,9 @@ func buildConfigFromFile(configFilePath string) (*Config, error) {
 	config.ConfigFolderPath = filepath.Dir(config.ConfigFilePath)
 
 	// Normalize Config struct into fully-and-correctly filled Config struct
-	if err = normalizeConfig(&config); err == nil {
-		return &config, nil
+	if err = config.normalize(); err == nil {
+		config.readExtraConfigFiles()
+		return config, nil
 	} else {
 		return nil, err
 	}
@@ -92,37 +94,18 @@ func buildConfigFromFile(configFilePath string) (*Config, error) {
 
 // buildDefaultConfig returns default Config
 func buildDefaultConfig() (*Config, error) {
-	var config Config
-	normalizeConfig(&config)
-	return &config, nil
+	config := &Config{}
+	config.normalize()
+	return config, nil
 }
 
-// normalizeConfig returns fully-and-correctly filled Config
-func normalizeConfig(config *Config) error {
-	// Apply default paths in case nothing specified
-	if (config.ConfigdPath == "") && (config.ConfigFolderPath != "") {
-		// Not specified, try to build it relative to config file
-		config.ConfigdPath = config.ConfigFolderPath + "/config.d"
-	}
-	if (config.ConfdPath == "") && (config.ConfigFolderPath != "") {
-		// Not specified, try to build it relative to config file
-		config.ConfdPath = config.ConfigFolderPath + "/conf.d"
-	}
-	if (config.UsersdPath == "") && (config.ConfigFolderPath != "") {
-		// Not specified, try to build it relative to config file
-		config.UsersdPath = config.ConfigFolderPath + "/users.d"
-	}
+// normalize() makes fully-and-correctly filled Config
+func (config *Config) normalize() error {
 
-	// Check whether specified dirs really exist
-	if (config.ConfigdPath != "") && !isDirOk(config.ConfigdPath) {
-		config.ConfigdPath = ""
-	}
-	if (config.ConfdPath != "") && !isDirOk(config.ConfdPath) {
-		config.ConfdPath = ""
-	}
-	if (config.UsersdPath != "") && !isDirOk(config.UsersdPath) {
-		config.UsersdPath = ""
-	}
+	// Apply default paths in case nothing specified
+	config.prepareConfigPath(&config.CommonConfigsPath, "config.d")
+	config.prepareConfigPath(&config.DeploymentConfigsPath, "conf.d")
+	config.prepareConfigPath(&config.UsersConfigsPath, "users.d")
 
 	// Rolling update section
 	if config.StatefulSetUpdateTimeout == 0 {
@@ -142,13 +125,96 @@ func normalizeConfig(config *Config) error {
 	return nil
 }
 
-// isDirOk returns whether the given path exists and is a dir
-func isDirOk(path string) bool {
-	if stat, err := os.Stat(path); (err == nil) && stat.IsDir() {
-		// File object Stat-ed without errors - it exists and it is a dir
+// prepareConfigPath - prepares config path absolute/relative with default relative value
+func (config *Config) prepareConfigPath(path *string, defaultRelativePath string) {
+	if *path == "" {
+		// Path not specified, try to build it relative to config file
+		*path = config.relativeToConfigFolderPath(defaultRelativePath)
+	} else if filepath.IsAbs(*path) {
+		// Absolute path already specified - nothing to do here
+	} else {
+		// Relative path - make it relative to config file itself
+		*path = config.relativeToConfigFolderPath(*path)
+	}
+
+	// In case of incorrect/unavailable path - make it empty
+	if (*path != "") && !isDirOk(*path) {
+		*path = ""
+	}
+}
+
+// relativeToConfigFolderPath returns absolute path relative to ConfigFolderPath
+func (config *Config) relativeToConfigFolderPath(relativePath string) string {
+	if config.ConfigFolderPath == "" {
+		// Relative base is not set, do nothing
+		return relativePath
+	}
+
+	// Relative base is set - try to be ralative to it
+	if absPath, err := filepath.Abs(config.ConfigFolderPath + "/" + relativePath); err == nil {
+		return absPath
+	} else {
+		return ""
+	}
+}
+
+// readExtraConfigFiles reads all extra user-specified ClickHouse config files
+func (config *Config) readExtraConfigFiles() {
+	config.CommonConfigs = config.readConfigFiles(config.CommonConfigsPath)
+	config.DeploymentConfigs = config.readConfigFiles(config.DeploymentConfigsPath)
+	config.UsersConfigs = config.readConfigFiles(config.UsersConfigsPath)
+}
+
+// readConfigFiles reads config files from specified path into filename->content map
+func (config *Config) readConfigFiles(path string) map[string]string {
+	// Look in real path only
+	if path == "" {
+		return nil
+	}
+
+	// Result is a filename to content map
+	var files map[string]string
+	// Loop over all files in folder
+	if matches, err := filepath.Glob(path + "/*"); err == nil {
+		for i := range matches {
+			// `file` comes with `path`-prefixed.
+			// So in case `path` is an absolute path, `file` will be absolute path to file
+			file := matches[i]
+			if config.isConfigExt(file) {
+				// Pick files with propoer extensions only
+				glog.Infof("CommonConfig file %s\n", file)
+				if content, err := ioutil.ReadFile(file); err == nil {
+					if files == nil {
+						files = make(map[string]string)
+					}
+					files[filepath.Base(file)] = string(content)
+				}
+			}
+		}
+	}
+
+	if len(files) > 0 {
+		return files
+	} else {
+		return nil
+	}
+}
+
+// isConfigExt return true in case specified file has proper extension for a config file
+func (config *Config) isConfigExt(file string) bool {
+	switch extToLower(file) {
+	case ".xml":
+		return true
+	}
+	return false
+}
+
+// IsWatchedNamespace returns is specified namespace in a list of watched
+func (config *Config) IsWatchedNamespace(namespace string) bool {
+	// In case no namespaces specified - watch all namespaces
+	if len(config.Namespaces) == 0 {
 		return true
 	}
 
-	// Some kind of error has happened
-	return false
+	return inArray(namespace, config.Namespaces)
 }

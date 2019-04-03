@@ -23,16 +23,24 @@ type Config struct {
 	Namespaces []string `yaml:"namespaces"`
 
 	// Paths where to look for additional ClickHouse config .xml files to be mounted into Pod
-	ConfigdPath string `yaml:"configdpath"`
-	ConfdPath   string `yaml:"confdpath"`
-	UsersdPath  string `yaml:"usersdpath"`
+	// config.d
+	// conf.d
+	// users.d
+	// respectively
+	CommonConfigsPath     string `yaml:"commonConfigsPath"`
+	DeploymentConfigsPath string `yaml:"deploymentConfigsPath"`
+	UsersConfigsPath      string `yaml:"usersConfigsPath"`
+	// Config files fetched by these paths
+	CommonConfigs     map[string]string
+	DeploymentConfigs map[string]string
+	UsersConfigs      map[string]string
 
 	// Rolling update behavior - for how long to wait for StatefulSet to reach new Generation
-	StatefulSetUpdateTimeout uint64 `yaml:"statefulsetupdatetimeout"`
+	StatefulSetUpdateTimeout uint64 `yaml:"statefulSetUpdateTimeout"`
 	// Rolling update behavior - for how long to sleep while polling StatefulSet to reach new Generation
-	StatefulSetUpdatePollPeriod uint64 `yaml:"statefulsetupdatepollperiod"`
+	StatefulSetUpdatePollPeriod uint64 `yaml:"statefulSetUpdatePollPeriod"`
 	// Rolling update behavior - what to do in case StatefulSet can't reach new Generation
-	OnStatefulSetUpdateFailureAction string `yaml:"onstatefulsetupdatefailureaction"`
+	OnStatefulSetUpdateFailureAction string `yaml:"onStatefulSetUpdateFailureAction"`
 }
 
 const (
