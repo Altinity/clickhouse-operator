@@ -1,4 +1,4 @@
-# ClickHouse rolling update
+# Update ClickHouse Installation - add replication to existing non-replicated cluster 
 
 ## Prerequisites
   1. Assume we have `clickhouse-operator` already installed and running
@@ -24,7 +24,7 @@ replicaset.apps/clickhouse-operator-5cbc47484   1         1         1       17s
 ```
 Now let's install ClickHouse from provided examples:
 ```bash
-kubectl -n dev apply -f 08-rolling-update-01-initial-position.yaml
+kubectl -n dev apply -f 07-rolling-update-01-initial-position.yaml
 ```
 Check initial position.
 ```bash
@@ -68,7 +68,7 @@ configmap/chi-d02eaa-deploy-confd-347e-2-0   1      19s
 configmap/chi-d02eaa-deploy-confd-347e-3-0   1      19s
 ```
 Let's explore one Pod in order to check available ClickHouse config files.
-Navigate birectly inside the Pod
+Navigate directly inside the Pod
 ```bash
 kubectl -n dev exec -it chi-d02eaa-347e-0-0-0 -- bash
 ```
@@ -82,12 +82,12 @@ listen.xml  remote_servers.xml
 Standard minimal set of config files is in place.
 All is well.
 
-## Rolling Update
+## Update ClickHouse Installation - add replication
 Let's run update - change `.yaml` manifest so we'll have replication.
 
 Apply update file available 
 ```bash
-kubectl -n dev apply -f 08-rolling-update-02-apply-update.yaml
+kubectl -n dev apply -f 07-rolling-update-02-apply-update.yaml
 ```
 And let's watch on how update is rolling over:
 ```text
@@ -126,7 +126,7 @@ macros.xml
 root@chi-d02eaa-347e-0-0-0:/# ls /etc/clickhouse-server/config.d
 listen.xml  remote_servers.xml  zookeeper.xml
 ```
-We can see new file added: `zookeeper.xml`. It is Zookeeper configuguration for ClickHouse. Let's take a look
+We can see new file added: `zookeeper.xml`. It is Zookeeper configuration for ClickHouse. Let's take a look
 ```text
 root@chi-d02eaa-347e-0-0-0:/# cat /etc/clickhouse-server/config.d/zookeeper.xml 
 <yandex>
