@@ -3,10 +3,10 @@ namespaces:
   - info
   - onemore
 
-commonconfigspath: config.d
-replicaconfigspath: conf.d
-usersconfigspath: users.d
+commonConfigsPath: config.d
+deploymentConfigsPath: conf.d
+usersConfigsPath: users.d
 
-statefulsetupdatetimeout: 50
-statefulsetupdatepollperiod: 2
-onstatefulsetupdatefailureaction: abort
+statefulSetUpdateTimeout: 50
+statefulSetUpdatePollPeriod: 2
+onStatefulSetUpdateFailureAction: abort

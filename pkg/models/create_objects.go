@@ -135,7 +135,7 @@ func createConfigMapObjectsDeployment(chi *chiv1.ClickHouseInstallation, config 
 		deploymentConfigSections := make(map[string]string)
 		includeNonEmpty(deploymentConfigSections, filenameMacrosXML, generateHostMacros(replica))
 		// Extra user-specified configs
-		for filename, content := range config.ReplicaConfigs {
+		for filename, content := range config.DeploymentConfigs {
 			includeNonEmpty(deploymentConfigSections, filename, content)
 		}
 

@@ -104,7 +104,7 @@ func (config *Config) normalize() error {
 
 	// Apply default paths in case nothing specified
 	config.prepareConfigPath(&config.CommonConfigsPath, "config.d")
-	config.prepareConfigPath(&config.ReplicaConfigsPath, "conf.d")
+	config.prepareConfigPath(&config.DeploymentConfigsPath, "conf.d")
 	config.prepareConfigPath(&config.UsersConfigsPath, "users.d")
 
 	// Rolling update section
@@ -161,7 +161,7 @@ func (config *Config) relativeToConfigFolderPath(relativePath string) string {
 // readExtraConfigFiles reads all extra user-specified ClickHouse config files
 func (config *Config) readExtraConfigFiles() {
 	config.CommonConfigs = config.readConfigFiles(config.CommonConfigsPath)
-	config.ReplicaConfigs = config.readConfigFiles(config.ReplicaConfigsPath)
+	config.DeploymentConfigs = config.readConfigFiles(config.DeploymentConfigsPath)
 	config.UsersConfigs = config.readConfigFiles(config.UsersConfigsPath)
 }
 

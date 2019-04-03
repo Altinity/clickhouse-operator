@@ -27,20 +27,20 @@ type Config struct {
 	// conf.d
 	// users.d
 	// respectively
-	CommonConfigsPath  string `yaml:"commonconfigspath"`
-	ReplicaConfigsPath string `yaml:"replicaconfigspath"`
-	UsersConfigsPath   string `yaml:"usersconfigspath"`
+	CommonConfigsPath     string `yaml:"commonConfigsPath"`
+	DeploymentConfigsPath string `yaml:"deploymentConfigsPath"`
+	UsersConfigsPath      string `yaml:"usersConfigsPath"`
 	// Config files fetched by these paths
-	CommonConfigs      map[string]string
-	ReplicaConfigs     map[string]string
-	UsersConfigs       map[string]string
+	CommonConfigs     map[string]string
+	DeploymentConfigs map[string]string
+	UsersConfigs      map[string]string
 
 	// Rolling update behavior - for how long to wait for StatefulSet to reach new Generation
-	StatefulSetUpdateTimeout uint64 `yaml:"statefulsetupdatetimeout"`
+	StatefulSetUpdateTimeout uint64 `yaml:"statefulSetUpdateTimeout"`
 	// Rolling update behavior - for how long to sleep while polling StatefulSet to reach new Generation
-	StatefulSetUpdatePollPeriod uint64 `yaml:"statefulsetupdatepollperiod"`
+	StatefulSetUpdatePollPeriod uint64 `yaml:"statefulSetUpdatePollPeriod"`
 	// Rolling update behavior - what to do in case StatefulSet can't reach new Generation
-	OnStatefulSetUpdateFailureAction string `yaml:"onstatefulsetupdatefailureaction"`
+	OnStatefulSetUpdateFailureAction string `yaml:"onStatefulSetUpdateFailureAction"`
 }
 
 const (
