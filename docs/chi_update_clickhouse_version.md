@@ -21,15 +21,15 @@ deployment.apps/clickhouse-operator   1/1     1            1           17s
 NAME                                            DESIRED   CURRENT   READY   AGE
 replicaset.apps/clickhouse-operator-5cbc47484   1         1         1       17s
 ```
-Now let's install ClickHouse from provided examples:
+Now let's install ClickHouse from provided examples. Manifest file with initial position is [08-clickhouse-version-update-01-initial-position.yaml](./examples/08-clickhouse-version-update-01-initial-position.yaml):
 ```bash
 kubectl -n dev apply -f 08-clickhouse-version-update-01-initial-position.yaml
 ```
-Check initial position.
+Check initial position. We should have cluster up and running:
 ```bash
 kubectl -n dev get all,configmap
 ```
-ClickHouse is installed, 3 pods are running
+ClickHouse is installed, up and running, all 3 pods are running
 ```text
 NAME                        READY   STATUS    RESTARTS   AGE
 pod/chi-06791a-28a0-0-0-0   1/1     Running   0          9s
@@ -51,7 +51,8 @@ configmap/chi-06791a-deploy-confd-28a0-0-0   1      9s
 configmap/chi-06791a-deploy-confd-28a0-0-1   1      9s
 configmap/chi-06791a-deploy-confd-28a0-0-2   1      9s
 ```
-We expect all Pods to run ClickHouse version 19.1.10 as specified in manifest.
+We expect all Pods to run ClickHouse version `19.1.10` as specified in [initial manifest](./examples/08-clickhouse-version-update-01-initial-position.yaml).
+
 Let's explore all Pods in order to check available ClickHouse version.
 Navigate directly inside each Pod
 ```bash
@@ -80,19 +81,25 @@ ClickHouse client version 19.1.10.
 Connecting to localhost:9000.
 Connected to ClickHouse server version 19.1.10 revision 54413.
 ```
+All is fine, all Pods are running `19.1.10`
 
+We'll make Version Update in two steps:
+ 1. Update one ClickHouse instance (one Pod)
+ 1. Update all the rest ClickHouse instances (all the rest Pods)
+ 
 ## Update one ClickHouse instance
 
 Now let's update version of only one instance of ClickHouse. Let it be the last one.
-We can do by explicitly specifying `deployment` with different ClickHouse version.
+We can do by explicitly specifying `deployment` with different ClickHouse version:
 ```yaml
                   deployment:
                     podTemplate: clickhouse:19.3.7
 ```
+Manifest file with one ClickHouse instance update is [08-clickhouse-version-update-02-apply-update-one.yaml](./examples/08-clickhouse-version-update-02-apply-update-one.yaml):
 ```bash
 kubectl -n dev apply -f 08-clickhouse-version-update-02-apply-update-one.yaml
 ``` 
-And let's check what ClickHouse versions are running. We expect the last one to be `19.3.7`
+And let's check what ClickHouse versions are running over the whole cluster. We expect the last instance to run specific version `19.3.7`. Check the first Pod:
 ```bash
 kubectl -n dev exec -it chi-06791a-28a0-0-0-0 -- clickhouse-client
 ```
@@ -101,6 +108,7 @@ ClickHouse client version 19.1.10.
 Connecting to localhost:9000.
 Connected to ClickHouse server version 19.1.10 revision 54413.
 ```
+The second Pod:
 ```bash
 kubectl -n dev exec -it chi-06791a-28a0-0-1-0 -- clickhouse-client
 ```
@@ -109,7 +117,7 @@ ClickHouse client version 19.1.10.
 Connecting to localhost:9000.
 Connected to ClickHouse server version 19.1.10 revision 54413.
 ```
-And the most interesting part - the last one
+And the most interesting part - the last one:
 ```bash
 kubectl -n dev exec -it chi-06791a-28a0-0-2-0 -- clickhouse-client
 ```
@@ -118,15 +126,17 @@ ClickHouse client version 19.3.7.
 Connecting to localhost:9000 as user default.
 Connected to ClickHouse server version 19.3.7 revision 54415.
 ```
+As we can see - it runs different, explicitly specified version `19.3.7`.
 All seems to be good. Let's update the whole cluster now.
 
 ## Update the whole cluster
 
-Let's run update - change `.yaml` manifest.
+Let's run update - apply `.yaml`.
+Manifest file with all ClickHouse instance updated is [08-clickhouse-version-update-03-apply-update-all.yaml](./examples/08-clickhouse-version-update-03-apply-update-all.yaml):
 ```bash
 kubectl -n dev apply -f 08-clickhouse-version-update-03-apply-update-all.yaml
 ```
-And let's check the results - we expect all Pods to have ClickHouse `19.3.7`
+And let's check the results - we expect all Pods to have ClickHouse `19.3.7` running. The first Pod
 ```bash
 kubectl -n dev exec -it chi-06791a-28a0-0-0-0 -- clickhouse-client
 ```
@@ -135,6 +145,7 @@ ClickHouse client version 19.3.7.
 Connecting to localhost:9000 as user default.
 Connected to ClickHouse server version 19.3.7 revision 54415.```
 ```
+The second Pod
 ```bash
 kubectl -n dev exec -it chi-06791a-28a0-0-1-0 -- clickhouse-client
 ```
@@ -143,6 +154,7 @@ ClickHouse client version 19.3.7.
 Connecting to localhost:9000 as user default.
 Connected to ClickHouse server version 19.3.7 revision 54415.
 ```
+And the last Pod
 ```bash
 kubectl -n dev exec -it chi-06791a-28a0-0-2-0 -- clickhouse-client
 ```
@@ -151,4 +163,4 @@ ClickHouse client version 19.3.7.
 Connecting to localhost:9000 as user default.
 Connected to ClickHouse server version 19.3.7 revision 54415.
 ```
-
+All looks fine.
