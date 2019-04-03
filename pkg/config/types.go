@@ -30,6 +30,7 @@ type Config struct {
 	CommonConfigsPath  string `yaml:"commonconfigspath"`
 	ReplicaConfigsPath string `yaml:"replicaconfigspath"`
 	UsersConfigsPath   string `yaml:"usersconfigspath"`
+	// Config files fetched by these paths
 	CommonConfigs      map[string]string
 	ReplicaConfigs     map[string]string
 	UsersConfigs       map[string]string

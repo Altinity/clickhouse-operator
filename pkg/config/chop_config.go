@@ -180,7 +180,7 @@ func (config *Config) readConfigFiles(path string) map[string]string {
 			// `file` comes with `path`-prefixed.
 			// So in case `path` is an absolute path, `file` will be absolute path to file
 			file := matches[i]
-			if config.checkExt(file) {
+			if config.isConfigExt(file) {
 				// Pick files with propoer extensions only
 				glog.Infof("CommonConfig file %s\n", file)
 				if content, err := ioutil.ReadFile(file); err == nil {
@@ -200,22 +200,21 @@ func (config *Config) readConfigFiles(path string) map[string]string {
 	}
 }
 
-// checkExt return true in case specified file has propoer extension for a config file
-func (config *Config) checkExt(file string) bool {
-	switch strings.ToLower(filepath.Ext(file)) {
+// isConfigExt return true in case specified file has proper extension for a config file
+func (config *Config) isConfigExt(file string) bool {
+	switch extToLower(file) {
 	case ".xml":
 		return true
 	}
 	return false
 }
 
-// isDirOk returns whether the given path exists and is a dir
-func isDirOk(path string) bool {
-	if stat, err := os.Stat(path); (err == nil) && stat.IsDir() {
-		// File object Stat-ed without errors - it exists and it is a dir
+// IsWatchedNamespace returns is specified namespace in a list of watched
+func (config *Config) IsWatchedNamespace(namespace string) bool {
+	// In case no namespaces specified - watch all namespaces
+	if len(config.Namespaces) == 0 {
 		return true
 	}
 
-	// Some kind of error has happened
-	return false
+	return inArray(namespace, config.Namespaces)
 }
