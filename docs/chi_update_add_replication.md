@@ -1,4 +1,4 @@
-# ClickHouse rolling update
+# Update ClickHouse Installation - add replication to existing non-replicated cluster 
 
 ## Prerequisites
   1. Assume we have `clickhouse-operator` already installed and running
@@ -22,43 +22,32 @@ deployment.apps/clickhouse-operator   1/1     1            1           17s
 NAME                                            DESIRED   CURRENT   READY   AGE
 replicaset.apps/clickhouse-operator-5cbc47484   1         1         1       17s
 ```
-Now let's install ClickHouse from provided examples:
+Now let's install ClickHouse from provided examples. Manifest file with initial position is [07-rolling-update-01-initial-position.yaml](./examples/07-rolling-update-01-initial-position.yaml):
 ```bash
-kubectl -n dev apply -f 08-rolling-update-01-initial-position.yaml
+kubectl -n dev apply -f 07-rolling-update-01-initial-position.yaml
 ```
-Check initial position.
+Check initial position. We should have cluster up and running:
 ```bash
 kubectl -n dev get all,configmap
 ```
-ClickHouse is installed, 4 pods are running
+ClickHouse is installed, up and running, all 4 expected pods are running
 ```text
 NAME                                      READY   STATUS    RESTARTS   AGE
 pod/chi-d02eaa-347e-0-0-0                 1/1     Running   0          19s
 pod/chi-d02eaa-347e-1-0-0                 1/1     Running   0          19s
 pod/chi-d02eaa-347e-2-0-0                 1/1     Running   0          19s
 pod/chi-d02eaa-347e-3-0-0                 1/1     Running   0          19s
-pod/clickhouse-operator-5cbc47484-v5cfg   1/1     Running   0          95s
-
 NAME                                  TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                         AGE
 service/chi-d02eaa-347e-0-0           ClusterIP      None            <none>        8123/TCP,9000/TCP,9009/TCP      19s
 service/chi-d02eaa-347e-1-0           ClusterIP      None            <none>        8123/TCP,9000/TCP,9009/TCP      19s
 service/chi-d02eaa-347e-2-0           ClusterIP      None            <none>        8123/TCP,9000/TCP,9009/TCP      19s
 service/chi-d02eaa-347e-3-0           ClusterIP      None            <none>        8123/TCP,9000/TCP,9009/TCP      19s
-service/clickhouse-operator-metrics   ClusterIP      10.102.229.22   <none>        8888/TCP                        95s
-service/clickhouse-rolling-update     LoadBalancer   10.106.139.11   <pending>     8123:31328/TCP,9000:32091/TCP   19s
-
-NAME                                  READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/clickhouse-operator   1/1     1            1           95s
-
-NAME                                            DESIRED   CURRENT   READY   AGE
-replicaset.apps/clickhouse-operator-5cbc47484   1         1         1       95s
-
+service/update-setup-replication      LoadBalancer   10.106.139.11   <pending>     8123:31328/TCP,9000:32091/TCP   19s
 NAME                                   READY   AGE
 statefulset.apps/chi-d02eaa-347e-0-0   1/1     19s
 statefulset.apps/chi-d02eaa-347e-1-0   1/1     19s
 statefulset.apps/chi-d02eaa-347e-2-0   1/1     19s
 statefulset.apps/chi-d02eaa-347e-3-0   1/1     19s
-
 NAME                                         DATA   AGE
 configmap/chi-d02eaa-common-configd          2      19s
 configmap/chi-d02eaa-common-usersd           0      19s
@@ -68,7 +57,7 @@ configmap/chi-d02eaa-deploy-confd-347e-2-0   1      19s
 configmap/chi-d02eaa-deploy-confd-347e-3-0   1      19s
 ```
 Let's explore one Pod in order to check available ClickHouse config files.
-Navigate birectly inside the Pod
+Navigate directly inside the Pod:
 ```bash
 kubectl -n dev exec -it chi-d02eaa-347e-0-0-0 -- bash
 ```
@@ -82,12 +71,13 @@ listen.xml  remote_servers.xml
 Standard minimal set of config files is in place.
 All is well.
 
-## Rolling Update
-Let's run update - change `.yaml` manifest so we'll have replication.
+## Update ClickHouse Installation - add replication
+Let's run update and change `.yaml` manifest so we'll have replication available. 
 
-Apply update file available 
+In order to have replication correctly setup, we need to specify `Zookeeper` (which is assumed to be running already) and specify replicas for ClickHouse.
+Manifest file with updates specified is [07-rolling-update-02-apply-update.yaml](./examples/07-rolling-update-02-apply-update.yaml):
 ```bash
-kubectl -n dev apply -f 08-rolling-update-02-apply-update.yaml
+kubectl -n dev apply -f 07-rolling-update-02-apply-update.yaml
 ```
 And let's watch on how update is rolling over:
 ```text
@@ -126,7 +116,7 @@ macros.xml
 root@chi-d02eaa-347e-0-0-0:/# ls /etc/clickhouse-server/config.d
 listen.xml  remote_servers.xml  zookeeper.xml
 ```
-We can see new file added: `zookeeper.xml`. It is Zookeeper configuguration for ClickHouse. Let's take a look
+We can see new file added: `zookeeper.xml`. It is Zookeeper configuration for ClickHouse. Let's take a look into:
 ```text
 root@chi-d02eaa-347e-0-0-0:/# cat /etc/clickhouse-server/config.d/zookeeper.xml 
 <yandex>
@@ -137,7 +127,7 @@ root@chi-d02eaa-347e-0-0-0:/# cat /etc/clickhouse-server/config.d/zookeeper.xml
         </node>
     </zookeeper>
     <distributed_ddl>
-        <path>/clickhouse/rolling-update/task_queue/ddl</path>
+        <path>/clickhouse/update-setup-replication/task_queue/ddl</path>
     </distributed_ddl>
 </yandex>
 ```

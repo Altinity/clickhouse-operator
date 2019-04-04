@@ -1,0 +1,12 @@
+namespaces:
+  - dev
+  - info
+  - onemore
+
+commonConfigsPath: config.d
+deploymentConfigsPath: conf.d
+usersConfigsPath: users.d
+
+statefulSetUpdateTimeout: 50
+statefulSetUpdatePollPeriod: 2
+onStatefulSetUpdateFailureAction: abort
