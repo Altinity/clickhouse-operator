@@ -1,11 +1,11 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "example-01"
+  name: "standard-01"
 spec:
   configuration:
     clusters:
-      - name: "example-01-1shard-1repl"
+      - name: "standard-01-1shard-1repl"
         layout:
           type: Standard
           shardsCount: 1

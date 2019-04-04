@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "replclusterpv"
+  name: "repl-04"
 spec:
   configuration:
     zookeeper:
