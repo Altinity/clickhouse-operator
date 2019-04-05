@@ -14,6 +14,10 @@
 
 package config
 
+import (
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+)
+
 type Config struct {
 	// Full path to the config file and folder where this Config originates from
 	ConfigFilePath   string
@@ -27,13 +31,20 @@ type Config struct {
 	// conf.d
 	// users.d
 	// respectively
-	CommonConfigsPath     string `yaml:"commonConfigsPath"`
-	DeploymentConfigsPath string `yaml:"deploymentConfigsPath"`
-	UsersConfigsPath      string `yaml:"usersConfigsPath"`
-	// Config files fetched by these paths
-	CommonConfigs     map[string]string
-	DeploymentConfigs map[string]string
-	UsersConfigs      map[string]string
+	ChCommonConfigsPath     string `yaml:"chCommonConfigsPath"`
+	ChDeploymentConfigsPath string `yaml:"chDeploymentConfigsPath"`
+	ChUsersConfigsPath      string `yaml:"chUsersConfigsPath"`
+	// Config files fetched from these paths. Maps "file name->file content"
+	ChCommonConfigs     map[string]string
+	ChDeploymentConfigs map[string]string
+	ChUsersConfigs      map[string]string
+
+	// Path where to look for ClickHouseInstallation templates .yaml files
+	ChiTemplatesPath string `yaml:"chiTemplatesPath"`
+	// Chi templates fetched from this path. Maps "file name->file content"
+	ChiTemplates map[string]string
+	// ClickHouseInstallation template
+	ChiTemplate *chiv1.ClickHouseInstallation
 
 	// Rolling update behavior - for how long to wait for StatefulSet to reach new Generation
 	StatefulSetUpdateTimeout uint64 `yaml:"statefulSetUpdateTimeout"`

@@ -15,6 +15,8 @@
 package config
 
 import (
+	"github.com/golang/glog"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,11 +33,49 @@ func isDirOk(path string) bool {
 	return false
 }
 
+// readConfigFiles reads config files from specified path into "file name->file content" map
+// path - folder where to look for files
+// isChConfigExt - accepts path to file return bool whether this file has config extension
+func readConfigFiles(path string, isConfigExt func(string) bool) map[string]string {
+	// Look in real path only
+	if path == "" {
+		return nil
+	}
+
+	// Result is a filename to content map
+	var files map[string]string
+	// Loop over all files in folder
+	if matches, err := filepath.Glob(path + "/*"); err == nil {
+		for i := range matches {
+			// `file` comes with `path`-prefixed.
+			// So in case `path` is an absolute path, `file` will be absolute path to file
+			file := matches[i]
+			if isConfigExt(file) {
+				// Pick files with proper extensions only
+				glog.Infof("CommonConfig file %s\n", file)
+				if content, err := ioutil.ReadFile(file); err == nil {
+					if files == nil {
+						files = make(map[string]string)
+					}
+					files[filepath.Base(file)] = string(content)
+				}
+			}
+		}
+	}
+
+	if len(files) > 0 {
+		return files
+	} else {
+		return nil
+	}
+}
+
 // extToLower fetches and lowercases file extension. With dot, as '.xml'
 func extToLower(file string) string {
 	return strings.ToLower(filepath.Ext(file))
 }
 
+// inArray checks whether a is in list
 func inArray(a string, list []string) bool {
 	for _, b := range list {
 		if b == a {
