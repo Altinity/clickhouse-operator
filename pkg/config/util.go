@@ -53,10 +53,12 @@ func readConfigFiles(path string, isConfigExt func(string) bool) map[string]stri
 			if isConfigExt(file) {
 				// Pick files with proper extensions only
 				glog.Infof("CommonConfig file %s\n", file)
-				if content, err := ioutil.ReadFile(file); err == nil {
+				if content, err := ioutil.ReadFile(file); (err == nil) && (len(content) > 0) {
+					// File content read successfully and file has some content
 					if files == nil {
 						files = make(map[string]string)
 					}
+					// Use short filename (file.ext) as a key for the content
 					files[filepath.Base(file)] = string(content)
 				}
 			}

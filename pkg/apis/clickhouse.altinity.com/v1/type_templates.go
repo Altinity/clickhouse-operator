@@ -21,9 +21,9 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 
 	if len(from.PodTemplates) > 0 {
 		// Append PodTemplates from `from`
-		//if len(templates.PodTemplates) == 0 {
-		//	templates.PodTemplates = make([]ChiPodTemplate, 0)
-		//}
+		if templates.PodTemplates == nil {
+			templates.PodTemplates = make([]ChiPodTemplate, 0)
+		}
 		for fromIndex := range from.PodTemplates {
 			fromPodTemplate := &from.PodTemplates[fromIndex]
 
@@ -47,9 +47,9 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 
 	if len(from.VolumeClaimTemplates) > 0 {
 		// Append VolumeClaimTemplates from `from`
-		//if len(templates.VolumeClaimTemplates) == 0 {
-		//	templates.VolumeClaimTemplates = make([]ChiVolumeClaimTemplate, 0)
-		//}
+		if templates.VolumeClaimTemplates == nil {
+			templates.VolumeClaimTemplates = make([]ChiVolumeClaimTemplate, 0)
+		}
 		for fromIndex := range from.VolumeClaimTemplates {
 			fromVolumeClaimTemplate := &from.VolumeClaimTemplates[fromIndex]
 

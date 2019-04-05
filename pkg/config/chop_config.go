@@ -75,7 +75,7 @@ func buildConfigFromFile(configFilePath string) (*Config, error) {
 	}
 
 	// Parse config file content into Config struct
-	config := &Config{}
+	config := new(Config)
 	err = yaml.Unmarshal(yamlText, config)
 	if err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func buildConfigFromFile(configFilePath string) (*Config, error) {
 
 // buildDefaultConfig returns default Config
 func buildDefaultConfig() (*Config, error) {
-	config := &Config{}
+	config := new(Config)
 	config.normalize()
 	return config, nil
 }
@@ -125,7 +125,7 @@ func (config *Config) buildChiTemplate() {
 		if config.ChiTemplate == nil {
 			config.ChiTemplate = new(chiv1.ClickHouseInstallation)
 		}
-		// Merge into target template from current template
+		// Merge into accumulated target template from current template
 		config.ChiTemplate.MergeFrom(chi)
 	}
 }
