@@ -54,7 +54,7 @@ func clusterNormalize(
 	cluster *chiv1.ChiCluster,
 ) error {
 	// Apply default deployment for the whole cluster
-	deploymentMergeFrom(&cluster.Deployment, &chi.Spec.Defaults.Deployment)
+	(&cluster.Deployment).MergeFrom(&chi.Spec.Defaults.Deployment)
 
 	// Convenience wrapper
 	layout := &cluster.Layout
@@ -69,7 +69,7 @@ func clusterNormalize(
 		shard := &layout.Shards[shardIndex]
 
 		// For each shard of this normalized cluster inherit cluster's Deployment
-		deploymentMergeFrom(&shard.Deployment, &cluster.Deployment)
+		(&shard.Deployment).MergeFrom(&cluster.Deployment)
 
 		// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
 		// Default value set to "true"
@@ -144,7 +144,7 @@ func shardNormalizeReplicas(shard *chiv1.ChiClusterLayoutShard) {
 		replicaNormalizePort(replica)
 
 		// Inherit deployment
-		deploymentMergeFrom(&replica.Deployment, &shard.Deployment)
+		(&replica.Deployment).MergeFrom(&shard.Deployment)
 		replica.Deployment.Fingerprint = deploymentGenerateFingerprint(replica, &replica.Deployment)
 	}
 }
@@ -248,43 +248,4 @@ func deploymentNormalizeScenario(d *chiv1.ChiDeployment) {
 		// Have no default deployment scenario specified - specify default one
 		d.Scenario = deploymentScenarioDefault
 	}
-}
-
-// deploymentMergeFrom updates empty fields of chiv1.ChiDeployment with values from src deployment
-func deploymentMergeFrom(dst, src *chiv1.ChiDeployment) {
-	if src == nil {
-		return
-	}
-
-	// Have source to merge from - copy locally unassigned values
-	// Walk over all fields of ChiDeployment and assign from `src` in case unassigned
-
-	if dst.PodTemplate == "" {
-		(*dst).PodTemplate = src.PodTemplate
-	}
-
-	if dst.VolumeClaimTemplate == "" {
-		(*dst).VolumeClaimTemplate = src.VolumeClaimTemplate
-	}
-
-	if len(dst.Zone.MatchLabels) == 0 {
-		zoneCopyFrom(&dst.Zone, &src.Zone)
-	}
-
-	if dst.Scenario == "" {
-		(*dst).Scenario = src.Scenario
-	}
-}
-
-// zoneCopyFrom copies one chiv1.ChiDeploymentZone object into another
-func zoneCopyFrom(dst, src *chiv1.ChiDeploymentZone) {
-	if src == nil {
-		return
-	}
-
-	copyMatchLabels := make(map[string]string)
-	for key, value := range src.MatchLabels {
-		copyMatchLabels[key] = value
-	}
-	(*dst).MatchLabels = copyMatchLabels
 }

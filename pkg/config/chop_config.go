@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -80,7 +81,7 @@ func buildConfigFromFile(configFilePath string) (*Config, error) {
 		return nil, err
 	}
 
-	// Fill Config/s paths
+	// Fill Config's paths
 	config.ConfigFilePath, err = filepath.Abs(configFilePath)
 	config.ConfigFolderPath = filepath.Dir(config.ConfigFilePath)
 
@@ -104,13 +105,28 @@ func buildDefaultConfig() (*Config, error) {
 
 // buildChiTemplate build Config.ChiTemplate from template files content
 func (config *Config) buildChiTemplate() {
-	for _, yamlText := range config.ChiTemplates {
-		chi := &chiv1.ClickHouseInstallation{}
-		if err := yaml.Unmarshal([]byte(yamlText), chi); err != nil {
-			// Skip incorrect template
+
+	// Extract file names into slice and sort it
+	// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
+	var sortedKeys []string
+	for key := range config.ChiTemplates {
+		sortedKeys = append(sortedKeys, key)
+	}
+	sort.Strings(sortedKeys)
+
+	// Extract templates in sorted order - according to sorted file names
+	for _, key := range sortedKeys {
+		chi := new(chiv1.ClickHouseInstallation)
+		if err := yaml.Unmarshal([]byte(config.ChiTemplates[key]), chi); err != nil {
+			// Unable to unmarshal - skip incorrect template
 			continue
 		}
-		config.ChiTemplate = chi
+		// Create target template, if not exists
+		if config.ChiTemplate == nil {
+			config.ChiTemplate = new(chiv1.ClickHouseInstallation)
+		}
+		// Merge into target template from current template
+		config.ChiTemplate.MergeFrom(chi)
 	}
 }
 
