@@ -22,6 +22,7 @@ import (
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/config"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/models"
 	"gopkg.in/d4l3k/messagediff.v1"
 
@@ -47,6 +48,7 @@ import (
 
 // CreateController creates instance of Controller
 func CreateController(
+	chopConfig *config.Config,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
 	chiInformer chopinformers.ClickHouseInstallationInformer,
@@ -75,6 +77,9 @@ func CreateController(
 
 	// Create Controller instance
 	controller := &Controller{
+		// chopConfig used to keep clickhouse-oprator config
+		chopConfig: chopConfig,
+
 		// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 		kubeClient: kubeClient,
 		// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
@@ -118,15 +123,19 @@ func CreateController(
 	chiInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chi := obj.(*chop.ClickHouseInstallation)
+			if !controller.chopConfig.IsWatchedNamespace(chi.Namespace) {
+				return
+			}
 			glog.V(1).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
 			controller.enqueueObject(NewReconcileChi(reconcileAdd, nil, chi))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			glog.V(1).Info("chiInformer.UpdateFunc")
-
 			newChi := new.(*chop.ClickHouseInstallation)
 			oldChi := old.(*chop.ClickHouseInstallation)
-
+			if !controller.chopConfig.IsWatchedNamespace(newChi.Namespace) {
+				return
+			}
+			glog.V(1).Info("chiInformer.UpdateFunc")
 			/*
 				// Update is called on after each Update() call on k8s resource
 				if oldChi.IsNew() && !newChi.IsNew() {
@@ -155,22 +164,34 @@ func CreateController(
 			// it is possible to scale the StatefulSet down to 0 prior to deletion.
 
 			chi := obj.(*chop.ClickHouseInstallation)
+			if !controller.chopConfig.IsWatchedNamespace(chi.Namespace) {
+				return
+			}
 			glog.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
-			controller.enqueueObject(NewReconcileChi(reconcielDelete, chi, nil))
+			controller.enqueueObject(NewReconcileChi(reconcileDelete, chi, nil))
 		},
 	})
 
 	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
+			if !controller.chopConfig.IsWatchedNamespace(service.Namespace) {
+				return
+			}
 			glog.V(1).Infof("serviceInformer AddFunc %s/%s", service.Namespace, service.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			service := old.(*core.Service)
+			if !controller.chopConfig.IsWatchedNamespace(service.Namespace) {
+				return
+			}
 			glog.V(1).Infof("serviceInformer UpdateFunc %s/%s", service.Namespace, service.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
+			if !controller.chopConfig.IsWatchedNamespace(service.Namespace) {
+				return
+			}
 			glog.V(1).Infof("serviceInformer DeleteFunc %s/%s", service.Namespace, service.Name)
 		},
 	})
@@ -178,14 +199,23 @@ func CreateController(
 	configMapInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
+			if !controller.chopConfig.IsWatchedNamespace(configMap.Namespace) {
+				return
+			}
 			glog.V(1).Infof("configMapInformer AddFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			configMap := old.(*core.ConfigMap)
+			if !controller.chopConfig.IsWatchedNamespace(configMap.Namespace) {
+				return
+			}
 			glog.V(1).Infof("configMapInformer UpdateFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
+			if !controller.chopConfig.IsWatchedNamespace(configMap.Namespace) {
+				return
+			}
 			glog.V(1).Infof("configMapInformer DeleteFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 	})
@@ -193,11 +223,17 @@ func CreateController(
 	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
+			if !controller.chopConfig.IsWatchedNamespace(statefulSet.Namespace) {
+				return
+			}
 			glog.V(1).Infof("statefulSetInformer AddFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
 			//controller.handleObject(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			statefulSet := old.(*apps.StatefulSet)
+			if !controller.chopConfig.IsWatchedNamespace(statefulSet.Namespace) {
+				return
+			}
 			glog.V(1).Infof("statefulSetInformer UpdateFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
 			/*
 				newStatefulSet := newObj.(*apps.StatefulSet)
@@ -217,6 +253,9 @@ func CreateController(
 		},
 		DeleteFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
+			if !controller.chopConfig.IsWatchedNamespace(statefulSet.Namespace) {
+				return
+			}
 			glog.V(1).Infof("statefulSetInformer DeleteFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
 			//controller.handleObject(obj)
 		},
@@ -225,14 +264,23 @@ func CreateController(
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
+			if !controller.chopConfig.IsWatchedNamespace(pod.Namespace) {
+				return
+			}
 			glog.V(1).Infof("podInformer AddFunc %s/%s", pod.Namespace, pod.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			pod := old.(*core.Pod)
+			if !controller.chopConfig.IsWatchedNamespace(pod.Namespace) {
+				return
+			}
 			glog.V(1).Infof("podInformer UpdateFunc %s/%s", pod.Namespace, pod.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
+			if !controller.chopConfig.IsWatchedNamespace(pod.Namespace) {
+				return
+			}
 			glog.V(1).Infof("podInformer DeleteFunc %s/%s", pod.Namespace, pod.Name)
 		},
 	})
@@ -323,7 +371,7 @@ func (c *Controller) syncChi(reconcile *ReconcileChi) error {
 		return c.onAddChi(reconcile.new)
 	case reconcileUpdate:
 		return c.onUpdateChi(reconcile.old, reconcile.new)
-	case reconcielDelete:
+	case reconcileDelete:
 		return c.onDeleteChi(reconcile.old)
 	}
 
@@ -383,10 +431,11 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	diff, equal := messagediff.DeepDiff(old, new)
 
 	if equal {
-		// No need tor react
+		// No need to react
 		return nil
 	}
 
+	// Deal with removed items
 	for path := range diff.Removed {
 		switch diff.Removed[path].(type) {
 		case chop.ChiCluster:
@@ -401,6 +450,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		}
 	}
 
+	// Deal with added/updated items
 	//	c.listStatefulSetResources(chi)
 	chi, _ := c.createOrUpdateChiResources(new)
 	c.updateCHIResource(chi)
