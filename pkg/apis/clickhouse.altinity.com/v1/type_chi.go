@@ -212,5 +212,10 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation) {
 		return
 	}
 
+	// Copy ObjectMeta for now
+	chi.ObjectMeta = from.ObjectMeta
+	// Do actual merge for Spec
 	(&chi.Spec).MergeFrom(&from.Spec)
+	// Copy Status for now
+	chi.Status = from.Status
 }

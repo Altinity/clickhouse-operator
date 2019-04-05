@@ -25,8 +25,8 @@ func (configuration *ChiConfiguration) MergeFrom(from *ChiConfiguration) {
 	mapMergeFrom(&configuration.Quotas, &from.Quotas)
 	mapMergeFrom(&configuration.Settings, &from.Settings)
 
-	// Skip Clusters from now
-	// configuration.Clusters
+	// Copy Clusters for now
+	configuration.Clusters = from.Clusters
 }
 
 // mapMergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`

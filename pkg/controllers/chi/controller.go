@@ -385,7 +385,13 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	// We need to create all resources that are needed to run user's .yaml specification
 	glog.V(1).Infof("onAddChi(%s/%s)", chi.Namespace, chi.Name)
 
-	chi, err := c.createOrUpdateChiResources(chi)
+	chi, err := chopmodels.ChiApplyTemplateAndNormalize(chi, c.chopConfig)
+	if err != nil {
+		glog.V(2).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
+		return err
+	}
+
+	err = c.createOrUpdateChiResources(chi)
 	if err != nil {
 		glog.V(2).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
 		return err
@@ -421,11 +427,11 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	}
 
 	if !old.IsFilled() {
-		old, _ = chopmodels.ChiCopyAndNormalize(new)
+		old, _ = chopmodels.ChiApplyTemplateAndNormalize(new, c.chopConfig)
 	}
 
 	if !new.IsFilled() {
-		new, _ = chopmodels.ChiCopyAndNormalize(new)
+		new, _ = chopmodels.ChiApplyTemplateAndNormalize(new, c.chopConfig)
 	}
 
 	diff, equal := messagediff.DeepDiff(old, new)
@@ -452,11 +458,11 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 
 	// Deal with added/updated items
 	//	c.listStatefulSetResources(chi)
-	chi, _ := c.createOrUpdateChiResources(new)
-	c.updateCHIResource(chi)
+	_ = c.createOrUpdateChiResources(new)
+	c.updateCHIResource(new)
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
-	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.ListPodFQDNs(chi))
+	c.metricsExporter.EnsureControlledValues(new.Name, chopmodels.ListPodFQDNs(new))
 
 	return nil
 }

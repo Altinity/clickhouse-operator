@@ -19,12 +19,24 @@ import (
 	"encoding/hex"
 	"fmt"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/config"
 	"sort"
 	"strings"
 )
 
-func ChiCopyAndNormalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
-	return ChiNormalize(chi.DeepCopy())
+// ChiApplyTemplateAndNormalize produces ready-to-use CHI object
+func ChiApplyTemplateAndNormalize(
+	chi *chiv1.ClickHouseInstallation,
+	config *config.Config,
+) (*chiv1.ClickHouseInstallation, error) {
+	if config.ChiTemplate == nil {
+		// No template specified
+		return ChiNormalize(chi.DeepCopy())
+	} else {
+		base := config.ChiTemplate.DeepCopy()
+		base.MergeFrom(chi)
+		return ChiNormalize(base)
+	}
 }
 
 // ChiNormalize normalizes CHI.
