@@ -226,12 +226,12 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 	// One Shard All Replicas
 
 	// <my_cluster_name>
-	clusterName := "one_shard_all_replicas"
+	clusterName := "all-replicated"
 	fprintf(b, "%8s<%s>\n", " ", clusterName)
 	// <shard>
 	fprintf(b, "%12s<shard>\n", " ")
 	// <internal_replication>
-	//fprintf(b, "%16s<internal_replication>%s</internal_replication>\n", " ", shard.InternalReplication)
+	fprintf(b, "%16s<internal_replication>%s</internal_replication>\n", " ", "yes")
 
 	// Build each cluster XML
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
@@ -267,7 +267,7 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 	// All Shards One Replicas
 
 	// <my_cluster_name>
-	clusterName = "all_shards_one_replica"
+	clusterName = "all-sharded"
 	fprintf(b, "%8s<%s>\n", " ", clusterName)
 
 	// Build each cluster XML
@@ -287,7 +287,7 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 				// <shard>
 				fprintf(b, "%12s<shard>\n", " ")
 				// <internal_replication>
-				//fprintf(b, "%16s<internal_replication>%s</internal_replication>\n", " ", shard.InternalReplication)
+				fprintf(b, "%16s<internal_replication>%s</internal_replication>\n", " ", "yes")
 
 				// <replica>
 				//		<host>XXX</host>
