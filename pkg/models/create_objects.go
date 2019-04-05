@@ -233,10 +233,6 @@ func createServiceObjectChi(
 					Name: chDefaultClientPortName,
 					Port: chDefaultClientPortNumber,
 				},
-				{
-					Name: chDefaultInterServerPortName,
-					Port: chDefaultInterServerPortNumber,
-				},
 			},
 			Selector: map[string]string{
 				ChiGeneratedLabel: chi.Name,

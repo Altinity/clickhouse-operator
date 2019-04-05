@@ -413,14 +413,16 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 
 // onUpdateChi sync CHI which was already created earlier
 func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
-	glog.V(1).Infof("onUpdateChi(%s/%s)", old.Namespace, old.Name)
+	glog.V(1).Infof("onUpdateChi(%s/%s):", old.Namespace, old.Name)
 
-	if old.ObjectMeta.Generation == new.ObjectMeta.Generation {
+	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
+		glog.V(1).Infof("onUpdateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
 		// No need to react
 		return nil
 	}
 
 	if !old.IsKnown() && new.IsKnown() {
+		glog.V(1).Infof("onUpdateChi(%s/%s): This `update` event triggered by `save` filled CHI action", old.Namespace, old.Name)
 		// This `update` event triggered by `save` filled CHI action
 		// No need to react
 		return nil
@@ -437,7 +439,8 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	diff, equal := messagediff.DeepDiff(old, new)
 
 	if equal {
-		// No need to react
+		glog.V(1).Infof("onUpdateChi(%s/%s): no changes found", old.Namespace, old.Name)
+		// No need tor react
 		return nil
 	}
 
