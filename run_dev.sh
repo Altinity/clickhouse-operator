@@ -5,6 +5,7 @@ if ./build_binary.sh; then
     echo "successfully built clickhouse-operator. Starting"
 
     mkdir -p log
+    rm -f log/clickhouse-operator.*.log.*
     ./clickhouse-operator \
     	-alsologtostderr=true \
     	-log_dir=log \
@@ -19,6 +20,11 @@ if ./build_binary.sh; then
 
     # And clean binary after run. It'll be rebuilt next time
     ./clean_binary.sh
+
+    echo "======================"
+    echo "=== Logs available ==="
+    echo "======================"
+    ls log/*
 else
     echo "unable to build clickhouse-operator"
 fi
