@@ -115,12 +115,13 @@ type ChiClusterLayoutShardReplica struct {
 }
 
 type ChiClusterLayoutShardReplicaAddress struct {
-	Namespace    string `json:"namespace"`
-	ChiName      string `json:"chiName"`
-	ClusterName  string `json:"clusterName"`
-	ClusterIndex int    `json:"clusterIndex"`
-	ShardIndex   int    `json:"shardIndex"`
-	ReplicaIndex int    `json:"replicaIndex"`
+	Namespace          string `json:"namespace"`
+	ChiName            string `json:"chiName"`
+	ClusterName        string `json:"clusterName"`
+	ClusterIndex       int    `json:"clusterIndex"`
+	ShardIndex         int    `json:"shardIndex"`
+	ReplicaIndex       int    `json:"replicaIndex"`
+	GlobalReplicaIndex int    `json:"globalReplicaIndex"`
 }
 
 type ChiClusterLayoutShardReplicaConfig struct {

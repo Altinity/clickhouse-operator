@@ -81,7 +81,9 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 		replica.Address.ClusterIndex = clusterIndex
 		replica.Address.ShardIndex = shardIndex
 		replica.Address.ReplicaIndex = replicaIndex
+		replica.Address.GlobalReplicaIndex = replicasCount
 
+		replicasCount++
 		return nil
 	}
 	chi.WalkReplicasFullPath(replicaProcessor)

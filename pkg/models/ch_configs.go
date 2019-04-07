@@ -23,6 +23,11 @@ import (
 	xmlbuilder "github.com/altinity/clickhouse-operator/pkg/models/builders/xml"
 )
 
+const (
+	oneShardAllReplicasClusterName = "all-replicated"
+	allShardsOneReplicaClusterName = "all-sharded"
+)
+
 // generateProfilesConfig creates data for "profiles.xml"
 func generateProfilesConfig(chi *chiv1.ClickHouseInstallation) string {
 	return genConfigXML(chi.Spec.Configuration.Profiles, configProfiles)
@@ -226,7 +231,7 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 	// One Shard All Replicas
 
 	// <my_cluster_name>
-	clusterName := "all-replicated"
+	clusterName := oneShardAllReplicasClusterName
 	fprintf(b, "%8s<%s>\n", " ", clusterName)
 	// <shard>
 	fprintf(b, "%12s<shard>\n", " ")
@@ -264,10 +269,10 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 	// </my_cluster_name>
 	fprintf(b, "%8s</%s>\n", " ", clusterName)
 
-	// All Shards One Replicas
+	// All Shards One Replica
 
 	// <my_cluster_name>
-	clusterName = "all-sharded"
+	clusterName = allShardsOneReplicaClusterName
 	fprintf(b, "%8s<%s>\n", " ", clusterName)
 
 	// Build each cluster XML
@@ -333,12 +338,42 @@ func generateHostMacros(replica *chiv1.ChiClusterLayoutShardReplica) string {
 		" ",
 		replica.Address.ClusterName,
 	)
-	// <CLUSTER_NAME-shard>1-based shard index within cluster</CLUSTER_NAME-shard>
+	// <CLUSTER_NAME-shard>0-based shard index within cluster</CLUSTER_NAME-shard>
 	fprintf(b,
 		"%8s<%s-shard>%d</%[2]s-shard>\n",
 		" ",
 		replica.Address.ClusterName,
 		replica.Address.ShardIndex,
+	)
+
+	// One Shard All Replicas Cluster
+	// <CLUSTER_NAME>cluster name</CLUSTER_NAME>
+	fprintf(b,
+		"%8s<%s>%[2]s</%[2]s>\n",
+		" ",
+		oneShardAllReplicasClusterName,
+	)
+	// <CLUSTER_NAME-shard>0-based shard index within one-shard-cluster would always be 0</CLUSTER_NAME-shard>
+	fprintf(b,
+		"%8s<%s-shard>%d</%[2]s-shard>\n",
+		" ",
+		oneShardAllReplicasClusterName,
+		0,
+	)
+
+	// All Shards One Replica Cluster
+	// <CLUSTER_NAME>cluster name</CLUSTER_NAME>
+	fprintf(b,
+		"%8s<%s>%[2]s</%[2]s>\n",
+		" ",
+		allShardsOneReplicaClusterName,
+	)
+	// <CLUSTER_NAME-shard>0-based shard index within all-shards-one-replica-cluster would always be GlobalReplicaIndex</CLUSTER_NAME-shard>
+	fprintf(b,
+		"%8s<%s-shard>%d</%[2]s-shard>\n",
+		" ",
+		allShardsOneReplicaClusterName,
+		replica.Address.GlobalReplicaIndex,
 	)
 
 	// <replica>replica id = full deployment id</replica>
