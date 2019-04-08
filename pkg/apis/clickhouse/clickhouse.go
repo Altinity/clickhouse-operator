@@ -16,24 +16,12 @@ package clickhouse
 
 import (
 	"fmt"
+	"github.com/golang/glog"
 	"io/ioutil"
 	"net/http"
 	neturl "net/url"
 	"strings"
 	"time"
-	"github.com/golang/glog"
-)
-
-const (
-	queryMetricsSQL = `
-	SELECT concat('metric.', metric) metric, toString(value), '' AS description, 'gauge' as type FROM system.asynchronous_metrics
-	UNION ALL 
-	SELECT concat('metric.', metric) metric, toString(value), description, 'gauge' as type FROM system.metrics
-	UNION ALL 
-	SELECT concat('event.', event) as metric, toString(value), description, 'counter' as type FROM system.events`
-	queryTableSizesSQL = `select database, table, 
-	uniq(partition) as partitions, count() as parts, sum(bytes) as bytes, sum(data_uncompressed_bytes) uncompressed_bytes, sum(rows) as rows 
-	from system.parts where active = 1 group by database, table`
 )
 
 const (
@@ -42,20 +30,8 @@ const (
 	chQueryDefaultTimeout = 10 * time.Second
 )
 
-// queryMetrics requests metrics data from the ClickHouse database using REST interface
-// data is a concealed output
-func QueryMetrics(data *[][]string, hostname string) error {
-	return ClickHouseQuery(data, queryMetricsSQL, hostname)
-}
-
-// queryTableSizes requests data sizes from the ClickHouse database using REST interface
-// data is a concealed output
-func QueryTableSizes(data *[][]string, hostname string) error {
-	return ClickHouseQuery(data, queryTableSizesSQL, hostname)
-}
-
-// clickhouseQuery runs given sql and writes results into data
-func ClickHouseQuery(data *[][]string, sql string, hostname string) error {
+// Query runs given sql and writes results into data
+func Query(data *[][]string, sql string, hostname string) error {
 	url, err := neturl.Parse(fmt.Sprintf(chQueryUrlPattern, hostname))
 	if err != nil {
 		return err
@@ -74,7 +50,7 @@ func encodeQuery(url *neturl.URL, sql string) {
 }
 
 // httpCall runs HTTP request using provided URL
-func httpCall(results *[][]string, url string) (err error) {
+func httpCall(results *[][]string, url string) error {
 	// glog.Infof("HTTP GET %s\n", url)
 	client := &http.Client{
 		Timeout: time.Duration(chQueryDefaultTimeout),
@@ -97,11 +73,8 @@ func httpCall(results *[][]string, url string) (err error) {
 	}
 
 	for _, line := range strings.Split(string(body), "\n") {
-		pairs := strings.Split(line, "\t")
-		if len(pairs) < 2 {
-			continue
-		}
-		*results = append(*results, pairs)
+		rows := strings.Split(line, "\t")
+		*results = append(*results, rows)
 	}
 	// glog.Infof("Loaded %d rows", len(*results))
 
