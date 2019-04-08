@@ -20,7 +20,7 @@ import (
 )
 
 func ClusterGatherCreateDatabases(cluster *v1.ChiCluster) ([]string, error) {
-	return gatherUnique(CreateClusterPodFQDNs(cluster), "SELECT concat('CREATE DATABASE ', name) FROM system.databases WHERE name != 'system' ORDER BY name")
+	return gatherUnique(CreateClusterPodFQDNs(cluster), "SELECT concat('CREATE DATABASE IF NOT EXISTS ', name) FROM system.databases WHERE name != 'system' ORDER BY name")
 }
 
 func ClusterGatherCreateTables(cluster *v1.ChiCluster) ([]string, error) {
