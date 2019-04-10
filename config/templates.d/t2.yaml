@@ -1,0 +1,21 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "template2"
+spec:
+  templates:
+    podTemplates:
+      - name: clickhouse-v19.4.3.11
+        containers:
+          - name: clickhouse
+            image: yandex/clickhouse-server:19.4.3.11
+            volumeMounts:
+              - name: clickhouse-data-test
+                mountPath: /var/lib/clickhouse
+      - name: clickhouse-v19.3.9.12
+        containers:
+          - name: clickhouse
+            image: yandex/clickhouse-server:19.3.9.12
+            volumeMounts:
+              - name: clickhouse-data-test
+                mountPath: /var/lib/clickhouse

@@ -3,9 +3,10 @@ namespaces:
   - info
   - onemore
 
-commonConfigsPath: config.d
-deploymentConfigsPath: conf.d
-usersConfigsPath: users.d
+chCommonConfigsPath: config.d
+chDeploymentConfigsPath: conf.d
+chUsersConfigsPath: users.d
+chiTemplatesPath: templates.d
 
 statefulSetUpdateTimeout: 50
 statefulSetUpdatePollPeriod: 2
