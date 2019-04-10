@@ -17,5 +17,6 @@ spec:
     spec:
       serviceAccountName: clickhouse-operator
       containers:
-        - image: sunsingerus/clickhouse-operator:dev
-          name: clickhouse-operator
+        - name: clickhouse-operator
+          image: sunsingerus/clickhouse-operator:dev
+          imagePullPolicy: Always
