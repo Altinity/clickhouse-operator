@@ -25,6 +25,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/config"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/models"
 	"gopkg.in/d4l3k/messagediff.v1"
+	"strings"
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -466,8 +467,18 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		new.WalkClusters(func(cluster *chop.ChiCluster) error {
 			createDatabaseSQLs, _ := chopmodels.ClusterGatherCreateDatabases(cluster)
 			createTableSQLs, _ := chopmodels.ClusterGatherCreateTables(cluster)
+			createTableIfNotExistsSQLs := make([]string, len(createTableSQLs))
+
+			for _, sql := range createTableSQLs {
+				if strings.HasPrefix(sql, "CREATE TABLE") {
+					createTableIfNotExistsSQLs = append(createTableIfNotExistsSQLs, strings.Replace(sql, "CREATE TABLE", "CREATE TABLE IF NOT EXISTS", 1))
+				}
+			}
+
+			glog.V(1).Infof("Create Database SQLs: %v\n", createDatabaseSQLs)
+			glog.V(1).Infof("Create Tables SQLs %v\n", createTableIfNotExistsSQLs)
 			_ = chopmodels.ClusterApplySQLs(cluster, createDatabaseSQLs)
-			_ = chopmodels.ClusterApplySQLs(cluster, createTableSQLs)
+			_ = chopmodels.ClusterApplySQLs(cluster, createTableIfNotExistsSQLs)
 			return nil
 		})
 	}

@@ -17,6 +17,7 @@ package models
 import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/golang/glog"
 )
 
 func ClusterGatherCreateDatabases(cluster *v1.ChiCluster) ([]string, error) {
@@ -40,14 +41,16 @@ func gatherUnique(hosts []string, sql string) ([]string, error) {
 		if clickhouse.Query(&hostItemsRows, sql, host) == nil {
 			for _, row := range hostItemsRows {
 				item := row[0]
-				allItemsMap[item] = true
+				if len(item) > 0 {
+					allItemsMap[item] = true
+				}
 			}
 		}
 	}
 
 	// Extract items from map into slice - slice is more user-friendly
 	items := make([]string, 0, len(allItemsMap))
-	for _, item := range items {
+	for item := range allItemsMap {
 		items = append(items, item)
 	}
 
@@ -55,10 +58,13 @@ func gatherUnique(hosts []string, sql string) ([]string, error) {
 }
 
 func applySQLs(hosts []string, sqls []string) error {
-	data := make([][]string, 0)
 	for _, host := range hosts {
 		for _, sql := range sqls {
-			clickhouse.Query(&data, sql, host)
+			if len(sql) > 0 {
+				data := make([][]string, 0)
+				clickhouse.Exec(&data, sql, host)
+				glog.V(1).Infof("applySQL(%s):%v\n", sql, data)
+			}
 		}
 	}
 

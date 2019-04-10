@@ -32,13 +32,32 @@ const (
 
 // Query runs given sql and writes results into data
 func Query(data *[][]string, sql string, hostname string) error {
+	if len(sql) == 0 {
+		return nil
+	}
 	url, err := neturl.Parse(fmt.Sprintf(chQueryUrlPattern, hostname))
 	if err != nil {
 		return err
 	}
 	encodeQuery(url, sql)
-	httpCall(data, url.String())
-	// glog.Infof("Loaded %d rows", len(*data))
+	httpCall(data, url.String(), "GET")
+
+	glog.V(1).Infof("clickhouseSQL(%s)'%s'rows:%d", hostname, sql, len(*data))
+	return nil
+}
+
+func Exec(data *[][]string, sql string, hostname string) error {
+	if len(sql) == 0 {
+		return nil
+	}
+	url, err := neturl.Parse(fmt.Sprintf(chQueryUrlPattern, hostname))
+	if err != nil {
+		return err
+	}
+	encodeQuery(url, sql)
+	httpCall(data, url.String(), "POST")
+
+	glog.V(1).Infof("clickhouseSQL(%s)'%s'rows:%d", hostname, sql, len(*data))
 	return nil
 }
 
@@ -50,12 +69,12 @@ func encodeQuery(url *neturl.URL, sql string) {
 }
 
 // httpCall runs HTTP request using provided URL
-func httpCall(results *[][]string, url string) error {
+func httpCall(results *[][]string, url string, method string) error {
 	// glog.Infof("HTTP GET %s\n", url)
 	client := &http.Client{
 		Timeout: time.Duration(chQueryDefaultTimeout),
 	}
-	request, err := http.NewRequest("GET", url, nil)
+	request, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		glog.Error(err)
 		return err
