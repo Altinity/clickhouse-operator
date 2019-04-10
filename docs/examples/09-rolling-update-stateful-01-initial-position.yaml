@@ -1,0 +1,34 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "update-replication-stateful-empty-dir"
+spec:
+  configuration:
+    clusters:
+      - name: "sharded"
+        deployment:
+          podTemplate: clickhouse-with-empty-dir-volume-template
+        layout:
+          type: Standard
+          shardsCount: 2
+  templates:
+    podTemplates:
+      - name: clickhouse-with-empty-dir-volume-template
+        containers:
+          - name: clickhouse-pod
+            image: yandex/clickhouse-server:19.3.7
+            ports:
+              - name: rest
+                containerPort: 8123
+              - name: rpc
+                containerPort: 9000
+              - name: interserver
+                containerPort: 9009
+            volumeMounts:
+              - name: clickhouse-storage
+                mountPath: /var/lib/clickhouse
+        volumes:
+          - name: clickhouse-storage
+            emptyDir:
+              medium: "" #accepted values:  empty str (means node's default medium) or Memory
+              sizeLimit: 1Gi

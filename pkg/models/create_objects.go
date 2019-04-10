@@ -378,7 +378,7 @@ func setupStatefulSetPodTemplate(
 	}
 
 	// And now loop over all containers in this template and
-	// append all VolumeMounts which are ConfigMap mounts
+	// apply configuration - meaning append all VolumeMounts which are ConfigMap mounts
 	for i := range statefulSetObject.Spec.Template.Spec.Containers {
 		// Convenience wrapper
 		container := &statefulSetObject.Spec.Template.Spec.Containers[i]
