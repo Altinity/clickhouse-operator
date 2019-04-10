@@ -12,5 +12,6 @@ kubectl create namespace "${DEV_NAMESPACE}"
 echo "Install operator requirements"
 kubectl -n "${DEV_NAMESPACE}" apply -f ./custom-resource-definition.yaml
 kubectl -n "${DEV_NAMESPACE}" apply -f ./rbac-service.yaml
-#kubectl -n "${DEV_NAMESPACE}" apply -f ./deployment.yaml
 
+# Install operator from Docker Registry (dockerhub or whatever)
+kubectl -n "${DEV_NAMESPACE}" apply -f ./deployment-dockerhub-sunsingerus-dev.yaml
