@@ -7,7 +7,7 @@ The ClickHouse Operator creates, configures and manages ClickHouse clusters runn
 [![Go Report Card](https://goreportcard.com/badge/github.com/altinity/clickhouse-operator)](https://goreportcard.com/report/github.com/altinity/clickhouse-operator)
 
 **Warning! 
-ClickHouse Operator is in early beta. You can use it at your own risk. There may be backwards incompatible API changes up until the first major release.**
+ClickHouse Operator is in beta. You can use it at your own risk. There may be backwards incompatible API changes up until the first major release.**
 
 ## Features
 
