@@ -35,6 +35,8 @@ The ClickHouse Operator for Kubernetes currently provides the following:
  * [Persistent Storage Configuration][storage]
  * [Update ClickHouseInstallation with **Rolling Update** - add replication to existing cluster][update_cluster_add_replication]
  * [Update ClickHouseInstallation with **Rolling Update** - update ClickHouse version][update_clickhouse_version]
+ * [Schema Migration][schema_migration]
+ * [Operator Configuration][operator_configuration]
 
 **Monitoring**
  * [Prometheus & clickhouse-operator integration][prometheus_setup]
@@ -60,3 +62,5 @@ See [LICENSE](./LICENSE) for more details.
 [storage]: ./docs/storage.md
 [update_cluster_add_replication]: ./docs/chi_update_add_replication.md
 [update_clickhouse_version]: ./docs/chi_update_clickhouse_version.md
+[schema_migration]: ./docs/schema_migration.md
+[operator_configuration]: ./docs/operator_configuration.md
