@@ -1,3 +1,6 @@
+# `clickhouse-operator` configuration
+
+```yaml
 # Namespaces where clickhouse-operator listens for events.
 # Concurrently running operators should listen on different namespaces
 namespaces:
@@ -39,3 +42,4 @@ statefulSetUpdatePollPeriod: 2
 
 # What to do in case created/updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
 onStatefulSetUpdateFailureAction: abort
+```
