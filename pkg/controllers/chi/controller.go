@@ -462,8 +462,9 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 
 	// Deal with added/updated items
 	//	c.listStatefulSetResources(chi)
-	if err := c.createOrUpdateChiResources(new); err == nil {
-
+	if err := c.createOrUpdateChiResources(new); err != nil {
+		glog.V(1).Infof("createOrUpdateChiResources() FAILED: %v\n", err)
+	} else {
 		new.WalkClusters(func(cluster *chop.ChiCluster) error {
 			createDatabaseSQLs, _ := chopmodels.ClusterGatherCreateDatabases(cluster)
 			createTableSQLs, _ := chopmodels.ClusterGatherCreateTables(cluster)
@@ -481,8 +482,8 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 			_ = chopmodels.ClusterApplySQLs(cluster, createTableIfNotExistsSQLs)
 			return nil
 		})
+		c.updateCHIResource(new)
 	}
-	c.updateCHIResource(new)
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
 	c.metricsExporter.EnsureControlledValues(new.Name, chopmodels.ListPodFQDNs(new))
