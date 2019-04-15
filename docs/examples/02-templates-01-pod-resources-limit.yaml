@@ -1,26 +1,27 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "standard-02-deployment-pv"
+  name: "template-01-resource-limit"
 spec:
   configuration:
     clusters:
-      - name: "standard-02-deployment-pv"
-        # Deployment is specified for this cluster explicitly
-        deployment:
-          podTemplate: pod-template-with-volume
-          volumeClaimTemplate: storage-vc-template
+      - name: "standard-template-with-resources"
         layout:
           type: Standard
           shardsCount: 1
           replicasCount: 1
+  defaults:
+    deployment:
+      # Deployment is specified as default for all clusters
+      podTemplate: pod-template-resource-limit
+      volumeClaimTemplate: vc-template-resource-limit
 
   templates:
     podTemplates:
-      - name: pod-template-with-volume
+      - name: pod-template-resource-limit
         containers:
           - name: clickhouse
-            image: yandex/clickhouse-server:19.3.7
+            image: yandex/clickhouse-server:18.16.1
             ports:
               - name: http
                 containerPort: 8123
@@ -31,15 +32,24 @@ spec:
             volumeMounts:
               - name: clickhouse-data-storage
                 mountPath: /var/lib/clickhouse
+            # Container has explicitly specified resource limits
+            resources:
+              requests:
+                memory: "512Mi"
+                cpu: "500m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
 
     volumeClaimTemplates:
-      - name: storage-vc-template
+      - name: vc-template-resource-limit
         persistentVolumeClaim:
           metadata:
             name: clickhouse-data-storage
           spec:
             accessModes:
               - ReadWriteOnce
+            # VolumeClaim has explicitly specified resource limits
             resources:
               requests:
-                storage: 1Gi
+                storage: 500Mi
