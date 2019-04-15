@@ -1,155 +1,212 @@
 # Quick Start Guides
 
 ## Table of Contents
-* [Installing ClickHouse Operator](#installing-clickhouse-operator)
+* [ClickHouse Operator Installation](#clickhouse-operator-installation)
 * [Simple deployment with default storage](#simple-deployment-with-default-storage)
 * [Custom deployment with Pod and VolumeClaim templates](#custom-deployment-with-pod-and-volumeclaim-templates)
 * [Custom deployment using specific ClickHouse configuration](#custom-deployment-using-specific-clickhouse-configuration)
 
-## Installing ClickHouse Operator
+## Prerequisites
+1. Operational Kubernetes instance
+1. Properly configured `kubectl`
 
-```console
-$ kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator/clickhouse-operator-install.yaml
+## ClickHouse Operator Installation
+
+Apply `clickhouse-operator` installation manifest. The simplest way - directly from github 
+```bash
+kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator/clickhouse-operator-install.yaml
+```
+Operator installation process
+```text
+customresourcedefinition.apiextensions.k8s.io/clickhouseinstallations.clickhouse.altinity.com created
 serviceaccount/clickhouse-operator created
 clusterrolebinding.rbac.authorization.k8s.io/clickhouse-operator created
 deployment.apps/clickhouse-operator created
-
-```
-Check it is running:
-```console
-$ kubectl get pods -n kube-system
-NAME                                        READY   STATUS    RESTARTS   AGE
-clickhouse-operator-ddc6fd499-fhxqs         1/1     Running   0          5m22s
+service/clickhouse-operator-metrics created
 ```
 
-## Simple deployment with default storage
+Check `clickhouse-operator` is running:
+```bash
+kubectl get pods -n kube-system
+```
+```text
+NAME                                 READY   STATUS    RESTARTS   AGE
+clickhouse-operator-5ddc6d858f-drppt 1/1     Running   0          1m
+```
 
-### 1. Creating a custom namespace
-```console
-$ kubectl create ns test
+## Example Deployment
+
+### 1. Create Custom Namespace
+```bash
+kubectl create namespace test
+```
+```text
 namespace/test created
 ```
 
-### 2. Creating a ClickHouse installation custom resource object
+### 2. Create ClickHouseInstallation Object
 
-You can use one of supplied examples:
+There are several ready-to-use [examples](./examples/)
+
+Let's installed the simplest one - [1-replica](./examples/01-standard-layout-01-1shard-1repl.yaml)
+ 
+```bash
+kubectl apply -n test -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/01-standard-layout-01-1shard-1repl.yaml
 ```
-$ kubectl apply -n test -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/chi-example-02-default-pv-no-replication.yaml
-clickhouseinstallation.clickhouse.altinity.com/test created
+```text
+clickhouseinstallation.clickhouse.altinity.com/example-01 created
 ```
 
-Installation specification is very simple and defined cluster with 3 shards:
+Installation specification is straightforward and defines 1-replica cluster:
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "test2-no-replication"
+  name: "standard-01"
 spec:
   configuration:
     clusters:
-      - name: "sharded-non-replicated"
+      - name: "standard-01-1shard-1repl"
         layout:
           type: Standard
-          shardsCount: 3
+          shardsCount: 1
+          replicasCount: 1
 ```
 
 Once cluster is created, there are two checks to be made.
 
-```console
-$ kubectl get pods -n test
-NAME             READY   STATUS    RESTARTS   AGE
-ch-d3ce483i1-0   1/1     Running   0          2m44s
-ch-d3ce483i2-0   1/1     Running   0          2m44s
-ch-d3ce483i3-0   1/1     Running   0          2m44s
+```bash
+kubectl get pods -n test
+```
+```text
+NAME                    READY   STATUS    RESTARTS   AGE
+chi-b3d29f-a242-0-0-0   1/1     Running   0          10m
 ```
 
 Watch out for 'Running' status. Also check services created by an operator:
 
-```console
-$ kubectl get svc -n test
-NAME                  TYPE          CLUSTER-IP   EXTERNAL-IP    PORT(S)                      AGE
-d3ce483i1s            ClusterIP     None         <none>         9000/TCP,9009/TCP,8123/TCP   2m32s
-d3ce483i2s            ClusterIP     None         <none>         9000/TCP,9009/TCP,8123/TCP   2m32s
-test2-no-replication  LoadBalancer  None         10.101.227.182 9000/TCP,9009/TCP,8123/TCP   2m32s
+```bash
+kubectl get service -n test
+```
+```text
+NAME                    TYPE           CLUSTER-IP       EXTERNAL-IP                          PORT(S)                         AGE
+chi-b3d29f-a242-0-0     ClusterIP      None             <none>                               8123/TCP,9000/TCP,9009/TCP      11m
+clickhouse-example-01   LoadBalancer   100.64.167.170   abc-123.us-east-1.elb.amazonaws.com   8123:30954/TCP,9000:32697/TCP   11m
 ```
 
 ClickHouse is up and running!
 
-### 3. Connecting to the ClickHouse database using clickhouse-client
+### 3. Connect to ClickHouse Database
 
-The easiest way to connect to a cluster is to enter a pod and run clickhouse client.
-```console
-$ kubectl exec -it -n test ch-d3ce483i1-0 clickhouse-client
-ClickHouse client version 19.1.6.
-Connecting to localhost:9000.
-Connected to ClickHouse server version 19.1.6 revision 54413.
-
-ch-d3ce483i1-0.d3ce483i1s.test.svc.cluster.local :) 
+There are two ways to connect to ClickHouse database
+1. In case previous command `kubectl get service -n test` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
+```bash
+clickhouse-client -h abc-123.us-east-1.elb.amazonaws.com
 ```
-You can also access the cluster using service names or external IP.
+```text
+ClickHouse client version 18.14.12.
+Connecting to abc-123.us-east-1.elb.amazonaws.com:9000.
+Connected to ClickHouse server version 19.4.3 revision 54416.
+``` 
+1. In case there is not **EXTERNAL-IP** available, we can access ClickHouse from inside Kubernetes cluster
+```bash
+kubectl -n test exec -it chi-b3d29f-a242-0-0-0 -- clickhouse-client
+```
+```text
+ClickHouse client version 19.4.3.11.
+Connecting to localhost:9000 as user default.
+Connected to ClickHouse server version 19.4.3 revision 54416.
+```
 
-## Custom deployment with Pod and VolumeClaim templates
-### Creating a custom resource object
+## Simple Persistent Volume
+In case of having Dynamic Volume Provisioning available - ex.: running on AWS - we are able to use PersistentVolumeClaims
+Manifest is [available in examples](./examples/02-standard-layout-01-1shard-1repl-simple-persistent-volume.yaml)
+
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "test5"
+  name: "standard-01-simple-pv"
 spec:
-  defaults:
-    deployment:
-      podTemplate: customPodTemplate
-      volumeClaimTemplate: customVolumeClaimTemplate
-  templates:
-    volumeClaimTemplates:
-    - name: customVolumeClaimTemplate
-      template:
-        metadata:
-          name: clickhouse-data-test
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          resources:
-            requests:
-              storage: 500Mi
-    podTemplates:
-    - name: customPodTemplate
-      containers:
-      - name: clickhouse
-        volumeMounts:
-        - name: clickhouse-data-test
-          mountPath: /var/lib/clickhouse
-        image: yandex/clickhouse-server:18.16.1
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "500m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
   configuration:
     clusters:
-      - name: "sharded-replicated"
+      - name: "standard-01-simple-pv"
         layout:
           type: Standard
           shardsCount: 1
-          replicasCount: 2
-      - name: "sharded-non-replicated"
-        layout:
-          type: Standard
-          shardsCount: 2
-      - name: "replicated"
-        layout:
-          type: Standard
-          replicasCount: 2
-```
-```console
-$ kubectl apply -n test -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/chi-example-05-custom-templates.yaml
-clickhouseinstallation.clickhouse.altinity.com/test5 created
+          replicasCount: 1
+  defaults:
+    deployment:
+      volumeClaimTemplate: volumeclaim-template
+  templates:
+    volumeClaimTemplates:
+      - name: volumeclaim-template
+        persistentVolumeClaim:
+          metadata:
+            name: USE_DEFAULT_NAME
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 500Mi
 ```
 
-## Custom deployment using specific ClickHouse configuration
-### Creating a custom resource object
+## Custom Deployment with Pod and VolumeClaim Templates
+
+Let's install more complex example with:
+1. Deployment specified
+1. Pod template
+1. VolumeClaim template
+
+Manifest is [available in examples](./examples/02-standard-layout-02-1shard-1repl-deployment-persistent-volume.yaml)
+
+```yaml
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "standard-02-deployment-pv"
+spec:
+  configuration:
+    clusters:
+      - name: "standard-02-deployment-pv"
+        deployment:
+          podTemplate: clickhouse-with-volume-template
+          volumeClaimTemplate: clickhouse-storage-template
+        layout:
+          type: Standard
+          shardsCount: 1
+          replicasCount: 1
+  templates:
+    podTemplates:
+      - name: clickhouse-with-volume-template
+        containers:
+          - name: clickhouse-pod
+            image: yandex/clickhouse-server:19.3.7
+            ports:
+              - name: http
+                containerPort: 8123
+              - name: client
+                containerPort: 9000
+              - name: interserver
+                containerPort: 9009
+            volumeMounts:
+              - name: clickhouse-storage
+                mountPath: /var/lib/clickhouse
+    volumeClaimTemplates:
+      - name: clickhouse-storage-template
+        persistentVolumeClaim:
+          metadata:
+            name: clickhouse-storage
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+```
+
+## Custom Deployment with Specific ClickHouse Configuration
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
@@ -169,21 +226,9 @@ spec:
     settings:
       compression/case/method: zstd
     clusters:
-      - name: "sharded-replicated"
+      - name: "simple"
         layout:
           type: Standard
           shardsCount: 1
-          replicasCount: 2
-      - name: "sharded-non-replicated"
-        layout:
-          type: Standard
-          shardsCount: 2
-      - name: "replicated"
-        layout:
-          type: Standard
-          replicasCount: 2
-```
-```console
-$ kubectl apply -n test -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/chi-example-04-no-pv-custom-configuration.yaml
-clickhouseinstallation.clickhouse.altinity.com/test4 created
+          replicasCount: 1
 ```
