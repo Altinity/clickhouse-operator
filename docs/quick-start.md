@@ -1,16 +1,19 @@
 # Quick Start Guides
 
-## Table of Contents
+# Table of Contents
 * [ClickHouse Operator Installation](#clickhouse-operator-installation)
-* [Simple deployment with default storage](#simple-deployment-with-default-storage)
-* [Custom deployment with Pod and VolumeClaim templates](#custom-deployment-with-pod-and-volumeclaim-templates)
-* [Custom deployment using specific ClickHouse configuration](#custom-deployment-using-specific-clickhouse-configuration)
+* [Examples](#examples)
+* [Simple Example](#simple-example)
+* [Connect to ClickHouse Database](#connect-to-clickhouse-database)
+* [Simple Persistent Volume Example](#simple-persistent-volume-example)
+* [Custom Deployment with Pod and VolumeClaim Templates](#custom-deployment-with-pod-and-volumeclaim-templates)
+* [Custom Deployment with Specific ClickHouse Configuration](#custom-deployment-with-specific-clickhouse-configuration)
 
-## Prerequisites
+# Prerequisites
 1. Operational Kubernetes instance
 1. Properly configured `kubectl`
 
-## ClickHouse Operator Installation
+# ClickHouse Operator Installation
 
 Apply `clickhouse-operator` installation manifest. The simplest way - directly from github 
 ```bash
@@ -34,9 +37,10 @@ NAME                                 READY   STATUS    RESTARTS   AGE
 clickhouse-operator-5ddc6d858f-drppt 1/1     Running   0          1m
 ```
 
-## Example Deployment
+# Examples
 
-### 1. Create Custom Namespace
+## Create Custom Namespace
+It is a good practice to have all components run in dedicated namespaces. Let's run examples in `test` namespace
 ```bash
 kubectl create namespace test
 ```
@@ -44,7 +48,7 @@ kubectl create namespace test
 namespace/test created
 ```
 
-### 2. Create ClickHouseInstallation Object
+## Simple example
 
 There are several ready-to-use [examples](./examples/)
 
@@ -96,7 +100,7 @@ clickhouse-example-01   LoadBalancer   100.64.167.170   abc-123.us-east-1.elb.am
 
 ClickHouse is up and running!
 
-### 3. Connect to ClickHouse Database
+## Connect to ClickHouse Database
 
 There are two ways to connect to ClickHouse database
 1. In case previous command `kubectl get service -n test` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
@@ -118,7 +122,7 @@ Connecting to localhost:9000 as user default.
 Connected to ClickHouse server version 19.4.3 revision 54416.
 ```
 
-## Simple Persistent Volume
+## Simple Persistent Volume Example
 In case of having Dynamic Volume Provisioning available - ex.: running on AWS - we are able to use PersistentVolumeClaims
 Manifest is [available in examples](./examples/02-standard-layout-01-1shard-1repl-simple-persistent-volume.yaml)
 
