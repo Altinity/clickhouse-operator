@@ -64,7 +64,7 @@ func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation, config *con
 	includeNonEmpty(configs.commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
 	includeNonEmpty(configs.commonConfigSections, filenameListenXML, generateListenConfig(chi))
 	// Extra user-specified configs
-	for filename, content := range config.CommonConfigs {
+	for filename, content := range config.ChCommonConfigs {
 		includeNonEmpty(configs.commonConfigSections, filename, content)
 	}
 
@@ -77,7 +77,7 @@ func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation, config *con
 	includeNonEmpty(configs.commonUsersConfigSections, filenameQuotasXML, generateQuotasConfig(chi))
 	includeNonEmpty(configs.commonUsersConfigSections, filenameProfilesXML, generateProfilesConfig(chi))
 	// Extra user-specified configs
-	for filename, content := range config.UsersConfigs {
+	for filename, content := range config.ChUsersConfigs {
 		includeNonEmpty(configs.commonUsersConfigSections, filename, content)
 	}
 
@@ -135,7 +135,7 @@ func createConfigMapObjectsDeployment(chi *chiv1.ClickHouseInstallation, config 
 		deploymentConfigSections := make(map[string]string)
 		includeNonEmpty(deploymentConfigSections, filenameMacrosXML, generateHostMacros(replica))
 		// Extra user-specified configs
-		for filename, content := range config.DeploymentConfigs {
+		for filename, content := range config.ChDeploymentConfigs {
 			includeNonEmpty(deploymentConfigSections, filename, content)
 		}
 
@@ -346,8 +346,8 @@ func createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.
 					},
 				},
 				Spec: corev1.PodSpec{
-					Volumes:    nil,
-					Containers: nil,
+					Volumes:                       nil,
+					Containers:                    nil,
 					TerminationGracePeriodSeconds: &terminationGracePeriod,
 				},
 			},
@@ -378,7 +378,7 @@ func setupStatefulSetPodTemplate(
 	}
 
 	// And now loop over all containers in this template and
-	// append all VolumeMounts which are ConfigMap mounts
+	// apply configuration - meaning append all VolumeMounts which are ConfigMap mounts
 	for i := range statefulSetObject.Spec.Template.Spec.Containers {
 		// Convenience wrapper
 		container := &statefulSetObject.Spec.Template.Spec.Containers[i]
@@ -480,14 +480,14 @@ func createDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 					},
 				},
 				ReadinessProbe: &corev1.Probe{
-					Handler: corev1.Handler {
+					Handler: corev1.Handler{
 						HTTPGet: &corev1.HTTPGetAction{
 							Path: "/ping",
 							Port: intstr.Parse(chDefaultHTTPPortName),
 						},
 					},
 					InitialDelaySeconds: 10,
-					PeriodSeconds: 10,
+					PeriodSeconds:       10,
 				},
 			},
 		},

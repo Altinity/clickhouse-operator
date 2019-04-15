@@ -127,6 +127,15 @@ func CreatePodFQDN(replica *chop.ChiClusterLayoutShardReplica) string {
 	)
 }
 
+func CreateClusterPodFQDNs(cluster *chop.ChiCluster) []string {
+	fqdns := make([]string, 0)
+	cluster.WalkReplicas(func(replica *chop.ChiClusterLayoutShardReplica) error {
+		fqdns = append(fqdns, CreatePodFQDN(replica))
+		return nil
+	})
+	return fqdns
+}
+
 // CreatePodName create Pod Name for a Service
 func CreatePodName(statefulSet *apps.StatefulSet) string {
 	return fmt.Sprintf(podNamePattern, statefulSet.Name)

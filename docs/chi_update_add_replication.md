@@ -22,9 +22,16 @@ deployment.apps/clickhouse-operator   1/1     1            1           17s
 NAME                                            DESIRED   CURRENT   READY   AGE
 replicaset.apps/clickhouse-operator-5cbc47484   1         1         1       17s
 ```
-Now let's install ClickHouse from provided examples. Manifest file with initial position is [07-rolling-update-01-initial-position.yaml](./examples/07-rolling-update-01-initial-position.yaml):
+Now let's install ClickHouse from provided examples. 
+There are two **rolling update** examples presented:
+1. Simple stateless cluster: [initial position](./examples/07-rolling-update-stateless-01-initial-position.yaml) and [update](./examples/07-rolling-update-stateless-02-apply-update.yaml)
+1. Stateful cluster with Persistent Volumes: [initial position](./examples/09-rolling-update-stateful-01-initial-position.yaml) and [update](./examples/09-rolling-update-stateful-02-apply-update.yaml) 
+
+## Simple Rolling Update Example
+
+Let's go with simple stateless cluster. Manifest file with initial position is [07-rolling-update-stateless-01-initial-position.yaml](./examples/07-rolling-update-stateless-01-initial-position.yaml):
 ```bash
-kubectl -n dev apply -f 07-rolling-update-01-initial-position.yaml
+kubectl -n dev apply -f 07-rolling-update-stateless-01-initial-position.yaml
 ```
 Check initial position. We should have cluster up and running:
 ```bash
@@ -75,9 +82,9 @@ All is well.
 Let's run update and change `.yaml` manifest so we'll have replication available. 
 
 In order to have replication correctly setup, we need to specify `Zookeeper` (which is assumed to be running already) and specify replicas for ClickHouse.
-Manifest file with updates specified is [07-rolling-update-02-apply-update.yaml](./examples/07-rolling-update-02-apply-update.yaml):
+Manifest file with updates specified is [07-rolling-update-stateless-02-apply-update.yaml](./examples/07-rolling-update-stateless-02-apply-update.yaml):
 ```bash
-kubectl -n dev apply -f 07-rolling-update-02-apply-update.yaml
+kubectl -n dev apply -f 07-rolling-update-stateless-02-apply-update.yaml
 ```
 And let's watch on how update is rolling over:
 ```text
@@ -131,3 +138,8 @@ root@chi-d02eaa-347e-0-0-0:/# cat /etc/clickhouse-server/config.d/zookeeper.xml
     </distributed_ddl>
 </yandex>
 ```
+
+## Rolling Update with State Example
+Stateful cluster with Persistent Volumes examples are presented as [initial position](./examples/09-rolling-update-stateful-01-initial-position.yaml) and [update](./examples/09-rolling-update-stateful-02-apply-update.yaml)
+The structure of the example is the same as for simple example, but Persistent Volumes are used. So this example is better to be run on cloud provider with Dynamic Volumes Provisioning available.
+  

@@ -30,12 +30,9 @@ import (
 )
 
 // createOrUpdateChiResources creates or updates kubernetes resources based on ClickHouseInstallation object specification
-func (c *Controller) createOrUpdateChiResources(chi *chop.ClickHouseInstallation) (*chop.ClickHouseInstallation, error) {
-	chiCopy, err := chopmodels.ChiCopyAndNormalize(chi)
-	listOfLists := chopmodels.ChiCreateObjects(chiCopy, c.chopConfig)
-	err = c.createOrUpdateResources(chiCopy, listOfLists)
-
-	return chiCopy, err
+func (c *Controller) createOrUpdateChiResources(chi *chop.ClickHouseInstallation) error {
+	listOfLists := chopmodels.ChiCreateObjects(chi, c.chopConfig)
+	return c.createOrUpdateResources(chi, listOfLists)
 }
 
 func (c *Controller) createOrUpdateResources(chi *chop.ClickHouseInstallation, listOfLists []interface{}) error {
@@ -71,7 +68,7 @@ func (c *Controller) createOrUpdateConfigMapResource(chi *chop.ClickHouseInstall
 	res, err := c.configMapLister.ConfigMaps(chi.Namespace).Get(configMap.Name)
 	if res != nil {
 		// Object with such name already exists, this is not an error
-		glog.Infof("Update ConfigMap %s/%s\n", configMap.Namespace, configMap.Name)
+		glog.V(1).Infof("Update ConfigMap %s/%s\n", configMap.Namespace, configMap.Name)
 		_, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Update(configMap)
 		if err != nil {
 			return err
@@ -119,65 +116,98 @@ func (c *Controller) createOrUpdateServiceResource(chi *chop.ClickHouseInstallat
 // createOrUpdateStatefulSetResource creates apps.StatefulSet resource
 func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInstallation, newStatefulSet *apps.StatefulSet) error {
 	// Check whether object with such name already exists in k8s
-	preUpdateStatefulSet, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
-	if preUpdateStatefulSet != nil {
-		preUpdateStatefulSet = preUpdateStatefulSet.DeepCopy()
-		// Object with such name already exists, this is not an error
-		glog.Infof("Update StatefulSet %s/%s\n", preUpdateStatefulSet.Namespace, preUpdateStatefulSet.Name)
-		preUpdateGeneration := preUpdateStatefulSet.Generation
-		updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Update(newStatefulSet)
-		// After calling "Update()"
-		// 1. ObjectMeta.Generation is target generation
-		// 2. Status.ObservedGeneration may be <= ObjectMeta.Generation
-		if err != nil {
-			return err
-		}
-
-		if updatedStatefulSet.Generation == preUpdateGeneration {
-			glog.Infof("No generation change needed for StatefulSet %s/%s\n", updatedStatefulSet.Namespace, updatedStatefulSet.Name)
-			return nil
-		}
-
-		glog.Infof("Generation change %d=>%d required for StatefulSet %s/%s\n", preUpdateGeneration, updatedStatefulSet.Generation, updatedStatefulSet.Namespace, updatedStatefulSet.Name)
-
-		// StatefulSet can be considered as ready when:
-		// 1. Status.ObservedGeneration ==
-		// 		ObjectMeta.Generation ==
-		// 2. Status.ReadyReplicas == Spec.Replicas
-		start := time.Now()
-		for {
-			curStatefulSet, _ := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
-			if hasStatefulSetReachedGeneration(curStatefulSet, updatedStatefulSet.Generation) {
-				// StatefulSet ready
-				glog.Infof("Update completed up to Generation %v: status:%s\n", curStatefulSet.Generation, strStatefulSetStatus(&curStatefulSet.Status))
-				break // for
-			} else {
-				glog.Info("======================\n")
-				glog.Infof("%s\n", strStatefulSetStatus(&updatedStatefulSet.Status))
-				glog.Infof("%s\n", strStatefulSetStatus(&curStatefulSet.Status))
-				if time.Since(start) < time.Duration(c.chopConfig.StatefulSetUpdateTimeout)*time.Second {
-					// Wait some more time
-					time.Sleep(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second)
-				} else {
-					// No more wait, do something
-					return c.onStatefulSetUpdateFailed(curStatefulSet, preUpdateStatefulSet)
-				}
-			}
-		}
-
-		return nil
+	oldStatefulSet, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
+	if oldStatefulSet != nil {
+		return c.updateStatefulSet(oldStatefulSet, newStatefulSet)
 	}
 
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found - create it
-		_, err = c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Create(newStatefulSet)
+		return c.createStatefulSet(chi, newStatefulSet)
 	}
+
+	return err
+}
+
+func (c *Controller) createStatefulSet(chi *chop.ClickHouseInstallation, statefulSet *apps.StatefulSet) error {
+	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Create(statefulSet); err == nil {
+		return c.waitStatefulSetGeneration(statefulSet.Namespace, statefulSet.Name, 1)
+	} else {
+		return err
+	}
+}
+
+func (c *Controller) updateStatefulSet(
+	oldStatefulSet *apps.StatefulSet,
+	newStatefulSet *apps.StatefulSet,
+) error {
+	// Convenience shortcuts
+	namespace := oldStatefulSet.Namespace
+	name := oldStatefulSet.Name
+	generation := oldStatefulSet.Generation
+	glog.V(1).Infof("updateStatefulSet(%s/%s)\n", namespace, name)
+
+	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(newStatefulSet)
 	if err != nil {
+		// Update failed
 		return err
 	}
 
-	// Object created
-	return nil
+	// After calling "Update()"
+	// 1. ObjectMeta.Generation is target generation
+	// 2. Status.ObservedGeneration may be <= ObjectMeta.Generation
+
+	if updatedStatefulSet.Generation == generation {
+		glog.V(1).Infof("updateStatefulSet(%s/%s) - no generation change\n", namespace, name)
+		return nil
+	}
+
+	glog.V(1).Infof("updateStatefulSet(%s/%s) - generation change %d=>%d\n", namespace, name, generation, updatedStatefulSet.Generation)
+
+	if err := c.waitStatefulSetGeneration(namespace, name, updatedStatefulSet.Generation); err == nil {
+		// Target generation reached
+		return nil
+	} else {
+		// Unable to reach target generation
+		return c.onStatefulSetUpdateFailed(oldStatefulSet)
+	}
+
+	return errors.New("updateStatefulSet() - unknown poisition")
+}
+
+func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGeneration int64) error {
+	// StatefulSet can be considered as "reached target generation" when:
+	// 1. Status.ObservedGeneration == ObjectMeta.Generation
+	// 2. Status.ReadyReplicas == Spec.Replicas
+	start := time.Now()
+	for {
+		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {
+			// Unable to get StatefulSet
+			if apierrors.IsNotFound(err) {
+				// Object with such name not found - may be is still being created - wait for it
+				glog.V(1).Infof("waitStatefulSetGeneration() - object not yet created, wait for it\n")
+				time.Sleep(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second)
+			} else {
+				// Some kind of total error
+				glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED\n", namespace, name)
+				return err
+			}
+		} else if hasStatefulSetReachedGeneration(statefulSet, targetGeneration) {
+			// StatefulSet ready
+			glog.V(1).Infof("waitStatefulSetGeneration() - generation %d reached status:%s\n", statefulSet.Generation, strStatefulSetStatus(&statefulSet.Status))
+			return nil
+		} else if time.Since(start) < (time.Duration(c.chopConfig.StatefulSetUpdateTimeout) * time.Second) {
+			// Wait some more time
+			glog.V(1).Infof("waitStatefulSetGeneration() - generation %d waiting status:%s\n", targetGeneration, strStatefulSetStatus(&statefulSet.Status))
+			time.Sleep(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second)
+		} else {
+			// Timeout reached
+			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) - TIMEOUT reached\n", namespace, name)
+			return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - wait timeout", namespace, name))
+		}
+	}
+
+	return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - unknown position", namespace, name))
 }
 
 // hasStatefulSetReachedGeneration returns whether has StatefulSet reached the expected generation after upgrade or not
@@ -196,18 +226,28 @@ func hasStatefulSetReachedGeneration(statefulSet *apps.StatefulSet, generation i
 		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
 }
 
-func (c *Controller) onStatefulSetUpdateFailed(curStatefulSet, preUpdateStatefulSet *apps.StatefulSet) error {
+func (c *Controller) onStatefulSetUpdateFailed(oldStatefulSet *apps.StatefulSet) error {
 	switch c.chopConfig.OnStatefulSetUpdateFailureAction {
 	case config.OnStatefulSetUpdateFailureActionAbort:
-		glog.Errorf("Updated failed %s\n", preUpdateStatefulSet.Name)
-		return errors.New(fmt.Sprintf("Updated failed %s", preUpdateStatefulSet.Name))
+		// Do nothing
+		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort\n", oldStatefulSet.Namespace, oldStatefulSet.Name)
+		return errors.New(fmt.Sprintf("Updated failed %s", oldStatefulSet.Name))
+
 	case config.OnStatefulSetUpdateFailureActionRevert:
-		curStatefulSet.Spec = preUpdateStatefulSet.Spec
-		curStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(curStatefulSet.Namespace).Update(curStatefulSet)
-		err = c.statefulSetDeletePod(curStatefulSet)
-		return err
+		// Need to revert current StatefulSet to oldStatefulSet
+		if statefulSet, err := c.statefulSetLister.StatefulSets(oldStatefulSet.Namespace).Get(oldStatefulSet.Name); err != nil {
+			// Unable to get StatefulSet
+			return err
+		} else {
+			// Get current status of oldStatefulSet and apply "previous" .Spec
+			// make copy of "previous" .Spec just to be sure nothing gets corrupted
+			statefulSet.Spec = *oldStatefulSet.Spec.DeepCopy()
+			statefulSet, err = c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Update(statefulSet)
+			_ = c.statefulSetDeletePod(statefulSet)
+			return nil
+		}
 	default:
-		glog.Errorf("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s\n", c.chopConfig.OnStatefulSetUpdateFailureAction)
+		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s\n", c.chopConfig.OnStatefulSetUpdateFailureAction)
 	}
 	return nil
 }

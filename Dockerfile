@@ -15,4 +15,4 @@ FROM alpine:3.8
 RUN apk update && apk add ca-certificates && rm -rf /var/cache/apk/*
 WORKDIR /
 COPY --from=builder /tmp/clickhouse-operator .
-ENTRYPOINT ["./clickhouse-operator"]
+ENTRYPOINT ["./clickhouse-operator", "-alsologtostderr=true", "-v=1"]
