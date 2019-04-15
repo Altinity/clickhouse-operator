@@ -1,19 +1,21 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "update-replication-stateful-empty-dir"
+  name: "standard-02-deployment-pv"
 spec:
   configuration:
     clusters:
-      - name: "sharded"
+      - name: "standard-02-deployment-pv"
         deployment:
-          podTemplate: clickhouse-with-empty-dir-volume-template
+          podTemplate: clickhouse-with-volume-template
+          volumeClaimTemplate: clickhouse-storage-template
         layout:
           type: Standard
-          shardsCount: 2
+          shardsCount: 1
+          replicasCount: 1
   templates:
     podTemplates:
-      - name: clickhouse-with-empty-dir-volume-template
+      - name: clickhouse-with-volume-template
         containers:
           - name: clickhouse-pod
             image: yandex/clickhouse-server:19.3.7
@@ -27,8 +29,14 @@ spec:
             volumeMounts:
               - name: clickhouse-storage
                 mountPath: /var/lib/clickhouse
-        volumes:
-          - name: clickhouse-storage
-            emptyDir:
-              medium: "" #accepted values:  empty str (means node's default medium) or Memory
-              sizeLimit: 1Gi
+    volumeClaimTemplates:
+      - name: clickhouse-storage-template
+        persistentVolumeClaim:
+          metadata:
+            name: clickhouse-storage
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
