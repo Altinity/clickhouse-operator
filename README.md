@@ -29,14 +29,17 @@ The ClickHouse Operator for Kubernetes currently provides the following:
 
 **Advanced setups**
  * [Detailed Operator Installation Instructions][detailed]
- * [ClickHouse Installation Custom Resource specification][crd_explained]
- * [How to setup ClickHouse cluster with replication][replication_setup]
- * [Zookeeper Setup][zookeeper_setup]
+   * [Operator Configuration][operator_configuration]
+ * [Setup ClickHouse cluster with replication][replication_setup]
+   * [Setting up Zookeeper][zookeeper_setup]
  * [Persistent Storage Configuration][storage]
- * [Update ClickHouseInstallation with **Rolling Update** - add replication to existing cluster][update_cluster_add_replication]
- * [Update ClickHouseInstallation with **Rolling Update** - update ClickHouse version][update_clickhouse_version]
- * [Schema Migration][schema_migration]
- * [Operator Configuration][operator_configuration]
+ * [ClickHouse Installation Custom Resource specification][crd_explained]
+ 
+**Maintanance tasks**
+ * [Adding replication to an existing ClickHouse cluster][update_cluster_add_replication]
+ * Adding shards and replicas
+   * [Automatic schema creation][schema_migration]
+ * [Update ClickHouse version][update_clickhouse_version]
 
 **Monitoring**
  * [Prometheus & clickhouse-operator integration][prometheus_setup]
