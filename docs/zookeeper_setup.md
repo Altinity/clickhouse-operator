@@ -18,24 +18,30 @@ What steps are performed during ZooKeeper installation:
   
 
 ## Quick start
-Quick start files are are located in [manifests/zookeeper/quick-start](../manifests/zookeeper/quick-start) folder
-
-[create](../manifests/zookeeper/quick-start/create-zookeeper.sh) and [delete](../manifests/zookeeper/quick-start/delete-zookeeper.sh)
+Quick start files are are located in [manifests/zookeeper/quick-start](../manifests/zookeeper/quick-start) folder. 
+Quick start provides the following installation options:
+1. 1-node Zookeeper cluster (**zookeeper-1-** files) in [quick-start](../manifests/zookeeper/quick-start) folder
+1. 3-node Zookeeper cluster (**zookeeper-3-** files) in [quick-start](../manifests/zookeeper/quick-start) folder
+In this example we'll go with simple 1-node Zookeeper cluster.
+[create](../manifests/zookeeper/quick-start/zookeeper-1-node-create.sh) and [delete](../manifests/zookeeper/quick-start/zookeeper-1-node-delete.sh)
 shell scripts are available for simplification. In case you'd like to deploy Zookeeper manually, the following steps should be performed: 
 
 ### Namespace
 Create **namespace**
 ```bash
-kubectl create namespace zoons
+kubectl create namespace zoo1ns
 ```
  
 ### Zookeeper
 Deploy Zookeeper into this namespace
 ```bash
-kubectl apply -f zookeeper.yaml -n zoons
+kubectl apply -f zookeeper-1-node.yaml -n zoo1ns
 ```
 
-Now Zookeeper should be up and running. Let's [explore Zookeeper cluster](#explore-zookeeper-cluster)
+Now Zookeeper should be up and running. Let's [explore Zookeeper cluster](#explore-zookeeper-cluster).
+
+**IMPORTANT** quick-start zookeeper installation are for test purposes only and are stateless - do not have **PersistentVolume**. 
+For persistent storage configuration for Zookeeper we need to apply [advanced setup](#advanced-setup)  
 
 ## Advanced setup
 Advanced files are are located in [manifests/zookeeper/advanced](../manifests/zookeeper/advanced) folder. 
