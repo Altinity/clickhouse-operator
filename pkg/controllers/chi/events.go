@@ -15,18 +15,25 @@
 package chi
 
 import (
-	"time"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
+)
+
+const (
+	eventTypeNormal  = "Normal"
+	eventTypeWarning = "Warning"
 )
 
 // createEventChi creates CHI-related event
+// action - what action was attempted (and then succeeded/failed regarding to the Involved Object
 // reason - short, machine understandable string, ex.: SuccessfulCreate
 // message - human-readable description
 // typ - type of the event - Normal, Warning, etc
 func (c *Controller) createEventChi(
 	chi *chop.ClickHouseInstallation,
+	action string,
 	reason string,
 	message string,
 	typ string,
@@ -37,14 +44,14 @@ func (c *Controller) createEventChi(
 			GenerateName: "chop-chi-",
 		},
 		InvolvedObject: core.ObjectReference{
-			Kind: "ClickHouseInstallation",
-			Namespace: chi.Namespace,
-			Name: chi.Name,
-			UID: chi.UID,
-			APIVersion: "clickhouse.altinity.com/v1",
+			Kind:            "ClickHouseInstallation",
+			Namespace:       chi.Namespace,
+			Name:            chi.Name,
+			UID:             chi.UID,
+			APIVersion:      "clickhouse.altinity.com/v1",
 			ResourceVersion: chi.ResourceVersion,
 		},
-		Reason: reason,
+		Reason:  reason,
 		Message: message,
 		Source: core.EventSource{
 			Component: "clickhouse-operator",
@@ -55,9 +62,9 @@ func (c *Controller) createEventChi(
 		LastTimestamp: meta.Time{
 			Time: now,
 		},
-		Count: 1,
-		Type: typ,
-		Action: "Created",
+		Count:               1,
+		Type:                typ,
+		Action:              action,
 		ReportingController: "clickhouse-operator",
 		// ID of the controller instance, e.g. `kubelet-xyzf`.
 		// ReportingInstance:
