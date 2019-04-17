@@ -22,8 +22,32 @@ import (
 )
 
 const (
+	// Event type (Normal, Warning) specifies what event type is this
 	eventTypeNormal  = "Normal"
 	eventTypeWarning = "Warning"
+)
+
+const (
+	// Event action describes what action was taken
+	eventActionCreate = "Create"
+	eventActionUpdate = "Update"
+	eventActionDelete = "Delete"
+)
+
+const (
+	// Short, machine understandable string that gives the reason for the transition into the object's current status
+	eventReasonCreateStarted    = "CreateStarted"
+	eventReasonCreateInProgress = "CreateInProgress"
+	eventReasonCreateCompleted  = "CreateCompleted"
+	eventReasonCreateFailed     = "CreateFailed"
+	eventReasonUpdateStarted    = "UpdateStarted"
+	eventReasonUpdateInProgress = "UpdateInProgress"
+	eventReasonUpdateCompleted  = "UpdateCompleted"
+	eventReasonUpdateFailed     = "UpdateFailed"
+	eventReasonDeleteStarted    = "DeleteStarted"
+	eventReasonDeleteInProgress = "DeleteInProgress"
+	eventReasonDeleteCompleted  = "DeleteCompleted"
+	eventReasonDeleteFailed     = "DeleteFailed"
 )
 
 // createEventChi creates CHI-related event
@@ -31,12 +55,12 @@ const (
 // reason - short, machine understandable string, ex.: SuccessfulCreate
 // message - human-readable description
 // typ - type of the event - Normal, Warning, etc
-func (c *Controller) createEventChi(
+func (c *Controller) eventChi(
 	chi *chop.ClickHouseInstallation,
+	typ string,
 	action string,
 	reason string,
 	message string,
-	typ string,
 ) error {
 	now := time.Now()
 	event := core.Event{

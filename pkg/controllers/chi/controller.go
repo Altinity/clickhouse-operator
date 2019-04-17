@@ -384,25 +384,32 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	// We need to create all resources that are needed to run user's .yaml specification
 	glog.V(1).Infof("onAddChi(%s/%s)", chi.Namespace, chi.Name)
 
+	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateStarted, fmt.Sprintf("onAddChi(%s/%s)", chi.Namespace, chi.Name))
 	chi, err := chopmodels.ChiApplyTemplateAndNormalize(chi, c.chopConfig)
 	if err != nil {
 		glog.V(2).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
+		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to normalize", chi.Name))
 		return err
 	}
 
+	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateInProgress, fmt.Sprintf("onAddChi(%s/%s) create objects", chi.Namespace, chi.Name))
 	err = c.createOrUpdateChiResources(chi)
 	if err != nil {
 		glog.V(2).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
+		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to create", chi.Name))
 		return err
 	}
 
 	// Update CHI status in k8s
+	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateInProgress, fmt.Sprintf("onAddChi(%s/%s) create CHI", chi.Namespace, chi.Name))
 	if err := c.updateCHIResource(chi); err != nil {
 		glog.V(2).Infof("ClickHouseInstallation (%q): unable to update status of CHI resource: %q", chi.Name, err)
+		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to update CHI Resource", chi.Name))
 		return err
 	}
 
 	glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
+	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted, fmt.Sprintf("onAddChi(%s/%s)", chi.Namespace, chi.Name))
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
 	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.ListPodFQDNs(chi))
@@ -443,26 +450,34 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
+	c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateStarted, fmt.Sprintf("onUpdateChi(%s/%s):", old.Namespace, old.Name))
+
 	// Deal with removed items
 	for path := range diff.Removed {
 		switch diff.Removed[path].(type) {
 		case chop.ChiCluster:
 			cluster := diff.Removed[path].(chop.ChiCluster)
+			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete cluster %s", cluster.Name))
 			c.deleteCluster(&cluster)
 		case chop.ChiClusterLayoutShard:
 			shard := diff.Removed[path].(chop.ChiClusterLayoutShard)
+			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete shard %d", shard.Address.ShardIndex))
 			c.deleteShard(&shard)
 		case chop.ChiClusterLayoutShardReplica:
 			replica := diff.Removed[path].(chop.ChiClusterLayoutShardReplica)
+			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete replica %d", replica.Address.ReplicaIndex))
 			c.deleteReplica(&replica)
 		}
 	}
 
 	// Deal with added/updated items
 	//	c.listStatefulSetResources(chi)
+	c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) update resources", old.Namespace, old.Name))
 	if err := c.createOrUpdateChiResources(new); err != nil {
 		glog.V(1).Infof("createOrUpdateChiResources() FAILED: %v\n", err)
+		c.eventChi(old, eventTypeWarning, eventActionUpdate, eventReasonUpdateFailed, fmt.Sprintf("onUpdateChi(%s/%s) update resources failed", old.Namespace, old.Name))
 	} else {
+		c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) migrate schema", old.Namespace, old.Name))
 		new.WalkClusters(func(cluster *chop.ChiCluster) error {
 			createDatabaseSQLs, _ := chopmodels.ClusterGatherCreateDatabases(cluster)
 			createTableSQLs, _ := chopmodels.ClusterGatherCreateTables(cluster)
@@ -481,6 +496,8 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 			return nil
 		})
 		c.updateCHIResource(new)
+
+		c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateCompleted, fmt.Sprintf("onUpdateChi(%s/%s) completed", old.Namespace, old.Name))
 	}
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
@@ -490,7 +507,9 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 }
 
 func (c *Controller) onDeleteChi(chi *chop.ClickHouseInstallation) error {
+	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteStarted, fmt.Sprintf("onDeleteChi(%s/%s) started", chi.Namespace, chi.Name))
 	c.deleteChi(chi)
+	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, fmt.Sprintf("onDeleteChi(%s/%s) completed", chi.Namespace, chi.Name))
 
 	return nil
 }
