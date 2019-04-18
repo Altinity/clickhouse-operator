@@ -2,6 +2,7 @@
 
 # Table of Contents
 * [ClickHouse Operator Installation](#clickhouse-operator-installation)
+* [Building ClickHouse Operator from Sources](#building-clickhouse-operator-from-sources)
 * [Examples](#examples)
 * [Simple Example](#simple-example)
 * [Connect to ClickHouse Database](#connect-to-clickhouse-database)
@@ -36,6 +37,10 @@ kubectl get pods -n kube-system
 NAME                                 READY   STATUS    RESTARTS   AGE
 clickhouse-operator-5ddc6d858f-drppt 1/1     Running   0          1m
 ```
+
+## Building ClickHouse Operator from Sources
+
+Complete instructions on how to build ClickHouse operator from sources as well as how to build a docker image and use it inside `kubernetes` described [here][build_from_sources].
 
 # Examples
 
@@ -236,3 +241,5 @@ spec:
           shardsCount: 1
           replicasCount: 1
 ```
+
+[build_from_sources]: ./operator_build_from_sources.md
