@@ -110,10 +110,10 @@ func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) error {
 	case []interface{}:
 		for _, value := range n.value.([]interface{}) {
 			stringValue := value.(string)
-			n.printTagValue(w, stringValue, indent, tabsize)
+			n.printTagWithValue(w, stringValue, indent, tabsize)
 		}
 	case string:
-		n.printTagValue(w, n.value.(string), indent, tabsize)
+		n.printTagWithValue(w, n.value.(string), indent, tabsize)
 	default:
 		n.printTagNoValue(w, indent, tabsize)
 	}
