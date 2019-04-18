@@ -44,7 +44,7 @@ func generateUsersConfig(chi *chiv1.ClickHouseInstallation) string {
 }
 
 // genConfigXML creates XML using map[string]string definitions
-func genConfigXML(data map[string]string, section string) string {
+func genConfigXML(data map[string]interface{}, section string) string {
 	if len(data) == 0 {
 		return ""
 	}
