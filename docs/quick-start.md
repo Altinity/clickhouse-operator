@@ -4,11 +4,11 @@
 * [ClickHouse Operator Installation](#clickhouse-operator-installation)
 * [Building ClickHouse Operator from Sources](#building-clickhouse-operator-from-sources)
 * [Examples](#examples)
-* [Simple Example](#simple-example)
-* [Connect to ClickHouse Database](#connect-to-clickhouse-database)
-* [Simple Persistent Volume Example](#simple-persistent-volume-example)
-* [Custom Deployment with Pod and VolumeClaim Templates](#custom-deployment-with-pod-and-volumeclaim-templates)
-* [Custom Deployment with Specific ClickHouse Configuration](#custom-deployment-with-specific-clickhouse-configuration)
+  * [Simple Example](#simple-example)
+  * [Connect to ClickHouse Database](#connect-to-clickhouse-database)
+  * [Simple Persistent Volume Example](#simple-persistent-volume-example)
+  * [Custom Deployment with Pod and VolumeClaim Templates](#custom-deployment-with-pod-and-volumeclaim-templates)
+  * [Custom Deployment with Specific ClickHouse Configuration](#custom-deployment-with-specific-clickhouse-configuration)
 
 # Prerequisites
 1. Operational Kubernetes instance
