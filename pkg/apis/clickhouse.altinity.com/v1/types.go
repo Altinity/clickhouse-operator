@@ -181,7 +181,6 @@ type ChiConfigurationZookeeperNode struct {
 type ChiVolumeClaimTemplate struct {
 	Name                  string                       `json:"name"                  yaml:"name"`
 	PersistentVolumeClaim corev1.PersistentVolumeClaim `json:"persistentVolumeClaim" yaml:"persistentVolumeClaim"`
-	UseDefaultName        bool                         `json:"useDefaultName"`
 }
 
 // ChiPodTemplate defines item of a podTemplates section of .spec.templates

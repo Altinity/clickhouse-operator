@@ -5,7 +5,7 @@ metadata:
 spec:
   defaults:
     deployment:
-      volumeClaimTemplate: default
+      volumeClaimTemplate: auto-simple-vc
   configuration:
     clusters:
       - name: "sharded-replicated"
@@ -23,10 +23,8 @@ spec:
           replicasCount: 2
   templates:
     volumeClaimTemplates:
-    - name: default
+    - name: auto-simple-vc
       persistentVolumeClaim:
-        metadata:
-          name: USE_DEFAULT_NAME
         spec:
           accessModes:
           - ReadWriteOnce

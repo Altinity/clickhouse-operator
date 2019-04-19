@@ -412,27 +412,60 @@ func setupStatefulSetVolumeClaimTemplate(
 	volumeClaimTemplate, ok := volumeClaimTemplatesIndex[volumeClaimTemplateName]
 	if !ok {
 		// Unknown VolumeClaimTemplate
+		// This is not an error, volumeClaimTemplate may be not specified and this is normal
 		glog.Infof("createStatefulSetObjects() for statefulSet %s - no VC templates\n", statefulSetName)
 		return
 	}
 
 	// Known VolumeClaimTemplate
 
+	// Specify StatefulSet's VolumeClaimTemplates array as one-element array of our volumeClaimTemplate
 	statefulSetObject.Spec.VolumeClaimTemplates = []corev1.PersistentVolumeClaim{
 		volumeClaimTemplate.PersistentVolumeClaim,
 	}
 
-	// Add default corev1.VolumeMount section for ClickHouse data
-	if volumeClaimTemplate.UseDefaultName {
-		statefulSetObject.Spec.Template.Spec.Containers[0].VolumeMounts = append(
-			statefulSetObject.Spec.Template.Spec.Containers[0].VolumeMounts,
-			corev1.VolumeMount{
-				Name:      chDefaultVolumeMountNameData,
-				MountPath: dirPathClickHouseData,
-			})
-		glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, volumeClaimTemplateName)
+	//This volumeClaimTemplate may be used explicitly in VolumeMounts
+	// or may be implicit usage as default volume for /var/lib/clickhouse is supposed
+	// So we need to check, whether this volumeClaimTemplate should be used as default volume mounted at /var/lib/clickhouse
+
+	// 1. Check explicit usage
+	// This volumeClaimTemplate may be explicitly used already, in case
+	// it is explicitly mentioned in Container's VolumeMounts.
+	for i := range statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts {
+		// Convenience wrapper
+		volumeMount := &statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts[i]
+		if volumeMount.Name == volumeClaimTemplate.PersistentVolumeClaim.Name {
+			// This volumeClaimTemplate is already used
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template 1: %s\n", statefulSetName, volumeClaimTemplateName)
+			return
+		}
 	}
-	glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template: %s\n", statefulSetName, volumeClaimTemplateName)
+
+	// 2. Check /var/lib/clickhouse usage
+	// This volumeClaimTemplate is not used by name - it is unused - what's it's purpose, then?
+	// So we want to mount it to /var/lib/clickhouse even more now, because it is unused.
+	// However, mount point /var/lib/clickhouse may be used already explicitly. Need to check
+	for i := range statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts {
+		// Convenience wrapper
+		volumeMount := &statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts[i]
+		if volumeMount.MountPath == dirPathClickHouseData {
+			// /var/lib/clickhouse is already mounted
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template 1: %s\n", statefulSetName, volumeClaimTemplateName)
+			return
+		}
+	}
+
+	// This volumeClaimTemplate is not used by name and /var/lib/clickhouse is not mounted
+	// Let's mount this volumeClaimTemplate into /var/lib/clickhouse
+	statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts = append(
+		statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts,
+		corev1.VolumeMount{
+			Name:      chDefaultVolumeMountNameData,
+			MountPath: dirPathClickHouseData,
+		},
+	)
+
+	glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, volumeClaimTemplateName)
 }
 
 func copyPodTemplateFrom(dst *apps.StatefulSet, src *chiv1.ChiPodTemplate) {
@@ -523,11 +556,6 @@ func createVolumeClaimTemplatesIndex(chi *chiv1.ClickHouseInstallation) volumeCl
 	for i := range chi.Spec.Templates.VolumeClaimTemplates {
 		// Convenience wrapper
 		volumeClaimTemplate := &chi.Spec.Templates.VolumeClaimTemplates[i]
-
-		if volumeClaimTemplate.PersistentVolumeClaim.Name == useDefaultPersistentVolumeClaimMacro {
-			volumeClaimTemplate.PersistentVolumeClaim.Name = chDefaultVolumeMountNameData
-			volumeClaimTemplate.UseDefaultName = true
-		}
 		index[volumeClaimTemplate.Name] = volumeClaimTemplate
 	}
 

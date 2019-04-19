@@ -165,7 +165,7 @@ const (
 	// Ex.: chi-example02-common-configd for chi named as 'example02'
 	configMapCommonNamePattern = "chi-%s-common-configd"
 
-	// configMapCommonusersNamePattern is a template of common users settings for the CHI ConfigMap
+	// configMapCommonUsersNamePattern is a template of common users settings for the CHI ConfigMap
 	// Ex.: chi-example02-common-usersd for chi named as 'example02'
 	configMapCommonUsersNamePattern = "chi-%s-common-usersd"
 
@@ -179,10 +179,7 @@ const (
 const (
 	chDefaultDockerImage         = "yandex/clickhouse-server:latest"
 	chDefaultVolumeMountNameData = "clickhouse-data"
-)
-
-const (
-	useDefaultPersistentVolumeClaimMacro = "USE_DEFAULT_NAME"
+	ClickHouseContainerIndex = 0
 )
 
 const (
