@@ -13,9 +13,9 @@ spec:
       test/profile: test_profile
       test/quota: test_quota
       test/allow_databases/database:
-        - dname1
-        - dname2
-        - dname3
+        - "dbname1"
+        - "dbname2"
+        - "dbname3"
     profiles:
       test_profile/max_memory_usage: "1000000000"
       test_profile/readonly: "1"
