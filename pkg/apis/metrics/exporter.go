@@ -16,14 +16,11 @@ package metrics
 
 import (
 	"strconv"
-	"sync"
-//	"unicode"
 	"strings"
+	"sync"
 
-	clickhouse "github.com/altinity/clickhouse-operator/pkg/apis/metrics/clickhouse"
-
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -57,11 +54,11 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect implements prometheus.Collector Collect method
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	if (ch == nil) {
+	if ch == nil {
 		glog.Info("Prometheus channel is closed. Skipping")
 		return
 	}
-	
+
 	e.mutex.Lock()
 	defer func() {
 		e.mutex.Unlock()
@@ -87,8 +84,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 				defer wg.Done()
 
 				glog.Infof("Querying metrics for %s\n", hostname)
-				metricsData := make([][]string,0)
-				if err := clickhouse.QueryMetrics(&metricsData, hostname); err != nil {
+				metricsData := make([][]string, 0)
+				if err := clickHouseQueryMetrics(&metricsData, hostname); err != nil {
 					// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 					glog.Infof("Error querying metrics for %s: %s\n", hostname, err)
 					e.cleanup.Store(name, struct{}{})
@@ -96,10 +93,10 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 				}
 				glog.Infof("Extracted %d metrics for %s\n", len(metricsData), hostname)
 				writeMetricsDataToPrometheus(c, metricsData, name, hostname)
-				
+
 				glog.Infof("Querying table sizes for %s\n", hostname)
-				tableSizes := make([][]string,0)
-				if err := clickhouse.QueryTableSizes(&tableSizes, hostname); err != nil {
+				tableSizes := make([][]string, 0)
+				if err := clickHouseQueryTableSizes(&tableSizes, hostname); err != nil {
 					// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 					glog.Infof("Error querying table sizes for %s: %s\n", hostname, err)
 					e.cleanup.Store(name, struct{}{})
@@ -107,7 +104,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 				}
 				glog.Infof("Extracted %d table sizes for %s\n", len(tableSizes), hostname)
 				writeTableSizesDataToPrometheus(c, tableSizes, name, hostname)
-				
+
 			}(chiName, hostname, ch)
 		}
 	}
@@ -115,16 +112,28 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	glog.Info("Finished Collect")
 }
 
-
 // writeMetricsDataToPrometheus pushes set of prometheus.Metric objects created from the ClickHouse system data
 // Expected data structure: metric, value, description, type (gauge|counter)
-func writeMetricsDataToPrometheus(out chan<- prometheus.Metric, data [][]string, chiname, hostname string) {
+func writeMetricsDataToPrometheus(out chan<- prometheus.Metric, data [][]string, chiName, hostname string) {
 	for _, metric := range data {
+		if len(metric) < 2 {
+			continue
+		}
 		var metricType prometheus.ValueType
-		if metric[3] == "counter" { metricType = prometheus.CounterValue } else { metricType = prometheus.GaugeValue }
-		writeSingleMetricToPrometheus(out, convertMetricName(metric[0]), metric[2], metric[1], metricType,
-			[]string{"chi","hostname"}, 
-			chiname, hostname)
+		if metric[3] == "counter" {
+			metricType = prometheus.CounterValue
+		} else {
+			metricType = prometheus.GaugeValue
+		}
+		writeSingleMetricToPrometheus(out,
+			convertMetricName(metric[0]),
+			metric[2],
+			metric[1],
+			metricType,
+			[]string{"chi", "hostname"},
+			chiName,
+			hostname,
+		)
 	}
 }
 
@@ -132,20 +141,23 @@ func writeMetricsDataToPrometheus(out chan<- prometheus.Metric, data [][]string,
 // Expected data structure: database, table, partitions, parts, bytes, uncompressed_bytes, rows
 func writeTableSizesDataToPrometheus(out chan<- prometheus.Metric, data [][]string, chiname, hostname string) {
 	for _, metric := range data {
+		if len(metric) < 2 {
+			continue
+		}
 		writeSingleMetricToPrometheus(out, "table_partitions", "Number of partitions of the table", metric[2], prometheus.GaugeValue,
-			[]string{"chi","hostname","database","table"}, 
+			[]string{"chi", "hostname", "database", "table"},
 			chiname, hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(out, "table_parts", "Number of parts of the table", metric[3], prometheus.GaugeValue,
-			[]string{"chi","hostname","database","table"}, 
+			[]string{"chi", "hostname", "database", "table"},
 			chiname, hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(out, "table_parts_bytes", "Table size in bytes", metric[4], prometheus.GaugeValue,
-			[]string{"chi","hostname","database","table"}, 
+			[]string{"chi", "hostname", "database", "table"},
 			chiname, hostname, metric[0], metric[1])
-		writeSingleMetricToPrometheus(out, "table_parts_bytes_uncompressed", "Table size in bytes uncompressed", metric[5], prometheus.GaugeValue, 
-			[]string{"chi","hostname","database","table"}, 
+		writeSingleMetricToPrometheus(out, "table_parts_bytes_uncompressed", "Table size in bytes uncompressed", metric[5], prometheus.GaugeValue,
+			[]string{"chi", "hostname", "database", "table"},
 			chiname, hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(out, "table_parts_rows", "Number of rows in the table", metric[6], prometheus.GaugeValue,
-			[]string{"chi","hostname","database","table"}, 
+			[]string{"chi", "hostname", "database", "table"},
 			chiname, hostname, metric[0], metric[1])
 	}
 }
@@ -153,19 +165,20 @@ func writeTableSizesDataToPrometheus(out chan<- prometheus.Metric, data [][]stri
 func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, desc string, value string, metricType prometheus.ValueType, labels []string, labelValues ...string) {
 	floatValue, _ := strconv.ParseFloat(value, 64)
 	m, err := prometheus.NewConstMetric(
-			newDescription(name, desc, labels),
-			metricType,
-			floatValue,
-			labelValues...)
-	if (err != nil) {
+		newDescription(name, desc, labels),
+		metricType,
+		floatValue,
+		labelValues...,
+	)
+	if err != nil {
 		glog.Infof("Error creating metric %s: %s", name, err)
 		return
 	}
 	select {
-		case out <- m:
-		
-		default: 
-			glog.Infof("Error sending metric to the channel %s", name)
+	case out <- m:
+
+	default:
+		glog.Infof("Error sending metric to the channel %s", name)
 	}
 }
 

@@ -1,6 +1,9 @@
 # Storage
 
-Example is [available here][example_aws_pv]
+Examples are availabe in [examples](./examples) folder:
+1. [Simple Persistent Volume](./examples/02-standard-layout-01-1shard-1repl-simple-persistent-volume.yaml)
+1. [Simple Deployment with Persistent Volume](./examples/02-standard-layout-02-1shard-1repl-deployment-persistent-volume.yaml)
+1. AWS-based cluster with data replication and Persistent Volumes [minimal](./examples/04-zookeeper-replication-03-minimal-AWS-persistent-volume.yaml) and [medium](./examples/04-zookeeper-replication-04-medium-AWS-persistent-volume.yaml) Zookeeper installations
 
 ## Persistent Volumes
 k8s cluster administrator provision storage with `PersistentVolume` objects to users. 

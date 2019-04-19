@@ -7,7 +7,7 @@ The ClickHouse Operator creates, configures and manages ClickHouse clusters runn
 [![Go Report Card](https://goreportcard.com/badge/github.com/altinity/clickhouse-operator)](https://goreportcard.com/report/github.com/altinity/clickhouse-operator)
 
 **Warning! 
-ClickHouse Operator is in early beta. You can use it at your own risk. There may be backwards incompatible API changes up until the first major release.**
+ClickHouse Operator is in beta. You can use it at your own risk. There may be backwards incompatible API changes up until the first major release.**
 
 ## Features
 
@@ -21,7 +21,7 @@ The ClickHouse Operator for Kubernetes currently provides the following:
 
 ## Requirements
 
- * Kubernetes 1.10.0 +
+ * Kubernetes 1.11.9+
  
 ## Documentation
 
@@ -29,12 +29,17 @@ The ClickHouse Operator for Kubernetes currently provides the following:
 
 **Advanced setups**
  * [Detailed Operator Installation Instructions][detailed]
- * [ClickHouse Installation Custom Resource specification][crd_explained]
- * [How to setup ClickHouse cluster with replication][replication_setup]
- * [Zookeeper Setup][zookeeper_setup]
+   * [Operator Configuration][operator_configuration]
+ * [Setup ClickHouse cluster with replication][replication_setup]
+   * [Setting up Zookeeper][zookeeper_setup]
  * [Persistent Storage Configuration][storage]
- * [Update ClickHouseInstallation with **Rolling Update** - add replication to existing cluster][update_cluster_add_replication]
- * [Update ClickHouseInstallation with **Rolling Update** - update ClickHouse version][update_clickhouse_version]
+ * [ClickHouse Installation Custom Resource specification][crd_explained]
+ 
+**Maintanance tasks**
+ * [Adding replication to an existing ClickHouse cluster][update_cluster_add_replication]
+ * Adding shards and replicas
+   * [Automatic schema creation][schema_migration]
+ * [Update ClickHouse version][update_clickhouse_version]
 
 **Monitoring**
  * [Prometheus & clickhouse-operator integration][prometheus_setup]
@@ -60,3 +65,5 @@ See [LICENSE](./LICENSE) for more details.
 [storage]: ./docs/storage.md
 [update_cluster_add_replication]: ./docs/chi_update_add_replication.md
 [update_clickhouse_version]: ./docs/chi_update_clickhouse_version.md
+[schema_migration]: ./docs/schema_migration.md
+[operator_configuration]: ./docs/operator_configuration.md

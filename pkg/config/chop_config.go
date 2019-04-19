@@ -15,13 +15,15 @@
 package config
 
 import (
-	"github.com/golang/glog"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strings"
+
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // GetConfig creates Config object based on current environment
@@ -67,25 +69,27 @@ func GetConfig(configFilePath string) (*Config, error) {
 // buildConfigFromFile returns Config struct built out of specified file path
 func buildConfigFromFile(configFilePath string) (*Config, error) {
 	// Read config file content
-	yamlFile, err := ioutil.ReadFile(configFilePath)
+	yamlText, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
 		return nil, err
 	}
 
 	// Parse config file content into Config struct
-	config := &Config{}
-	err = yaml.Unmarshal(yamlFile, config)
+	config := new(Config)
+	err = yaml.Unmarshal(yamlText, config)
 	if err != nil {
 		return nil, err
 	}
 
-	// Fill Config/s paths
+	// Fill Config's paths
 	config.ConfigFilePath, err = filepath.Abs(configFilePath)
 	config.ConfigFolderPath = filepath.Dir(config.ConfigFilePath)
 
 	// Normalize Config struct into fully-and-correctly filled Config struct
 	if err = config.normalize(); err == nil {
-		config.readExtraConfigFiles()
+		config.readChConfigFiles()
+		config.readChiTemplateFiles()
+		config.buildChiTemplate()
 		return config, nil
 	} else {
 		return nil, err
@@ -94,20 +98,51 @@ func buildConfigFromFile(configFilePath string) (*Config, error) {
 
 // buildDefaultConfig returns default Config
 func buildDefaultConfig() (*Config, error) {
-	config := &Config{}
+	config := new(Config)
 	config.normalize()
 	return config, nil
+}
+
+// buildChiTemplate build Config.ChiTemplate from template files content
+func (config *Config) buildChiTemplate() {
+
+	// Extract file names into slice and sort it
+	// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
+	var sortedKeys []string
+	for key := range config.ChiTemplates {
+		sortedKeys = append(sortedKeys, key)
+	}
+	sort.Strings(sortedKeys)
+
+	// Extract templates in sorted order - according to sorted file names
+	for _, key := range sortedKeys {
+		chi := new(chiv1.ClickHouseInstallation)
+		if err := yaml.Unmarshal([]byte(config.ChiTemplates[key]), chi); err != nil {
+			// Unable to unmarshal - skip incorrect template
+			continue
+		}
+		// Create target template, if not exists
+		if config.ChiTemplate == nil {
+			config.ChiTemplate = new(chiv1.ClickHouseInstallation)
+		}
+		// Merge into accumulated target template from current template
+		config.ChiTemplate.MergeFrom(chi)
+	}
 }
 
 // normalize() makes fully-and-correctly filled Config
 func (config *Config) normalize() error {
 
+	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
-	config.prepareConfigPath(&config.CommonConfigsPath, "config.d")
-	config.prepareConfigPath(&config.DeploymentConfigsPath, "conf.d")
-	config.prepareConfigPath(&config.UsersConfigsPath, "users.d")
+	config.prepareConfigPath(&config.ChCommonConfigsPath, "config.d")
+	config.prepareConfigPath(&config.ChDeploymentConfigsPath, "conf.d")
+	config.prepareConfigPath(&config.ChUsersConfigsPath, "users.d")
 
-	// Rolling update section
+	// Process ClickHouseInstallation templates section
+	config.prepareConfigPath(&config.ChiTemplatesPath, "templates.d")
+
+	// Process Rolling update section
 	if config.StatefulSetUpdateTimeout == 0 {
 		config.StatefulSetUpdateTimeout = 3600
 	}
@@ -158,52 +193,31 @@ func (config *Config) relativeToConfigFolderPath(relativePath string) string {
 	}
 }
 
-// readExtraConfigFiles reads all extra user-specified ClickHouse config files
-func (config *Config) readExtraConfigFiles() {
-	config.CommonConfigs = config.readConfigFiles(config.CommonConfigsPath)
-	config.DeploymentConfigs = config.readConfigFiles(config.DeploymentConfigsPath)
-	config.UsersConfigs = config.readConfigFiles(config.UsersConfigsPath)
+// readChConfigFiles reads all extra user-specified ClickHouse config files
+func (config *Config) readChConfigFiles() {
+	config.ChCommonConfigs = readConfigFiles(config.ChCommonConfigsPath, config.isChConfigExt)
+	config.ChDeploymentConfigs = readConfigFiles(config.ChDeploymentConfigsPath, config.isChConfigExt)
+	config.ChUsersConfigs = readConfigFiles(config.ChUsersConfigsPath, config.isChConfigExt)
 }
 
-// readConfigFiles reads config files from specified path into filename->content map
-func (config *Config) readConfigFiles(path string) map[string]string {
-	// Look in real path only
-	if path == "" {
-		return nil
-	}
-
-	// Result is a filename to content map
-	var files map[string]string
-	// Loop over all files in folder
-	if matches, err := filepath.Glob(path + "/*"); err == nil {
-		for i := range matches {
-			// `file` comes with `path`-prefixed.
-			// So in case `path` is an absolute path, `file` will be absolute path to file
-			file := matches[i]
-			if config.isConfigExt(file) {
-				// Pick files with propoer extensions only
-				glog.Infof("CommonConfig file %s\n", file)
-				if content, err := ioutil.ReadFile(file); err == nil {
-					if files == nil {
-						files = make(map[string]string)
-					}
-					files[filepath.Base(file)] = string(content)
-				}
-			}
-		}
-	}
-
-	if len(files) > 0 {
-		return files
-	} else {
-		return nil
-	}
-}
-
-// isConfigExt return true in case specified file has proper extension for a config file
-func (config *Config) isConfigExt(file string) bool {
+// isChConfigExt return true in case specified file has proper extension for a ClickHouse config file
+func (config *Config) isChConfigExt(file string) bool {
 	switch extToLower(file) {
 	case ".xml":
+		return true
+	}
+	return false
+}
+
+// readChConfigFiles reads all CHI templates
+func (config *Config) readChiTemplateFiles() {
+	config.ChiTemplates = readConfigFiles(config.ChiTemplatesPath, config.isChiTemplateExt)
+}
+
+// isChiTemplateExt return true in case specified file has proper extension for a CHI template config file
+func (config *Config) isChiTemplateExt(file string) bool {
+	switch extToLower(file) {
+	case ".yaml":
 		return true
 	}
 	return false

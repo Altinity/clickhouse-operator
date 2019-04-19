@@ -1,0 +1,22 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: clickhouse-operator
+  namespace: dev
+  labels:
+    app: clickhouse-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clickhouse-operator
+  template:
+    metadata:
+      labels:
+        app: clickhouse-operator
+    spec:
+      serviceAccountName: clickhouse-operator
+      containers:
+        - name: clickhouse-operator
+          image: sunsingerus/clickhouse-operator:dev
+          imagePullPolicy: Always
