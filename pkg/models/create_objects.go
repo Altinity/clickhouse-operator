@@ -460,7 +460,7 @@ func setupStatefulSetVolumeClaimTemplate(
 	statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts = append(
 		statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts,
 		corev1.VolumeMount{
-			Name:      chDefaultVolumeMountNameData,
+			Name:      volumeClaimTemplate.PersistentVolumeClaim.Name,
 			MountPath: dirPathClickHouseData,
 		},
 	)
