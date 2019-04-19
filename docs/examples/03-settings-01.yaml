@@ -9,16 +9,22 @@ spec:
       test/networks/ip:
         - "::1"
         - "127.0.0.1"
-        - "1.2.3.4"
       test/profile: test_profile
       test/quota: test_quota
       test/allow_databases/database:
         - "dbname1"
         - "dbname2"
         - "dbname3"
+      admin/password_sha256_hex: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
+      admin/networks/ip: 0.0.0.0/0
+      admin/profile: default
+      admin/quota: default
+      readonly/profile: readonly
+      readonly/quota: default
     profiles:
       test_profile/max_memory_usage: "1000000000"
       test_profile/readonly: "1"
+      readonly/readonly: "1"
     quotas:
       test_quota/interval/duration: "3600"
     settings:
