@@ -151,8 +151,6 @@ spec:
     volumeClaimTemplates:
       - name: volumeclaim-template
         persistentVolumeClaim:
-          metadata:
-            name: USE_DEFAULT_NAME
           spec:
             accessModes:
               - ReadWriteOnce
