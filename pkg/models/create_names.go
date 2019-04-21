@@ -73,6 +73,16 @@ func CreateChiServiceName(chi *chop.ClickHouseInstallation) string {
 	)
 }
 
+// CreateChiServiceName creates a name of a Installation Service resource
+func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
+	return fmt.Sprintf(
+		chiServiceFQDNPattern,
+		chi.Name,
+		chi.Namespace,
+	)
+}
+
+
 // CreateStatefulSetName creates a name of a StatefulSet for replica
 func CreateStatefulSetName(replica *chop.ChiClusterLayoutShardReplica) string {
 	return fmt.Sprintf(
