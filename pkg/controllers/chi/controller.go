@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"strings"
 
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -198,21 +197,21 @@ func CreateController(
 	configMapInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
-			if !controller.chopConfig.IsWatchedNamespace(configMap.Namespace) {
+			if !controller.chopConfig.IsWatchedNamespace(configMap.Namespace) || configMap.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
 				return
 			}
 			glog.V(1).Infof("configMapInformer AddFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			configMap := old.(*core.ConfigMap)
-			if !controller.chopConfig.IsWatchedNamespace(configMap.Namespace) {
+			if !controller.chopConfig.IsWatchedNamespace(configMap.Namespace) || configMap.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
 				return
 			}
 			glog.V(1).Infof("configMapInformer UpdateFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
-			if !controller.chopConfig.IsWatchedNamespace(configMap.Namespace) {
+			if !controller.chopConfig.IsWatchedNamespace(configMap.Namespace) || configMap.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
 				return
 			}
 			glog.V(1).Infof("configMapInformer DeleteFunc %s/%s", configMap.Namespace, configMap.Name)
@@ -222,7 +221,7 @@ func CreateController(
 	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
-			if !controller.chopConfig.IsWatchedNamespace(statefulSet.Namespace) {
+			if !controller.chopConfig.IsWatchedNamespace(statefulSet.Namespace) || statefulSet.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
 				return
 			}
 			glog.V(1).Infof("statefulSetInformer AddFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
@@ -230,7 +229,7 @@ func CreateController(
 		},
 		UpdateFunc: func(old, new interface{}) {
 			statefulSet := old.(*apps.StatefulSet)
-			if !controller.chopConfig.IsWatchedNamespace(statefulSet.Namespace) {
+			if !controller.chopConfig.IsWatchedNamespace(statefulSet.Namespace) || statefulSet.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
 				return
 			}
 			glog.V(1).Infof("statefulSetInformer UpdateFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
@@ -252,7 +251,7 @@ func CreateController(
 		},
 		DeleteFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
-			if !controller.chopConfig.IsWatchedNamespace(statefulSet.Namespace) {
+			if !controller.chopConfig.IsWatchedNamespace(statefulSet.Namespace) || statefulSet.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
 				return
 			}
 			glog.V(1).Infof("statefulSetInformer DeleteFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
@@ -263,21 +262,21 @@ func CreateController(
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
-			if !controller.chopConfig.IsWatchedNamespace(pod.Namespace) {
+			if !controller.chopConfig.IsWatchedNamespace(pod.Namespace) || pod.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
 				return
 			}
 			glog.V(1).Infof("podInformer AddFunc %s/%s", pod.Namespace, pod.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			pod := old.(*core.Pod)
-			if !controller.chopConfig.IsWatchedNamespace(pod.Namespace) {
+			if !controller.chopConfig.IsWatchedNamespace(pod.Namespace) || pod.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
 				return
 			}
 			glog.V(1).Infof("podInformer UpdateFunc %s/%s", pod.Namespace, pod.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
-			if !controller.chopConfig.IsWatchedNamespace(pod.Namespace) {
+			if !controller.chopConfig.IsWatchedNamespace(pod.Namespace) || pod.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
 				return
 			}
 			glog.V(1).Infof("podInformer DeleteFunc %s/%s", pod.Namespace, pod.Name)
@@ -286,6 +285,11 @@ func CreateController(
 
 	return controller
 }
+
+/*
+func isChopResource(obj interface{}) {
+	return obj.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] != ""
+}*/
 
 // Run syncs caches, starts workers
 func (c *Controller) Run(ctx context.Context, threadiness int) {
@@ -479,20 +483,13 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	} else {
 		c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) migrate schema", old.Namespace, old.Name))
 		new.WalkClusters(func(cluster *chop.ChiCluster) error {
-			createDatabaseSQLs, _ := chopmodels.ClusterGatherCreateDatabases(cluster)
-			createTableSQLs, _ := chopmodels.ClusterGatherCreateTables(cluster)
-			createTableIfNotExistsSQLs := make([]string, len(createTableSQLs))
-
-			for _, sql := range createTableSQLs {
-				if strings.HasPrefix(sql, "CREATE TABLE") {
-					createTableIfNotExistsSQLs = append(createTableIfNotExistsSQLs, strings.Replace(sql, "CREATE TABLE", "CREATE TABLE IF NOT EXISTS", 1))
-				}
-			}
-
-			glog.V(1).Infof("Create Database SQLs: %v\n", createDatabaseSQLs)
-			glog.V(1).Infof("Create Tables SQLs %v\n", createTableIfNotExistsSQLs)
+			dbNames, createDatabaseSQLs, _ := chopmodels.ClusterGetCreateDatabases(new, cluster)
+			glog.V(1).Infof("Creating databases: %v\n", dbNames)
 			_ = chopmodels.ClusterApplySQLs(cluster, createDatabaseSQLs)
-			_ = chopmodels.ClusterApplySQLs(cluster, createTableIfNotExistsSQLs)
+
+			tableNames, createTableSQLs, _ := chopmodels.ClusterGetCreateTables(new, cluster)
+			glog.V(1).Infof("Creating tables: %v\n", tableNames)
+			_ = chopmodels.ClusterApplySQLs(cluster, createTableSQLs)
 			return nil
 		})
 		c.updateCHIResource(new)

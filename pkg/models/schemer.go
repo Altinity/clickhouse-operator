@@ -15,46 +15,64 @@
 package models
 
 import (
+	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/golang/glog"
 )
 
-func ClusterGatherCreateDatabases(cluster *v1.ChiCluster) ([]string, error) {
-	return gatherUnique(CreateClusterPodFQDNs(cluster), "SELECT concat('CREATE DATABASE IF NOT EXISTS ', name) FROM system.databases WHERE name != 'system' ORDER BY name")
+const (
+	ignoredDBs = "'system'"
+)
+
+func ClusterGetCreateDatabases(chi *v1.ClickHouseInstallation, cluster *v1.ChiCluster) ([]string, []string, error) {
+	result := make([][]string, 0)
+	glog.V(1).Info(CreateChiServiceFQDN(chi))
+	clickhouse.Query(&result,
+		fmt.Sprintf(
+			`SELECT distinct name, concat('CREATE DATABASE IF NOT EXISTS ', name) 
+			   FROM cluster('%s', system, databases) 
+			  WHERE name not in (%s)
+			  ORDER BY name
+			  SETTINGS skip_unavailable_shards = 1`,
+			cluster.Name, ignoredDBs),
+		CreateChiServiceFQDN(chi),
+	)
+	names, creates := unzip(result)
+	return names, creates, nil
 }
 
-func ClusterGatherCreateTables(cluster *v1.ChiCluster) ([]string, error) {
-	return gatherUnique(CreateClusterPodFQDNs(cluster), "SELECT create_table_query FROM system.tables WHERE database != 'system'")
+func ClusterGetCreateTables(chi *v1.ClickHouseInstallation, cluster *v1.ChiCluster) ([]string, []string, error) {
+	result := make([][]string, 0)
+	clickhouse.Query(&result,
+		fmt.Sprintf(
+			`SELECT distinct name, 
+			        replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS') 
+			   FROM cluster('%s', system, tables)
+			  WHERE database not in (%s) 
+			    AND name not like '.inner.%%'
+			  ORDER BY multiIf(engine not in ('Distributed', 'View', 'MaterializedView'), 1, engine = 'MaterializedView', 2, engine = 'Distributed', 3, 4), name
+			  SETTINGS skip_unavailable_shards = 1`,
+			cluster.Name, ignoredDBs),
+		CreateChiServiceFQDN(chi),
+	)
+	names, creates := unzip(result)
+	return names, creates, nil
+}
+
+func unzip(slice [][]string) ([]string, []string) {
+	col1, col2 := make([]string, len(slice)), make([]string, len(slice))
+	for i := 0; i < len(slice); i++ {
+		col1 = append(col1, slice[i][0])
+		if len(slice[i]) > 1 {
+			col2 = append(col2, slice[i][1])
+		}
+	}
+	return col1, col2
 }
 
 func ClusterApplySQLs(cluster *v1.ChiCluster, sqls []string) error {
 	return applySQLs(CreateClusterPodFQDNs(cluster), sqls)
-}
-
-func gatherUnique(hosts []string, sql string) ([]string, error) {
-	// Make set-alike data-structure with map - fetch items from all hosts which maps item to bool
-	allItemsMap := make(map[string]bool)
-	for _, host := range hosts {
-		// Items gathered from this host - slice of rows (slices)
-		hostItemsRows := make([][]string, 0)
-		if clickhouse.Query(&hostItemsRows, sql, host) == nil {
-			for _, row := range hostItemsRows {
-				item := row[0]
-				if len(item) > 0 {
-					allItemsMap[item] = true
-				}
-			}
-		}
-	}
-
-	// Extract items from map into slice - slice is more user-friendly
-	items := make([]string, 0, len(allItemsMap))
-	for item := range allItemsMap {
-		items = append(items, item)
-	}
-
-	return items, nil
 }
 
 func applySQLs(hosts []string, sqls []string) error {

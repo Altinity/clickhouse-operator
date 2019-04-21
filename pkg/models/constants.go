@@ -129,17 +129,19 @@ const (
 	// In this pattern "%s" is substituted with fullDeploymentIDPattern-generated value
 	// Ex.: svc-1eb454-2
 	statefulSetServiceNamePattern = "chi-%s-%s-%d-%d"
-	
+
+	// namespaceDomainPattern presents Domain Name pattern of a namespace
+	// In this pattern "%s" is substituted namespace name's value
+	// Ex.: my-dev-namespace.svc.cluster.local
+	namespaceDomainPattern = "%s.svc.cluster.local"
+
 	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
 	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
 	// In this pattern "%s" is substituted with clickhouse installation name - 'replcluster' in this case
 	// Ex.: test
 	chiServiceNamePattern = "clickhouse-%s"
 
-	// namespaceDomainPattern presents Domain Name pattern of a namespace
-	// In this pattern "%s" is substituted namespace name's value
-	// Ex.: my-dev-namespace.svc.cluster.local
-	namespaceDomainPattern = "%s.svc.cluster.local"
+	chiServiceFQDNPattern = chiServiceNamePattern + "." + namespaceDomainPattern
 
 	// NAME                READY   STATUS    RESTARTS   AGE   IP            NODE   NOMINATED NODE   READINESS GATES
 	// pod/ss-1eb454-2   1/1     Running   0          11h   10.244.1.17   kub2   <none>           <none>
@@ -149,7 +151,7 @@ const (
 	// podFQDNPattern consists of 3 parts:
 	// 1. nameless service of of stateful set
 	// 2. namespace name
-	// 3. 
+	// 3.
 	// ss-1eb454-2-0.my-dev-domain.svc.cluster.local
 	podFQDNPattern = podHostnamePattern + "." + namespaceDomainPattern
 
@@ -179,7 +181,7 @@ const (
 const (
 	chDefaultDockerImage         = "yandex/clickhouse-server:latest"
 	chDefaultVolumeMountNameData = "clickhouse-data"
-	ClickHouseContainerIndex = 0
+	ClickHouseContainerIndex     = 0
 )
 
 const (
