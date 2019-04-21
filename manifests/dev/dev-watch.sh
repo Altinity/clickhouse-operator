@@ -1,3 +1,5 @@
 #!/bin/bash
 
-watch -n1 "kubectl -n dev get all,configmap"
+. ./dev-config.sh
+
+watch -n1 "kubectl -n ${DEV_NAMESPACE} get all,configmap"

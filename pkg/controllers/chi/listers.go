@@ -16,8 +16,8 @@ package chi
 
 import (
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func (c *Controller) listStatefulSetResources(chi *chop.ClickHouseInstallation) error {

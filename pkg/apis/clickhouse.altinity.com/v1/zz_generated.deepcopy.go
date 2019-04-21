@@ -181,30 +181,46 @@ func (in *ChiConfiguration) DeepCopyInto(out *ChiConfiguration) {
 	in.Zookeeper.DeepCopyInto(&out.Zookeeper)
 	if in.Users != nil {
 		in, out := &in.Users, &out.Users
-		*out = make(map[string]string, len(*in))
+		*out = make(map[string]interface{}, len(*in))
 		for key, val := range *in {
-			(*out)[key] = val
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				(*out)[key] = val
+			}
 		}
 	}
 	if in.Profiles != nil {
 		in, out := &in.Profiles, &out.Profiles
-		*out = make(map[string]string, len(*in))
+		*out = make(map[string]interface{}, len(*in))
 		for key, val := range *in {
-			(*out)[key] = val
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				(*out)[key] = val
+			}
 		}
 	}
 	if in.Quotas != nil {
 		in, out := &in.Quotas, &out.Quotas
-		*out = make(map[string]string, len(*in))
+		*out = make(map[string]interface{}, len(*in))
 		for key, val := range *in {
-			(*out)[key] = val
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				(*out)[key] = val
+			}
 		}
 	}
 	if in.Settings != nil {
 		in, out := &in.Settings, &out.Settings
-		*out = make(map[string]string, len(*in))
+		*out = make(map[string]interface{}, len(*in))
 		for key, val := range *in {
-			(*out)[key] = val
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				(*out)[key] = val
+			}
 		}
 	}
 	if in.Clusters != nil {

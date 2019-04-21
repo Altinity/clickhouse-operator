@@ -82,7 +82,6 @@ func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
 	)
 }
 
-
 // CreateStatefulSetName creates a name of a StatefulSet for replica
 func CreateStatefulSetName(replica *chop.ChiClusterLayoutShardReplica) string {
 	return fmt.Sprintf(

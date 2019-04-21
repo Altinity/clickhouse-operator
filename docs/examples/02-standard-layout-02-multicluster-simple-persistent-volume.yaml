@@ -1,26 +1,33 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "test2-no-replication"
+  name: "syandard-02-multicluster"
 spec:
   defaults:
     deployment:
-      volumeClaimTemplate: default
+      volumeClaimTemplate: auto-simple-vc
   configuration:
     clusters:
+      - name: "sharded-replicated"
+        layout:
+          type: Standard
+          shardsCount: 1
+          replicasCount: 2
       - name: "sharded-non-replicated"
         layout:
           type: Standard
-          shardsCount: 3
+          shardsCount: 2
+      - name: "replicated"
+        layout:
+          type: Standard
+          replicasCount: 2
   templates:
     volumeClaimTemplates:
-    - name: default
+    - name: auto-simple-vc
       persistentVolumeClaim:
-        metadata:
-          name: USE_DEFAULT_NAME
         spec:
           accessModes:
           - ReadWriteOnce
           resources:
             requests:
-              storage: 500Mi
+              storage: 123Mi

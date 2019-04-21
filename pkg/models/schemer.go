@@ -15,26 +15,26 @@
 package models
 
 import (
+	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/golang/glog"
-	"fmt"
 )
 
 const (
-	ignoredDBs = "'system'" 
+	ignoredDBs = "'system'"
 )
 
 func ClusterGetCreateDatabases(chi *v1.ClickHouseInstallation, cluster *v1.ChiCluster) ([]string, []string, error) {
 	result := make([][]string, 0)
 	glog.V(1).Info(CreateChiServiceFQDN(chi))
-	clickhouse.Query(&result, 
+	clickhouse.Query(&result,
 		fmt.Sprintf(
 			`SELECT distinct name, concat('CREATE DATABASE IF NOT EXISTS ', name) 
 			   FROM cluster('%s', system, databases) 
 			  WHERE name not in (%s)
 			  ORDER BY name
-			  SETTINGS skip_unavailable_shards = 1`, 
+			  SETTINGS skip_unavailable_shards = 1`,
 			cluster.Name, ignoredDBs),
 		CreateChiServiceFQDN(chi),
 	)
@@ -42,10 +42,9 @@ func ClusterGetCreateDatabases(chi *v1.ClickHouseInstallation, cluster *v1.ChiCl
 	return names, creates, nil
 }
 
-
 func ClusterGetCreateTables(chi *v1.ClickHouseInstallation, cluster *v1.ChiCluster) ([]string, []string, error) {
 	result := make([][]string, 0)
-	clickhouse.Query(&result, 
+	clickhouse.Query(&result,
 		fmt.Sprintf(
 			`SELECT distinct name, 
 			        replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS') 
@@ -53,7 +52,7 @@ func ClusterGetCreateTables(chi *v1.ClickHouseInstallation, cluster *v1.ChiClust
 			  WHERE database not in (%s) 
 			    AND name not like '.inner.%%'
 			  ORDER BY multiIf(engine not in ('Distributed', 'View', 'MaterializedView'), 1, engine = 'MaterializedView', 2, engine = 'Distributed', 3, 4), name
-			  SETTINGS skip_unavailable_shards = 1`, 
+			  SETTINGS skip_unavailable_shards = 1`,
 			cluster.Name, ignoredDBs),
 		CreateChiServiceFQDN(chi),
 	)
@@ -62,10 +61,10 @@ func ClusterGetCreateTables(chi *v1.ClickHouseInstallation, cluster *v1.ChiClust
 }
 
 func unzip(slice [][]string) ([]string, []string) {
-	col1, col2 := make([]string, len(slice)), make([]string, len(slice)) 
-	for i := 0; i<len(slice); i++ {
+	col1, col2 := make([]string, len(slice)), make([]string, len(slice))
+	for i := 0; i < len(slice); i++ {
 		col1 = append(col1, slice[i][0])
-		if len(slice[i])>1 {
+		if len(slice[i]) > 1 {
 			col2 = append(col2, slice[i][1])
 		}
 	}

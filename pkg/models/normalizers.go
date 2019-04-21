@@ -45,6 +45,7 @@ func ChiNormalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallat
 	// Set defaults for CHI object properties
 	defaultsNormalizeReplicasUseFQDN(&chi.Spec.Defaults)
 	deploymentNormalizeScenario(&chi.Spec.Defaults.Deployment)
+	templatesNormalizeVolumeClaimTemplatesNames(chi.Spec.Templates.VolumeClaimTemplates)
 
 	// Normalize all clusters in this CHI
 	chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
@@ -259,5 +260,24 @@ func deploymentNormalizeScenario(d *chiv1.ChiDeployment) {
 	if d.Scenario == "" {
 		// Have no default deployment scenario specified - specify default one
 		d.Scenario = deploymentScenarioDefault
+	}
+}
+
+// templatesNormalizeVolumeClaimTemplatesNames normalizes naming of chiv1.ChiVolumeClaimTemplate
+func templatesNormalizeVolumeClaimTemplatesNames(volumeClaimTemplates []chiv1.ChiVolumeClaimTemplate) {
+	for i := range volumeClaimTemplates {
+		// Convenience wrapper
+		volumeClaimTemplate := &volumeClaimTemplates[i]
+		//   templates:
+		//    volumeClaimTemplates:
+		//      - name: volumeclaim-template
+		//        persistentVolumeClaim:
+		//          meta:
+		//            name: QWE
+		// In case of .templates.volumeClaimTemplates.persistentVolumeClaim.meta.name (QWE in this case) is omitted
+		// assign .templates.volumeClaimTemplates.persistentVolumeClaim.meta.name with .templates.volumeClaimTemplates.name
+		if volumeClaimTemplate.PersistentVolumeClaim.Name == "" {
+			volumeClaimTemplate.PersistentVolumeClaim.Name = volumeClaimTemplate.Name
+		}
 	}
 }
