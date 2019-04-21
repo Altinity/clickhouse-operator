@@ -470,7 +470,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		case chop.ChiClusterLayoutShardReplica:
 			replica := diff.Removed[path].(chop.ChiClusterLayoutShardReplica)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete replica %d", replica.Address.ReplicaIndex))
-			c.deleteReplica(&replica)
+			_ = c.deleteReplica(&replica)
 		}
 	}
 
@@ -492,7 +492,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 			_ = chopmodels.ClusterApplySQLs(cluster, createTableSQLs)
 			return nil
 		})
-		c.updateCHIResource(new)
+		_ = c.updateCHIResource(new)
 
 		c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateCompleted, fmt.Sprintf("onUpdateChi(%s/%s) completed", old.Namespace, old.Name))
 	}
