@@ -30,7 +30,7 @@ const (
 	chQueryDefaultTimeout = 10 * time.Second
 )
 
-// Query runs given sql and writes results into data
+// Query runs given sql as GET and writes results into data
 func Query(data *[][]string, sql string, hostname string) error {
 	if len(sql) == 0 {
 		return nil
@@ -46,6 +46,7 @@ func Query(data *[][]string, sql string, hostname string) error {
 	return nil
 }
 
+// Exec runs given sql as POST and writes results into data
 func Exec(data *[][]string, sql string, hostname string) error {
 	if len(sql) == 0 {
 		return nil

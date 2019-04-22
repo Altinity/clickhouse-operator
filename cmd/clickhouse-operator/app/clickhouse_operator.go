@@ -37,11 +37,13 @@ import (
 	kuberest "k8s.io/client-go/rest"
 	kubeclientcmd "k8s.io/client-go/tools/clientcmd"
 
+	chopmodels "github.com/altinity/clickhouse-operator/pkg/models"
+
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Version defines current build version
+// Version defines current build versionRequest
 const Version = "0.2.0-beta"
 
 // Prometheus exporter defaults
@@ -52,6 +54,9 @@ const (
 )
 
 var (
+	// versionRequest defines versionRequest request
+	versionRequest bool
+
 	// chopConfigFile defines path to clickhouse-operator config file to be used
 	chopConfigFile string
 
@@ -66,6 +71,7 @@ var (
 )
 
 func init() {
+	flag.BoolVar(&versionRequest, "version", false, "Display versionRequest and exit")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
 	flag.StringVar(&kubeConfigFile, "kube-config", "", "Path to kubernetes config file. Only required if called outside of the cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Only required if called outside of the cluster and not being specified in kube config file.")
@@ -123,12 +129,19 @@ func createClientsets(config *kuberest.Config) (*kube.Clientset, *chopclientset.
 
 // Run is an entry point of the application
 func Run() {
-	glog.V(1).Infof("Starting clickhouse-operator version '%s'\n", Version)
+	if versionRequest {
+		fmt.Printf("%s\n", Version)
+		os.Exit(0)
+	}
+
+	glog.V(1).Infof("Starting clickhouse-operator versionRequest '%s'\n", Version)
 	chopConfig, err := config.GetConfig(chopConfigFile)
 	if err != nil {
 		glog.Fatalf("Unable to build config file %v\n", err)
 		os.Exit(1)
 	}
+
+	chopmodels.SetAppVersion(Version)
 
 	// Initializing Prometheus Metrics Exporter
 	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
@@ -166,6 +179,7 @@ func Run() {
 		kubeClient,
 		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
 		kubeInformerFactory.Core().V1().Services(),
+		kubeInformerFactory.Core().V1().Endpoints(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().Pods(),

@@ -17,6 +17,7 @@ package models
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/config"
+	"strconv"
 
 	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
@@ -24,6 +25,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
+
+var (
+	AppVersion string
+)
+
+func SetAppVersion(version string) {
+	AppVersion = version
+}
 
 // ChiCreateObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
 func ChiCreateObjects(chi *chiv1.ClickHouseInstallation, config *config.Config) []interface{} {
@@ -99,7 +108,7 @@ func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation, config *con
 				Name:      CreateConfigMapCommonName(chi.Name),
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
-					ChopGeneratedLabel: chi.Name,
+					ChopGeneratedLabel: AppVersion,
 					ChiGeneratedLabel:  chi.Name,
 				},
 			},
@@ -116,7 +125,7 @@ func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation, config *con
 				Name:      CreateConfigMapCommonUsersName(chi.Name),
 				Namespace: chi.Namespace,
 				Labels: map[string]string{
-					ChopGeneratedLabel: chi.Name,
+					ChopGeneratedLabel: AppVersion,
 					ChiGeneratedLabel:  chi.Name,
 				},
 			},
@@ -147,7 +156,7 @@ func createConfigMapObjectsDeployment(chi *chiv1.ClickHouseInstallation, config 
 					Name:      CreateConfigMapDeploymentName(replica),
 					Namespace: replica.Address.Namespace,
 					Labels: map[string]string{
-						ChopGeneratedLabel: replica.Address.ChiName,
+						ChopGeneratedLabel: AppVersion,
 						ChiGeneratedLabel:  replica.Address.ChiName,
 					},
 				},
@@ -218,7 +227,7 @@ func createServiceObjectChi(
 			Name:      serviceName,
 			Namespace: chi.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel: chi.Name,
+				ChopGeneratedLabel: AppVersion,
 				ChiGeneratedLabel:  chi.Name,
 			},
 		},
@@ -252,8 +261,11 @@ func createServiceObjectDeployment(replica *chiv1.ChiClusterLayoutShardReplica) 
 			Name:      serviceName,
 			Namespace: replica.Address.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel: replica.Address.ChiName,
-				ChiGeneratedLabel:  replica.Address.ChiName,
+				ChopGeneratedLabel:         AppVersion,
+				ChiGeneratedLabel:          replica.Address.ChiName,
+				ClusterGeneratedLabel:      replica.Address.ClusterName,
+				ClusterIndexGeneratedLabel: strconv.Itoa(replica.Address.ClusterIndex),
+				ReplicaIndexGeneratedLabel: strconv.Itoa(replica.Address.ReplicaIndex),
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -278,6 +290,27 @@ func createServiceObjectDeployment(replica *chiv1.ChiClusterLayoutShardReplica) 
 			Type:      "ClusterIP",
 		},
 	}
+}
+
+func IsChopGeneratedObject(objectMeta *metav1.ObjectMeta) bool {
+	// Parse Labels
+	// 			Labels: map[string]string{
+	//				ChopGeneratedLabel: AppVersion,
+	//				ChiGeneratedLabel:  replica.Address.ChiName,
+	//				ClusterGeneratedLabel: replica.Address.ClusterName,
+	//				ClusterIndexGeneratedLabel: strconv.Itoa(replica.Address.ClusterIndex),
+	//				ReplicaIndexGeneratedLabel: strconv.Itoa(replica.Address.ReplicaIndex),
+	//			},
+
+	// ObjectMeta must have some labels
+	if len(objectMeta.Labels) == 0 {
+		return false
+	}
+
+	// ObjectMeta must have ChiGeneratedLabel:  chi.Name label
+	_, ok := objectMeta.Labels[ChopGeneratedLabel]
+
+	return ok
 }
 
 // createStatefulSetObjects returns a list of apps.StatefulSet objects
@@ -322,7 +355,7 @@ func createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.
 			Name:      statefulSetName,
 			Namespace: replica.Address.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel: replica.Address.ChiName,
+				ChopGeneratedLabel: AppVersion,
 				ChiGeneratedLabel:  replica.Address.ChiName,
 				ZkVersionLabel:     replica.Config.ZkFingerprint,
 			},
@@ -340,7 +373,7 @@ func createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.
 					Name: statefulSetName,
 					Labels: map[string]string{
 						chDefaultAppLabel:  statefulSetName,
-						ChopGeneratedLabel: replica.Address.ChiName,
+						ChopGeneratedLabel: AppVersion,
 						ChiGeneratedLabel:  replica.Address.ChiName,
 						ZkVersionLabel:     replica.Config.ZkFingerprint,
 					},

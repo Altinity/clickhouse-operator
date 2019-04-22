@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	kube "k8s.io/client-go/kubernetes"
@@ -51,6 +50,7 @@ func CreateController(
 	kubeClient kube.Interface,
 	chiInformer chopinformers.ClickHouseInstallationInformer,
 	serviceInformer coreinformers.ServiceInformer,
+	endpointsInformer coreinformers.EndpointsInformer,
 	configMapInformer coreinformers.ConfigMapInformer,
 	statefulSetInformer appsinformers.StatefulSetInformer,
 	podInformer coreinformers.PodInformer,
@@ -92,6 +92,11 @@ func CreateController(
 		serviceLister: serviceInformer.Lister(),
 		// serviceListerSynced used in waitForCacheSync()
 		serviceListerSynced: serviceInformer.Informer().HasSynced,
+
+		// endpointsLister used as endpointsLister.Endpoints(namespace).Get(name)
+		endpointsLister: endpointsInformer.Lister(),
+		// endpointsListerSynced used in waitForCacheSync()
+		endpointsListerSynced: endpointsInformer.Informer().HasSynced,
 
 		// configMapLister used as configMapLister.ConfigMaps(namespace).Get(name)
 		configMapLister: configMapInformer.Lister(),
@@ -173,45 +178,144 @@ func CreateController(
 	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
-			if !controller.chopConfig.IsWatchedNamespace(service.Namespace) {
+			if !controller.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
 			glog.V(1).Infof("serviceInformer AddFunc %s/%s", service.Namespace, service.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
-			service := old.(*core.Service)
-			if !controller.chopConfig.IsWatchedNamespace(service.Namespace) {
+			oldService := old.(*core.Service)
+			newService := new.(*core.Service)
+			if !controller.isTrackedObject(&oldService.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("serviceInformer UpdateFunc %s/%s", service.Namespace, service.Name)
+
+			diff, equal := messagediff.DeepDiff(oldService, newService)
+			if equal {
+				glog.V(1).Infof("onUpdateService(%s/%s): no changes found", oldService.Namespace, oldService.Name)
+				// No need tor react
+				return
+			}
+
+			for path := range diff.Added {
+				glog.V(1).Infof("onUpdateService(%s/%s): added %v", oldService.Namespace, oldService.Name, path)
+			}
+			for path := range diff.Removed {
+				glog.V(1).Infof("onUpdateService(%s/%s): removed %v", oldService.Namespace, oldService.Name, path)
+			}
+			for path := range diff.Modified {
+				glog.V(1).Infof("onUpdateService(%s/%s): modified %v", oldService.Namespace, oldService.Name, path)
+			}
+
+			if (oldService.Spec.ClusterIP == "") && (newService.Spec.ClusterIP != "") {
+				// Internal IP address assigned
+				// Pod restart completed?
+				glog.V(1).Infof("serviceInformer UpdateFunc(%s/%s) IP ASSIGNED %s:%s", newService.Namespace, newService.Name, newService.Spec.Type, newService.Spec.ClusterIP)
+				if cluster, err := controller.createClusterFromObjectMeta(&newService.ObjectMeta); err != nil {
+					glog.V(1).Infof("serviceInformer UpdateFunc(%s/%s) flushing DNS for cluster %s", newService.Namespace, newService.Name, cluster.Name)
+					//chopmodels.ClusterDropDnsCache(cluster)
+				} else {
+					glog.V(1).Infof("serviceInformer UpdateFunc(%s/%s) unable to find cluster cluster", newService.Namespace, newService.Name)
+				}
+			} else if (oldService.Spec.ClusterIP != "") && (newService.Spec.ClusterIP == "") {
+				// Internal IP address lost
+				// Pod restart?
+				glog.V(1).Infof("serviceInformer UpdateFunc(%s/%s) IP LOST %s:%s", oldService.Namespace, oldService.Name, oldService.Spec.Type, oldService.Spec.ClusterIP)
+			} else {
+				glog.V(1).Infof("serviceInformer UpdateFunc(%s/%s)", oldService.Namespace, oldService.Name)
+			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
-			if !controller.chopConfig.IsWatchedNamespace(service.Namespace) {
+			if !controller.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
 			glog.V(1).Infof("serviceInformer DeleteFunc %s/%s", service.Namespace, service.Name)
 		},
 	})
 
+	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			endpoints := obj.(*core.Endpoints)
+			if !controller.isTrackedObject(&endpoints.ObjectMeta) {
+				return
+			}
+			glog.V(1).Infof("endpointsInformer AddFunc %s/%s", endpoints.Namespace, endpoints.Name)
+		},
+		UpdateFunc: func(old, new interface{}) {
+			oldEndpoints := old.(*core.Endpoints)
+			newEndpoints := new.(*core.Endpoints)
+			if !controller.isTrackedObject(&oldEndpoints.ObjectMeta) {
+				return
+			}
+
+			diff, equal := messagediff.DeepDiff(oldEndpoints, newEndpoints)
+			if equal {
+				glog.V(1).Infof("onUpdateEndpoints(%s/%s): no changes found", oldEndpoints.Namespace, oldEndpoints.Name)
+				// No need tor react
+				return
+			}
+
+			added := false
+			for path := range diff.Added {
+				glog.V(1).Infof("onUpdateEndpoints(%s/%s): added %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
+				for _, pathnode := range *path {
+					s := pathnode.String()
+					if s == ".Addresses" {
+						added = true
+					}
+				}
+			}
+			for path := range diff.Removed {
+				glog.V(1).Infof("onUpdateEndpoints(%s/%s): removed %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
+			}
+			for path := range diff.Modified {
+				glog.V(1).Infof("onUpdateEndpoints(%s/%s): modified %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
+				for _, pathnode := range *path {
+					s := pathnode.String()
+					if s == ".Addresses" {
+						added = true
+					}
+				}
+			}
+
+			if added {
+				glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) IP ASSIGNED %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.Subsets)
+				if cluster, err := controller.createClusterFromObjectMeta(&newEndpoints.ObjectMeta); err == nil {
+					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for cluster %s", newEndpoints.Namespace, newEndpoints.Name, cluster.Name)
+					chopmodels.ClusterDropDnsCache(cluster)
+				} else {
+					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find cluster by %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.ObjectMeta.Labels)
+				}
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			endpoints := obj.(*core.Endpoints)
+			if !controller.isTrackedObject(&endpoints.ObjectMeta) {
+				return
+			}
+			glog.V(1).Infof("endpointsInformer DeleteFunc %s/%s", endpoints.Namespace, endpoints.Name)
+		},
+	})
+
 	configMapInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
-			if !controller.chopConfig.IsWatchedNamespace(configMap.Namespace) || configMap.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
+			if !controller.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
 			glog.V(1).Infof("configMapInformer AddFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			configMap := old.(*core.ConfigMap)
-			if !controller.chopConfig.IsWatchedNamespace(configMap.Namespace) || configMap.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
+			if !controller.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
 			glog.V(1).Infof("configMapInformer UpdateFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
-			if !controller.chopConfig.IsWatchedNamespace(configMap.Namespace) || configMap.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
+			if !controller.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
 			glog.V(1).Infof("configMapInformer DeleteFunc %s/%s", configMap.Namespace, configMap.Name)
@@ -221,7 +325,7 @@ func CreateController(
 	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
-			if !controller.chopConfig.IsWatchedNamespace(statefulSet.Namespace) || statefulSet.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
+			if !controller.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
 			glog.V(1).Infof("statefulSetInformer AddFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
@@ -229,7 +333,7 @@ func CreateController(
 		},
 		UpdateFunc: func(old, new interface{}) {
 			statefulSet := old.(*apps.StatefulSet)
-			if !controller.chopConfig.IsWatchedNamespace(statefulSet.Namespace) || statefulSet.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
+			if !controller.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
 			glog.V(1).Infof("statefulSetInformer UpdateFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
@@ -251,7 +355,7 @@ func CreateController(
 		},
 		DeleteFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
-			if !controller.chopConfig.IsWatchedNamespace(statefulSet.Namespace) || statefulSet.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
+			if !controller.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
 			glog.V(1).Infof("statefulSetInformer DeleteFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
@@ -262,21 +366,21 @@ func CreateController(
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
-			if !controller.chopConfig.IsWatchedNamespace(pod.Namespace) || pod.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
+			if !controller.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
 			glog.V(1).Infof("podInformer AddFunc %s/%s", pod.Namespace, pod.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			pod := old.(*core.Pod)
-			if !controller.chopConfig.IsWatchedNamespace(pod.Namespace) || pod.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
+			if !controller.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
 			glog.V(1).Infof("podInformer UpdateFunc %s/%s", pod.Namespace, pod.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
-			if !controller.chopConfig.IsWatchedNamespace(pod.Namespace) || pod.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] == "" {
+			if !controller.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
 			glog.V(1).Infof("podInformer DeleteFunc %s/%s", pod.Namespace, pod.Name)
@@ -284,6 +388,11 @@ func CreateController(
 	})
 
 	return controller
+}
+
+// isTrackedObject checks whether operator is interested in changes of this object
+func (c *Controller) isTrackedObject(objectMeta *meta.ObjectMeta) bool {
+	return c.chopConfig.IsWatchedNamespace(objectMeta.Namespace) && chopmodels.IsChopGeneratedObject(objectMeta)
 }
 
 /*
