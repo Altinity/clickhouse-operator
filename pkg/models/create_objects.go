@@ -17,6 +17,7 @@ package models
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/config"
+	"strconv"
 
 	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
@@ -260,8 +261,11 @@ func createServiceObjectDeployment(replica *chiv1.ChiClusterLayoutShardReplica) 
 			Name:      serviceName,
 			Namespace: replica.Address.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel: AppVersion,
-				ChiGeneratedLabel:  replica.Address.ChiName,
+				ChopGeneratedLabel:         AppVersion,
+				ChiGeneratedLabel:          replica.Address.ChiName,
+				ClusterGeneratedLabel:      replica.Address.ClusterName,
+				ClusterIndexGeneratedLabel: strconv.Itoa(replica.Address.ClusterIndex),
+				ReplicaIndexGeneratedLabel: strconv.Itoa(replica.Address.ReplicaIndex),
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -286,6 +290,27 @@ func createServiceObjectDeployment(replica *chiv1.ChiClusterLayoutShardReplica) 
 			Type:      "ClusterIP",
 		},
 	}
+}
+
+func IsChopGeneratedObject(objectMeta *metav1.ObjectMeta) bool {
+	// Parse Labels
+	// 			Labels: map[string]string{
+	//				ChopGeneratedLabel: AppVersion,
+	//				ChiGeneratedLabel:  replica.Address.ChiName,
+	//				ClusterGeneratedLabel: replica.Address.ClusterName,
+	//				ClusterIndexGeneratedLabel: strconv.Itoa(replica.Address.ClusterIndex),
+	//				ReplicaIndexGeneratedLabel: strconv.Itoa(replica.Address.ReplicaIndex),
+	//			},
+
+	// ObjectMeta must have some labels
+	if len(objectMeta.Labels) == 0 {
+		return false
+	}
+
+	// ObjectMeta must have ChiGeneratedLabel:  chi.Name label
+	_, ok := objectMeta.Labels[ChopGeneratedLabel]
+
+	return ok
 }
 
 // createStatefulSetObjects returns a list of apps.StatefulSet objects

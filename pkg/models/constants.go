@@ -20,9 +20,12 @@ import (
 
 const (
 	// ChopGeneratedLabel applied to all objects created by the ClickHouse Operator
-	ChopGeneratedLabel = clickhousealtinitycom.GroupName + "/chop"
-	ChiGeneratedLabel  = clickhousealtinitycom.GroupName + "/chi"
-	ZkVersionLabel     = clickhousealtinitycom.GroupName + "/zkv"
+	ChopGeneratedLabel         = clickhousealtinitycom.GroupName + "/chop"
+	ChiGeneratedLabel          = clickhousealtinitycom.GroupName + "/chi"
+	ClusterGeneratedLabel      = clickhousealtinitycom.GroupName + "/cluster"
+	ClusterIndexGeneratedLabel = clickhousealtinitycom.GroupName + "/clusterIndex"
+	ReplicaIndexGeneratedLabel = clickhousealtinitycom.GroupName + "/replicaIndex"
+	ZkVersionLabel             = clickhousealtinitycom.GroupName + "/zkv"
 )
 
 const (

@@ -39,6 +39,8 @@ type Controller struct {
 	chiListerSynced         cache.InformerSynced
 	serviceLister           corelisters.ServiceLister
 	serviceListerSynced     cache.InformerSynced
+	endpointsLister         corelisters.EndpointsLister
+	endpointsListerSynced   cache.InformerSynced
 	configMapLister         corelisters.ConfigMapLister
 	configMapListerSynced   cache.InformerSynced
 	statefulSetLister       appslisters.StatefulSetLister

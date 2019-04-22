@@ -71,7 +71,7 @@ var (
 )
 
 func init() {
-	flag.BoolVar(&versionRequest, "version", true, "Display versionRequest and exit")
+	flag.BoolVar(&versionRequest, "version", false, "Display versionRequest and exit")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
 	flag.StringVar(&kubeConfigFile, "kube-config", "", "Path to kubernetes config file. Only required if called outside of the cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Only required if called outside of the cluster and not being specified in kube config file.")
@@ -179,6 +179,7 @@ func Run() {
 		kubeClient,
 		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
 		kubeInformerFactory.Core().V1().Services(),
+		kubeInformerFactory.Core().V1().Endpoints(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().Pods(),
