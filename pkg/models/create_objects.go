@@ -307,7 +307,7 @@ func IsChopGeneratedObject(objectMeta *metav1.ObjectMeta) bool {
 		return false
 	}
 
-	// ObjectMeta must have ChiGeneratedLabel:  chi.Name label
+	// ObjectMeta must have ChopGeneratedLabel
 	_, ok := objectMeta.Labels[ChopGeneratedLabel]
 
 	return ok
