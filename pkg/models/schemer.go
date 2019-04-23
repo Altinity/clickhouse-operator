@@ -72,25 +72,36 @@ func unzip(slice [][]string) ([]string, []string) {
 	return col1, col2
 }
 
-func ClusterDropDnsCache(cluster *chi.ChiCluster) error {
-	time.Sleep(45 * time.Second)
+func ClusterApplySQLs(cluster *chi.ChiCluster, sqls []string, retry bool) error {
+	return applySQLs(CreateClusterPodFQDNs(cluster), sqls, retry)
+}
+
+func ChiDropDnsCache(chi *chi.ClickHouseInstallation) error {
 	sqls := []string{
 		`SYSTEM DROP DNS CACHE`,
 	}
-	return ClusterApplySQLs(cluster, sqls)
+	return ChiApplySQLs(chi, sqls)
 }
 
-func ClusterApplySQLs(cluster *chi.ChiCluster, sqls []string) error {
-	return applySQLs(CreateClusterPodFQDNs(cluster), sqls)
+func ChiApplySQLs(chi *chi.ClickHouseInstallation, sqls []string) error {
+	return applySQLs(CreateChiPodFQDNs(chi), sqls, true)
 }
 
-func applySQLs(hosts []string, sqls []string) error {
+func applySQLs(hosts []string, sqls []string, retry bool) error {
 	for _, host := range hosts {
 		for _, sql := range sqls {
 			if len(sql) > 0 {
-				data := make([][]string, 0)
-				_ = clickhouse.Exec(&data, sql, host)
-				glog.V(1).Infof("applySQL(%s):%v\n", sql, data)
+				for retryCount := 0; retryCount < 10; retryCount++ {
+					data := make([][]string, 0)
+					err := clickhouse.Exec(&data, sql, host)
+					glog.V(1).Infof("applySQL(%s):%v\n", sql, data)
+					if (err == nil) || !retry {
+						// Either all is good or we are not interested in retries anyway
+						return err
+					}
+					glog.V(1).Infof("attempt %d failed, sleep and retry\n", retryCount)
+					time.Sleep(5 * time.Second)
+				}
 			}
 		}
 	}

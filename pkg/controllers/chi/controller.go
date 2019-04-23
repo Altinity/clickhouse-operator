@@ -281,11 +281,11 @@ func CreateController(
 
 			if added {
 				glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) IP ASSIGNED %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.Subsets)
-				if cluster, err := controller.createClusterFromObjectMeta(&newEndpoints.ObjectMeta); err == nil {
-					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for cluster %s", newEndpoints.Namespace, newEndpoints.Name, cluster.Name)
-					chopmodels.ClusterDropDnsCache(cluster)
+				if chi, err := controller.createChiFromObjectMeta(&newEndpoints.ObjectMeta); err == nil {
+					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", newEndpoints.Namespace, newEndpoints.Name, chi.Name)
+					chopmodels.ChiDropDnsCache(chi)
 				} else {
-					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find cluster by %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.ObjectMeta.Labels)
+					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.ObjectMeta.Labels)
 				}
 			}
 		},
@@ -337,21 +337,6 @@ func CreateController(
 				return
 			}
 			glog.V(1).Infof("statefulSetInformer UpdateFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
-			/*
-				newStatefulSet := newObj.(*apps.StatefulSet)
-				oldStatefulSet := oldObj.(*apps.StatefulSet)
-				if newStatefulSet.ResourceVersion == oldStatefulSet.ResourceVersion {
-					glog.V(1).Infof("statefulSetInformer.UpdateFunc - no update required, no ResourceVersion change %s", newStatefulSet.ResourceVersion)
-					return
-				}
-
-				if newStatefulSet.Status.ReadyReplicas == newStatefulSet.Status.Replicas {
-					glog.V(1).Infof("statefulSetInformer.UpdateFunc - %s/%s is Ready", newStatefulSet.Namespace, newStatefulSet.Name)
-				}
-
-				glog.V(1).Info("statefulSetInformer.UpdateFunc - UPDATE REQUIRED")
-				controller.handleObject(newObj)
-			*/
 		},
 		DeleteFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
@@ -394,11 +379,6 @@ func CreateController(
 func (c *Controller) isTrackedObject(objectMeta *meta.ObjectMeta) bool {
 	return c.chopConfig.IsWatchedNamespace(objectMeta.Namespace) && chopmodels.IsChopGeneratedObject(objectMeta)
 }
-
-/*
-func isChopResource(obj interface{}) {
-	return obj.ObjectMeta.Labels[chopmodels.ChopGeneratedLabel] != ""
-}*/
 
 // Run syncs caches, starts workers
 func (c *Controller) Run(ctx context.Context, threadiness int) {
@@ -594,11 +574,11 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		new.WalkClusters(func(cluster *chop.ChiCluster) error {
 			dbNames, createDatabaseSQLs, _ := chopmodels.ClusterGetCreateDatabases(new, cluster)
 			glog.V(1).Infof("Creating databases: %v\n", dbNames)
-			_ = chopmodels.ClusterApplySQLs(cluster, createDatabaseSQLs)
+			_ = chopmodels.ClusterApplySQLs(cluster, createDatabaseSQLs, false)
 
 			tableNames, createTableSQLs, _ := chopmodels.ClusterGetCreateTables(new, cluster)
 			glog.V(1).Infof("Creating tables: %v\n", tableNames)
-			_ = chopmodels.ClusterApplySQLs(cluster, createTableSQLs)
+			_ = chopmodels.ClusterApplySQLs(cluster, createTableSQLs, false)
 			return nil
 		})
 		_ = c.updateCHIResource(new)
