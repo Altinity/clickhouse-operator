@@ -15,55 +15,93 @@
 package models
 
 import (
+	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse"
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/golang/glog"
+	"time"
 )
 
-func ClusterGatherCreateDatabases(cluster *v1.ChiCluster) ([]string, error) {
-	return gatherUnique(CreateClusterPodFQDNs(cluster), "SELECT concat('CREATE DATABASE IF NOT EXISTS ', name) FROM system.databases WHERE name != 'system' ORDER BY name")
+const (
+	ignoredDBs = "'system'"
+)
+
+func ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
+	result := make([][]string, 0)
+	glog.V(1).Info(CreateChiServiceFQDN(chi))
+	_ = clickhouse.Query(&result,
+		fmt.Sprintf(
+			`SELECT distinct name, concat('CREATE DATABASE IF NOT EXISTS ', name)
+				FROM cluster('%s', system, databases) 
+				WHERE name not in (%s)
+				ORDER BY name
+				SETTINGS skip_unavailable_shards = 1`,
+			cluster.Name, ignoredDBs),
+		CreateChiServiceFQDN(chi),
+	)
+	names, creates := unzip(result)
+	return names, creates, nil
 }
 
-func ClusterGatherCreateTables(cluster *v1.ChiCluster) ([]string, error) {
-	return gatherUnique(CreateClusterPodFQDNs(cluster), "SELECT create_table_query FROM system.tables WHERE database != 'system'")
+func ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
+	result := make([][]string, 0)
+	_ = clickhouse.Query(&result,
+		fmt.Sprintf(
+			`SELECT distinct name, 
+			        replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS') 
+				FROM cluster('%s', system, tables)
+				WHERE database not in (%s) 
+				AND name not like '.inner.%%'
+				ORDER BY multiIf(engine not in ('Distributed', 'View', 'MaterializedView'), 1, engine = 'MaterializedView', 2, engine = 'Distributed', 3, 4), name
+				SETTINGS skip_unavailable_shards = 1`,
+			cluster.Name, ignoredDBs),
+		CreateChiServiceFQDN(chi),
+	)
+	names, creates := unzip(result)
+	return names, creates, nil
 }
 
-func ClusterApplySQLs(cluster *v1.ChiCluster, sqls []string) error {
-	return applySQLs(CreateClusterPodFQDNs(cluster), sqls)
-}
-
-func gatherUnique(hosts []string, sql string) ([]string, error) {
-	// Make set-alike data-structure with map - fetch items from all hosts which maps item to bool
-	allItemsMap := make(map[string]bool)
-	for _, host := range hosts {
-		// Items gathered from this host - slice of rows (slices)
-		hostItemsRows := make([][]string, 0)
-		if clickhouse.Query(&hostItemsRows, sql, host) == nil {
-			for _, row := range hostItemsRows {
-				item := row[0]
-				if len(item) > 0 {
-					allItemsMap[item] = true
-				}
-			}
+func unzip(slice [][]string) ([]string, []string) {
+	col1, col2 := make([]string, len(slice)), make([]string, len(slice))
+	for i := 0; i < len(slice); i++ {
+		col1 = append(col1, slice[i][0])
+		if len(slice[i]) > 1 {
+			col2 = append(col2, slice[i][1])
 		}
 	}
-
-	// Extract items from map into slice - slice is more user-friendly
-	items := make([]string, 0, len(allItemsMap))
-	for item := range allItemsMap {
-		items = append(items, item)
-	}
-
-	return items, nil
+	return col1, col2
 }
 
-func applySQLs(hosts []string, sqls []string) error {
+func ClusterApplySQLs(cluster *chi.ChiCluster, sqls []string, retry bool) error {
+	return applySQLs(CreateClusterPodFQDNs(cluster), sqls, retry)
+}
+
+func ChiDropDnsCache(chi *chi.ClickHouseInstallation) error {
+	sqls := []string{
+		`SYSTEM DROP DNS CACHE`,
+	}
+	return ChiApplySQLs(chi, sqls)
+}
+
+func ChiApplySQLs(chi *chi.ClickHouseInstallation, sqls []string) error {
+	return applySQLs(CreateChiPodFQDNs(chi), sqls, true)
+}
+
+func applySQLs(hosts []string, sqls []string, retry bool) error {
 	for _, host := range hosts {
 		for _, sql := range sqls {
 			if len(sql) > 0 {
-				data := make([][]string, 0)
-				clickhouse.Exec(&data, sql, host)
-				glog.V(1).Infof("applySQL(%s):%v\n", sql, data)
+				for retryCount := 0; retryCount < 10; retryCount++ {
+					data := make([][]string, 0)
+					err := clickhouse.Exec(&data, sql, host)
+					glog.V(1).Infof("applySQL(%s):%v\n", sql, data)
+					if (err == nil) || !retry {
+						// Either all is good or we are not interested in retries anyway
+						return err
+					}
+					glog.V(1).Infof("attempt %d failed, sleep and retry\n", retryCount)
+					time.Sleep(5 * time.Second)
+				}
 			}
 		}
 	}

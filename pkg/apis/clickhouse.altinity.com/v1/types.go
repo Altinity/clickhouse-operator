@@ -53,10 +53,10 @@ type ChiDefaults struct {
 // ChiConfiguration defines configuration section of .spec
 type ChiConfiguration struct {
 	Zookeeper ChiConfigurationZookeeper `json:"zookeeper,omitempty" yaml:"zookeeper"`
-	Users     map[string]string         `json:"users,omitempty"     yaml:"users"`
-	Profiles  map[string]string         `json:"profiles,omitempty"  yaml:"profiles"`
-	Quotas    map[string]string         `json:"quotas,omitempty"    yaml:"quotas"`
-	Settings  map[string]string         `json:"settings,omitempty"  yaml:"settings"`
+	Users     map[string]interface{}    `json:"users,omitempty"     yaml:"users"`
+	Profiles  map[string]interface{}    `json:"profiles,omitempty"  yaml:"profiles"`
+	Quotas    map[string]interface{}    `json:"quotas,omitempty"    yaml:"quotas"`
+	Settings  map[string]interface{}    `json:"settings,omitempty"  yaml:"settings"`
 	// TODO refactor into map[string]ChiCluster
 	Clusters []ChiCluster `json:"clusters,omitempty"`
 }
@@ -181,7 +181,6 @@ type ChiConfigurationZookeeperNode struct {
 type ChiVolumeClaimTemplate struct {
 	Name                  string                       `json:"name"                  yaml:"name"`
 	PersistentVolumeClaim corev1.PersistentVolumeClaim `json:"persistentVolumeClaim" yaml:"persistentVolumeClaim"`
-	UseDefaultName        bool                         `json:"useDefaultName"`
 }
 
 // ChiPodTemplate defines item of a podTemplates section of .spec.templates

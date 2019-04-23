@@ -151,8 +151,6 @@ spec:
     volumeClaimTemplates:
       - name: volumeclaim-template
         persistentVolumeClaim:
-          metadata:
-            name: USE_DEFAULT_NAME
           spec:
             accessModes:
               - ReadWriteOnce
@@ -168,7 +166,7 @@ Let's install more complex example with:
 1. Pod template
 1. VolumeClaim template
 
-Manifest is [available in examples](./examples/02-standard-layout-02-1shard-1repl-deployment-persistent-volume.yaml)
+Manifest is [available in examples](./examples/02-standard-layout-03-1shard-1repl-deployment-persistent-volume.yaml)
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
@@ -186,6 +184,7 @@ spec:
           type: Standard
           shardsCount: 1
           replicasCount: 1
+          
   templates:
     podTemplates:
       - name: clickhouse-with-volume-template
@@ -202,6 +201,7 @@ spec:
             volumeMounts:
               - name: clickhouse-storage
                 mountPath: /var/lib/clickhouse
+                
     volumeClaimTemplates:
       - name: clickhouse-storage-template
         persistentVolumeClaim:
@@ -216,11 +216,12 @@ spec:
 ```
 
 ## Custom Deployment with Specific ClickHouse Configuration
+More extended settings example is [available here](./examples/03-settings-01.yaml)
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "test4"
+  name: "test-custom-settings"
 spec:
   configuration:
     users:
