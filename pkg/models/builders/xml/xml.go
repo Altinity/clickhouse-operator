@@ -39,7 +39,7 @@ func GenerateXML(w io.Writer, input map[string]interface{}, indent, tabsize uint
 
 	// data is copy of 'input' with:
 	// 1. paths (map keys) are normalized in terms of trimmed '/'
-	// 2. all exlcudes are excluded
+	// 2. all excludes are excluded
 	data := make(map[string]interface{})
 	// Skip excluded paths
 	for key, value := range input {

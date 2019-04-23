@@ -24,8 +24,10 @@ import (
 
 const (
 	ignoredDBs = "'system'"
+	maxRetries = 10
 )
 
+// ClusterGetCreateDatabases returns set of 'CREATE DATABASE ...' SQLs
 func ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
 	result := make([][]string, 0)
 	glog.V(1).Info(CreateChiServiceFQDN(chi))
@@ -43,6 +45,7 @@ func ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.Chi
 	return names, creates, nil
 }
 
+// ClusterGetCreateTables returns set of 'CREATE TABLE ...' SQLs
 func ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
 	result := make([][]string, 0)
 	_ = clickhouse.Query(&result,
@@ -61,8 +64,10 @@ func ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiClu
 	return names, creates, nil
 }
 
+// unzip makes two 1-value columns (slices) out of one 2-value column (slice)
 func unzip(slice [][]string) ([]string, []string) {
-	col1, col2 := make([]string, len(slice)), make([]string, len(slice))
+	col1 := make([]string, len(slice))
+	col2 := make([]string, len(slice))
 	for i := 0; i < len(slice); i++ {
 		col1 = append(col1, slice[i][0])
 		if len(slice[i]) > 1 {
@@ -72,10 +77,7 @@ func unzip(slice [][]string) ([]string, []string) {
 	return col1, col2
 }
 
-func ClusterApplySQLs(cluster *chi.ChiCluster, sqls []string, retry bool) error {
-	return applySQLs(CreateClusterPodFQDNs(cluster), sqls, retry)
-}
-
+// ChiDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
 func ChiDropDnsCache(chi *chi.ClickHouseInstallation) error {
 	sqls := []string{
 		`SYSTEM DROP DNS CACHE`,
@@ -83,28 +85,41 @@ func ChiDropDnsCache(chi *chi.ClickHouseInstallation) error {
 	return ChiApplySQLs(chi, sqls)
 }
 
+// ClusterApplySQLs runs set of SQL queries over the cluster
+func ClusterApplySQLs(cluster *chi.ChiCluster, sqls []string, retry bool) error {
+	return applySQLs(CreateClusterPodFQDNs(cluster), sqls, retry)
+}
+
+// ChiApplySQLs runs set of SQL queries over the whole CHI
 func ChiApplySQLs(chi *chi.ClickHouseInstallation, sqls []string) error {
 	return applySQLs(CreateChiPodFQDNs(chi), sqls, true)
 }
 
+// applySQLs runs set of SQL queries on set on hosts
 func applySQLs(hosts []string, sqls []string, retry bool) error {
+	var err error = nil
+	// For each host in the list run all SQL queries
 	for _, host := range hosts {
 		for _, sql := range sqls {
-			if len(sql) > 0 {
-				for retryCount := 0; retryCount < 10; retryCount++ {
-					data := make([][]string, 0)
-					err := clickhouse.Exec(&data, sql, host)
-					glog.V(1).Infof("applySQL(%s):%v\n", sql, data)
-					if (err == nil) || !retry {
-						// Either all is good or we are not interested in retries anyway
-						return err
-					}
-					glog.V(1).Infof("attempt %d failed, sleep and retry\n", retryCount)
-					time.Sleep(5 * time.Second)
+			if len(sql) == 0 {
+				// Skip malformed SQL query, move to the next SQL query
+				continue
+			}
+			// Now retry this SQL query on particular host
+			for retryCount := 0; retryCount < maxRetries; retryCount++ {
+				glog.V(1).Infof("applySQL(%s)\n", sql)
+				data := make([][]string, 0)
+				err = clickhouse.Exec(&data, sql, host)
+				if (err == nil) || !retry {
+					// Either all is good or we are not interested in retries anyway
+					// Move on to the next SQL query on this host
+					break
 				}
+				glog.V(1).Infof("attempt %d failed, sleep and retry\n", retryCount)
+				time.Sleep(5 * time.Second)
 			}
 		}
 	}
 
-	return nil
+	return err
 }
