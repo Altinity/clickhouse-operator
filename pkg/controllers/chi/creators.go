@@ -136,11 +136,17 @@ func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInsta
 }
 
 func (c *Controller) createStatefulSet(chi *chop.ClickHouseInstallation, statefulSet *apps.StatefulSet) error {
-	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Create(statefulSet); err == nil {
-		return c.waitStatefulSetGeneration(statefulSet.Namespace, statefulSet.Name, 1)
-	} else {
+	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Create(statefulSet); err != nil {
 		return err
+	} else if err := c.waitStatefulSetGeneration(statefulSet.Namespace, statefulSet.Name, statefulSet.Generation); err == nil {
+		// Target generation reached, StatefulSet created successfully
+		return nil
+	} else {
+		// Unable to reach target generation, StatefulSet create failed, time to rollback?
+		return c.onStatefulSetCreateFailed(statefulSet)
 	}
+
+	return errors.New("createStatefulSet() - unknown position")
 }
 
 func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet) error {
@@ -199,12 +205,12 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 		} else if hasStatefulSetReachedGeneration(statefulSet, targetGeneration) {
 			// StatefulSet is available and generation reached
 			// All is good, job done, exit
-			glog.V(1).Infof("waitStatefulSetGeneration() - generation %d reached status:%s\n", statefulSet.Generation, strStatefulSetStatus(&statefulSet.Status))
+			glog.V(1).Infof("waitStatefulSetGeneration(OK):%s\n", strStatefulSetStatus(&statefulSet.Status))
 			return nil
 		} else if time.Since(start) < (time.Duration(c.chopConfig.StatefulSetUpdateTimeout) * time.Second) {
 			// StatefulSet is available but generation is not yet reached
 			// Wait some more time
-			glog.V(1).Infof("waitStatefulSetGeneration() - generation %d waiting status:%s\n", targetGeneration, strStatefulSetStatus(&statefulSet.Status))
+			glog.V(1).Infof("waitStatefulSetGeneration():%s\n", strStatefulSetStatus(&statefulSet.Status))
 			time.Sleep(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second)
 		} else {
 			// StatefulSet is available but generation is not yet reached
@@ -216,6 +222,33 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 	}
 
 	return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - unknown position", namespace, name))
+}
+
+// onStatefulSetCreateFailed handles situation when StatefulSet create failed
+// It can just delete failed StatefulSet or do nothing
+func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulSet) error {
+	// Convenience shortcuts
+	namespace := failedStatefulSet.Namespace
+	name := failedStatefulSet.Name
+
+	// What to do with StatefulSet - look into chop configuration settings
+	switch c.chopConfig.OnStatefulSetCreateFailureAction {
+	case config.OnStatefulSetCreateFailureActionAbort:
+		// Do nothing, just report appropriate error
+		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - abort\n", namespace, name)
+		return errors.New(fmt.Sprintf("Create failed on %s/%s", namespace, name))
+
+	case config.OnStatefulSetCreateFailureActionDelete:
+		// Delete gracefully problematic failed StatefulSet
+		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to DELETE FAILED StatefulSet\n", namespace, name)
+		c.statefulSetDelete(namespace, name)
+		return c.shouldContinueOnCreateFailed()
+	default:
+		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetCreateFailureAction=%s\n", c.chopConfig.OnStatefulSetCreateFailureAction)
+		return nil
+	}
+
+	return errors.New(fmt.Sprintf("onStatefulSetCreateFailed(%s/%s) - unknown position", namespace, name))
 }
 
 // onStatefulSetUpdateFailed handles situation when StatefulSet update failed
@@ -234,6 +267,7 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 
 	case config.OnStatefulSetUpdateFailureActionRevert:
 		// Need to revert current StatefulSet to oldStatefulSet
+		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - going to ROLLBACK FAILED StatefulSet\n", namespace, name)
 		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {
 			// Unable to get StatefulSet
 			return err
@@ -255,6 +289,20 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 	}
 
 	return errors.New(fmt.Sprintf("onStatefulSetUpdateFailed(%s/%s) - unknown position", namespace, name))
+}
+
+// shouldContinueOnCreateFailed return nil in case 'continue' or error in case 'do not continue'
+func (c *Controller) shouldContinueOnCreateFailed() error {
+	// Check configuration option regarding should we continue when errors met on the way
+	// c.chopConfig.OnStatefulSetUpdateFailureAction
+	var continueUpdate = false
+	if continueUpdate {
+		// Continue update
+		return nil
+	}
+
+	// Do not continue update
+	return errors.New(fmt.Sprintf("Create stopped due to previous errors"))
 }
 
 // shouldContinueOnUpdateFailed return nil in case 'continue' or error in case 'do not continue'

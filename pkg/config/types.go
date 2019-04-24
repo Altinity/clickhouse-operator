@@ -46,13 +46,25 @@ type Config struct {
 	// ClickHouseInstallation template
 	ChiTemplate *chiv1.ClickHouseInstallation
 
-	// Rolling update behavior - for how long to wait for StatefulSet to reach new Generation
+	// Create/Update StatefulSet behavior - for how long to wait for StatefulSet to reach new Generation
 	StatefulSetUpdateTimeout uint64 `yaml:"statefulSetUpdateTimeout"`
-	// Rolling update behavior - for how long to sleep while polling StatefulSet to reach new Generation
+	// Create/Update StatefulSet behavior - for how long to sleep while polling StatefulSet to reach new Generation
 	StatefulSetUpdatePollPeriod uint64 `yaml:"statefulSetUpdatePollPeriod"`
-	// Rolling update behavior - what to do in case StatefulSet can't reach new Generation
+
+	// Rolling Create/Update behavior
+	// StatefulSet create behavior - what to do in case StatefulSet can't reach new Generation
+	OnStatefulSetCreateFailureAction string `yaml:"onStatefulSetCreateFailureAction"`
+	// StatefulSet update behavior - what to do in case StatefulSet can't reach new Generation
 	OnStatefulSetUpdateFailureAction string `yaml:"onStatefulSetUpdateFailureAction"`
 }
+
+const (
+	// What to do in case StatefulSet can't reach new Generation - abort rolling create
+	OnStatefulSetCreateFailureActionAbort = "abort"
+
+	// What to do in case StatefulSet can't reach new Generation - delete newly created problematic StatefulSet
+	OnStatefulSetCreateFailureActionDelete = "delete"
+)
 
 const (
 	// What to do in case StatefulSet can't reach new Generation - abort rolling update
