@@ -120,6 +120,7 @@ func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInsta
 	// Check whether object with such name already exists in k8s
 	oldStatefulSet, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
 	if oldStatefulSet != nil {
+		newStatefulSet.Namespace = oldStatefulSet.Namespace
 		return c.updateStatefulSet(oldStatefulSet, newStatefulSet)
 	}
 
@@ -139,16 +140,13 @@ func (c *Controller) createStatefulSet(chi *chop.ClickHouseInstallation, statefu
 	}
 }
 
-func (c *Controller) updateStatefulSet(
-	oldStatefulSet *apps.StatefulSet,
-	newStatefulSet *apps.StatefulSet,
-) error {
+func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet) error {
 	// Convenience shortcuts
-	namespace := oldStatefulSet.Namespace
-	name := oldStatefulSet.Name
-	generation := oldStatefulSet.Generation
+	namespace := newStatefulSet.Namespace
+	name := newStatefulSet.Name
 	glog.V(1).Infof("updateStatefulSet(%s/%s)\n", namespace, name)
 
+	// Apply newStatefulSet and wait for Generation to change
 	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(newStatefulSet)
 	if err != nil {
 		// Update failed
@@ -159,28 +157,29 @@ func (c *Controller) updateStatefulSet(
 	// 1. ObjectMeta.Generation is target generation
 	// 2. Status.ObservedGeneration may be <= ObjectMeta.Generation
 
-	if updatedStatefulSet.Generation == generation {
+	if updatedStatefulSet.Generation == oldStatefulSet.Generation {
+		// Generation is not updated - no changes in .spec section were made
 		glog.V(1).Infof("updateStatefulSet(%s/%s) - no generation change\n", namespace, name)
 		return nil
 	}
 
-	glog.V(1).Infof("updateStatefulSet(%s/%s) - generation change %d=>%d\n", namespace, name, generation, updatedStatefulSet.Generation)
+	glog.V(1).Infof("updateStatefulSet(%s/%s) - generation change %d=>%d\n", namespace, name, oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
 	if err := c.waitStatefulSetGeneration(namespace, name, updatedStatefulSet.Generation); err == nil {
-		// Target generation reached
+		// Target generation reached, StatefulSet updated successfully
 		return nil
 	} else {
-		// Unable to reach target generation
+		// Unable to reach target generation, StatefulSet update failed, time to rollback?
 		return c.onStatefulSetUpdateFailed(oldStatefulSet)
 	}
 
-	return errors.New("updateStatefulSet() - unknown poisition")
+	return errors.New("updateStatefulSet() - unknown position")
 }
 
+// waitStatefulSetGeneration polls StatefulSet for reaching target generation
 func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGeneration int64) error {
-	// StatefulSet can be considered as "reached target generation" when:
-	// 1. Status.ObservedGeneration == ObjectMeta.Generation
-	// 2. Status.ReadyReplicas == Spec.Replicas
+	// Wait for some limited time for StatefulSet to reach target generation
+	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
 	start := time.Now()
 	for {
 		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {
@@ -195,15 +194,19 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 				return err
 			}
 		} else if hasStatefulSetReachedGeneration(statefulSet, targetGeneration) {
-			// StatefulSet ready
+			// StatefulSet is available and generation reached
+			// All is good, job done, exit
 			glog.V(1).Infof("waitStatefulSetGeneration() - generation %d reached status:%s\n", statefulSet.Generation, strStatefulSetStatus(&statefulSet.Status))
 			return nil
 		} else if time.Since(start) < (time.Duration(c.chopConfig.StatefulSetUpdateTimeout) * time.Second) {
+			// StatefulSet is available but generation is not yet reached
 			// Wait some more time
 			glog.V(1).Infof("waitStatefulSetGeneration() - generation %d waiting status:%s\n", targetGeneration, strStatefulSetStatus(&statefulSet.Status))
 			time.Sleep(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second)
 		} else {
+			// StatefulSet is available but generation is not yet reached
 			// Timeout reached
+			// Failed, time to quit
 			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) - TIMEOUT reached\n", namespace, name)
 			return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - wait timeout", namespace, name))
 		}
@@ -298,32 +301,60 @@ func hasStatefulSetReachedGeneration(statefulSet *apps.StatefulSet, generation i
 		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
 }
 
-func (c *Controller) onStatefulSetUpdateFailed(oldStatefulSet *apps.StatefulSet) error {
+// onStatefulSetUpdateFailed handles situation when StatefulSet update failed
+// It can try to revert StatefulSet to its previous version, specified in rollbackStatefulSet
+func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.StatefulSet) error {
+	// Convenience shortcuts
+	namespace := rollbackStatefulSet.Namespace
+	name := rollbackStatefulSet.Name
+
+	// What to do with StatefulSet - look into chop configuration settings
 	switch c.chopConfig.OnStatefulSetUpdateFailureAction {
 	case config.OnStatefulSetUpdateFailureActionAbort:
-		// Do nothing
-		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort\n", oldStatefulSet.Namespace, oldStatefulSet.Name)
-		return errors.New(fmt.Sprintf("Updated failed %s", oldStatefulSet.Name))
+		// Do nothing, just report appropriate error
+		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort\n", namespace, name)
+		return errors.New(fmt.Sprintf("Update failed on %s/%s", namespace, name))
 
 	case config.OnStatefulSetUpdateFailureActionRevert:
 		// Need to revert current StatefulSet to oldStatefulSet
-		if statefulSet, err := c.statefulSetLister.StatefulSets(oldStatefulSet.Namespace).Get(oldStatefulSet.Name); err != nil {
+		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {
 			// Unable to get StatefulSet
 			return err
 		} else {
-			// Get current status of oldStatefulSet and apply "previous" .Spec
-			// make copy of "previous" .Spec just to be sure nothing gets corrupted
-			statefulSet.Spec = *oldStatefulSet.Spec.DeepCopy()
-			statefulSet, err = c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Update(statefulSet)
+			// Make copy of "previous" .Spec just to be sure nothing gets corrupted
+			// Update StatefulSet to its 'previous' oldStatefulSet - this is expected to rollback inapplicable changes
+			// Having StatefulSet .spec in rolled back status we need to delete current Pod - because in case of Pod being seriously broken,
+			// it is the only way to go. Just delete Pod and StatefulSet will recreated Pod with current .spec
+			// This will rollback Pod to previous .spec
+			statefulSet.Spec = *rollbackStatefulSet.Spec.DeepCopy()
+			statefulSet, err = c.kubeClient.AppsV1().StatefulSets(namespace).Update(statefulSet)
 			_ = c.statefulSetDeletePod(statefulSet)
-			return nil
+
+			return c.shouldContinueOnUpdateFailed()
 		}
 	default:
 		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s\n", c.chopConfig.OnStatefulSetUpdateFailureAction)
+		return nil
 	}
-	return nil
+
+	return errors.New(fmt.Sprintf("onStatefulSetUpdateFailed(%s/%s) - unknown position", namespace, name))
 }
 
+// shouldContinueOnUpdateFailed return nil in case 'continue' or error in case 'do not continue'
+func (c *Controller) shouldContinueOnUpdateFailed() error {
+	// Check configuration option regarding should we continue when errors met on the way
+	// c.chopConfig.OnStatefulSetUpdateFailureAction
+	var continueUpdate = false
+	if continueUpdate {
+		// Continue update
+		return nil
+	}
+
+	// Do not continue update
+	return errors.New(fmt.Sprintf("Update stopped due to previous errors"))
+}
+
+// strStatefulSetStatus returns human-friendly string representation of StatefulSet status
 func strStatefulSetStatus(status *apps.StatefulSetStatus) string {
 	return fmt.Sprintf(
 		"ObservedGeneration:%d Replicas:%d ReadyReplicas:%d CurrentReplicas:%d UpdatedReplicas:%d CurrentRevision:%s UpdateRevision:%s",
