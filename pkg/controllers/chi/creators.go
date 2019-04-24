@@ -119,16 +119,19 @@ func (c *Controller) createOrUpdateServiceResource(chi *chop.ClickHouseInstallat
 func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInstallation, newStatefulSet *apps.StatefulSet) error {
 	// Check whether object with such name already exists in k8s
 	oldStatefulSet, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
+
 	if oldStatefulSet != nil {
+		// StatefulSet already exists - update it
 		newStatefulSet.Namespace = oldStatefulSet.Namespace
 		return c.updateStatefulSet(oldStatefulSet, newStatefulSet)
 	}
 
 	if apierrors.IsNotFound(err) {
-		// Object with such name not found - create it
+		// StatefulSet with such name not found - create StatefulSet
 		return c.createStatefulSet(chi, newStatefulSet)
 	}
 
+	// Error has happened with .Get()
 	return err
 }
 
@@ -215,6 +218,89 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 	return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - unknown position", namespace, name))
 }
 
+// onStatefulSetUpdateFailed handles situation when StatefulSet update failed
+// It can try to revert StatefulSet to its previous version, specified in rollbackStatefulSet
+func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.StatefulSet) error {
+	// Convenience shortcuts
+	namespace := rollbackStatefulSet.Namespace
+	name := rollbackStatefulSet.Name
+
+	// What to do with StatefulSet - look into chop configuration settings
+	switch c.chopConfig.OnStatefulSetUpdateFailureAction {
+	case config.OnStatefulSetUpdateFailureActionAbort:
+		// Do nothing, just report appropriate error
+		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort\n", namespace, name)
+		return errors.New(fmt.Sprintf("Update failed on %s/%s", namespace, name))
+
+	case config.OnStatefulSetUpdateFailureActionRevert:
+		// Need to revert current StatefulSet to oldStatefulSet
+		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {
+			// Unable to get StatefulSet
+			return err
+		} else {
+			// Make copy of "previous" .Spec just to be sure nothing gets corrupted
+			// Update StatefulSet to its 'previous' oldStatefulSet - this is expected to rollback inapplicable changes
+			// Having StatefulSet .spec in rolled back status we need to delete current Pod - because in case of Pod being seriously broken,
+			// it is the only way to go. Just delete Pod and StatefulSet will recreated Pod with current .spec
+			// This will rollback Pod to previous .spec
+			statefulSet.Spec = *rollbackStatefulSet.Spec.DeepCopy()
+			statefulSet, err = c.kubeClient.AppsV1().StatefulSets(namespace).Update(statefulSet)
+			_ = c.statefulSetDeletePod(statefulSet)
+
+			return c.shouldContinueOnUpdateFailed()
+		}
+	default:
+		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s\n", c.chopConfig.OnStatefulSetUpdateFailureAction)
+		return nil
+	}
+
+	return errors.New(fmt.Sprintf("onStatefulSetUpdateFailed(%s/%s) - unknown position", namespace, name))
+}
+
+// shouldContinueOnUpdateFailed return nil in case 'continue' or error in case 'do not continue'
+func (c *Controller) shouldContinueOnUpdateFailed() error {
+	// Check configuration option regarding should we continue when errors met on the way
+	// c.chopConfig.OnStatefulSetUpdateFailureAction
+	var continueUpdate = false
+	if continueUpdate {
+		// Continue update
+		return nil
+	}
+
+	// Do not continue update
+	return errors.New(fmt.Sprintf("Update stopped due to previous errors"))
+}
+
+// hasStatefulSetReachedGeneration returns whether has StatefulSet reached the expected generation after upgrade or not
+func hasStatefulSetReachedGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
+	// StatefulSet has .spec generation we are waiting for
+	return (statefulSet.Generation == generation) &&
+		// and this .spec generation is being applied to replicas - it is observed right now
+		(statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
+		// and all replicas are in "Ready" status - meaning ready to be used - no failure inside
+		(statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas) &&
+		// and all replicas are of expected generation
+		(statefulSet.Status.CurrentReplicas == *statefulSet.Spec.Replicas) &&
+		// and all replicas are updated - meaning rolling update completed over all replicas
+		(statefulSet.Status.UpdatedReplicas == *statefulSet.Spec.Replicas) &&
+		// and current revision is an updated one - meaning rolling update completed over all replicas
+		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
+}
+
+// strStatefulSetStatus returns human-friendly string representation of StatefulSet status
+func strStatefulSetStatus(status *apps.StatefulSetStatus) string {
+	return fmt.Sprintf(
+		"ObservedGeneration:%d Replicas:%d ReadyReplicas:%d CurrentReplicas:%d UpdatedReplicas:%d CurrentRevision:%s UpdateRevision:%s",
+		status.ObservedGeneration,
+		status.Replicas,
+		status.ReadyReplicas,
+		status.CurrentReplicas,
+		status.UpdatedReplicas,
+		status.CurrentRevision,
+		status.UpdateRevision,
+	)
+}
+
 // TODO move labels into models modules
 func (c *Controller) createChiFromObjectMeta(objectMeta *meta.ObjectMeta) (*chi.ClickHouseInstallation, error) {
 	// Parse Labels
@@ -283,87 +369,4 @@ func (c *Controller) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*
 	}
 
 	return cluster, nil
-}
-
-// hasStatefulSetReachedGeneration returns whether has StatefulSet reached the expected generation after upgrade or not
-func hasStatefulSetReachedGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
-	// StatefulSet has .spec generation we are waiting for
-	return (statefulSet.Generation == generation) &&
-		// and this .spec generation is being applied to replicas - it is observed right now
-		(statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
-		// and all replicas are in "Ready" status - meaning ready to be used - no failure inside
-		(statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas) &&
-		// and all replicas are of expected generation
-		(statefulSet.Status.CurrentReplicas == *statefulSet.Spec.Replicas) &&
-		// and all replicas are updated - meaning rolling update completed over all replicas
-		(statefulSet.Status.UpdatedReplicas == *statefulSet.Spec.Replicas) &&
-		// and current revision is an updated one - meaning rolling update completed over all replicas
-		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
-}
-
-// onStatefulSetUpdateFailed handles situation when StatefulSet update failed
-// It can try to revert StatefulSet to its previous version, specified in rollbackStatefulSet
-func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.StatefulSet) error {
-	// Convenience shortcuts
-	namespace := rollbackStatefulSet.Namespace
-	name := rollbackStatefulSet.Name
-
-	// What to do with StatefulSet - look into chop configuration settings
-	switch c.chopConfig.OnStatefulSetUpdateFailureAction {
-	case config.OnStatefulSetUpdateFailureActionAbort:
-		// Do nothing, just report appropriate error
-		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort\n", namespace, name)
-		return errors.New(fmt.Sprintf("Update failed on %s/%s", namespace, name))
-
-	case config.OnStatefulSetUpdateFailureActionRevert:
-		// Need to revert current StatefulSet to oldStatefulSet
-		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {
-			// Unable to get StatefulSet
-			return err
-		} else {
-			// Make copy of "previous" .Spec just to be sure nothing gets corrupted
-			// Update StatefulSet to its 'previous' oldStatefulSet - this is expected to rollback inapplicable changes
-			// Having StatefulSet .spec in rolled back status we need to delete current Pod - because in case of Pod being seriously broken,
-			// it is the only way to go. Just delete Pod and StatefulSet will recreated Pod with current .spec
-			// This will rollback Pod to previous .spec
-			statefulSet.Spec = *rollbackStatefulSet.Spec.DeepCopy()
-			statefulSet, err = c.kubeClient.AppsV1().StatefulSets(namespace).Update(statefulSet)
-			_ = c.statefulSetDeletePod(statefulSet)
-
-			return c.shouldContinueOnUpdateFailed()
-		}
-	default:
-		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s\n", c.chopConfig.OnStatefulSetUpdateFailureAction)
-		return nil
-	}
-
-	return errors.New(fmt.Sprintf("onStatefulSetUpdateFailed(%s/%s) - unknown position", namespace, name))
-}
-
-// shouldContinueOnUpdateFailed return nil in case 'continue' or error in case 'do not continue'
-func (c *Controller) shouldContinueOnUpdateFailed() error {
-	// Check configuration option regarding should we continue when errors met on the way
-	// c.chopConfig.OnStatefulSetUpdateFailureAction
-	var continueUpdate = false
-	if continueUpdate {
-		// Continue update
-		return nil
-	}
-
-	// Do not continue update
-	return errors.New(fmt.Sprintf("Update stopped due to previous errors"))
-}
-
-// strStatefulSetStatus returns human-friendly string representation of StatefulSet status
-func strStatefulSetStatus(status *apps.StatefulSetStatus) string {
-	return fmt.Sprintf(
-		"ObservedGeneration:%d Replicas:%d ReadyReplicas:%d CurrentReplicas:%d UpdatedReplicas:%d CurrentRevision:%s UpdateRevision:%s",
-		status.ObservedGeneration,
-		status.Replicas,
-		status.ReadyReplicas,
-		status.CurrentReplicas,
-		status.UpdatedReplicas,
-		status.CurrentRevision,
-		status.UpdateRevision,
-	)
 }
