@@ -18,7 +18,7 @@ echo "Install operator requirements"
 kubectl -n "${DEV_NAMESPACE}" apply -f ./custom-resource-definition.yaml
 kubectl -n "${DEV_NAMESPACE}" apply -f ./rbac-service.yaml
 
-if [[ ${INSTALL_FROM_PERSONAL_DEVELOP_DOCKERHUB} == "yes" ]]; then
+if [[ ${INSTALL_FROM_PERSONAL_DEV_MANIFEST} == "yes" ]]; then
     # Install operator from Docker Registry (dockerhub or whatever)
-    kubectl -n "${DEV_NAMESPACE}" apply -f ./deployment-dockerhub-sunsingerus-dev.yaml
+    kubectl -n "${DEV_NAMESPACE}" apply -f "${PERSONAL_DEV_INSTALL_MANIFEST}"
 fi
