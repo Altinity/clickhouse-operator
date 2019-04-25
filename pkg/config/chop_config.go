@@ -156,17 +156,17 @@ func (config *Config) normalize() error {
 	// Default action on Create/Update failure - to keep system in previous state
 
 	// Default Create Failure action - delete
-	if strings.ToLower(config.OnStatefulSetCreateFailureAction) == "abort" {
+	if strings.ToLower(config.OnStatefulSetCreateFailureAction) == OnStatefulSetCreateFailureActionAbort {
 		config.OnStatefulSetCreateFailureAction = OnStatefulSetCreateFailureActionAbort
 	} else {
 		config.OnStatefulSetCreateFailureAction = OnStatefulSetCreateFailureActionDelete
 	}
 
 	// Default Updated Failure action - revert
-	if strings.ToLower(config.OnStatefulSetUpdateFailureAction) == "abort" {
+	if strings.ToLower(config.OnStatefulSetUpdateFailureAction) == OnStatefulSetUpdateFailureActionAbort {
 		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionAbort
 	} else {
-		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionRevert
+		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionRollback
 	}
 
 	return nil

@@ -70,6 +70,7 @@ const (
 	// What to do in case StatefulSet can't reach new Generation - abort rolling update
 	OnStatefulSetUpdateFailureActionAbort = "abort"
 
-	// What to do in case StatefulSet can't reach new Generation - delete Pod and revert StatefulSet to previous Generation
-	OnStatefulSetUpdateFailureActionRevert = "revert"
+	// What to do in case StatefulSet can't reach new Generation - delete Pod and rollback StatefulSet to previous Generation
+	// Pod would be recreated by StatefulSet based on rollback-ed configuration
+	OnStatefulSetUpdateFailureActionRollback = "rollback"
 )
