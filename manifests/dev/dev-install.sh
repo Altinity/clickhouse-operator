@@ -20,5 +20,5 @@ kubectl -n "${DEV_NAMESPACE}" apply -f ./rbac-service.yaml
 
 if [[ ${INSTALL_FROM_PERSONAL_DEV_MANIFEST} == "yes" ]]; then
     # Install operator from Docker Registry (dockerhub or whatever)
-    kubectl -n "${DEV_NAMESPACE}" apply -f "${PERSONAL_DEV_INSTALL_MANIFEST}"
+    kubectl -n "${DEV_NAMESPACE}" apply -f <(cat "${PERSONAL_DEV_INSTALL_MANIFEST}" | PERSONAL_DEV_INSTALL_IMAGE="${PERSONAL_DEV_INSTALL_IMAGE}" envsubst)
 fi
