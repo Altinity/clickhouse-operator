@@ -17,8 +17,6 @@ package models
 import (
 	"bytes"
 	"fmt"
-	"github.com/golang/glog"
-
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	xmlbuilder "github.com/altinity/clickhouse-operator/pkg/models/builders/xml"
 )
@@ -56,11 +54,7 @@ func genConfigXML(data map[string]interface{}, section string) string {
 	fprintf(b, "<%s>\n", xmlTagYandex)
 	fprintf(b, "%4s<%s>\n", " ", section)
 
-	err := xmlbuilder.GenerateXML(b, data, 4, 4)
-	if err != nil {
-		glog.V(2).Infof(err.Error())
-		return ""
-	}
+	xmlbuilder.GenerateXML(b, data, 4, 4)
 	//		<SECTION>
 	// <yandex>
 	fprintf(b, "%4s</%s>\n", " ", section)
@@ -78,11 +72,7 @@ func generateSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
 	b := &bytes.Buffer{}
 	// <yandex>
 	fprintf(b, "<%s>\n", xmlTagYandex)
-	err := xmlbuilder.GenerateXML(b, chi.Spec.Configuration.Settings, 0, 4, configUsers, configProfiles, configQuotas)
-	if err != nil {
-		glog.V(2).Infof(err.Error())
-		return ""
-	}
+	xmlbuilder.GenerateXML(b, chi.Spec.Configuration.Settings, 0, 4, configUsers, configProfiles, configQuotas)
 	// </yandex>
 	fprintf(b, "</%s>\n", xmlTagYandex)
 
@@ -98,11 +88,9 @@ func generateListenConfig(chi *chiv1.ClickHouseInstallation) string {
     <listen_host>0.0.0.0</listen_host>
     <listen_try>1</listen_try>
 
-    <!--
     <logger>
         <console>1</console>
     </logger>
-    -->
 </yandex>
 `
 }

@@ -129,7 +129,7 @@ func CreateController(
 			if !controller.chopConfig.IsWatchedNamespace(chi.Namespace) {
 				return
 			}
-			glog.V(1).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
+			//glog.V(1).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
 			controller.enqueueObject(NewReconcileChi(reconcileAdd, nil, chi))
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -138,39 +138,15 @@ func CreateController(
 			if !controller.chopConfig.IsWatchedNamespace(newChi.Namespace) {
 				return
 			}
-			glog.V(1).Info("chiInformer.UpdateFunc")
-			/*
-				// Update is called on after each Update() call on k8s resource
-				if oldChi.IsNew() && !newChi.IsNew() {
-					glog.V(1).Infof("chiInformer.UpdateFunc - no update required - switch from new to known chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
-					return
-				}
-
-				// Update is called periodically, don't know why
-				if newChi.ResourceVersion == oldChi.ResourceVersion {
-					glog.V(1).Info("chiInformer.UpdateFunc - ResourceVersion is the same - periodical housekeeping")
-				} else {
-					// Looks like real update has happened
-					glog.V(1).Infof("chiInformer.UpdateFunc - UPDATE REQUIRED chi.ResourceVersion: %s->%s", oldChi.ResourceVersion, newChi.ResourceVersion)
-					glog.V(1).Infof("\n===old===:\n%s\n===new===:\n%s\n=========\n", chopmodels.Yaml(oldChi), chopmodels.Yaml(newChi))
-				}
-			*/
-
+			//glog.V(1).Info("chiInformer.UpdateFunc")
 			controller.enqueueObject(NewReconcileChi(reconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: func(obj interface{}) {
-
-			// TODO
-			// IMPORTANT
-			// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
-			// To achieve ordered and graceful termination of the pods in the StatefulSet,
-			// it is possible to scale the StatefulSet down to 0 prior to deletion.
-
 			chi := obj.(*chop.ClickHouseInstallation)
 			if !controller.chopConfig.IsWatchedNamespace(chi.Namespace) {
 				return
 			}
-			glog.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
+			//glog.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
 			controller.enqueueObject(NewReconcileChi(reconcileDelete, chi, nil))
 		},
 	})
@@ -181,7 +157,7 @@ func CreateController(
 			if !controller.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("serviceInformer AddFunc %s/%s", service.Namespace, service.Name)
+			//glog.V(1).Infof("serviceInformer AddFunc %s/%s", service.Namespace, service.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldService := old.(*core.Service)
@@ -192,7 +168,7 @@ func CreateController(
 
 			diff, equal := messagediff.DeepDiff(oldService, newService)
 			if equal {
-				glog.V(1).Infof("onUpdateService(%s/%s): no changes found", oldService.Namespace, oldService.Name)
+				//glog.V(1).Infof("onUpdateService(%s/%s): no changes found", oldService.Namespace, oldService.Name)
 				// No need tor react
 				return
 			}
@@ -230,7 +206,7 @@ func CreateController(
 			if !controller.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("serviceInformer DeleteFunc %s/%s", service.Namespace, service.Name)
+			//glog.V(1).Infof("serviceInformer DeleteFunc %s/%s", service.Namespace, service.Name)
 		},
 	})
 
@@ -240,7 +216,7 @@ func CreateController(
 			if !controller.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("endpointsInformer AddFunc %s/%s", endpoints.Namespace, endpoints.Name)
+			//glog.V(1).Infof("endpointsInformer AddFunc %s/%s", endpoints.Namespace, endpoints.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldEndpoints := old.(*core.Endpoints)
@@ -251,8 +227,8 @@ func CreateController(
 
 			diff, equal := messagediff.DeepDiff(oldEndpoints, newEndpoints)
 			if equal {
-				glog.V(1).Infof("onUpdateEndpoints(%s/%s): no changes found", oldEndpoints.Namespace, oldEndpoints.Name)
-				// No need tor react
+				//glog.V(1).Infof("onUpdateEndpoints(%s/%s): no changes found", oldEndpoints.Namespace, oldEndpoints.Name)
+				// No need to react
 				return
 			}
 
@@ -294,7 +270,7 @@ func CreateController(
 			if !controller.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("endpointsInformer DeleteFunc %s/%s", endpoints.Namespace, endpoints.Name)
+			//glog.V(1).Infof("endpointsInformer DeleteFunc %s/%s", endpoints.Namespace, endpoints.Name)
 		},
 	})
 
@@ -304,21 +280,21 @@ func CreateController(
 			if !controller.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("configMapInformer AddFunc %s/%s", configMap.Namespace, configMap.Name)
+			//glog.V(1).Infof("configMapInformer AddFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			configMap := old.(*core.ConfigMap)
 			if !controller.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("configMapInformer UpdateFunc %s/%s", configMap.Namespace, configMap.Name)
+			//glog.V(1).Infof("configMapInformer UpdateFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
 			if !controller.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("configMapInformer DeleteFunc %s/%s", configMap.Namespace, configMap.Name)
+			//glog.V(1).Infof("configMapInformer DeleteFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 	})
 
@@ -328,7 +304,7 @@ func CreateController(
 			if !controller.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("statefulSetInformer AddFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			//glog.V(1).Infof("statefulSetInformer AddFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
 			//controller.handleObject(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -336,14 +312,14 @@ func CreateController(
 			if !controller.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("statefulSetInformer UpdateFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			//glog.V(1).Infof("statefulSetInformer UpdateFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
 			if !controller.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("statefulSetInformer DeleteFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			//glog.V(1).Infof("statefulSetInformer DeleteFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
 			//controller.handleObject(obj)
 		},
 	})
@@ -354,21 +330,21 @@ func CreateController(
 			if !controller.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("podInformer AddFunc %s/%s", pod.Namespace, pod.Name)
+			//glog.V(1).Infof("podInformer AddFunc %s/%s", pod.Namespace, pod.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			pod := old.(*core.Pod)
 			if !controller.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("podInformer UpdateFunc %s/%s", pod.Namespace, pod.Name)
+			//glog.V(1).Infof("podInformer UpdateFunc %s/%s", pod.Namespace, pod.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
 			if !controller.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
-			glog.V(1).Infof("podInformer DeleteFunc %s/%s", pod.Namespace, pod.Name)
+			//glog.V(1).Infof("podInformer DeleteFunc %s/%s", pod.Namespace, pod.Name)
 		},
 	})
 
@@ -480,7 +456,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateStarted, fmt.Sprintf("onAddChi(%s/%s)", chi.Namespace, chi.Name))
 	chi, err := chopmodels.ChiApplyTemplateAndNormalize(chi, c.chopConfig)
 	if err != nil {
-		glog.V(2).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
+		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
 		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to normalize", chi.Name))
 		return err
 	}
@@ -488,7 +464,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateInProgress, fmt.Sprintf("onAddChi(%s/%s) create objects", chi.Namespace, chi.Name))
 	err = c.createOrUpdateChiResources(chi)
 	if err != nil {
-		glog.V(2).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
+		glog.V(1).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
 		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to create", chi.Name))
 		return err
 	}
@@ -496,12 +472,12 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	// Update CHI status in k8s
 	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateInProgress, fmt.Sprintf("onAddChi(%s/%s) create CHI", chi.Namespace, chi.Name))
 	if err := c.updateCHIResource(chi); err != nil {
-		glog.V(2).Infof("ClickHouseInstallation (%q): unable to update status of CHI resource: %q", chi.Name, err)
+		glog.V(1).Infof("ClickHouseInstallation (%q): unable to update status of CHI resource: %q", chi.Name, err)
 		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to update CHI Resource", chi.Name))
 		return err
 	}
 
-	glog.V(2).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
+	glog.V(1).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
 	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted, fmt.Sprintf("onAddChi(%s/%s)", chi.Namespace, chi.Name))
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
@@ -642,13 +618,13 @@ func (c *Controller) handleObject(obj interface{}) {
 		return
 	}
 
-	glog.V(2).Infof("Processing object: %s", object.GetName())
+	glog.V(1).Infof("Processing object: %s", object.GetName())
 
 	// Get owner - it is expected to be CHI
 	chi, err := c.chiLister.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
 
 	if err != nil {
-		glog.V(2).Infof("ignoring orphaned object '%s' of ClickHouseInstallation '%s'", object.GetSelfLink(), ownerRef.Name)
+		glog.V(1).Infof("ignoring orphaned object '%s' of ClickHouseInstallation '%s'", object.GetSelfLink(), ownerRef.Name)
 		return
 	}
 
