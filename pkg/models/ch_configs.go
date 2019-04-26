@@ -98,11 +98,9 @@ func generateListenConfig(chi *chiv1.ClickHouseInstallation) string {
     <listen_host>0.0.0.0</listen_host>
     <listen_try>1</listen_try>
 
-    <!--
     <logger>
         <console>1</console>
     </logger>
-    -->
 </yandex>
 `
 }
