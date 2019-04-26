@@ -20,9 +20,12 @@ import (
 
 const (
 	// ChopGeneratedLabel applied to all objects created by the ClickHouse Operator
-	ChopGeneratedLabel = clickhousealtinitycom.GroupName + "/chop"
-	ChiGeneratedLabel  = clickhousealtinitycom.GroupName + "/chi"
-	ZkVersionLabel     = clickhousealtinitycom.GroupName + "/zkv"
+	ChopGeneratedLabel         = clickhousealtinitycom.GroupName + "/chop"
+	ChiGeneratedLabel          = clickhousealtinitycom.GroupName + "/chi"
+	ClusterGeneratedLabel      = clickhousealtinitycom.GroupName + "/cluster"
+	ClusterIndexGeneratedLabel = clickhousealtinitycom.GroupName + "/clusterIndex"
+	ReplicaIndexGeneratedLabel = clickhousealtinitycom.GroupName + "/replicaIndex"
+	ZkVersionLabel             = clickhousealtinitycom.GroupName + "/zkv"
 )
 
 const (
@@ -129,18 +132,18 @@ const (
 	// In this pattern "%s" is substituted with fullDeploymentIDPattern-generated value
 	// Ex.: svc-1eb454-2
 	statefulSetServiceNamePattern = "chi-%s-%s-%d-%d"
-	
+
 	// namespaceDomainPattern presents Domain Name pattern of a namespace
 	// In this pattern "%s" is substituted namespace name's value
 	// Ex.: my-dev-namespace.svc.cluster.local
 	namespaceDomainPattern = "%s.svc.cluster.local"
-	
+
 	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
 	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
 	// In this pattern "%s" is substituted with clickhouse installation name - 'replcluster' in this case
 	// Ex.: test
 	chiServiceNamePattern = "clickhouse-%s"
-	
+
 	chiServiceFQDNPattern = chiServiceNamePattern + "." + namespaceDomainPattern
 
 	// NAME                READY   STATUS    RESTARTS   AGE   IP            NODE   NOMINATED NODE   READINESS GATES
@@ -151,7 +154,7 @@ const (
 	// podFQDNPattern consists of 3 parts:
 	// 1. nameless service of of stateful set
 	// 2. namespace name
-	// 3. 
+	// 3.
 	// ss-1eb454-2-0.my-dev-domain.svc.cluster.local
 	podFQDNPattern = podHostnamePattern + "." + namespaceDomainPattern
 
@@ -167,7 +170,7 @@ const (
 	// Ex.: chi-example02-common-configd for chi named as 'example02'
 	configMapCommonNamePattern = "chi-%s-common-configd"
 
-	// configMapCommonusersNamePattern is a template of common users settings for the CHI ConfigMap
+	// configMapCommonUsersNamePattern is a template of common users settings for the CHI ConfigMap
 	// Ex.: chi-example02-common-usersd for chi named as 'example02'
 	configMapCommonUsersNamePattern = "chi-%s-common-usersd"
 
@@ -181,10 +184,7 @@ const (
 const (
 	chDefaultDockerImage         = "yandex/clickhouse-server:latest"
 	chDefaultVolumeMountNameData = "clickhouse-data"
-)
-
-const (
-	useDefaultPersistentVolumeClaimMacro = "USE_DEFAULT_NAME"
+	ClickHouseContainerIndex     = 0
 )
 
 const (

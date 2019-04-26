@@ -30,7 +30,7 @@ const (
 	chQueryDefaultTimeout = 10 * time.Second
 )
 
-// Query runs given sql and writes results into data
+// Query runs given sql as GET and writes results into data
 func Query(data *[][]string, sql string, hostname string) error {
 	if len(sql) == 0 {
 		return nil
@@ -40,12 +40,14 @@ func Query(data *[][]string, sql string, hostname string) error {
 		return err
 	}
 	encodeQuery(url, sql)
-	httpCall(data, url.String(), "GET")
+	err = httpCall(data, url.String(), "GET")
 
 	glog.V(1).Infof("clickhouseSQL(%s)'%s'rows:%d", hostname, sql, len(*data))
-	return nil
+
+	return err
 }
 
+// Exec runs given sql as POST and writes results into data
 func Exec(data *[][]string, sql string, hostname string) error {
 	if len(sql) == 0 {
 		return nil
@@ -55,10 +57,11 @@ func Exec(data *[][]string, sql string, hostname string) error {
 		return err
 	}
 	encodeQuery(url, sql)
-	httpCall(data, url.String(), "POST")
+	err = httpCall(data, url.String(), "POST")
 
 	glog.V(1).Infof("clickhouseSQL(%s)'%s'rows:%d", hostname, sql, len(*data))
-	return nil
+
+	return err
 }
 
 // encodeQuery injects SQL command into url.URL query

@@ -221,3 +221,14 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation) {
 	// Copy Status for now
 	chi.Status = from.Status
 }
+
+func (chi *ClickHouseInstallation) FindCluster(name string) *ChiCluster {
+	var cluster *ChiCluster
+	chi.WalkClusters(func(c *ChiCluster) error {
+		if c.Name == name {
+			cluster = c
+		}
+		return nil
+	})
+	return cluster
+}

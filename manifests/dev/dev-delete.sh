@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DEV_NAMESPACE="dev"
+. ./dev-config.sh
 
 if kubectl get namespace "${DEV_NAMESPACE}"; then
     echo "Delete ${DEV_NAMESPACE} namespace"

@@ -15,7 +15,6 @@
 package xml
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"regexp"
@@ -24,111 +23,143 @@ import (
 )
 
 type xmlNode struct {
-	childs []*xmlNode
-	tag    string
-	value  string
+	children []*xmlNode
+	tag      string
+	value    interface{}
 }
 
 const xmlBuildError = "Unable to build XML: incorrect structure of definitions"
 
 // GenerateXML creates XML representation from the provided input
-func GenerateXML(w io.Writer, input map[string]string, depth, step uint8, excludes ...string) error {
-	// preparing the data
+func GenerateXML(w io.Writer, input map[string]interface{}, indent, tabsize uint8, excludes ...string) error {
 	re := regexp.MustCompile("//+")
-	keys := make([]string, 0, len(input))
-	data := make(map[string]string)
-	for k, v := range input {
-		nk := re.ReplaceAllString(strings.Trim(k, "/"), "/")
-		if nk == "" || checkExcludes(nk, excludes) {
+
+	// paths is sorted set of normalized paths (maps keys) from 'input'
+	paths := make([]string, 0, len(input))
+
+	// data is copy of 'input' with:
+	// 1. paths (map keys) are normalized in terms of trimmed '/'
+	// 2. all excludes are excluded
+	data := make(map[string]interface{})
+	// Skip excluded paths
+	for key, value := range input {
+		// key may be non-normalized, and may have starting or trailing '/'
+		// path is normalized path without starting and trailing '/', ex.: 'test/quotas'
+		path := re.ReplaceAllString(strings.Trim(key, "/"), "/")
+		if path == "" || checkExcludes(path, excludes) {
 			continue
 		}
-		keys = append(keys, nk)
-		data[nk] = v
+		paths = append(paths, path)
+		data[path] = value
 	}
-	sort.Strings(keys)
-	// xmlTree - root of the XML tree data structure
-	xmlTree := &xmlNode{
-		childs: make([]*xmlNode, 0, len(data)),
-	}
-	// reading all tags and values into the tree structure
-	for _, k := range keys {
-		v := data[k]
-		var val string
-		tags := strings.Split(k, "/")
-		last := len(tags) - 1
-		if last < 0 {
+	sort.Strings(paths)
+
+	// xmlTreeRoot - root of the XML tree data structure
+	xmlTreeRoot := new(xmlNode)
+
+	// Read all tags and values into the tree structure
+	for _, path := range paths {
+		// Split path (test/quotas) into tags which would be 'test' and 'quota'
+		tags := strings.Split(path, "/")
+		if len(tags) == 0 {
+			// Empty path? Should not be, but double check
 			continue
-		} else if last == 0 {
-			val = v
 		}
-		node := xmlTree.addChild(&xmlNode{
-			tag:   tags[0],
-			value: val,
-		})
-		for j := 1; j <= last; j++ {
-			if j == last {
-				val = v
-			}
-			node = node.addChild(&xmlNode{
-				tag:   tags[j],
-				value: val,
-			})
-		}
+		xmlTreeRoot.addBranch(tags, data[path])
 	}
-	// building XML document
-	return xmlTree.buildXML(w, depth, step)
+
+	// return XML
+	return xmlTreeRoot.buildXML(w, indent, tabsize)
 }
 
-// addChild checks list of xmlNode childs in order to match corresponding tags,
-// if no match - it sets the node as a new child, otherwise returns matched child
-func (n *xmlNode) addChild(node *xmlNode) *xmlNode {
-	if len(n.childs) > 0 {
-		for i := range n.childs {
-			// set existing child as a reference to the node with the same tag
-			if n.childs[i].tag == node.tag {
-				return n.childs[i]
-			}
+// addBranch ensures branch esists and assign value to the last tagged node
+func (n *xmlNode) addBranch(tags []string, value interface{}) {
+	node := n
+	for _, tag := range tags {
+		node = node.addChild(tag)
+	}
+	node.value = value
+}
+
+// addChild add new or return existing child with matching tag
+func (n *xmlNode) addChild(tag string) *xmlNode {
+	if n.children == nil {
+		n.children = make([]*xmlNode, 0, 0)
+	}
+
+	// Check for such tag exists
+	for i := range n.children {
+		if n.children[i].tag == tag {
+			// Already have such a tag
+			return n.children[i]
 		}
 	}
-	// setting the "node" parameter as a new child of the node "n"
-	n.childs = append(n.childs, node)
+
+	// No this is new tag - add as a child
+	node := &xmlNode{
+		tag: tag,
+	}
+	n.children = append(n.children, node)
+
 	return node
 }
 
 // buildXML generates XML from xmlNode type linked list
-func (n *xmlNode) buildXML(w io.Writer, depth, step uint8) error {
-	hasChilds := len(n.childs) > 0
-	x := ""
-	if hasChilds {
-		if n.value != "" {
-			return errors.New(xmlBuildError)
+func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) error {
+	switch n.value.(type) {
+	case []interface{}:
+		for _, value := range n.value.([]interface{}) {
+			stringValue := value.(string)
+			n.printTagWithValue(w, stringValue, indent, tabsize)
 		}
-		x = "\n"
+	case string:
+		n.printTagWithValue(w, n.value.(string), indent, tabsize)
+	default:
+		n.printTagNoValue(w, indent, tabsize)
 	}
-	n.printTag(w, depth, " ", "", x)
-	for i := range n.childs {
-		err := n.childs[i].buildXML(w, depth+step, step)
-		if err != nil {
-			return err
-		}
-	}
-	space := " "
-	d := depth
-	if !hasChilds {
-		fmt.Fprintf(w, "%s", n.value)
-		space = ""
-		d = 0
-	}
-	n.printTag(w, d, space, "/", "\n")
+
 	return nil
 }
 
-// printTag prints XML tag with io.Writer
-func (n *xmlNode) printTag(w io.Writer, d uint8, sp, s, l string) {
-	if n.tag != "" {
-		pattern := fmt.Sprintf("%%%ds<%%s%%s>%%s", d)
-		fmt.Fprintf(w, pattern, sp, s, n.tag, l)
+func (n *xmlNode) printTagNoValue(w io.Writer, indent, tabsize uint8) {
+	n.printTag(w, indent, true, "\n")
+	for i := range n.children {
+		n.children[i].buildXML(w, indent+tabsize, tabsize)
 	}
+	n.printTag(w, indent, false, "\n")
+}
+
+func (n *xmlNode) printTagWithValue(w io.Writer, value string, indent, tabsize uint8) {
+	n.printTag(w, indent, true, "\n")
+	for i := range n.children {
+		n.children[i].buildXML(w, indent+tabsize, tabsize)
+	}
+	n.printValue(w, value, indent+tabsize, "\n")
+	n.printTag(w, indent, false, "\n")
+}
+
+// printTag prints XML tag into io.Writer
+func (n *xmlNode) printTag(w io.Writer, indent uint8, openTag bool, eol string) {
+	if n.tag == "" {
+		return
+	}
+
+	pattern := ""
+	if openTag {
+		// pattern would be: %4s<%s>%s
+		pattern = fmt.Sprintf("%%%ds<%%s>%%s", indent)
+	} else {
+		// pattern would be: %4s</%s>%s
+		pattern = fmt.Sprintf("%%%ds</%%s>%%s", indent)
+	}
+	fmt.Fprintf(w, pattern, " ", n.tag, eol)
+}
+
+// printTag prints XML value into io.Writer
+func (n *xmlNode) printValue(w io.Writer, value string, indent uint8, eol string) {
+	// pattern would be: %4s%s%s
+	pattern := fmt.Sprintf("%%%ds%%s%%s", indent)
+	fmt.Fprintf(w, pattern, " ", value, eol)
 }
 
 // checkExcludes returns true if first tag of the key matches item with excludes list

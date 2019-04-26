@@ -30,24 +30,22 @@ func (configuration *ChiConfiguration) MergeFrom(from *ChiConfiguration) {
 }
 
 // mapMergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`
-func mapMergeFrom(dst, src *map[string]string) {
+func mapMergeFrom(dst, src *map[string]interface{}) {
 	if (src == nil) || (*src == nil) {
 		return
 	}
 
 	if *dst == nil {
-		*dst = make(map[string]string)
+		*dst = make(map[string]interface{})
 	}
 
 	for key, value := range *src {
 		if _, ok := (*dst)[key]; ok {
-			// Such a key already in dst
+			// Such key already exists in dst
 			continue
 		}
 
 		// No such a key in dst
-		if len(value) > 0 {
-			(*dst)[key] = value
-		}
+		(*dst)[key] = value
 	}
 }
