@@ -45,6 +45,8 @@ The ClickHouse Operator for Kubernetes currently provides the following:
  * [Prometheus & clickhouse-operator integration][prometheus_setup]
  * [Grafana & Prometheus integration][grafana_setup]
 
+**All docs**
+ * [All available docs list][all_docs_list]
 ## License
 
 Copyright (c) 2019, Altinity Ltd and/or its affiliates. All rights reserved.
@@ -67,3 +69,4 @@ See [LICENSE](./LICENSE) for more details.
 [update_clickhouse_version]: ./docs/chi_update_clickhouse_version.md
 [schema_migration]: ./docs/schema_migration.md
 [operator_configuration]: ./docs/operator_configuration.md
+[all_docs_list]: ./docs/README.md
