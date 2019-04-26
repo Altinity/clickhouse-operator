@@ -5,6 +5,7 @@ metadata:
 spec:
   configuration:
     users:
+      # test user has 'password' specified, while admin user has 'password_sha256_hex' specified
       test/password: qwerty
       test/networks/ip:
         - "127.0.0.1/32"
@@ -15,10 +16,12 @@ spec:
         - "dbname1"
         - "dbname2"
         - "dbname3"
+      # admin use has 'password_sha256_hex' so actual password value is not published
       admin/password_sha256_hex: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
       admin/networks/ip: "127.0.0.1/32"
       admin/profile: default
       admin/quota: default
+      # readonly user has 'password' field specified, not 'password_sha256_hex' as admin user above
       readonly/password: readonly_password
       readonly/profile: readonly
       readonly/quota: default
