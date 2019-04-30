@@ -13,11 +13,13 @@ ClickHouse Operator is in beta. You can use it at your own risk. There may be ba
 
 The ClickHouse Operator for Kubernetes currently provides the following:
 
-- Creates cluster of the ClickHouse database based on Custom Resource [specification][crd_spec] provided
-- Supports Storage customization (VolumeClaim templates)
-- Supports Pod template customization (Volume and Container templates)
-- Supports ClickHouse configuration customization (including Zookeeper integration)
-- Supports ClickHouse metrics export to Prometheus
+- Creates ClickHouse cluster based on Custom Resource [specification][crd_spec] provided
+- Storage customization (VolumeClaim templates)
+- Pod template customization (Volume and Container templates)
+- ClickHouse configuration customization (including Zookeeper integration)
+- ClickHouse cluster scaling including automatic schema propagation
+- ClickHouse cluster version upgrades
+- Exporting ClickHouse metrics to Prometheus
 
 ## Requirements
 
@@ -40,11 +42,14 @@ The ClickHouse Operator for Kubernetes currently provides the following:
  * Adding shards and replicas
    * [Automatic schema creation][schema_migration]
  * [Update ClickHouse version][update_clickhouse_version]
+ * [Update Operator version][update_operator]
 
 **Monitoring**
  * [Prometheus & clickhouse-operator integration][prometheus_setup]
  * [Grafana & Prometheus integration][grafana_setup]
 
+**All docs**
+ * [All available docs list][all_docs_list]
 ## License
 
 Copyright (c) 2019, Altinity Ltd and/or its affiliates. All rights reserved.
@@ -65,5 +70,7 @@ See [LICENSE](./LICENSE) for more details.
 [storage]: ./docs/storage.md
 [update_cluster_add_replication]: ./docs/chi_update_add_replication.md
 [update_clickhouse_version]: ./docs/chi_update_clickhouse_version.md
+[update_operator]: ./docs/operator_upgrade.md
 [schema_migration]: ./docs/schema_migration.md
 [operator_configuration]: ./docs/operator_configuration.md
+[all_docs_list]: ./docs/README.md

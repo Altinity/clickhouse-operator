@@ -1,0 +1,29 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "incorrect-settings-update"
+spec:
+  configuration:
+    users:
+      test/password: qwerty
+      test/networks/ip:
+        - "::/0"
+      test/profile: test_profile
+      test/quota: test_quota
+      test/allow_databases/database:
+        - "dbname1"
+        - "dbname2"
+        - "dbname3"
+    profiles:
+      test_profile/max_memory_usage: "1000000000"
+      test_profile/readonly: "1"
+    quotas:
+      test_quota/interval/duration: "3600"
+    settings:
+      compression/case/method: zstd
+    clusters:
+      - name: "standard"
+        layout:
+          type: Standard
+          shardsCount: 1
+          replicasCount: 1

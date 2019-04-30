@@ -30,7 +30,7 @@ chiTemplatesPath: templates.d
 
 ###########################################
 ##
-## Cluster Update Section
+## Cluster Create/Update/Delete Objects Section
 ##
 ###########################################
 
@@ -40,6 +40,16 @@ statefulSetUpdateTimeout: 50
 # How many seconds to wait between checks for created/updated StatefulSet status
 statefulSetUpdatePollPeriod: 2
 
-# What to do in case created/updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
-onStatefulSetUpdateFailureAction: abort
+# What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+# Possible options:
+# 1. abort - do nothing, just break the process and wait for admin
+# 2. delete - delete newly created problematic StatefulSet
+onStatefulSetCreateFailureAction: delete
+
+# What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+# Possible options:
+# 1. abort - do nothing, just break the process and wait for admin
+# 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
+# Pod would be recreated by StatefulSet based on rollback-ed configuration
+onStatefulSetUpdateFailureAction: rollback
 ```
