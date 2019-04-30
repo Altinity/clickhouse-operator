@@ -50,7 +50,7 @@ Pod Template:
 If we want to update to the new version, we can run following command:
   
 ```
-kubectl set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:0.2.2 -n kube-system
+kubectl set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:0.2.1 -n kube-system
 deployment.apps/clickhouse-operator image updated
 ```
   
