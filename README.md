@@ -40,6 +40,7 @@ The ClickHouse Operator for Kubernetes currently provides the following:
  * Adding shards and replicas
    * [Automatic schema creation][schema_migration]
  * [Update ClickHouse version][update_clickhouse_version]
+ * [Update Operator version][update_operator]
 
 **Monitoring**
  * [Prometheus & clickhouse-operator integration][prometheus_setup]
@@ -67,6 +68,7 @@ See [LICENSE](./LICENSE) for more details.
 [storage]: ./docs/storage.md
 [update_cluster_add_replication]: ./docs/chi_update_add_replication.md
 [update_clickhouse_version]: ./docs/chi_update_clickhouse_version.md
+[update_operator]: ./docs/operator_upgrade.md
 [schema_migration]: ./docs/schema_migration.md
 [operator_configuration]: ./docs/operator_configuration.md
 [all_docs_list]: ./docs/README.md
