@@ -44,7 +44,7 @@ import (
 )
 
 // Version defines current build versionRequest
-const Version = "0.2.0-beta"
+const Version = "0.2.2"
 
 // Prometheus exporter defaults
 const (
