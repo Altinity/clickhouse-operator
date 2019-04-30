@@ -38,26 +38,22 @@ func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) e
 
 	// Delete StatefulSet
 	statefulSetName := chopmodels.CreateStatefulSetName(replica)
-	if err := c.kubeClient.AppsV1().StatefulSets(replica.Address.Namespace).Delete(statefulSetName, newDeleteOptions()); err == nil {
-		glog.Infof("StatefulSet %s deleted", statefulSetName)
-	} else {
-		glog.Fatalf("%v\n", err)
-	}
+	c.statefulSetDelete(replica.Address.Namespace, statefulSetName)
 
 	// Delete ConfigMap
 	configMapName := chopmodels.CreateConfigMapDeploymentName(replica)
 	if err := c.kubeClient.CoreV1().ConfigMaps(replica.Address.Namespace).Delete(configMapName, newDeleteOptions()); err == nil {
-		glog.Infof("ConfigMap %s deleted", configMapName)
+		glog.V(1).Infof("ConfigMap %s deleted", configMapName)
 	} else {
-		glog.Fatalf("%v\n", err)
+		glog.V(1).Infof("ConfigMap delete FAILED %v\n", err)
 	}
 
 	// Delete Service
 	statefulSetServiceName := chopmodels.CreateStatefulSetServiceName(replica)
 	if err := c.kubeClient.CoreV1().Services(replica.Address.Namespace).Delete(statefulSetServiceName, newDeleteOptions()); err == nil {
-		glog.Infof("Service %s deleted", statefulSetServiceName)
+		glog.V(1).Infof("Service %s deleted", statefulSetServiceName)
 	} else {
-		glog.Fatalf("%v\n", err)
+		glog.V(1).Infof("Server delete FAILED %v\n", err)
 	}
 
 	return nil
@@ -93,29 +89,59 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
 	// Delete ConfigMap
 	err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommon, newDeleteOptions())
 	if err == nil {
-		glog.Infof("OK delete ConfigMap %s %v\n", configMapCommon, err)
+		glog.V(1).Infof("OK delete ConfigMap %s\n", configMapCommon)
 	} else {
-		glog.Infof("FAIL delete ConfigMap %s %v\n", configMapCommon, err)
+		glog.V(1).Infof("FAIL delete ConfigMap %s %v\n", configMapCommon, err)
 	}
 
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommonUsersName, newDeleteOptions())
 	if err == nil {
-		glog.Infof("OK delete ConfigMap %s %v\n", configMapCommonUsersName, err)
+		glog.V(1).Infof("OK delete ConfigMap %s\n", configMapCommonUsersName)
 	} else {
-		glog.Infof("FAIL delete ConfigMap %s %v\n", configMapCommonUsersName, err)
+		glog.V(1).Infof("FAIL delete ConfigMap %s %v\n", configMapCommonUsersName, err)
 	}
 
 	chiServiceName := chopmodels.CreateChiServiceName(chi)
 	// Delete Service
 	err = c.kubeClient.CoreV1().Services(chi.Namespace).Delete(chiServiceName, newDeleteOptions())
 	if err == nil {
-		glog.Infof("OK delete Service %s %v\n", chiServiceName, err)
+		glog.V(1).Infof("OK delete Service %s\n", chiServiceName)
 	} else {
-		glog.Infof("FAIL delete Service %s %v\n", chiServiceName, err)
+		glog.V(1).Infof("FAIL delete Service %s %v\n", chiServiceName, err)
 	}
 }
 
 // statefulSetDeletePod delete all pod of a StatefulSet. This requests StatefulSet to relaunch deleted pods
 func (c *Controller) statefulSetDeletePod(statefulSet *apps.StatefulSet) error {
-	return c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(chopmodels.CreatePodName(statefulSet), newDeleteOptions())
+	name := chopmodels.CreatePodName(statefulSet)
+	glog.V(1).Infof("Delete Pod %s/%s\n", statefulSet.Namespace, name)
+	return c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(name, newDeleteOptions())
+}
+
+// statefulSetDelete gracefully deletes StatefulSet through zeroing Pod's count
+func (c *Controller) statefulSetDelete(namespace, name string) error {
+	// IMPORTANT
+	// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
+	// To achieve ordered and graceful termination of the pods in the StatefulSet,
+	// it is possible to scale the StatefulSet down to 0 prior to deletion.
+
+	statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name)
+	if err != nil {
+		return nil
+	}
+
+	// Zero pods count. This is the proper and graceful way to delete StatefulSet
+	var zero int32 = 0
+	statefulSet.Spec.Replicas = &zero
+	statefulSet, _ = c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Update(statefulSet)
+	_ = c.waitStatefulSetGeneration(statefulSet.Namespace, statefulSet.Name, statefulSet.Generation)
+
+	// And now delete empty StatefulSet
+	if err := c.kubeClient.AppsV1().StatefulSets(namespace).Delete(name, newDeleteOptions()); err == nil {
+		glog.V(1).Infof("StatefulSet %s/%s deleted", namespace, name)
+	} else {
+		glog.V(1).Infof("StatefulSet FAILED TO DELETE %v\n", err)
+	}
+
+	return nil
 }

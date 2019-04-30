@@ -1,12 +1,18 @@
 #!/bin/bash
 
+# Run clickhouse-operator
+# Do not forget to update version
+
+source ./binary_build_config.sh
+LOG_DIR=${CUR_DIR}/log
+
 echo -n "Building binary, please wait..."
-if ./build_binary.sh; then
+if ./binary_build.sh; then
     echo "successfully built clickhouse-operator. Starting"
 
-    mkdir -p log
-    rm -f log/clickhouse-operator.*.log.*
-    ./clickhouse-operator \
+    mkdir -p ${LOG_DIR}
+    rm -f ${LOG_DIR}/clickhouse-operator.*.log.*
+    ${OPERATOR_BIN} \
     	-alsologtostderr=true \
     	-log_dir=log \
     	-v=1
@@ -19,12 +25,12 @@ if ./build_binary.sh; then
 # -stderrthreshold=FATAL Log events at or above this severity are logged to standard	error as well as to files
 
     # And clean binary after run. It'll be rebuilt next time
-    ./clean_binary.sh
+    ./binary_clean.sh
 
     echo "======================"
     echo "=== Logs available ==="
     echo "======================"
-    ls log/*
+    ls ${LOG_DIR}/*
 else
     echo "unable to build clickhouse-operator"
 fi

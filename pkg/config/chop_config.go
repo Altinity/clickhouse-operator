@@ -144,17 +144,29 @@ func (config *Config) normalize() error {
 
 	// Process Rolling update section
 	if config.StatefulSetUpdateTimeout == 0 {
-		config.StatefulSetUpdateTimeout = 3600
+		// Default update timeout in seconds
+		config.StatefulSetUpdateTimeout = 120
 	}
 
 	if config.StatefulSetUpdatePollPeriod == 0 {
-		config.StatefulSetUpdatePollPeriod = 1
+		// Default polling period in seconds
+		config.StatefulSetUpdatePollPeriod = 15
 	}
 
-	if strings.ToLower(config.OnStatefulSetUpdateFailureAction) == "revert" {
-		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionRevert
+	// Default action on Create/Update failure - to keep system in previous state
+
+	// Default Create Failure action - delete
+	if strings.ToLower(config.OnStatefulSetCreateFailureAction) == OnStatefulSetCreateFailureActionAbort {
+		config.OnStatefulSetCreateFailureAction = OnStatefulSetCreateFailureActionAbort
 	} else {
+		config.OnStatefulSetCreateFailureAction = OnStatefulSetCreateFailureActionDelete
+	}
+
+	// Default Updated Failure action - revert
+	if strings.ToLower(config.OnStatefulSetUpdateFailureAction) == OnStatefulSetUpdateFailureActionAbort {
 		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionAbort
+	} else {
+		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionRollback
 	}
 
 	return nil

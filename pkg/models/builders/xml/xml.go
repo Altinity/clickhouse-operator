@@ -28,10 +28,13 @@ type xmlNode struct {
 	value    interface{}
 }
 
-const xmlBuildError = "Unable to build XML: incorrect structure of definitions"
+const (
+	eol   = "\n"
+	noEol = ""
+)
 
 // GenerateXML creates XML representation from the provided input
-func GenerateXML(w io.Writer, input map[string]interface{}, indent, tabsize uint8, excludes ...string) error {
+func GenerateXML(w io.Writer, input map[string]interface{}, indent, tabsize uint8, excludes ...string) {
 	re := regexp.MustCompile("//+")
 
 	// paths is sorted set of normalized paths (maps keys) from 'input'
@@ -69,7 +72,7 @@ func GenerateXML(w io.Writer, input map[string]interface{}, indent, tabsize uint
 	}
 
 	// return XML
-	return xmlTreeRoot.buildXML(w, indent, tabsize)
+	xmlTreeRoot.buildXML(w, indent, tabsize)
 }
 
 // addBranch ensures branch esists and assign value to the last tagged node
@@ -105,37 +108,50 @@ func (n *xmlNode) addChild(tag string) *xmlNode {
 }
 
 // buildXML generates XML from xmlNode type linked list
-func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) error {
+func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) {
 	switch n.value.(type) {
 	case []interface{}:
+		// Value is an array of strings
+		// Repeat tag with each value, like:
+		// <yandex>
+		//    ...
+		//    <networks>
+		//        <ip>::/64</ip>
+		//        <ip>203.0.113.0/24</ip>
+		//        <ip>2001:DB8::/32</ip>
 		for _, value := range n.value.([]interface{}) {
 			stringValue := value.(string)
 			n.printTagWithValue(w, stringValue, indent, tabsize)
 		}
 	case string:
-		n.printTagWithValue(w, n.value.(string), indent, tabsize)
+		// value is a string
+		stringValue := n.value.(string)
+		n.printTagWithValue(w, stringValue, indent, tabsize)
 	default:
+		// no value node, may have nested tags
 		n.printTagNoValue(w, indent, tabsize)
 	}
-
-	return nil
 }
 
+// printTagNoValue prints tag which has no value, But it may have nested tags
+// <a>
+//  <b>...</b>
+// </a>
 func (n *xmlNode) printTagNoValue(w io.Writer, indent, tabsize uint8) {
-	n.printTag(w, indent, true, "\n")
+	n.printTag(w, indent, true, eol)
 	for i := range n.children {
 		n.children[i].buildXML(w, indent+tabsize, tabsize)
 	}
-	n.printTag(w, indent, false, "\n")
+	n.printTag(w, indent, false, eol)
 }
 
+// printTagWithValue prints tag with value. But it must have no children,
+// and children are not printed
+// <tag>value</tag>
 func (n *xmlNode) printTagWithValue(w io.Writer, value string, indent, tabsize uint8) {
-	n.printTag(w, indent, true, "\n")
-	for i := range n.children {
-		n.children[i].buildXML(w, indent+tabsize, tabsize)
-	}
-	n.printValue(w, value, indent+tabsize, "\n")
-	n.printTag(w, indent, false, "\n")
+	n.printTag(w, indent, true, noEol)
+	n.printValue(w, value)
+	n.printTag(w, 0, false, eol)
 }
 
 // printTag prints XML tag into io.Writer
@@ -144,22 +160,32 @@ func (n *xmlNode) printTag(w io.Writer, indent uint8, openTag bool, eol string) 
 		return
 	}
 
-	pattern := ""
-	if openTag {
-		// pattern would be: %4s<%s>%s
-		pattern = fmt.Sprintf("%%%ds<%%s>%%s", indent)
+	// We have to separate indent and no-indent cases, because event target pattern is like
+	// "%0s</%s> - meaning we do not want to print leading spaces, having " " in Fprint inserts one space
+	if indent > 0 {
+		pattern := ""
+		if openTag {
+			// pattern would be: %4s<%s>%s
+			pattern = fmt.Sprintf("%%%ds<%%s>%%s", indent)
+		} else {
+			// pattern would be: %4s</%s>%s
+			pattern = fmt.Sprintf("%%%ds</%%s>%%s", indent)
+		}
+		_, _ = fmt.Fprintf(w, pattern, " ", n.tag, eol)
 	} else {
-		// pattern would be: %4s</%s>%s
-		pattern = fmt.Sprintf("%%%ds</%%s>%%s", indent)
+		if openTag {
+			// pattern would be: %4s<%s>%s
+			_, _ = fmt.Fprintf(w, "<%s>%s", n.tag, eol)
+		} else {
+			// pattern would be: %4s</%s>%s
+			_, _ = fmt.Fprintf(w, "</%s>%s", n.tag, eol)
+		}
 	}
-	fmt.Fprintf(w, pattern, " ", n.tag, eol)
 }
 
 // printTag prints XML value into io.Writer
-func (n *xmlNode) printValue(w io.Writer, value string, indent uint8, eol string) {
-	// pattern would be: %4s%s%s
-	pattern := fmt.Sprintf("%%%ds%%s%%s", indent)
-	fmt.Fprintf(w, pattern, " ", value, eol)
+func (n *xmlNode) printValue(w io.Writer, value string) {
+	_, _ = fmt.Fprintf(w, "%s", value)
 }
 
 // checkExcludes returns true if first tag of the key matches item with excludes list
