@@ -10,6 +10,7 @@
 1. [operator_build_from_sources.md](./operator_build_from_sources.md) - how to build operator from sources
 1. [operator_configuration.md](./operator_configuration.md) - operator configuration in details
 1. [operator_installation_details.md](./operator_installation_details.md) - how to install operator in details
+1. [operator_upgrade.md](./operator_upgrade.md) - how to upgrade operator to the different version
 1. [prometheus_setup.md](./prometheus_setup.md) - how to setup Prometheus
 1. [quick-start.md](./quick-start.md) - quick start
 1. [replication_setup.md](./replication_setup.md) - how to setup replication
