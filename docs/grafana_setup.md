@@ -79,6 +79,7 @@ In order to install dashboard:
  1. Select recommended [Grafana dashoard][altinity_recommended_dashboard]
  1. Select a Prometheus data source from which data would be fetched  
  1. Click **Import**
+ 
 By now Altinity recommended dashboard should be available for use.  
 
 More Grafana [docs](http://docs.grafana.org/)
