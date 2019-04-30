@@ -13,11 +13,13 @@ ClickHouse Operator is in beta. You can use it at your own risk. There may be ba
 
 The ClickHouse Operator for Kubernetes currently provides the following:
 
-- Creates cluster of the ClickHouse database based on Custom Resource [specification][crd_spec] provided
-- Supports Storage customization (VolumeClaim templates)
-- Supports Pod template customization (Volume and Container templates)
-- Supports ClickHouse configuration customization (including Zookeeper integration)
-- Supports ClickHouse metrics export to Prometheus
+- Creates ClickHouse cluster based on Custom Resource [specification][crd_spec] provided
+- Storage customization (VolumeClaim templates)
+- Pod template customization (Volume and Container templates)
+- ClickHouse configuration customization (including Zookeeper integration)
+- ClickHouse cluster scaling including automatic schema propagation
+- ClickHouse cluster version upgrades
+- Exporting ClickHouse metrics to Prometheus
 
 ## Requirements
 
