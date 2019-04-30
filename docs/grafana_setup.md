@@ -11,7 +11,7 @@ We may have two starting points:
 
 ## Install Grafana
 In case we do not have Grafana available, we can setup it directly into k8s and integrate with Prometheus afterwards. 
-We already have [manifests available][grafana_namifest_folder]. 
+We already have [manifests available][grafana_manifest_folder]. 
 We can either run [create-grafana.sh][create_grafana_script] or setup the whole process by hands, in case we need to edit configuration.
 
   - We'd like to setup all Grafana-related components into dedicated `namespace`. Let's create it
