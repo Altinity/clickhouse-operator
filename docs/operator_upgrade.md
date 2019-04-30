@@ -82,6 +82,6 @@ Waiting for deployment "clickhouse-operator" rollout to finish: 1 old replicas a
 
 In this case deployment can be undone:
 ```
-kubectl rollout undo deployment.v1.apps/clickhouse-operator -n kube-system --to-revision=2
+kubectl rollout undo deployment.v1.apps/clickhouse-operator -n kube-system
 deployment.apps/clickhouse-operator
 ```
