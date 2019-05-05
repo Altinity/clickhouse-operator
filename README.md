@@ -37,9 +37,9 @@ The ClickHouse Operator for Kubernetes currently provides the following:
  * [Persistent Storage Configuration][storage]
  * [ClickHouse Installation Custom Resource specification][crd_explained]
  
-**Maintanance tasks**
- * [Add replication to an existing ClickHouse cluster][update_cluster_add_replication]
- * Add shards and replicas
+**Maintenance tasks**
+ * [Adding replication to an existing ClickHouse cluster][update_cluster_add_replication]
+ * Adding shards and replicas
    * [Automatic schema creation][schema_migration]
  * [Update ClickHouse version][update_clickhouse_version]
  * [Update Operator version][update_operator]
