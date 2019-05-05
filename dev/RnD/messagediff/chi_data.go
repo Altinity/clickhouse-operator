@@ -15,12 +15,12 @@ func exCHI1() (ChiSpec, ChiSpec) {
 				Profile: "",
 			},
 			Deployment: ChiDeployment{
-				PodTemplate: "",
+				PodTemplate:         "",
 				VolumeClaimTemplate: "",
 				Zone: ChiDeploymentZone{
 					MatchLabels: nil, // map[string]string,
 				},
-				Scenario: "",
+				Scenario:    "",
 				Fingerprint: "",
 			},
 		},
@@ -35,9 +35,9 @@ func exCHI1() (ChiSpec, ChiSpec) {
 					},
 				},
 			},
-			Users: nil,
+			Users:    nil,
 			Profiles: nil,
-			Quotas: nil,
+			Quotas:   nil,
 			Settings: nil,
 
 			Clusters: []ChiCluster{
@@ -46,12 +46,12 @@ func exCHI1() (ChiSpec, ChiSpec) {
 
 					// useless
 					Deployment: ChiDeployment{
-						PodTemplate: "",
+						PodTemplate:         "",
 						VolumeClaimTemplate: "",
 						Zone: ChiDeploymentZone{
 							MatchLabels: nil, // map[string]string,
 						},
-						Scenario: "",
+						Scenario:    "",
 						Fingerprint: "",
 					},
 
@@ -70,17 +70,17 @@ func exCHI1() (ChiSpec, ChiSpec) {
 								// useless
 								ReplicasCount: 1,
 
-								Weight: 1,
+								Weight:              1,
 								InternalReplication: "yes",
 
 								// useless
 								Deployment: ChiDeployment{
-									PodTemplate: "",
+									PodTemplate:         "",
 									VolumeClaimTemplate: "",
 									Zone: ChiDeploymentZone{
 										MatchLabels: nil, // map[string]string,
 									},
-									Scenario: "",
+									Scenario:    "",
 									Fingerprint: "",
 								},
 
@@ -90,12 +90,12 @@ func exCHI1() (ChiSpec, ChiSpec) {
 										Port: 9000,
 
 										Deployment: ChiDeployment{
-											PodTemplate: "podTemplate1",
+											PodTemplate:         "podTemplate1",
 											VolumeClaimTemplate: "volumeClaimTemplate1",
 											Zone: ChiDeploymentZone{
 												MatchLabels: nil, // map[string]string,
 											},
-											Scenario: "",
+											Scenario:    "",
 											Fingerprint: "",
 										},
 									},
@@ -108,16 +108,16 @@ func exCHI1() (ChiSpec, ChiSpec) {
 		},
 
 		Templates: ChiTemplates{
-			PodTemplates:         []ChiPodTemplate{
+			PodTemplates: []ChiPodTemplate{
 				{
-					Name: "podTemplate1",
+					Name:       "podTemplate1",
 					Containers: []corev1.Container{},
 					Volumes:    []corev1.Volume{},
 				},
 			},
 			VolumeClaimTemplates: []ChiVolumeClaimTemplate{
 				{
-					Name:"volumeClaimTemplate1",
+					Name:                  "volumeClaimTemplate1",
 					PersistentVolumeClaim: corev1.PersistentVolumeClaim{},
 				},
 			},
@@ -133,12 +133,12 @@ func exCHI1() (ChiSpec, ChiSpec) {
 				Profile: "",
 			},
 			Deployment: ChiDeployment{
-				PodTemplate: "",
+				PodTemplate:         "",
 				VolumeClaimTemplate: "",
 				Zone: ChiDeploymentZone{
 					MatchLabels: nil, // map[string]string,
 				},
-				Scenario: "",
+				Scenario:    "",
 				Fingerprint: "",
 			},
 		},
@@ -153,9 +153,9 @@ func exCHI1() (ChiSpec, ChiSpec) {
 					},
 				},
 			},
-			Users: nil,
+			Users:    nil,
 			Profiles: nil,
-			Quotas: nil,
+			Quotas:   nil,
 			Settings: nil,
 
 			Clusters: []ChiCluster{
@@ -164,12 +164,12 @@ func exCHI1() (ChiSpec, ChiSpec) {
 
 					// useless
 					Deployment: ChiDeployment{
-						PodTemplate: "",
+						PodTemplate:         "",
 						VolumeClaimTemplate: "",
 						Zone: ChiDeploymentZone{
 							MatchLabels: nil, // map[string]string,
 						},
-						Scenario: "",
+						Scenario:    "",
 						Fingerprint: "",
 					},
 
@@ -188,17 +188,17 @@ func exCHI1() (ChiSpec, ChiSpec) {
 								// useless
 								ReplicasCount: 1,
 
-								Weight: 1,
+								Weight:              1,
 								InternalReplication: "yes",
 
 								// useless
 								Deployment: ChiDeployment{
-									PodTemplate: "",
+									PodTemplate:         "",
 									VolumeClaimTemplate: "",
 									Zone: ChiDeploymentZone{
 										MatchLabels: nil, // map[string]string,
 									},
-									Scenario: "",
+									Scenario:    "",
 									Fingerprint: "",
 								},
 
@@ -208,12 +208,12 @@ func exCHI1() (ChiSpec, ChiSpec) {
 										Port: 9000,
 
 										Deployment: ChiDeployment{
-											PodTemplate: "podTemplate1",
+											PodTemplate:         "podTemplate1",
 											VolumeClaimTemplate: "volumeClaimTemplate1",
 											Zone: ChiDeploymentZone{
 												MatchLabels: nil, // map[string]string,
 											},
-											Scenario: "",
+											Scenario:    "",
 											Fingerprint: "",
 										},
 									},
@@ -222,12 +222,12 @@ func exCHI1() (ChiSpec, ChiSpec) {
 										Port: 9000,
 
 										Deployment: ChiDeployment{
-											PodTemplate: "podTemplate1",
+											PodTemplate:         "podTemplate1",
 											VolumeClaimTemplate: "volumeClaimTemplate1",
 											Zone: ChiDeploymentZone{
 												MatchLabels: nil, // map[string]string,
 											},
-											Scenario: "",
+											Scenario:    "",
 											Fingerprint: "",
 										},
 									},
@@ -240,16 +240,16 @@ func exCHI1() (ChiSpec, ChiSpec) {
 		},
 
 		Templates: ChiTemplates{
-			PodTemplates:         []ChiPodTemplate{
+			PodTemplates: []ChiPodTemplate{
 				{
-					Name: "podTemplate1",
+					Name:       "podTemplate1",
 					Containers: []corev1.Container{},
 					Volumes:    []corev1.Volume{},
 				},
 			},
 			VolumeClaimTemplates: []ChiVolumeClaimTemplate{
 				{
-					Name:"volumeClaimTemplate1",
+					Name:                  "volumeClaimTemplate1",
 					PersistentVolumeClaim: corev1.PersistentVolumeClaim{},
 				},
 			},

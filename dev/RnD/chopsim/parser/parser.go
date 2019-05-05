@@ -348,7 +348,7 @@ func (chi *ClickHouseInstallation) createConfigMapObjects(data map[string]string
 	return cmList
 }
 
-// Returns list of services: 
+// Returns list of services:
 // one service per pod with internal name, and one service for installation itself that should finally bind to:
 // clickhouse-<installation_name>.<namespace>.svc.cluster.local
 func (chi *ClickHouseInstallation) createServiceObjects(o *genOptions) serviceList {
