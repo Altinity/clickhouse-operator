@@ -1,7 +1,17 @@
 #!/bin/bash
 
-kubectl create namespace zoons
-for f in 01-service-client-access.yaml  02-headless-service.yaml  03-pod-disruption-budget.yaml  04-storageclass-zookeeper.yaml  05-stateful-set.yaml; do
-    kubectl apply -f $f -n zoons
-done
+ZK_NAMESPACE="${ZK_NAMESPACE:-zoons}"
+YAML_FILES_LIST="\
+01-service-client-access.yaml \
+02-headless-service.yaml \
+03-pod-disruption-budget.yaml \
+04-storageclass-zookeeper.yaml \
+05-stateful-set.yaml\
+"
 
+CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+
+kubectl create namespace ${ZK_NAMESPACE}
+for FILE in ${YAML_FILES_LIST}; do
+    kubectl -n "${ZK_NAMESPACE}" apply -f "${CUR_DIR}/${FILE}"
+done
