@@ -3,16 +3,14 @@
 # Find unformatted .go sources
 
 # Exit immediately when a command fails
-set -e
-
+set -o errexit
+# Error on unset variables
+set -o nounset
 # Only exit with zero if all commands of the pipeline exit successfully
 set -o pipefail
 
-# Error on unset variables
-set -u
-
+# Source configuration
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-
 source ${CUR_DIR}/binary_build_config.sh
 
 # Prepare list of all .go files in the project, but exclude all files from /vendor/ folder
