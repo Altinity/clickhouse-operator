@@ -6,12 +6,9 @@ YAML_FILES_LIST="\
 02-headless-service.yaml \
 03-pod-disruption-budget.yaml \
 04-storageclass-zookeeper.yaml \
-05-stateful-set.yaml\
+05-stateful-set-persistent-volume.yaml\
 "
 
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-kubectl create namespace ${ZK_NAMESPACE}
-for FILE in ${YAML_FILES_LIST}; do
-    kubectl -n "${ZK_NAMESPACE}" apply -f "${CUR_DIR}/${FILE}"
-done
+source "${CUR_DIR}/zookeeper-create-universal.sh"

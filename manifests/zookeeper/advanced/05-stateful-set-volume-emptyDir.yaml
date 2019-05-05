@@ -114,4 +114,6 @@ spec:
 #        requests:
 #          storage: 1Gi
 ## storageClassName has to be coordinated with k8s admin and has to be created as a `kind: StorageClass` resource
+## In case no storageClassName specified at all - means use default storageClassName
+## In case storageClassName specified as empty value "" - means do dot use dynamic provisioning
 #      storageClassName: storageclass-zookeeper
