@@ -1,7 +1,10 @@
 #!/bin/bash
 
+# Exit immediately when a command fails
 set -o errexit
+# Error on unset variables
 set -o nounset
+# Only exit with zero if all commands of the pipeline exit successfully
 set -o pipefail
 
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..

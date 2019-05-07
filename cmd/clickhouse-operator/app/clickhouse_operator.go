@@ -127,6 +127,42 @@ func createClientsets(config *kuberest.Config) (*kube.Clientset, *chopclientset.
 	return kubeClientset, chopClientset
 }
 
+func GetRuntimeParams() map[string]string {
+	res := make(map[string]string)
+	// This list of ENV VARS is specified in operator .yaml manifest, section "kind: Deployment"
+	vars := []string{
+		// spec.nodeName: ip-172-20-52-62.ec2.internal
+		"OPERATOR_POD_NODE_NAME",
+		// metadata.name: clickhouse-operator-6f87589dbb-ftcsf
+		"OPERATOR_POD_NAME",
+		// metadata.namespace: kube-system
+		"OPERATOR_POD_NAMESPACE",
+		// status.podIP: 100.96.3.2
+		"OPERATOR_POD_IP",
+		// spec.serviceAccount: clickhouse-operator
+		// spec.serviceAccountName: clickhouse-operator
+		"OPERATOR_POD_SERVICE_ACCOUNT",
+
+		"OPERATOR_CONTAINER_CPU_REQUEST",
+		"OPERATOR_CONTAINER_CPU_LIMIT",
+		"OPERATOR_CONTAINER_MEM_REQUEST",
+		"OPERATOR_CONTAINER_MEM_LIMIT",
+	}
+
+	for _, varName := range vars {
+		res[varName] = os.Getenv(varName)
+	}
+
+	return res
+}
+
+func LogRuntimeParams() {
+	runtimeParams := GetRuntimeParams()
+	for name, value := range runtimeParams {
+		glog.V(1).Infof("%s=%s\n", name, value)
+	}
+}
+
 // Run is an entry point of the application
 func Run() {
 	if versionRequest {
@@ -134,7 +170,9 @@ func Run() {
 		os.Exit(0)
 	}
 
-	glog.V(1).Infof("Starting clickhouse-operator versionRequest '%s'\n", Version)
+	glog.V(1).Infof("Starting clickhouse-operator version '%s'\n", Version)
+	LogRuntimeParams()
+
 	chopConfig, err := config.GetConfig(chopConfigFile)
 	if err != nil {
 		glog.Fatalf("Unable to build config file %v\n", err)

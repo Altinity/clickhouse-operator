@@ -2,7 +2,7 @@
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
-  name: zookeeper-pod-distribution-budget
+  name: zookeeper-pod-disruption-budget
 spec:
   selector:
     matchLabels:

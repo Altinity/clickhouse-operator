@@ -16,8 +16,8 @@ package models
 
 import (
 	"encoding/hex"
-	"io"
 	"fmt"
+	"io"
 	"math/rand"
 	"time"
 )

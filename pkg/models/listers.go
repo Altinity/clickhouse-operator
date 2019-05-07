@@ -30,7 +30,6 @@ func ListPodFQDNs(chi *chiv1.ClickHouseInstallation) []string {
 	return names
 }
 
-
 func Yaml(chi *chiv1.ClickHouseInstallation) string {
 	if data, err := yaml.Marshal(chi); err != nil {
 		return ""
