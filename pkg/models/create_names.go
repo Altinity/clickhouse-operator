@@ -135,8 +135,8 @@ func CreatePodFQDN(replica *chop.ChiClusterLayoutShardReplica) string {
 	)
 }
 
-// CreateClusterPodFQDNs creates fully qualified domain names of all pods in a cluster
-func CreateClusterPodFQDNs(cluster *chop.ChiCluster) []string {
+// CreatePodFQDNs4Cluster creates fully qualified domain names of all pods in a cluster
+func CreatePodFQDNs4Cluster(cluster *chop.ChiCluster) []string {
 	fqdns := make([]string, 0)
 	cluster.WalkReplicas(func(replica *chop.ChiClusterLayoutShardReplica) error {
 		fqdns = append(fqdns, CreatePodFQDN(replica))
@@ -145,8 +145,8 @@ func CreateClusterPodFQDNs(cluster *chop.ChiCluster) []string {
 	return fqdns
 }
 
-// CreateChiPodFQDNs creates fully qualified domain names of all pods in a CHI
-func CreateChiPodFQDNs(chi *chop.ClickHouseInstallation) []string {
+// CreatePodFQDNs4Chi creates fully qualified domain names of all pods in a CHI
+func CreatePodFQDNs4Chi(chi *chop.ClickHouseInstallation) []string {
 	fqdns := make([]string, 0)
 	chi.WalkReplicas(func(replica *chop.ChiClusterLayoutShardReplica) error {
 		fqdns = append(fqdns, CreatePodFQDN(replica))

@@ -35,6 +35,17 @@ func newDeleteOptions() *metav1.DeleteOptions {
 
 // deleteReplica deletes all kubernetes resources related to replica *chop.ChiClusterLayoutShardReplica
 func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) error {
+	// Each replica consists of
+	// 1. Tables on replica - we need to delete tables on replica in order to clean Zookeeper data
+	// 2. StatefulSet
+	// 3. ConfigMap
+	// 4. Service
+	// Need to delete all these item
+
+	// Delete tables on replica
+	tableNames, dropTableSQLs, _ := chopmodels.ReplicaGetDropTables(replica)
+	glog.V(1).Infof("Drop tables: %v as %v\n", tableNames, dropTableSQLs)
+	_ = chopmodels.ReplicaApplySQLs(replica, dropTableSQLs, false)
 
 	// Delete StatefulSet
 	statefulSetName := chopmodels.CreateStatefulSetName(replica)
@@ -111,7 +122,7 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
 	}
 }
 
-// statefulSetDeletePod delete all pod of a StatefulSet. This requests StatefulSet to relaunch deleted pods
+// statefulSetDeletePod delete a pod of a StatefulSet. This requests StatefulSet to relaunch deleted pod
 func (c *Controller) statefulSetDeletePod(statefulSet *apps.StatefulSet) error {
 	name := chopmodels.CreatePodName(statefulSet)
 	glog.V(1).Infof("Delete Pod %s/%s\n", statefulSet.Namespace, name)
