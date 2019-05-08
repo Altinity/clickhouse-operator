@@ -102,26 +102,11 @@ const (
 	// 1. macros
 	dirPathConfd = "/etc/clickhouse-server/conf.d/"
 
-	fullPathConfigd = "/etc/clickhouse-server/config.d/"
-	// fullPathConfigTemplate specifies template for full path of the XML config files for ClickHouse
-	fullPathConfigTemplate = fullPathConfigd + "%s"
-
 	// dirPathClickHouseData specifies full path of data folder where ClickHouse would place its datastorage
 	dirPathClickHouseData = "/var/lib/clickhouse"
 )
 
 const (
-	// Full Deployment ID consists of two parts:
-	// 1. "deployment id" (it should be derived from fingerprint) of each deployment in ClickHouseInstallation object.
-	//    Some deployments may be the same and thus have the same "deployment id" (because of the same fingerprint)
-	// 2. Sequential index of this "deployment id" in ClickHouseInstallation object.
-	//    Some deployments may be the same and thus have the same "deployment id" (because of the same fingerprint),
-	//    but they will have different sequentially increasing index of this "deployment id" in ClickHouseInstallation object
-	// Ex.: two running instances of the same deployment will have full deployments ids
-	// 1eb454-1
-	// 1eb454-2
-	fullDeploymentIDPattern = "%s-%d"
-
 	// NAME                           READY   AGE   CONTAINERS    IMAGES
 	// statefulset.apps/ss-1eb454-1   0/1     2s    ss-1eb454-1   yandex/clickhouse-server:latest
 	statefulSetNamePattern = "chi-%s-%s-%d-%d"
@@ -182,21 +167,26 @@ const (
 )
 
 const (
-	chDefaultDockerImage         = "yandex/clickhouse-server:latest"
-	chDefaultVolumeMountNameData = "clickhouse-data"
+	// Default docker image to be used
+	defaultClickHouseDockerImage = "yandex/clickhouse-server:latest"
+
+	// Index of container within Pod with ClickHouse instance. Pod may have other containers included, such as monitoring
 	ClickHouseContainerIndex     = 0
 )
 
 const (
+	// ClickHouse open ports
 	chDefaultHTTPPortName          = "http"
 	chDefaultHTTPPortNumber        = 8123
 	chDefaultClientPortName        = "client"
 	chDefaultClientPortNumber      = 9000
 	chDefaultInterServerPortName   = "interserver"
 	chDefaultInterServerPortNumber = 9009
+	// Application Label
 	chDefaultAppLabel              = clickhousealtinitycom.GroupName + "/app"
 )
 
 const (
+	// Default value for ClusterIP service
 	templateDefaultsServiceClusterIP = "None"
 )

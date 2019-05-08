@@ -22,6 +22,10 @@ import (
 )
 
 const (
+	// Special auto-generated clusters. Each of these clusters lay over all replicas in CHI
+	// 1. Cluster with one shard and all replicas. Used to duplicate data over all replicas.
+	// 2. Cluster with all shards (1 replica). Used to gather/scatter data over all replicas.
+
 	oneShardAllReplicasClusterName = "all-replicated"
 	allShardsOneReplicaClusterName = "all-sharded"
 )

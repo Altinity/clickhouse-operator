@@ -453,7 +453,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted, fmt.Sprintf("onAddChi(%s/%s)", chi.Namespace, chi.Name))
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
-	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.ListPodFQDNs(chi))
+	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.CreatePodFQDNsOfChi(chi))
 
 	return nil
 }
@@ -535,7 +535,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	}
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
-	c.metricsExporter.EnsureControlledValues(new.Name, chopmodels.ListPodFQDNs(new))
+	c.metricsExporter.EnsureControlledValues(new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 
 	return nil
 }

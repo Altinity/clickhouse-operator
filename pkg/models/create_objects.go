@@ -530,7 +530,7 @@ func createDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 		Containers: []corev1.Container{
 			{
 				Name:  name,
-				Image: chDefaultDockerImage,
+				Image: defaultClickHouseDockerImage,
 				Ports: []corev1.ContainerPort{
 					{
 						Name:          chDefaultHTTPPortName,

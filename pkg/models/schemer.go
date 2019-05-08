@@ -106,12 +106,12 @@ func ChiDropDnsCache(chi *chi.ClickHouseInstallation) error {
 
 // ClusterApplySQLs runs set of SQL queries over the cluster
 func ClusterApplySQLs(cluster *chi.ChiCluster, sqls []string, retry bool) error {
-	return applySQLs(CreatePodFQDNs4Cluster(cluster), sqls, retry)
+	return applySQLs(CreatePodFQDNsOfCluster(cluster), sqls, retry)
 }
 
 // ChiApplySQLs runs set of SQL queries over the whole CHI
 func ChiApplySQLs(chi *chi.ClickHouseInstallation, sqls []string) error {
-	return applySQLs(CreatePodFQDNs4Chi(chi), sqls, true)
+	return applySQLs(CreatePodFQDNsOfChi(chi), sqls, true)
 }
 
 // ReplicaApplySQLs runs set of SQL queries over the replica

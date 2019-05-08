@@ -217,31 +217,6 @@ func deploymentGenerateFingerprint(replica *chiv1.ChiClusterLayoutShardReplica, 
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-// deploymentGenerateID generates short-printable deployment ID out of long deployment fingerprint
-// Generally, fingerprint is perfectly OK - it is unique for each unique deployment inside ClickHouseInstallation object,
-// but it is extremely long and thus can not be used in k8s resources names.
-// So we need to produce another - much shorter - unique id for each unique deployment inside ClickHouseInstallation object.
-// IMPORTANT there can be the same deployments inside ClickHouseInstallation object and they will have the same
-// deployment fingerprint and thus deployment id. This is addressed by FullDeploymentID, which is unique for each
-// deployment inside ClickHouseInstallation object
-func deploymentGenerateID(fingerprint string) string {
-	// Extract last 10 chars of fingerprint
-	return fingerprint[len(fingerprint)-10:]
-	//return randomString()
-}
-
-// generateFullDeploymentID generates full deployment ID out of deployment ID
-// Full Deployment ID is unique for each deployment inside ClickHouseInstallation object and can be used for naming.
-// IMPORTANT there can be the same deployments inside ClickHouseInstallation object and they will have the same
-// deployment fingerprint and thus deployment id. This is addressed by FullDeploymentID, which is unique for each
-// deployment inside ClickHouseInstallation object
-func generateFullDeploymentID(replica *chiv1.ChiClusterLayoutShardReplica) string {
-	deploymentID := deploymentGenerateID(replica.Deployment.Fingerprint)
-	index := replica.Deployment.Index
-	// 1eb454-2 (deployment id - sequential index of this deployment id)
-	return fmt.Sprintf(fullDeploymentIDPattern, deploymentID, index)
-}
-
 // defaultsNormalizeReplicasUseFQDN ensures chiv1.ChiDefaults.ReplicasUseFQDN section has proper values
 func defaultsNormalizeReplicasUseFQDN(d *chiv1.ChiDefaults) {
 	// Acceptable values are 0 and 1
