@@ -15,22 +15,12 @@
 package models
 
 import (
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"gopkg.in/yaml.v2"
+
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-func ListPodFQDNs(chi *chiv1.ClickHouseInstallation) []string {
-
-	names := make([]string, 0)
-	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
-		names = append(names, CreatePodFQDN(replica))
-		return nil
-	}
-	chi.WalkReplicas(replicaProcessor)
-	return names
-}
-
-func Yaml(chi *chiv1.ClickHouseInstallation) string {
+func Yaml(chi *chi.ClickHouseInstallation) string {
 	if data, err := yaml.Marshal(chi); err != nil {
 		return ""
 	} else {

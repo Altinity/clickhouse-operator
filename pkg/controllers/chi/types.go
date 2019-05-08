@@ -32,24 +32,44 @@ import (
 
 // Controller defines CRO controller
 type Controller struct {
-	chopConfig              *config.Config
-	kubeClient              kube.Interface
-	chopClient              chopclientset.Interface
-	chiLister               choplisters.ClickHouseInstallationLister
-	chiListerSynced         cache.InformerSynced
-	serviceLister           corelisters.ServiceLister
-	serviceListerSynced     cache.InformerSynced
-	endpointsLister         corelisters.EndpointsLister
-	endpointsListerSynced   cache.InformerSynced
-	configMapLister         corelisters.ConfigMapLister
-	configMapListerSynced   cache.InformerSynced
-	statefulSetLister       appslisters.StatefulSetLister
+	// chopConfig used to keep clickhouse-oprator config
+	chopConfig *config.Config
+	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
+	kubeClient kube.Interface
+	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
+	chopClient chopclientset.Interface
+
+	// chiLister used as chiLister.ClickHouseInstallations(namespace).Get(name)
+	chiLister choplisters.ClickHouseInstallationLister
+	// chiListerSynced used in waitForCacheSync()
+	chiListerSynced cache.InformerSynced
+	// serviceLister used as serviceLister.Services(namespace).Get(name)
+	serviceLister corelisters.ServiceLister
+	// serviceListerSynced used in waitForCacheSync()
+	serviceListerSynced cache.InformerSynced
+	// endpointsLister used as endpointsLister.Endpoints(namespace).Get(name)
+	endpointsLister corelisters.EndpointsLister
+	// endpointsListerSynced used in waitForCacheSync()
+	endpointsListerSynced cache.InformerSynced
+	// configMapLister used as configMapLister.ConfigMaps(namespace).Get(name)
+	configMapLister corelisters.ConfigMapLister
+	// configMapListerSynced used in waitForCacheSync()
+	configMapListerSynced cache.InformerSynced
+	// statefulSetLister used as statefulSetLister.StatefulSets(namespace).Get(name)
+	statefulSetLister appslisters.StatefulSetLister
+	// statefulSetListerSynced used in waitForCacheSync()
 	statefulSetListerSynced cache.InformerSynced
-	podLister               corelisters.PodLister
-	podListerSynced         cache.InformerSynced
-	queue                   workqueue.RateLimitingInterface
-	recorder                record.EventRecorder
-	metricsExporter         *chopmetrics.Exporter
+	// podLister used as statefulSetLister.StatefulSets(namespace).Get(name)
+	podLister corelisters.PodLister
+	// podListerSynced used in waitForCacheSync()
+	podListerSynced cache.InformerSynced
+
+	// queue used to organize events queue processed by operator
+	queue workqueue.RateLimitingInterface
+	// not used explicitly
+	recorder record.EventRecorder
+	// export metrics to Prometheus
+	metricsExporter *chopmetrics.Exporter
 }
 
 const (

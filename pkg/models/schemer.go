@@ -23,7 +23,10 @@ import (
 )
 
 const (
+	// Comma-separated ''-enclosed list of database names to be ignored
 	ignoredDBs = "'system'"
+
+	// Max number of retries for SQL queries
 	maxRetries = 10
 )
 
@@ -33,7 +36,9 @@ func ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.Chi
 	glog.V(1).Info(CreateChiServiceFQDN(chi))
 	_ = clickhouse.Query(&result,
 		fmt.Sprintf(
-			`SELECT distinct name, concat('CREATE DATABASE IF NOT EXISTS ', name)
+			`SELECT
+					distinct name,
+					concat('CREATE DATABASE IF NOT EXISTS ', name)
 				FROM cluster('%s', system, databases) 
 				WHERE name not in (%s)
 				ORDER BY name
@@ -41,40 +46,54 @@ func ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.Chi
 			cluster.Name, ignoredDBs),
 		CreateChiServiceFQDN(chi),
 	)
-	names, creates := unzip(result)
-	return names, creates, nil
+	dbNames, createStatements := unzip(result)
+	return dbNames, createStatements, nil
 }
 
 // ClusterGetCreateTables returns set of 'CREATE TABLE ...' SQLs
 func ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
 	result := make([][]string, 0)
-	_ = clickhouse.Query(&result,
+	_ = clickhouse.Query(
+		&result,
 		fmt.Sprintf(
-			`SELECT distinct name, 
+			`SELECT
+					distinct name, 
 			        replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS') 
 				FROM cluster('%s', system, tables)
 				WHERE database not in (%s) 
 				AND name not like '.inner.%%'
 				ORDER BY multiIf(engine not in ('Distributed', 'View', 'MaterializedView'), 1, engine = 'MaterializedView', 2, engine = 'Distributed', 3, 4), name
 				SETTINGS skip_unavailable_shards = 1`,
-			cluster.Name, ignoredDBs),
+			cluster.Name,
+			ignoredDBs,
+		),
 		CreateChiServiceFQDN(chi),
 	)
-	names, creates := unzip(result)
-	return names, creates, nil
+	tableNames, createStatements := unzip(result)
+	return tableNames, createStatements, nil
 }
 
-// unzip makes two 1-value columns (slices) out of one 2-value column (slice)
-func unzip(slice [][]string) ([]string, []string) {
-	col1 := make([]string, len(slice))
-	col2 := make([]string, len(slice))
-	for i := 0; i < len(slice); i++ {
-		col1 = append(col1, slice[i][0])
-		if len(slice[i]) > 1 {
-			col2 = append(col2, slice[i][1])
-		}
-	}
-	return col1, col2
+// ReplicaGetDropTables returns set of 'DROP TABLE ...' SQLs
+func ReplicaGetDropTables(replica *chi.ChiClusterLayoutShardReplica) ([]string, []string, error) {
+	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
+	// See https://clickhouse.yandex/docs/en/query_language/create/
+	result := make([][]string, 0)
+	_ = clickhouse.Query(
+		&result,
+		fmt.Sprintf(
+			`SELECT
+					distinct name, 
+					concat('DROP TABLE IF EXISTS ', database, '.', name)
+				FROM system.tables
+				WHERE database not in (%s) 
+				ORDER BY multiIf(engine = 'View', 1, engine = 'Distributed', 2, engine = 'MaterializedView', 3, 4), name
+				SETTINGS skip_unavailable_shards = 1`,
+			ignoredDBs,
+		),
+		CreatePodFQDN(replica),
+	)
+	tableNames, dropStatements := unzip(result)
+	return tableNames, dropStatements, nil
 }
 
 // ChiDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
@@ -87,12 +106,18 @@ func ChiDropDnsCache(chi *chi.ClickHouseInstallation) error {
 
 // ClusterApplySQLs runs set of SQL queries over the cluster
 func ClusterApplySQLs(cluster *chi.ChiCluster, sqls []string, retry bool) error {
-	return applySQLs(CreateClusterPodFQDNs(cluster), sqls, retry)
+	return applySQLs(CreatePodFQDNsOfCluster(cluster), sqls, retry)
 }
 
 // ChiApplySQLs runs set of SQL queries over the whole CHI
 func ChiApplySQLs(chi *chi.ClickHouseInstallation, sqls []string) error {
-	return applySQLs(CreateChiPodFQDNs(chi), sqls, true)
+	return applySQLs(CreatePodFQDNsOfChi(chi), sqls, true)
+}
+
+// ReplicaApplySQLs runs set of SQL queries over the replica
+func ReplicaApplySQLs(replica *chi.ChiClusterLayoutShardReplica, sqls []string, retry bool) error {
+	hosts := []string{CreatePodFQDN(replica)}
+	return applySQLs(hosts, sqls, true)
 }
 
 // applySQLs runs set of SQL queries on set on hosts

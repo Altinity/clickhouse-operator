@@ -46,3 +46,16 @@ func includeNonEmpty(dst map[string]string, key, src string) {
 func fprintf(w io.Writer, format string, a ...interface{}) {
 	_, _ = fmt.Fprintf(w, format, a...)
 }
+
+// unzip makes two 1-value columns (slices) out of one 2-value column (slice)
+func unzip(slice [][]string) ([]string, []string) {
+	col1 := make([]string, len(slice))
+	col2 := make([]string, len(slice))
+	for i := 0; i < len(slice); i++ {
+		col1 = append(col1, slice[i][0])
+		if len(slice[i]) > 1 {
+			col2 = append(col2, slice[i][1])
+		}
+	}
+	return col1, col2
+}
