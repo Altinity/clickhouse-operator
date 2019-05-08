@@ -57,7 +57,7 @@ func ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiClu
 		&result,
 		fmt.Sprintf(
 			`SELECT
-					distinct name, 
+				distinct name, 
 			        replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS') 
 				FROM cluster('%s', system, tables)
 				WHERE database not in (%s) 
@@ -82,12 +82,11 @@ func ReplicaGetDropTables(replica *chi.ChiClusterLayoutShardReplica) ([]string, 
 		&result,
 		fmt.Sprintf(
 			`SELECT
-					distinct name, 
-					concat('DROP TABLE IF EXISTS ', database, '.', name)
-				FROM system.tables
-				WHERE database not in (%s) 
-				ORDER BY multiIf(engine = 'View', 1, engine = 'Distributed', 2, engine = 'MaterializedView', 3, 4), name
-				SETTINGS skip_unavailable_shards = 1`,
+				distinct name, 
+				concat('DROP TABLE IF EXISTS ', database, '.', name)
+			   FROM system.tables
+			  WHERE database not in (%s) 
+			    AND engine like 'Replicated%',
 			ignoredDBs,
 		),
 		CreatePodFQDN(replica),
