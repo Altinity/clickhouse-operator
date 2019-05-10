@@ -26,6 +26,14 @@ import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
+const(
+	// Default update timeout in seconds
+	defaultStatefulSetUpdateTimeout = 120
+
+	// Default polling period in seconds
+	defaultStatefulSetUpdatePollPeriod = 15
+)
+
 // GetConfig creates Config object based on current environment
 func GetConfig(configFilePath string) (*Config, error) {
 	if len(configFilePath) > 0 {
@@ -56,8 +64,8 @@ func GetConfig(configFilePath string) (*Config, error) {
 		}
 	}
 
-	// Try to find /etc/clickhouse-oprator/config.yaml
-	if conf, err := buildConfigFromFile("/etc/clickhouse-oprator/config.yaml"); err == nil {
+	// Try to find /etc/clickhouse-operator/config.yaml
+	if conf, err := buildConfigFromFile("/etc/clickhouse-operator/config.yaml"); err == nil {
 		// Able to build config, all is fine
 		return conf, nil
 	}
@@ -142,15 +150,17 @@ func (config *Config) normalize() error {
 	// Process ClickHouseInstallation templates section
 	config.prepareConfigPath(&config.ChiTemplatesPath, "templates.d")
 
-	// Process Rolling update section
+	// Process Create/Update section
+
+	// Timeouts
 	if config.StatefulSetUpdateTimeout == 0 {
 		// Default update timeout in seconds
-		config.StatefulSetUpdateTimeout = 120
+		config.StatefulSetUpdateTimeout = defaultStatefulSetUpdateTimeout
 	}
 
 	if config.StatefulSetUpdatePollPeriod == 0 {
 		// Default polling period in seconds
-		config.StatefulSetUpdatePollPeriod = 15
+		config.StatefulSetUpdatePollPeriod = defaultStatefulSetUpdatePollPeriod
 	}
 
 	// Default action on Create/Update failure - to keep system in previous state
