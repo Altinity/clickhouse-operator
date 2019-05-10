@@ -171,7 +171,7 @@ const (
 	defaultClickHouseDockerImage = "yandex/clickhouse-server:latest"
 
 	// Index of container within Pod with ClickHouse instance. Pod may have other containers included, such as monitoring
-	ClickHouseContainerIndex     = 0
+	ClickHouseContainerIndex = 0
 )
 
 const (
@@ -183,7 +183,7 @@ const (
 	chDefaultInterServerPortName   = "interserver"
 	chDefaultInterServerPortNumber = 9009
 	// Application Label
-	chDefaultAppLabel              = clickhousealtinitycom.GroupName + "/app"
+	chDefaultAppLabel = clickhousealtinitycom.GroupName + "/app"
 )
 
 const (

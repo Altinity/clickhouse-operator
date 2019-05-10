@@ -14,25 +14,12 @@
 
 package util
 
-// InArray checks whether needle is in haystack
-func InArray(needle string, haystack []string) bool {
-	for _, b := range haystack {
-		if b == needle {
-			return true
-		}
-	}
-	return false
-}
+import (
+	"fmt"
+	"io"
+)
 
-// Unzip makes two 1-value columns (slices) out of one 2-value column (slice)
-func Unzip(slice [][]string) ([]string, []string) {
-	col1 := make([]string, len(slice))
-	col2 := make([]string, len(slice))
-	for i := 0; i < len(slice); i++ {
-		col1 = append(col1, slice[i][0])
-		if len(slice[i]) > 1 {
-			col2 = append(col2, slice[i][1])
-		}
-	}
-	return col1, col2
+// Fprintf suppresses warning for unused returns of fmt.Fprintf()
+func Fprintf(w io.Writer, format string, a ...interface{}) {
+	_, _ = fmt.Fprintf(w, format, a...)
 }

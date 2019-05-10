@@ -15,47 +15,11 @@
 package models
 
 import (
-	"encoding/hex"
-	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"io"
-	"math/rand"
-	"time"
 )
-
-// randomString generates random string
-func randomString() string {
-	b := make([]byte, 3)
-	rand.New(rand.NewSource(time.Now().UnixNano())).Read(b)
-	return hex.EncodeToString(b)
-}
-
-// includeNonEmpty inserts (and overwrites) data into map object using specified key, if not empty value provided
-func includeNonEmpty(dst map[string]string, key, src string) {
-	// Do not include empty value
-	if src == "" {
-		return
-	}
-
-	// Include (and overwrite) value by specified key
-	dst[key] = src
-
-	return
-}
 
 // fprintf suppresses warning for unused returns of fmt.Fprintf()
 func fprintf(w io.Writer, format string, a ...interface{}) {
-	_, _ = fmt.Fprintf(w, format, a...)
-}
-
-// unzip makes two 1-value columns (slices) out of one 2-value column (slice)
-func unzip(slice [][]string) ([]string, []string) {
-	col1 := make([]string, len(slice))
-	col2 := make([]string, len(slice))
-	for i := 0; i < len(slice); i++ {
-		col1 = append(col1, slice[i][0])
-		if len(slice[i]) > 1 {
-			col2 = append(col2, slice[i][1])
-		}
-	}
-	return col1, col2
+	util.Fprintf(w, format, a...)
 }

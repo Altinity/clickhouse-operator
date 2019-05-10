@@ -77,4 +77,3 @@ func ReadFilesIntoMap(path string, isOurFile func(string) bool) map[string]strin
 func ExtToLower(file string) string {
 	return strings.ToLower(filepath.Ext(file))
 }
-

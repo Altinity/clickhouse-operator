@@ -27,7 +27,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-const(
+const (
 	// Default update timeout in seconds
 	defaultStatefulSetUpdateTimeout = 120
 
