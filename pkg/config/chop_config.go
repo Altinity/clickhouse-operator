@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 const(
@@ -195,7 +196,7 @@ func (config *Config) prepareConfigPath(path *string, defaultRelativePath string
 	}
 
 	// In case of incorrect/unavailable path - make it empty
-	if (*path != "") && !isDirOk(*path) {
+	if (*path != "") && !util.IsDirOk(*path) {
 		*path = ""
 	}
 }
@@ -224,7 +225,7 @@ func (config *Config) readChConfigFiles() {
 
 // isChConfigExt return true in case specified file has proper extension for a ClickHouse config file
 func (config *Config) isChConfigExt(file string) bool {
-	switch extToLower(file) {
+	switch util.ExtToLower(file) {
 	case ".xml":
 		return true
 	}
@@ -238,7 +239,7 @@ func (config *Config) readChiTemplateFiles() {
 
 // isChiTemplateExt return true in case specified file has proper extension for a CHI template config file
 func (config *Config) isChiTemplateExt(file string) bool {
-	switch extToLower(file) {
+	switch util.ExtToLower(file) {
 	case ".yaml":
 		return true
 	}
@@ -252,5 +253,12 @@ func (config *Config) IsWatchedNamespace(namespace string) bool {
 		return true
 	}
 
-	return inArray(namespace, config.Namespaces)
+	return util.InArray(namespace, config.Namespaces)
+}
+
+// readConfigFiles reads config files from specified path into "file name->file content" map
+// path - folder where to look for files
+// isChConfigExt - accepts path to file return bool whether this file has config extension
+func readConfigFiles(path string, isConfigExt func(string) bool) map[string]string {
+	return util.ReadFilesIntoMap(path, isConfigExt)
 }
