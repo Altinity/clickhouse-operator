@@ -86,7 +86,7 @@ func ReplicaGetDropTables(replica *chi.ChiClusterLayoutShardReplica) ([]string, 
 				concat('DROP TABLE IF EXISTS ', database, '.', name)
 			   FROM system.tables
 			  WHERE database not in (%s) 
-			    AND engine like 'Replicated%',
+			    AND engine like 'Replicated%%',
 			ignoredDBs,
 		),
 		CreatePodFQDN(replica),
