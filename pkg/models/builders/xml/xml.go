@@ -34,22 +34,20 @@ const (
 )
 
 // GenerateXML creates XML representation from the provided input
-func GenerateXML(w io.Writer, input map[string]interface{}, indent, tabsize uint8, excludes ...string) {
-	re := regexp.MustCompile("//+")
-
+func GenerateXML(w io.Writer, input map[string]interface{}, prefix string) {
 	// paths is sorted set of normalized paths (maps keys) from 'input'
 	paths := make([]string, 0, len(input))
 
 	// data is copy of 'input' with:
 	// 1. paths (map keys) are normalized in terms of trimmed '/'
-	// 2. all excludes are excluded
+	// 2. all map keys listed in 'excludes' are excluded
 	data := make(map[string]interface{})
 	// Skip excluded paths
 	for key, value := range input {
-		// key may be non-normalized, and may have starting or trailing '/'
-		// path is normalized path without starting and trailing '/', ex.: 'test/quotas'
-		path := re.ReplaceAllString(strings.Trim(key, "/"), "/")
-		if path == "" || checkExcludes(path, excludes) {
+		// 'key' may be non-normalized, and may have starting or trailing '/'
+		// 'path' is normalized path without starting and trailing '/', ex.: 'test/quotas'
+		path := normalizePath(prefix, key)
+		if path == "" {
 			continue
 		}
 		paths = append(paths, path)
@@ -72,7 +70,22 @@ func GenerateXML(w io.Writer, input map[string]interface{}, indent, tabsize uint
 	}
 
 	// return XML
-	xmlTreeRoot.buildXML(w, indent, tabsize)
+	xmlTreeRoot.buildXML(w, 0, 4)
+}
+
+// normalizePath makes 'prefix/a/b/c' out of 'prefix' + '/a//b///c////'
+// Important - leading '/' is removed!
+func normalizePath(prefix, path string) string {
+	// Normalize '//' to '/'
+	re := regexp.MustCompile("//+")
+	path = re.ReplaceAllString(path, "/")
+	// Cut all leading and trailing '/'
+	path = strings.Trim(path, "/")
+	if len(prefix) > 0 {
+		return prefix + "/" + path
+	} else {
+		return path
+	}
 }
 
 // addBranch ensures branch esists and assign value to the last tagged node
@@ -121,41 +134,41 @@ func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) {
 		//        <ip>2001:DB8::/32</ip>
 		for _, value := range n.value.([]interface{}) {
 			stringValue := value.(string)
-			n.printTagWithValue(w, stringValue, indent, tabsize)
+			n.writeTagWithValue(w, stringValue, indent, tabsize)
 		}
 	case string:
 		// value is a string
 		stringValue := n.value.(string)
-		n.printTagWithValue(w, stringValue, indent, tabsize)
+		n.writeTagWithValue(w, stringValue, indent, tabsize)
 	default:
 		// no value node, may have nested tags
-		n.printTagNoValue(w, indent, tabsize)
+		n.writeTagNoValue(w, indent, tabsize)
 	}
 }
 
-// printTagNoValue prints tag which has no value, But it may have nested tags
+// writeTagNoValue prints tag which has no value, But it may have nested tags
 // <a>
 //  <b>...</b>
 // </a>
-func (n *xmlNode) printTagNoValue(w io.Writer, indent, tabsize uint8) {
-	n.printTag(w, indent, true, eol)
+func (n *xmlNode) writeTagNoValue(w io.Writer, indent, tabsize uint8) {
+	n.writeTag(w, indent, true, eol)
 	for i := range n.children {
 		n.children[i].buildXML(w, indent+tabsize, tabsize)
 	}
-	n.printTag(w, indent, false, eol)
+	n.writeTag(w, indent, false, eol)
 }
 
-// printTagWithValue prints tag with value. But it must have no children,
+// writeTagWithValue prints tag with value. But it must have no children,
 // and children are not printed
 // <tag>value</tag>
-func (n *xmlNode) printTagWithValue(w io.Writer, value string, indent, tabsize uint8) {
-	n.printTag(w, indent, true, noEol)
-	n.printValue(w, value)
-	n.printTag(w, 0, false, eol)
+func (n *xmlNode) writeTagWithValue(w io.Writer, value string, indent, tabsize uint8) {
+	n.writeTag(w, indent, true, noEol)
+	n.writeValue(w, value)
+	n.writeTag(w, 0, false, eol)
 }
 
-// printTag prints XML tag into io.Writer
-func (n *xmlNode) printTag(w io.Writer, indent uint8, openTag bool, eol string) {
+// writeTag prints XML tag into io.Writer
+func (n *xmlNode) writeTag(w io.Writer, indent uint8, openTag bool, eol string) {
 	if n.tag == "" {
 		return
 	}
@@ -183,21 +196,7 @@ func (n *xmlNode) printTag(w io.Writer, indent uint8, openTag bool, eol string) 
 	}
 }
 
-// printTag prints XML value into io.Writer
-func (n *xmlNode) printValue(w io.Writer, value string) {
+// writeTag prints XML value into io.Writer
+func (n *xmlNode) writeValue(w io.Writer, value string) {
 	_, _ = fmt.Fprintf(w, "%s", value)
-}
-
-// checkExcludes returns true if first tag of the key matches item with excludes list
-func checkExcludes(key string, excludes []string) bool {
-	tags := strings.Split(key, "/")
-	if len(tags) == 0 {
-		return false
-	}
-	for j := range excludes {
-		if tags[0] == excludes[j] {
-			return true
-		}
-	}
-	return false
 }
