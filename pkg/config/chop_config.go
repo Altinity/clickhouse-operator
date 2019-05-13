@@ -29,7 +29,7 @@ import (
 
 const (
 	// Default values for update timeout and polling period in seconds
-	defaultStatefulSetUpdateTimeout    = 120
+	defaultStatefulSetUpdateTimeout    = 300
 	defaultStatefulSetUpdatePollPeriod = 15
 
 	// Default values for ClickHouse user configuration
