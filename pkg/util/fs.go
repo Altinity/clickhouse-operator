@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package util
 
 import (
 	"github.com/golang/glog"
@@ -22,8 +22,8 @@ import (
 	"strings"
 )
 
-// isDirOk returns whether the given path exists and is a dir
-func isDirOk(path string) bool {
+// IsDirOk returns whether the given path exists and is a dir
+func IsDirOk(path string) bool {
 	if stat, err := os.Stat(path); (err == nil) && stat.IsDir() {
 		// File object Stat-ed without errors - it exists and it is a dir
 		return true
@@ -33,10 +33,10 @@ func isDirOk(path string) bool {
 	return false
 }
 
-// readConfigFiles reads config files from specified path into "file name->file content" map
+// ReadFilesIntoMap reads config files from specified path into "file name->file content" map
 // path - folder where to look for files
-// isChConfigExt - accepts path to file return bool whether this file has config extension
-func readConfigFiles(path string, isConfigExt func(string) bool) map[string]string {
+// isOurFile - accepts path to file return bool whether this file should be read
+func ReadFilesIntoMap(path string, isOurFile func(string) bool) map[string]string {
 	// Look in real path only
 	if path == "" {
 		return nil
@@ -44,15 +44,16 @@ func readConfigFiles(path string, isConfigExt func(string) bool) map[string]stri
 
 	// Result is a filename to content map
 	var files map[string]string
+
 	// Loop over all files in folder
 	if matches, err := filepath.Glob(path + "/*"); err == nil {
 		for i := range matches {
 			// `file` comes with `path`-prefixed.
 			// So in case `path` is an absolute path, `file` will be absolute path to file
 			file := matches[i]
-			if isConfigExt(file) {
-				// Pick files with proper extensions only
-				glog.Infof("CommonConfig file %s\n", file)
+			if isOurFile(file) {
+				// Pick our files only
+				glog.Infof("Reading file %s\n", file)
 				if content, err := ioutil.ReadFile(file); (err == nil) && (len(content) > 0) {
 					// File content read successfully and file has some content
 					if files == nil {
@@ -72,17 +73,7 @@ func readConfigFiles(path string, isConfigExt func(string) bool) map[string]stri
 	}
 }
 
-// extToLower fetches and lowercases file extension. With dot, as '.xml'
-func extToLower(file string) string {
+// ExtToLower fetches and lower-cases file extension. With dot, as '.xml'
+func ExtToLower(file string) string {
 	return strings.ToLower(filepath.Ext(file))
-}
-
-// inArray checks whether a is in list
-func inArray(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
 }

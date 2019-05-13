@@ -12,14 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package models
+package util
 
-import (
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"io"
-)
+// IncludeNonEmpty inserts (and overwrites) data into map object using specified key, if not empty value provided
+func IncludeNonEmpty(dst map[string]string, key, src string) {
+	// Do not include empty value
+	if src == "" {
+		return
+	}
 
-// fprintf suppresses warning for unused returns of fmt.Fprintf()
-func fprintf(w io.Writer, format string, a ...interface{}) {
-	util.Fprintf(w, format, a...)
+	// Include (and overwrite) value by specified key
+	dst[key] = src
+
+	return
 }

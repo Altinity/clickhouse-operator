@@ -21,6 +21,8 @@ spec:
       admin/quota: default
       readonly/profile: readonly
       readonly/quota: default
+      support/password: qwerty
+      support_readonly/profile: readonly
     profiles:
       test_profile/max_memory_usage: "1000000000"
       test_profile/readonly: "1"

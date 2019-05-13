@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/golang/glog"
 	"time"
 )
@@ -46,7 +47,7 @@ func ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.Chi
 			cluster.Name, ignoredDBs),
 		CreateChiServiceFQDN(chi),
 	)
-	dbNames, createStatements := unzip(result)
+	dbNames, createStatements := util.Unzip(result)
 	return dbNames, createStatements, nil
 }
 
@@ -69,7 +70,7 @@ func ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiClu
 		),
 		CreateChiServiceFQDN(chi),
 	)
-	tableNames, createStatements := unzip(result)
+	tableNames, createStatements := util.Unzip(result)
 	return tableNames, createStatements, nil
 }
 
@@ -91,7 +92,7 @@ func ReplicaGetDropTables(replica *chi.ChiClusterLayoutShardReplica) ([]string, 
 		),
 		CreatePodFQDN(replica),
 	)
-	tableNames, dropStatements := unzip(result)
+	tableNames, dropStatements := util.Unzip(result)
 	return tableNames, dropStatements, nil
 }
 

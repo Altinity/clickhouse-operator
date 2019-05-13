@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package models
+package util
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/util"
+	"fmt"
 	"io"
 )
 
-// fprintf suppresses warning for unused returns of fmt.Fprintf()
-func fprintf(w io.Writer, format string, a ...interface{}) {
-	util.Fprintf(w, format, a...)
+// Fprintf suppresses warning for unused returns of fmt.Fprintf()
+func Fprintf(w io.Writer, format string, a ...interface{}) {
+	_, _ = fmt.Fprintf(w, format, a...)
 }

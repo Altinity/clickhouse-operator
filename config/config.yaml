@@ -49,3 +49,20 @@ onStatefulSetCreateFailureAction: delete
 # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
 # Pod would be recreated by StatefulSet based on rollback-ed configuration
 onStatefulSetUpdateFailureAction: rollback
+
+################################################
+##
+## ClickHouse Settings Section
+##
+################################################
+
+# Default values for ClickHouse user configuration
+# 1. user/profile - string
+# 2. user/quota - string
+# 3. user/networks/ip - multiple strings
+# 4. user/password - string
+chConfigUserDefaultProfile: default
+chConfigUserDefaultQuota: default
+chConfigUserDefaultNetworksIP:
+  - "::/0"
+chConfigUserDefaultPassword: "default"
