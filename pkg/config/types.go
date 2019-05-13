@@ -58,10 +58,10 @@ type Config struct {
 	OnStatefulSetUpdateFailureAction string `yaml:"onStatefulSetUpdateFailureAction"`
 
 	// Default values for ClickHouse user configuration
-	// 1. user/profile
-	// 2. user/quota
-	// 3. user/networks/ip
-	// 4. user/password
+	// 1. user/profile - string
+	// 2. user/quota - string
+	// 3. user/networks/ip - multiple strings
+	// 4. user/password - string
 	ChConfigUserDefaultProfile    string   `yaml:"chConfigUserDefaultProfile"`
 	ChConfigUserDefaultQuota      string   `yaml:"chConfigUserDefaultQuota"`
 	ChConfigUserDefaultNetworksIP []string `yaml:"chConfigUserDefaultNetworksIP"`
