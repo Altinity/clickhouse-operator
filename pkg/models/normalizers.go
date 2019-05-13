@@ -20,6 +20,7 @@ import (
 	"fmt"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/config"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -46,6 +47,7 @@ func ChiNormalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallat
 	defaultsNormalizeReplicasUseFQDN(&chi.Spec.Defaults)
 	deploymentNormalizeScenario(&chi.Spec.Defaults.Deployment)
 	templatesNormalizeVolumeClaimTemplatesNames(chi.Spec.Templates.VolumeClaimTemplates)
+	configurationNormalize(&chi.Spec.Configuration)
 
 	// Normalize all clusters in this CHI
 	chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
@@ -59,6 +61,96 @@ func ChiNormalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallat
 	chi.SetKnown()
 
 	return chi, nil
+}
+
+func configurationNormalize(conf *chiv1.ChiConfiguration) {
+	configurationUsersNormalize(&conf.Users)
+	configurationProfilesNormalize(&conf.Profiles)
+	configurationQuotasNormalize(&conf.Quotas)
+	configurationSettingsNormalize(&conf.Settings)
+}
+
+func normalizePath(path string) string {
+	// Normalize '//' to '/'
+	re := regexp.MustCompile("//+")
+	path = re.ReplaceAllString(path, "/")
+	// Cut all leading and trailing '/'
+	return strings.Trim(path, "/")
+}
+
+func normalizePaths(conf *map[string]interface{}) {
+	pathsToNormalize := make([]string, 0, 0)
+
+	// Find entries with paths to normalize
+	for key := range *conf {
+		path := normalizePath(key)
+		if len(path) != len(key) {
+			// Normalization worked. These paths have to be normalized
+			pathsToNormalize = append(pathsToNormalize, key)
+		}
+	}
+
+	// Add entries with normalized paths
+	for _, key := range pathsToNormalize {
+		path := normalizePath(key)
+		(*conf)[path] = (*conf)[key]
+	}
+
+	// Delete entries with un-normalized paths
+	for _, key := range pathsToNormalize {
+		delete(*conf, key)
+	}
+}
+
+func configurationUsersNormalize(conf *map[string]interface{}) {
+	normalizePaths(conf)
+
+	// Extract username from path
+	usernameMap := make(map[string]bool)
+	for path := range *conf {
+		// Split 'admin/password'
+		tags := strings.Split(path, "/")
+		username := tags[0]
+		usernameMap[username] = true
+	}
+
+	// Ensure "must have" sections are in place, which are
+	// 1. user/profile
+	// 2. user/quota
+	// 3. user/networks/ip
+	// 4. user/password OR user/password_sha256_hex
+	for username := range usernameMap {
+		if _, ok := (*conf)[username+"/profile"]; !ok {
+			// No 'user/profile' section
+			(*conf)[username+"/profile"] = "default"
+		}
+		if _, ok := (*conf)[username+"/quota"]; !ok {
+			// No 'user/quota' section
+			(*conf)[username+"/quota"] = "default"
+		}
+		if _, ok := (*conf)[username+"/networks/ip"]; !ok {
+			// No 'user/networks/ip' section
+			(*conf)[username+"/networks/ip"] = []string{"::/0"}
+		}
+		_, okPassword := (*conf)[username+"/password"]
+		_, okPasswordSHA256 := (*conf)[username+"/password_sha256_hex"]
+		if !okPassword && !okPasswordSHA256 {
+			// Neither 'password' nor 'password_sha256_hex' are in place
+			(*conf)[username+"/password"] = "default"
+		}
+	}
+}
+
+func configurationProfilesNormalize(conf *map[string]interface{}) {
+	normalizePaths(conf)
+}
+
+func configurationQuotasNormalize(conf *map[string]interface{}) {
+	normalizePaths(conf)
+}
+
+func configurationSettingsNormalize(conf *map[string]interface{}) {
+	normalizePaths(conf)
 }
 
 // clusterNormalize normalizes cluster and returns deployments usage counters for this cluster

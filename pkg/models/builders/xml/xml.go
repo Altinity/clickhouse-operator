@@ -124,7 +124,7 @@ func (n *xmlNode) addChild(tag string) *xmlNode {
 func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) {
 	switch n.value.(type) {
 	case []interface{}:
-		// Value is an array of strings
+		// Value is an array of "what would be a string"
 		// Repeat tag with each value, like:
 		// <yandex>
 		//    ...
@@ -135,6 +135,18 @@ func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) {
 		for _, value := range n.value.([]interface{}) {
 			stringValue := value.(string)
 			n.writeTagWithValue(w, stringValue, indent, tabsize)
+		}
+	case []string:
+		// Value is an array of strings
+		// Repeat tag with each value, like:
+		// <yandex>
+		//    ...
+		//    <networks>
+		//        <ip>::/64</ip>
+		//        <ip>203.0.113.0/24</ip>
+		//        <ip>2001:DB8::/32</ip>
+		for _, value := range n.value.([]string) {
+			n.writeTagWithValue(w, value, indent, tabsize)
 		}
 	case string:
 		// value is a string
