@@ -376,7 +376,7 @@ func (c *Controller) createChiFromObjectMeta(objectMeta *meta.ObjectMeta) (*chi.
 		return nil, err
 	}
 
-	chi, err = chopmodels.ChiNormalize(chi)
+	chi, err = chopmodels.ChiNormalize(chi, c.chopConfig)
 	if err != nil {
 		return nil, err
 	}

@@ -28,11 +28,19 @@ import (
 )
 
 const (
-	// Default update timeout in seconds
-	defaultStatefulSetUpdateTimeout = 120
-
-	// Default polling period in seconds
+	// Default values for update timeout and polling period in seconds
+	defaultStatefulSetUpdateTimeout    = 120
 	defaultStatefulSetUpdatePollPeriod = 15
+
+	// Default values for ClickHouse user configuration
+	// 1. user/profile
+	// 2. user/quota
+	// 3. user/networks/ip
+	// 4. user/password
+	defaultChConfigUserDefaultProfile    = "default"
+	defaultChConfigUserDefaultQuota      = "default"
+	defaultChConfigUserDefaultNetworksIP = "::/0"
+	defaultChConfigUserDefaultPassword   = "default"
 )
 
 // GetConfig creates Config object based on current environment
@@ -178,6 +186,24 @@ func (config *Config) normalize() error {
 		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionAbort
 	} else {
 		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionRollback
+	}
+
+	// Default values for ClickHouse user configuration
+	// 1. user/profile
+	// 2. user/quota
+	// 3. user/networks/ip
+	// 4. user/password
+	if config.ChConfigUserDefaultProfile == "" {
+		config.ChConfigUserDefaultProfile = defaultChConfigUserDefaultProfile
+	}
+	if config.ChConfigUserDefaultQuota == "" {
+		config.ChConfigUserDefaultQuota = defaultChConfigUserDefaultQuota
+	}
+	if len(config.ChConfigUserDefaultNetworksIP) == 0 {
+		config.ChConfigUserDefaultNetworksIP = []string{defaultChConfigUserDefaultNetworksIP}
+	}
+	if config.ChConfigUserDefaultPassword == "" {
+		config.ChConfigUserDefaultPassword = defaultChConfigUserDefaultPassword
 	}
 
 	return nil

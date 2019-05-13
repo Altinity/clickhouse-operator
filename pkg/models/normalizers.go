@@ -32,22 +32,22 @@ func ChiApplyTemplateAndNormalize(
 ) (*chiv1.ClickHouseInstallation, error) {
 	if config.ChiTemplate == nil {
 		// No template specified
-		return ChiNormalize(chi.DeepCopy())
+		return ChiNormalize(chi.DeepCopy(), config)
 	} else {
 		base := config.ChiTemplate.DeepCopy()
 		base.MergeFrom(chi)
-		return ChiNormalize(base)
+		return ChiNormalize(base, config)
 	}
 }
 
 // ChiNormalize normalizes CHI.
 // Returns NamedNumber of deployments number required to satisfy clusters' infrastructure
-func ChiNormalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
+func ChiNormalize(chi *chiv1.ClickHouseInstallation, config *config.Config) (*chiv1.ClickHouseInstallation, error) {
 	// Set defaults for CHI object properties
 	defaultsNormalizeReplicasUseFQDN(&chi.Spec.Defaults)
 	deploymentNormalizeScenario(&chi.Spec.Defaults.Deployment)
 	templatesNormalizeVolumeClaimTemplatesNames(chi.Spec.Templates.VolumeClaimTemplates)
-	configurationNormalize(&chi.Spec.Configuration)
+	configurationNormalize(&chi.Spec.Configuration, config)
 
 	// Normalize all clusters in this CHI
 	chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
@@ -63,8 +63,8 @@ func ChiNormalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallat
 	return chi, nil
 }
 
-func configurationNormalize(conf *chiv1.ChiConfiguration) {
-	configurationUsersNormalize(&conf.Users)
+func configurationNormalize(conf *chiv1.ChiConfiguration, chopConf *config.Config) {
+	configurationUsersNormalize(&conf.Users, chopConf)
 	configurationProfilesNormalize(&conf.Profiles)
 	configurationQuotasNormalize(&conf.Quotas)
 	configurationSettingsNormalize(&conf.Settings)
@@ -102,7 +102,7 @@ func normalizePaths(conf *map[string]interface{}) {
 	}
 }
 
-func configurationUsersNormalize(conf *map[string]interface{}) {
+func configurationUsersNormalize(conf *map[string]interface{}, chopConf *config.Config) {
 	normalizePaths(conf)
 
 	// Extract username from path
@@ -122,21 +122,21 @@ func configurationUsersNormalize(conf *map[string]interface{}) {
 	for username := range usernameMap {
 		if _, ok := (*conf)[username+"/profile"]; !ok {
 			// No 'user/profile' section
-			(*conf)[username+"/profile"] = "default"
+			(*conf)[username+"/profile"] = chopConf.ChConfigUserDefaultProfile
 		}
 		if _, ok := (*conf)[username+"/quota"]; !ok {
 			// No 'user/quota' section
-			(*conf)[username+"/quota"] = "default"
+			(*conf)[username+"/quota"] = chopConf.ChConfigUserDefaultQuota
 		}
 		if _, ok := (*conf)[username+"/networks/ip"]; !ok {
 			// No 'user/networks/ip' section
-			(*conf)[username+"/networks/ip"] = []string{"::/0"}
+			(*conf)[username+"/networks/ip"] = chopConf.ChConfigUserDefaultNetworksIP
 		}
 		_, okPassword := (*conf)[username+"/password"]
 		_, okPasswordSHA256 := (*conf)[username+"/password_sha256_hex"]
 		if !okPassword && !okPasswordSHA256 {
 			// Neither 'password' nor 'password_sha256_hex' are in place
-			(*conf)[username+"/password"] = "default"
+			(*conf)[username+"/password"] = chopConf.ChConfigUserDefaultPassword
 		}
 	}
 }

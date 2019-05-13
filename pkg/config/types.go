@@ -56,6 +56,16 @@ type Config struct {
 	OnStatefulSetCreateFailureAction string `yaml:"onStatefulSetCreateFailureAction"`
 	// StatefulSet update behavior - what to do in case StatefulSet can't reach new Generation
 	OnStatefulSetUpdateFailureAction string `yaml:"onStatefulSetUpdateFailureAction"`
+
+	// Default values for ClickHouse user configuration
+	// 1. user/profile
+	// 2. user/quota
+	// 3. user/networks/ip
+	// 4. user/password
+	ChConfigUserDefaultProfile    string   `yaml:"chConfigUserDefaultProfile"`
+	ChConfigUserDefaultQuota      string   `yaml:"chConfigUserDefaultQuota"`
+	ChConfigUserDefaultNetworksIP []string `yaml:"chConfigUserDefaultNetworksIP"`
+	ChConfigUserDefaultPassword   string   `yaml:"chConfigUserDefaultPassword"`
 }
 
 const (
