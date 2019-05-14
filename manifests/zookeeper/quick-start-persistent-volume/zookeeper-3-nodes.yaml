@@ -37,7 +37,7 @@ spec:
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
-  name: zookeeper-pod-distribution-budget
+  name: zookeeper-pod-disruption-budget
 spec:
   selector:
     matchLabels:
@@ -61,7 +61,7 @@ spec:
     matchLabels:
       app: zookeeper
   serviceName: zookeepers
-  replicas: 1
+  replicas: 3
   updateStrategy:
     type: RollingUpdate
   podManagementPolicy: Parallel
@@ -100,7 +100,7 @@ spec:
         - sh
         - -c
         - "start-zookeeper \
-          --servers=1 \
+          --servers=3 \
           --data_dir=/var/lib/zookeeper/data \
           --data_log_dir=/var/lib/zookeeper/data/log \
           --conf_dir=/opt/zookeeper/conf \
@@ -140,8 +140,12 @@ spec:
       securityContext:
         runAsUser: 1000
         fsGroup: 1000
-      volumes:
-      - name: datadir-volume
-        emptyDir:
-          medium: "" #accepted values:  empty str (means node's default medium) or Memory
-          sizeLimit: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: datadir-volume
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
