@@ -109,17 +109,17 @@ This part is not that straightforward and may require communication with k8s ins
 
 First of all, we need to decide, whether Zookeeper would use [Persistent Volume][k8sdoc_persistent_volume] as a storage or just stick to more simple [Volume][k8sdoc_volume] (In doc [emptyDir][k8sdoc_emptydir] type is used)
 
-In case we'd prefer to stick with simpler solution and go with [Volume of type emptyDir][k8sdoc_emptydir], we need to go with [emptyDir StatefulSet config](../manifests/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) as described in next [Stateful Set unit](#stateful-set). Just move to [it](#stateful-set).
+In case we'd prefer to stick with simpler solution and go with [Volume of type emptyDir][k8sdoc_emptydir], we need to go with **emptyDir StatefulSet config** [05-stateful-set-volume-emptyDir.yaml](../manifests/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) as described in next [Stateful Set unit](#stateful-set). Just move to [it](#stateful-set).
 
-In case we'd prefer to go with [Persistent Volume][k8sdoc_persistent_volume] storage, we need to go with [persistent Volume StatefulSet config](../manifests/zookeeper/advanced/05-stateful-set-persistent-volume.yaml)
+In case we'd prefer to go with [Persistent Volume][k8sdoc_persistent_volume] storage, we need to go with **Persistent Volume StatefulSet config** [05-stateful-set-persistent-volume.yaml](../manifests/zookeeper/advanced/05-stateful-set-persistent-volume.yaml)
 
 Shortly, [Storage Class][k8sdoc_storage_class] is used to bind together [Persistent Volumes][k8sdoc_persistent_volume],
 which are created either by k8s admin manually or automatically by [Provisioner][k8sdocs_dynamic_provisioning]. In any case, Persistent Volumes are provided externally to an application to be deployed into k8s. 
 So, this application has to know **Storage Class Name** to ask for from the k8s in application's claim for new persistent volume - [Persistent Volume Claim][k8sdoc_persistent_volume_claim].
-This **Storage Class Name** should be asked from k8s admin and written as application's **Persistent Volume Claim** `.spec.volumeClaimTemplates.storageClassName` parameter in `StatefulSet` configuration. [StatefulSet manifest with emptyDir](../manifests/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) and/or [StatefulSet manifest with Persistent Volume](../manifests/zookeeper/advanced/05-stateful-set-persistent-volume.yaml). 
+This **Storage Class Name** should be asked from k8s admin and written as application's **Persistent Volume Claim** `.spec.volumeClaimTemplates.storageClassName` parameter in `StatefulSet` configuration. **StatefulSet manifest with emptyDir** [05-stateful-set-volume-emptyDir.yaml](../manifests/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) and/or **StatefulSet manifest with Persistent Volume** [05-stateful-set-persistent-volume.yaml](../manifests/zookeeper/advanced/05-stateful-set-persistent-volume.yaml). 
 
 ### Stateful Set
-Edit [StatefulSet manifest with emptyDir](../manifests/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) and/or [StatefulSet manifest with Persistent Volume](../manifests/zookeeper/advanced/05-stateful-set-persistent-volume.yaml). according to your Storage Preferences.
+Edit **StatefulSet manifest with emptyDir** [05-stateful-set-volume-emptyDir.yaml](../manifests/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) and/or **StatefulSet manifest with Persistent Volume** [05-stateful-set-persistent-volume.yaml](../manifests/zookeeper/advanced/05-stateful-set-persistent-volume.yaml) according to your Storage Preferences.
 
 In case we'd go with [Volume of type emptyDir][k8sdoc_emptydir], ensure `.spec.template.spec.containers.volumes` is in place and look like the following:
 ```yaml
