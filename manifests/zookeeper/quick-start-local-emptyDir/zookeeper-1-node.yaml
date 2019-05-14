@@ -37,7 +37,7 @@ spec:
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
-  name: zookeeper-pod-distribution-budget
+  name: zookeeper-pod-disruption-budget
 spec:
   selector:
     matchLabels:
@@ -61,7 +61,7 @@ spec:
     matchLabels:
       app: zookeeper
   serviceName: zookeepers
-  replicas: 3
+  replicas: 1
   updateStrategy:
     type: RollingUpdate
   podManagementPolicy: Parallel
@@ -100,7 +100,7 @@ spec:
         - sh
         - -c
         - "start-zookeeper \
-          --servers=3 \
+          --servers=1 \
           --data_dir=/var/lib/zookeeper/data \
           --data_log_dir=/var/lib/zookeeper/data/log \
           --conf_dir=/opt/zookeeper/conf \
