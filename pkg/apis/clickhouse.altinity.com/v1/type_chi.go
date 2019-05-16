@@ -38,20 +38,6 @@ func (chi *ClickHouseInstallation) IsFilled() bool {
 	return (clusters > 0) && filled
 }
 
-func (chi *ClickHouseInstallation) DeploymentsCount() int {
-	replicasCount := 0
-
-	shardProcessor := func(
-		shard *ChiClusterLayoutShard,
-	) error {
-		replicasCount += shard.ReplicasCount
-		return nil
-	}
-	chi.WalkShards(shardProcessor)
-
-	return replicasCount
-}
-
 func (chi *ClickHouseInstallation) FillAddressInfo() int {
 	replicasCount := 0
 

@@ -52,7 +52,7 @@ func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) e
 	c.statefulSetDelete(replica.Address.Namespace, statefulSetName)
 
 	// Delete ConfigMap
-	configMapName := chopmodels.CreateConfigMapDeploymentName(replica)
+	configMapName := chopmodels.CreateConfigMapPodName(replica)
 	if err := c.kubeClient.CoreV1().ConfigMaps(replica.Address.Namespace).Delete(configMapName, newDeleteOptions()); err == nil {
 		glog.V(1).Infof("ConfigMap %s deleted", configMapName)
 	} else {

@@ -45,9 +45,10 @@ type ChiStatus struct {
 
 // ChiDefaults defines defaults section of .spec
 type ChiDefaults struct {
+	PodTemplate      string     `json:"podTemplate,omitempty"      yaml:"podTemplate"`
+	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty" yaml:"volumeClaimTemplate"`
 	ReplicasUseFQDN int               `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN"`
 	DistributedDDL  ChiDistributedDDL `json:"distributedDDL,omitempty"  yaml:"distributedDDL"`
-	Deployment      ChiDeployment     `json:"deployment,omitempty"      yaml:"deployment"`
 }
 
 // ChiConfiguration defines configuration section of .spec
@@ -65,7 +66,7 @@ type ChiConfiguration struct {
 type ChiCluster struct {
 	Name       string           `json:"name"`
 	Layout     ChiClusterLayout `json:"layout"`
-	Deployment ChiDeployment    `json:"deployment,omitempty"`
+	PodTemplate string    `json:"podTemplate,omitempty"`
 
 	Address ChiClusterAddress `json:"address"`
 }
@@ -91,7 +92,7 @@ type ChiClusterLayoutShard struct {
 	ReplicasCount       int                            `json:"replicasCount,omitempty"`
 	Weight              int                            `json:"weight,omitempty"`
 	InternalReplication string                         `json:"internalReplication,omitempty"`
-	Deployment          ChiDeployment                  `json:"deployment,omitempty"`
+	PodTemplate          string                  `json:"podTemplate,omitempty"`
 	Replicas            []ChiClusterLayoutShardReplica `json:"replicas,omitempty"`
 
 	Address ChiClusterLayoutShardAddress `json:"address"`
@@ -108,7 +109,7 @@ type ChiClusterLayoutShardAddress struct {
 // ChiClusterLayoutShardReplica defines item of a replicas section of .spec.configuration.clusters[n].shards[m]
 type ChiClusterLayoutShardReplica struct {
 	Port       int32         `json:"port,omitempty"`
-	Deployment ChiDeployment `json:"deployment,omitempty"`
+	PodTemplate string `json:"podTemplate,omitempty"`
 
 	Address ChiClusterLayoutShardReplicaAddress `json:"address"`
 	Config  ChiClusterLayoutShardReplicaConfig  `json:"config"`
@@ -136,34 +137,19 @@ type ChiTemplates struct {
 	VolumeClaimTemplates []ChiVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates"`
 }
 
+type ChiPodTemplate struct {
+	Name string
+	Spec corev1.PodSpec
+}
+
+type ChiVolumeClaimTemplate struct {
+	Name string
+	Spec corev1.PersistentVolumeClaimSpec
+}
+
 // ChiDistributedDDL defines distributedDDL section of .spec.defaults
 type ChiDistributedDDL struct {
 	Profile string `json:"profile,omitempty" yaml:"profile"`
-}
-
-// ChiDeployment defines deployment section of .spec
-type ChiDeployment struct {
-	// PodTemplate specifies which Pod template from
-	// .spec.templates.podTemplates should be used
-	PodTemplate string `json:"podTemplate,omitempty" yaml:"podTemplate"`
-
-	// VolumeClaimTemplate specifies which VolumeClaim template
-	// from .spec.templates.volumeClaimTemplates should be used
-	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty" yaml:"volumeClaimTemplate"`
-
-	Zone     ChiDeploymentZone `json:"zone,omitempty"     yaml:"zone"`
-	Scenario string            `json:"scenario,omitempty" yaml:"scenario"`
-
-	// Fingerprint is a fingerprint of the ChiDeployment. Used to find equal deployments
-	Fingerprint string `json:"fingerprint,omitempty"`
-
-	// Index is an index of this Deployment within Cluster
-	Index int `json:"index,omitempty"`
-}
-
-// ChiDeploymentZone defines zone section of *.deployment
-type ChiDeploymentZone struct {
-	MatchLabels map[string]string `json:"matchLabels" yaml:"matchLabels"`
 }
 
 // ChiConfigurationZookeeper defines zookeeper section of .spec.configuration
@@ -175,19 +161,6 @@ type ChiConfigurationZookeeper struct {
 type ChiConfigurationZookeeperNode struct {
 	Host string `json:"host" yaml:"host"`
 	Port int32  `json:"port" yaml:"port"`
-}
-
-// ChiVolumeClaimTemplate defines item of .spec.templates.volumeClaimTemplates
-type ChiVolumeClaimTemplate struct {
-	Name                  string                       `json:"name"                  yaml:"name"`
-	PersistentVolumeClaim corev1.PersistentVolumeClaim `json:"persistentVolumeClaim" yaml:"persistentVolumeClaim"`
-}
-
-// ChiPodTemplate defines item of a podTemplates section of .spec.templates
-type ChiPodTemplate struct {
-	Name       string             `json:"name"       yaml:"name"`
-	Containers []corev1.Container `json:"containers" yaml:"containers"`
-	Volumes    []corev1.Volume    `json:"volumes"    yaml:"volumes"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

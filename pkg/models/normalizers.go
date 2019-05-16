@@ -15,13 +15,9 @@
 package models
 
 import (
-	"crypto/sha1"
-	"encoding/hex"
-	"fmt"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/config"
 	"regexp"
-	"sort"
 	"strings"
 )
 
@@ -45,8 +41,6 @@ func ChiApplyTemplateAndNormalize(
 func ChiNormalize(chi *chiv1.ClickHouseInstallation, config *config.Config) (*chiv1.ClickHouseInstallation, error) {
 	// Set defaults for CHI object properties
 	defaultsNormalizeReplicasUseFQDN(&chi.Spec.Defaults)
-	deploymentNormalizeScenario(&chi.Spec.Defaults.Deployment)
-	templatesNormalizeVolumeClaimTemplatesNames(chi.Spec.Templates.VolumeClaimTemplates)
 	configurationNormalize(&chi.Spec.Configuration, config)
 
 	// Normalize all clusters in this CHI
@@ -63,45 +57,16 @@ func ChiNormalize(chi *chiv1.ClickHouseInstallation, config *config.Config) (*ch
 	return chi, nil
 }
 
+// configurationNormalize normalizes .spec.configuration
 func configurationNormalize(conf *chiv1.ChiConfiguration, chopConf *config.Config) {
+	// TODO normalize zookeeper
 	configurationUsersNormalize(&conf.Users, chopConf)
 	configurationProfilesNormalize(&conf.Profiles)
 	configurationQuotasNormalize(&conf.Quotas)
 	configurationSettingsNormalize(&conf.Settings)
 }
 
-func normalizePath(path string) string {
-	// Normalize '//' to '/'
-	re := regexp.MustCompile("//+")
-	path = re.ReplaceAllString(path, "/")
-	// Cut all leading and trailing '/'
-	return strings.Trim(path, "/")
-}
-
-func normalizePaths(conf *map[string]interface{}) {
-	pathsToNormalize := make([]string, 0, 0)
-
-	// Find entries with paths to normalize
-	for key := range *conf {
-		path := normalizePath(key)
-		if len(path) != len(key) {
-			// Normalization worked. These paths have to be normalized
-			pathsToNormalize = append(pathsToNormalize, key)
-		}
-	}
-
-	// Add entries with normalized paths
-	for _, key := range pathsToNormalize {
-		path := normalizePath(key)
-		(*conf)[path] = (*conf)[key]
-	}
-
-	// Delete entries with un-normalized paths
-	for _, key := range pathsToNormalize {
-		delete(*conf, key)
-	}
-}
-
+// configurationUsersNormalize normalizes .spec.configuration.users
 func configurationUsersNormalize(conf *map[string]interface{}, chopConf *config.Config) {
 	normalizePaths(conf)
 
@@ -141,14 +106,17 @@ func configurationUsersNormalize(conf *map[string]interface{}, chopConf *config.
 	}
 }
 
+// configurationProfilesNormalize normalizes .spec.configuration.profiles
 func configurationProfilesNormalize(conf *map[string]interface{}) {
 	normalizePaths(conf)
 }
 
+// configurationQuotasNormalize normalizes .spec.configuration.quotas
 func configurationQuotasNormalize(conf *map[string]interface{}) {
 	normalizePaths(conf)
 }
 
+// configurationSettingsNormalize normalizes .spec.configuration.settings
 func configurationSettingsNormalize(conf *map[string]interface{}) {
 	normalizePaths(conf)
 }
@@ -158,8 +126,10 @@ func clusterNormalize(
 	chi *chiv1.ClickHouseInstallation,
 	cluster *chiv1.ChiCluster,
 ) error {
-	// Apply default deployment for the whole cluster
-	(&cluster.Deployment).MergeFrom(&chi.Spec.Defaults.Deployment)
+	// Inherit PodTemplate from .spec.defaults
+	if cluster.PodTemplate == "" {
+		cluster.PodTemplate = chi.Spec.Defaults.PodTemplate
+	}
 
 	// Convenience wrapper
 	layout := &cluster.Layout
@@ -173,8 +143,10 @@ func clusterNormalize(
 		// Convenience wrapper
 		shard := &layout.Shards[shardIndex]
 
-		// For each shard of this normalized cluster inherit cluster's Deployment
-		(&shard.Deployment).MergeFrom(&cluster.Deployment)
+		// For each shard of this normalized cluster inherit cluster's PodTemplate
+		if shard.PodTemplate == "" {
+			shard.PodTemplate = cluster.PodTemplate
+		}
 
 		// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
 		// Default value set to "true"
@@ -248,9 +220,10 @@ func shardNormalizeReplicas(shard *chiv1.ChiClusterLayoutShard) {
 
 		replicaNormalizePort(replica)
 
-		// Inherit deployment
-		(&replica.Deployment).MergeFrom(&shard.Deployment)
-		replica.Deployment.Fingerprint = deploymentGenerateFingerprint(replica, &replica.Deployment)
+		// Inherit PodTemplate from shard
+		if replica.PodTemplate == "" {
+			replica.PodTemplate = shard.PodTemplate
+		}
 	}
 }
 
@@ -273,42 +246,6 @@ func shardNormalizeInternalReplication(shard *chiv1.ChiClusterLayoutShard) {
 	}
 }
 
-// deploymentGenerateString creates string representation
-// of chiv1.ChiDeployment object of the following form:
-// "PodTemplate::VolumeClaimTemplate::Scenario::Zone.MatchLabels.Key1=Zone.MatchLabels.Val1::Zone.MatchLabels.Key2=Zone.MatchLabels.Val2"
-// IMPORTANT there can be the same deployments inside ClickHouseInstallation object
-// and they will have the same deployment string representation
-func deploymentGenerateString(d *chiv1.ChiDeployment) string {
-	zoneMatchLabelsNum := len(d.Zone.MatchLabels)
-
-	// Labels should be sorted key keys
-	keys := make([]string, 0, zoneMatchLabelsNum)
-	for key := range d.Zone.MatchLabels {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	a := make([]string, 0, zoneMatchLabelsNum+1)
-	a = append(a, fmt.Sprintf("%s::%s::%s::", d.PodTemplate, d.VolumeClaimTemplate, d.Scenario))
-	// Loop over sorted d.Zone.MatchLabels keys
-	for _, key := range keys {
-		// Append d.Zone.MatchLabels values
-		a = append(a, fmt.Sprintf("%s=%s", key, d.Zone.MatchLabels[key]))
-	}
-
-	return strings.Join(a, "::")
-}
-
-// deploymentGenerateFingerprint creates fingerprint
-// of chiv1.ChiDeployment object located inside chiv1.ClickHouseInstallation
-// IMPORTANT there can be the same deployments inside ClickHouseInstallation object
-// and they will have the same fingerprint
-func deploymentGenerateFingerprint(replica *chiv1.ChiClusterLayoutShardReplica, deployment *chiv1.ChiDeployment) string {
-	hasher := sha1.New()
-	hasher.Write([]byte(replica.Address.ChiName + deploymentGenerateString(deployment)))
-	return hex.EncodeToString(hasher.Sum(nil))
-}
-
 // defaultsNormalizeReplicasUseFQDN ensures chiv1.ChiDefaults.ReplicasUseFQDN section has proper values
 func defaultsNormalizeReplicasUseFQDN(d *chiv1.ChiDefaults) {
 	// Acceptable values are 0 and 1
@@ -322,29 +259,38 @@ func defaultsNormalizeReplicasUseFQDN(d *chiv1.ChiDefaults) {
 	d.ReplicasUseFQDN = 0
 }
 
-// deploymentNormalizeScenario normalizes chiv1.ChiDeployment.Scenario
-func deploymentNormalizeScenario(d *chiv1.ChiDeployment) {
-	if d.Scenario == "" {
-		// Have no default deployment scenario specified - specify default one
-		d.Scenario = deploymentScenarioDefault
-	}
+// normalizePath normalizes path in .spec.configuration.{users, profiles, quotas, settings} section
+// Normalized path looks like 'a/b/c'
+func normalizePath(path string) string {
+	// Normalize multi-'/' values (like '//') to single-'/'
+	re := regexp.MustCompile("//+")
+	path = re.ReplaceAllString(path, "/")
+
+	// Cut all leading and trailing '/', so the result would be 'a/b/c'
+	return strings.Trim(path, "/")
 }
 
-// templatesNormalizeVolumeClaimTemplatesNames normalizes naming of chiv1.ChiVolumeClaimTemplate
-func templatesNormalizeVolumeClaimTemplatesNames(volumeClaimTemplates []chiv1.ChiVolumeClaimTemplate) {
-	for i := range volumeClaimTemplates {
-		// Convenience wrapper
-		volumeClaimTemplate := &volumeClaimTemplates[i]
-		//   templates:
-		//    volumeClaimTemplates:
-		//      - name: volumeclaim-template
-		//        persistentVolumeClaim:
-		//          meta:
-		//            name: QWE
-		// In case of .templates.volumeClaimTemplates.persistentVolumeClaim.meta.name (QWE in this case) is omitted
-		// assign .templates.volumeClaimTemplates.persistentVolumeClaim.meta.name with .templates.volumeClaimTemplates.name
-		if volumeClaimTemplate.PersistentVolumeClaim.Name == "" {
-			volumeClaimTemplate.PersistentVolumeClaim.Name = volumeClaimTemplate.Name
+// normalizePaths normalizes paths in whole conf section, like .spec.configuration.users
+func normalizePaths(conf *map[string]interface{}) {
+	pathsToNormalize := make([]string, 0, 0)
+
+	// Find entries with paths to normalize
+	for key := range *conf {
+		path := normalizePath(key)
+		if len(path) != len(key) {
+			// Normalization worked. These paths have to be normalized
+			pathsToNormalize = append(pathsToNormalize, key)
 		}
+	}
+
+	// Add entries with normalized paths
+	for _, key := range pathsToNormalize {
+		path := normalizePath(key)
+		(*conf)[path] = (*conf)[key]
+	}
+
+	// Delete entries with un-normalized paths
+	for _, key := range pathsToNormalize {
+		delete(*conf, key)
 	}
 }

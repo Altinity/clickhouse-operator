@@ -38,8 +38,8 @@ func createClusterNameID(name string) string {
 	return createStringID(name, 4)
 }
 
-// CreateConfigMapDeploymentName returns a name for a ConfigMap for replica's deployment
-func CreateConfigMapDeploymentName(replica *chop.ChiClusterLayoutShardReplica) string {
+// CreateConfigMapPodName returns a name for a ConfigMap for replica's pod
+func CreateConfigMapPodName(replica *chop.ChiClusterLayoutShardReplica) string {
 	return fmt.Sprintf(
 		configMapDeploymentNamePattern,
 		createChiNameID(replica.Address.ChiName),

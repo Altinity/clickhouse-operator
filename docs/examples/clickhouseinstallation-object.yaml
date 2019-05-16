@@ -2,230 +2,164 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
   name: "clickhouse-installation-test"
+
 spec:
 
   defaults:
+    podTemplate: clickhouse-v18.16.1
+    volumeClaimTemplate: default-volume-claim
     replicasUseFQDN: 0 # 0 - by default, 1 - enabled
     distributedDDL:
       profile: default
-    deployment:
-      zone:
-        matchLabels:
-          clickhouse.altinity.com/zone: zone1
-      podTemplate: clickhouse-v18.16.1
-      volumeClaimTemplate: default
-#     scenario: Default
 
   configuration:
     zookeeper:
       nodes:
-      - host: zk-statefulset-0.zk-service.default.svc.cluster.local
-        port: 2181
-      - host: zk-statefulset-1.zk-service.default.svc.cluster.local
-        port: 2181
-      - host: zk-statefulset-2.zk-service.default.svc.cluster.local
-        port: 2181
+        - host: zk-statefulset-0.zk-service.default.svc.cluster.local
+          port: 2181
+        - host: zk-statefulset-1.zk-service.default.svc.cluster.local
+          port: 2181
+        - host: zk-statefulset-2.zk-service.default.svc.cluster.local
+          port: 2181
     users:
+      readonly/profile: readonly
+      #     <users>
+      #        <readonly>
+      #          <profile>readonly</profile>
+      #        </readonly>
+      #     </users>
+      test/networks/ip:
+        - "127.0.0.1"
+        - "::/0"
+      #     <users>
+      #        <test>
+      #          <networks>
+      #            <ip>127.0.0.1</ip>
+      #            <ip>::/0</ip>
+      #          </networks>
+      #        </test>
+      #     </users>
       test/profile: default
       test/quotas: default
-      readonly/profile: readonly
-#     <users>
-#        <readonly>
-#          <profile>readonly</profile>
-#        </readonly>
-#     </users>
     profiles:
       readonly/readonly: "1"
-#      <profiles>
-#        <readonly>
-#          <readonly>1</readonly>
-#        </readonly>
-#      </profiles>
+      #      <profiles>
+      #        <readonly>
+      #          <readonly>1</readonly>
+      #        </readonly>
+      #      </profiles>
       default/max_memory_usage: "1000000000"
-#      <profiles>
-#        <default>
-#          <max_memory_usage>1000000000</max_memory_usage>
-#        </default>
-#      </profiles>
     quotas:
       default/interval/duration: "3600"
-#     <quotas>
-#       <default>
-#         <interval>
-#           <duration>3600</duration>
-#         </interval>
-#       </default>
-#     </quotas>
+      #     <quotas>
+      #       <default>
+      #         <interval>
+      #           <duration>3600</duration>
+      #         </interval>
+      #       </default>
+      #     </quotas>
     settings:
       compression/case/method: zstd
-#      <compression>
-#       <case>
-#         <method>zstd</method>
-#      </case>
-#      </compression>
+      #      <compression>
+      #        <case>
+      #          <method>zstd</method>
+      #        </case>
+      #      </compression>
+
     clusters:
 
-    - name: sharded-replicated
-      layout:
-        type: Standard
-        shardsCount: 3
-        replicasCount: 2
-      deployment:
+      - name: sharded-replicated
         podTemplate: clickhouse-v18.16.1
-#       scanario: Default
-#       zone:
-#         matchLabels:
-#           clickhouse.altinity.com/zone: zone1
-# 
-#       values inherited from global .spec.deployment section
-#
-    - name: sharded-non-replicated
-      layout:
-        type: Standard
-        shardsCount: 3
-        # replicasCount not specified, assumed = 1, by default
-      deployment:
-        zone:
-          matchLabels:
-            clickhouse.altinity.com/zone: zone2
-#       scenario: Default
-#       podTemplate: clickhouse-v18.16.1
-#
-#       values inherited from global .spec.deployment section
-#
-    - name: replicated
-      layout:
-        type: Standard
-        replicasCount: 4
-        # shardsCount not specified, assumed = 1, by default
-#     deployment:
-#       podTemplate: clickhouse-v18.16.1
-#       scanario: Default
-#       zone:
-#         matchLabels:
-#           clickhouse.altinity.com/zone: zone1
-# 
-#       values inherited from global .spec.deployment section
-#
-    - name: customized
-#     deployment:
-#       scenario: Default
-#       zone:
-#         matchLabels:
-#           clickhouse.altinity.com/zone: zone1
-#       podTemplate: clickhouse-v18.16.1
-#
-#       values inherited from global .spec.deployment section
-#
-      layout:
-        type: Advanced
-        shards:
-
-        - definitionType: ReplicasCount
+        layout:
+          type: Standard
+          shardsCount: 3
           replicasCount: 2
-          weight: 1
-#         weight - omitted by default
-          internalReplication: Disabled
-#         internalReplication: Enabled - default value
-          deployment:
-            podTemplate: clickhouse-v18.16.1
-            zone:
-              matchLabels:
-                clickhouse.altinity.com/zone: zone3
-#           scenario: Default
-#         
-#           values inherited from .spec.configuration.clusters[3].deployment section
-#
-        - definitionType: ReplicasCount
-          replicasCount: 3
-#         deployment:
-#           scenario: Default
-#           zone:
-#             matchLabels:
-#               clickhouse.altinity.com/zone: zone1
-#           podTemplate: clickhouse-v18.16.1
-#  
-#         values inherited from .spec.configuration.clusters[3].deployment section
-#  
-        - definitionType: Replicas
-#         deployment:
-#           scenario: Default
-#           zone:
-#             matchLabels:
-#               clickhouse.altinity.com/zone: zone1
-#           podTemplate: clickhouse-v18.16.1
-#
-#         values inherited from .spec.configuration.clusters[3].deployment section
-#
-          replicas:
-          - port: 9000
-            deployment:
-              scenario: Default
-#             zone:
-#               matchLabels:
-#                 clickhouse.altinity.com/zone: zone1
-#             podTemplate: clickhouse-v18.16.1
-#  
-#           values inherited from .spec.configuration.clusters[3].shards[2].deployment section
-#           
-          - deployment:
-              scenario: NodeMonopoly # 1 pod (CH server instance) per node (zone can be a set of n nodes) -> podAntiAffinity
-              zone:
-                matchLabels:
-                  clickhouse.altinity.com/zone: zone4
-                  clickhouse.altinity.com/kind: ssd
+
+      - name: sharded-non-replicated
+        podTemplate: clickhouse-v18.16.1
+        layout:
+          type: Standard
+          shardsCount: 3
+          # replicasCount not specified, assumed = 1, by default
+
+      - name: replicated
+        podTemplate: clickhouse-v18.16.1
+        layout:
+          type: Standard
+          replicasCount: 4
+          # shardsCount not specified, assumed = 1, by default
+
+      - name: customized
+        podTemplate: clickhouse-v18.16.1
+        layout:
+          type: Advanced
+          shards:
+            - definitionType: ReplicasCount
+              replicasCount: 2
+              weight: 1
+              internalReplication: Disabled
               podTemplate: clickhouse-v18.16.1
+
+            - definitionType: ReplicasCount
+              replicasCount: 3
+              podTemplate: clickhouse-v18.16.1
+
+            - definitionType: Replicas
+              podTemplate: clickhouse-v18.16.1
+              replicas:
+                - port: 9000
+                  podTemplate: clickhouse-v18.16.1
 
   templates:
     volumeClaimTemplates:
-    - name: default
-      persistentVolumeClaim:
-        metadata:
-          name: clickhouse-data-test
-          # namespace: testnamespace
+      # type PersistentVolumeClaim struct from k8s.io/core/v1
+      - name: default-volume-claim
         spec:
-          # 1. if  storageClassName is not specified, default StorageClass
+          # 1. If storageClassName is not specified, default StorageClass
           # (must be specified by cluster administrator) would be used for provisioning
-          # 2. if storageClassName is set to an empty string (‘’), no storage class will be used
+          # 2. If storageClassName is set to an empty string (‘’), no storage class will be used
           # dynamic provisioning is disabled for this PVC. Existing, “Available”, PVs
           # (that do not have a specified storageClassName) will be considered for binding to the PVC
           #storageClassName: gold
           accessModes:
-          - ReadWriteOnce
+            - ReadWriteOnce
           resources:
             requests:
               storage: 1Gi
     podTemplates:
-    # multiple pod templates makes possible to update version smoothly
-    # pod template for ClickHouse v18.16.1
-    - name: clickhouse-v18.16.1
-    # volumes: are missing
-      containers:
-      - name: clickhouse
-        image: yandex/clickhouse-server:18.16.1
-        volumeMounts:
-        - name: clickhouse-data-test
-          mountPath: /var/lib/clickhouse
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "100m"
-          limits:
-            memory: "64Mi"
-            cpu: "100m"
-    # pod template for ClickHouse v18.16.2
-    - name: clickhouse-v18.16.2
-    # volumes: are missing
-      containers:
-      - name: clickhouse
-        image: yandex/clickhouse-server:18.16.2
-        volumeMounts:
-        - name: clickhouse-data-test
-          mountPath: /var/lib/clickhouse
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "100m"
-          limits:
-            memory: "64Mi"
-            cpu: "100m"
+      # multiple pod templates makes possible to update version smoothly
+      # pod template for ClickHouse v18.16.1
+      # type PodTemplateSpec struct {} from k8s.io/core/v1
+      - name: clickhouse-v18.16.1
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:18.16.1
+              volumeMounts:
+                - name: default-volume-claim
+                  mountPath: /var/lib/clickhouse
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "64Mi"
+                  cpu: "100m"
+
+      # pod template for ClickHouse v18.16.2
+      # type type PodTemplateSpec struct {} from k8s.io/core/v1
+      - name: clickhouse-v18.16.2
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:18.16.2
+              volumeMounts:
+                - name: default-volume-claim
+                  mountPath: /var/lib/clickhouse
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "64Mi"
+                  cpu: "100m"

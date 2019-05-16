@@ -15,7 +15,7 @@
 package models
 
 import (
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -40,9 +40,9 @@ type configSections struct {
 // volumeClaimTemplatesIndex maps volume claim template name - which
 // is .spec.templates.volumeClaimTemplates.name to VolumeClaimTemplate itself
 // Used to provide dictionary/index for templates
-type volumeClaimTemplatesIndex map[string]*chiv1.ChiVolumeClaimTemplate
+type volumeClaimTemplatesIndex map[string]*v1.ChiVolumeClaimTemplate
 
 // podTemplatesIndex maps pod template name - which
 // is .spec.templates.podTemplates.name to PodTemplate itself
 // Used to provide dictionary/index for templates
-type podTemplatesIndex map[string]*chiv1.ChiPodTemplate
+type podTemplatesIndex map[string]*v1.ChiPodTemplate
