@@ -29,21 +29,6 @@ const (
 )
 
 const (
-	clusterLayoutTypeStandard = "Standard"
-	clusterLayoutTypeAdvanced = "Advanced"
-)
-
-const (
-	shardDefinitionTypeReplicasCount = "ReplicasCount"
-	shardDefinitionTypeReplicas      = "Replicas"
-)
-
-const (
-	deploymentScenarioDefault      = "Default"
-	deploymentScenarioNodeMonopoly = "NodeMonopoly"
-)
-
-const (
 	shardInternalReplicationDisabled = "Disabled"
 	stringTrue                       = "true"
 	stringFalse                      = "false"

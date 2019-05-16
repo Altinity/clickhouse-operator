@@ -28,18 +28,18 @@ import (
 )
 
 type Creator struct {
-	chi *chiv1.ClickHouseInstallation
-	config *config.Config
+	chi        *chiv1.ClickHouseInstallation
+	config     *config.Config
 	appVersion string
 
-	podTemplatesIndex podTemplatesIndex
+	podTemplatesIndex         podTemplatesIndex
 	volumeClaimTemplatesIndex volumeClaimTemplatesIndex
 }
 
 func NewCreator(chi *chiv1.ClickHouseInstallation, config *config.Config, appVersion string) *Creator {
 	creator := &Creator{
-		chi: chi,
-		config: config,
+		chi:        chi,
+		config:     config,
 		appVersion: appVersion,
 	}
 	creator.createPodTemplatesIndex()
@@ -126,7 +126,7 @@ func (creator *Creator) createConfigMapObjectsCommon() ConfigMapList {
 					ChiGeneratedLabel:  creator.chi.Name,
 				},
 			},
-			// Data contains several sections which are to be several xml configs
+			// Data contains several sections which are to be several xml config files
 			Data: configs.commonConfigSections,
 		},
 	)
@@ -143,7 +143,7 @@ func (creator *Creator) createConfigMapObjectsCommon() ConfigMapList {
 					ChiGeneratedLabel:  creator.chi.Name,
 				},
 			},
-			// Data contains several sections which are to be several xml configs
+			// Data contains several sections which are to be several xml config files
 			Data: configs.commonUsersConfigSections,
 		},
 	)
@@ -371,19 +371,15 @@ func (creator *Creator) createStatefulSetObject(replica *chiv1.ChiClusterLayoutS
 			VolumeClaimTemplates: nil,
 
 			// IMPORTANT
-			// Template to be setup later
+			// Template is to be setup later
 			Template: corev1.PodTemplateSpec{},
 		},
 	}
 
 	creator.setupStatefulSetPodTemplate(statefulSet, replica)
-	creator.setupStatefulSetVolumeClaimTemplate(statefulSet, replica)
+	creator.setupStatefulSetVolumeClaimTemplates(statefulSet, replica)
 
 	return statefulSet
-}
-
-func (creator *Creator) findPodTemplate(podtemplate string) (*corev1.PodTemplateSpec, bool) {
-	for i := range creator.chi.
 }
 
 func (creator *Creator) setupStatefulSetPodTemplate(
@@ -391,11 +387,10 @@ func (creator *Creator) setupStatefulSetPodTemplate(
 	replica *chiv1.ChiClusterLayoutShardReplica,
 ) {
 	statefulSetName := CreateStatefulSetName(replica)
-	configMapMacrosName := CreateConfigMapPodName(replica)
-	configMapCommonName := CreateConfigMapCommonName(replica.Address.ChiName)
-	configMapCommonUsersName := CreateConfigMapCommonUsersName(replica.Address.ChiName)
-	podTemplateName := replica.PodTemplate
+	podTemplateName := replica.Templates.PodTemplate
 
+	// Initial PodTemplateSpec value
+	// All the rest firls would be filled later
 	statefulSetObject.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
@@ -418,8 +413,28 @@ func (creator *Creator) setupStatefulSetPodTemplate(
 		glog.Infof("createStatefulSetObjects() for statefulSet %s - default template\n", statefulSetName)
 	}
 
-	// And now loop over all containers in this template and
-	// apply configuration - meaning append all VolumeMounts which are ConfigMap mounts
+	creator.setupConfigMapVolumes(statefulSetObject, replica)
+}
+
+// setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
+func (creator *Creator) setupConfigMapVolumes(
+	statefulSetObject *apps.StatefulSet,
+	replica *chiv1.ChiClusterLayoutShardReplica,
+) {
+	configMapMacrosName := CreateConfigMapPodName(replica)
+	configMapCommonName := CreateConfigMapCommonName(replica.Address.ChiName)
+	configMapCommonUsersName := CreateConfigMapCommonUsersName(replica.Address.ChiName)
+
+	// Add all ConfigMap objects as Volume objects of type ConfigMap
+	statefulSetObject.Spec.Template.Spec.Volumes = append(
+		statefulSetObject.Spec.Template.Spec.Volumes,
+		createVolumeObjectConfigMap(configMapCommonName),
+		createVolumeObjectConfigMap(configMapCommonUsersName),
+		createVolumeObjectConfigMap(configMapMacrosName),
+	)
+
+	// And reference these Volumes in each Container via VolumeMount
+	// So Pod will have ConfigMaps mounted as Volumes
 	for i := range statefulSetObject.Spec.Template.Spec.Containers {
 		// Convenience wrapper
 		container := &statefulSetObject.Spec.Template.Spec.Containers[i]
@@ -431,20 +446,14 @@ func (creator *Creator) setupStatefulSetPodTemplate(
 			createVolumeMountObject(configMapMacrosName, dirPathConfd),
 		)
 	}
-
-	// Add all ConfigMap objects as Pod's volumes
-	statefulSetObject.Spec.Template.Spec.Volumes = append(
-		statefulSetObject.Spec.Template.Spec.Volumes,
-		createVolumeObjectConfigMap(configMapCommonName),
-		createVolumeObjectConfigMap(configMapCommonUsersName),
-		createVolumeObjectConfigMap(configMapMacrosName),
-	)
 }
 
 func (creator *Creator) setupStatefulSetVolumeClaimTemplates(
 	statefulSetObject *apps.StatefulSet,
 	replica *chiv1.ChiClusterLayoutShardReplica,
 ) {
+	// Append VolumeClaimTemplates, that are referenced in Containers' VolumeMount object(s)
+	// to StatefulSet's Spec.VolumeClaimTemplates slice, so these
 	statefulSetName := CreateStatefulSetName(replica)
 	for i := range statefulSetObject.Spec.Template.Spec.Containers {
 		container := &statefulSetObject.Spec.Template.Spec.Containers[i]
@@ -457,50 +466,63 @@ func (creator *Creator) setupStatefulSetVolumeClaimTemplates(
 		}
 	}
 
+	// Now deal with .templates.VolumeClaimTemplate
+	//
+	// We want to mount this default VolumeClaimTemplate into /var/lib/clickhouse in case:
+	// 1. This default VolumeClaimTemplate is not already mounted with any VolumeMount
+	// 2. And /var/lib/clickhouse  is not already mounted with any VolumeMount
 
-	// This volumeClaimTemplate may be used as
-	// 1. explicitly in VolumeMounts
-	// 2. implicitly as default volume for /var/lib/clickhouse
-	// So we need to check, whether this volumeClaimTemplate should be used as default volume mounted at /var/lib/clickhouse
+	defaultVolumeClaimTemplateName := replica.Templates.VolumeClaimTemplate
 
-	// 1. Check explicit usage
-	// This volumeClaimTemplate may be explicitly used already, in case
-	// it is explicitly mentioned in Container's VolumeMounts.
+	if defaultVolumeClaimTemplateName == "" {
+		// No .templates.VolumeClaimTemplate specified
+		return
+	}
+
+	if _, ok := creator.getVolumeClaimTemplate(defaultVolumeClaimTemplateName); !ok {
+		// Incorrect .templates.VolumeClaimTemplate specified
+		return
+	}
+
+	// 1. Check explicit usage - whether this default VolumeClaimTemplate is already listed in VolumeMount
 	for i := range statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts {
 		// Convenience wrapper
 		volumeMount := &statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts[i]
-		if volumeMount.Name == volumeClaimTemplate.PersistentVolumeClaim.Name {
-			// This volumeClaimTemplate is already used
-			glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template 1: %s\n", statefulSetName, volumeClaimTemplateName)
+		if volumeMount.Name == defaultVolumeClaimTemplateName {
+			// This .templates.VolumeClaimTemplate is already used in VolumeMount
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template 1: %s\n", statefulSetName, volumeMount.Name)
 			return
 		}
 	}
 
-	// 2. Check /var/lib/clickhouse usage
-	// This volumeClaimTemplate is not used by name - it is unused - what's it's purpose, then?
+	// This default VolumeClaimTemplate is not used by name - it is unused - what's it's purpose, then?
 	// So we want to mount it to /var/lib/clickhouse even more now, because it is unused.
 	// However, mount point /var/lib/clickhouse may be used already explicitly. Need to check
+
+	// 2. Check whether /var/lib/clickhouse is already mounted
 	for i := range statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts {
 		// Convenience wrapper
 		volumeMount := &statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts[i]
 		if volumeMount.MountPath == dirPathClickHouseData {
 			// /var/lib/clickhouse is already mounted
-			glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template 1: %s\n", statefulSetName, volumeClaimTemplateName)
+			glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template 2: /var/lib/clickhouse already mounte\n", statefulSetName)
 			return
 		}
 	}
 
-	// This volumeClaimTemplate is not used by name and /var/lib/clickhouse is not mounted
-	// Let's mount this volumeClaimTemplate into /var/lib/clickhouse
-	statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts = append(
-		statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts,
-		corev1.VolumeMount{
-			Name:      volumeClaimTemplate.PersistentVolumeClaim.Name,
-			MountPath: dirPathClickHouseData,
-		},
-	)
+	// This default volumeClaimTemplate is not used explicitly by name and /var/lib/clickhouse is not mounted also.
+	// Let's mount this default VolumeClaimTemplate into /var/lib/clickhouse
+	if template, ok := creator.getVolumeClaimTemplate(defaultVolumeClaimTemplateName); ok {
+		// Add VolumeClaimTemplate to StatefulSet
+		appendVolumeClaimTemplateFrom(statefulSetObject, template)
+		// Add VolumeMount to ClickHouse container to /var/lib/clickhouse point
+		statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts = append(
+			statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts,
+			createVolumeMountObject(replica.Templates.VolumeClaimTemplate, dirPathClickHouseData),
+		)
+	}
 
-	glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, volumeClaimTemplateName)
+	glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, defaultVolumeClaimTemplateName)
 }
 
 func copyPodTemplateFrom(dst *apps.StatefulSet, src *chiv1.ChiPodTemplate) {
@@ -509,9 +531,12 @@ func copyPodTemplateFrom(dst *apps.StatefulSet, src *chiv1.ChiPodTemplate) {
 }
 
 func appendVolumeClaimTemplateFrom(dst *apps.StatefulSet, src *chiv1.ChiVolumeClaimTemplate) {
+	// Ensure VolumeClaimTemplates slice is in place
 	if dst.Spec.VolumeClaimTemplates == nil {
 		dst.Spec.VolumeClaimTemplates = make([]corev1.PersistentVolumeClaim, 0, 0)
 	}
+
+	// Append copy of PersistentVolumeClaimSpec
 	dst.Spec.VolumeClaimTemplates = append(dst.Spec.VolumeClaimTemplates, corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: src.Name,

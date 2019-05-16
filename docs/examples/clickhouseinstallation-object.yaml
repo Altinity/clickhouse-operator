@@ -6,11 +6,12 @@ metadata:
 spec:
 
   defaults:
-    podTemplate: clickhouse-v18.16.1
-    volumeClaimTemplate: default-volume-claim
     replicasUseFQDN: 0 # 0 - by default, 1 - enabled
     distributedDDL:
       profile: default
+    templates:
+      podTemplate: clickhouse-v18.16.1
+      volumeClaimTemplate: default-volume-claim
 
   configuration:
     zookeeper:

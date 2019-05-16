@@ -45,6 +45,7 @@ import (
 
 // CreateController creates instance of Controller
 func CreateController(
+	version string,
 	chopConfig *config.Config,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
@@ -75,6 +76,8 @@ func CreateController(
 
 	// Create Controller instance
 	controller := &Controller{
+		version:                 version,
+		normalizer:              chopmodels.NewNormalizer(chopConfig),
 		chopConfig:              chopConfig,
 		kubeClient:              kubeClient,
 		chopClient:              chopClient,
@@ -426,7 +429,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	glog.V(1).Infof("onAddChi(%s/%s)", chi.Namespace, chi.Name)
 
 	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateStarted, fmt.Sprintf("onAddChi(%s/%s)", chi.Namespace, chi.Name))
-	chi, err := chopmodels.ChiApplyTemplateAndNormalize(chi, c.chopConfig)
+	chi, err := c.normalizer.CreateTemplatedChi(chi)
 	if err != nil {
 		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
 		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to normalize", chi.Name))
@@ -476,11 +479,11 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	}
 
 	if !old.IsFilled() {
-		old, _ = chopmodels.ChiApplyTemplateAndNormalize(new, c.chopConfig)
+		old, _ = c.normalizer.CreateTemplatedChi(old)
 	}
 
 	if !new.IsFilled() {
-		new, _ = chopmodels.ChiApplyTemplateAndNormalize(new, c.chopConfig)
+		new, _ = c.normalizer.CreateTemplatedChi(new)
 	}
 
 	diff, equal := messagediff.DeepDiff(old, new)

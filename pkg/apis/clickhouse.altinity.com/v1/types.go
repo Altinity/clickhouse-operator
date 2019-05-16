@@ -45,10 +45,14 @@ type ChiStatus struct {
 
 // ChiDefaults defines defaults section of .spec
 type ChiDefaults struct {
-	PodTemplate      string     `json:"podTemplate,omitempty"      yaml:"podTemplate"`
+	Templates       ChiDefaultTemplates `json:"templates" yaml:"templates"`
+	ReplicasUseFQDN int                 `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN"`
+	DistributedDDL  ChiDistributedDDL   `json:"distributedDDL,omitempty"  yaml:"distributedDDL"`
+}
+
+type ChiDefaultTemplates struct {
+	PodTemplate         string `json:"podTemplate,omitempty"      yaml:"podTemplate"`
 	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty" yaml:"volumeClaimTemplate"`
-	ReplicasUseFQDN int               `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN"`
-	DistributedDDL  ChiDistributedDDL `json:"distributedDDL,omitempty"  yaml:"distributedDDL"`
 }
 
 // ChiConfiguration defines configuration section of .spec
@@ -64,9 +68,9 @@ type ChiConfiguration struct {
 
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
-	Name       string           `json:"name"`
-	Layout     ChiClusterLayout `json:"layout"`
-	PodTemplate string    `json:"podTemplate,omitempty"`
+	Name      string              `json:"name"`
+	Layout    ChiClusterLayout    `json:"layout"`
+	Templates ChiDefaultTemplates `json:"templates,omitempty"`
 
 	Address ChiClusterAddress `json:"address"`
 }
@@ -92,7 +96,7 @@ type ChiClusterLayoutShard struct {
 	ReplicasCount       int                            `json:"replicasCount,omitempty"`
 	Weight              int                            `json:"weight,omitempty"`
 	InternalReplication string                         `json:"internalReplication,omitempty"`
-	PodTemplate          string                  `json:"podTemplate,omitempty"`
+	Templates           ChiDefaultTemplates            `json:"templates,omitempty"`
 	Replicas            []ChiClusterLayoutShardReplica `json:"replicas,omitempty"`
 
 	Address ChiClusterLayoutShardAddress `json:"address"`
@@ -108,8 +112,8 @@ type ChiClusterLayoutShardAddress struct {
 
 // ChiClusterLayoutShardReplica defines item of a replicas section of .spec.configuration.clusters[n].shards[m]
 type ChiClusterLayoutShardReplica struct {
-	Port       int32         `json:"port,omitempty"`
-	PodTemplate string `json:"podTemplate,omitempty"`
+	Port      int32               `json:"port,omitempty"`
+	Templates ChiDefaultTemplates `json:"templates,omitempty"`
 
 	Address ChiClusterLayoutShardReplicaAddress `json:"address"`
 	Config  ChiClusterLayoutShardReplicaConfig  `json:"config"`

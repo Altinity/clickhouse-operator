@@ -37,8 +37,6 @@ import (
 	kuberest "k8s.io/client-go/rest"
 	kubeclientcmd "k8s.io/client-go/tools/clientcmd"
 
-	chopmodels "github.com/altinity/clickhouse-operator/pkg/models"
-
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -179,8 +177,6 @@ func Run() {
 		os.Exit(1)
 	}
 
-	chopmodels.SetAppVersion(Version)
-
 	// Initializing Prometheus Metrics Exporter
 	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
 	metricsExporter := chopmetrics.CreateExporter()
@@ -212,6 +208,7 @@ func Run() {
 
 	// Creating resource Controller
 	chiController := chi.CreateController(
+		Version,
 		chopConfig,
 		chopClient,
 		kubeClient,

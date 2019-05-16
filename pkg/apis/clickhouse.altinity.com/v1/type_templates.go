@@ -14,8 +14,6 @@
 
 package v1
 
-import "k8s.io/api/core/v1"
-
 func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 	if from == nil {
 		return
@@ -25,7 +23,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 		// We have templates to copy from
 		// Append PodTemplates from `from` to receiver
 		if templates.PodTemplates == nil {
-			templates.PodTemplates = make([]v1.PodTemplateSpec, 0)
+			templates.PodTemplates = make([]ChiPodTemplate, 0)
 		}
 		// Loop over all 'from' templates and copy it in case no such template in receiver
 		for fromIndex := range from.PodTemplates {
@@ -54,7 +52,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 		// We have templates to copy from
 		// Append VolumeClaimTemplates from `from` to receiver
 		if templates.VolumeClaimTemplates == nil {
-			templates.VolumeClaimTemplates = make([]v1.PersistentVolumeClaim, 0)
+			templates.VolumeClaimTemplates = make([]ChiVolumeClaimTemplate, 0)
 		}
 		// Loop over all 'from' templates and copy it in case no such template in receiver
 		for fromIndex := range from.VolumeClaimTemplates {

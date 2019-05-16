@@ -33,7 +33,8 @@ import (
 
 // createOrUpdateChiResources creates or updates kubernetes resources based on ClickHouseInstallation object specification
 func (c *Controller) createOrUpdateChiResources(chi *chop.ClickHouseInstallation) error {
-	listOfLists := chopmodels.ChiCreateObjects(chi, c.chopConfig)
+	creator := chopmodels.NewCreator(chi, c.chopConfig, c.version)
+	listOfLists := creator.CreateObjects()
 	return c.createOrUpdateResources(chi, listOfLists)
 }
 
@@ -376,7 +377,7 @@ func (c *Controller) createChiFromObjectMeta(objectMeta *meta.ObjectMeta) (*chi.
 		return nil, err
 	}
 
-	chi, err = chopmodels.ChiNormalize(chi, c.chopConfig)
+	chi, err = c.normalizer.DoChi(chi)
 	if err != nil {
 		return nil, err
 	}

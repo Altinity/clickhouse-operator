@@ -14,6 +14,15 @@
 
 package v1
 
+func (shard *ChiClusterLayoutShard) InheritTemplates(cluster *ChiCluster) {
+	if shard.Templates.PodTemplate == "" {
+		shard.Templates.PodTemplate = cluster.Templates.PodTemplate
+	}
+	if shard.Templates.VolumeClaimTemplate == "" {
+		shard.Templates.VolumeClaimTemplate = cluster.Templates.VolumeClaimTemplate
+	}
+}
+
 func (shard *ChiClusterLayoutShard) WalkReplicas(
 	f func(replica *ChiClusterLayoutShardReplica) error,
 ) []error {

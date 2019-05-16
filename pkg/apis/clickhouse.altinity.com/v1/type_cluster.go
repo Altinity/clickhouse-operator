@@ -14,6 +14,15 @@
 
 package v1
 
+func (cluster *ChiCluster) InheritTemplates(chi *ClickHouseInstallation) {
+	if cluster.Templates.PodTemplate == "" {
+		cluster.Templates.PodTemplate = chi.Spec.Defaults.Templates.PodTemplate
+	}
+	if cluster.Templates.VolumeClaimTemplate == "" {
+		cluster.Templates.VolumeClaimTemplate = chi.Spec.Defaults.Templates.VolumeClaimTemplate
+	}
+}
+
 func (cluster *ChiCluster) WalkShards(
 	f func(shardIndex int, shard *ChiClusterLayoutShard) error,
 ) []error {

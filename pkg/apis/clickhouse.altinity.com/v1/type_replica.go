@@ -14,21 +14,11 @@
 
 package v1
 
-func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults) {
-	if from == nil {
-		return
+func (replica *ChiClusterLayoutShardReplica) InheritTemplates(shard *ChiClusterLayoutShard) {
+	if replica.Templates.PodTemplate == "" {
+		replica.Templates.PodTemplate = shard.Templates.PodTemplate
 	}
-
-	if from.ReplicasUseFQDN > 0 {
-		defaults.ReplicasUseFQDN = from.ReplicasUseFQDN
-	}
-	(&defaults.DistributedDDL).MergeFrom(&from.DistributedDDL)
-
-	if defaults.Templates.PodTemplate == "" {
-		defaults.Templates.PodTemplate = from.Templates.PodTemplate
-	}
-
-	if defaults.Templates.VolumeClaimTemplate == "" {
-		defaults.Templates.VolumeClaimTemplate = from.Templates.VolumeClaimTemplate
+	if replica.Templates.VolumeClaimTemplate == "" {
+		replica.Templates.VolumeClaimTemplate = shard.Templates.VolumeClaimTemplate
 	}
 }

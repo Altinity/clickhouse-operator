@@ -21,31 +21,39 @@ import (
 	"strings"
 )
 
-// ChiApplyTemplateAndNormalize produces ready-to-use CHI object
-func ChiApplyTemplateAndNormalize(
-	chi *chiv1.ClickHouseInstallation,
-	config *config.Config,
-) (*chiv1.ClickHouseInstallation, error) {
-	if config.ChiTemplate == nil {
-		// No template specified
-		return ChiNormalize(chi.DeepCopy(), config)
-	} else {
-		base := config.ChiTemplate.DeepCopy()
-		base.MergeFrom(chi)
-		return ChiNormalize(base, config)
+type Normalizer struct {
+	config *config.Config
+}
+
+func NewNormalizer(config *config.Config) *Normalizer {
+	return &Normalizer{
+		config: config,
 	}
 }
 
-// ChiNormalize normalizes CHI.
+// CreateTemplatedChi produces ready-to-use CHI object
+func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
+	if n.config.ChiTemplate == nil {
+		// No template specified
+		return n.DoChi(chi.DeepCopy())
+	} else {
+		// Template specified
+		base := n.config.ChiTemplate.DeepCopy()
+		base.MergeFrom(chi)
+		return n.DoChi(base)
+	}
+}
+
+// DoChi normalizes CHI.
 // Returns NamedNumber of deployments number required to satisfy clusters' infrastructure
-func ChiNormalize(chi *chiv1.ClickHouseInstallation, config *config.Config) (*chiv1.ClickHouseInstallation, error) {
+func (n *Normalizer) DoChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
 	// Set defaults for CHI object properties
-	defaultsNormalizeReplicasUseFQDN(&chi.Spec.Defaults)
-	configurationNormalize(&chi.Spec.Configuration, config)
+	n.doDefaultsReplicasUseFQDN(&chi.Spec.Defaults)
+	n.doConfiguration(&chi.Spec.Configuration)
 
 	// Normalize all clusters in this CHI
 	chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
-		return clusterNormalize(chi, cluster)
+		return n.doCluster(chi, cluster)
 	})
 	chi.FillAddressInfo()
 	chi.WalkReplicas(func(replica *chiv1.ChiClusterLayoutShardReplica) error {
@@ -57,22 +65,22 @@ func ChiNormalize(chi *chiv1.ClickHouseInstallation, config *config.Config) (*ch
 	return chi, nil
 }
 
-// configurationNormalize normalizes .spec.configuration
-func configurationNormalize(conf *chiv1.ChiConfiguration, chopConf *config.Config) {
+// doConfiguration normalizes .spec.configuration
+func (n *Normalizer) doConfiguration(conf *chiv1.ChiConfiguration) {
 	// TODO normalize zookeeper
-	configurationUsersNormalize(&conf.Users, chopConf)
-	configurationProfilesNormalize(&conf.Profiles)
-	configurationQuotasNormalize(&conf.Quotas)
-	configurationSettingsNormalize(&conf.Settings)
+	n.doConfigurationUsers(&conf.Users)
+	n.doConfigurationProfiles(&conf.Profiles)
+	n.doConfigurationQuotas(&conf.Quotas)
+	n.doConfigurationSettings(&conf.Settings)
 }
 
-// configurationUsersNormalize normalizes .spec.configuration.users
-func configurationUsersNormalize(conf *map[string]interface{}, chopConf *config.Config) {
-	normalizePaths(conf)
+// doConfigurationUsers normalizes .spec.configuration.users
+func (n *Normalizer) doConfigurationUsers(users *map[string]interface{}) {
+	normalizePaths(users)
 
 	// Extract username from path
 	usernameMap := make(map[string]bool)
-	for path := range *conf {
+	for path := range *users {
 		// Split 'admin/password'
 		tags := strings.Split(path, "/")
 		username := tags[0]
@@ -85,83 +93,78 @@ func configurationUsersNormalize(conf *map[string]interface{}, chopConf *config.
 	// 3. user/networks/ip
 	// 4. user/password OR user/password_sha256_hex
 	for username := range usernameMap {
-		if _, ok := (*conf)[username+"/profile"]; !ok {
+		if _, ok := (*users)[username+"/profile"]; !ok {
 			// No 'user/profile' section
-			(*conf)[username+"/profile"] = chopConf.ChConfigUserDefaultProfile
+			(*users)[username+"/profile"] = n.config.ChConfigUserDefaultProfile
 		}
-		if _, ok := (*conf)[username+"/quota"]; !ok {
+		if _, ok := (*users)[username+"/quota"]; !ok {
 			// No 'user/quota' section
-			(*conf)[username+"/quota"] = chopConf.ChConfigUserDefaultQuota
+			(*users)[username+"/quota"] = n.config.ChConfigUserDefaultQuota
 		}
-		if _, ok := (*conf)[username+"/networks/ip"]; !ok {
+		if _, ok := (*users)[username+"/networks/ip"]; !ok {
 			// No 'user/networks/ip' section
-			(*conf)[username+"/networks/ip"] = chopConf.ChConfigUserDefaultNetworksIP
+			(*users)[username+"/networks/ip"] = n.config.ChConfigUserDefaultNetworksIP
 		}
-		_, okPassword := (*conf)[username+"/password"]
-		_, okPasswordSHA256 := (*conf)[username+"/password_sha256_hex"]
+		_, okPassword := (*users)[username+"/password"]
+		_, okPasswordSHA256 := (*users)[username+"/password_sha256_hex"]
 		if !okPassword && !okPasswordSHA256 {
 			// Neither 'password' nor 'password_sha256_hex' are in place
-			(*conf)[username+"/password"] = chopConf.ChConfigUserDefaultPassword
+			(*users)[username+"/password"] = n.config.ChConfigUserDefaultPassword
 		}
 	}
 }
 
-// configurationProfilesNormalize normalizes .spec.configuration.profiles
-func configurationProfilesNormalize(conf *map[string]interface{}) {
-	normalizePaths(conf)
+// doConfigurationProfiles normalizes .spec.configuration.profiles
+func (n *Normalizer) doConfigurationProfiles(profiles *map[string]interface{}) {
+	normalizePaths(profiles)
 }
 
-// configurationQuotasNormalize normalizes .spec.configuration.quotas
-func configurationQuotasNormalize(conf *map[string]interface{}) {
-	normalizePaths(conf)
+// doConfigurationQuotas normalizes .spec.configuration.quotas
+func (n *Normalizer) doConfigurationQuotas(quotas *map[string]interface{}) {
+	normalizePaths(quotas)
 }
 
-// configurationSettingsNormalize normalizes .spec.configuration.settings
-func configurationSettingsNormalize(conf *map[string]interface{}) {
-	normalizePaths(conf)
+// doConfigurationSettings normalizes .spec.configuration.settings
+func (n *Normalizer) doConfigurationSettings(settings *map[string]interface{}) {
+	normalizePaths(settings)
 }
 
-// clusterNormalize normalizes cluster and returns deployments usage counters for this cluster
-func clusterNormalize(
+// doCluster normalizes cluster and returns deployments usage counters for this cluster
+func (n *Normalizer) doCluster(
 	chi *chiv1.ClickHouseInstallation,
 	cluster *chiv1.ChiCluster,
 ) error {
 	// Inherit PodTemplate from .spec.defaults
-	if cluster.PodTemplate == "" {
-		cluster.PodTemplate = chi.Spec.Defaults.PodTemplate
-	}
+	cluster.InheritTemplates(chi)
 
 	// Convenience wrapper
 	layout := &cluster.Layout
 
-	layoutNormalizeShardsAndReplicasCount(layout)
-	layoutEnsureShards(layout)
+	n.doLayoutShardsAndReplicasCount(layout)
 
 	// Loop over all shards and replicas inside shards and fill structure
 	// .Layout.ShardsCount is provided
+	n.ensureLayoutShards(layout)
 	for shardIndex := range layout.Shards {
 		// Convenience wrapper
 		shard := &layout.Shards[shardIndex]
 
 		// For each shard of this normalized cluster inherit cluster's PodTemplate
-		if shard.PodTemplate == "" {
-			shard.PodTemplate = cluster.PodTemplate
-		}
+		shard.InheritTemplates(cluster)
 
 		// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
 		// Default value set to "true"
-		shardNormalizeInternalReplication(shard)
-
-		shardNormalizeReplicasCount(shard, layout.ReplicasCount)
-		shardEnsureReplicas(shard)
-		shardNormalizeReplicas(shard)
+		n.doShardInternalReplication(shard)
+		// Normalize Replicas
+		n.doShardReplicasCount(shard, layout.ReplicasCount)
+		n.doShardReplicas(shard)
 	}
 
 	return nil
 }
 
-// layoutNormalizeShardsAndReplicasCount ensures at least 1 shard and 1 replica counters
-func layoutNormalizeShardsAndReplicasCount(layout *chiv1.ChiClusterLayout) {
+// doLayoutShardsAndReplicasCount ensures at least 1 shard and 1 replica counters
+func (n *Normalizer) doLayoutShardsAndReplicasCount(layout *chiv1.ChiClusterLayout) {
 	if len(layout.Shards) > 0 {
 		// We have Shards specified - ok, this is to be exact ShardsCount
 		layout.ShardsCount = len(layout.Shards)
@@ -178,8 +181,8 @@ func layoutNormalizeShardsAndReplicasCount(layout *chiv1.ChiClusterLayout) {
 	}
 }
 
-// shardNormalizeReplicasCount ensures shard.ReplicasCount filled properly
-func shardNormalizeReplicasCount(shard *chiv1.ChiClusterLayoutShard, layoutReplicasCount int) {
+// doShardReplicasCount ensures shard.ReplicasCount filled properly
+func (n *Normalizer) doShardReplicasCount(shard *chiv1.ChiClusterLayoutShard, layoutReplicasCount int) {
 	if len(shard.Replicas) > 0 {
 		// .layout.type: Advanced + definitionType: Replicas
 		// We have Replicas specified as slice
@@ -197,46 +200,43 @@ func shardNormalizeReplicasCount(shard *chiv1.ChiClusterLayoutShard, layoutRepli
 	}
 }
 
-// layoutEnsureShards ensures slice layout.Shards is in place
-func layoutEnsureShards(layout *chiv1.ChiClusterLayout) {
+// ensureLayoutShards ensures slice layout.Shards is in place
+func (n *Normalizer) ensureLayoutShards(layout *chiv1.ChiClusterLayout) {
 	if (len(layout.Shards) == 0) && (layout.ShardsCount > 0) {
 		layout.Shards = make([]chiv1.ChiClusterLayoutShard, layout.ShardsCount)
 	}
 }
 
-// shardEnsureReplicas ensures slice shard.Replicas is in place
-func shardEnsureReplicas(shard *chiv1.ChiClusterLayoutShard) {
+// ensureShardReplicas ensures slice shard.Replicas is in place
+func (n *Normalizer) ensureShardReplicas(shard *chiv1.ChiClusterLayoutShard) {
 	if (len(shard.Replicas) == 0) && (shard.ReplicasCount > 0) {
 		shard.Replicas = make([]chiv1.ChiClusterLayoutShardReplica, shard.ReplicasCount)
 	}
 }
 
-// shardNormalizeReplicas normalizes all replicas of specified shard
-func shardNormalizeReplicas(shard *chiv1.ChiClusterLayoutShard) {
+// doShardReplicas normalizes all replicas of specified shard
+func (n *Normalizer) doShardReplicas(shard *chiv1.ChiClusterLayoutShard) {
 	// Fill each replica
+	n.ensureShardReplicas(shard)
 	for replicaIndex := range shard.Replicas {
 		// Convenience wrapper
 		replica := &shard.Replicas[replicaIndex]
-
-		replicaNormalizePort(replica)
-
+		n.doReplicaPort(replica)
 		// Inherit PodTemplate from shard
-		if replica.PodTemplate == "" {
-			replica.PodTemplate = shard.PodTemplate
-		}
+		replica.InheritTemplates(shard)
 	}
 }
 
-// replicaNormalizePort ensures chiv1.ChiClusterLayoutShardReplica.Port is reasonable
-func replicaNormalizePort(replica *chiv1.ChiClusterLayoutShardReplica) {
+// doReplicaPort ensures chiv1.ChiClusterLayoutShardReplica.Port is reasonable
+func (n *Normalizer) doReplicaPort(replica *chiv1.ChiClusterLayoutShardReplica) {
 	if replica.Port <= 0 {
 		replica.Port = chDefaultClientPortNumber
 	}
 }
 
-// shardNormalizeInternalReplication ensures reasonable values in
+// doShardInternalReplication ensures reasonable values in
 // .spec.configuration.clusters.layout.shards.internalReplication
-func shardNormalizeInternalReplication(shard *chiv1.ChiClusterLayoutShard) {
+func (n *Normalizer) doShardInternalReplication(shard *chiv1.ChiClusterLayoutShard) {
 	// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
 	// with default value set to "true"
 	if shard.InternalReplication == shardInternalReplicationDisabled {
@@ -246,8 +246,8 @@ func shardNormalizeInternalReplication(shard *chiv1.ChiClusterLayoutShard) {
 	}
 }
 
-// defaultsNormalizeReplicasUseFQDN ensures chiv1.ChiDefaults.ReplicasUseFQDN section has proper values
-func defaultsNormalizeReplicasUseFQDN(d *chiv1.ChiDefaults) {
+// doDefaultsReplicasUseFQDN ensures chiv1.ChiDefaults.ReplicasUseFQDN section has proper values
+func (n *Normalizer) doDefaultsReplicasUseFQDN(d *chiv1.ChiDefaults) {
 	// Acceptable values are 0 and 1
 	// So if it is 1 - it is ok and assign 0 for any other values
 	if d.ReplicasUseFQDN == 1 {
