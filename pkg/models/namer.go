@@ -49,7 +49,7 @@ func CreateConfigMapPodName(replica *chop.ChiClusterLayoutShardReplica) string {
 	)
 }
 
-// CreateConfigMapCommonName returns a name for a ConfigMap for replica's common config
+// CreateConfigMapCommonName returns a name for a ConfigMap for replica's common chopConfig
 func CreateConfigMapCommonName(chiName string) string {
 	return fmt.Sprintf(
 		configMapCommonNamePattern,
@@ -57,7 +57,7 @@ func CreateConfigMapCommonName(chiName string) string {
 	)
 }
 
-// CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common config
+// CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common chopConfig
 func CreateConfigMapCommonUsersName(chiName string) string {
 	return fmt.Sprintf(
 		configMapCommonUsersNamePattern,

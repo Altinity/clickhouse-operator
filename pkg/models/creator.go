@@ -28,19 +28,21 @@ import (
 )
 
 type Creator struct {
-	chi        *chiv1.ClickHouseInstallation
-	config     *config.Config
-	appVersion string
+	appVersion        string
+	chi               *chiv1.ClickHouseInstallation
+	chopConfig        *config.Config
+	chConfigGenerator *ClickHouseConfigGenerator
 
 	podTemplatesIndex         podTemplatesIndex
 	volumeClaimTemplatesIndex volumeClaimTemplatesIndex
 }
 
-func NewCreator(chi *chiv1.ClickHouseInstallation, config *config.Config, appVersion string) *Creator {
+func NewCreator(chi *chiv1.ClickHouseInstallation, chopConfig *config.Config, appVersion string) *Creator {
 	creator := &Creator{
-		chi:        chi,
-		config:     config,
-		appVersion: appVersion,
+		chi:               chi,
+		chopConfig:        chopConfig,
+		appVersion:        appVersion,
+		chConfigGenerator: NewClickHouseConfigGenerator(chi),
 	}
 	creator.createPodTemplatesIndex()
 	creator.createVolumeClaimTemplatesIndex()
@@ -49,84 +51,84 @@ func NewCreator(chi *chiv1.ClickHouseInstallation, config *config.Config, appVer
 }
 
 // ChiCreateObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
-func (creator *Creator) CreateObjects() []interface{} {
+func (c *Creator) CreateObjects() []interface{} {
 	list := make([]interface{}, 0)
-	list = append(list, creator.createServiceObjects())
-	list = append(list, creator.createConfigMapObjects())
-	list = append(list, creator.createStatefulSetObjects())
+	list = append(list, c.createServiceObjects())
+	list = append(list, c.createConfigMapObjects())
+	list = append(list, c.createStatefulSetObjects())
 
 	return list
 }
 
 // createConfigMapObjects returns a list of corev1.ConfigMap objects
-func (creator *Creator) createConfigMapObjects() ConfigMapList {
+func (c *Creator) createConfigMapObjects() ConfigMapList {
 	configMapList := make(ConfigMapList, 0)
 	configMapList = append(
 		configMapList,
-		creator.createConfigMapObjectsCommon()...,
+		c.createConfigMapObjectsCommon()...,
 	)
 	configMapList = append(
 		configMapList,
-		creator.createConfigMapObjectsPod()...,
+		c.createConfigMapObjectsPod()...,
 	)
 
 	return configMapList
 }
 
-func (creator *Creator) createConfigMapObjectsCommon() ConfigMapList {
+func (c *Creator) createConfigMapObjectsCommon() ConfigMapList {
 	var configs configSections
 
-	// commonConfigSections maps section name to section XML config of the following sections:
+	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. remote servers
 	// 2. zookeeper
 	// 3. settings
 	// 4. listen
 	configs.commonConfigSections = make(map[string]string)
-	util.IncludeNonEmpty(configs.commonConfigSections, filenameRemoteServersXML, generateRemoteServersConfig(creator.chi))
-	util.IncludeNonEmpty(configs.commonConfigSections, filenameZookeeperXML, generateZookeeperConfig(creator.chi))
-	util.IncludeNonEmpty(configs.commonConfigSections, filenameSettingsXML, generateSettingsConfig(creator.chi))
-	util.IncludeNonEmpty(configs.commonConfigSections, filenameListenXML, generateListenConfig(creator.chi))
+	util.IncludeNonEmpty(configs.commonConfigSections, filenameRemoteServersXML, c.chConfigGenerator.GetRemoteServers())
+	util.IncludeNonEmpty(configs.commonConfigSections, filenameZookeeperXML, c.chConfigGenerator.GetZookeeper())
+	util.IncludeNonEmpty(configs.commonConfigSections, filenameSettingsXML, c.chConfigGenerator.GetSettings())
+	util.IncludeNonEmpty(configs.commonConfigSections, filenameListenXML, c.chConfigGenerator.GetListen())
 	// Extra user-specified configs
-	for filename, content := range creator.config.ChCommonConfigs {
+	for filename, content := range c.chopConfig.ChCommonConfigs {
 		util.IncludeNonEmpty(configs.commonConfigSections, filename, content)
 	}
 
-	// commonConfigSections maps section name to section XML config of the following sections:
+	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. users
 	// 2. quotas
 	// 3. profiles
 	configs.commonUsersConfigSections = make(map[string]string)
-	util.IncludeNonEmpty(configs.commonUsersConfigSections, filenameUsersXML, generateUsersConfig(creator.chi))
-	util.IncludeNonEmpty(configs.commonUsersConfigSections, filenameQuotasXML, generateQuotasConfig(creator.chi))
-	util.IncludeNonEmpty(configs.commonUsersConfigSections, filenameProfilesXML, generateProfilesConfig(creator.chi))
+	util.IncludeNonEmpty(configs.commonUsersConfigSections, filenameUsersXML, c.chConfigGenerator.GetUsers())
+	util.IncludeNonEmpty(configs.commonUsersConfigSections, filenameQuotasXML, c.chConfigGenerator.GetQuotas())
+	util.IncludeNonEmpty(configs.commonUsersConfigSections, filenameProfilesXML, c.chConfigGenerator.GetProfiles())
 	// Extra user-specified configs
-	for filename, content := range creator.config.ChUsersConfigs {
+	for filename, content := range c.chopConfig.ChUsersConfigs {
 		util.IncludeNonEmpty(configs.commonUsersConfigSections, filename, content)
 	}
 
 	// There are two types of configs, kept in ConfigMaps:
 	// 1. Common configs - for all resources in the CHI (remote servers, zookeeper setup, etc)
 	//    consists of common configs and common users configs
-	// 2. Personal configs - macros config
+	// 2. Personal configs - macros chopConfig
 	// configMapList contains all configs so we need deploymentsNum+2 ConfigMap objects
-	// personal config for each deployment and +2 for common config + common user config
+	// personal chopConfig for each deployment and +2 for common chopConfig + common user chopConfig
 	configMapList := make(ConfigMapList, 0)
 
 	// ConfigMap common for all resources in CHI
-	// contains several sections, mapped as separated config files,
+	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
 	configMapList = append(
 		configMapList,
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      CreateConfigMapCommonName(creator.chi.Name),
-				Namespace: creator.chi.Namespace,
+				Name:      CreateConfigMapCommonName(c.chi.Name),
+				Namespace: c.chi.Namespace,
 				Labels: map[string]string{
-					ChopGeneratedLabel: creator.appVersion,
-					ChiGeneratedLabel:  creator.chi.Name,
+					ChopGeneratedLabel: c.appVersion,
+					ChiGeneratedLabel:  c.chi.Name,
 				},
 			},
-			// Data contains several sections which are to be several xml config files
+			// Data contains several sections which are to be several xml chopConfig files
 			Data: configs.commonConfigSections,
 		},
 	)
@@ -136,14 +138,14 @@ func (creator *Creator) createConfigMapObjectsCommon() ConfigMapList {
 		configMapList,
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      CreateConfigMapCommonUsersName(creator.chi.Name),
-				Namespace: creator.chi.Namespace,
+				Name:      CreateConfigMapCommonUsersName(c.chi.Name),
+				Namespace: c.chi.Namespace,
 				Labels: map[string]string{
-					ChopGeneratedLabel: creator.appVersion,
-					ChiGeneratedLabel:  creator.chi.Name,
+					ChopGeneratedLabel: c.appVersion,
+					ChiGeneratedLabel:  c.chi.Name,
 				},
 			},
-			// Data contains several sections which are to be several xml config files
+			// Data contains several sections which are to be several xml chopConfig files
 			Data: configs.commonUsersConfigSections,
 		},
 	)
@@ -151,14 +153,14 @@ func (creator *Creator) createConfigMapObjectsCommon() ConfigMapList {
 	return configMapList
 }
 
-func (creator *Creator) createConfigMapObjectsPod() ConfigMapList {
+func (c *Creator) createConfigMapObjectsPod() ConfigMapList {
 	configMapList := make(ConfigMapList, 0)
 	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
-		// Prepare for this replica deployment config files map as filename->content
+		// Prepare for this replica deployment chopConfig files map as filename->content
 		podConfigSections := make(map[string]string)
-		util.IncludeNonEmpty(podConfigSections, filenameMacrosXML, generateHostMacros(replica))
+		util.IncludeNonEmpty(podConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(replica))
 		// Extra user-specified configs
-		for filename, content := range creator.config.ChPodConfigs {
+		for filename, content := range c.chopConfig.ChPodConfigs {
 			util.IncludeNonEmpty(podConfigSections, filename, content)
 		}
 
@@ -170,7 +172,7 @@ func (creator *Creator) createConfigMapObjectsPod() ConfigMapList {
 					Name:      CreateConfigMapPodName(replica),
 					Namespace: replica.Address.Namespace,
 					Labels: map[string]string{
-						ChopGeneratedLabel: creator.appVersion,
+						ChopGeneratedLabel: c.appVersion,
 						ChiGeneratedLabel:  replica.Address.ChiName,
 					},
 				},
@@ -180,38 +182,38 @@ func (creator *Creator) createConfigMapObjectsPod() ConfigMapList {
 
 		return nil
 	}
-	creator.chi.WalkReplicas(replicaProcessor)
+	c.chi.WalkReplicas(replicaProcessor)
 
 	return configMapList
 }
 
 // createServiceObjects returns a list of corev1.Service objects
-func (creator *Creator) createServiceObjects() ServiceList {
+func (c *Creator) createServiceObjects() ServiceList {
 	// We'd like to create "number of deployments" + 1 kubernetes services in order to provide access
 	// to each deployment separately and one common predictably-named access point - common service
 	serviceList := make(ServiceList, 0)
 	serviceList = append(
 		serviceList,
-		creator.createServiceObjectsCommon()...,
+		c.createServiceObjectsCommon()...,
 	)
 	serviceList = append(
 		serviceList,
-		creator.createServiceObjectsPod()...,
+		c.createServiceObjectsPod()...,
 	)
 
 	return serviceList
 }
 
-func (creator *Creator) createServiceObjectsCommon() ServiceList {
+func (c *Creator) createServiceObjectsCommon() ServiceList {
 	// Create one predictably-named service to access the whole installation
 	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
 	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
 	return ServiceList{
-		creator.createServiceObjectChi(CreateChiServiceName(creator.chi)),
+		c.createServiceObjectChi(CreateChiServiceName(c.chi)),
 	}
 }
 
-func (creator *Creator) createServiceObjectsPod() ServiceList {
+func (c *Creator) createServiceObjectsPod() ServiceList {
 	// Create "number of pods" service - one service for each stateful set
 	// Each replica has its stateful set and each stateful set has it service
 	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
@@ -222,24 +224,24 @@ func (creator *Creator) createServiceObjectsPod() ServiceList {
 		// Add corev1.Service object to the list
 		serviceList = append(
 			serviceList,
-			creator.createServiceObjectPod(replica),
+			c.createServiceObjectPod(replica),
 		)
 		return nil
 	}
-	creator.chi.WalkReplicas(replicaProcessor)
+	c.chi.WalkReplicas(replicaProcessor)
 
 	return serviceList
 }
 
-func (creator *Creator) createServiceObjectChi(serviceName string) *corev1.Service {
-	glog.Infof("createServiceObjectChi() for service %s\n", serviceName)
+func (c *Creator) createServiceObjectChi(serviceName string) *corev1.Service {
+	glog.V(1).Infof("createServiceObjectChi() for service %s\n", serviceName)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
-			Namespace: creator.chi.Namespace,
+			Namespace: c.chi.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel: creator.appVersion,
-				ChiGeneratedLabel:  creator.chi.Name,
+				ChopGeneratedLabel: c.appVersion,
+				ChiGeneratedLabel:  c.chi.Name,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -255,24 +257,24 @@ func (creator *Creator) createServiceObjectChi(serviceName string) *corev1.Servi
 				},
 			},
 			Selector: map[string]string{
-				ChiGeneratedLabel: creator.chi.Name,
+				ChiGeneratedLabel: c.chi.Name,
 			},
 			Type: "LoadBalancer",
 		},
 	}
 }
 
-func (creator *Creator) createServiceObjectPod(replica *chiv1.ChiClusterLayoutShardReplica) *corev1.Service {
+func (c *Creator) createServiceObjectPod(replica *chiv1.ChiClusterLayoutShardReplica) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(replica)
 	statefulSetName := CreateStatefulSetName(replica)
 
-	glog.Infof("createServiceObjectPod() for service %s %s\n", serviceName, statefulSetName)
+	glog.V(1).Infof("createServiceObjectPod() for service %s %s\n", serviceName, statefulSetName)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: replica.Address.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel:         creator.appVersion,
+				ChopGeneratedLabel:         c.appVersion,
 				ChiGeneratedLabel:          replica.Address.ChiName,
 				ClusterGeneratedLabel:      replica.Address.ClusterName,
 				ClusterIndexGeneratedLabel: strconv.Itoa(replica.Address.ClusterIndex),
@@ -303,46 +305,25 @@ func (creator *Creator) createServiceObjectPod(replica *chiv1.ChiClusterLayoutSh
 	}
 }
 
-func IsChopGeneratedObject(objectMeta *metav1.ObjectMeta) bool {
-	// Parse Labels
-	// 			Labels: map[string]string{
-	//				ChopGeneratedLabel: AppVersion,
-	//				ChiGeneratedLabel:  replica.Address.ChiName,
-	//				ClusterGeneratedLabel: replica.Address.ClusterName,
-	//				ClusterIndexGeneratedLabel: strconv.Itoa(replica.Address.ClusterIndex),
-	//				ReplicaIndexGeneratedLabel: strconv.Itoa(replica.Address.ReplicaIndex),
-	//			},
-
-	// ObjectMeta must have some labels
-	if len(objectMeta.Labels) == 0 {
-		return false
-	}
-
-	// ObjectMeta must have ChopGeneratedLabel
-	_, ok := objectMeta.Labels[ChopGeneratedLabel]
-
-	return ok
-}
-
 // createStatefulSetObjects returns a list of apps.StatefulSet objects
-func (creator *Creator) createStatefulSetObjects() StatefulSetList {
+func (c *Creator) createStatefulSetObjects() StatefulSetList {
 	statefulSetList := make(StatefulSetList, 0)
 
 	// Create list of apps.StatefulSet objects
 	// StatefulSet is created for each replica.Deployment
 
 	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
-		glog.Infof("createStatefulSetObjects() for statefulSet %s\n", CreateStatefulSetName(replica))
+		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s\n", CreateStatefulSetName(replica))
 		// Append new StatefulSet to the list of stateful sets
-		statefulSetList = append(statefulSetList, creator.createStatefulSetObject(replica))
+		statefulSetList = append(statefulSetList, c.createStatefulSetObject(replica))
 		return nil
 	}
-	creator.chi.WalkReplicas(replicaProcessor)
+	c.chi.WalkReplicas(replicaProcessor)
 
 	return statefulSetList
 }
 
-func (creator *Creator) createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.StatefulSet {
+func (c *Creator) createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(replica)
 	serviceName := CreateStatefulSetServiceName(replica)
 
@@ -353,7 +334,7 @@ func (creator *Creator) createStatefulSetObject(replica *chiv1.ChiClusterLayoutS
 			Name:      statefulSetName,
 			Namespace: replica.Address.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel: creator.appVersion,
+				ChopGeneratedLabel: c.appVersion,
 				ChiGeneratedLabel:  replica.Address.ChiName,
 				ZkVersionLabel:     replica.Config.ZkFingerprint,
 			},
@@ -376,13 +357,13 @@ func (creator *Creator) createStatefulSetObject(replica *chiv1.ChiClusterLayoutS
 		},
 	}
 
-	creator.setupStatefulSetPodTemplate(statefulSet, replica)
-	creator.setupStatefulSetVolumeClaimTemplates(statefulSet, replica)
+	c.setupStatefulSetPodTemplate(statefulSet, replica)
+	c.setupStatefulSetVolumeClaimTemplates(statefulSet, replica)
 
 	return statefulSet
 }
 
-func (creator *Creator) setupStatefulSetPodTemplate(
+func (c *Creator) setupStatefulSetPodTemplate(
 	statefulSetObject *apps.StatefulSet,
 	replica *chiv1.ChiClusterLayoutShardReplica,
 ) {
@@ -395,7 +376,7 @@ func (creator *Creator) setupStatefulSetPodTemplate(
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
 				chDefaultAppLabel:  statefulSetName,
-				ChopGeneratedLabel: creator.appVersion,
+				ChopGeneratedLabel: c.appVersion,
 				ChiGeneratedLabel:  replica.Address.ChiName,
 				ZkVersionLabel:     replica.Config.ZkFingerprint,
 			},
@@ -403,21 +384,21 @@ func (creator *Creator) setupStatefulSetPodTemplate(
 	}
 
 	// Specify pod templates - either explicitly defined or default
-	if podTemplate, ok := creator.getPodTemplate(podTemplateName); ok {
+	if podTemplate, ok := c.getPodTemplate(podTemplateName); ok {
 		// Replica references known PodTemplate
 		copyPodTemplateFrom(statefulSetObject, podTemplate)
-		glog.Infof("createStatefulSetObjects() for statefulSet %s - template: %s\n", statefulSetName, podTemplateName)
+		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - template: %s\n", statefulSetName, podTemplateName)
 	} else {
 		// Replica references UNKNOWN PodTemplate
 		copyPodTemplateFrom(statefulSetObject, createDefaultPodTemplate(statefulSetName))
-		glog.Infof("createStatefulSetObjects() for statefulSet %s - default template\n", statefulSetName)
+		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - default template\n", statefulSetName)
 	}
 
-	creator.setupConfigMapVolumes(statefulSetObject, replica)
+	c.setupConfigMapVolumes(statefulSetObject, replica)
 }
 
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
-func (creator *Creator) setupConfigMapVolumes(
+func (c *Creator) setupConfigMapVolumes(
 	statefulSetObject *apps.StatefulSet,
 	replica *chiv1.ChiClusterLayoutShardReplica,
 ) {
@@ -448,7 +429,7 @@ func (creator *Creator) setupConfigMapVolumes(
 	}
 }
 
-func (creator *Creator) setupStatefulSetVolumeClaimTemplates(
+func (c *Creator) setupStatefulSetVolumeClaimTemplates(
 	statefulSetObject *apps.StatefulSet,
 	replica *chiv1.ChiClusterLayoutShardReplica,
 ) {
@@ -459,7 +440,7 @@ func (creator *Creator) setupStatefulSetVolumeClaimTemplates(
 		container := &statefulSetObject.Spec.Template.Spec.Containers[i]
 		for j := range container.VolumeMounts {
 			volumeMount := &container.VolumeMounts[j]
-			if volumeClaimTemplate, ok := creator.getVolumeClaimTemplate(volumeMount.Name); ok {
+			if volumeClaimTemplate, ok := c.getVolumeClaimTemplate(volumeMount.Name); ok {
 				// Found VolumeClaimTemplate to mount by VolumeMount
 				appendVolumeClaimTemplateFrom(statefulSetObject, volumeClaimTemplate)
 			}
@@ -479,7 +460,7 @@ func (creator *Creator) setupStatefulSetVolumeClaimTemplates(
 		return
 	}
 
-	if _, ok := creator.getVolumeClaimTemplate(defaultVolumeClaimTemplateName); !ok {
+	if _, ok := c.getVolumeClaimTemplate(defaultVolumeClaimTemplateName); !ok {
 		// Incorrect .templates.VolumeClaimTemplate specified
 		return
 	}
@@ -490,7 +471,7 @@ func (creator *Creator) setupStatefulSetVolumeClaimTemplates(
 		volumeMount := &statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts[i]
 		if volumeMount.Name == defaultVolumeClaimTemplateName {
 			// This .templates.VolumeClaimTemplate is already used in VolumeMount
-			glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template 1: %s\n", statefulSetName, volumeMount.Name)
+			glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - VC template 1: %s\n", statefulSetName, volumeMount.Name)
 			return
 		}
 	}
@@ -505,14 +486,14 @@ func (creator *Creator) setupStatefulSetVolumeClaimTemplates(
 		volumeMount := &statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts[i]
 		if volumeMount.MountPath == dirPathClickHouseData {
 			// /var/lib/clickhouse is already mounted
-			glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template 2: /var/lib/clickhouse already mounte\n", statefulSetName)
+			glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - VC template 2: /var/lib/clickhouse already mounte\n", statefulSetName)
 			return
 		}
 	}
 
 	// This default volumeClaimTemplate is not used explicitly by name and /var/lib/clickhouse is not mounted also.
 	// Let's mount this default VolumeClaimTemplate into /var/lib/clickhouse
-	if template, ok := creator.getVolumeClaimTemplate(defaultVolumeClaimTemplateName); ok {
+	if template, ok := c.getVolumeClaimTemplate(defaultVolumeClaimTemplateName); ok {
 		// Add VolumeClaimTemplate to StatefulSet
 		appendVolumeClaimTemplateFrom(statefulSetObject, template)
 		// Add VolumeMount to ClickHouse container to /var/lib/clickhouse point
@@ -522,7 +503,7 @@ func (creator *Creator) setupStatefulSetVolumeClaimTemplates(
 		)
 	}
 
-	glog.Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, defaultVolumeClaimTemplateName)
+	glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, defaultVolumeClaimTemplateName)
 }
 
 func copyPodTemplateFrom(dst *apps.StatefulSet, src *chiv1.ChiPodTemplate) {
@@ -608,33 +589,54 @@ func createVolumeMountObject(name, mountPath string) corev1.VolumeMount {
 }
 
 // createVolumeClaimTemplatesIndex creates a map of volumeClaimTemplatesIndexData used as a reference storage for VolumeClaimTemplates
-func (creator *Creator) createVolumeClaimTemplatesIndex() {
-	creator.volumeClaimTemplatesIndex = make(volumeClaimTemplatesIndex)
-	for i := range creator.chi.Spec.Templates.VolumeClaimTemplates {
+func (c *Creator) createVolumeClaimTemplatesIndex() {
+	c.volumeClaimTemplatesIndex = make(volumeClaimTemplatesIndex)
+	for i := range c.chi.Spec.Templates.VolumeClaimTemplates {
 		// Convenience wrapper
-		volumeClaimTemplate := &creator.chi.Spec.Templates.VolumeClaimTemplates[i]
-		creator.volumeClaimTemplatesIndex[volumeClaimTemplate.Name] = volumeClaimTemplate
+		volumeClaimTemplate := &c.chi.Spec.Templates.VolumeClaimTemplates[i]
+		c.volumeClaimTemplatesIndex[volumeClaimTemplate.Name] = volumeClaimTemplate
 	}
 }
 
 // getVolumeClaimTemplate gets VolumeClaimTemplate by name
-func (creator *Creator) getVolumeClaimTemplate(name string) (*chiv1.ChiVolumeClaimTemplate, bool) {
-	pvc, ok := creator.volumeClaimTemplatesIndex[name]
+func (c *Creator) getVolumeClaimTemplate(name string) (*chiv1.ChiVolumeClaimTemplate, bool) {
+	pvc, ok := c.volumeClaimTemplatesIndex[name]
 	return pvc, ok
 }
 
 // createPodTemplatesIndex creates a map of podTemplatesIndexData used as a reference storage for PodTemplates
-func (creator *Creator) createPodTemplatesIndex() {
-	creator.podTemplatesIndex = make(podTemplatesIndex)
-	for i := range creator.chi.Spec.Templates.PodTemplates {
+func (c *Creator) createPodTemplatesIndex() {
+	c.podTemplatesIndex = make(podTemplatesIndex)
+	for i := range c.chi.Spec.Templates.PodTemplates {
 		// Convenience wrapper
-		podTemplate := &creator.chi.Spec.Templates.PodTemplates[i]
-		creator.podTemplatesIndex[podTemplate.Name] = podTemplate
+		podTemplate := &c.chi.Spec.Templates.PodTemplates[i]
+		c.podTemplatesIndex[podTemplate.Name] = podTemplate
 	}
 }
 
 // getPodTemplate gets PodTemplate by name
-func (creator *Creator) getPodTemplate(name string) (*chiv1.ChiPodTemplate, bool) {
-	podTemplateSpec, ok := creator.podTemplatesIndex[name]
+func (c *Creator) getPodTemplate(name string) (*chiv1.ChiPodTemplate, bool) {
+	podTemplateSpec, ok := c.podTemplatesIndex[name]
 	return podTemplateSpec, ok
+}
+
+func IsChopGeneratedObject(objectMeta *metav1.ObjectMeta) bool {
+	// Parse Labels
+	// 			Labels: map[string]string{
+	//				ChopGeneratedLabel: AppVersion,
+	//				ChiGeneratedLabel:  replica.Address.ChiName,
+	//				ClusterGeneratedLabel: replica.Address.ClusterName,
+	//				ClusterIndexGeneratedLabel: strconv.Itoa(replica.Address.ClusterIndex),
+	//				ReplicaIndexGeneratedLabel: strconv.Itoa(replica.Address.ReplicaIndex),
+	//			},
+
+	// ObjectMeta must have some labels
+	if len(objectMeta.Labels) == 0 {
+		return false
+	}
+
+	// ObjectMeta must have ChopGeneratedLabel
+	_, ok := objectMeta.Labels[ChopGeneratedLabel]
+
+	return ok
 }

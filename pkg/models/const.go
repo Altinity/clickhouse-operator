@@ -52,7 +52,7 @@ const (
 const (
 	dotXML = ".xml"
 
-	// Filenames of the config files in /etc/clickhouse-server/config.d
+	// Filenames of the chopConfig files in /etc/clickhouse-server/chopConfig.d
 	// These files would be created as ConfigMaps mapping if necessary
 	filenameRemoteServersXML = configRemoteServers + dotXML
 	filenameZookeeperXML     = configZookeeper + dotXML
@@ -65,24 +65,24 @@ const (
 )
 
 const (
-	// fullPathConfigd specifies full path to folder, where generated XML config files for ClickHouse would be placed
+	// fullPathConfigd specifies full path to folder, where generated XML chopConfig files for ClickHouse would be placed
 
-	// dirPathConfigd specifies full path to folder, where generated XML config files for ClickHouse would be placed
+	// dirPathConfigd specifies full path to folder, where generated XML chopConfig files for ClickHouse would be placed
 	// for the following sections:
 	// 1. remote servers
 	// 2. zookeeper
 	// 3. settings
 	// 4. listen
-	dirPathConfigd = "/etc/clickhouse-server/config.d/"
+	dirPathConfigd = "/etc/clickhouse-server/chopConfig.d/"
 
-	// dirPathUsersd specifies full path to folder, where generated XML config files for ClickHouse would be placed
+	// dirPathUsersd specifies full path to folder, where generated XML chopConfig files for ClickHouse would be placed
 	// for the following sections:
 	// 1. users
 	// 2. quotas
 	// 3. profiles
 	dirPathUsersd = "/etc/clickhouse-server/users.d/"
 
-	// dirPathConfd specifies full path to folder, where generated XML config files for ClickHouse would be placed
+	// dirPathConfd specifies full path to folder, where generated XML chopConfig files for ClickHouse would be placed
 	// for the following sections:
 	// 1. macros
 	dirPathConfd = "/etc/clickhouse-server/conf.d/"

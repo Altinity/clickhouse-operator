@@ -30,10 +30,10 @@ type StatefulSetList []*apps.StatefulSet
 type ServiceList []*corev1.Service
 
 type configSections struct {
-	// commonConfigSections maps section name to section XML config
+	// commonConfigSections maps section name to section XML chopConfig
 	commonConfigSections map[string]string
 
-	// commonUsersConfigSections maps section name to section XML config
+	// commonUsersConfigSections maps section name to section XML chopConfig
 	commonUsersConfigSections map[string]string
 }
 

@@ -30,45 +30,39 @@ const (
 	allShardsOneReplicaClusterName = "all-sharded"
 )
 
-// generateUsersConfig creates data for "users.xml"
-func generateUsersConfig(chi *chiv1.ClickHouseInstallation) string {
-	return generateXMLConfig(chi.Spec.Configuration.Users, configUsers)
+type ClickHouseConfigGenerator struct {
+	chi *chiv1.ClickHouseInstallation
 }
 
-// generateProfilesConfig creates data for "profiles.xml"
-func generateProfilesConfig(chi *chiv1.ClickHouseInstallation) string {
-	return generateXMLConfig(chi.Spec.Configuration.Profiles, configProfiles)
-}
-
-// generateQuotasConfig creates data for "quotas.xml"
-func generateQuotasConfig(chi *chiv1.ClickHouseInstallation) string {
-	return generateXMLConfig(chi.Spec.Configuration.Quotas, configQuotas)
-}
-
-// generateSettingsConfig creates data for "settings.xml"
-func generateSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
-	return generateXMLConfig(chi.Spec.Configuration.Settings, "")
-}
-
-// generateXMLConfig creates XML using map[string]string definitions
-func generateXMLConfig(data map[string]interface{}, prefix string) string {
-	if len(data) == 0 {
-		return ""
+func NewClickHouseConfigGenerator(chi *chiv1.ClickHouseInstallation) *ClickHouseConfigGenerator {
+	return &ClickHouseConfigGenerator{
+		chi: chi,
 	}
-
-	b := &bytes.Buffer{}
-	// <yandex>
-	fprintf(b, "<%s>\n", xmlTagYandex)
-	xmlbuilder.GenerateXML(b, data, prefix)
-	// <yandex>
-	fprintf(b, "</%s>\n", xmlTagYandex)
-
-	return b.String()
 }
 
-// generateListenConfig creates data for "listen.xml"
-func generateListenConfig(chi *chiv1.ClickHouseInstallation) string {
-	return `<!-- Generated as default config by clickhouse-operator -->
+// GetUsers creates data for "users.xml"
+func (c *ClickHouseConfigGenerator) GetUsers() string {
+	return generateXMLConfig(c.chi.Spec.Configuration.Users, configUsers)
+}
+
+// GetProfiles creates data for "profiles.xml"
+func (c *ClickHouseConfigGenerator) GetProfiles() string {
+	return generateXMLConfig(c.chi.Spec.Configuration.Profiles, configProfiles)
+}
+
+// GetQuotas creates data for "quotas.xml"
+func (c *ClickHouseConfigGenerator) GetQuotas() string {
+	return generateXMLConfig(c.chi.Spec.Configuration.Quotas, configQuotas)
+}
+
+// GetSettings creates data for "settings.xml"
+func (c *ClickHouseConfigGenerator) GetSettings() string {
+	return generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
+}
+
+// GetListen creates data for "listen.xml"
+func (c *ClickHouseConfigGenerator) GetListen() string {
+	return `<!-- Generated as default chopConfig by clickhouse-operator -->
 <yandex>
     <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
     <listen_host>::</listen_host>
@@ -82,9 +76,9 @@ func generateListenConfig(chi *chiv1.ClickHouseInstallation) string {
 `
 }
 
-// generateZookeeperConfig creates data for "zookeeper.xml"
-func generateZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
-	if len(chi.Spec.Configuration.Zookeeper.Nodes) == 0 {
+// GetZookeeper creates data for "zookeeper.xml"
+func (c *ClickHouseConfigGenerator) GetZookeeper() string {
+	if len(c.chi.Spec.Configuration.Zookeeper.Nodes) == 0 {
 		// No Zookeeper nodes provided
 		return ""
 	}
@@ -95,9 +89,9 @@ func generateZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 	fprintf(b, "<%s>\n", xmlTagYandex)
 	fprintf(b, "%4s<zookeeper>\n", " ")
 	// Append Zookeeper nodes
-	for i := range chi.Spec.Configuration.Zookeeper.Nodes {
+	for i := range c.chi.Spec.Configuration.Zookeeper.Nodes {
 		// Convenience wrapper
-		node := &chi.Spec.Configuration.Zookeeper.Nodes[i]
+		node := &c.chi.Spec.Configuration.Zookeeper.Nodes[i]
 		// <node>
 		//		<host>HOST</host>
 		//		<port>PORT</port>
@@ -114,9 +108,9 @@ func generateZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 	//      <path>/x/y/chi.name/z</path>
 	//      <profile>X</prpfile>
 	fprintf(b, "%4s<distributed_ddl>\n", " ")
-	fprintf(b, "%8s<path>%s</path>\n", " ", fmt.Sprintf(distributedDDLPattern, chi.Name))
-	if chi.Spec.Defaults.DistributedDDL.Profile != "" {
-		fprintf(b, "%8s<profile>%s</profile>\n", " ", chi.Spec.Defaults.DistributedDDL.Profile)
+	fprintf(b, "%8s<path>%s</path>\n", " ", fmt.Sprintf(distributedDDLPattern, c.chi.Name))
+	if c.chi.Spec.Defaults.DistributedDDL.Profile != "" {
+		fprintf(b, "%8s<profile>%s</profile>\n", " ", c.chi.Spec.Defaults.DistributedDDL.Profile)
 	}
 	//		</distributed_ddl>
 	// </yandex>
@@ -126,13 +120,10 @@ func generateZookeeperConfig(chi *chiv1.ClickHouseInstallation) string {
 	return b.String()
 }
 
-// generateRemoteServersConfigReplicaHostname creates hostname (podhostname + service or FQDN) for "remote_servers.xml"
+// getRemoteServersReplicaHostname creates hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
-func generateRemoteServersConfigReplicaHostname(
-	chi *chiv1.ClickHouseInstallation,
-	replica *chiv1.ChiClusterLayoutShardReplica,
-) string {
-	if chi.Spec.Defaults.ReplicasUseFQDN == 1 {
+func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(replica *chiv1.ChiClusterLayoutShardReplica) string {
+	if c.chi.Spec.Defaults.ReplicasUseFQDN == 1 {
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local
@@ -142,8 +133,8 @@ func generateRemoteServersConfigReplicaHostname(
 	}
 }
 
-// generateRemoteServersConfig creates "remote_servers.xml" content and calculates data generation parameters for other sections
-func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
+// GetRemoteServers creates "remote_servers.xml" content and calculates data generation parameters for other sections
+func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 	b := &bytes.Buffer{}
 
 	// <yandex>
@@ -156,9 +147,9 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 	fprintf(b, "\n")
 
 	// Build each cluster XML
-	for clusterIndex := range chi.Spec.Configuration.Clusters {
+	for clusterIndex := range c.chi.Spec.Configuration.Clusters {
 		// Convenience wrapper
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := &c.chi.Spec.Configuration.Clusters[clusterIndex]
 
 		// <my_cluster_name>
 		fprintf(b, "%8s<%s>\n", " ", cluster.Name)
@@ -188,7 +179,7 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 				//		<port>XXX</port>
 				// </replica>
 				fprintf(b, "%16s<replica>\n", " ")
-				fprintf(b, "%20s<host>%s</host>\n", " ", generateRemoteServersConfigReplicaHostname(chi, replica))
+				fprintf(b, "%20s<host>%s</host>\n", " ", c.getRemoteServersReplicaHostname(replica))
 				fprintf(b, "%20s<port>%d</port>\n", " ", replica.Port)
 				fprintf(b, "%16s</replica>\n", " ")
 			}
@@ -214,9 +205,9 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 	fprintf(b, "%16s<internal_replication>%s</internal_replication>\n", " ", "yes")
 
 	// Build each cluster XML
-	for clusterIndex := range chi.Spec.Configuration.Clusters {
+	for clusterIndex := range c.chi.Spec.Configuration.Clusters {
 		// Convenience wrapper
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := &c.chi.Spec.Configuration.Clusters[clusterIndex]
 		// Build each shard XML
 		for shardIndex := range cluster.Layout.Shards {
 			// Convenience wrapper
@@ -232,7 +223,7 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 				//		<port>XXX</port>
 				// </replica>
 				fprintf(b, "%16s<replica>\n", " ")
-				fprintf(b, "%20s<host>%s</host>\n", " ", generateRemoteServersConfigReplicaHostname(chi, replica))
+				fprintf(b, "%20s<host>%s</host>\n", " ", c.getRemoteServersReplicaHostname(replica))
 				fprintf(b, "%20s<port>%d</port>\n", " ", replica.Port)
 				fprintf(b, "%16s</replica>\n", " ")
 			}
@@ -251,9 +242,9 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 	fprintf(b, "%8s<%s>\n", " ", clusterName)
 
 	// Build each cluster XML
-	for clusterIndex := range chi.Spec.Configuration.Clusters {
+	for clusterIndex := range c.chi.Spec.Configuration.Clusters {
 		// Convenience wrapper
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := &c.chi.Spec.Configuration.Clusters[clusterIndex]
 		// Build each shard XML
 		for shardIndex := range cluster.Layout.Shards {
 			// Convenience wrapper
@@ -274,7 +265,7 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 				//		<port>XXX</port>
 				// </replica>
 				fprintf(b, "%16s<replica>\n", " ")
-				fprintf(b, "%20s<host>%s</host>\n", " ", generateRemoteServersConfigReplicaHostname(chi, replica))
+				fprintf(b, "%20s<host>%s</host>\n", " ", c.getRemoteServersReplicaHostname(replica))
 				fprintf(b, "%20s<port>%d</port>\n", " ", replica.Port)
 				fprintf(b, "%16s</replica>\n", " ")
 
@@ -295,8 +286,8 @@ func generateRemoteServersConfig(chi *chiv1.ClickHouseInstallation) string {
 	return b.String()
 }
 
-// generateHostMacros creates "macros.xml" content
-func generateHostMacros(replica *chiv1.ChiClusterLayoutShardReplica) string {
+// GetHostMacros creates "macros.xml" content
+func (c *ClickHouseConfigGenerator) GetHostMacros(replica *chiv1.ChiClusterLayoutShardReplica) string {
 	b := &bytes.Buffer{}
 
 	// <yandex>
@@ -358,6 +349,22 @@ func generateHostMacros(replica *chiv1.ChiClusterLayoutShardReplica) string {
 	// 		</macros>
 	// </yandex>
 	fprintf(b, "%4s</macros>\n", " ")
+	fprintf(b, "</%s>\n", xmlTagYandex)
+
+	return b.String()
+}
+
+// generateXMLConfig creates XML using map[string]string definitions
+func generateXMLConfig(data map[string]interface{}, prefix string) string {
+	if len(data) == 0 {
+		return ""
+	}
+
+	b := &bytes.Buffer{}
+	// <yandex>
+	fprintf(b, "<%s>\n", xmlTagYandex)
+	xmlbuilder.GenerateXML(b, data, prefix)
+	// <yandex>
 	fprintf(b, "</%s>\n", xmlTagYandex)
 
 	return b.String()
