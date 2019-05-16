@@ -70,28 +70,36 @@ spec:
     clusters:
 
       - name: sharded-replicated
-        podTemplate: clickhouse-v18.16.1
+        templates:
+          podTemplate: clickhouse-v18.16.1
+          volumeClaimTemplate: default-volume-claim
         layout:
           type: Standard
           shardsCount: 3
           replicasCount: 2
 
       - name: sharded-non-replicated
-        podTemplate: clickhouse-v18.16.1
+        templates:
+          podTemplate: clickhouse-v18.16.1
+          volumeClaimTemplate: default-volume-claim
         layout:
           type: Standard
           shardsCount: 3
           # replicasCount not specified, assumed = 1, by default
 
       - name: replicated
-        podTemplate: clickhouse-v18.16.1
+        templates:
+          podTemplate: clickhouse-v18.16.1
+          volumeClaimTemplate: default-volume-claim
         layout:
           type: Standard
           replicasCount: 4
           # shardsCount not specified, assumed = 1, by default
 
       - name: customized
-        podTemplate: clickhouse-v18.16.1
+        templates:
+          podTemplate: clickhouse-v18.16.1
+          volumeClaimTemplate: default-volume-claim
         layout:
           type: Advanced
           shards:
@@ -99,22 +107,30 @@ spec:
               replicasCount: 2
               weight: 1
               internalReplication: Disabled
-              podTemplate: clickhouse-v18.16.1
+              templates:
+                podTemplate: clickhouse-v18.16.1
+                volumeClaimTemplate: default-volume-claim
 
             - definitionType: ReplicasCount
               replicasCount: 3
-              podTemplate: clickhouse-v18.16.1
+              templates:
+                podTemplate: clickhouse-v18.16.1
+                volumeClaimTemplate: default-volume-claim
 
             - definitionType: Replicas
-              podTemplate: clickhouse-v18.16.1
+              templates:
+                podTemplate: clickhouse-v18.16.1
+                volumeClaimTemplate: default-volume-claim
               replicas:
                 - port: 9000
-                  podTemplate: clickhouse-v18.16.1
+                  templates:
+                    podTemplate: clickhouse-v18.16.1
+                    volumeClaimTemplate: default-volume-claim
 
   templates:
     volumeClaimTemplates:
-      # type PersistentVolumeClaim struct from k8s.io/core/v1
       - name: default-volume-claim
+        # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
         spec:
           # 1. If storageClassName is not specified, default StorageClass
           # (must be specified by cluster administrator) would be used for provisioning
@@ -130,8 +146,8 @@ spec:
     podTemplates:
       # multiple pod templates makes possible to update version smoothly
       # pod template for ClickHouse v18.16.1
-      # type PodTemplateSpec struct {} from k8s.io/core/v1
       - name: clickhouse-v18.16.1
+        # type PodSpec struct {} from k8s.io/core/v1
         spec:
           containers:
             - name: clickhouse
@@ -148,8 +164,8 @@ spec:
                   cpu: "100m"
 
       # pod template for ClickHouse v18.16.2
-      # type type PodTemplateSpec struct {} from k8s.io/core/v1
       - name: clickhouse-v18.16.2
+        # type PodSpec struct {} from k8s.io/core/v1
         spec:
           containers:
             - name: clickhouse
