@@ -4,7 +4,7 @@ metadata:
   name: "syandard-02-multicluster"
 spec:
   defaults:
-    deployment:
+    templates:
       volumeClaimTemplate: auto-simple-vc
   configuration:
     clusters:
@@ -24,10 +24,9 @@ spec:
   templates:
     volumeClaimTemplates:
     - name: auto-simple-vc
-      persistentVolumeClaim:
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          resources:
-            requests:
-              storage: 123Mi
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 123Mi

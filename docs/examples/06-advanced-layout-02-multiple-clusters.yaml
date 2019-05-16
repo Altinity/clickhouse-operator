@@ -5,87 +5,87 @@ metadata:
 spec:
   configuration:
     clusters:
-    - name: 3-2
-      layout:
-        type: Advanced
-        shards:
-        - definitionType: Replicas
-          replicas:
-            - deployment:
-                podTemplate: t1
-            - deployment:
-                podTemplate: t1
-        - definitionType: Replicas
-          replicas:
-            - deployment:
-                podTemplate: t1
-            - deployment:
-                podTemplate: t1
-        - definitionType: Replicas
-          replicas:
-            - deployment:
-                podTemplate: t1
-            - deployment:
-                podTemplate: t2
-                
-    - name: 2-3
-      layout:
-        type: Advanced
-        shards:
-          - definitionType: Replicas
-            replicas:
-              - deployment:
-                  podTemplate: t1
-              - deployment:
-                  podTemplate: t1
-              - deployment:
-                  podTemplate: t1
-          - definitionType: Replicas
-            replicas:
-              - deployment:
-                  podTemplate: t1
-              - deployment:
-                  podTemplate: t1
-              - deployment:
-                  podTemplate: t1
+      - name: 3-2
+        layout:
+          type: Advanced
+          shards:
+            - definitionType: Replicas
+              replicas:
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t1
+            - definitionType: Replicas
+              replicas:
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t1
+            - definitionType: Replicas
+              replicas:
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t2
+
+      - name: 2-3
+        layout:
+          type: Advanced
+          shards:
+            - definitionType: Replicas
+              replicas:
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t1
+            - definitionType: Replicas
+              replicas:
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t1
 
   templates:
     podTemplates:
-    - name: clickhouse:19.3.7
-      # volumes:
-      containers:
-      - name: clickhouse-pod
-        image: yandex/clickhouse-server:19.3.7
-        ports:
-        - name: http
-          containerPort: 8123
-        - name: client
-          containerPort: 9000
-        - name: interserver
-          containerPort: 9009
+      - name: clickhouse:19.3.7
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.3.7
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009
 
-    - name: clickhouse:19.3.5
-      # volumes:
-      containers:
-      - name: clickhouse-pod
-        image: yandex/clickhouse-server:19.3.5
-        ports:
-        - name: http
-          containerPort: 8123
-        - name: client
-          containerPort: 9000
-        - name: interserver
-          containerPort: 9009
+      - name: clickhouse:19.3.5
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.3.5
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009
 
-    - name: clickhouse:19.1.10
-      # volumes:
-      containers:
-      - name: clickhouse-pod
-        image: yandex/clickhouse-server:19.1.10
-        ports:
-        - name: http
-          containerPort: 8123
-        - name: client
-          containerPort: 9000
-        - name: interserver
-          containerPort: 9009
+      - name: clickhouse:19.1.10
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.1.10
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009

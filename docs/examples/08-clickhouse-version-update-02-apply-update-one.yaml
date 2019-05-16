@@ -6,7 +6,7 @@ spec:
   configuration:
     clusters:
       - name: update
-        deployment:
+        templates:
           podTemplate: clickhouse:19.1.10
         layout:
           type: Advanced
@@ -16,31 +16,33 @@ spec:
                 - port: 9000
                 - port: 9000
                 - port: 9000
-                  deployment:
+                  templates:
                     podTemplate: clickhouse:19.3.7
 
   templates:
     podTemplates:
-    - name: clickhouse:19.3.7
-      containers:
-      - name: clickhouse-pod
-        image: yandex/clickhouse-server:19.3.7
-        ports:
-        - name: http
-          containerPort: 8123
-        - name: client
-          containerPort: 9000
-        - name: interserver
-          containerPort: 9009
+      - name: clickhouse:19.3.7
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.3.7
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009
 
-    - name: clickhouse:19.1.10
-      containers:
-      - name: clickhouse-pod
-        image: yandex/clickhouse-server:19.1.10
-        ports:
-        - name: http
-          containerPort: 8123
-        - name: client
-          containerPort: 9000
-        - name: interserver
-          containerPort: 9009
+      - name: clickhouse:19.1.10
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.1.10
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009
