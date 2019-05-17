@@ -19,13 +19,16 @@ import (
 )
 
 const (
-	// ChopGeneratedLabel applied to all objects created by the ClickHouse Operator
-	ChopGeneratedLabel         = clickhousealtinitycom.GroupName + "/chop"
-	ChiGeneratedLabel          = clickhousealtinitycom.GroupName + "/chi"
-	ClusterGeneratedLabel      = clickhousealtinitycom.GroupName + "/cluster"
-	ClusterIndexGeneratedLabel = clickhousealtinitycom.GroupName + "/clusterIndex"
-	ReplicaIndexGeneratedLabel = clickhousealtinitycom.GroupName + "/replicaIndex"
-	ZkVersionLabel             = clickhousealtinitycom.GroupName + "/zkv"
+	// Kubernetes labels
+	LabelApp             = clickhousealtinitycom.GroupName + "/app"
+	LabelAppValue        = "chop"
+	LabelChop            = clickhousealtinitycom.GroupName + "/chop"
+	LabelChi             = clickhousealtinitycom.GroupName + "/chi"
+	LabelCluster         = clickhousealtinitycom.GroupName + "/cluster"
+	LabelClusterIndex    = clickhousealtinitycom.GroupName + "/clusterIndex"
+	LabelReplicaIndex    = clickhousealtinitycom.GroupName + "/replicaIndex"
+	LabelZkConfigVersion = clickhousealtinitycom.GroupName + "/zkv"
+	LabelStatefulSet     = "StatefulSet"
 )
 
 const (
@@ -167,8 +170,6 @@ const (
 	chDefaultClientPortNumber      = 9000
 	chDefaultInterServerPortName   = "interserver"
 	chDefaultInterServerPortNumber = 9009
-	// Application Label
-	chDefaultAppLabel = clickhousealtinitycom.GroupName + "/app"
 )
 
 const (

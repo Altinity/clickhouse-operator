@@ -124,8 +124,8 @@ func (c *Creator) createConfigMapObjectsCommon() ConfigMapList {
 				Name:      CreateConfigMapCommonName(c.chi.Name),
 				Namespace: c.chi.Namespace,
 				Labels: map[string]string{
-					ChopGeneratedLabel: c.appVersion,
-					ChiGeneratedLabel:  c.chi.Name,
+					LabelChop: c.appVersion,
+					LabelChi:  c.chi.Name,
 				},
 			},
 			// Data contains several sections which are to be several xml chopConfig files
@@ -141,8 +141,8 @@ func (c *Creator) createConfigMapObjectsCommon() ConfigMapList {
 				Name:      CreateConfigMapCommonUsersName(c.chi.Name),
 				Namespace: c.chi.Namespace,
 				Labels: map[string]string{
-					ChopGeneratedLabel: c.appVersion,
-					ChiGeneratedLabel:  c.chi.Name,
+					LabelChop: c.appVersion,
+					LabelChi:  c.chi.Name,
 				},
 			},
 			// Data contains several sections which are to be several xml chopConfig files
@@ -172,8 +172,8 @@ func (c *Creator) createConfigMapObjectsPod() ConfigMapList {
 					Name:      CreateConfigMapPodName(replica),
 					Namespace: replica.Address.Namespace,
 					Labels: map[string]string{
-						ChopGeneratedLabel: c.appVersion,
-						ChiGeneratedLabel:  replica.Address.ChiName,
+						LabelChop: c.appVersion,
+						LabelChi:  replica.Address.ChiName,
 					},
 				},
 				Data: podConfigSections,
@@ -224,7 +224,7 @@ func (c *Creator) createServiceObjectsPod() ServiceList {
 		// Add corev1.Service object to the list
 		serviceList = append(
 			serviceList,
-			c.createServiceObjectPod(replica),
+			c.createServiceObjectForStatefulSet(replica),
 		)
 		return nil
 	}
@@ -240,8 +240,9 @@ func (c *Creator) createServiceObjectChi(serviceName string) *corev1.Service {
 			Name:      serviceName,
 			Namespace: c.chi.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel: c.appVersion,
-				ChiGeneratedLabel:  c.chi.Name,
+				LabelApp:  LabelAppValue,
+				LabelChop: c.appVersion,
+				LabelChi:  c.chi.Name,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -257,28 +258,31 @@ func (c *Creator) createServiceObjectChi(serviceName string) *corev1.Service {
 				},
 			},
 			Selector: map[string]string{
-				ChiGeneratedLabel: c.chi.Name,
+				LabelApp: LabelAppValue,
+				LabelChi: c.chi.Name,
 			},
 			Type: "LoadBalancer",
 		},
 	}
 }
 
-func (c *Creator) createServiceObjectPod(replica *chiv1.ChiReplica) *corev1.Service {
+func (c *Creator) createServiceObjectForStatefulSet(replica *chiv1.ChiReplica) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(replica)
 	statefulSetName := CreateStatefulSetName(replica)
 
-	glog.V(1).Infof("createServiceObjectPod() for service %s %s\n", serviceName, statefulSetName)
+	glog.V(1).Infof("createServiceObjectForStatefulSet() for service %s %s\n", serviceName, statefulSetName)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: replica.Address.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel:         c.appVersion,
-				ChiGeneratedLabel:          replica.Address.ChiName,
-				ClusterGeneratedLabel:      replica.Address.ClusterName,
-				ClusterIndexGeneratedLabel: strconv.Itoa(replica.Address.ClusterIndex),
-				ReplicaIndexGeneratedLabel: strconv.Itoa(replica.Address.ReplicaIndex),
+				LabelApp:          LabelAppValue,
+				LabelChop:         c.appVersion,
+				LabelChi:          replica.Address.ChiName,
+				LabelCluster:      replica.Address.ClusterName,
+				LabelClusterIndex: strconv.Itoa(replica.Address.ClusterIndex),
+				LabelReplicaIndex: strconv.Itoa(replica.Address.ReplicaIndex),
+				LabelStatefulSet:  statefulSetName,
 			},
 		},
 		Spec: corev1.ServiceSpec{
@@ -297,7 +301,9 @@ func (c *Creator) createServiceObjectPod(replica *chiv1.ChiReplica) *corev1.Serv
 				},
 			},
 			Selector: map[string]string{
-				chDefaultAppLabel: statefulSetName,
+				LabelApp:         LabelAppValue,
+				LabelChi:         replica.Address.ChiName,
+				LabelStatefulSet: statefulSetName,
 			},
 			ClusterIP: templateDefaultsServiceClusterIP,
 			Type:      "ClusterIP",
@@ -334,9 +340,14 @@ func (c *Creator) createStatefulSetObject(replica *chiv1.ChiReplica) *apps.State
 			Name:      statefulSetName,
 			Namespace: replica.Address.Namespace,
 			Labels: map[string]string{
-				ChopGeneratedLabel: c.appVersion,
-				ChiGeneratedLabel:  replica.Address.ChiName,
-				ZkVersionLabel:     replica.Config.ZkFingerprint,
+				LabelApp:             LabelAppValue,
+				LabelChop:            c.appVersion,
+				LabelChi:             replica.Address.ChiName,
+				LabelCluster:         replica.Address.ClusterName,
+				LabelClusterIndex:    strconv.Itoa(replica.Address.ClusterIndex),
+				LabelReplicaIndex:    strconv.Itoa(replica.Address.ReplicaIndex),
+				LabelZkConfigVersion: replica.Config.ZkFingerprint,
+				LabelStatefulSet:     statefulSetName,
 			},
 		},
 		Spec: apps.StatefulSetSpec{
@@ -344,7 +355,8 @@ func (c *Creator) createStatefulSetObject(replica *chiv1.ChiReplica) *apps.State
 			ServiceName: serviceName,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					chDefaultAppLabel: statefulSetName,
+					LabelApp:         LabelAppValue,
+					LabelStatefulSet: statefulSetName,
 				},
 			},
 			// IMPORTANT
@@ -375,10 +387,14 @@ func (c *Creator) setupStatefulSetPodTemplate(
 	statefulSetObject.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				chDefaultAppLabel:  statefulSetName,
-				ChopGeneratedLabel: c.appVersion,
-				ChiGeneratedLabel:  replica.Address.ChiName,
-				ZkVersionLabel:     replica.Config.ZkFingerprint,
+				LabelApp:             LabelAppValue,
+				LabelChop:            c.appVersion,
+				LabelChi:             replica.Address.ChiName,
+				LabelCluster:         replica.Address.ClusterName,
+				LabelClusterIndex:    strconv.Itoa(replica.Address.ClusterIndex),
+				LabelReplicaIndex:    strconv.Itoa(replica.Address.ReplicaIndex),
+				LabelZkConfigVersion: replica.Config.ZkFingerprint,
+				LabelStatefulSet:     statefulSetName,
 			},
 		},
 	}
@@ -623,11 +639,11 @@ func (c *Creator) getPodTemplate(name string) (*chiv1.ChiPodTemplate, bool) {
 func IsChopGeneratedObject(objectMeta *metav1.ObjectMeta) bool {
 	// Parse Labels
 	// 			Labels: map[string]string{
-	//				ChopGeneratedLabel: AppVersion,
-	//				ChiGeneratedLabel:  replica.Address.ChiName,
-	//				ClusterGeneratedLabel: replica.Address.ClusterName,
-	//				ClusterIndexGeneratedLabel: strconv.Itoa(replica.Address.ClusterIndex),
-	//				ReplicaIndexGeneratedLabel: strconv.Itoa(replica.Address.ReplicaIndex),
+	//				LabelChop: AppVersion,
+	//				LabelChi:  replica.Address.ChiName,
+	//				LabelCluster: replica.Address.ClusterName,
+	//				LabelClusterIndex: strconv.Itoa(replica.Address.ClusterIndex),
+	//				LabelReplicaIndex: strconv.Itoa(replica.Address.ReplicaIndex),
 	//			},
 
 	// ObjectMeta must have some labels
@@ -635,8 +651,8 @@ func IsChopGeneratedObject(objectMeta *metav1.ObjectMeta) bool {
 		return false
 	}
 
-	// ObjectMeta must have ChopGeneratedLabel
-	_, ok := objectMeta.Labels[ChopGeneratedLabel]
+	// ObjectMeta must have LabelChop
+	_, ok := objectMeta.Labels[LabelChop]
 
 	return ok
 }

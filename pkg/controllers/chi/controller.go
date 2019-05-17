@@ -621,7 +621,7 @@ func waitForCacheSync(name string, stopCh <-chan struct{}, cacheSyncs ...cache.I
 // clusterWideSelector returns labels.Selector object
 func clusterWideSelector(name string) labels.Selector {
 	return labels.SelectorFromSet(labels.Set{
-		chopmodels.ChopGeneratedLabel: name,
+		chopmodels.LabelChop: name,
 	})
 	/*
 		glog.V(2).Infof("ClickHouseInstallation (%q) listing controlled resources", chi.Name)
