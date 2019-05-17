@@ -148,14 +148,14 @@ type ChiTemplates struct {
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet
 type ChiPodTemplate struct {
-	Name string
-	Spec corev1.PodSpec
+	Name string         `json:"name" yaml:"name"`
+	Spec corev1.PodSpec `json:"spec" yaml:"spec"`
 }
 
 // ChiVolumeClaimTemplate defines PeristentVolumeClaim Template, directly used by StatefulSet
 type ChiVolumeClaimTemplate struct {
-	Name string
-	Spec corev1.PersistentVolumeClaimSpec
+	Name string                           `json:"name" yaml:"name"`
+	Spec corev1.PersistentVolumeClaimSpec `json:"spec" yaml:"spec"`
 }
 
 // ChiDistributedDDL defines distributedDDL section of .spec.defaults

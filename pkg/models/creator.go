@@ -371,7 +371,7 @@ func (c *Creator) setupStatefulSetPodTemplate(
 	podTemplateName := replica.Templates.PodTemplate
 
 	// Initial PodTemplateSpec value
-	// All the rest firls would be filled later
+	// All the rest fields would be filled later
 	statefulSetObject.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
@@ -600,8 +600,8 @@ func (c *Creator) createVolumeClaimTemplatesIndex() {
 
 // getVolumeClaimTemplate gets VolumeClaimTemplate by name
 func (c *Creator) getVolumeClaimTemplate(name string) (*chiv1.ChiVolumeClaimTemplate, bool) {
-	pvc, ok := c.volumeClaimTemplatesIndex[name]
-	return pvc, ok
+	volumeClaimTemplate, ok := c.volumeClaimTemplatesIndex[name]
+	return volumeClaimTemplate, ok
 }
 
 // createPodTemplatesIndex creates a map of podTemplatesIndexData used as a reference storage for PodTemplates
@@ -616,8 +616,8 @@ func (c *Creator) createPodTemplatesIndex() {
 
 // getPodTemplate gets PodTemplate by name
 func (c *Creator) getPodTemplate(name string) (*chiv1.ChiPodTemplate, bool) {
-	podTemplateSpec, ok := c.podTemplatesIndex[name]
-	return podTemplateSpec, ok
+	podTemplate, ok := c.podTemplatesIndex[name]
+	return podTemplate, ok
 }
 
 func IsChopGeneratedObject(objectMeta *metav1.ObjectMeta) bool {
