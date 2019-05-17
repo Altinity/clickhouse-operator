@@ -46,17 +46,17 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 		clusterIndex int,
 		cluster *ChiCluster,
 		shardIndex int,
-		shard *ChiClusterLayoutShard,
+		shard *ChiShard,
 		replicaIndex int,
-		replica *ChiClusterLayoutShardReplica,
+		replica *ChiReplica,
 	) error {
 		cluster.Address.Namespace = chi.Namespace
-		cluster.Address.CHIName = chi.Name
+		cluster.Address.ChiName = chi.Name
 		cluster.Address.ClusterName = cluster.Name
 		cluster.Address.ClusterIndex = clusterIndex
 
 		shard.Address.Namespace = chi.Namespace
-		shard.Address.CHIName = chi.Name
+		shard.Address.ChiName = chi.Name
 		shard.Address.ClusterName = cluster.Name
 		shard.Address.ClusterIndex = clusterIndex
 		shard.Address.ShardIndex = shardIndex
@@ -109,7 +109,7 @@ func (chi *ClickHouseInstallation) WalkShardsFullPath(
 		clusterIndex int,
 		cluster *ChiCluster,
 		shardIndex int,
-		shard *ChiClusterLayoutShard,
+		shard *ChiShard,
 	) error,
 ) []error {
 
@@ -128,7 +128,7 @@ func (chi *ClickHouseInstallation) WalkShardsFullPath(
 
 func (chi *ClickHouseInstallation) WalkShards(
 	f func(
-		shard *ChiClusterLayoutShard,
+		shard *ChiShard,
 	) error,
 ) []error {
 
@@ -151,9 +151,9 @@ func (chi *ClickHouseInstallation) WalkReplicasFullPath(
 		clusterIndex int,
 		cluster *ChiCluster,
 		shardIndex int,
-		shard *ChiClusterLayoutShard,
+		shard *ChiShard,
 		replicaIndex int,
-		replica *ChiClusterLayoutShardReplica,
+		replica *ChiReplica,
 	) error,
 ) []error {
 
@@ -175,7 +175,7 @@ func (chi *ClickHouseInstallation) WalkReplicasFullPath(
 
 func (chi *ClickHouseInstallation) WalkReplicas(
 	f func(
-		replica *ChiClusterLayoutShardReplica,
+		replica *ChiReplica,
 	) error,
 ) []error {
 

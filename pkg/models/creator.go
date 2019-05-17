@@ -155,7 +155,7 @@ func (c *Creator) createConfigMapObjectsCommon() ConfigMapList {
 
 func (c *Creator) createConfigMapObjectsPod() ConfigMapList {
 	configMapList := make(ConfigMapList, 0)
-	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
+	replicaProcessor := func(replica *chiv1.ChiReplica) error {
 		// Prepare for this replica deployment chopConfig files map as filename->content
 		podConfigSections := make(map[string]string)
 		util.IncludeNonEmpty(podConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(replica))
@@ -220,7 +220,7 @@ func (c *Creator) createServiceObjectsPod() ServiceList {
 	// service/chi-01a1ce7dce-2         ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
 	serviceList := make(ServiceList, 0)
 
-	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
+	replicaProcessor := func(replica *chiv1.ChiReplica) error {
 		// Add corev1.Service object to the list
 		serviceList = append(
 			serviceList,
@@ -264,7 +264,7 @@ func (c *Creator) createServiceObjectChi(serviceName string) *corev1.Service {
 	}
 }
 
-func (c *Creator) createServiceObjectPod(replica *chiv1.ChiClusterLayoutShardReplica) *corev1.Service {
+func (c *Creator) createServiceObjectPod(replica *chiv1.ChiReplica) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(replica)
 	statefulSetName := CreateStatefulSetName(replica)
 
@@ -312,7 +312,7 @@ func (c *Creator) createStatefulSetObjects() StatefulSetList {
 	// Create list of apps.StatefulSet objects
 	// StatefulSet is created for each replica.Deployment
 
-	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
+	replicaProcessor := func(replica *chiv1.ChiReplica) error {
 		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s\n", CreateStatefulSetName(replica))
 		// Append new StatefulSet to the list of stateful sets
 		statefulSetList = append(statefulSetList, c.createStatefulSetObject(replica))
@@ -323,7 +323,7 @@ func (c *Creator) createStatefulSetObjects() StatefulSetList {
 	return statefulSetList
 }
 
-func (c *Creator) createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardReplica) *apps.StatefulSet {
+func (c *Creator) createStatefulSetObject(replica *chiv1.ChiReplica) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(replica)
 	serviceName := CreateStatefulSetServiceName(replica)
 
@@ -365,7 +365,7 @@ func (c *Creator) createStatefulSetObject(replica *chiv1.ChiClusterLayoutShardRe
 
 func (c *Creator) setupStatefulSetPodTemplate(
 	statefulSetObject *apps.StatefulSet,
-	replica *chiv1.ChiClusterLayoutShardReplica,
+	replica *chiv1.ChiReplica,
 ) {
 	statefulSetName := CreateStatefulSetName(replica)
 	podTemplateName := replica.Templates.PodTemplate
@@ -400,7 +400,7 @@ func (c *Creator) setupStatefulSetPodTemplate(
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
 func (c *Creator) setupConfigMapVolumes(
 	statefulSetObject *apps.StatefulSet,
-	replica *chiv1.ChiClusterLayoutShardReplica,
+	replica *chiv1.ChiReplica,
 ) {
 	configMapMacrosName := CreateConfigMapPodName(replica)
 	configMapCommonName := CreateConfigMapCommonName(replica.Address.ChiName)
@@ -431,7 +431,7 @@ func (c *Creator) setupConfigMapVolumes(
 
 func (c *Creator) setupStatefulSetVolumeClaimTemplates(
 	statefulSetObject *apps.StatefulSet,
-	replica *chiv1.ChiClusterLayoutShardReplica,
+	replica *chiv1.ChiReplica,
 ) {
 	// Append VolumeClaimTemplates, that are referenced in Containers' VolumeMount object(s)
 	// to StatefulSet's Spec.VolumeClaimTemplates slice, so these

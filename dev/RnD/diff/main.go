@@ -76,8 +76,8 @@ func ex2() (ChiSpec, ChiSpec) {
 
 		Configuration: ChiConfiguration{
 
-			Zookeeper: ChiConfigurationZookeeper{
-				Nodes: []ChiConfigurationZookeeperNode{
+			Zookeeper: ChiZookeeperNodes{
+				Nodes: []ChiZookeeperNode{
 					{
 						Host: "host1",
 						Port: 123,
@@ -104,7 +104,7 @@ func ex2() (ChiSpec, ChiSpec) {
 						Fingerprint: "",
 					},
 
-					Layout: ChiClusterLayout{
+					Layout: ChiLayout{
 						// useless
 						Type: "",
 						// useless
@@ -112,7 +112,7 @@ func ex2() (ChiSpec, ChiSpec) {
 						// useless
 						ReplicasCount: 1,
 
-						Shards: []ChiClusterLayoutShard{
+						Shards: []ChiShard{
 							{
 								// useless
 								DefinitionType: "",
@@ -133,7 +133,7 @@ func ex2() (ChiSpec, ChiSpec) {
 									Fingerprint: "",
 								},
 
-								Replicas: []ChiClusterLayoutShardReplica{
+								Replicas: []ChiReplica{
 									// Replica 0
 									{
 										Port: 9000,
@@ -194,8 +194,8 @@ func ex2() (ChiSpec, ChiSpec) {
 
 		Configuration: ChiConfiguration{
 
-			Zookeeper: ChiConfigurationZookeeper{
-				Nodes: []ChiConfigurationZookeeperNode{
+			Zookeeper: ChiZookeeperNodes{
+				Nodes: []ChiZookeeperNode{
 					{
 						Host: "host1",
 						Port: 123,
@@ -222,7 +222,7 @@ func ex2() (ChiSpec, ChiSpec) {
 						Fingerprint: "",
 					},
 
-					Layout: ChiClusterLayout{
+					Layout: ChiLayout{
 						// useless
 						Type: "",
 						// useless
@@ -230,7 +230,7 @@ func ex2() (ChiSpec, ChiSpec) {
 						// useless
 						ReplicasCount: 1,
 
-						Shards: []ChiClusterLayoutShard{
+						Shards: []ChiShard{
 							{
 								// useless
 								DefinitionType: "",
@@ -251,7 +251,7 @@ func ex2() (ChiSpec, ChiSpec) {
 									Fingerprint: "",
 								},
 
-								Replicas: []ChiClusterLayoutShardReplica{
+								Replicas: []ChiReplica{
 									// Replica 0
 									{
 										Port: 9000,

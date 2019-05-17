@@ -16,16 +16,17 @@ package models
 
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/config"
+	chopconfig "github.com/altinity/clickhouse-operator/pkg/config"
 	"regexp"
 	"strings"
 )
 
 type Normalizer struct {
-	config *config.Config
+	config *chopconfig.Config
+	chi    *chiv1.ClickHouseInstallation
 }
 
-func NewNormalizer(config *config.Config) *Normalizer {
+func NewNormalizer(config *chopconfig.Config) *Normalizer {
 	return &Normalizer{
 		config: config,
 	}
@@ -45,24 +46,24 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation) (*chi
 }
 
 // DoChi normalizes CHI.
-// Returns NamedNumber of deployments number required to satisfy clusters' infrastructure
+// Returns normalized CHI
 func (n *Normalizer) DoChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
+	n.chi = chi
+
+	// Walk over ChiSpec datatype fields
+	n.doDefaults(&n.chi.Spec.Defaults)
+	n.doConfiguration(&n.chi.Spec.Configuration)
+	n.doClusters()
+
+	n.chi.SetKnown()
+
+	return n.chi, nil
+}
+
+// doDefaults normalizes .spec.defaults
+func (n *Normalizer) doDefaults(defaults *chiv1.ChiDefaults) {
 	// Set defaults for CHI object properties
-	n.doDefaultsReplicasUseFQDN(&chi.Spec.Defaults)
-	n.doConfiguration(&chi.Spec.Configuration)
-
-	// Normalize all clusters in this CHI
-	chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
-		return n.doCluster(chi, cluster)
-	})
-	chi.FillAddressInfo()
-	chi.WalkReplicas(func(replica *chiv1.ChiClusterLayoutShardReplica) error {
-		replica.Config.ZkFingerprint = fingerprint(chi.Spec.Configuration.Zookeeper)
-		return nil
-	})
-	chi.SetKnown()
-
-	return chi, nil
+	n.doDefaultsReplicasUseFQDN(defaults)
 }
 
 // doConfiguration normalizes .spec.configuration
@@ -72,6 +73,19 @@ func (n *Normalizer) doConfiguration(conf *chiv1.ChiConfiguration) {
 	n.doConfigurationProfiles(&conf.Profiles)
 	n.doConfigurationQuotas(&conf.Quotas)
 	n.doConfigurationSettings(&conf.Settings)
+}
+
+// doClusters normalizes clusters
+func (n *Normalizer) doClusters() {
+	// Normalize all clusters in this CHI
+	n.chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
+		return n.doCluster(cluster)
+	})
+	n.chi.FillAddressInfo()
+	n.chi.WalkReplicas(func(replica *chiv1.ChiReplica) error {
+		replica.Config.ZkFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
+		return nil
+	})
 }
 
 // doConfigurationUsers normalizes .spec.configuration.users
@@ -130,17 +144,14 @@ func (n *Normalizer) doConfigurationSettings(settings *map[string]interface{}) {
 }
 
 // doCluster normalizes cluster and returns deployments usage counters for this cluster
-func (n *Normalizer) doCluster(
-	chi *chiv1.ClickHouseInstallation,
-	cluster *chiv1.ChiCluster,
-) error {
+func (n *Normalizer) doCluster(cluster *chiv1.ChiCluster) error {
 	// Inherit PodTemplate from .spec.defaults
-	cluster.InheritTemplates(chi)
+	cluster.InheritTemplates(n.chi)
 
 	// Convenience wrapper
 	layout := &cluster.Layout
 
-	n.doLayoutShardsAndReplicasCount(layout)
+	n.doLayoutShardsCountAndReplicasCount(layout)
 
 	// Loop over all shards and replicas inside shards and fill structure
 	// .Layout.ShardsCount is provided
@@ -149,9 +160,10 @@ func (n *Normalizer) doCluster(
 		// Convenience wrapper
 		shard := &layout.Shards[shardIndex]
 
+		// Normalize a shard
+
 		// For each shard of this normalized cluster inherit cluster's PodTemplate
 		shard.InheritTemplates(cluster)
-
 		// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
 		// Default value set to "true"
 		n.doShardInternalReplication(shard)
@@ -163,13 +175,13 @@ func (n *Normalizer) doCluster(
 	return nil
 }
 
-// doLayoutShardsAndReplicasCount ensures at least 1 shard and 1 replica counters
-func (n *Normalizer) doLayoutShardsAndReplicasCount(layout *chiv1.ChiClusterLayout) {
+// doLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
+func (n *Normalizer) doLayoutShardsCountAndReplicasCount(layout *chiv1.ChiLayout) {
 	if len(layout.Shards) > 0 {
-		// We have Shards specified - ok, this is to be exact ShardsCount
+		// We have Shards specified as slice - ok, this means exact ShardsCount is known
 		layout.ShardsCount = len(layout.Shards)
 	} else if layout.ShardsCount == 0 {
-		// Neither ShardsCount nor Shards specified, assume 1 as default value
+		// Neither ShardsCount nor Shards are specified, assume 1 as default value
 		layout.ShardsCount = 1
 	} else {
 		// ShardsCount specified explicitly, Just use it
@@ -182,10 +194,10 @@ func (n *Normalizer) doLayoutShardsAndReplicasCount(layout *chiv1.ChiClusterLayo
 }
 
 // doShardReplicasCount ensures shard.ReplicasCount filled properly
-func (n *Normalizer) doShardReplicasCount(shard *chiv1.ChiClusterLayoutShard, layoutReplicasCount int) {
+func (n *Normalizer) doShardReplicasCount(shard *chiv1.ChiShard, layoutReplicasCount int) {
 	if len(shard.Replicas) > 0 {
 		// .layout.type: Advanced + definitionType: Replicas
-		// We have Replicas specified as slice
+		// We have Replicas specified as slice - ok, this means exact ReplicasCount is known
 		shard.ReplicasCount = len(shard.Replicas)
 	} else if shard.ReplicasCount == 0 {
 		// We do not have Replicas slice specified
@@ -201,34 +213,36 @@ func (n *Normalizer) doShardReplicasCount(shard *chiv1.ChiClusterLayoutShard, la
 }
 
 // ensureLayoutShards ensures slice layout.Shards is in place
-func (n *Normalizer) ensureLayoutShards(layout *chiv1.ChiClusterLayout) {
+func (n *Normalizer) ensureLayoutShards(layout *chiv1.ChiLayout) {
 	if (len(layout.Shards) == 0) && (layout.ShardsCount > 0) {
-		layout.Shards = make([]chiv1.ChiClusterLayoutShard, layout.ShardsCount)
+		layout.Shards = make([]chiv1.ChiShard, layout.ShardsCount)
 	}
 }
 
 // ensureShardReplicas ensures slice shard.Replicas is in place
-func (n *Normalizer) ensureShardReplicas(shard *chiv1.ChiClusterLayoutShard) {
+func (n *Normalizer) ensureShardReplicas(shard *chiv1.ChiShard) {
 	if (len(shard.Replicas) == 0) && (shard.ReplicasCount > 0) {
-		shard.Replicas = make([]chiv1.ChiClusterLayoutShardReplica, shard.ReplicasCount)
+		shard.Replicas = make([]chiv1.ChiReplica, shard.ReplicasCount)
 	}
 }
 
 // doShardReplicas normalizes all replicas of specified shard
-func (n *Normalizer) doShardReplicas(shard *chiv1.ChiClusterLayoutShard) {
+func (n *Normalizer) doShardReplicas(shard *chiv1.ChiShard) {
 	// Fill each replica
 	n.ensureShardReplicas(shard)
 	for replicaIndex := range shard.Replicas {
 		// Convenience wrapper
 		replica := &shard.Replicas[replicaIndex]
+
+		// Normalize a replica
 		n.doReplicaPort(replica)
 		// Inherit PodTemplate from shard
 		replica.InheritTemplates(shard)
 	}
 }
 
-// doReplicaPort ensures chiv1.ChiClusterLayoutShardReplica.Port is reasonable
-func (n *Normalizer) doReplicaPort(replica *chiv1.ChiClusterLayoutShardReplica) {
+// doReplicaPort ensures chiv1.ChiReplica.Port is reasonable
+func (n *Normalizer) doReplicaPort(replica *chiv1.ChiReplica) {
 	if replica.Port <= 0 {
 		replica.Port = chDefaultClientPortNumber
 	}
@@ -236,7 +250,7 @@ func (n *Normalizer) doReplicaPort(replica *chiv1.ChiClusterLayoutShardReplica) 
 
 // doShardInternalReplication ensures reasonable values in
 // .spec.configuration.clusters.layout.shards.internalReplication
-func (n *Normalizer) doShardInternalReplication(shard *chiv1.ChiClusterLayoutShard) {
+func (n *Normalizer) doShardInternalReplication(shard *chiv1.ChiShard) {
 	// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
 	// with default value set to "true"
 	if shard.InternalReplication == shardInternalReplicationDisabled {

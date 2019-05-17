@@ -93,8 +93,8 @@ spec:
           volumeClaimTemplate: default-volume-claim
         layout:
           type: Standard
-          replicasCount: 4
           # shardsCount not specified, assumed = 1, by default
+          replicasCount: 4
 
       - name: customized
         templates:

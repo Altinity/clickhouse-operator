@@ -14,7 +14,7 @@
 
 package v1
 
-func (replica *ChiClusterLayoutShardReplica) InheritTemplates(shard *ChiClusterLayoutShard) {
+func (replica *ChiReplica) InheritTemplates(shard *ChiShard) {
 	if replica.Templates.PodTemplate == "" {
 		replica.Templates.PodTemplate = shard.Templates.PodTemplate
 	}

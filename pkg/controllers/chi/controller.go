@@ -503,12 +503,12 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 			cluster := diff.Removed[path].(chop.ChiCluster)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete cluster %s", cluster.Name))
 			c.deleteCluster(&cluster)
-		case chop.ChiClusterLayoutShard:
-			shard := diff.Removed[path].(chop.ChiClusterLayoutShard)
+		case chop.ChiShard:
+			shard := diff.Removed[path].(chop.ChiShard)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete shard %d", shard.Address.ShardIndex))
 			c.deleteShard(&shard)
-		case chop.ChiClusterLayoutShardReplica:
-			replica := diff.Removed[path].(chop.ChiClusterLayoutShardReplica)
+		case chop.ChiReplica:
+			replica := diff.Removed[path].(chop.ChiReplica)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete replica %d", replica.Address.ReplicaIndex))
 			_ = c.deleteReplica(&replica)
 		}

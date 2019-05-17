@@ -14,7 +14,7 @@
 
 package v1
 
-func (zoo *ChiConfigurationZookeeper) MergeFrom(from *ChiConfigurationZookeeper) {
+func (zoo *ChiZookeeperNodes) MergeFrom(from *ChiZookeeperNodes) {
 	if from == nil {
 		return
 	}
@@ -22,7 +22,7 @@ func (zoo *ChiConfigurationZookeeper) MergeFrom(from *ChiConfigurationZookeeper)
 	if len(from.Nodes) > 0 {
 		// Append Nodes from `from`
 		if zoo.Nodes == nil {
-			zoo.Nodes = make([]ChiConfigurationZookeeperNode, 0)
+			zoo.Nodes = make([]ChiZookeeperNode, 0)
 		}
 		for fromIndex := range from.Nodes {
 			fromNode := &from.Nodes[fromIndex]

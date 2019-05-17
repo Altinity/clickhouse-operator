@@ -122,7 +122,7 @@ func (c *ClickHouseConfigGenerator) GetZookeeper() string {
 
 // getRemoteServersReplicaHostname creates hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
-func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(replica *chiv1.ChiClusterLayoutShardReplica) string {
+func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(replica *chiv1.ChiReplica) string {
 	if c.chi.Spec.Defaults.ReplicasUseFQDN == 1 {
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
@@ -287,7 +287,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 }
 
 // GetHostMacros creates "macros.xml" content
-func (c *ClickHouseConfigGenerator) GetHostMacros(replica *chiv1.ChiClusterLayoutShardReplica) string {
+func (c *ClickHouseConfigGenerator) GetHostMacros(replica *chiv1.ChiReplica) string {
 	b := &bytes.Buffer{}
 
 	// <yandex>

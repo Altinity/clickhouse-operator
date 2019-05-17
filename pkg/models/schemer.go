@@ -75,7 +75,7 @@ func ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiClu
 }
 
 // ReplicaGetDropTables returns set of 'DROP TABLE ...' SQLs
-func ReplicaGetDropTables(replica *chi.ChiClusterLayoutShardReplica) ([]string, []string, error) {
+func ReplicaGetDropTables(replica *chi.ChiReplica) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	result := make([][]string, 0)
@@ -115,7 +115,7 @@ func ChiApplySQLs(chi *chi.ClickHouseInstallation, sqls []string) error {
 }
 
 // ReplicaApplySQLs runs set of SQL queries over the replica
-func ReplicaApplySQLs(replica *chi.ChiClusterLayoutShardReplica, sqls []string, retry bool) error {
+func ReplicaApplySQLs(replica *chi.ChiReplica, sqls []string, retry bool) error {
 	hosts := []string{CreatePodFQDN(replica)}
 	return applySQLs(hosts, sqls, true)
 }

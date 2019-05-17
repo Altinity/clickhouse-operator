@@ -14,7 +14,7 @@
 
 package v1
 
-func (shard *ChiClusterLayoutShard) InheritTemplates(cluster *ChiCluster) {
+func (shard *ChiShard) InheritTemplates(cluster *ChiCluster) {
 	if shard.Templates.PodTemplate == "" {
 		shard.Templates.PodTemplate = cluster.Templates.PodTemplate
 	}
@@ -23,8 +23,8 @@ func (shard *ChiClusterLayoutShard) InheritTemplates(cluster *ChiCluster) {
 	}
 }
 
-func (shard *ChiClusterLayoutShard) WalkReplicas(
-	f func(replica *ChiClusterLayoutShardReplica) error,
+func (shard *ChiShard) WalkReplicas(
+	f func(replica *ChiReplica) error,
 ) []error {
 	res := make([]error, 0)
 

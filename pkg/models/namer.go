@@ -39,7 +39,7 @@ func createClusterNameID(name string) string {
 }
 
 // CreateConfigMapPodName returns a name for a ConfigMap for replica's pod
-func CreateConfigMapPodName(replica *chop.ChiClusterLayoutShardReplica) string {
+func CreateConfigMapPodName(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		configMapDeploymentNamePattern,
 		createChiNameID(replica.Address.ChiName),
@@ -83,7 +83,7 @@ func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
 }
 
 // CreateStatefulSetName creates a name of a StatefulSet for replica
-func CreateStatefulSetName(replica *chop.ChiClusterLayoutShardReplica) string {
+func CreateStatefulSetName(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		statefulSetNamePattern,
 		createChiNameID(replica.Address.ChiName),
@@ -94,7 +94,7 @@ func CreateStatefulSetName(replica *chop.ChiClusterLayoutShardReplica) string {
 }
 
 // CreateStatefulSetServiceName returns a name of a StatefulSet-related Service for replica
-func CreateStatefulSetServiceName(replica *chop.ChiClusterLayoutShardReplica) string {
+func CreateStatefulSetServiceName(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		statefulSetServiceNamePattern,
 		createChiNameID(replica.Address.ChiName),
@@ -106,7 +106,7 @@ func CreateStatefulSetServiceName(replica *chop.ChiClusterLayoutShardReplica) st
 
 // CreatePodHostname returns a name of a Pod resource for replica
 // ss-1eb454-2-0
-func CreatePodHostname(replica *chop.ChiClusterLayoutShardReplica) string {
+func CreatePodHostname(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		podHostnamePattern,
 		createChiNameID(replica.Address.ChiName),
@@ -124,7 +124,7 @@ func CreateNamespaceDomainName(chiNamespace string) string {
 
 // CreatePodFQDN creates a fully qualified domain name of a pod
 // ss-1eb454-2-0.my-dev-domain.svc.cluster.local
-func CreatePodFQDN(replica *chop.ChiClusterLayoutShardReplica) string {
+func CreatePodFQDN(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		podFQDNPattern,
 		createChiNameID(replica.Address.ChiName),
@@ -138,7 +138,7 @@ func CreatePodFQDN(replica *chop.ChiClusterLayoutShardReplica) string {
 // CreatePodFQDNsOfCluster creates fully qualified domain names of all pods in a cluster
 func CreatePodFQDNsOfCluster(cluster *chop.ChiCluster) []string {
 	fqdns := make([]string, 0)
-	cluster.WalkReplicas(func(replica *chop.ChiClusterLayoutShardReplica) error {
+	cluster.WalkReplicas(func(replica *chop.ChiReplica) error {
 		fqdns = append(fqdns, CreatePodFQDN(replica))
 		return nil
 	})
@@ -148,7 +148,7 @@ func CreatePodFQDNsOfCluster(cluster *chop.ChiCluster) []string {
 // CreatePodFQDNsOfChi creates fully qualified domain names of all pods in a CHI
 func CreatePodFQDNsOfChi(chi *chop.ClickHouseInstallation) []string {
 	fqdns := make([]string, 0)
-	chi.WalkReplicas(func(replica *chop.ChiClusterLayoutShardReplica) error {
+	chi.WalkReplicas(func(replica *chop.ChiReplica) error {
 		fqdns = append(fqdns, CreatePodFQDN(replica))
 		return nil
 	})

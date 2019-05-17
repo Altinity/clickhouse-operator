@@ -33,8 +33,8 @@ func newDeleteOptions() *metav1.DeleteOptions {
 	}
 }
 
-// deleteReplica deletes all kubernetes resources related to replica *chop.ChiClusterLayoutShardReplica
-func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) error {
+// deleteReplica deletes all kubernetes resources related to replica *chop.ChiReplica
+func (c *Controller) deleteReplica(replica *chop.ChiReplica) error {
 	// Each replica consists of
 	// 1. Tables on replica - we need to delete tables on replica in order to clean Zookeeper data
 	// 2. StatefulSet
@@ -70,8 +70,8 @@ func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) e
 	return nil
 }
 
-// deleteShard deletes all kubernetes resources related to shard *chop.ChiClusterLayoutShard
-func (c *Controller) deleteShard(shard *chop.ChiClusterLayoutShard) {
+// deleteShard deletes all kubernetes resources related to shard *chop.ChiShard
+func (c *Controller) deleteShard(shard *chop.ChiShard) {
 	shard.WalkReplicas(c.deleteReplica)
 }
 
