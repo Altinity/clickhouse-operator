@@ -42,14 +42,17 @@ spec:
 
   templates:
     podTemplates:
+      # Specify Pod Templates with affinity
+
       - name: clickhouse-in-zone-us-east-1a
         spec:
           affinity:
+            # Specify Pod affinity to nodes in specified availability zone
             nodeAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
                 nodeSelectorTerms:
                   - matchExpressions:
-                      - key: failure-domain.beta.kubernetes.io/zone
+                      - key: "failure-domain.beta.kubernetes.io/zone"
                         operator: In
                         values:
                           - "us-east-1a"
@@ -67,11 +70,12 @@ spec:
       - name: clickhouse-in-zone-us-east-1b
         spec:
           affinity:
+            # Specify Pod affinity to nodes in specified availability zone
             nodeAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
                 nodeSelectorTerms:
                   - matchExpressions:
-                      - key: failure-domain.beta.kubernetes.io/zone
+                      - key: "failure-domain.beta.kubernetes.io/zone"
                         operator: In
                         values:
                           - "us-east-1b"
