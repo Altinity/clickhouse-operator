@@ -37,7 +37,6 @@ spec:
         spec:
           affinity:
             # Specify Pod affinity to nodes in specified availability zone
-            # Specify Pod anti-affinity to Pods with the same label "/app" on the same "hostname"
             nodeAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
                 nodeSelectorTerms:
@@ -46,6 +45,7 @@ spec:
                         operator: In
                         values:
                           - "us-east-1a"
+            # Specify Pod anti-affinity to Pods with the same label "/app" on the same "hostname"
             podAntiAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
                 - labelSelector:
