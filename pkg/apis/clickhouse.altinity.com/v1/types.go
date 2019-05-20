@@ -58,7 +58,7 @@ type ChiTemplateNames struct {
 
 // ChiConfiguration defines configuration section of .spec
 type ChiConfiguration struct {
-	Zookeeper ChiZookeeperNodes      `json:"zookeeper,omitempty" yaml:"zookeeper"`
+	Zookeeper ChiZookeeperConfig     `json:"zookeeper,omitempty" yaml:"zookeeper"`
 	Users     map[string]interface{} `json:"users,omitempty"     yaml:"users"`
 	Profiles  map[string]interface{} `json:"profiles,omitempty"  yaml:"profiles"`
 	Quotas    map[string]interface{} `json:"quotas,omitempty"    yaml:"quotas"`
@@ -170,8 +170,8 @@ type ChiDistributedDDL struct {
 	Profile string `json:"profile,omitempty" yaml:"profile"`
 }
 
-// ChiZookeeperNodes defines zookeeper section of .spec.configuration
-type ChiZookeeperNodes struct {
+// ChiZookeeperConfig defines zookeeper section of .spec.configuration
+type ChiZookeeperConfig struct {
 	Nodes []ChiZookeeperNode `json:"nodes,omitempty" yaml:"nodes"`
 }
 

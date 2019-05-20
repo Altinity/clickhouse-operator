@@ -70,7 +70,7 @@ func (n *Normalizer) doDefaults(defaults *chiv1.ChiDefaults) {
 
 // doConfiguration normalizes .spec.configuration
 func (n *Normalizer) doConfiguration(conf *chiv1.ChiConfiguration) {
-	// TODO normalize zookeeper
+	n.doConfigurationZookeeper(&conf.Zookeeper)
 	n.doConfigurationUsers(&conf.Users)
 	n.doConfigurationProfiles(&conf.Profiles)
 	n.doConfigurationQuotas(&conf.Quotas)
@@ -91,6 +91,17 @@ func (n *Normalizer) doClusters() {
 		replica.Config.ZkFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
 		return nil
 	})
+}
+
+// doConfigurationZookeeper normalizes .spec.configuration.zookeeper
+func (n *Normalizer) doConfigurationZookeeper(zk *chiv1.ChiZookeeperConfig) {
+	for i := range zk.Nodes {
+		// Convenience wrapper
+		node := &zk.Nodes[i]
+		if node.Port == 0 {
+			node.Port = 2181
+		}
+	}
 }
 
 // doConfigurationUsers normalizes .spec.configuration.users
