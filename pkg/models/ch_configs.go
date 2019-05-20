@@ -22,58 +22,45 @@ import (
 )
 
 const (
+	// Special auto-generated clusters. Each of these clusters lay over all replicas in CHI
+	// 1. Cluster with one shard and all replicas. Used to duplicate data over all replicas.
+	// 2. Cluster with all shards (1 replica). Used to gather/scatter data over all replicas.
+
 	oneShardAllReplicasClusterName = "all-replicated"
 	allShardsOneReplicaClusterName = "all-sharded"
 )
 
+// generateUsersConfig creates data for "users.xml"
+func generateUsersConfig(chi *chiv1.ClickHouseInstallation) string {
+	return generateXMLConfig(chi.Spec.Configuration.Users, configUsers)
+}
+
 // generateProfilesConfig creates data for "profiles.xml"
 func generateProfilesConfig(chi *chiv1.ClickHouseInstallation) string {
-	return genConfigXML(chi.Spec.Configuration.Profiles, configProfiles)
+	return generateXMLConfig(chi.Spec.Configuration.Profiles, configProfiles)
 }
 
 // generateQuotasConfig creates data for "quotas.xml"
 func generateQuotasConfig(chi *chiv1.ClickHouseInstallation) string {
-	return genConfigXML(chi.Spec.Configuration.Quotas, configQuotas)
+	return generateXMLConfig(chi.Spec.Configuration.Quotas, configQuotas)
 }
 
-// generateUsersConfig creates data for "users.xml"
-func generateUsersConfig(chi *chiv1.ClickHouseInstallation) string {
-	return genConfigXML(chi.Spec.Configuration.Users, configUsers)
+// generateSettingsConfig creates data for "settings.xml"
+func generateSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
+	return generateXMLConfig(chi.Spec.Configuration.Settings, "")
 }
 
-// genConfigXML creates XML using map[string]string definitions
-func genConfigXML(data map[string]interface{}, section string) string {
+// generateXMLConfig creates XML using map[string]string definitions
+func generateXMLConfig(data map[string]interface{}, prefix string) string {
 	if len(data) == 0 {
 		return ""
 	}
 
 	b := &bytes.Buffer{}
-
-	// <yandex>
-	//		<SECTION>
-	fprintf(b, "<%s>\n", xmlTagYandex)
-	fprintf(b, "%4s<%s>\n", " ", section)
-
-	xmlbuilder.GenerateXML(b, data, 4, 4)
-	//		<SECTION>
-	// <yandex>
-	fprintf(b, "%4s</%s>\n", " ", section)
-	fprintf(b, "</%s>\n", xmlTagYandex)
-
-	return b.String()
-}
-
-// generateSettingsConfig creates data for "settings.xml"
-func generateSettingsConfig(chi *chiv1.ClickHouseInstallation) string {
-	if len(chi.Spec.Configuration.Settings) == 0 {
-		return ""
-	}
-
-	b := &bytes.Buffer{}
 	// <yandex>
 	fprintf(b, "<%s>\n", xmlTagYandex)
-	xmlbuilder.GenerateXML(b, chi.Spec.Configuration.Settings, 0, 4, configUsers, configProfiles, configQuotas)
-	// </yandex>
+	xmlbuilder.GenerateXML(b, data, prefix)
+	// <yandex>
 	fprintf(b, "</%s>\n", xmlTagYandex)
 
 	return b.String()

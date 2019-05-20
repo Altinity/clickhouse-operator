@@ -11,7 +11,7 @@ func processor(diff *messagediff.Diff) {
 	shardIndex := -1
 	replicaIndex := -1
 	structField := ""
-	for pPath:= range diff.Added {
+	for pPath := range diff.Added {
 		for i := range *pPath {
 			pathNode := (*pPath)[i]
 			switch pathNode.(type) {

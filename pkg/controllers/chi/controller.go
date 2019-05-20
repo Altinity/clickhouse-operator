@@ -75,52 +75,24 @@ func CreateController(
 
 	// Create Controller instance
 	controller := &Controller{
-		// chopConfig used to keep clickhouse-oprator config
-		chopConfig: chopConfig,
-
-		// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
-		kubeClient: kubeClient,
-		// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
-		chopClient: chopClient,
-
-		// chiLister used as chiLister.ClickHouseInstallations(namespace).Get(name)
-		chiLister: chiInformer.Lister(),
-		// chiListerSynced used in waitForCacheSync()
-		chiListerSynced: chiInformer.Informer().HasSynced,
-
-		// serviceLister used as serviceLister.Services(namespace).Get(name)
-		serviceLister: serviceInformer.Lister(),
-		// serviceListerSynced used in waitForCacheSync()
-		serviceListerSynced: serviceInformer.Informer().HasSynced,
-
-		// endpointsLister used as endpointsLister.Endpoints(namespace).Get(name)
-		endpointsLister: endpointsInformer.Lister(),
-		// endpointsListerSynced used in waitForCacheSync()
-		endpointsListerSynced: endpointsInformer.Informer().HasSynced,
-
-		// configMapLister used as configMapLister.ConfigMaps(namespace).Get(name)
-		configMapLister: configMapInformer.Lister(),
-		// configMapListerSynced used in waitForCacheSync()
-		configMapListerSynced: configMapInformer.Informer().HasSynced,
-
-		// statefulSetLister used as statefulSetLister.StatefulSets(namespace).Get(name)
-		statefulSetLister: statefulSetInformer.Lister(),
-		// statefulSetListerSynced used in waitForCacheSync()
+		chopConfig:              chopConfig,
+		kubeClient:              kubeClient,
+		chopClient:              chopClient,
+		chiLister:               chiInformer.Lister(),
+		chiListerSynced:         chiInformer.Informer().HasSynced,
+		serviceLister:           serviceInformer.Lister(),
+		serviceListerSynced:     serviceInformer.Informer().HasSynced,
+		endpointsLister:         endpointsInformer.Lister(),
+		endpointsListerSynced:   endpointsInformer.Informer().HasSynced,
+		configMapLister:         configMapInformer.Lister(),
+		configMapListerSynced:   configMapInformer.Informer().HasSynced,
+		statefulSetLister:       statefulSetInformer.Lister(),
 		statefulSetListerSynced: statefulSetInformer.Informer().HasSynced,
-
-		// podLister used as statefulSetLister.StatefulSets(namespace).Get(name)
-		podLister: podInformer.Lister(),
-		// podListerSynced used in waitForCacheSync()
-		podListerSynced: podInformer.Informer().HasSynced,
-
-		// queue used to organize events queue processed by operator
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
-
-		// not used explicitly
-		recorder: recorder,
-
-		// export metrics to Prometheus
-		metricsExporter: chopMetricsExporter,
+		podLister:               podInformer.Lister(),
+		podListerSynced:         podInformer.Informer().HasSynced,
+		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
+		recorder:                recorder,
+		metricsExporter:         chopMetricsExporter,
 	}
 
 	chiInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -481,7 +453,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted, fmt.Sprintf("onAddChi(%s/%s)", chi.Namespace, chi.Name))
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
-	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.ListPodFQDNs(chi))
+	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.CreatePodFQDNsOfChi(chi))
 
 	return nil
 }
@@ -563,7 +535,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	}
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
-	c.metricsExporter.EnsureControlledValues(new.Name, chopmodels.ListPodFQDNs(new))
+	c.metricsExporter.EnsureControlledValues(new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 
 	return nil
 }

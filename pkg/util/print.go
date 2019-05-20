@@ -12,29 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package models
+package util
 
 import (
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"gopkg.in/yaml.v2"
+	"fmt"
+	"io"
 )
 
-func ListPodFQDNs(chi *chiv1.ClickHouseInstallation) []string {
-
-	names := make([]string, 0)
-	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
-		names = append(names, CreatePodFQDN(replica))
-		return nil
-	}
-	chi.WalkReplicas(replicaProcessor)
-	return names
-}
-
-
-func Yaml(chi *chiv1.ClickHouseInstallation) string {
-	if data, err := yaml.Marshal(chi); err != nil {
-		return ""
-	} else {
-		return string(data)
-	}
+// Fprintf suppresses warning for unused returns of fmt.Fprintf()
+func Fprintf(w io.Writer, format string, a ...interface{}) {
+	_, _ = fmt.Fprintf(w, format, a...)
 }

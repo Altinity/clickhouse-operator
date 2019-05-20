@@ -15,11 +15,15 @@
 package models
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"io"
+	"gopkg.in/yaml.v2"
+
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-// fprintf suppresses warning for unused returns of fmt.Fprintf()
-func fprintf(w io.Writer, format string, a ...interface{}) {
-	util.Fprintf(w, format, a...)
+func Yaml(chi *chi.ClickHouseInstallation) string {
+	if data, err := yaml.Marshal(chi); err != nil {
+		return ""
+	} else {
+		return string(data)
+	}
 }

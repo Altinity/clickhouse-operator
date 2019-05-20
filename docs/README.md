@@ -14,6 +14,6 @@
 1. [prometheus_setup.md](./prometheus_setup.md) - how to setup Prometheus
 1. [quick-start.md](./quick-start.md) - quick start
 1. [replication_setup.md](./replication_setup.md) - how to setup replication
-1. [schema_migration.md](./schema_migration.md) - how operator migrates shena during cluster resize
+1. [schema_migration.md](./schema_migration.md) - how operator migrates schema during cluster resize
 1. [storage.md](./storage.md) - storage explained
 1. [zookeeper_setup.md](./zookeeper_setup.md) - how to setup zookeeper

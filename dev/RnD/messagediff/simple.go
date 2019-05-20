@@ -103,9 +103,9 @@ func ex7() (struct5, struct5) {
 			{
 				s3: struct3{
 					s2: struct2{
-						A:1,
-						b:2,
-						C:[]int{1},
+						A: 1,
+						b: 2,
+						C: []int{1},
 					},
 				},
 			},
@@ -126,9 +126,9 @@ func ex7() (struct5, struct5) {
 			{
 				s3: struct3{
 					s2: struct2{
-						A:1,
-						b:2,
-						C:[]int{1},
+						A: 1,
+						b: 2,
+						C: []int{1},
 					},
 				},
 			},
@@ -144,9 +144,9 @@ func ex8() (struct5, struct5) {
 			{
 				s3: struct3{
 					s2: struct2{
-						A:1,
-						b:2,
-						C:[]int{1},
+						A: 1,
+						b: 2,
+						C: []int{1},
 					},
 				},
 			},
@@ -158,9 +158,9 @@ func ex8() (struct5, struct5) {
 			{
 				s3: struct3{
 					s2: struct2{
-						A:1,
-						b:2,
-						C:[]int{1},
+						A: 1,
+						b: 2,
+						C: []int{1},
 					},
 				},
 			},
@@ -185,9 +185,9 @@ func ex9() (struct5, struct5) {
 			{
 				s3: struct3{
 					s2: struct2{
-						A:1,
-						b:2,
-						C:[]int{1},
+						A: 1,
+						b: 2,
+						C: []int{1},
 					},
 				},
 			},
@@ -199,9 +199,9 @@ func ex9() (struct5, struct5) {
 			{
 				s3: struct3{
 					s2: struct2{
-						A:1,
-						b:2,
-						C:[]int{1, 1},
+						A: 1,
+						b: 2,
+						C: []int{1, 1},
 					},
 				},
 			},

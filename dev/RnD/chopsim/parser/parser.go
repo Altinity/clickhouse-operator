@@ -348,23 +348,23 @@ func (chi *ClickHouseInstallation) createConfigMapObjects(data map[string]string
 	return cmList
 }
 
-// Returns list of services: 
+// Returns list of services:
 // one service per pod with internal name, and one service for installation itself that should finally bind to:
 // clickhouse-<installation_name>.<namespace>.svc.cluster.local
 func (chi *ClickHouseInstallation) createServiceObjects(o *genOptions) serviceList {
 	svcList := make(serviceList, 0, len(o.ssNames)+1)
 	ports := []serviceSpecPort{
 		{
-			Name: "rpc",
+			Name: "http",
+			Port: 8123,
+		},
+		{
+			Name: "client",
 			Port: 9000,
 		},
 		{
 			Name: "interserver",
 			Port: 9009,
-		},
-		{
-			Name: "rest",
-			Port: 8123,
 		},
 	}
 	for ssName := range o.ssNames {
