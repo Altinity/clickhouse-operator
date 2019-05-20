@@ -18,7 +18,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/config"
 	"net/http"
 	"os"
 	"os/signal"
@@ -27,6 +26,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/altinity/clickhouse-operator/pkg/config"
+	"github.com/altinity/clickhouse-operator/pkg/version"
 
 	chopmetrics "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
@@ -40,9 +42,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
-
-// Version defines current build versionRequest
-const Version = "0.2.2"
 
 // Prometheus exporter defaults
 const (
@@ -164,11 +163,11 @@ func LogRuntimeParams() {
 // Run is an entry point of the application
 func Run() {
 	if versionRequest {
-		fmt.Printf("%s\n", Version)
+		fmt.Printf("%s\n", version.Version)
 		os.Exit(0)
 	}
 
-	glog.V(1).Infof("Starting clickhouse-operator version '%s'\n", Version)
+	glog.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
 	LogRuntimeParams()
 
 	chopConfig, err := config.GetConfig(chopConfigFile)
@@ -208,7 +207,7 @@ func Run() {
 
 	// Creating resource Controller
 	chiController := chi.CreateController(
-		Version,
+		version.Version,
 		chopConfig,
 		chopClient,
 		kubeClient,
