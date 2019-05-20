@@ -117,12 +117,13 @@ const (
 	// Ex.: test
 	chiServiceNamePattern = "clickhouse-%s"
 
-	chiServiceFQDNPattern = chiServiceNamePattern + "." + namespaceDomainPattern
+	// ServiceName.domain.name
+	chiServiceFQDNPattern = "%s" + "." + namespaceDomainPattern
 
 	// podFQDNPattern consists of 3 parts:
 	// 1. nameless service of of stateful set
 	// 2. namespace name
-	// hostname.domain.name
+	// Hostname.domain.name
 	podFQDNPattern = "%s" + "." + namespaceDomainPattern
 
 	// podNamePattern is a name of a Pod as ServiceName-0

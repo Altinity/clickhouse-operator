@@ -31,8 +31,12 @@ func createClusterNameID(name string) string {
 	return util.CreateStringID(name, 4)
 }
 
-func nameSectionChi(replica *chop.ChiReplica) string {
+func nameSectionChiReplica(replica *chop.ChiReplica) string {
 	return createChiNameID(replica.Address.ChiName)
+}
+
+func nameSectionChi(chi *chop.ClickHouseInstallation) string {
+	return createChiNameID(chi.Name)
 }
 
 func nameSectionCluster(replica *chop.ChiReplica) string {
@@ -51,7 +55,7 @@ func nameSectionReplica(replica *chop.ChiReplica) string {
 func CreateConfigMapPodName(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		configMapDeploymentNamePattern,
-		nameSectionChi(replica),
+		nameSectionChiReplica(replica),
 		nameSectionCluster(replica),
 		nameSectionShard(replica),
 		nameSectionReplica(replica),
@@ -62,7 +66,7 @@ func CreateConfigMapPodName(replica *chop.ChiReplica) string {
 func CreateConfigMapCommonName(chi *chop.ClickHouseInstallation) string {
 	return fmt.Sprintf(
 		configMapCommonNamePattern,
-		createChiNameID(chi.Name),
+		nameSectionChi(chi),
 	)
 }
 
@@ -70,7 +74,7 @@ func CreateConfigMapCommonName(chi *chop.ClickHouseInstallation) string {
 func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
 	return fmt.Sprintf(
 		configMapCommonUsersNamePattern,
-		createChiNameID(chi.Name),
+		nameSectionChi(chi),
 	)
 }
 
@@ -86,7 +90,7 @@ func CreateChiServiceName(chi *chop.ClickHouseInstallation) string {
 func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
 	return fmt.Sprintf(
 		chiServiceFQDNPattern,
-		chi.Name,
+		CreateChiServiceName(chi),
 		chi.Namespace,
 	)
 }
@@ -95,7 +99,7 @@ func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
 func CreateStatefulSetName(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		statefulSetNamePattern,
-		nameSectionChi(replica),
+		nameSectionChiReplica(replica),
 		nameSectionCluster(replica),
 		nameSectionShard(replica),
 		nameSectionReplica(replica),
@@ -106,7 +110,7 @@ func CreateStatefulSetName(replica *chop.ChiReplica) string {
 func CreateStatefulSetServiceName(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		statefulSetServiceNamePattern,
-		nameSectionChi(replica),
+		nameSectionChiReplica(replica),
 		nameSectionCluster(replica),
 		nameSectionShard(replica),
 		nameSectionReplica(replica),
