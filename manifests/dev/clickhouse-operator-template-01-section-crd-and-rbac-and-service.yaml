@@ -19,6 +19,23 @@ spec:
     plural: clickhouseinstallations
     shortNames:
       - chi
+  additionalPrinterColumns:
+    - name: version
+      type: string
+      description: Operator version
+      JSONPath: .status.version
+    - name: clusters
+      type: integer
+      description: Clusters number
+      JSONPath: .status.clustersCount
+    - name: replicas
+      type: integer
+      description: Replicas count
+      JSONPath: .status.replicasCount
+    - name: endpoint
+      type: string
+      description: Client access endpoint
+      JSONPath: .status.endpoint
   validation:
     openAPIV3Schema:
       properties:

@@ -57,7 +57,7 @@ func (n *Normalizer) DoChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouse
 	n.doConfiguration(&n.chi.Spec.Configuration)
 	// ChiSpec.Templates
 
-	n.chi.SetKnown()
+	n.chi.StatusFill(CreateChiServiceFQDN(chi))
 
 	return n.chi, nil
 }
