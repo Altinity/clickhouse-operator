@@ -67,6 +67,10 @@ var (
 	metricsEP string
 )
 
+var (
+	runtimeParams map[string]string
+)
+
 func init() {
 	flag.BoolVar(&versionRequest, "version", false, "Display versionRequest and exit")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
@@ -154,7 +158,7 @@ func GetRuntimeParams() map[string]string {
 }
 
 func LogRuntimeParams() {
-	runtimeParams := GetRuntimeParams()
+	runtimeParams = GetRuntimeParams()
 	for name, value := range runtimeParams {
 		glog.V(1).Infof("%s=%s\n", name, value)
 	}
@@ -208,6 +212,7 @@ func Run() {
 	// Creating resource Controller
 	chiController := chi.CreateController(
 		version.Version,
+		runtimeParams,
 		chopConfig,
 		chopClient,
 		kubeClient,

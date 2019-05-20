@@ -46,6 +46,7 @@ import (
 // CreateController creates instance of Controller
 func CreateController(
 	version string,
+	runtimeParams map[string]string,
 	chopConfig *config.Config,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
@@ -77,6 +78,7 @@ func CreateController(
 	// Create Controller instance
 	controller := &Controller{
 		version:                 version,
+		runtimeParams: runtimeParams,
 		normalizer:              chopmodels.NewNormalizer(chopConfig),
 		chopConfig:              chopConfig,
 		kubeClient:              kubeClient,
@@ -347,6 +349,16 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 	) {
 		// Unable to sync
 		return
+	}
+
+	// Label operator's Pod with version label
+	podname, ok1 := c.runtimeParams["OPERATOR_POD_NAME"]
+	namespace, ok2 := c.runtimeParams["OPERATOR_POD_NAMESPACE"]
+	if ok1 && ok2 {
+		if pod, err := c.podLister.Pods(namespace).Get(podname); err == nil {
+			pod.Labels["version"] = c.version
+			c.kubeClient.CoreV1().Pods(namespace).Update(pod)
+		}
 	}
 
 	glog.V(1).Info("ClickHouseInstallation controller: starting workers")

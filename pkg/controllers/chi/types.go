@@ -34,6 +34,7 @@ import (
 // Controller defines CRO controller
 type Controller struct {
 	version string
+	runtimeParams map[string]string
 
 	normalizer *models.Normalizer
 
