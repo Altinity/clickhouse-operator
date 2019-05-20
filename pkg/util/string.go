@@ -32,56 +32,79 @@ func RandomString() string {
 // IsStringBool checks whether str is a string as bool value
 func IsStringBool(str string) bool {
 	switch strings.ToLower(str) {
-	case "0": return true
-	case "1": return true
+	case "0":
+		return true
+	case "1":
+		return true
 
-	case "false": return true
-	case "true": return true
+	case "false":
+		return true
+	case "true":
+		return true
 
-	case "no": return true
-	case "yes": return true
+	case "no":
+		return true
+	case "yes":
+		return true
 
-	case "off": return true
-	case "on": return true
+	case "off":
+		return true
+	case "on":
+		return true
 
-	case "disabled": return true
-	case "enabled": return true
+	case "disabled":
+		return true
+	case "enabled":
+		return true
 
-	default: return false
+	default:
+		return false
 	}
 }
 
 // IsStringBool checks whether str is a string as bool "false" value
 func IsStringBoolFalse(str string) bool {
 	switch strings.ToLower(str) {
-	case "0": return true
+	case "0":
+		return true
 
-	case "false": return true
+	case "false":
+		return true
 
-	case "no": return true
+	case "no":
+		return true
 
-	case "off": return true
+	case "off":
+		return true
 
-	case "disabled": return true
+	case "disabled":
+		return true
 
-	default: return false
+	default:
+		return false
 	}
 }
 
 // IsStringBool checks whether str is a string as bool "true" value
 func IsStringBoolTrue(str string) bool {
 	switch strings.ToLower(str) {
-	case "1": return true
+	case "1":
+		return true
 
-	case "true": return true
+	case "true":
+		return true
 
-	case "yes": return true
+	case "yes":
+		return true
 
-	case "on": return true
+	case "on":
+		return true
 
-	case "enabled": return true
+	case "enabled":
+		return true
 
-	default: return false
+	default:
+		return false
 	}
 }
 

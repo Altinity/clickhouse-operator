@@ -17,6 +17,7 @@ package models
 import (
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"strconv"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	apps "k8s.io/api/apps/v1"
@@ -30,30 +31,46 @@ func createClusterNameID(name string) string {
 	return util.CreateStringID(name, 4)
 }
 
+func nameSectionChi(replica *chop.ChiReplica) string {
+	return createChiNameID(replica.Address.ChiName)
+}
+
+func nameSectionCluster(replica *chop.ChiReplica) string {
+	return createClusterNameID(replica.Address.ClusterName)
+}
+
+func nameSectionShard(replica *chop.ChiReplica) string {
+	return strconv.Itoa(replica.Address.ShardIndex)
+}
+
+func nameSectionReplica(replica *chop.ChiReplica) string {
+	return strconv.Itoa(replica.Address.ReplicaIndex)
+}
+
 // CreateConfigMapPodName returns a name for a ConfigMap for replica's pod
 func CreateConfigMapPodName(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		configMapDeploymentNamePattern,
-		createChiNameID(replica.Address.ChiName),
-		createClusterNameID(replica.Address.ClusterName),
-		replica.Address.ShardIndex,
-		replica.Address.ReplicaIndex,
+		nameSectionChi(replica),
+		nameSectionCluster(replica),
+		nameSectionShard(replica),
+		nameSectionReplica(replica),
 	)
 }
 
 // CreateConfigMapCommonName returns a name for a ConfigMap for replica's common chopConfig
-func CreateConfigMapCommonName(chiName string) string {
+func CreateConfigMapCommonName(chi *chop.ClickHouseInstallation) string {
 	return fmt.Sprintf(
 		configMapCommonNamePattern,
-		createChiNameID(chiName),
+		createChiNameID(chi.Name),
 	)
 }
 
 // CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common chopConfig
-func CreateConfigMapCommonUsersName(chiName string) string {
+func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
 	return fmt.Sprintf(
 		configMapCommonUsersNamePattern,
-		createChiNameID(chiName),
+		createChiNameID(chi.Name),
 	)
 }
 
@@ -78,10 +95,10 @@ func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
 func CreateStatefulSetName(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		statefulSetNamePattern,
-		createChiNameID(replica.Address.ChiName),
-		createClusterNameID(replica.Address.ClusterName),
-		replica.Address.ShardIndex,
-		replica.Address.ReplicaIndex,
+		nameSectionChi(replica),
+		nameSectionCluster(replica),
+		nameSectionShard(replica),
+		nameSectionReplica(replica),
 	)
 }
 
@@ -89,23 +106,17 @@ func CreateStatefulSetName(replica *chop.ChiReplica) string {
 func CreateStatefulSetServiceName(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		statefulSetServiceNamePattern,
-		createChiNameID(replica.Address.ChiName),
-		createClusterNameID(replica.Address.ClusterName),
-		replica.Address.ShardIndex,
-		replica.Address.ReplicaIndex,
+		nameSectionChi(replica),
+		nameSectionCluster(replica),
+		nameSectionShard(replica),
+		nameSectionReplica(replica),
 	)
 }
 
 // CreatePodHostname returns a name of a Pod resource for replica
-// ss-1eb454-2-0
 func CreatePodHostname(replica *chop.ChiReplica) string {
-	return fmt.Sprintf(
-		podHostnamePattern,
-		createChiNameID(replica.Address.ChiName),
-		createClusterNameID(replica.Address.ClusterName),
-		replica.Address.ShardIndex,
-		replica.Address.ReplicaIndex,
-	)
+	// Pod has no own hostname - redirect to appropriate Service
+	return CreateStatefulSetServiceName(replica)
 }
 
 // CreateNamespaceDomainName creates domain name of a namespace
@@ -119,10 +130,7 @@ func CreateNamespaceDomainName(chiNamespace string) string {
 func CreatePodFQDN(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		podFQDNPattern,
-		createChiNameID(replica.Address.ChiName),
-		createClusterNameID(replica.Address.ClusterName),
-		replica.Address.ShardIndex,
-		replica.Address.ReplicaIndex,
+		CreatePodHostname(replica),
 		replica.Address.Namespace,
 	)
 }

@@ -94,8 +94,8 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
 	// chi-b3d29f-common-usersd    0      61s
 	// service/clickhouse-example-01         LoadBalancer   10.106.183.200   <pending>     8123:31607/TCP,9000:31492/TCP,9009:31357/TCP   33s   clickhouse.altinity.com/chi=example-01
 
-	configMapCommon := chopmodels.CreateConfigMapCommonName(chi.Name)
-	configMapCommonUsersName := chopmodels.CreateConfigMapCommonUsersName(chi.Name)
+	configMapCommon := chopmodels.CreateConfigMapCommonName(chi)
+	configMapCommonUsersName := chopmodels.CreateConfigMapCommonUsersName(chi)
 
 	// Delete ConfigMap
 	err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommon, newDeleteOptions())

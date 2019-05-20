@@ -97,14 +97,14 @@ const (
 const (
 	// NAME                           READY   AGE   CONTAINERS    IMAGES
 	// statefulset.apps/ss-1eb454-1   0/1     2s    ss-1eb454-1   yandex/clickhouse-server:latest
-	statefulSetNamePattern = "chi-%s-%s-%d-%d"
+	statefulSetNamePattern = "chi-%s-%s-%s-%s"
 
 	// NAME                  TYPE       CLUSTER-IP  EXTERNAL-IP  PORT(S)                     AGE  SELECTOR
 	// service/svc-1eb454-1  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-1
 	// service/svc-1eb454-2  ClusterIP  None        <none>       9000/TCP,9009/TCP,8123/TCP  2s   clickhouse.altinity.com/app=ss-1eb454-2
 	// In this pattern "%s" is substituted with fullDeploymentIDPattern-generated value
 	// Ex.: svc-1eb454-2
-	statefulSetServiceNamePattern = "chi-%s-%s-%d-%d"
+	statefulSetServiceNamePattern = "chi-%s-%s-%s-%s"
 
 	// namespaceDomainPattern presents Domain Name pattern of a namespace
 	// In this pattern "%s" is substituted namespace name's value
@@ -119,17 +119,11 @@ const (
 
 	chiServiceFQDNPattern = chiServiceNamePattern + "." + namespaceDomainPattern
 
-	// NAME                READY   STATUS    RESTARTS   AGE   IP            NODE   NOMINATED NODE   READINESS GATES
-	// pod/ss-1eb454-2   1/1     Running   0          11h   10.244.1.17   kub2   <none>           <none>
-	// Ex.: ss-1eb454-2
-	podHostnamePattern = statefulSetServiceNamePattern
-
 	// podFQDNPattern consists of 3 parts:
 	// 1. nameless service of of stateful set
 	// 2. namespace name
-	// 3.
-	// ss-1eb454-2-0.my-dev-domain.svc.cluster.local
-	podFQDNPattern = podHostnamePattern + "." + namespaceDomainPattern
+	// hostname.domain.name
+	podFQDNPattern = "%s" + "." + namespaceDomainPattern
 
 	// podNamePattern is a name of a Pod as ServiceName-0
 	podNamePattern = "%s-0"
@@ -149,7 +143,7 @@ const (
 
 	// configMapDeploymentNamePattern is a template of macros ConfigMap
 	// Ex.: chi-example02-deploy-confd-33260f1800-2 for chi named as 'example02'
-	configMapDeploymentNamePattern = "chi-%s-deploy-confd-%s-%d-%d"
+	configMapDeploymentNamePattern = "chi-%s-deploy-confd-%s-%s-%s"
 
 	distributedDDLPattern = "/clickhouse/%s/task_queue/ddl"
 )

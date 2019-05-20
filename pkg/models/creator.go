@@ -124,7 +124,7 @@ func (c *Creator) createConfigMapObjectsCommon() ConfigMapList {
 		configMapList,
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      CreateConfigMapCommonName(c.chi.Name),
+				Name:      CreateConfigMapCommonName(c.chi),
 				Namespace: c.chi.Namespace,
 				Labels: map[string]string{
 					LabelChop: c.appVersion,
@@ -141,7 +141,7 @@ func (c *Creator) createConfigMapObjectsCommon() ConfigMapList {
 		configMapList,
 		&corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      CreateConfigMapCommonUsersName(c.chi.Name),
+				Name:      CreateConfigMapCommonUsersName(c.chi),
 				Namespace: c.chi.Namespace,
 				Labels: map[string]string{
 					LabelChop: c.appVersion,
@@ -423,8 +423,8 @@ func (c *Creator) setupConfigMapVolumes(
 	replica *chiv1.ChiReplica,
 ) {
 	configMapMacrosName := CreateConfigMapPodName(replica)
-	configMapCommonName := CreateConfigMapCommonName(replica.Address.ChiName)
-	configMapCommonUsersName := CreateConfigMapCommonUsersName(replica.Address.ChiName)
+	configMapCommonName := CreateConfigMapCommonName(c.chi)
+	configMapCommonUsersName := CreateConfigMapCommonUsersName(c.chi)
 
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
 	statefulSetObject.Spec.Template.Spec.Volumes = append(

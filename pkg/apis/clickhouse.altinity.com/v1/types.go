@@ -97,7 +97,7 @@ type ChiLayout struct {
 type ChiShard struct {
 	// DEPRECATED - to be removed soon
 	DefinitionType      string           `json:"definitionType"`
-	Name string `json:"name,omitempty"`
+	Name                string           `json:"name,omitempty"`
 	Weight              int              `json:"weight,omitempty"`
 	InternalReplication string           `json:"internalReplication,omitempty"`
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
@@ -159,7 +159,7 @@ type ChiPodTemplate struct {
 	Spec corev1.PodSpec `json:"spec" yaml:"spec"`
 }
 
-// ChiVolumeClaimTemplate defines PeristentVolumeClaim Template, directly used by StatefulSet
+// ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
 type ChiVolumeClaimTemplate struct {
 	Name string                           `json:"name" yaml:"name"`
 	Spec corev1.PersistentVolumeClaimSpec `json:"spec" yaml:"spec"`
