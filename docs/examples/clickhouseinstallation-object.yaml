@@ -74,7 +74,6 @@ spec:
           podTemplate: clickhouse-v18.16.1
           volumeClaimTemplate: default-volume-claim
         layout:
-          type: Standard
           shardsCount: 3
           replicasCount: 2
 
@@ -83,7 +82,6 @@ spec:
           podTemplate: clickhouse-v18.16.1
           volumeClaimTemplate: default-volume-claim
         layout:
-          type: Standard
           shardsCount: 3
           # replicasCount not specified, assumed = 1, by default
 
@@ -92,7 +90,6 @@ spec:
           podTemplate: clickhouse-v18.16.1
           volumeClaimTemplate: default-volume-claim
         layout:
-          type: Standard
           # shardsCount not specified, assumed = 1, by default
           replicasCount: 4
 
@@ -101,9 +98,8 @@ spec:
           podTemplate: clickhouse-v18.16.1
           volumeClaimTemplate: default-volume-claim
         layout:
-          type: Advanced
           shards:
-            - definitionType: ReplicasCount
+            - name: shard0
               replicasCount: 2
               weight: 1
               internalReplication: Disabled
@@ -111,18 +107,19 @@ spec:
                 podTemplate: clickhouse-v18.16.1
                 volumeClaimTemplate: default-volume-claim
 
-            - definitionType: ReplicasCount
+            - name: shard1
               replicasCount: 3
               templates:
                 podTemplate: clickhouse-v18.16.1
                 volumeClaimTemplate: default-volume-claim
 
-            - definitionType: Replicas
+            - name: shard2
               templates:
                 podTemplate: clickhouse-v18.16.1
                 volumeClaimTemplate: default-volume-claim
               replicas:
-                - port: 9000
+                - name: replica0
+                  port: 9000
                   templates:
                     podTemplate: clickhouse-v18.16.1
                     volumeClaimTemplate: default-volume-claim

@@ -59,13 +59,16 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 		shard.Address.ChiName = chi.Name
 		shard.Address.ClusterName = cluster.Name
 		shard.Address.ClusterIndex = clusterIndex
+		shard.Address.ShardName = shard.Name
 		shard.Address.ShardIndex = shardIndex
 
 		replica.Address.Namespace = chi.Namespace
 		replica.Address.ChiName = chi.Name
 		replica.Address.ClusterName = cluster.Name
 		replica.Address.ClusterIndex = clusterIndex
+		replica.Address.ShardName = shard.Name
 		replica.Address.ShardIndex = shardIndex
+		replica.Address.ReplicaName = replica.Name
 		replica.Address.ReplicaIndex = replicaIndex
 		replica.Address.GlobalReplicaIndex = replicasCount
 

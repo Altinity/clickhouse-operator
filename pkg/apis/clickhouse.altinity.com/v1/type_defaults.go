@@ -19,7 +19,7 @@ func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults) {
 		return
 	}
 
-	if from.ReplicasUseFQDN > 0 {
+	if from.ReplicasUseFQDN == "" {
 		defaults.ReplicasUseFQDN = from.ReplicasUseFQDN
 	}
 	(&defaults.DistributedDDL).MergeFrom(&from.DistributedDDL)

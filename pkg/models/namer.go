@@ -15,27 +15,19 @@
 package models
 
 import (
-	"crypto/sha1"
-	"encoding/hex"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	apps "k8s.io/api/apps/v1"
 )
 
-func createStringID(str string, hashLen int) string {
-	hasher := sha1.New()
-	hasher.Write([]byte(str))
-	hash := hex.EncodeToString(hasher.Sum(nil))
-	return hash[len(hash)-hashLen:]
-}
-
 func createChiNameID(name string) string {
-	return createStringID(name, 6)
+	return util.CreateStringID(name, 6)
 }
 
 func createClusterNameID(name string) string {
-	return createStringID(name, 4)
+	return util.CreateStringID(name, 4)
 }
 
 // CreateConfigMapPodName returns a name for a ConfigMap for replica's pod

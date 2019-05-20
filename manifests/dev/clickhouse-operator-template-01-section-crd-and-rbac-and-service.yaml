@@ -31,9 +31,17 @@ spec:
               type: object
               properties:
                 replicasUseFQDN:
-                  type: integer
-                  minimum: 0
-                  maximum: 1
+                  enum:
+                    - 0
+                    - 1
+                    - False
+                    - True
+                    - No
+                    - Yes
+                    - Off
+                    - On
+                    - Disabled
+                    - Enabled
                 distributedDDL:
                   type: object
                   properties:
@@ -58,6 +66,8 @@ spec:
                       type: array
                       items:
                         type: object
+                        required:
+                          - host
                         properties:
                           host:
                             type: string
@@ -97,9 +107,8 @@ spec:
                             type: string
                       layout:
                         type: object
-                        required:
-                          - type
                         properties:
+                          # DEPRECATED - to be removed soon
                           type:
                             enum:
                               - Standard
@@ -112,9 +121,10 @@ spec:
                             type: array
                             items:
                               type: object
-                              required:
-                                - definitionType
                               properties:
+                                name:
+                                  type: string
+                                # DEPRECATED - to be removed soon
                                 definitionType:
                                   enum:
                                     - ReplicasCount
@@ -126,6 +136,14 @@ spec:
                                   type: integer
                                 internalReplication:
                                   enum:
+                                    - 0
+                                    - 1
+                                    - False
+                                    - True
+                                    - No
+                                    - Yes
+                                    - Off
+                                    - On
                                     - Disabled
                                     - Enabled
                                 templates:
@@ -140,6 +158,8 @@ spec:
                                   items:
                                     type: object
                                     properties:
+                                      name:
+                                        type: string
                                       port:
                                         type: integer
                                         minimum: 1

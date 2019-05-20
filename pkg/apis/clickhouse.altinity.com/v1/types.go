@@ -45,7 +45,7 @@ type ChiStatus struct {
 
 // ChiDefaults defines defaults section of .spec
 type ChiDefaults struct {
-	ReplicasUseFQDN int               `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN"`
+	ReplicasUseFQDN string            `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN"`
 	DistributedDDL  ChiDistributedDDL `json:"distributedDDL,omitempty"  yaml:"distributedDDL"`
 	Templates       ChiTemplateNames  `json:"templates" yaml:"templates"`
 }
@@ -86,6 +86,7 @@ type ChiClusterAddress struct {
 
 // ChiLayout defines layout section of .spec.configuration.clusters
 type ChiLayout struct {
+	// DEPRECATED - to be removed soon
 	Type          string     `json:"type"`
 	ShardsCount   int        `json:"shardsCount,omitempty"`
 	ReplicasCount int        `json:"replicasCount,omitempty"`
@@ -94,11 +95,13 @@ type ChiLayout struct {
 
 // ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
 type ChiShard struct {
+	// DEPRECATED - to be removed soon
 	DefinitionType      string           `json:"definitionType"`
-	ReplicasCount       int              `json:"replicasCount,omitempty"`
+	Name string `json:"name,omitempty"`
 	Weight              int              `json:"weight,omitempty"`
 	InternalReplication string           `json:"internalReplication,omitempty"`
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
+	ReplicasCount       int              `json:"replicasCount,omitempty"`
 	Replicas            []ChiReplica     `json:"replicas,omitempty"`
 
 	Address ChiShardAddress `json:"address"`
@@ -110,11 +113,13 @@ type ChiShardAddress struct {
 	ChiName      string `json:"chiName"`
 	ClusterName  string `json:"clusterName"`
 	ClusterIndex int    `json:"clusterIndex"`
+	ShardName    string `json:"shardName,omitempty"`
 	ShardIndex   int    `json:"shardIndex"`
 }
 
 // ChiReplica defines item of a replicas section of .spec.configuration.clusters[n].shards[m]
 type ChiReplica struct {
+	Name      string           `json:"name,omitempty"`
 	Port      int32            `json:"port,omitempty"`
 	Templates ChiTemplateNames `json:"templates,omitempty"`
 
@@ -128,7 +133,9 @@ type ChiReplicaAddress struct {
 	ChiName            string `json:"chiName"`
 	ClusterName        string `json:"clusterName"`
 	ClusterIndex       int    `json:"clusterIndex"`
+	ShardName          string `json:"shardName,omitempty"`
 	ShardIndex         int    `json:"shardIndex"`
+	ReplicaName        string `json:"replicaName,omitempty"`
 	ReplicaIndex       int    `json:"replicaIndex"`
 	GlobalReplicaIndex int    `json:"globalReplicaIndex"`
 }

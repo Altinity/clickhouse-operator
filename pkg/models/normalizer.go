@@ -17,7 +17,9 @@ package models
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopconfig "github.com/altinity/clickhouse-operator/pkg/config"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -53,7 +55,7 @@ func (n *Normalizer) DoChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouse
 	// Walk over ChiSpec datatype fields
 	n.doDefaults(&n.chi.Spec.Defaults)
 	n.doConfiguration(&n.chi.Spec.Configuration)
-	n.doClusters()
+	// ChiSpec.Templates
 
 	n.chi.SetKnown()
 
@@ -73,6 +75,9 @@ func (n *Normalizer) doConfiguration(conf *chiv1.ChiConfiguration) {
 	n.doConfigurationProfiles(&conf.Profiles)
 	n.doConfigurationQuotas(&conf.Quotas)
 	n.doConfigurationSettings(&conf.Settings)
+
+	// ChiConfiguration.Clusters
+	n.doClusters()
 }
 
 // doClusters normalizes clusters
@@ -160,13 +165,12 @@ func (n *Normalizer) doCluster(cluster *chiv1.ChiCluster) error {
 		// Convenience wrapper
 		shard := &layout.Shards[shardIndex]
 
-		// Normalize a shard
-
+		// Normalize a shard - walk over all fields
+		n.doShardName(shard, shardIndex)
+		n.doShardWeight(shard)
+		n.doShardInternalReplication(shard)
 		// For each shard of this normalized cluster inherit cluster's PodTemplate
 		shard.InheritTemplates(cluster)
-		// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
-		// Default value set to "true"
-		n.doShardInternalReplication(shard)
 		// Normalize Replicas
 		n.doShardReplicasCount(shard, layout.ReplicasCount)
 		n.doShardReplicas(shard)
@@ -177,52 +181,94 @@ func (n *Normalizer) doCluster(cluster *chiv1.ChiCluster) error {
 
 // doLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
 func (n *Normalizer) doLayoutShardsCountAndReplicasCount(layout *chiv1.ChiLayout) {
-	if len(layout.Shards) > 0 {
-		// We have Shards specified as slice - ok, this means exact ShardsCount is known
-		layout.ShardsCount = len(layout.Shards)
-	} else if layout.ShardsCount == 0 {
-		// Neither ShardsCount nor Shards are specified, assume 1 as default value
-		layout.ShardsCount = 1
-	} else {
-		// ShardsCount specified explicitly, Just use it
+	if layout.ShardsCount == 0 {
+		// We can look for explicitly specified Shards slice
+		if len(layout.Shards) > 0 {
+			// We have Shards specified as slice - ok, this means exact ShardsCount is known
+			layout.ShardsCount = len(layout.Shards)
+		} else {
+			// Neither ShardsCount nor Shards are specified, assume 1 as default value
+			layout.ShardsCount = 1
+		}
 	}
 
+	// Here layout.ShardsCount is specified
+
+	// layout.ReplicasCount is used in case Shard not opinionated how many replicas it (shard) needs
 	if layout.ReplicasCount == 0 {
-		// In case no ReplicasCount specified use 1 as a default value - it will be used in Standard layout only
+		// In case no ReplicasCount specified use 1 as a default value
 		layout.ReplicasCount = 1
 	}
+
+	// Here layout.ReplicasCount is specified
 }
 
 // doShardReplicasCount ensures shard.ReplicasCount filled properly
 func (n *Normalizer) doShardReplicasCount(shard *chiv1.ChiShard, layoutReplicasCount int) {
-	if len(shard.Replicas) > 0 {
-		// .layout.type: Advanced + definitionType: Replicas
-		// We have Replicas specified as slice - ok, this means exact ReplicasCount is known
-		shard.ReplicasCount = len(shard.Replicas)
-	} else if shard.ReplicasCount == 0 {
-		// We do not have Replicas slice specified
-		// We do not have ReplicasCount specified
-		// Inherit ReplicasCount from layout
-		shard.ReplicasCount = layoutReplicasCount
-	} else {
-		// shard.ReplicasCount > 0 and is Already specified
-		// .layout.type: Advanced + definitionType: ReplicasCount
-		// We have Replicas specified as ReplicasCount
-		// Nothing to do here
+	if shard.ReplicasCount == 0 {
+		// We can look for explicitly specified Replicas
+		if len(shard.Replicas) > 0 {
+			// We have Replicas specified as slice - ok, this means exact ReplicasCount is known
+			shard.ReplicasCount = len(shard.Replicas)
+		} else {
+			// Inherit ReplicasCount from layout
+			shard.ReplicasCount = layoutReplicasCount
+		}
 	}
+}
+
+// doShardName normalizes shard name
+func (n *Normalizer) doShardName(shard *chiv1.ChiShard, index int) {
+	if len(shard.Name) > 0 {
+		// Already has a name
+		return
+	}
+
+	shard.Name = strconv.Itoa(index)
+}
+
+// doShardName normalizes shard weight
+func (n *Normalizer) doShardWeight(shard *chiv1.ChiShard) {
 }
 
 // ensureLayoutShards ensures slice layout.Shards is in place
 func (n *Normalizer) ensureLayoutShards(layout *chiv1.ChiLayout) {
-	if (len(layout.Shards) == 0) && (layout.ShardsCount > 0) {
-		layout.Shards = make([]chiv1.ChiShard, layout.ShardsCount)
+	if layout.ShardsCount <= 0 {
+		// May be need to do something like throw an exception
+		return
+	}
+
+	// Disposition of shards in slice would be
+	// [explicitly specified shards 0..N, N+1..layout.ShardsCount-1 empty slots for to-be-filled shards]
+
+	if len(layout.Shards) == 0 {
+		// No shards specified - just allocate required number
+		layout.Shards = make([]chiv1.ChiShard, layout.ShardsCount, layout.ShardsCount)
+	} else {
+		// Some (may be all) shards specified, need to append space for unspecified shards
+		// TODO may be there is better way to append N slots to slice
+		for len(layout.Shards) < layout.ShardsCount {
+			layout.Shards = append(layout.Shards, chiv1.ChiShard{})
+		}
 	}
 }
 
 // ensureShardReplicas ensures slice shard.Replicas is in place
 func (n *Normalizer) ensureShardReplicas(shard *chiv1.ChiShard) {
-	if (len(shard.Replicas) == 0) && (shard.ReplicasCount > 0) {
+	if shard.ReplicasCount <= 0 {
+		// May be need to do something like throw an exception
+		return
+	}
+
+	if shard.ReplicasCount == 0 {
+		// No replicas specified - just allocate required number
 		shard.Replicas = make([]chiv1.ChiReplica, shard.ReplicasCount)
+	} else {
+		// Some (may be all) replicas specified, need to append space for unspecified replicas
+		// TODO may be there is better way to append N slots to slice
+		for len(shard.Replicas) < shard.ReplicasCount {
+			shard.Replicas = append(shard.Replicas, chiv1.ChiReplica{})
+		}
 	}
 }
 
@@ -235,10 +281,21 @@ func (n *Normalizer) doShardReplicas(shard *chiv1.ChiShard) {
 		replica := &shard.Replicas[replicaIndex]
 
 		// Normalize a replica
+		n.doReplicaName(replica, replicaIndex)
 		n.doReplicaPort(replica)
 		// Inherit PodTemplate from shard
 		replica.InheritTemplates(shard)
 	}
+}
+
+// doReplicaName normalizes replica name
+func (n *Normalizer) doReplicaName(replica *chiv1.ChiReplica, index int) {
+	if len(replica.Name) > 0 {
+		// Already has a name
+		return
+	}
+
+	replica.Name = strconv.Itoa(index)
 }
 
 // doReplicaPort ensures chiv1.ChiReplica.Port is reasonable
@@ -251,26 +308,14 @@ func (n *Normalizer) doReplicaPort(replica *chiv1.ChiReplica) {
 // doShardInternalReplication ensures reasonable values in
 // .spec.configuration.clusters.layout.shards.internalReplication
 func (n *Normalizer) doShardInternalReplication(shard *chiv1.ChiShard) {
-	// Advanced layout supports .spec.configuration.clusters.layout.shards.internalReplication
-	// with default value set to "true"
-	if shard.InternalReplication == shardInternalReplicationDisabled {
-		shard.InternalReplication = stringFalse
-	} else {
-		shard.InternalReplication = stringTrue
-	}
+	// Default value set to true
+	shard.InternalReplication = util.CastStringBoolToTrueFalse(shard.InternalReplication, true)
 }
 
 // doDefaultsReplicasUseFQDN ensures chiv1.ChiDefaults.ReplicasUseFQDN section has proper values
 func (n *Normalizer) doDefaultsReplicasUseFQDN(d *chiv1.ChiDefaults) {
-	// Acceptable values are 0 and 1
-	// So if it is 1 - it is ok and assign 0 for any other values
-	if d.ReplicasUseFQDN == 1 {
-		// Acceptable value
-		return
-	}
-
-	// Assign 0 for any other values (including 0 - rewrite is unimportant)
-	d.ReplicasUseFQDN = 0
+	// Default value set to false
+	d.ReplicasUseFQDN = util.CastStringBoolToTrueFalse(d.ReplicasUseFQDN, false)
 }
 
 // normalizePath normalizes path in .spec.configuration.{users, profiles, quotas, settings} section

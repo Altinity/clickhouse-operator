@@ -19,6 +19,7 @@ import (
 	"fmt"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	xmlbuilder "github.com/altinity/clickhouse-operator/pkg/models/builders/xml"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 const (
@@ -123,7 +124,7 @@ func (c *ClickHouseConfigGenerator) GetZookeeper() string {
 // getRemoteServersReplicaHostname creates hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
 func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(replica *chiv1.ChiReplica) string {
-	if c.chi.Spec.Defaults.ReplicasUseFQDN == 1 {
+	if util.IsStringBoolTrue(c.chi.Spec.Defaults.ReplicasUseFQDN) {
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local
