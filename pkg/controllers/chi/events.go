@@ -51,11 +51,11 @@ const (
 	eventReasonDeleteFailed     = "DeleteFailed"
 )
 
-// createEventChi creates CHI-related event
-// action - what action was attempted (and then succeeded/failed regarding to the Involved Object
-// reason - short, machine understandable string, ex.: SuccessfulCreate
+// eventChi creates CHI-related event
+// typ - type of the event - Normal, Warning, etc, one of eventType*
+// action - what action was attempted, and then succeeded/failed regarding to the Involved Object. One of eventAction*
+// reason - short, machine understandable string, one of eventReason*
 // message - human-readable description
-// typ - type of the event - Normal, Warning, etc
 func (c *Controller) eventChi(
 	chi *chop.ClickHouseInstallation,
 	typ string,
@@ -64,7 +64,7 @@ func (c *Controller) eventChi(
 	message string,
 ) {
 	now := time.Now()
-	event := core.Event{
+	event := &core.Event{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: "chop-chi-",
 		},
@@ -94,7 +94,7 @@ func (c *Controller) eventChi(
 		// ID of the controller instance, e.g. `kubelet-xyzf`.
 		// ReportingInstance:
 	}
-	_, err := c.kubeClient.CoreV1().Events(chi.Namespace).Create(&event)
+	_, err := c.kubeClient.CoreV1().Events(chi.Namespace).Create(event)
 
 	if err != nil {
 		glog.V(1).Infof("Create Event failed: %v\n", err)

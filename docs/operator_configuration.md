@@ -8,11 +8,11 @@ namespaces:
   - info
   - onemore
 
-###########################################
+################################################
 ##
 ## Additional Configuration Files Section
 ##
-###########################################
+################################################
 
 # Path to folder where ClickHouse configuration files common for all instances within CHI are located.
 chCommonConfigsPath: config.d
@@ -28,11 +28,11 @@ chUsersConfigsPath: users.d
 # Manifests are applied in sorted alpha-numeric order
 chiTemplatesPath: templates.d
 
-###########################################
+################################################
 ##
 ## Cluster Create/Update/Delete Objects Section
 ##
-###########################################
+################################################
 
 # How many seconds to wait for created/updated StatefulSet to be Ready
 statefulSetUpdateTimeout: 50
@@ -52,4 +52,21 @@ onStatefulSetCreateFailureAction: delete
 # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
 # Pod would be recreated by StatefulSet based on rollback-ed configuration
 onStatefulSetUpdateFailureAction: rollback
+
+################################################
+##
+## ClickHouse Settings Section
+##
+################################################
+
+# Default values for ClickHouse user configuration
+# 1. user/profile - string
+# 2. user/quota - string
+# 3. user/networks/ip - multiple strings
+# 4. user/password - string
+chConfigUserDefaultProfile: default
+chConfigUserDefaultQuota: default
+chConfigUserDefaultNetworksIP:
+  - "::/0"
+chConfigUserDefaultPassword: "default"
 ```

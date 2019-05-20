@@ -17,6 +17,7 @@ package models
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/config"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"strconv"
 
 	"github.com/golang/glog"
@@ -68,13 +69,13 @@ func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation, config *con
 	// 3. settings
 	// 4. listen
 	configs.commonConfigSections = make(map[string]string)
-	includeNonEmpty(configs.commonConfigSections, filenameRemoteServersXML, generateRemoteServersConfig(chi))
-	includeNonEmpty(configs.commonConfigSections, filenameZookeeperXML, generateZookeeperConfig(chi))
-	includeNonEmpty(configs.commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
-	includeNonEmpty(configs.commonConfigSections, filenameListenXML, generateListenConfig(chi))
+	util.IncludeNonEmpty(configs.commonConfigSections, filenameRemoteServersXML, generateRemoteServersConfig(chi))
+	util.IncludeNonEmpty(configs.commonConfigSections, filenameZookeeperXML, generateZookeeperConfig(chi))
+	util.IncludeNonEmpty(configs.commonConfigSections, filenameSettingsXML, generateSettingsConfig(chi))
+	util.IncludeNonEmpty(configs.commonConfigSections, filenameListenXML, generateListenConfig(chi))
 	// Extra user-specified configs
 	for filename, content := range config.ChCommonConfigs {
-		includeNonEmpty(configs.commonConfigSections, filename, content)
+		util.IncludeNonEmpty(configs.commonConfigSections, filename, content)
 	}
 
 	// commonConfigSections maps section name to section XML config of the following sections:
@@ -82,12 +83,12 @@ func createConfigMapObjectsCommon(chi *chiv1.ClickHouseInstallation, config *con
 	// 2. quotas
 	// 3. profiles
 	configs.commonUsersConfigSections = make(map[string]string)
-	includeNonEmpty(configs.commonUsersConfigSections, filenameUsersXML, generateUsersConfig(chi))
-	includeNonEmpty(configs.commonUsersConfigSections, filenameQuotasXML, generateQuotasConfig(chi))
-	includeNonEmpty(configs.commonUsersConfigSections, filenameProfilesXML, generateProfilesConfig(chi))
+	util.IncludeNonEmpty(configs.commonUsersConfigSections, filenameUsersXML, generateUsersConfig(chi))
+	util.IncludeNonEmpty(configs.commonUsersConfigSections, filenameQuotasXML, generateQuotasConfig(chi))
+	util.IncludeNonEmpty(configs.commonUsersConfigSections, filenameProfilesXML, generateProfilesConfig(chi))
 	// Extra user-specified configs
 	for filename, content := range config.ChUsersConfigs {
-		includeNonEmpty(configs.commonUsersConfigSections, filename, content)
+		util.IncludeNonEmpty(configs.commonUsersConfigSections, filename, content)
 	}
 
 	// There are two types of configs, kept in ConfigMaps:
@@ -142,10 +143,10 @@ func createConfigMapObjectsDeployment(chi *chiv1.ClickHouseInstallation, config 
 	replicaProcessor := func(replica *chiv1.ChiClusterLayoutShardReplica) error {
 		// Prepare for this replica deployment config files map as filename->content
 		deploymentConfigSections := make(map[string]string)
-		includeNonEmpty(deploymentConfigSections, filenameMacrosXML, generateHostMacros(replica))
+		util.IncludeNonEmpty(deploymentConfigSections, filenameMacrosXML, generateHostMacros(replica))
 		// Extra user-specified configs
 		for filename, content := range config.ChDeploymentConfigs {
-			includeNonEmpty(deploymentConfigSections, filename, content)
+			util.IncludeNonEmpty(deploymentConfigSections, filename, content)
 		}
 
 		// Add corev1.ConfigMap object to the list
@@ -530,7 +531,7 @@ func createDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 		Containers: []corev1.Container{
 			{
 				Name:  name,
-				Image: chDefaultDockerImage,
+				Image: defaultClickHouseDockerImage,
 				Ports: []corev1.ContainerPort{
 					{
 						Name:          chDefaultHTTPPortName,

@@ -17,8 +17,8 @@ package main
 import (
 	"fmt"
 	. "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	corev1 "k8s.io/api/core/v1"
 	"github.com/r3labs/diff"
+	corev1 "k8s.io/api/core/v1"
 )
 
 type Order struct {
@@ -47,8 +47,6 @@ func ex4() ([]int, []int) {
 	return a, b
 }
 
-
-
 func ex3() ([]int, []int) {
 	a := []int{1, 2, 3, 4}
 	b := []int{1, 2, 3}
@@ -66,12 +64,12 @@ func ex2() (ChiSpec, ChiSpec) {
 				Profile: "",
 			},
 			Deployment: ChiDeployment{
-				PodTemplate: "",
+				PodTemplate:         "",
 				VolumeClaimTemplate: "",
 				Zone: ChiDeploymentZone{
 					MatchLabels: nil, // map[string]string,
 				},
-				Scenario: "",
+				Scenario:    "",
 				Fingerprint: "",
 			},
 		},
@@ -86,9 +84,9 @@ func ex2() (ChiSpec, ChiSpec) {
 					},
 				},
 			},
-			Users: nil,
+			Users:    nil,
 			Profiles: nil,
-			Quotas: nil,
+			Quotas:   nil,
 			Settings: nil,
 
 			Clusters: []ChiCluster{
@@ -97,12 +95,12 @@ func ex2() (ChiSpec, ChiSpec) {
 
 					// useless
 					Deployment: ChiDeployment{
-						PodTemplate: "",
+						PodTemplate:         "",
 						VolumeClaimTemplate: "",
 						Zone: ChiDeploymentZone{
 							MatchLabels: nil, // map[string]string,
 						},
-						Scenario: "",
+						Scenario:    "",
 						Fingerprint: "",
 					},
 
@@ -121,17 +119,17 @@ func ex2() (ChiSpec, ChiSpec) {
 								// useless
 								ReplicasCount: 1,
 
-								Weight: 1,
+								Weight:              1,
 								InternalReplication: "yes",
 
 								// useless
 								Deployment: ChiDeployment{
-									PodTemplate: "",
+									PodTemplate:         "",
 									VolumeClaimTemplate: "",
 									Zone: ChiDeploymentZone{
 										MatchLabels: nil, // map[string]string,
 									},
-									Scenario: "",
+									Scenario:    "",
 									Fingerprint: "",
 								},
 
@@ -141,12 +139,12 @@ func ex2() (ChiSpec, ChiSpec) {
 										Port: 9000,
 
 										Deployment: ChiDeployment{
-											PodTemplate: "podTemplate1",
+											PodTemplate:         "podTemplate1",
 											VolumeClaimTemplate: "volumeClaimTemplate1",
 											Zone: ChiDeploymentZone{
 												MatchLabels: nil, // map[string]string,
 											},
-											Scenario: "",
+											Scenario:    "",
 											Fingerprint: "",
 										},
 									},
@@ -159,16 +157,16 @@ func ex2() (ChiSpec, ChiSpec) {
 		},
 
 		Templates: ChiTemplates{
-			PodTemplates:         []ChiPodTemplate{
+			PodTemplates: []ChiPodTemplate{
 				{
-					Name: "podTemplate1",
+					Name:       "podTemplate1",
 					Containers: []corev1.Container{},
 					Volumes:    []corev1.Volume{},
 				},
 			},
 			VolumeClaimTemplates: []ChiVolumeClaimTemplate{
 				{
-					Name:"volumeClaimTemplate1",
+					Name:                  "volumeClaimTemplate1",
 					PersistentVolumeClaim: corev1.PersistentVolumeClaim{},
 				},
 			},
@@ -184,12 +182,12 @@ func ex2() (ChiSpec, ChiSpec) {
 				Profile: "",
 			},
 			Deployment: ChiDeployment{
-				PodTemplate: "",
+				PodTemplate:         "",
 				VolumeClaimTemplate: "",
 				Zone: ChiDeploymentZone{
 					MatchLabels: nil, // map[string]string,
 				},
-				Scenario: "",
+				Scenario:    "",
 				Fingerprint: "",
 			},
 		},
@@ -204,9 +202,9 @@ func ex2() (ChiSpec, ChiSpec) {
 					},
 				},
 			},
-			Users: nil,
+			Users:    nil,
 			Profiles: nil,
-			Quotas: nil,
+			Quotas:   nil,
 			Settings: nil,
 
 			Clusters: []ChiCluster{
@@ -215,12 +213,12 @@ func ex2() (ChiSpec, ChiSpec) {
 
 					// useless
 					Deployment: ChiDeployment{
-						PodTemplate: "",
+						PodTemplate:         "",
 						VolumeClaimTemplate: "",
 						Zone: ChiDeploymentZone{
 							MatchLabels: nil, // map[string]string,
 						},
-						Scenario: "",
+						Scenario:    "",
 						Fingerprint: "",
 					},
 
@@ -239,17 +237,17 @@ func ex2() (ChiSpec, ChiSpec) {
 								// useless
 								ReplicasCount: 1,
 
-								Weight: 1,
+								Weight:              1,
 								InternalReplication: "yes",
 
 								// useless
 								Deployment: ChiDeployment{
-									PodTemplate: "",
+									PodTemplate:         "",
 									VolumeClaimTemplate: "",
 									Zone: ChiDeploymentZone{
 										MatchLabels: nil, // map[string]string,
 									},
-									Scenario: "",
+									Scenario:    "",
 									Fingerprint: "",
 								},
 
@@ -259,12 +257,12 @@ func ex2() (ChiSpec, ChiSpec) {
 										Port: 9000,
 
 										Deployment: ChiDeployment{
-											PodTemplate: "podTemplate1",
+											PodTemplate:         "podTemplate1",
 											VolumeClaimTemplate: "volumeClaimTemplate1",
 											Zone: ChiDeploymentZone{
 												MatchLabels: nil, // map[string]string,
 											},
-											Scenario: "",
+											Scenario:    "",
 											Fingerprint: "",
 										},
 									},
@@ -273,12 +271,12 @@ func ex2() (ChiSpec, ChiSpec) {
 										Port: 9000,
 
 										Deployment: ChiDeployment{
-											PodTemplate: "podTemplate1",
+											PodTemplate:         "podTemplate1",
 											VolumeClaimTemplate: "volumeClaimTemplate1",
 											Zone: ChiDeploymentZone{
 												MatchLabels: nil, // map[string]string,
 											},
-											Scenario: "",
+											Scenario:    "",
 											Fingerprint: "",
 										},
 									},
@@ -291,16 +289,16 @@ func ex2() (ChiSpec, ChiSpec) {
 		},
 
 		Templates: ChiTemplates{
-			PodTemplates:         []ChiPodTemplate{
+			PodTemplates: []ChiPodTemplate{
 				{
-					Name: "podTemplate1",
+					Name:       "podTemplate1",
 					Containers: []corev1.Container{},
 					Volumes:    []corev1.Volume{},
 				},
 			},
 			VolumeClaimTemplates: []ChiVolumeClaimTemplate{
 				{
-					Name:"volumeClaimTemplate1",
+					Name:                  "volumeClaimTemplate1",
 					PersistentVolumeClaim: corev1.PersistentVolumeClaim{},
 				},
 			},
@@ -312,12 +310,12 @@ func ex2() (ChiSpec, ChiSpec) {
 
 func ex1() (Order, Order) {
 	a := Order{
-		ID: "1234",
+		ID:    "1234",
 		Items: []int{1, 2, 3, 4},
 	}
 
 	b := Order{
-		ID: "1234",
+		ID:    "1234",
 		Items: []int{1, 2, 4},
 	}
 

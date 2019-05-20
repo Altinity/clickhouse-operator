@@ -24,6 +24,23 @@ import (
 	"strings"
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
+)
+
+const (
+	// Default values for update timeout and polling period in seconds
+	defaultStatefulSetUpdateTimeout    = 300
+	defaultStatefulSetUpdatePollPeriod = 15
+
+	// Default values for ClickHouse user configuration
+	// 1. user/profile
+	// 2. user/quota
+	// 3. user/networks/ip
+	// 4. user/password
+	defaultChConfigUserDefaultProfile    = "default"
+	defaultChConfigUserDefaultQuota      = "default"
+	defaultChConfigUserDefaultNetworksIP = "::/0"
+	defaultChConfigUserDefaultPassword   = "default"
 )
 
 // GetConfig creates Config object based on current environment
@@ -56,8 +73,8 @@ func GetConfig(configFilePath string) (*Config, error) {
 		}
 	}
 
-	// Try to find /etc/clickhouse-oprator/config.yaml
-	if conf, err := buildConfigFromFile("/etc/clickhouse-oprator/config.yaml"); err == nil {
+	// Try to find /etc/clickhouse-operator/config.yaml
+	if conf, err := buildConfigFromFile("/etc/clickhouse-operator/config.yaml"); err == nil {
 		// Able to build config, all is fine
 		return conf, nil
 	}
@@ -142,15 +159,17 @@ func (config *Config) normalize() error {
 	// Process ClickHouseInstallation templates section
 	config.prepareConfigPath(&config.ChiTemplatesPath, "templates.d")
 
-	// Process Rolling update section
+	// Process Create/Update section
+
+	// Timeouts
 	if config.StatefulSetUpdateTimeout == 0 {
 		// Default update timeout in seconds
-		config.StatefulSetUpdateTimeout = 120
+		config.StatefulSetUpdateTimeout = defaultStatefulSetUpdateTimeout
 	}
 
 	if config.StatefulSetUpdatePollPeriod == 0 {
 		// Default polling period in seconds
-		config.StatefulSetUpdatePollPeriod = 15
+		config.StatefulSetUpdatePollPeriod = defaultStatefulSetUpdatePollPeriod
 	}
 
 	// Default action on Create/Update failure - to keep system in previous state
@@ -169,6 +188,24 @@ func (config *Config) normalize() error {
 		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionRollback
 	}
 
+	// Default values for ClickHouse user configuration
+	// 1. user/profile
+	// 2. user/quota
+	// 3. user/networks/ip
+	// 4. user/password
+	if config.ChConfigUserDefaultProfile == "" {
+		config.ChConfigUserDefaultProfile = defaultChConfigUserDefaultProfile
+	}
+	if config.ChConfigUserDefaultQuota == "" {
+		config.ChConfigUserDefaultQuota = defaultChConfigUserDefaultQuota
+	}
+	if len(config.ChConfigUserDefaultNetworksIP) == 0 {
+		config.ChConfigUserDefaultNetworksIP = []string{defaultChConfigUserDefaultNetworksIP}
+	}
+	if config.ChConfigUserDefaultPassword == "" {
+		config.ChConfigUserDefaultPassword = defaultChConfigUserDefaultPassword
+	}
+
 	return nil
 }
 
@@ -185,7 +222,7 @@ func (config *Config) prepareConfigPath(path *string, defaultRelativePath string
 	}
 
 	// In case of incorrect/unavailable path - make it empty
-	if (*path != "") && !isDirOk(*path) {
+	if (*path != "") && !util.IsDirOk(*path) {
 		*path = ""
 	}
 }
@@ -214,7 +251,7 @@ func (config *Config) readChConfigFiles() {
 
 // isChConfigExt return true in case specified file has proper extension for a ClickHouse config file
 func (config *Config) isChConfigExt(file string) bool {
-	switch extToLower(file) {
+	switch util.ExtToLower(file) {
 	case ".xml":
 		return true
 	}
@@ -228,7 +265,7 @@ func (config *Config) readChiTemplateFiles() {
 
 // isChiTemplateExt return true in case specified file has proper extension for a CHI template config file
 func (config *Config) isChiTemplateExt(file string) bool {
-	switch extToLower(file) {
+	switch util.ExtToLower(file) {
 	case ".yaml":
 		return true
 	}
@@ -242,5 +279,12 @@ func (config *Config) IsWatchedNamespace(namespace string) bool {
 		return true
 	}
 
-	return inArray(namespace, config.Namespaces)
+	return util.InArray(namespace, config.Namespaces)
+}
+
+// readConfigFiles reads config files from specified path into "file name->file content" map
+// path - folder where to look for files
+// isChConfigExt - accepts path to file return bool whether this file has config extension
+func readConfigFiles(path string, isConfigExt func(string) bool) map[string]string {
+	return util.ReadFilesIntoMap(path, isConfigExt)
 }

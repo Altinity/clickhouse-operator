@@ -12,14 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package models
+package util
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"io"
+	"encoding/hex"
+	"math/rand"
+	"time"
 )
 
-// fprintf suppresses warning for unused returns of fmt.Fprintf()
-func fprintf(w io.Writer, format string, a ...interface{}) {
-	util.Fprintf(w, format, a...)
+// RandomString generates random string
+func RandomString() string {
+	b := make([]byte, 3)
+	rand.New(rand.NewSource(time.Now().UnixNano())).Read(b)
+	return hex.EncodeToString(b)
 }
