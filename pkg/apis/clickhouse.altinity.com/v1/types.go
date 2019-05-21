@@ -23,7 +23,7 @@ import (
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClickHouseInstallation describes the Installation of a ClickHouse Database Cluster
+// ClickHouseInstallation defines the Installation of a ClickHouse Database Cluster
 type ClickHouseInstallation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" yaml:"metadata"`
@@ -40,91 +40,112 @@ type ChiSpec struct {
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	IsKnown int `json:"isKnown"`
+	IsKnown       int    `json:"isKnown"`
+	Version       string `json:"version"`
+	ClustersCount int    `json:"clusters"`
+	ReplicasCount int    `json:"replicas"`
+	Endpoint      string `json:"endpoint"`
 }
 
 // ChiDefaults defines defaults section of .spec
 type ChiDefaults struct {
-	ReplicasUseFQDN int               `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN"`
+	ReplicasUseFQDN string            `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN"`
 	DistributedDDL  ChiDistributedDDL `json:"distributedDDL,omitempty"  yaml:"distributedDDL"`
-	Deployment      ChiDeployment     `json:"deployment,omitempty"      yaml:"deployment"`
+	Templates       ChiTemplateNames  `json:"templates" yaml:"templates"`
+}
+
+// ChiTemplateNames defines references to .spec.templates to be used on current level of cluster
+type ChiTemplateNames struct {
+	PodTemplate         string `json:"podTemplate,omitempty"      yaml:"podTemplate"`
+	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty" yaml:"volumeClaimTemplate"`
 }
 
 // ChiConfiguration defines configuration section of .spec
 type ChiConfiguration struct {
-	Zookeeper ChiConfigurationZookeeper `json:"zookeeper,omitempty" yaml:"zookeeper"`
-	Users     map[string]interface{}    `json:"users,omitempty"     yaml:"users"`
-	Profiles  map[string]interface{}    `json:"profiles,omitempty"  yaml:"profiles"`
-	Quotas    map[string]interface{}    `json:"quotas,omitempty"    yaml:"quotas"`
-	Settings  map[string]interface{}    `json:"settings,omitempty"  yaml:"settings"`
+	Zookeeper ChiZookeeperConfig     `json:"zookeeper,omitempty" yaml:"zookeeper"`
+	Users     map[string]interface{} `json:"users,omitempty"     yaml:"users"`
+	Profiles  map[string]interface{} `json:"profiles,omitempty"  yaml:"profiles"`
+	Quotas    map[string]interface{} `json:"quotas,omitempty"    yaml:"quotas"`
+	Settings  map[string]interface{} `json:"settings,omitempty"  yaml:"settings"`
 	// TODO refactor into map[string]ChiCluster
 	Clusters []ChiCluster `json:"clusters,omitempty"`
 }
 
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
-	Name       string           `json:"name"`
-	Layout     ChiClusterLayout `json:"layout"`
-	Deployment ChiDeployment    `json:"deployment,omitempty"`
+	Name      string           `json:"name"`
+	Layout    ChiLayout        `json:"layout"`
+	Templates ChiTemplateNames `json:"templates,omitempty"`
 
 	Address ChiClusterAddress `json:"address"`
 }
 
+// ChiClusterAddress defines address of a cluster within ClickHouseInstallation
 type ChiClusterAddress struct {
 	Namespace    string `json:"namespace"`
-	CHIName      string `json:"chiName"`
+	ChiName      string `json:"chiName"`
 	ClusterName  string `json:"clusterName"`
 	ClusterIndex int    `json:"clusterIndex"`
 }
 
-// ChiClusterLayout defines layout section of .spec.configuration.clusters
-type ChiClusterLayout struct {
-	Type          string                  `json:"type"`
-	ShardsCount   int                     `json:"shardsCount,omitempty"`
-	ReplicasCount int                     `json:"replicasCount,omitempty"`
-	Shards        []ChiClusterLayoutShard `json:"shards,omitempty"`
+// ChiLayout defines layout section of .spec.configuration.clusters
+type ChiLayout struct {
+	// DEPRECATED - to be removed soon
+	Type          string     `json:"type"`
+	ShardsCount   int        `json:"shardsCount,omitempty"`
+	ReplicasCount int        `json:"replicasCount,omitempty"`
+	Shards        []ChiShard `json:"shards,omitempty"`
 }
 
-// ChiClusterLayoutShard defines item of a shard section of .spec.configuration.clusters[n].shards
-type ChiClusterLayoutShard struct {
-	DefinitionType      string                         `json:"definitionType"`
-	ReplicasCount       int                            `json:"replicasCount,omitempty"`
-	Weight              int                            `json:"weight,omitempty"`
-	InternalReplication string                         `json:"internalReplication,omitempty"`
-	Deployment          ChiDeployment                  `json:"deployment,omitempty"`
-	Replicas            []ChiClusterLayoutShardReplica `json:"replicas,omitempty"`
+// ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
+type ChiShard struct {
+	// DEPRECATED - to be removed soon
+	DefinitionType      string           `json:"definitionType"`
+	Name                string           `json:"name,omitempty"`
+	Weight              int              `json:"weight,omitempty"`
+	InternalReplication string           `json:"internalReplication,omitempty"`
+	Templates           ChiTemplateNames `json:"templates,omitempty"`
+	ReplicasCount       int              `json:"replicasCount,omitempty"`
+	Replicas            []ChiReplica     `json:"replicas,omitempty"`
 
-	Address ChiClusterLayoutShardAddress `json:"address"`
+	Address ChiShardAddress `json:"address"`
 }
 
-type ChiClusterLayoutShardAddress struct {
+// ChiShardAddress defines address of a shard within ClickHouseInstallation
+type ChiShardAddress struct {
 	Namespace    string `json:"namespace"`
-	CHIName      string `json:"chiName"`
+	ChiName      string `json:"chiName"`
 	ClusterName  string `json:"clusterName"`
 	ClusterIndex int    `json:"clusterIndex"`
+	ShardName    string `json:"shardName,omitempty"`
 	ShardIndex   int    `json:"shardIndex"`
 }
 
-// ChiClusterLayoutShardReplica defines item of a replicas section of .spec.configuration.clusters[n].shards[m]
-type ChiClusterLayoutShardReplica struct {
-	Port       int32         `json:"port,omitempty"`
-	Deployment ChiDeployment `json:"deployment,omitempty"`
+// ChiReplica defines item of a replicas section of .spec.configuration.clusters[n].shards[m]
+type ChiReplica struct {
+	Name      string           `json:"name,omitempty"`
+	Port      int32            `json:"port,omitempty"`
+	Templates ChiTemplateNames `json:"templates,omitempty"`
 
-	Address ChiClusterLayoutShardReplicaAddress `json:"address"`
-	Config  ChiClusterLayoutShardReplicaConfig  `json:"config"`
+	Address ChiReplicaAddress `json:"address"`
+	Config  ChiReplicaConfig  `json:"config"`
 }
 
-type ChiClusterLayoutShardReplicaAddress struct {
+// ChiReplicaAddress defines address of a replica within ClickHouseInstallation
+type ChiReplicaAddress struct {
 	Namespace          string `json:"namespace"`
 	ChiName            string `json:"chiName"`
 	ClusterName        string `json:"clusterName"`
 	ClusterIndex       int    `json:"clusterIndex"`
+	ShardName          string `json:"shardName,omitempty"`
 	ShardIndex         int    `json:"shardIndex"`
+	ReplicaName        string `json:"replicaName,omitempty"`
 	ReplicaIndex       int    `json:"replicaIndex"`
 	GlobalReplicaIndex int    `json:"globalReplicaIndex"`
 }
 
-type ChiClusterLayoutShardReplicaConfig struct {
+// ChiReplicaConfig defines additional data related to replica
+type ChiReplicaConfig struct {
 	ZkFingerprint string `json:"zkfingerprint"`
 }
 
@@ -136,58 +157,32 @@ type ChiTemplates struct {
 	VolumeClaimTemplates []ChiVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates"`
 }
 
+// ChiPodTemplate defines full Pod Template, directly used by StatefulSet
+type ChiPodTemplate struct {
+	Name string         `json:"name" yaml:"name"`
+	Spec corev1.PodSpec `json:"spec" yaml:"spec"`
+}
+
+// ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
+type ChiVolumeClaimTemplate struct {
+	Name string                           `json:"name" yaml:"name"`
+	Spec corev1.PersistentVolumeClaimSpec `json:"spec" yaml:"spec"`
+}
+
 // ChiDistributedDDL defines distributedDDL section of .spec.defaults
 type ChiDistributedDDL struct {
 	Profile string `json:"profile,omitempty" yaml:"profile"`
 }
 
-// ChiDeployment defines deployment section of .spec
-type ChiDeployment struct {
-	// PodTemplate specifies which Pod template from
-	// .spec.templates.podTemplates should be used
-	PodTemplate string `json:"podTemplate,omitempty" yaml:"podTemplate"`
-
-	// VolumeClaimTemplate specifies which VolumeClaim template
-	// from .spec.templates.volumeClaimTemplates should be used
-	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty" yaml:"volumeClaimTemplate"`
-
-	Zone     ChiDeploymentZone `json:"zone,omitempty"     yaml:"zone"`
-	Scenario string            `json:"scenario,omitempty" yaml:"scenario"`
-
-	// Fingerprint is a fingerprint of the ChiDeployment. Used to find equal deployments
-	Fingerprint string `json:"fingerprint,omitempty"`
-
-	// Index is an index of this Deployment within Cluster
-	Index int `json:"index,omitempty"`
+// ChiZookeeperConfig defines zookeeper section of .spec.configuration
+type ChiZookeeperConfig struct {
+	Nodes []ChiZookeeperNode `json:"nodes,omitempty" yaml:"nodes"`
 }
 
-// ChiDeploymentZone defines zone section of *.deployment
-type ChiDeploymentZone struct {
-	MatchLabels map[string]string `json:"matchLabels" yaml:"matchLabels"`
-}
-
-// ChiConfigurationZookeeper defines zookeeper section of .spec.configuration
-type ChiConfigurationZookeeper struct {
-	Nodes []ChiConfigurationZookeeperNode `json:"nodes,omitempty" yaml:"nodes"`
-}
-
-// ChiConfigurationZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
-type ChiConfigurationZookeeperNode struct {
+// ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
+type ChiZookeeperNode struct {
 	Host string `json:"host" yaml:"host"`
 	Port int32  `json:"port" yaml:"port"`
-}
-
-// ChiVolumeClaimTemplate defines item of .spec.templates.volumeClaimTemplates
-type ChiVolumeClaimTemplate struct {
-	Name                  string                       `json:"name"                  yaml:"name"`
-	PersistentVolumeClaim corev1.PersistentVolumeClaim `json:"persistentVolumeClaim" yaml:"persistentVolumeClaim"`
-}
-
-// ChiPodTemplate defines item of a podTemplates section of .spec.templates
-type ChiPodTemplate struct {
-	Name       string             `json:"name"       yaml:"name"`
-	Containers []corev1.Container `json:"containers" yaml:"containers"`
-	Volumes    []corev1.Volume    `json:"volumes"    yaml:"volumes"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

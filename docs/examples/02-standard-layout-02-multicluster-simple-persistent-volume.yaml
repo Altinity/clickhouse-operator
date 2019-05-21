@@ -4,30 +4,26 @@ metadata:
   name: "syandard-02-multicluster"
 spec:
   defaults:
-    deployment:
+    templates:
       volumeClaimTemplate: auto-simple-vc
   configuration:
     clusters:
       - name: "sharded-replicated"
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 2
       - name: "sharded-non-replicated"
         layout:
-          type: Standard
           shardsCount: 2
       - name: "replicated"
         layout:
-          type: Standard
           replicasCount: 2
   templates:
     volumeClaimTemplates:
     - name: auto-simple-vc
-      persistentVolumeClaim:
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          resources:
-            requests:
-              storage: 123Mi
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 123Mi

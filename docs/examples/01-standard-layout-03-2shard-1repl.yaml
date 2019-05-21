@@ -7,5 +7,4 @@ spec:
     clusters:
       - name: "standard-03-2shard-1repl"
         layout:
-          type: Standard
           shardsCount: 2

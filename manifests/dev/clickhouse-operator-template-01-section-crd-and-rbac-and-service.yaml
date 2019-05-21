@@ -1,7 +1,7 @@
 # Possible Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:latest
+# ${CHOPERATOR_NAMESPACE}
+# ${CHOPERATOR_IMAGE}
 #
 # Setup CustomResourceDefinition
 # CustomResourceDefinition is namespace-less and must have unique name
@@ -201,7 +201,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: clickhouse-operator
-  namespace: kube-system
+  namespace: ${CHOPERATOR_NAMESPACE}
 ---
 # Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
 # ClusterRoleBinding is namespace-less and must have unique name
@@ -216,7 +216,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: clickhouse-operator
-    namespace: kube-system
+    namespace: ${CHOPERATOR_NAMESPACE}
 ---
 # Setup ClusterIP Service to provide monitoring metrics for Prometheus
 # Service would be created in kubectl-specified namespace
@@ -227,7 +227,7 @@ kind: Service
 apiVersion: v1
 metadata:
   name: clickhouse-operator-metrics
-  namespace: kube-system
+  namespace: ${CHOPERATOR_NAMESPACE}
   labels:
     app: clickhouse-operator
 spec:
@@ -236,82 +236,3 @@ spec:
       name: clickhouse-operator-metrics
   selector:
     app: clickhouse-operator
----
-# Possible Template Parameters:
-#
-# kube-system
-# altinity/clickhouse-operator:latest
-#
-# Setup Deployment for clickhouse-operator
-# Deployment would be created in kubectl-specified namespace
-kind: Deployment
-apiVersion: apps/v1
-metadata:
-  name: clickhouse-operator
-  namespace: kube-system
-  labels:
-    app: clickhouse-operator
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: clickhouse-operator
-  template:
-    metadata:
-      labels:
-        app: clickhouse-operator
-    spec:
-      serviceAccountName: clickhouse-operator
-      containers:
-        - name: clickhouse-operator
-          image: altinity/clickhouse-operator:latest
-          env:
-            # Pod-specific
-            # spec.nodeName: ip-172-20-52-62.ec2.internal
-            - name: OPERATOR_POD_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            # metadata.name: clickhouse-operator-6f87589dbb-ftcsf
-            - name: OPERATOR_POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            # metadata.namespace: kube-system
-            - name: OPERATOR_POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            # status.podIP: 100.96.3.2
-            - name: OPERATOR_POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            # spec.serviceAccount: clickhouse-operator
-            # spec.serviceAccountName: clickhouse-operator
-            - name: OPERATOR_POD_SERVICE_ACCOUNT
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.serviceAccountName
-
-            # Container-specific
-            - name: OPERATOR_CONTAINER_CPU_REQUEST
-              valueFrom:
-                resourceFieldRef:
-                  containerName: clickhouse-operator
-                  resource: requests.cpu
-            - name: OPERATOR_CONTAINER_CPU_LIMIT
-              valueFrom:
-                resourceFieldRef:
-                  containerName: clickhouse-operator
-                  resource: limits.cpu
-            - name: OPERATOR_CONTAINER_MEM_REQUEST
-              valueFrom:
-                resourceFieldRef:
-                  containerName: clickhouse-operator
-                  resource: requests.memory
-            - name: OPERATOR_CONTAINER_MEM_LIMIT
-              valueFrom:
-                resourceFieldRef:
-                  containerName: clickhouse-operator
-                  resource: limits.memory

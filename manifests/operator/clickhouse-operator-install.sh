@@ -2,6 +2,7 @@
 
 CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE:-kube-system}"
 
+
 echo "Setup ClickHouse Operator into ${CHOPERATOR_NAMESPACE} namespace"
 
 # Let's setup all clickhouse-operator-related stuff into dedicated namespace

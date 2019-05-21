@@ -1,8 +1,15 @@
+# Possible Template Parameters:
+#
+# ${CHOPERATOR_NAMESPACE}
+# ${CHOPERATOR_IMAGE}
+#
+# Setup Deployment for clickhouse-operator
+# Deployment would be created in kubectl-specified namespace
 kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: clickhouse-operator
-  namespace: dev
+  namespace: ${CHOPERATOR_NAMESPACE}
   labels:
     app: clickhouse-operator
 spec:
@@ -18,10 +25,9 @@ spec:
       serviceAccountName: clickhouse-operator
       containers:
         - name: clickhouse-operator
-          #image: sunsingerus/clickhouse-operator:dev
-          image: $PERSONAL_DEV_INSTALL_IMAGE
-          imagePullPolicy: Always
+          image: ${CHOPERATOR_IMAGE}
           env:
+            # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
             - name: OPERATOR_POD_NODE_NAME
               valueFrom:

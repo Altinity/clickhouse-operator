@@ -2,6 +2,7 @@
 
 CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE:-kube-system}"
 
+
 if [[ "${CHOPERATOR_NAMESPACE}" == "kube-system" ]]; then
     echo "Default k8s namespace 'kube-system' must not be deleted"
     echo "Delete components only"

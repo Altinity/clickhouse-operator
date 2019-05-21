@@ -24,6 +24,5 @@ spec:
     clusters:
       - name: "standard"
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 1

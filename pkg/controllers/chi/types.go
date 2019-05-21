@@ -16,6 +16,7 @@ package chi
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/config"
+	"github.com/altinity/clickhouse-operator/pkg/models"
 	"time"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -32,6 +33,11 @@ import (
 
 // Controller defines CRO controller
 type Controller struct {
+	version string
+	runtimeParams map[string]string
+
+	normalizer *models.Normalizer
+
 	// chopConfig used to keep clickhouse-oprator config
 	chopConfig *config.Config
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)

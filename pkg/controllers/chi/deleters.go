@@ -33,8 +33,8 @@ func newDeleteOptions() *metav1.DeleteOptions {
 	}
 }
 
-// deleteReplica deletes all kubernetes resources related to replica *chop.ChiClusterLayoutShardReplica
-func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) error {
+// deleteReplica deletes all kubernetes resources related to replica *chop.ChiReplica
+func (c *Controller) deleteReplica(replica *chop.ChiReplica) error {
 	// Each replica consists of
 	// 1. Tables on replica - we need to delete tables on replica in order to clean Zookeeper data
 	// 2. StatefulSet
@@ -52,7 +52,7 @@ func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) e
 	c.statefulSetDelete(replica.Address.Namespace, statefulSetName)
 
 	// Delete ConfigMap
-	configMapName := chopmodels.CreateConfigMapDeploymentName(replica)
+	configMapName := chopmodels.CreateConfigMapPodName(replica)
 	if err := c.kubeClient.CoreV1().ConfigMaps(replica.Address.Namespace).Delete(configMapName, newDeleteOptions()); err == nil {
 		glog.V(1).Infof("ConfigMap %s deleted", configMapName)
 	} else {
@@ -70,8 +70,8 @@ func (c *Controller) deleteReplica(replica *chop.ChiClusterLayoutShardReplica) e
 	return nil
 }
 
-// deleteShard deletes all kubernetes resources related to shard *chop.ChiClusterLayoutShard
-func (c *Controller) deleteShard(shard *chop.ChiClusterLayoutShard) {
+// deleteShard deletes all kubernetes resources related to shard *chop.ChiShard
+func (c *Controller) deleteShard(shard *chop.ChiShard) {
 	shard.WalkReplicas(c.deleteReplica)
 }
 
@@ -94,8 +94,8 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
 	// chi-b3d29f-common-usersd    0      61s
 	// service/clickhouse-example-01         LoadBalancer   10.106.183.200   <pending>     8123:31607/TCP,9000:31492/TCP,9009:31357/TCP   33s   clickhouse.altinity.com/chi=example-01
 
-	configMapCommon := chopmodels.CreateConfigMapCommonName(chi.Name)
-	configMapCommonUsersName := chopmodels.CreateConfigMapCommonUsersName(chi.Name)
+	configMapCommon := chopmodels.CreateConfigMapCommonName(chi)
+	configMapCommonUsersName := chopmodels.CreateConfigMapCommonUsersName(chi)
 
 	// Delete ConfigMap
 	err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommon, newDeleteOptions())

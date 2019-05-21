@@ -14,15 +14,11 @@
 
 package v1
 
-// CopyFrom copies ChiDeploymentZone from `from`
-func (zone *ChiDeploymentZone) CopyFrom(from *ChiDeploymentZone) {
-	if from == nil {
-		return
+func (replica *ChiReplica) InheritTemplates(shard *ChiShard) {
+	if replica.Templates.PodTemplate == "" {
+		replica.Templates.PodTemplate = shard.Templates.PodTemplate
 	}
-
-	copyMatchLabels := make(map[string]string)
-	for key, value := range from.MatchLabels {
-		copyMatchLabels[key] = value
+	if replica.Templates.VolumeClaimTemplate == "" {
+		replica.Templates.VolumeClaimTemplate = shard.Templates.VolumeClaimTemplate
 	}
-	(*zone).MatchLabels = copyMatchLabels
 }

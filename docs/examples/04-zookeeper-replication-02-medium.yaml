@@ -13,8 +13,7 @@ spec:
         - host: zookeeper-2.zookeepers.zoo3ns
           port: 2181
     clusters:
-    - name: replcluster
-      layout:
-        type: Standard
-        shardsCount: 3
-        replicasCount: 2
+      - name: replcluster
+        layout:
+          shardsCount: 3
+          replicasCount: 2

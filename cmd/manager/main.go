@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v1
+package main
 
-func (zkNode *ChiZookeeperNode) Equal(to *ChiZookeeperNode) bool {
-	if to == nil {
-		return false
-	}
+import (
+	"github.com/altinity/clickhouse-operator/cmd/manager/app"
+)
 
-	return (zkNode.Host == to.Host) && (zkNode.Port == to.Port)
+func main() {
+	// Application entry point
+	app.Run()
 }

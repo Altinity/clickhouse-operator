@@ -153,7 +153,7 @@ func (config *Config) normalize() error {
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
 	config.prepareConfigPath(&config.ChCommonConfigsPath, "config.d")
-	config.prepareConfigPath(&config.ChDeploymentConfigsPath, "conf.d")
+	config.prepareConfigPath(&config.ChPodConfigsPath, "conf.d")
 	config.prepareConfigPath(&config.ChUsersConfigsPath, "users.d")
 
 	// Process ClickHouseInstallation templates section
@@ -245,7 +245,7 @@ func (config *Config) relativeToConfigFolderPath(relativePath string) string {
 // readChConfigFiles reads all extra user-specified ClickHouse config files
 func (config *Config) readChConfigFiles() {
 	config.ChCommonConfigs = readConfigFiles(config.ChCommonConfigsPath, config.isChConfigExt)
-	config.ChDeploymentConfigs = readConfigFiles(config.ChDeploymentConfigsPath, config.isChConfigExt)
+	config.ChPodConfigs = readConfigFiles(config.ChPodConfigsPath, config.isChConfigExt)
 	config.ChUsersConfigs = readConfigFiles(config.ChUsersConfigsPath, config.isChConfigExt)
 }
 

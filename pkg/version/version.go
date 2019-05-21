@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package version
 
-import (
-	"github.com/altinity/clickhouse-operator/cmd/clickhouse-operator/app"
-)
+// Version represents the software version
+var Version = "dev-version"
 
-func main() {
-	// Application entry point
-	app.Run()
-}
+// GitSHA represents the Git commit hash in short format
+var GitSHA string

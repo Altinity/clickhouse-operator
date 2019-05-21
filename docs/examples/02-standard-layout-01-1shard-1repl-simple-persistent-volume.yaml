@@ -3,23 +3,21 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "standard-01-simple-pv"
 spec:
+  defaults:
+    templates:
+      volumeClaimTemplate: volumeclaim-template
   configuration:
     clusters:
       - name: "standard-01-simple-pv"
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 1
-  defaults:
-    deployment:
-      volumeClaimTemplate: volumeclaim-template
   templates:
     volumeClaimTemplates:
       - name: volumeclaim-template
-        persistentVolumeClaim:
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 500Mi
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 500Mi

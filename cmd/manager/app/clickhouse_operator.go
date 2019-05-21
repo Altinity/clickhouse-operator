@@ -18,7 +18,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/config"
 	"net/http"
 	"os"
 	"os/signal"
@@ -27,6 +26,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/altinity/clickhouse-operator/pkg/config"
+	"github.com/altinity/clickhouse-operator/pkg/version"
 
 	chopmetrics "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
@@ -37,14 +39,9 @@ import (
 	kuberest "k8s.io/client-go/rest"
 	kubeclientcmd "k8s.io/client-go/tools/clientcmd"
 
-	chopmodels "github.com/altinity/clickhouse-operator/pkg/models"
-
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
-
-// Version defines current build versionRequest
-const Version = "0.2.2"
 
 // Prometheus exporter defaults
 const (
@@ -68,6 +65,10 @@ var (
 
 	// metricsEP defines metrics end-point IP address
 	metricsEP string
+)
+
+var (
+	runtimeParams map[string]string
 )
 
 func init() {
@@ -157,7 +158,7 @@ func GetRuntimeParams() map[string]string {
 }
 
 func LogRuntimeParams() {
-	runtimeParams := GetRuntimeParams()
+	runtimeParams = GetRuntimeParams()
 	for name, value := range runtimeParams {
 		glog.V(1).Infof("%s=%s\n", name, value)
 	}
@@ -166,11 +167,11 @@ func LogRuntimeParams() {
 // Run is an entry point of the application
 func Run() {
 	if versionRequest {
-		fmt.Printf("%s\n", Version)
+		fmt.Printf("%s\n", version.Version)
 		os.Exit(0)
 	}
 
-	glog.V(1).Infof("Starting clickhouse-operator version '%s'\n", Version)
+	glog.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
 	LogRuntimeParams()
 
 	chopConfig, err := config.GetConfig(chopConfigFile)
@@ -178,8 +179,6 @@ func Run() {
 		glog.Fatalf("Unable to build config file %v\n", err)
 		os.Exit(1)
 	}
-
-	chopmodels.SetAppVersion(Version)
 
 	// Initializing Prometheus Metrics Exporter
 	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
@@ -212,6 +211,8 @@ func Run() {
 
 	// Creating resource Controller
 	chiController := chi.CreateController(
+		version.Version,
+		runtimeParams,
 		chopConfig,
 		chopClient,
 		kubeClient,

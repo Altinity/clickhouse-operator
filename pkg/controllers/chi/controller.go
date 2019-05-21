@@ -45,6 +45,8 @@ import (
 
 // CreateController creates instance of Controller
 func CreateController(
+	version string,
+	runtimeParams map[string]string,
 	chopConfig *config.Config,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
@@ -75,6 +77,9 @@ func CreateController(
 
 	// Create Controller instance
 	controller := &Controller{
+		version:                 version,
+		runtimeParams: runtimeParams,
+		normalizer:              chopmodels.NewNormalizer(chopConfig),
 		chopConfig:              chopConfig,
 		kubeClient:              kubeClient,
 		chopClient:              chopClient,
@@ -346,6 +351,16 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 		return
 	}
 
+	// Label operator's Pod with version label
+	podname, ok1 := c.runtimeParams["OPERATOR_POD_NAME"]
+	namespace, ok2 := c.runtimeParams["OPERATOR_POD_NAMESPACE"]
+	if ok1 && ok2 {
+		if pod, err := c.podLister.Pods(namespace).Get(podname); err == nil {
+			pod.Labels["version"] = c.version
+			c.kubeClient.CoreV1().Pods(namespace).Update(pod)
+		}
+	}
+
 	glog.V(1).Info("ClickHouseInstallation controller: starting workers")
 	for i := 0; i < threadiness; i++ {
 		glog.V(1).Infof("ClickHouseInstallation controller: starting worker %d with poll period %d", i+1, runWorkerPeriod)
@@ -426,7 +441,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	glog.V(1).Infof("onAddChi(%s/%s)", chi.Namespace, chi.Name)
 
 	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateStarted, fmt.Sprintf("onAddChi(%s/%s)", chi.Namespace, chi.Name))
-	chi, err := chopmodels.ChiApplyTemplateAndNormalize(chi, c.chopConfig)
+	chi, err := c.normalizer.CreateTemplatedChi(chi)
 	if err != nil {
 		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
 		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to normalize", chi.Name))
@@ -476,11 +491,11 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	}
 
 	if !old.IsFilled() {
-		old, _ = chopmodels.ChiApplyTemplateAndNormalize(new, c.chopConfig)
+		old, _ = c.normalizer.CreateTemplatedChi(old)
 	}
 
 	if !new.IsFilled() {
-		new, _ = chopmodels.ChiApplyTemplateAndNormalize(new, c.chopConfig)
+		new, _ = c.normalizer.CreateTemplatedChi(new)
 	}
 
 	diff, equal := messagediff.DeepDiff(old, new)
@@ -500,12 +515,12 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 			cluster := diff.Removed[path].(chop.ChiCluster)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete cluster %s", cluster.Name))
 			c.deleteCluster(&cluster)
-		case chop.ChiClusterLayoutShard:
-			shard := diff.Removed[path].(chop.ChiClusterLayoutShard)
+		case chop.ChiShard:
+			shard := diff.Removed[path].(chop.ChiShard)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete shard %d", shard.Address.ShardIndex))
 			c.deleteShard(&shard)
-		case chop.ChiClusterLayoutShardReplica:
-			replica := diff.Removed[path].(chop.ChiClusterLayoutShardReplica)
+		case chop.ChiReplica:
+			replica := diff.Removed[path].(chop.ChiReplica)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete replica %d", replica.Address.ReplicaIndex))
 			_ = c.deleteReplica(&replica)
 		}
@@ -618,7 +633,7 @@ func waitForCacheSync(name string, stopCh <-chan struct{}, cacheSyncs ...cache.I
 // clusterWideSelector returns labels.Selector object
 func clusterWideSelector(name string) labels.Selector {
 	return labels.SelectorFromSet(labels.Set{
-		chopmodels.ChopGeneratedLabel: name,
+		chopmodels.LabelChop: name,
 	})
 	/*
 		glog.V(2).Infof("ClickHouseInstallation (%q) listing controlled resources", chi.Name)

@@ -13,36 +13,32 @@ spec:
         - host: zookeeper-2.zookeepers.zoo3ns
           port: 2181
     clusters:
-    - name: replcluster
-      deployment:
-        podTemplate: clickhouse-with-volume-template
-        volumeClaimTemplate: clickhouse-storage-template
-      layout:
-        type: Standard
-        shardsCount: 3
-        replicasCount: 2
+      - name: replcluster
+        templates:
+          podTemplate: clickhouse-with-volume-template
+          volumeClaimTemplate: clickhouse-storage-template
+        layout:
+          shardsCount: 3
+          replicasCount: 2
   templates:
     podTemplates:
-    - name: clickhouse-with-volume-template
-      # volumes:
-      containers:
-      - name: clickhouse-pod
-        image: yandex/clickhouse-server:18.16.1
-        ports:
-        - name: http
-          containerPort: 8123
-        - name: client
-          containerPort: 9000
-        - name: interserver
-          containerPort: 9009
-        volumeMounts:
-        - name: clickhouse-storage
-          mountPath: /var/lib/clickhouse
+      - name: clickhouse-with-volume-template
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:18.16.1
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009
+              volumeMounts:
+                - name: clickhouse-storage-template
+                  mountPath: /var/lib/clickhouse
     volumeClaimTemplates:
-    - name: clickhouse-storage-template
-      persistentVolumeClaim:
-        metadata:
-          name: clickhouse-storage
+      - name: clickhouse-storage-template
         spec:
           # no storageClassName - means use default storageClassName
           #storageClassName: default

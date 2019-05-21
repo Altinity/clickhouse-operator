@@ -5,54 +5,55 @@ metadata:
 spec:
   configuration:
     clusters:
-    - name: adv
-      layout:
-        type: Advanced
-        shards:
-        - definitionType: Replicas
-          replicas:
-          - deployment:
-              podTemplate: clickhouse:19.3.5
-          - deployment:
-              podTemplate: clickhouse:19.3.100
-          - deployment:
-              podTemplate: clickhouse:19.3.7
+      - name: adv
+        layout:
+          shards:
+            - replicas:
+                - templates:
+                    podTemplate: clickhouse:19.3.5
+                - templates:
+                    podTemplate: clickhouse:19.3.100
+                - templates:
+                    podTemplate: clickhouse:19.3.7
 
   templates:
     podTemplates:
       - name: clickhouse:19.3.5
-        containers:
-          - name: clickhouse-pod
-            image: yandex/clickhouse-server:19.3.5
-            ports:
-              - name: http
-                containerPort: 8123
-              - name: client
-                containerPort: 9000
-              - name: interserver
-                containerPort: 9009
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.3.5
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009
 
       - name: clickhouse:19.3.7
-        containers:
-        - name: clickhouse-pod
-          image: yandex/clickhouse-server:19.3.7
-          ports:
-          - name: http
-            containerPort: 8123
-          - name: client
-            containerPort: 9000
-          - name: interserver
-            containerPort: 9009
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.3.7
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009
 
       # Incorrect image
       - name: clickhouse:19.3.100
-        containers:
-        - name: clickhouse-pod
-          image: yandex/clickhouse-server:19.3.100
-          ports:
-          - name: http
-            containerPort: 8123
-          - name: client
-            containerPort: 9000
-          - name: interserver
-            containerPort: 9009
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.3.100
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009

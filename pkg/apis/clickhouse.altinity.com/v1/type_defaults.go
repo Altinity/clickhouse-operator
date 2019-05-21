@@ -19,9 +19,16 @@ func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults) {
 		return
 	}
 
-	if from.ReplicasUseFQDN > 0 {
+	if from.ReplicasUseFQDN == "" {
 		defaults.ReplicasUseFQDN = from.ReplicasUseFQDN
 	}
 	(&defaults.DistributedDDL).MergeFrom(&from.DistributedDDL)
-	(&defaults.Deployment).MergeFrom(&from.Deployment)
+
+	if defaults.Templates.PodTemplate == "" {
+		defaults.Templates.PodTemplate = from.Templates.PodTemplate
+	}
+
+	if defaults.Templates.VolumeClaimTemplate == "" {
+		defaults.Templates.VolumeClaimTemplate = from.Templates.VolumeClaimTemplate
+	}
 }
