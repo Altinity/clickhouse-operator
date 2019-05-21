@@ -6,11 +6,11 @@ WORKDIR $GOPATH/src/github.com/altinity/clickhouse-operator
 
 # Reconstruct source tree inside docker
 ADD . .
-# ./vendor is exluded in .dockerignore, reconstruct it with 'dep' tool
+# ./vendor is excluded in .dockerignore, reconstruct it with 'dep' tool
 RUN go get -u github.com/golang/dep/cmd/dep
 RUN dep ensure --vendor-only
 
-# Build operator binary
+# Build operator binary with explicitly specified output
 RUN OPERATOR_BIN=/tmp/clickhouse-operator ./dev/binary_build.sh
 
 # === Runner ===
