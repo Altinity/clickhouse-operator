@@ -9,10 +9,8 @@ spec:
         templates:
           podTemplate: clickhouse:19.3.7
         layout:
-          type: Advanced
           shards:
-            - definitionType: Replicas
-              replicas:
+            - replicas:
                 - port: 9000
                 - port: 9000
                 - port: 9000

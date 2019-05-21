@@ -7,14 +7,11 @@ spec:
     clusters:
       - name: "standard-04-not-sharded-replicated"
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 2
       - name: "standard-04-sharded-not-replicated"
         layout:
-          type: Standard
           shardsCount: 2
       - name: "standard-04-sharded-replicated"
         layout:
-          type: Standard
           replicasCount: 2

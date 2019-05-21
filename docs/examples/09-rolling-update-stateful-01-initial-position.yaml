@@ -9,7 +9,6 @@ spec:
         templates:
           podTemplate: clickhouse-with-empty-dir-volume-template
         layout:
-          type: Standard
           shardsCount: 2
   templates:
     podTemplates:

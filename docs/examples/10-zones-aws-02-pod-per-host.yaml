@@ -26,7 +26,6 @@ spec:
     clusters:
       - name: zoned-cluster
         layout:
-          type: Standard
           shardsCount: 3
 
   templates:

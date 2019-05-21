@@ -23,10 +23,8 @@ spec:
     clusters:
       - name: zoned-cluster
         layout:
-          type: Advanced
           shards:
-            - definitionType: Replicas
-              replicas:
+            - replicas:
                 - templates:
                     podTemplate: clickhouse-in-zone-us-east-1a
                 - templates:

@@ -7,6 +7,5 @@ spec:
     clusters:
       - name: "standard-01-1shard-1repl"
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 1

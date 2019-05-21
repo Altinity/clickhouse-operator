@@ -10,7 +10,6 @@ spec:
     clusters:
       - name: "standard-01-simple-pv"
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 1
   templates:

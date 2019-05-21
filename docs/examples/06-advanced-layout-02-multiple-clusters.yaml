@@ -7,22 +7,18 @@ spec:
     clusters:
       - name: 3-2
         layout:
-          type: Advanced
           shards:
-            - definitionType: Replicas
-              replicas:
+            - replicas:
                 - templates:
                     podTemplate: t1
                 - templates:
                     podTemplate: t1
-            - definitionType: Replicas
-              replicas:
+            - replicas:
                 - templates:
                     podTemplate: t1
                 - templates:
                     podTemplate: t1
-            - definitionType: Replicas
-              replicas:
+            - replicas:
                 - templates:
                     podTemplate: t1
                 - templates:
@@ -30,18 +26,15 @@ spec:
 
       - name: 2-3
         layout:
-          type: Advanced
           shards:
-            - definitionType: Replicas
-              replicas:
+            - replicas:
                 - templates:
                     podTemplate: t1
                 - templates:
                     podTemplate: t1
                 - templates:
                     podTemplate: t1
-            - definitionType: Replicas
-              replicas:
+            - replicas:
                 - templates:
                     podTemplate: t1
                 - templates:

@@ -15,6 +15,5 @@ spec:
     clusters:
       - name: replcluster
         layout:
-          type: Standard
           shardsCount: 3
           replicasCount: 2

@@ -14,7 +14,6 @@ spec:
           podTemplate: clickhouse-with-volume-template
           volumeClaimTemplate: clickhouse-storage-template
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 2
   templates:

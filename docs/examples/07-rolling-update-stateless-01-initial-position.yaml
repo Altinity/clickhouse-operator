@@ -7,10 +7,8 @@ spec:
     zookeeper: # Add Zookeeper
       nodes:
         - host: zookeeper.zoo1ns
-          port: 2181
     clusters:
       - name: "sharded"
         layout:
-          type: Standard
           shardsCount: 4
 #          replicasCount: 2 # Enable replication

@@ -11,7 +11,6 @@ spec:
           podTemplate: pod-template-with-volume
           volumeClaimTemplate: storage-vc-template
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 1
 

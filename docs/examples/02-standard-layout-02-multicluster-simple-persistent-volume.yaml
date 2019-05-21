@@ -10,16 +10,13 @@ spec:
     clusters:
       - name: "sharded-replicated"
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 2
       - name: "sharded-non-replicated"
         layout:
-          type: Standard
           shardsCount: 2
       - name: "replicated"
         layout:
-          type: Standard
           replicasCount: 2
   templates:
     volumeClaimTemplates:

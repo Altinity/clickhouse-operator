@@ -7,7 +7,6 @@ spec:
     clusters:
       - name: "standard-template-with-resources"
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 1
   defaults:
