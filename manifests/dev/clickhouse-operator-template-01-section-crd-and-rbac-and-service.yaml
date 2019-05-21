@@ -27,11 +27,11 @@ spec:
     - name: clusters
       type: integer
       description: Clusters count
-      JSONPath: .status.clustersCount
+      JSONPath: .status.clusters
     - name: replicas
       type: integer
       description: Replicas count
-      JSONPath: .status.replicasCount
+      JSONPath: .status.replicas
     - name: endpoint
       type: string
       description: Client access endpoint
@@ -47,18 +47,9 @@ spec:
             defaults:
               type: object
               properties:
+                # Need to be string-bool
                 replicasUseFQDN:
-                  enum:
-                    - 0
-                    - 1
-                    - False
-                    - True
-                    - No
-                    - Yes
-                    - Off
-                    - On
-                    - Disabled
-                    - Enabled
+                  type: string
                 distributedDDL:
                   type: object
                   properties:
@@ -127,9 +118,7 @@ spec:
                         properties:
                           # DEPRECATED - to be removed soon
                           type:
-                            enum:
-                              - Standard
-                              - Advanced
+                            type: string
                           shardsCount:
                             type: integer
                           replicasCount:
@@ -143,26 +132,15 @@ spec:
                                   type: string
                                 # DEPRECATED - to be removed soon
                                 definitionType:
-                                  enum:
-                                    - ReplicasCount
-                                    - Replicas
+                                  type: string
                                 replicasCount:
                                   type: integer
                                   minimum: 1
                                 weight:
                                   type: integer
+                                # Need to be string-bool
                                 internalReplication:
-                                  enum:
-                                    - 0
-                                    - 1
-                                    - False
-                                    - True
-                                    - No
-                                    - Yes
-                                    - Off
-                                    - On
-                                    - Disabled
-                                    - Enabled
+                                  type: string
                                 templates:
                                   type: object
                                   properties:
