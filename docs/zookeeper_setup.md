@@ -238,4 +238,4 @@ In case all looks fine Zookeeper cluster is up and running
 [k8sdocs_dynamic_provisioning]: https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/
 
 [quickstart_persistent]: ../manifests/zookeeper/quick-start-persistent-volume
-[quickstart_emptydir]: ../manifests/zookeeper/quick-start-local-emptyDir
+[quickstart_emptydir]: ../manifests/zookeeper/quick-start-volume-emptyDir

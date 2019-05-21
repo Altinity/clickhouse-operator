@@ -77,7 +77,6 @@ spec:
     clusters:
       - name: "standard-01-1shard-1repl"
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 1
 ```
@@ -137,26 +136,24 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "standard-01-simple-pv"
 spec:
+  defaults:
+    templates:
+      volumeClaimTemplate: volumeclaim-template
   configuration:
     clusters:
       - name: "standard-01-simple-pv"
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 1
-  defaults:
-    deployment:
-      volumeClaimTemplate: volumeclaim-template
   templates:
     volumeClaimTemplates:
       - name: volumeclaim-template
-        persistentVolumeClaim:
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 500Mi
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 500Mi
 ```
 
 ## Custom Deployment with Pod and VolumeClaim Templates
@@ -177,42 +174,40 @@ spec:
   configuration:
     clusters:
       - name: "standard-02-deployment-pv"
-        deployment:
-          podTemplate: clickhouse-with-volume-template
-          volumeClaimTemplate: clickhouse-storage-template
+        # Templates are specified for this cluster explicitly
+        templates:
+          podTemplate: pod-template-with-volume
+          volumeClaimTemplate: storage-vc-template
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 1
-          
+
   templates:
     podTemplates:
-      - name: clickhouse-with-volume-template
-        containers:
-          - name: clickhouse-pod
-            image: yandex/clickhouse-server:19.3.7
-            ports:
-              - name: http
-                containerPort: 8123
-              - name: client
-                containerPort: 9000
-              - name: interserver
-                containerPort: 9009
-            volumeMounts:
-              - name: clickhouse-storage
-                mountPath: /var/lib/clickhouse
-                
+      - name: pod-template-with-volume
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:19.3.7
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009
+              volumeMounts:
+                - name: storage-vc-template
+                  mountPath: /var/lib/clickhouse
+
     volumeClaimTemplates:
-      - name: clickhouse-storage-template
-        persistentVolumeClaim:
-          metadata:
-            name: clickhouse-storage
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi
+      - name: storage-vc-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
 ```
 
 ## Custom Deployment with Specific ClickHouse Configuration
@@ -221,24 +216,41 @@ More extended settings example is [available here](./examples/03-settings-01.yam
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "test-custom-settings"
+  name: "settings-01"
 spec:
   configuration:
     users:
+      # test user has 'password' specified, while admin user has 'password_sha256_hex' specified
+      test/password: qwerty
+      test/networks/ip:
+        - "127.0.0.1/32"
+        - "192.168.74.1/24"
+      test/profile: test_profile
+      test/quota: test_quota
+      test/allow_databases/database:
+        - "dbname1"
+        - "dbname2"
+        - "dbname3"
+      # admin use has 'password_sha256_hex' so actual password value is not published
+      admin/password_sha256_hex: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
+      admin/networks/ip: "127.0.0.1/32"
+      admin/profile: default
+      admin/quota: default
+      # readonly user has 'password' field specified, not 'password_sha256_hex' as admin user above
+      readonly/password: readonly_password
       readonly/profile: readonly
-      test/profile: default
-      test/quota: default
+      readonly/quota: default
     profiles:
-      default/max_memory_usage: "1000000000"
+      test_profile/max_memory_usage: "1000000000"
+      test_profile/readonly: "1"
       readonly/readonly: "1"
     quotas:
-      default/interval/duration: "3600"
+      test_quota/interval/duration: "3600"
     settings:
       compression/case/method: zstd
     clusters:
-      - name: "simple"
+      - name: "standard"
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 1
 ```

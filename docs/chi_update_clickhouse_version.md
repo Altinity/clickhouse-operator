@@ -90,9 +90,9 @@ We'll make Version Update in two steps:
 ## Update one ClickHouse instance
 
 Now let's update version of only one instance of ClickHouse. Let it be the last one.
-We can do by explicitly specifying `deployment` with different ClickHouse version:
+We can do by explicitly specifying `templates` with different ClickHouse version:
 ```yaml
-                  deployment:
+                  templates:
                     podTemplate: clickhouse:19.3.7
 ```
 Manifest file with one ClickHouse instance update is [08-clickhouse-version-update-02-apply-update-one.yaml](./examples/08-clickhouse-version-update-02-apply-update-one.yaml):
