@@ -26,7 +26,7 @@ spec:
       JSONPath: .status.version
     - name: clusters
       type: integer
-      description: Clusters number
+      description: Clusters count
       JSONPath: .status.clustersCount
     - name: replicas
       type: integer
