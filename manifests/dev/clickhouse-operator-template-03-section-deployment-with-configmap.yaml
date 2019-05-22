@@ -27,12 +27,17 @@ spec:
         - name: etc-clickhouse-operator-folder
           configMap:
             name: etc-clickhouse-operator-files
+        - name: etc-clickhouse-operator-usersd-folder
+          configMap:
+            name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
           image: ${CHOPERATOR_IMAGE}
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
+            - name: etc-clickhouse-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/users.d
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal

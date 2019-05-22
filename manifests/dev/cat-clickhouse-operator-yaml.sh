@@ -11,6 +11,7 @@ PROJECT_ROOT=$(realpath ${CUR_DIR}/../..)
 CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE:-kube-system}"
 CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
 CHOPERATOR_CONFIG_FILE="${PROJECT_ROOT}/config/config.yaml"
+CHOPERATOR_USERSD_FOLDER="${PROJECT_ROOT}/config/users.d"
 
 # .yaml manifest sections to be rendered
 MANIFEST_PRINT_CRD="${MANIFEST_PRINT_CRD:-yes}"
@@ -63,10 +64,20 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         # Config file specified, render deployment with ConfigMap
         echo "---"
         cat ${CUR_DIR}/clickhouse-operator-template-03-section-deployment-with-configmap.yaml | CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
-        # Render specified config file into ConfigMap
-        # Apply additional indentation to config file while rendering
+
+        # Render clickhouse-operator config file
         echo "---"
-        cat ${CUR_DIR}/clickhouse-operator-template-04-section-configmap-header.yaml | CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
+        cat ${CUR_DIR}/clickhouse-operator-template-04-section-configmap-header.yaml | CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" CONFIGMAP_NAME="etc-clickhouse-operator-files" envsubst
         render_file_into_configmap "${PROJECT_ROOT}/config/config.yaml"
+
+        # Render users.d files
+        echo "---"
+        cat ${CUR_DIR}/clickhouse-operator-template-04-section-configmap-header.yaml | CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" CONFIGMAP_NAME="etc-clickhouse-operator-usersd-files" envsubst
+        if [[ ! -z "${CHOPERATOR_USERSD_FOLDER}" ]]; then
+            for FILE in ${CHOPERATOR_USERSD_FOLDER}/*; do
+                render_file_into_configmap "${FILE}"
+            done
+        fi
     fi
 fi
+

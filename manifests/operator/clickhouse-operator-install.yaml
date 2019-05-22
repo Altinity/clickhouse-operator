@@ -195,6 +195,11 @@ spec:
                         # TODO specify PodSpec
                         type: object
 ---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+#
 # Setup ServiceAccount
 # ServiceAccount would be created in kubectl-specified namespace
 apiVersion: v1
@@ -262,9 +267,21 @@ spec:
         app: clickhouse-operator
     spec:
       serviceAccountName: clickhouse-operator
+      volumes:
+        - name: etc-clickhouse-operator-folder
+          configMap:
+            name: etc-clickhouse-operator-files
+        - name: etc-clickhouse-operator-usersd-folder
+          configMap:
+            name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
           image: altinity/clickhouse-operator:latest
+          volumeMounts:
+            - name: etc-clickhouse-operator-folder
+              mountPath: /etc/clickhouse-operator
+            - name: etc-clickhouse-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/users.d
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -315,3 +332,113 @@ spec:
                 resourceFieldRef:
                   containerName: clickhouse-operator
                   resource: limits.memory
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+# etc-clickhouse-operator-files
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-clickhouse-operator-files
+  namespace: kube-system
+data:
+  config.yaml: |
+    # Namespaces where clickhouse-operator listens for events.
+    # Concurrently running operators should listen on different namespaces
+    namespaces:
+      - dev
+      - info
+      - onemore
+    
+    ################################################
+    ##
+    ## Additional Configuration Files Section
+    ##
+    ################################################
+    
+    # Path to folder where ClickHouse configuration files common for all instances within CHI are located.
+    chCommonConfigsPath: config.d
+    
+    # Path to folder where ClickHouse configuration files unique for each instances within CHI are located.
+    chDeploymentConfigsPath: conf.d
+    
+    # Path to folder where ClickHouse configuration files with users settings are located.
+    # Files are common for all instances within CHI
+    chUsersConfigsPath: users.d
+    
+    # Path to folder where ClickHouseInstallation .yaml manifests are located.
+    # Manifests are applied in sorted alpha-numeric order
+    chiTemplatesPath: templates.d
+    
+    ################################################
+    ##
+    ## Cluster Create/Update/Delete Objects Section
+    ##
+    ################################################
+    
+    # How many seconds to wait for created/updated StatefulSet to be Ready
+    statefulSetUpdateTimeout: 50
+    
+    # How many seconds to wait between checks for created/updated StatefulSet status
+    statefulSetUpdatePollPeriod: 2
+    
+    # What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+    # Possible options:
+    # 1. abort - do nothing, just break the process and wait for admin
+    # 2. delete - delete newly created problematic StatefulSet
+    onStatefulSetCreateFailureAction: delete
+    
+    # What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+    # Possible options:
+    # 1. abort - do nothing, just break the process and wait for admin
+    # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
+    # Pod would be recreated by StatefulSet based on rollback-ed configuration
+    onStatefulSetUpdateFailureAction: rollback
+    
+    ################################################
+    ##
+    ## ClickHouse Settings Section
+    ##
+    ################################################
+    
+    # Default values for ClickHouse user configuration
+    # 1. user/profile - string
+    # 2. user/quota - string
+    # 3. user/networks/ip - multiple strings
+    # 4. user/password - string
+    chConfigUserDefaultProfile: default
+    chConfigUserDefaultQuota: default
+    chConfigUserDefaultNetworksIP:
+      - "::/0"
+    chConfigUserDefaultPassword: "default"
+
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+# etc-clickhouse-operator-usersd-files
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-clickhouse-operator-usersd-files
+  namespace: kube-system
+data:
+  01-clickhouse-operator-user.xml: |
+    <yandex>
+        <users>
+            <clickhouse_operator>
+                <networks>
+                    <ip>::/0</ip>
+                </networks>
+                <password>clickhouse_operator_password</password>
+                <profile>default</profile>
+                <quota>default</quota>
+            </clickhouse_operator>
+        </users>
+    </yandex>
+
