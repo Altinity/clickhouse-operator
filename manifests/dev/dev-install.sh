@@ -20,6 +20,6 @@ else
 
     if [[ "${INSTALL_FROM_DEPLOYMENT_MANIFEST}" == "yes" ]]; then
         # Install operator from Docker Registry (dockerhub or whatever)
-        kubectl -n "${CHOPERATOR_NAMESPACE}" apply -f <(CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" MANIFEST_PRINT_CRD_RBAC="no" ${CUR_DIR}/cat-clickhouse-operator-yaml.sh)
+        kubectl -n "${CHOPERATOR_NAMESPACE}" apply -f <(CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" MANIFEST_PRINT_CRD="no" MANIFEST_PRINT_RBAC="no" ${CUR_DIR}/cat-clickhouse-operator-yaml.sh)
     fi
 fi
