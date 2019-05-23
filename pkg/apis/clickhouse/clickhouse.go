@@ -15,90 +15,98 @@
 package clickhouse
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/golang/glog"
-	"io/ioutil"
-	"net/http"
-	neturl "net/url"
-	"strings"
-	"time"
+	_ "github.com/mailru/go-clickhouse"
+	"strconv"
 )
 
 const (
-	chQueryUrlPattern     = "http://%s:8123/"
-	chQueryUrlParam       = "query"
-	chQueryDefaultTimeout = 10 * time.Second
+	// http://user:password@host:8123/
+	chDsnUrlPattern = "http://%s%s:%s/"
 )
 
-// Query runs given sql as GET and writes results into data
-func Query(data *[][]string, sql string, hostname string) error {
-	if len(sql) == 0 {
+type Conn struct {
+	Hostname string
+	Username string
+	Password string
+	Port     int
+}
+
+func New(hostname, username, password string, port int) *Conn {
+	return &Conn{
+		Hostname: hostname,
+		Username: username,
+		Password: password,
+		Port:     port,
+	}
+}
+
+func (c *Conn) makeUsernamePassword() string {
+	if c.Username == "" && c.Password == "" {
+		return ""
+	}
+	return c.Username + ":" + c.Password
+}
+
+func (c *Conn) makeDsn() string {
+	return fmt.Sprintf(chDsnUrlPattern, c.makeUsernamePassword(), c.Hostname, strconv.Itoa(c.Port))
+}
+
+// Query runs given sql query
+func (c *Conn) Query(query string) (*sql.Rows, error) {
+	if len(query) == 0 {
+		return nil, nil
+	}
+
+	connect, err := sql.Open("clickhouse", c.makeDsn())
+	if err != nil {
+		glog.V(1).Infof("%v", err)
+		return nil, err
+	}
+
+	if err := connect.Ping(); err != nil {
+		glog.V(1).Infof("%v", err)
+		return nil, err
+	}
+
+	rows, err := connect.Query(query)
+	if err != nil {
+		glog.V(1).Infof("%v", err)
+		return nil, err
+	}
+
+	glog.V(1).Infof("clickhouseSQL(%s)'%s'rows:%d", c.Hostname, query)
+
+	return rows, nil
+}
+
+// Exec runs given sql query
+func (c *Conn) Exec(query string) error {
+	if len(query) == 0 {
 		return nil
 	}
-	url, err := neturl.Parse(fmt.Sprintf(chQueryUrlPattern, hostname))
+
+	connect, err := sql.Open("clickhouse", c.makeDsn())
 	if err != nil {
-		return err
-	}
-	encodeQuery(url, sql)
-	err = httpCall(data, url.String(), "GET")
-
-	glog.V(1).Infof("clickhouseSQL(%s)'%s'rows:%d", hostname, sql, len(*data))
-
-	return err
-}
-
-// Exec runs given sql as POST and writes results into data
-func Exec(data *[][]string, sql string, hostname string) error {
-	if len(sql) == 0 {
-		return nil
-	}
-	url, err := neturl.Parse(fmt.Sprintf(chQueryUrlPattern, hostname))
-	if err != nil {
-		return err
-	}
-	encodeQuery(url, sql)
-	err = httpCall(data, url.String(), "POST")
-
-	glog.V(1).Infof("clickhouseSQL(%s)'%s'rows:%d", hostname, sql, len(*data))
-
-	return err
-}
-
-// encodeQuery injects SQL command into url.URL query
-func encodeQuery(url *neturl.URL, sql string) {
-	query := url.Query()
-	query.Set(chQueryUrlParam, sql)
-	url.RawQuery = query.Encode()
-}
-
-// httpCall runs HTTP request using provided URL
-func httpCall(results *[][]string, url string, method string) error {
-	// glog.Infof("HTTP GET %s\n", url)
-	client := &http.Client{
-		Timeout: time.Duration(chQueryDefaultTimeout),
-	}
-	request, err := http.NewRequest(method, url, nil)
-	if err != nil {
-		glog.Error(err)
-		return err
-	}
-	response, err := client.Do(request)
-	if err != nil {
-		glog.Error(err)
-		return err
-	}
-	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		glog.Error(err)
+		glog.V(1).Infof("%v", err)
 		return err
 	}
 
-	for _, line := range strings.Split(string(body), "\n") {
-		rows := strings.Split(line, "\t")
-		*results = append(*results, rows)
+	if err := connect.Ping(); err != nil {
+		glog.V(1).Infof("%v", err)
+		return err
 	}
-	// glog.Infof("Loaded %d rows", len(*results))
+
+	_, err = connect.Exec(query)
+
+	if err != nil {
+		glog.V(1).Infof("%v", err)
+		return err
+	}
+
+	glog.V(1).Infof("clickhouse.Exec(%s)'%s'", c.Hostname, query)
 
 	return nil
 }

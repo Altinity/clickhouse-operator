@@ -121,6 +121,14 @@
   version = "v1.1.5"
 
 [[projects]]
+  digest = "1:0ec583a42f28bee6e21323ec543d6dcef2d465d9bf3887c289bacc529d7fa9db"
+  name = "github.com/mailru/go-clickhouse"
+  packages = ["."]
+  pruneopts = ""
+  revision = "1490ca26a370f93bd4365156bfe94cade38f64cd"
+  version = "v1.1"
+
+[[projects]]
   digest = "1:63722a4b1e1717be7b98fc686e0b30d5e7f734b9e93d7dee86293b6deab7ea28"
   name = "github.com/matttproud/golang_protobuf_extensions"
   packages = ["pbutil"]
@@ -590,6 +598,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/golang/glog",
+    "github.com/mailru/go-clickhouse",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/r3labs/diff",
     "gopkg.in/d4l3k/messagediff.v1",
