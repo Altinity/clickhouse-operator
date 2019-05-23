@@ -20,24 +20,75 @@ import (
 
 const (
 	queryMetricsSQL = `
-	SELECT concat('metric.', metric) metric, toString(value), '' AS description, 'gauge' as type FROM system.asynchronous_metrics
+	SELECT
+		concat('metric.', metric) AS metric,
+		toString(value)           AS value, 
+		''                        AS description, 
+		'gauge'                   AS type   
+	FROM system.asynchronous_metrics
 	UNION ALL 
-	SELECT concat('metric.', metric) metric, toString(value), description, 'gauge' as type FROM system.metrics
+	SELECT 
+		concat('metric.', metric) AS metric, 
+		toString(value)           AS value, 
+		description               AS description,       
+		'gauge'                   AS type   
+	FROM system.metrics
 	UNION ALL 
-	SELECT concat('event.', event) as metric, toString(value), description, 'counter' as type FROM system.events`
-	queryTableSizesSQL = `select database, table, 
-	uniq(partition) as partitions, count() as parts, sum(bytes) as bytes, sum(data_uncompressed_bytes) uncompressed_bytes, sum(rows) as rows 
-	from system.parts where active = 1 group by database, table`
+	SELECT
+		concat('event.', event)   AS metric,
+		toString(value)           AS value,
+		description               AS description,
+		'counter'                 AS type
+	FROM system.events`
+
+	queryTableSizesSQL = `
+	SELECT
+		database,
+		table, 
+		toString(uniq(partition)) AS partitions, 
+		toString(count())         AS parts, 
+		toString(sum(bytes))      AS bytes, 
+		toString(sum(data_uncompressed_bytes)) AS uncompressed_bytes, 
+		toString(sum(rows))       AS rows 
+	FROM system.parts
+	WHERE active = 1
+	GROUP BY database, table`
 )
 
 // clickHouseQueryMetrics requests metrics data from the ClickHouse database using REST interface
 // data is a concealed output
 func clickHouseQueryMetrics(data *[][]string, hostname string) error {
-	return clickhouse.Query(data, queryMetricsSQL, hostname)
+	conn := clickhouse.New(hostname, "", "", 8123)
+	if rows, err := conn.Query(queryMetricsSQL); err != nil {
+		return err
+	} else {
+		for rows.Next() {
+			var metric, value, description, _type string
+			if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
+				*data = append(*data, []string{metric, value, description, _type})
+			} else {
+				// Skip erroneous line
+			}
+		}
+	}
+	return nil
 }
 
 // clickHouseQueryTableSizes requests data sizes from the ClickHouse database using REST interface
 // data is a concealed output
 func clickHouseQueryTableSizes(data *[][]string, hostname string) error {
-	return clickhouse.Query(data, queryTableSizesSQL, hostname)
+	conn := clickhouse.New(hostname, "", "", 8123)
+	if rows, err := conn.Query(queryTableSizesSQL); err != nil {
+		return err
+	} else {
+		for rows.Next() {
+			var database, table, partitions, parts, bytes, uncompressed, _rows string
+			if err := rows.Scan(&database, &table, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
+				*data = append(*data, []string{database, table, partitions, parts, bytes, uncompressed, _rows})
+			} else {
+				// Skip erroneous line
+			}
+		}
+	}
+	return nil
 }

@@ -78,7 +78,7 @@ func CreateController(
 	// Create Controller instance
 	controller := &Controller{
 		version:                 version,
-		runtimeParams: runtimeParams,
+		runtimeParams:           runtimeParams,
 		normalizer:              chopmodels.NewNormalizer(chopConfig),
 		chopConfig:              chopConfig,
 		kubeClient:              kubeClient,

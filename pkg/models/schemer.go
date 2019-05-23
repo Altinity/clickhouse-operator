@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/golang/glog"
 	"time"
 )
@@ -33,44 +32,66 @@ const (
 
 // ClusterGetCreateDatabases returns set of 'CREATE DATABASE ...' SQLs
 func ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
-	result := make([][]string, 0)
+	sql := `
+		SELECT
+			distinct name AS name,
+			concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_db_query
+		FROM cluster('%s', system, databases) 
+		WHERE name not in (%s)
+		ORDER BY name
+		SETTINGS skip_unavailable_shards = 1`
+	sql = fmt.Sprintf(sql, cluster.Name, ignoredDBs)
+
+	dbNames := make([]string, 0)
+	createStatements := make([]string, 0)
 	glog.V(1).Info(CreateChiServiceFQDN(chi))
-	_ = clickhouse.Query(&result,
-		fmt.Sprintf(
-			`SELECT
-					distinct name,
-					concat('CREATE DATABASE IF NOT EXISTS ', name)
-				FROM cluster('%s', system, databases) 
-				WHERE name not in (%s)
-				ORDER BY name
-				SETTINGS skip_unavailable_shards = 1`,
-			cluster.Name, ignoredDBs),
-		CreateChiServiceFQDN(chi),
-	)
-	dbNames, createStatements := util.Unzip(result)
+	conn := clickhouse.New(CreateChiServiceFQDN(chi), "", "", 8123)
+	if rows, err := conn.Query(sql); err != nil {
+		return nil, nil, err
+	} else {
+		for rows.Next() {
+			var name, create string
+			if err := rows.Scan(&name, &create); err == nil {
+				dbNames = append(dbNames, name)
+				createStatements = append(createStatements, create)
+			} else {
+				// Skip erroneous line
+			}
+		}
+	}
 	return dbNames, createStatements, nil
 }
 
 // ClusterGetCreateTables returns set of 'CREATE TABLE ...' SQLs
 func ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
-	result := make([][]string, 0)
-	_ = clickhouse.Query(
-		&result,
-		fmt.Sprintf(
-			`SELECT
-					distinct name, 
-					replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS') 
-				FROM cluster('%s', system, tables)
-				WHERE database not in (%s)
-					AND name not like '.inner.%%'
-				ORDER BY multiIf(engine not in ('Distributed', 'View', 'MaterializedView'), 1, engine = 'MaterializedView', 2, engine = 'Distributed', 3, 4), name
-				SETTINGS skip_unavailable_shards = 1`,
-			cluster.Name,
-			ignoredDBs,
-		),
-		CreateChiServiceFQDN(chi),
-	)
-	tableNames, createStatements := util.Unzip(result)
+	sql := `
+		SELECT
+			distinct name, 
+			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS') 
+		FROM cluster('%s', system, tables)
+		WHERE database not in (%s)
+			AND name not like '.inner.%%'
+		ORDER BY multiIf(engine not in ('Distributed', 'View', 'MaterializedView'), 1, engine = 'MaterializedView', 2, engine = 'Distributed', 3, 4), name
+		SETTINGS skip_unavailable_shards = 1`
+	sql = fmt.Sprintf(sql, cluster.Name, ignoredDBs)
+
+	tableNames := make([]string, 0)
+	createStatements := make([]string, 0)
+	glog.V(1).Info(CreateChiServiceFQDN(chi))
+	conn := clickhouse.New(CreateChiServiceFQDN(chi), "", "", 8123)
+	if rows, err := conn.Query(sql); err != nil {
+		return nil, nil, err
+	} else {
+		for rows.Next() {
+			var name, create string
+			if err := rows.Scan(&name, &create); err == nil {
+				tableNames = append(tableNames, name)
+				createStatements = append(createStatements, create)
+			} else {
+				// Skip erroneous line
+			}
+		}
+	}
 	return tableNames, createStatements, nil
 }
 
@@ -78,21 +99,33 @@ func ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiClu
 func ReplicaGetDropTables(replica *chi.ChiReplica) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
-	result := make([][]string, 0)
-	_ = clickhouse.Query(
-		&result,
-		fmt.Sprintf(
-			`SELECT
-					distinct name, 
-					concat('DROP TABLE IF EXISTS ', database, '.', name)
-				FROM system.tables
-				WHERE database not in (%s) 
-					AND engine like 'Replicated%%'`,
-			ignoredDBs,
-		),
-		CreatePodFQDN(replica),
-	)
-	tableNames, dropStatements := util.Unzip(result)
+
+	sql := `
+		SELECT
+			distinct name, 
+			concat('DROP TABLE IF EXISTS ', database, '.', name)
+		FROM system.tables
+		WHERE database not in (%s) 
+			AND engine like 'Replicated%%'`
+	sql = fmt.Sprintf(sql, ignoredDBs)
+
+	tableNames := make([]string, 0)
+	dropStatements := make([]string, 0)
+	glog.V(1).Info(CreatePodFQDN(replica))
+	conn := clickhouse.New(CreatePodFQDN(replica), "", "", 8123)
+	if rows, err := conn.Query(sql); err != nil {
+		return nil, nil, err
+	} else {
+		for rows.Next() {
+			var name, create string
+			if err := rows.Scan(&name, &create); err == nil {
+				tableNames = append(tableNames, name)
+				dropStatements = append(dropStatements, create)
+			} else {
+				// Skip erroneous line
+			}
+		}
+	}
 	return tableNames, dropStatements, nil
 }
 
@@ -125,6 +158,7 @@ func applySQLs(hosts []string, sqls []string, retry bool) error {
 	var err error = nil
 	// For each host in the list run all SQL queries
 	for _, host := range hosts {
+		conn := clickhouse.New(host, "", "", 8123)
 		for _, sql := range sqls {
 			if len(sql) == 0 {
 				// Skip malformed SQL query, move to the next SQL query
@@ -133,15 +167,15 @@ func applySQLs(hosts []string, sqls []string, retry bool) error {
 			// Now retry this SQL query on particular host
 			for retryCount := 0; retryCount < maxRetries; retryCount++ {
 				glog.V(1).Infof("applySQL(%s)\n", sql)
-				data := make([][]string, 0)
-				err = clickhouse.Exec(&data, sql, host)
+				err = conn.Exec(sql)
 				if (err == nil) || !retry {
 					// Either all is good or we are not interested in retries anyway
 					// Move on to the next SQL query on this host
 					break
 				}
 				glog.V(1).Infof("attempt %d failed, sleep and retry\n", retryCount)
-				time.Sleep(5 * time.Second)
+				seconds := (retryCount + 1) * 5
+				time.Sleep(time.Duration(seconds) * time.Second)
 			}
 		}
 	}
