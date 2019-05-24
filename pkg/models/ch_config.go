@@ -61,22 +61,6 @@ func (c *ClickHouseConfigGenerator) GetSettings() string {
 	return generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
 }
 
-// GetListen creates data for "listen.xml"
-func (c *ClickHouseConfigGenerator) GetListen() string {
-	return `<!-- Generated as default chopConfig by clickhouse-operator -->
-<yandex>
-    <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
-    <listen_host>::</listen_host>
-    <listen_host>0.0.0.0</listen_host>
-    <listen_try>1</listen_try>
-
-    <logger>
-        <console>1</console>
-    </logger>
-</yandex>
-`
-}
-
 // GetZookeeper creates data for "zookeeper.xml"
 func (c *ClickHouseConfigGenerator) GetZookeeper() string {
 	if len(c.chi.Spec.Configuration.Zookeeper.Nodes) == 0 {

@@ -49,7 +49,6 @@ const (
 	configRemoteServers = "remote_servers"
 	configZookeeper     = "zookeeper"
 	configMacros        = "macros"
-	configListen        = "listen"
 )
 
 const (
@@ -64,7 +63,6 @@ const (
 	filenameProfilesXML      = configProfiles + dotXML
 	filenameSettingsXML      = configSettings + dotXML
 	filenameMacrosXML        = configMacros + dotXML
-	filenameListenXML        = configListen + dotXML
 )
 
 const (

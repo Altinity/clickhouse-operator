@@ -271,6 +271,15 @@ spec:
         - name: etc-clickhouse-operator-folder
           configMap:
             name: etc-clickhouse-operator-files
+        - name: etc-clickhouse-operator-confd-folder
+          configMap:
+            name: etc-clickhouse-operator-confd-files
+        - name: etc-clickhouse-operator-configd-folder
+          configMap:
+            name: etc-clickhouse-operator-configd-files
+        - name: etc-clickhouse-operator-templatesd-folder
+          configMap:
+            name: etc-clickhouse-operator-templatesd-files
         - name: etc-clickhouse-operator-usersd-folder
           configMap:
             name: etc-clickhouse-operator-usersd-files
@@ -280,6 +289,12 @@ spec:
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
+            - name: etc-clickhouse-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/conf.d
+            - name: etc-clickhouse-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/config.d
+            - name: etc-clickhouse-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/templates.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/users.d
           env:
@@ -380,10 +395,10 @@ data:
     ################################################
     
     # How many seconds to wait for created/updated StatefulSet to be Ready
-    statefulSetUpdateTimeout: 50
+    statefulSetUpdateTimeout: 600
     
     # How many seconds to wait between checks for created/updated StatefulSet status
-    statefulSetUpdatePollPeriod: 2
+    statefulSetUpdatePollPeriod: 10
     
     # What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
     # Possible options:
@@ -414,7 +429,77 @@ data:
     chConfigUserDefaultNetworksIP:
       - "::/0"
     chConfigUserDefaultPassword: "default"
+    
+    ################################################
+    ##
+    ## Operator's access to ClickHouse instances
+    ##
+    ################################################
+    
+    # ClickHouse credentials (username, password and port) to be used by operator to connect to ClickHouse instances for:
+    # 1. Metrics requests
+    # 2. Schema maintenance
+    # 3. DROP DNS CACHE
+    # User with such credentials credentials can be specified in additional ClickHouse .xml config files,
+    # located in `chUsersConfigsPath` folder
+    chUsername: clickhouse_operator
+    chPassword: clickhouse_operator_password
+    chPort: 8123
 
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+# etc-clickhouse-operator-confd-files
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-clickhouse-operator-confd-files
+  namespace: kube-system
+data:
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+# etc-clickhouse-operator-configd-files
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-clickhouse-operator-configd-files
+  namespace: kube-system
+data:
+  01-clickhouse-operator-listen.xml: |
+    <yandex>
+        <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
+        <listen_host>::</listen_host>
+        <listen_host>0.0.0.0</listen_host>
+        <listen_try>1</listen_try>
+    </yandex>
+
+  02-clickhouse-operator-logger.xml: |
+    <yandex>
+        <logger>
+            <console>1</console>
+        </logger>
+    </yandex>
+
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+# etc-clickhouse-operator-templatesd-files
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-clickhouse-operator-templatesd-files
+  namespace: kube-system
+data:
 ---
 # Possible Template Parameters:
 #
