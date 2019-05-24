@@ -85,12 +85,10 @@ func (c *Creator) createConfigMapObjectsCommon() ConfigMapList {
 	// 1. remote servers
 	// 2. zookeeper
 	// 3. settings
-	// 4. listen
 	configs.commonConfigSections = make(map[string]string)
 	util.IncludeNonEmpty(configs.commonConfigSections, filenameRemoteServersXML, c.chConfigGenerator.GetRemoteServers())
 	util.IncludeNonEmpty(configs.commonConfigSections, filenameZookeeperXML, c.chConfigGenerator.GetZookeeper())
 	util.IncludeNonEmpty(configs.commonConfigSections, filenameSettingsXML, c.chConfigGenerator.GetSettings())
-	util.IncludeNonEmpty(configs.commonConfigSections, filenameListenXML, c.chConfigGenerator.GetListen())
 	// Extra user-specified configs
 	for filename, content := range c.chopConfig.ChCommonConfigs {
 		util.IncludeNonEmpty(configs.commonConfigSections, filename, content)

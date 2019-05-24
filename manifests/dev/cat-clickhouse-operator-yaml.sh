@@ -11,6 +11,7 @@ PROJECT_ROOT=$(realpath ${CUR_DIR}/../..)
 CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE:-kube-system}"
 CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
 CHOPERATOR_CONFIG_FILE="${PROJECT_ROOT}/config/config.yaml"
+CHOPERATOR_CONFIGD_FOLDER="${PROJECT_ROOT}/config/config.d"
 CHOPERATOR_USERSD_FOLDER="${PROJECT_ROOT}/config/users.d"
 
 # .yaml manifest sections to be rendered
@@ -69,6 +70,15 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         echo "---"
         cat ${CUR_DIR}/clickhouse-operator-template-04-section-configmap-header.yaml | CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" CONFIGMAP_NAME="etc-clickhouse-operator-files" envsubst
         render_file_into_configmap "${PROJECT_ROOT}/config/config.yaml"
+
+        # Render configd.d files
+        echo "---"
+        cat ${CUR_DIR}/clickhouse-operator-template-04-section-configmap-header.yaml | CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" CONFIGMAP_NAME="etc-clickhouse-operator-configd-files" envsubst
+        if [[ ! -z "${CHOPERATOR_CONFIGD_FOLDER}" ]]; then
+            for FILE in ${CHOPERATOR_CONFIGD_FOLDER}/*; do
+                render_file_into_configmap "${FILE}"
+            done
+        fi
 
         # Render users.d files
         echo "---"

@@ -271,6 +271,9 @@ spec:
         - name: etc-clickhouse-operator-folder
           configMap:
             name: etc-clickhouse-operator-files
+        - name: etc-clickhouse-operator-configd-folder
+          configMap:
+            name: etc-clickhouse-operator-configd-files
         - name: etc-clickhouse-operator-usersd-folder
           configMap:
             name: etc-clickhouse-operator-usersd-files
@@ -280,6 +283,8 @@ spec:
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
+            - name: etc-clickhouse-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/config.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/users.d
           env:
@@ -414,6 +419,48 @@ data:
     chConfigUserDefaultNetworksIP:
       - "::/0"
     chConfigUserDefaultPassword: "default"
+    
+    ################################################
+    ##
+    ## Operator's access to ClickHouse instances
+    ##
+    ################################################
+    
+    # Username and Password to be used by operator to connect to ClickHouse instances for
+    # 1. Metrics requests
+    # 2. Schema maintenance
+    # User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
+    chUsername: clickhouse_operator
+    chPassword: clickhouse_operator_password
+    chPort: 2181
+
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+# etc-clickhouse-operator-configd-files
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-clickhouse-operator-configd-files
+  namespace: kube-system
+data:
+  01-clickhouse-operator-listen.xml: |
+    <yandex>
+        <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
+        <listen_host>::</listen_host>
+        <listen_host>0.0.0.0</listen_host>
+        <listen_try>1</listen_try>
+    </yandex>
+
+  02-clickhouse-operator-logger.xml: |
+    <yandex>
+        <logger>
+            <console>1</console>
+        </logger>
+    </yandex>
 
 ---
 # Possible Template Parameters:

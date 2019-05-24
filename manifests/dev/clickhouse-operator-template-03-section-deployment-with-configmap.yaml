@@ -27,6 +27,9 @@ spec:
         - name: etc-clickhouse-operator-folder
           configMap:
             name: etc-clickhouse-operator-files
+        - name: etc-clickhouse-operator-configd-folder
+          configMap:
+            name: etc-clickhouse-operator-configd-files
         - name: etc-clickhouse-operator-usersd-folder
           configMap:
             name: etc-clickhouse-operator-usersd-files
@@ -36,6 +39,8 @@ spec:
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
+            - name: etc-clickhouse-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/config.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/users.d
           env:
