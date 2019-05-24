@@ -30,8 +30,26 @@ const (
 	maxRetries = 10
 )
 
+type Schemer struct {
+	Username string
+	Password string
+	Port     int
+}
+
+func NewSchemer(username, password string, port int) *Schemer {
+	return &Schemer{
+		Username: username,
+		Password: password,
+		Port:     port,
+	}
+}
+
+func (s *Schemer) newConn(hostname string) *clickhouse.Conn {
+	return clickhouse.New(hostname, s.Username, s.Password, s.Port)
+}
+
 // ClusterGetCreateDatabases returns set of 'CREATE DATABASE ...' SQLs
-func ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
+func (s *Schemer) ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
 	sql := `
 		SELECT
 			distinct name AS name,
@@ -45,7 +63,7 @@ func ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.Chi
 	dbNames := make([]string, 0)
 	createStatements := make([]string, 0)
 	glog.V(1).Info(CreateChiServiceFQDN(chi))
-	conn := clickhouse.New(CreateChiServiceFQDN(chi), "", "", 8123)
+	conn := s.newConn(CreateChiServiceFQDN(chi))
 	if rows, err := conn.Query(sql); err != nil {
 		return nil, nil, err
 	} else {
@@ -63,7 +81,7 @@ func ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.Chi
 }
 
 // ClusterGetCreateTables returns set of 'CREATE TABLE ...' SQLs
-func ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
+func (s *Schemer) ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
 	sql := `
 		SELECT
 			distinct name, 
@@ -78,7 +96,7 @@ func ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiClu
 	tableNames := make([]string, 0)
 	createStatements := make([]string, 0)
 	glog.V(1).Info(CreateChiServiceFQDN(chi))
-	conn := clickhouse.New(CreateChiServiceFQDN(chi), "", "", 8123)
+	conn := s.newConn(CreateChiServiceFQDN(chi))
 	if rows, err := conn.Query(sql); err != nil {
 		return nil, nil, err
 	} else {
@@ -96,7 +114,7 @@ func ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiClu
 }
 
 // ReplicaGetDropTables returns set of 'DROP TABLE ...' SQLs
-func ReplicaGetDropTables(replica *chi.ChiReplica) ([]string, []string, error) {
+func (s *Schemer) ReplicaGetDropTables(replica *chi.ChiReplica) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 
@@ -112,7 +130,7 @@ func ReplicaGetDropTables(replica *chi.ChiReplica) ([]string, []string, error) {
 	tableNames := make([]string, 0)
 	dropStatements := make([]string, 0)
 	glog.V(1).Info(CreatePodFQDN(replica))
-	conn := clickhouse.New(CreatePodFQDN(replica), "", "", 8123)
+	conn := s.newConn(CreatePodFQDN(replica))
 	if rows, err := conn.Query(sql); err != nil {
 		return nil, nil, err
 	} else {
@@ -130,35 +148,35 @@ func ReplicaGetDropTables(replica *chi.ChiReplica) ([]string, []string, error) {
 }
 
 // ChiDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
-func ChiDropDnsCache(chi *chi.ClickHouseInstallation) error {
+func (s *Schemer) ChiDropDnsCache(chi *chi.ClickHouseInstallation) error {
 	sqls := []string{
 		`SYSTEM DROP DNS CACHE`,
 	}
-	return ChiApplySQLs(chi, sqls)
+	return s.ChiApplySQLs(chi, sqls)
 }
 
 // ClusterApplySQLs runs set of SQL queries over the cluster
-func ClusterApplySQLs(cluster *chi.ChiCluster, sqls []string, retry bool) error {
-	return applySQLs(CreatePodFQDNsOfCluster(cluster), sqls, retry)
+func (s *Schemer) ClusterApplySQLs(cluster *chi.ChiCluster, sqls []string, retry bool) error {
+	return s.applySQLs(CreatePodFQDNsOfCluster(cluster), sqls, retry)
 }
 
 // ChiApplySQLs runs set of SQL queries over the whole CHI
-func ChiApplySQLs(chi *chi.ClickHouseInstallation, sqls []string) error {
-	return applySQLs(CreatePodFQDNsOfChi(chi), sqls, true)
+func (s *Schemer) ChiApplySQLs(chi *chi.ClickHouseInstallation, sqls []string) error {
+	return s.applySQLs(CreatePodFQDNsOfChi(chi), sqls, true)
 }
 
 // ReplicaApplySQLs runs set of SQL queries over the replica
-func ReplicaApplySQLs(replica *chi.ChiReplica, sqls []string, retry bool) error {
+func (s *Schemer) ReplicaApplySQLs(replica *chi.ChiReplica, sqls []string, retry bool) error {
 	hosts := []string{CreatePodFQDN(replica)}
-	return applySQLs(hosts, sqls, true)
+	return s.applySQLs(hosts, sqls, true)
 }
 
 // applySQLs runs set of SQL queries on set on hosts
-func applySQLs(hosts []string, sqls []string, retry bool) error {
+func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 	var err error = nil
 	// For each host in the list run all SQL queries
 	for _, host := range hosts {
-		conn := clickhouse.New(host, "", "", 8123)
+		conn := s.newConn(host)
 		for _, sql := range sqls {
 			if len(sql) == 0 {
 				// Skip malformed SQL query, move to the next SQL query

@@ -182,7 +182,7 @@ func Run() {
 
 	// Initializing Prometheus Metrics Exporter
 	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
-	metricsExporter := chopmetrics.CreateExporter()
+	metricsExporter := chopmetrics.NewExporter(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort)
 	prometheus.MustRegister(metricsExporter)
 	http.Handle(metricsPath, prometheus.Handler())
 	go http.ListenAndServe(metricsEP, nil)
@@ -210,7 +210,7 @@ func Run() {
 	chopInformerFactory := chopinformers.NewSharedInformerFactory(chopClient, informerFactoryResync)
 
 	// Creating resource Controller
-	chiController := chi.CreateController(
+	chiController := chi.NewController(
 		version.Version,
 		runtimeParams,
 		chopConfig,
@@ -223,6 +223,14 @@ func Run() {
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().Pods(),
 		metricsExporter,
+	)
+	chiController.AddEventHandlers(
+		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
+		kubeInformerFactory.Core().V1().Services(),
+		kubeInformerFactory.Core().V1().Endpoints(),
+		kubeInformerFactory.Core().V1().ConfigMaps(),
+		kubeInformerFactory.Apps().V1().StatefulSets(),
+		kubeInformerFactory.Core().V1().Pods(),
 	)
 
 	// Starting Informers

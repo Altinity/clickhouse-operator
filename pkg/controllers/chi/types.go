@@ -35,8 +35,8 @@ import (
 type Controller struct {
 	version       string
 	runtimeParams map[string]string
-
-	normalizer *models.Normalizer
+	normalizer    *models.Normalizer
+	schemer       *models.Schemer
 
 	// chopConfig used to keep clickhouse-oprator config
 	chopConfig *config.Config

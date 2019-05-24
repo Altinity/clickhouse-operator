@@ -43,8 +43,8 @@ import (
 	"github.com/golang/glog"
 )
 
-// CreateController creates instance of Controller
-func CreateController(
+// NewController creates instance of Controller
+func NewController(
 	version string,
 	runtimeParams map[string]string,
 	chopConfig *config.Config,
@@ -80,6 +80,7 @@ func CreateController(
 		version:                 version,
 		runtimeParams:           runtimeParams,
 		normalizer:              chopmodels.NewNormalizer(chopConfig),
+		schemer:                 chopmodels.NewSchemer(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort),
 		chopConfig:              chopConfig,
 		kubeClient:              kubeClient,
 		chopClient:              chopClient,
@@ -100,38 +101,49 @@ func CreateController(
 		metricsExporter:         chopMetricsExporter,
 	}
 
+	return controller
+}
+
+func (c *Controller) AddEventHandlers(
+	chiInformer chopinformers.ClickHouseInstallationInformer,
+	serviceInformer coreinformers.ServiceInformer,
+	endpointsInformer coreinformers.EndpointsInformer,
+	configMapInformer coreinformers.ConfigMapInformer,
+	statefulSetInformer appsinformers.StatefulSetInformer,
+	podInformer coreinformers.PodInformer,
+) {
 	chiInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chi := obj.(*chop.ClickHouseInstallation)
-			if !controller.chopConfig.IsWatchedNamespace(chi.Namespace) {
+			if !c.chopConfig.IsWatchedNamespace(chi.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
-			controller.enqueueObject(NewReconcileChi(reconcileAdd, nil, chi))
+			c.enqueueObject(NewReconcileChi(reconcileAdd, nil, chi))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			newChi := new.(*chop.ClickHouseInstallation)
 			oldChi := old.(*chop.ClickHouseInstallation)
-			if !controller.chopConfig.IsWatchedNamespace(newChi.Namespace) {
+			if !c.chopConfig.IsWatchedNamespace(newChi.Namespace) {
 				return
 			}
 			//glog.V(1).Info("chiInformer.UpdateFunc")
-			controller.enqueueObject(NewReconcileChi(reconcileUpdate, oldChi, newChi))
+			c.enqueueObject(NewReconcileChi(reconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: func(obj interface{}) {
 			chi := obj.(*chop.ClickHouseInstallation)
-			if !controller.chopConfig.IsWatchedNamespace(chi.Namespace) {
+			if !c.chopConfig.IsWatchedNamespace(chi.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
-			controller.enqueueObject(NewReconcileChi(reconcileDelete, chi, nil))
+			c.enqueueObject(NewReconcileChi(reconcileDelete, chi, nil))
 		},
 	})
 
 	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
-			if !controller.isTrackedObject(&service.ObjectMeta) {
+			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("serviceInformer AddFunc %s/%s", service.Namespace, service.Name)
@@ -139,7 +151,7 @@ func CreateController(
 		UpdateFunc: func(old, new interface{}) {
 			oldService := old.(*core.Service)
 			newService := new.(*core.Service)
-			if !controller.isTrackedObject(&oldService.ObjectMeta) {
+			if !c.isTrackedObject(&oldService.ObjectMeta) {
 				return
 			}
 
@@ -164,7 +176,7 @@ func CreateController(
 				// Internal IP address assigned
 				// Pod restart completed?
 				glog.V(1).Infof("serviceInformer UpdateFunc(%s/%s) IP ASSIGNED %s:%s", newService.Namespace, newService.Name, newService.Spec.Type, newService.Spec.ClusterIP)
-				if cluster, err := controller.createClusterFromObjectMeta(&newService.ObjectMeta); err != nil {
+				if cluster, err := c.createClusterFromObjectMeta(&newService.ObjectMeta); err != nil {
 					glog.V(1).Infof("serviceInformer UpdateFunc(%s/%s) flushing DNS for cluster %s", newService.Namespace, newService.Name, cluster.Name)
 					//chopmodels.ClusterDropDnsCache(cluster)
 				} else {
@@ -180,7 +192,7 @@ func CreateController(
 		},
 		DeleteFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
-			if !controller.isTrackedObject(&service.ObjectMeta) {
+			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("serviceInformer DeleteFunc %s/%s", service.Namespace, service.Name)
@@ -190,7 +202,7 @@ func CreateController(
 	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			endpoints := obj.(*core.Endpoints)
-			if !controller.isTrackedObject(&endpoints.ObjectMeta) {
+			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("endpointsInformer AddFunc %s/%s", endpoints.Namespace, endpoints.Name)
@@ -198,7 +210,7 @@ func CreateController(
 		UpdateFunc: func(old, new interface{}) {
 			oldEndpoints := old.(*core.Endpoints)
 			newEndpoints := new.(*core.Endpoints)
-			if !controller.isTrackedObject(&oldEndpoints.ObjectMeta) {
+			if !c.isTrackedObject(&oldEndpoints.ObjectMeta) {
 				return
 			}
 
@@ -234,9 +246,9 @@ func CreateController(
 
 			if added {
 				glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) IP ASSIGNED %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.Subsets)
-				if chi, err := controller.createChiFromObjectMeta(&newEndpoints.ObjectMeta); err == nil {
+				if chi, err := c.createChiFromObjectMeta(&newEndpoints.ObjectMeta); err == nil {
 					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", newEndpoints.Namespace, newEndpoints.Name, chi.Name)
-					chopmodels.ChiDropDnsCache(chi)
+					c.schemer.ChiDropDnsCache(chi)
 				} else {
 					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.ObjectMeta.Labels)
 				}
@@ -244,7 +256,7 @@ func CreateController(
 		},
 		DeleteFunc: func(obj interface{}) {
 			endpoints := obj.(*core.Endpoints)
-			if !controller.isTrackedObject(&endpoints.ObjectMeta) {
+			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("endpointsInformer DeleteFunc %s/%s", endpoints.Namespace, endpoints.Name)
@@ -254,21 +266,21 @@ func CreateController(
 	configMapInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
-			if !controller.isTrackedObject(&configMap.ObjectMeta) {
+			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("configMapInformer AddFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			configMap := old.(*core.ConfigMap)
-			if !controller.isTrackedObject(&configMap.ObjectMeta) {
+			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("configMapInformer UpdateFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
-			if !controller.isTrackedObject(&configMap.ObjectMeta) {
+			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("configMapInformer DeleteFunc %s/%s", configMap.Namespace, configMap.Name)
@@ -278,7 +290,7 @@ func CreateController(
 	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
-			if !controller.isTrackedObject(&statefulSet.ObjectMeta) {
+			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("statefulSetInformer AddFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
@@ -286,14 +298,14 @@ func CreateController(
 		},
 		UpdateFunc: func(old, new interface{}) {
 			statefulSet := old.(*apps.StatefulSet)
-			if !controller.isTrackedObject(&statefulSet.ObjectMeta) {
+			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("statefulSetInformer UpdateFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
-			if !controller.isTrackedObject(&statefulSet.ObjectMeta) {
+			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("statefulSetInformer DeleteFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
@@ -304,28 +316,26 @@ func CreateController(
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
-			if !controller.isTrackedObject(&pod.ObjectMeta) {
+			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("podInformer AddFunc %s/%s", pod.Namespace, pod.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			pod := old.(*core.Pod)
-			if !controller.isTrackedObject(&pod.ObjectMeta) {
+			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("podInformer UpdateFunc %s/%s", pod.Namespace, pod.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
-			if !controller.isTrackedObject(&pod.ObjectMeta) {
+			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
 			//glog.V(1).Infof("podInformer DeleteFunc %s/%s", pod.Namespace, pod.Name)
 		},
 	})
-
-	return controller
 }
 
 // isTrackedObject checks whether operator is interested in changes of this object
@@ -535,13 +545,13 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	} else {
 		c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) migrate schema", old.Namespace, old.Name))
 		new.WalkClusters(func(cluster *chop.ChiCluster) error {
-			dbNames, createDatabaseSQLs, _ := chopmodels.ClusterGetCreateDatabases(new, cluster)
+			dbNames, createDatabaseSQLs, _ := c.schemer.ClusterGetCreateDatabases(new, cluster)
 			glog.V(1).Infof("Creating databases: %v\n", dbNames)
-			_ = chopmodels.ClusterApplySQLs(cluster, createDatabaseSQLs, false)
+			_ = c.schemer.ClusterApplySQLs(cluster, createDatabaseSQLs, false)
 
-			tableNames, createTableSQLs, _ := chopmodels.ClusterGetCreateTables(new, cluster)
+			tableNames, createTableSQLs, _ := c.schemer.ClusterGetCreateTables(new, cluster)
 			glog.V(1).Infof("Creating tables: %v\n", tableNames)
-			_ = chopmodels.ClusterApplySQLs(cluster, createTableSQLs, false)
+			_ = c.schemer.ClusterApplySQLs(cluster, createTableSQLs, false)
 			return nil
 		})
 		_ = c.updateCHIResource(new)

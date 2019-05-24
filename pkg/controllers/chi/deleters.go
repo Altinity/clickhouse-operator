@@ -33,6 +33,14 @@ func newDeleteOptions() *metav1.DeleteOptions {
 	}
 }
 
+// deleteTablesOnReplica deletes ClickHouse tables on replica before replica is deleted
+func (c *Controller) deleteTablesOnReplica(replica *chop.ChiReplica) {
+	// Delete tables on replica
+	tableNames, dropTableSQLs, _ := c.schemer.ReplicaGetDropTables(replica)
+	glog.V(1).Infof("Drop tables: %v as %v\n", tableNames, dropTableSQLs)
+	_ = c.schemer.ReplicaApplySQLs(replica, dropTableSQLs, false)
+}
+
 // deleteReplica deletes all kubernetes resources related to replica *chop.ChiReplica
 func (c *Controller) deleteReplica(replica *chop.ChiReplica) error {
 	// Each replica consists of
@@ -42,10 +50,7 @@ func (c *Controller) deleteReplica(replica *chop.ChiReplica) error {
 	// 4. Service
 	// Need to delete all these item
 
-	// Delete tables on replica
-	tableNames, dropTableSQLs, _ := chopmodels.ReplicaGetDropTables(replica)
-	glog.V(1).Infof("Drop tables: %v as %v\n", tableNames, dropTableSQLs)
-	_ = chopmodels.ReplicaApplySQLs(replica, dropTableSQLs, false)
+	c.deleteTablesOnReplica(replica)
 
 	// Delete StatefulSet
 	statefulSetName := chopmodels.CreateStatefulSetName(replica)

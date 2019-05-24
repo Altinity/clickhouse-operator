@@ -66,3 +66,17 @@ chConfigUserDefaultQuota: default
 chConfigUserDefaultNetworksIP:
   - "::/0"
 chConfigUserDefaultPassword: "default"
+
+################################################
+##
+## Operator's access to ClickHouse instances
+##
+################################################
+
+# Username and Password to be used by operator to connect to ClickHouse instances for
+# 1. Metrics requests
+# 2. Schema maintenance
+# User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
+chUsername: clickhouse_operator
+chPassword: clickhouse_operator_password
+chPort: 2181
