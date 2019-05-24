@@ -73,7 +73,7 @@ type Config struct {
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
 	ChUsername string `yaml:"chUsername"`
 	ChPassword string `yaml:"chPassword"`
-	ChPort     int    `yaml:chPort`
+	ChPort     int    `yaml:"chPort""`
 }
 
 const (

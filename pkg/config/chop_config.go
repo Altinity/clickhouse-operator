@@ -48,7 +48,7 @@ const (
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
 	defaultChUsername = ""
 	defaultChPassword = ""
-	defaultChPort     = 2181
+	defaultChPort     = 8123
 )
 
 // GetConfig creates Config object based on current environment

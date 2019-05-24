@@ -395,10 +395,10 @@ data:
     ################################################
     
     # How many seconds to wait for created/updated StatefulSet to be Ready
-    statefulSetUpdateTimeout: 50
+    statefulSetUpdateTimeout: 600
     
     # How many seconds to wait between checks for created/updated StatefulSet status
-    statefulSetUpdatePollPeriod: 2
+    statefulSetUpdatePollPeriod: 10
     
     # What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
     # Possible options:
@@ -436,13 +436,14 @@ data:
     ##
     ################################################
     
-    # Username and Password to be used by operator to connect to ClickHouse instances for
+    # ClickHouse credentials (username, password and port) to be used by operator to connect to ClickHouse instances for:
     # 1. Metrics requests
     # 2. Schema maintenance
-    # User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
+    # User with such credentials credentials can be specified in additional ClickHouse .xml config files,
+    # located in `chUsersConfigsPath` folder
     chUsername: clickhouse_operator
     chPassword: clickhouse_operator_password
-    chPort: 2181
+    chPort: 8123
 
 ---
 # Possible Template Parameters:
