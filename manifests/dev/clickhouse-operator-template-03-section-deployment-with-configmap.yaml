@@ -33,6 +33,9 @@ spec:
         - name: etc-clickhouse-operator-configd-folder
           configMap:
             name: etc-clickhouse-operator-configd-files
+        - name: etc-clickhouse-operator-templatesd-folder
+          configMap:
+            name: etc-clickhouse-operator-templatesd-files
         - name: etc-clickhouse-operator-usersd-folder
           configMap:
             name: etc-clickhouse-operator-usersd-files
@@ -46,6 +49,8 @@ spec:
               mountPath: /etc/clickhouse-operator/conf.d
             - name: etc-clickhouse-operator-configd-folder
               mountPath: /etc/clickhouse-operator/config.d
+            - name: etc-clickhouse-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/templates.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/users.d
           env:

@@ -13,6 +13,7 @@ CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
 CHOPERATOR_CONFIG_FILE="${PROJECT_ROOT}/config/config.yaml"
 CHOPERATOR_CONFD_FOLDER="${PROJECT_ROOT}/config/conf.d"
 CHOPERATOR_CONFIGD_FOLDER="${PROJECT_ROOT}/config/config.d"
+CHOPERATOR_TEMPLATESD_FOLDER="${PROJECT_ROOT}/config/templates.d"
 CHOPERATOR_USERSD_FOLDER="${PROJECT_ROOT}/config/users.d"
 
 # .yaml manifest sections to be rendered
@@ -75,7 +76,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         # Render confd.d files
         echo "---"
         cat ${CUR_DIR}/clickhouse-operator-template-04-section-configmap-header.yaml | CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" CONFIGMAP_NAME="etc-clickhouse-operator-confd-files" envsubst
-        if [[ ! -z "${CHOPERATOR_CONFD_FOLDER}" ]]; then
+        if [[ ! -z "${CHOPERATOR_CONFD_FOLDER}" ]] && [[ ! -z "$(ls ${CHOPERATOR_CONFD_FOLDER})" ]]; then
             for FILE in ${CHOPERATOR_CONFD_FOLDER}/*; do
                 render_file_into_configmap "${FILE}"
             done
@@ -84,8 +85,17 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         # Render configd.d files
         echo "---"
         cat ${CUR_DIR}/clickhouse-operator-template-04-section-configmap-header.yaml | CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" CONFIGMAP_NAME="etc-clickhouse-operator-configd-files" envsubst
-        if [[ ! -z "${CHOPERATOR_CONFIGD_FOLDER}" ]]; then
+        if [[ ! -z "${CHOPERATOR_CONFIGD_FOLDER}" ]] && [[ ! -z "$(ls ${CHOPERATOR_CONFIGD_FOLDER})" ]]; then
             for FILE in ${CHOPERATOR_CONFIGD_FOLDER}/*; do
+                render_file_into_configmap "${FILE}"
+            done
+        fi
+
+        # Render templates.d files
+        echo "---"
+        cat ${CUR_DIR}/clickhouse-operator-template-04-section-configmap-header.yaml | CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" CONFIGMAP_NAME="etc-clickhouse-operator-templatesd-files" envsubst
+        if [[ ! -z "${CHOPERATOR_TEMPLATESD_FOLDER}" ]] && [[ ! -z "$(ls ${CHOPERATOR_TEMPLATESD_FOLDER})" ]]; then
+            for FILE in ${CHOPERATOR_TEMPLATESD_FOLDER}/*; do
                 render_file_into_configmap "${FILE}"
             done
         fi
@@ -93,11 +103,10 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         # Render users.d files
         echo "---"
         cat ${CUR_DIR}/clickhouse-operator-template-04-section-configmap-header.yaml | CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" CONFIGMAP_NAME="etc-clickhouse-operator-usersd-files" envsubst
-        if [[ ! -z "${CHOPERATOR_USERSD_FOLDER}" ]]; then
+        if [[ ! -z "${CHOPERATOR_USERSD_FOLDER}" ]] && [[ ! -z "$(ls ${CHOPERATOR_USERSD_FOLDER})" ]]; then
             for FILE in ${CHOPERATOR_USERSD_FOLDER}/*; do
                 render_file_into_configmap "${FILE}"
             done
         fi
     fi
 fi
-
