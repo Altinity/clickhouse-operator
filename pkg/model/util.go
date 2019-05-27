@@ -12,18 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package models
+package model
 
 import (
-	"gopkg.in/yaml.v2"
-
-	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
+	"io"
 )
 
-func Yaml(chi *chi.ClickHouseInstallation) string {
-	if data, err := yaml.Marshal(chi); err != nil {
-		return ""
-	} else {
-		return string(data)
-	}
+// fprintf suppresses warning for unused returns of fmt.Fprintf()
+func fprintf(w io.Writer, format string, a ...interface{}) {
+	util.Fprintf(w, format, a...)
 }

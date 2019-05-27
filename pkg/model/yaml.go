@@ -12,33 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package models
+package model
 
 import (
-	"bytes"
-	"crypto/sha1"
-	"encoding/gob"
-	"encoding/hex"
-	"fmt"
+	"gopkg.in/yaml.v2"
+
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-func serialize(obj interface{}) []byte {
-	b := bytes.Buffer{}
-	encoder := gob.NewEncoder(&b)
-	err := encoder.Encode(obj)
-	if err != nil {
-		fmt.Println(`failed gob Encode`, err)
+func Yaml(chi *chi.ClickHouseInstallation) string {
+	if data, err := yaml.Marshal(chi); err != nil {
+		return ""
+	} else {
+		return string(data)
 	}
-
-	return b.Bytes()
-}
-
-func hash(b []byte) string {
-	hasher := sha1.New()
-	hasher.Write(b)
-	return hex.EncodeToString(hasher.Sum(nil))
-}
-
-func fingerprint(obj interface{}) string {
-	return hash(serialize(obj))
 }

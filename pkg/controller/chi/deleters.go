@@ -18,7 +18,7 @@ import (
 	"github.com/golang/glog"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmodels "github.com/altinity/clickhouse-operator/pkg/models"
+	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -53,11 +53,11 @@ func (c *Controller) deleteReplica(replica *chop.ChiReplica) error {
 	c.deleteTablesOnReplica(replica)
 
 	// Delete StatefulSet
-	statefulSetName := chopmodels.CreateStatefulSetName(replica)
+	statefulSetName := chopmodel.CreateStatefulSetName(replica)
 	c.statefulSetDelete(replica.Address.Namespace, statefulSetName)
 
 	// Delete ConfigMap
-	configMapName := chopmodels.CreateConfigMapPodName(replica)
+	configMapName := chopmodel.CreateConfigMapPodName(replica)
 	if err := c.kubeClient.CoreV1().ConfigMaps(replica.Address.Namespace).Delete(configMapName, newDeleteOptions()); err == nil {
 		glog.V(1).Infof("ConfigMap %s deleted", configMapName)
 	} else {
@@ -65,7 +65,7 @@ func (c *Controller) deleteReplica(replica *chop.ChiReplica) error {
 	}
 
 	// Delete Service
-	statefulSetServiceName := chopmodels.CreateStatefulSetServiceName(replica)
+	statefulSetServiceName := chopmodel.CreateStatefulSetServiceName(replica)
 	if err := c.kubeClient.CoreV1().Services(replica.Address.Namespace).Delete(statefulSetServiceName, newDeleteOptions()); err == nil {
 		glog.V(1).Infof("Service %s deleted", statefulSetServiceName)
 	} else {
@@ -99,8 +99,8 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
 	// chi-b3d29f-common-usersd    0      61s
 	// service/clickhouse-example-01         LoadBalancer   10.106.183.200   <pending>     8123:31607/TCP,9000:31492/TCP,9009:31357/TCP   33s   clickhouse.altinity.com/chi=example-01
 
-	configMapCommon := chopmodels.CreateConfigMapCommonName(chi)
-	configMapCommonUsersName := chopmodels.CreateConfigMapCommonUsersName(chi)
+	configMapCommon := chopmodel.CreateConfigMapCommonName(chi)
+	configMapCommonUsersName := chopmodel.CreateConfigMapCommonUsersName(chi)
 
 	// Delete ConfigMap
 	err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommon, newDeleteOptions())
@@ -117,7 +117,7 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
 		glog.V(1).Infof("FAIL delete ConfigMap %s %v\n", configMapCommonUsersName, err)
 	}
 
-	chiServiceName := chopmodels.CreateChiServiceName(chi)
+	chiServiceName := chopmodel.CreateChiServiceName(chi)
 	// Delete Service
 	err = c.kubeClient.CoreV1().Services(chi.Namespace).Delete(chiServiceName, newDeleteOptions())
 	if err == nil {
@@ -129,7 +129,7 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
 
 // statefulSetDeletePod delete a pod of a StatefulSet. This requests StatefulSet to relaunch deleted pod
 func (c *Controller) statefulSetDeletePod(statefulSet *apps.StatefulSet) error {
-	name := chopmodels.CreatePodName(statefulSet)
+	name := chopmodel.CreatePodName(statefulSet)
 	glog.V(1).Infof("Delete Pod %s/%s\n", statefulSet.Namespace, name)
 	return c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(name, newDeleteOptions())
 }
