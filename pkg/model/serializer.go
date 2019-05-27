@@ -12,14 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package models
+package model
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"io"
+	"bytes"
+	"crypto/sha1"
+	"encoding/gob"
+	"encoding/hex"
+	"fmt"
 )
 
-// fprintf suppresses warning for unused returns of fmt.Fprintf()
-func fprintf(w io.Writer, format string, a ...interface{}) {
-	util.Fprintf(w, format, a...)
+func serialize(obj interface{}) []byte {
+	b := bytes.Buffer{}
+	encoder := gob.NewEncoder(&b)
+	err := encoder.Encode(obj)
+	if err != nil {
+		fmt.Println(`failed gob Encode`, err)
+	}
+
+	return b.Bytes()
+}
+
+func hash(b []byte) string {
+	hasher := sha1.New()
+	hasher.Write(b)
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func fingerprint(obj interface{}) string {
+	return hash(serialize(obj))
 }

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package models
+package model
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/golang/glog"
 	"time"

@@ -15,7 +15,7 @@
 package metrics
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 )
 
 const (
