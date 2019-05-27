@@ -4,23 +4,23 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 source ${CUR_DIR}/dev-config.sh
 
-echo "=== Dev Pods ==="
+echo "=== Pod ==="
 kubectl -n "${CHOPERATOR_NAMESPACE}" -o wide get pod
 
-echo "=== Dev Services ==="
+echo "=== Service ==="
 kubectl -n "${CHOPERATOR_NAMESPACE}" -o wide get service
 
-echo "=== Dev Statefule Sets ==="
+echo "=== StatefulSet ==="
 kubectl -n "${CHOPERATOR_NAMESPACE}" -o wide get statefulset
 
-echo "=== Dev Config Maps ==="
+echo "=== ConfigMap ==="
 kubectl -n "${CHOPERATOR_NAMESPACE}" -o wide get configmap
 
-echo "=== Dev PVC ==="
+echo "=== StorageClass ==="
 kubectl get storageclasses
 
-echo "=== Dev PVC ==="
+echo "=== PersistentVolumeClaim ==="
 kubectl -n "${CHOPERATOR_NAMESPACE}" -o wide get persistentvolumeclaims
 
-echo "=== Dev PV ==="
+echo "=== PersistentVolume ==="
 kubectl -n "${CHOPERATOR_NAMESPACE}" -o wide get persistentvolume
