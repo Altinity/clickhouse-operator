@@ -77,7 +77,7 @@ func GetSelectorReplicaFromObjectMeta(obj *meta.ObjectMeta) (labels.Set, error) 
 
 	if ok1 && ok2 && ok3 && ok4 && ok5 {
 		set := labels.Set{
-			LabelApp:     labelApp,
+			LabelApp: labelApp,
 			// skip chop
 			LabelChi:     labelChi,
 			LabelCluster: labelCluster,

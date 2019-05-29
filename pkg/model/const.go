@@ -32,12 +32,6 @@ const (
 )
 
 const (
-	shardInternalReplicationDisabled = "Disabled"
-	stringTrue                       = "true"
-	stringFalse                      = "false"
-)
-
-const (
 	xmlTagYandex = "yandex"
 )
 
