@@ -459,7 +459,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	}
 
 	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateInProgress, fmt.Sprintf("onAddChi(%s/%s) create objects", chi.Namespace, chi.Name))
-	err = c.createOrUpdateChiResources(chi)
+	err = c.reconcileChi(chi)
 	if err != nil {
 		glog.V(1).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
 		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to create", chi.Name))
@@ -539,8 +539,8 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	// Deal with added/updated items
 	//	c.listStatefulSetResources(chi)
 	c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) update resources", old.Namespace, old.Name))
-	if err := c.createOrUpdateChiResources(new); err != nil {
-		glog.V(1).Infof("createOrUpdateChiResources() FAILED: %v\n", err)
+	if err := c.reconcileChi(new); err != nil {
+		glog.V(1).Infof("reconcileChi() FAILED: %v\n", err)
 		c.eventChi(old, eventTypeWarning, eventActionUpdate, eventReasonUpdateFailed, fmt.Sprintf("onUpdateChi(%s/%s) update resources failed", old.Namespace, old.Name))
 	} else {
 		c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) migrate schema", old.Namespace, old.Name))
