@@ -40,22 +40,8 @@ func (c *Controller) getConfigMap(obj *meta.ObjectMeta) (*core.ConfigMap, error)
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found
 		// Try to find by labels
-		labelApp, ok1 := obj.Labels[chopmodel.LabelApp]
-		labelChi, ok2 := obj.Labels[chopmodel.LabelChi]
-		labelCluster, ok3 := obj.Labels[chopmodel.LabelCluster]
-		labelClusterIndex, ok4 := obj.Labels[chopmodel.LabelClusterIndex]
-		labelReplicaIndex, ok5 := obj.Labels[chopmodel.LabelReplicaIndex]
-
-		if ok1 && ok2 && ok3 && ok4 && ok5 {
-			set := labels.Set{
-				chopmodel.LabelApp:          labelApp,
-				chopmodel.LabelChi:          labelChi,
-				chopmodel.LabelCluster:      labelCluster,
-				chopmodel.LabelClusterIndex: labelClusterIndex,
-				chopmodel.LabelReplicaIndex: labelReplicaIndex,
-			}
+		if set, err := chopmodel.GetSelectorReplicaFromObjectMeta(obj); err == nil {
 			selector := labels.SelectorFromSet(set)
-
 			objects, err := c.configMapLister.ConfigMaps(obj.Namespace).List(selector)
 			if err != nil {
 				return nil, err
@@ -84,20 +70,7 @@ func (c *Controller) getService(obj *meta.ObjectMeta) (*core.Service, error) {
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found
 		// Try to find by labels
-		labelApp, ok1 := obj.Labels[chopmodel.LabelApp]
-		labelChi, ok2 := obj.Labels[chopmodel.LabelChi]
-		labelCluster, ok3 := obj.Labels[chopmodel.LabelCluster]
-		labelClusterIndex, ok4 := obj.Labels[chopmodel.LabelClusterIndex]
-		labelReplicaIndex, ok5 := obj.Labels[chopmodel.LabelReplicaIndex]
-
-		if ok1 && ok2 && ok3 && ok4 && ok5 {
-			set := labels.Set{
-				chopmodel.LabelApp:          labelApp,
-				chopmodel.LabelChi:          labelChi,
-				chopmodel.LabelCluster:      labelCluster,
-				chopmodel.LabelClusterIndex: labelClusterIndex,
-				chopmodel.LabelReplicaIndex: labelReplicaIndex,
-			}
+		if set, err := chopmodel.GetSelectorReplicaFromObjectMeta(obj); err == nil {
 			selector := labels.SelectorFromSet(set)
 
 			objects, err := c.serviceLister.Services(obj.Namespace).List(selector)
@@ -128,20 +101,7 @@ func (c *Controller) getStatefulSet(obj *meta.ObjectMeta) (*apps.StatefulSet, er
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found
 		// Try to find by labels
-		labelApp, ok1 := obj.Labels[chopmodel.LabelApp]
-		labelChi, ok2 := obj.Labels[chopmodel.LabelChi]
-		labelCluster, ok3 := obj.Labels[chopmodel.LabelCluster]
-		labelClusterIndex, ok4 := obj.Labels[chopmodel.LabelClusterIndex]
-		labelReplicaIndex, ok5 := obj.Labels[chopmodel.LabelReplicaIndex]
-
-		if ok1 && ok2 && ok3 && ok4 && ok5 {
-			set := labels.Set{
-				chopmodel.LabelApp:          labelApp,
-				chopmodel.LabelChi:          labelChi,
-				chopmodel.LabelCluster:      labelCluster,
-				chopmodel.LabelClusterIndex: labelClusterIndex,
-				chopmodel.LabelReplicaIndex: labelReplicaIndex,
-			}
+		if set, err := chopmodel.GetSelectorReplicaFromObjectMeta(obj); err == nil {
 			selector := labels.SelectorFromSet(set)
 
 			objects, err := c.statefulSetLister.StatefulSets(obj.Namespace).List(selector)
