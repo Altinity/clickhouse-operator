@@ -8,8 +8,8 @@ metadata:
     app: zookeeper
 spec:
   ports:
-  - port: 2181
-    name: client
+    - port: 2181
+      name: client
   selector:
     app: zookeeper
     what: node
