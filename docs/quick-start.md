@@ -4,7 +4,7 @@
 * [ClickHouse Operator Installation](#clickhouse-operator-installation)
 * [Building ClickHouse Operator from Sources](#building-clickhouse-operator-from-sources)
 * [Examples](#examples)
-  * [Simple Example](#simple-example)
+  * [Trivial Example](#trivial-example)
   * [Connect to ClickHouse Database](#connect-to-clickhouse-database)
   * [Simple Persistent Volume Example](#simple-persistent-volume-example)
   * [Custom Deployment with Pod and VolumeClaim Templates](#custom-deployment-with-pod-and-volumeclaim-templates)
@@ -44,6 +44,8 @@ Complete instructions on how to build ClickHouse operator from sources as well a
 
 # Examples
 
+There are several ready-to-use [examples](./examples/). Below are few ones to start with.
+
 ## Create Custom Namespace
 It is a good practice to have all components run in dedicated namespaces. Let's run examples in `test` namespace
 ```bash
@@ -53,11 +55,11 @@ kubectl create namespace test
 namespace/test created
 ```
 
-## Simple example
+## Trivial example
 
-There are several ready-to-use [examples](./examples/)
+This is the trivial [1 shard 1 replica](./examples/01-standard-layout-01-1shard-1repl.yaml) example.
 
-Let's installed the simplest one - [1-replica](./examples/01-standard-layout-01-1shard-1repl.yaml)
+**WARNING**: Do not use it for anything other than 'Hello, world!', it does not have persistent storage!
  
 ```bash
 kubectl apply -n test -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/01-standard-layout-01-1shard-1repl.yaml
@@ -107,6 +109,7 @@ ClickHouse is up and running!
 ## Connect to ClickHouse Database
 
 There are two ways to connect to ClickHouse database
+
 1. In case previous command `kubectl get service -n test` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
 ```bash
 clickhouse-client -h abc-123.us-east-1.elb.amazonaws.com
@@ -127,6 +130,7 @@ Connected to ClickHouse server version 19.4.3 revision 54416.
 ```
 
 ## Simple Persistent Volume Example
+
 In case of having Dynamic Volume Provisioning available - ex.: running on AWS - we are able to use PersistentVolumeClaims
 Manifest is [available in examples](./examples/02-standard-layout-01-1shard-1repl-simple-persistent-volume.yaml)
 
@@ -211,7 +215,9 @@ spec:
 ```
 
 ## Custom Deployment with Specific ClickHouse Configuration
-More extended settings example is [available here](./examples/03-settings-01.yaml)
+
+You can tell operator to configure your ClickHouse, as shown in the example below ([link to the manifest](./examples/03-settings-01.yaml)):
+
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
