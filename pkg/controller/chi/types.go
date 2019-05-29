@@ -84,10 +84,6 @@ const (
 )
 
 const (
-	successSynced         = "Synced"
-	errResourceExists     = "ErrResourceExists"
-	messageResourceSynced = "ClickHouseInstallation synced successfully"
-	messageResourceExists = "Resource %q already exists and is not managed by ClickHouseInstallation"
 	messageUnableToDecode = "unable to decode object (invalid type)"
 	messageUnableToSync   = "unable to sync caches for %s controller"
 )

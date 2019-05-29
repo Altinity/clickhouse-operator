@@ -16,8 +16,8 @@ package model
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/golang/glog"
 	"time"
 )

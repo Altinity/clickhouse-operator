@@ -10,7 +10,7 @@ INSTALL_FROM_DEPLOYMENT_MANIFEST="${INSTALL_FROM_DEPLOYMENT_MANIFEST:-no}"
 
 # In case both INSTALL_* options are "no" we are going to run operator manually, not from dockerhub
 
-if [[ ${INSTALL_FROM_ALTINITY_RELEASE_DOCKERHUB} == "yes" ]]; then
+if [[ "${INSTALL_FROM_ALTINITY_RELEASE_DOCKERHUB}" == "yes" ]]; then
     CHOPERATOR_IMAGE="altinity/clickhouse-operator:latest"
 fi
 

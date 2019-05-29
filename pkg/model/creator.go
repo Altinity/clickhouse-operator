@@ -18,8 +18,6 @@ import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"strconv"
-
 	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -124,10 +122,7 @@ func (c *Creator) createConfigMapObjectsCommon() ConfigMapList {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      CreateConfigMapCommonName(c.chi),
 				Namespace: c.chi.Namespace,
-				Labels: map[string]string{
-					LabelChop: c.appVersion,
-					LabelChi:  c.chi.Name,
-				},
+				Labels:    c.getLabelsCommonObject(),
 			},
 			// Data contains several sections which are to be several xml chopConfig files
 			Data: configs.commonConfigSections,
@@ -141,10 +136,7 @@ func (c *Creator) createConfigMapObjectsCommon() ConfigMapList {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      CreateConfigMapCommonUsersName(c.chi),
 				Namespace: c.chi.Namespace,
-				Labels: map[string]string{
-					LabelChop: c.appVersion,
-					LabelChi:  c.chi.Name,
-				},
+				Labels:    c.getLabelsCommonObject(),
 			},
 			// Data contains several sections which are to be several xml chopConfig files
 			Data: configs.commonUsersConfigSections,
@@ -173,10 +165,7 @@ func (c *Creator) createConfigMapObjectsPod() ConfigMapList {
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      CreateConfigMapPodName(replica),
 					Namespace: replica.Address.Namespace,
-					Labels: map[string]string{
-						LabelChop: c.appVersion,
-						LabelChi:  replica.Address.ChiName,
-					},
+					Labels:    c.getLabelsReplica(replica, false),
 				},
 				Data: podConfigSections,
 			},
@@ -241,11 +230,7 @@ func (c *Creator) createServiceObjectChi(serviceName string) *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: c.chi.Namespace,
-			Labels: map[string]string{
-				LabelApp:  LabelAppValue,
-				LabelChop: c.appVersion,
-				LabelChi:  c.chi.Name,
-			},
+			Labels:    c.getLabelsCommonObject(),
 		},
 		Spec: corev1.ServiceSpec{
 			// ClusterIP: templateDefaultsServiceClusterIP,
@@ -259,11 +244,8 @@ func (c *Creator) createServiceObjectChi(serviceName string) *corev1.Service {
 					Port: chDefaultClientPortNumber,
 				},
 			},
-			Selector: map[string]string{
-				LabelApp: LabelAppValue,
-				LabelChi: c.chi.Name,
-			},
-			Type: "LoadBalancer",
+			Selector: c.getSelectorCommonObject(),
+			Type:     "LoadBalancer",
 		},
 	}
 }
@@ -277,15 +259,7 @@ func (c *Creator) createServiceObjectForStatefulSet(replica *chiv1.ChiReplica) *
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: replica.Address.Namespace,
-			Labels: map[string]string{
-				LabelApp:          LabelAppValue,
-				LabelChop:         c.appVersion,
-				LabelChi:          replica.Address.ChiName,
-				LabelCluster:      replica.Address.ClusterName,
-				LabelClusterIndex: strconv.Itoa(replica.Address.ClusterIndex),
-				LabelReplicaIndex: strconv.Itoa(replica.Address.ReplicaIndex),
-				LabelStatefulSet:  statefulSetName,
-			},
+			Labels:    c.getLabelsReplica(replica, false),
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -302,11 +276,7 @@ func (c *Creator) createServiceObjectForStatefulSet(replica *chiv1.ChiReplica) *
 					Port: chDefaultInterServerPortNumber,
 				},
 			},
-			Selector: map[string]string{
-				LabelApp:         LabelAppValue,
-				LabelChi:         replica.Address.ChiName,
-				LabelStatefulSet: statefulSetName,
-			},
+			Selector:  c.getSelectorReplica(replica),
 			ClusterIP: templateDefaultsServiceClusterIP,
 			Type:      "ClusterIP",
 		},
@@ -337,29 +307,18 @@ func (c *Creator) createStatefulSetObject(replica *chiv1.ChiReplica) *apps.State
 
 	// Create apps.StatefulSet object
 	replicasNum := int32(1)
+	// StatefulSet has additional label - ZK config fingerprint
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      statefulSetName,
 			Namespace: replica.Address.Namespace,
-			Labels: map[string]string{
-				LabelApp:             LabelAppValue,
-				LabelChop:            c.appVersion,
-				LabelChi:             replica.Address.ChiName,
-				LabelCluster:         replica.Address.ClusterName,
-				LabelClusterIndex:    strconv.Itoa(replica.Address.ClusterIndex),
-				LabelReplicaIndex:    strconv.Itoa(replica.Address.ReplicaIndex),
-				LabelZkConfigVersion: replica.Config.ZkFingerprint,
-				LabelStatefulSet:     statefulSetName,
-			},
+			Labels:    c.getLabelsReplica(replica, true),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    &replicasNum,
 			ServiceName: serviceName,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					LabelApp:         LabelAppValue,
-					LabelStatefulSet: statefulSetName,
-				},
+				MatchLabels: c.getSelectorReplica(replica),
 			},
 			// IMPORTANT
 			// VolumeClaimTemplates are to be setup later
@@ -388,16 +347,7 @@ func (c *Creator) setupStatefulSetPodTemplate(
 	// All the rest fields would be filled later
 	statefulSetObject.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				LabelApp:             LabelAppValue,
-				LabelChop:            c.appVersion,
-				LabelChi:             replica.Address.ChiName,
-				LabelCluster:         replica.Address.ClusterName,
-				LabelClusterIndex:    strconv.Itoa(replica.Address.ClusterIndex),
-				LabelReplicaIndex:    strconv.Itoa(replica.Address.ReplicaIndex),
-				LabelZkConfigVersion: replica.Config.ZkFingerprint,
-				LabelStatefulSet:     statefulSetName,
-			},
+			Labels: c.getLabelsReplica(replica, true),
 		},
 	}
 
@@ -640,26 +590,4 @@ func (c *Creator) createPodTemplatesIndex() {
 func (c *Creator) getPodTemplate(name string) (*chiv1.ChiPodTemplate, bool) {
 	podTemplate, ok := c.podTemplatesIndex[name]
 	return podTemplate, ok
-}
-
-// IsChopGeneratedObject check whether object is generated by an operator. Check is label-based
-func IsChopGeneratedObject(objectMeta *metav1.ObjectMeta) bool {
-	// Parse Labels
-	// 			Labels: map[string]string{
-	//				LabelChop: AppVersion,
-	//				LabelChi:  replica.Address.ChiName,
-	//				LabelCluster: replica.Address.ClusterName,
-	//				LabelClusterIndex: strconv.Itoa(replica.Address.ClusterIndex),
-	//				LabelReplicaIndex: strconv.Itoa(replica.Address.ReplicaIndex),
-	//			},
-
-	// ObjectMeta must have some labels
-	if len(objectMeta.Labels) == 0 {
-		return false
-	}
-
-	// ObjectMeta must have LabelChop
-	_, ok := objectMeta.Labels[LabelChop]
-
-	return ok
 }

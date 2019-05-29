@@ -17,11 +17,8 @@ package chi
 import (
 	"errors"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/config"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/config"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
@@ -31,31 +28,28 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-// createOrUpdateChiResources creates or updates kubernetes resources based on ClickHouseInstallation object specification
-func (c *Controller) createOrUpdateChiResources(chi *chop.ClickHouseInstallation) error {
+// reconcileChi reconciles ClickHouseInstallation
+func (c *Controller) reconcileChi(chi *chop.ClickHouseInstallation) error {
 	creator := chopmodel.NewCreator(chi, c.chopConfig, c.version)
-	listOfLists := creator.CreateObjects()
-	return c.createOrUpdateResources(chi, listOfLists)
-}
+	listOfObjectsLists := creator.CreateObjects()
 
-func (c *Controller) createOrUpdateResources(chi *chop.ClickHouseInstallation, listOfLists []interface{}) error {
-	for i := range listOfLists {
-		switch listOfLists[i].(type) {
+	for i := range listOfObjectsLists {
+		switch listOfObjectsLists[i].(type) {
 		case chopmodel.ServiceList:
-			for j := range listOfLists[i].(chopmodel.ServiceList) {
-				if err := c.createOrUpdateServiceResource(chi, listOfLists[i].(chopmodel.ServiceList)[j]); err != nil {
+			for j := range listOfObjectsLists[i].(chopmodel.ServiceList) {
+				if err := c.reconcileService(listOfObjectsLists[i].(chopmodel.ServiceList)[j]); err != nil {
 					return err
 				}
 			}
 		case chopmodel.ConfigMapList:
-			for j := range listOfLists[i].(chopmodel.ConfigMapList) {
-				if err := c.createOrUpdateConfigMapResource(chi, listOfLists[i].(chopmodel.ConfigMapList)[j]); err != nil {
+			for j := range listOfObjectsLists[i].(chopmodel.ConfigMapList) {
+				if err := c.reconcileConfigMap(listOfObjectsLists[i].(chopmodel.ConfigMapList)[j]); err != nil {
 					return err
 				}
 			}
 		case chopmodel.StatefulSetList:
-			for j := range listOfLists[i].(chopmodel.StatefulSetList) {
-				if err := c.createOrUpdateStatefulSetResource(chi, listOfLists[i].(chopmodel.StatefulSetList)[j]); err != nil {
+			for j := range listOfObjectsLists[i].(chopmodel.StatefulSetList) {
+				if err := c.reconcileStatefulSet(listOfObjectsLists[i].(chopmodel.StatefulSetList)[j]); err != nil {
 					return err
 				}
 			}
@@ -65,14 +59,15 @@ func (c *Controller) createOrUpdateResources(chi *chop.ClickHouseInstallation, l
 	return nil
 }
 
-// createOrUpdateConfigMapResource creates core.ConfigMap resource
-func (c *Controller) createOrUpdateConfigMapResource(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
+// reconcileConfigMap reconciles core.ConfigMap
+func (c *Controller) reconcileConfigMap(configMap *core.ConfigMap) error {
 	// Check whether object with such name already exists in k8s
-	res, err := c.configMapLister.ConfigMaps(chi.Namespace).Get(configMap.Name)
-	if res != nil {
+	curConfigMap, err := c.getConfigMap(&configMap.ObjectMeta)
+
+	if curConfigMap != nil {
 		// Object with such name already exists, this is not an error
 		glog.V(1).Infof("Update ConfigMap %s/%s\n", configMap.Namespace, configMap.Name)
-		_, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Update(configMap)
+		_, err := c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
 		if err != nil {
 			return err
 		}
@@ -83,7 +78,7 @@ func (c *Controller) createOrUpdateConfigMapResource(chi *chop.ClickHouseInstall
 
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found - create it
-		_, err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Create(configMap)
+		_, err = c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
 	}
 	if err != nil {
 		return err
@@ -93,11 +88,12 @@ func (c *Controller) createOrUpdateConfigMapResource(chi *chop.ClickHouseInstall
 	return nil
 }
 
-// createOrUpdateServiceResource creates core.Service resource
-func (c *Controller) createOrUpdateServiceResource(chi *chop.ClickHouseInstallation, service *core.Service) error {
+// reconcileService reconciles core.Service
+func (c *Controller) reconcileService(service *core.Service) error {
 	// Check whether object with such name already exists in k8s
-	res, err := c.serviceLister.Services(chi.Namespace).Get(service.Name)
-	if res != nil {
+	curService, err := c.getService(&service.ObjectMeta)
+
+	if curService != nil {
 		// Object with such name already exists, this is not an error
 		return nil
 	}
@@ -106,7 +102,7 @@ func (c *Controller) createOrUpdateServiceResource(chi *chop.ClickHouseInstallat
 
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found - create it
-		_, err = c.kubeClient.CoreV1().Services(chi.Namespace).Create(service)
+		_, err = c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
 	}
 	if err != nil {
 		return err
@@ -116,28 +112,27 @@ func (c *Controller) createOrUpdateServiceResource(chi *chop.ClickHouseInstallat
 	return nil
 }
 
-// createOrUpdateStatefulSetResource creates apps.StatefulSet resource
-func (c *Controller) createOrUpdateStatefulSetResource(chi *chop.ClickHouseInstallation, newStatefulSet *apps.StatefulSet) error {
+// reconcileStatefulSet reconciles apps.StatefulSet
+func (c *Controller) reconcileStatefulSet(newStatefulSet *apps.StatefulSet) error {
 	// Check whether object with such name already exists in k8s
-	oldStatefulSet, err := c.statefulSetLister.StatefulSets(chi.Namespace).Get(newStatefulSet.Name)
+	curStatefulSet, err := c.getStatefulSet(&newStatefulSet.ObjectMeta)
 
-	if oldStatefulSet != nil {
+	if curStatefulSet != nil {
 		// StatefulSet already exists - update it
-		newStatefulSet.Namespace = oldStatefulSet.Namespace
-		return c.updateStatefulSet(oldStatefulSet, newStatefulSet)
+		return c.updateStatefulSet(curStatefulSet, newStatefulSet)
 	}
 
 	if apierrors.IsNotFound(err) {
 		// StatefulSet with such name not found - create StatefulSet
-		return c.createStatefulSet(chi, newStatefulSet)
+		return c.createStatefulSet(newStatefulSet)
 	}
 
 	// Error has happened with .Get()
 	return err
 }
 
-func (c *Controller) createStatefulSet(chi *chop.ClickHouseInstallation, statefulSet *apps.StatefulSet) error {
-	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).Create(statefulSet); err != nil {
+func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet) error {
+	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
 		return err
 	} else if err := c.waitStatefulSetGeneration(statefulSet.Namespace, statefulSet.Name, statefulSet.Generation); err == nil {
 		// Target generation reached, StatefulSet created successfully
@@ -348,74 +343,4 @@ func strStatefulSetStatus(status *apps.StatefulSetStatus) string {
 		status.CurrentRevision,
 		status.UpdateRevision,
 	)
-}
-
-// TODO move labels into models modules
-func (c *Controller) createChiFromObjectMeta(objectMeta *meta.ObjectMeta) (*chi.ClickHouseInstallation, error) {
-	// Parse Labels
-	//			Labels: map[string]string{
-	//				labelChop: AppVersion,
-	//				LabelChi:  replica.Address.ChiName,
-	//				LabelCluster: replica.Address.ClusterName,
-	//				LabelClusterIndex: strconv.Itoa(replica.Address.ClusterIndex),
-	//				LabelReplicaIndex: strconv.Itoa(replica.Address.ReplicaIndex),
-	//			},
-
-	// ObjectMeta must have some labels
-	if len(objectMeta.Labels) == 0 {
-		return nil, errors.New(fmt.Sprintf("ObjectMeta %s does not have labels", objectMeta.Name))
-	}
-
-	// ObjectMeta must have LabelChi:  chi.Name label
-	chiName, ok := objectMeta.Labels[chopmodel.LabelChi]
-	if !ok {
-		return nil, errors.New(fmt.Sprintf("ObjectMeta %s does not generated by CHI", objectMeta.Name))
-	}
-
-	chi, err := c.chiLister.ClickHouseInstallations(objectMeta.Namespace).Get(chiName)
-	if err != nil {
-		return nil, err
-	}
-
-	chi, err = c.normalizer.DoChi(chi)
-	if err != nil {
-		return nil, err
-	}
-
-	return chi, nil
-}
-
-// TODO move labels into models modules
-func (c *Controller) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chi.ChiCluster, error) {
-	// Parse Labels
-	// 			Labels: map[string]string{
-	//				labelChop: AppVersion,
-	//				LabelChi:  replica.Address.ChiName,
-	//				LabelCluster: replica.Address.ClusterName,
-	//				LabelClusterIndex: strconv.Itoa(replica.Address.ClusterIndex),
-	//				LabelReplicaIndex: strconv.Itoa(replica.Address.ReplicaIndex),
-	//			},
-
-	// ObjectMeta must have some labels
-	if len(objectMeta.Labels) == 0 {
-		return nil, errors.New(fmt.Sprintf("ObjectMeta %s does not have labels", objectMeta.Name))
-	}
-
-	// ObjectMeta must have LabelCluster
-	clusterName, ok := objectMeta.Labels[chopmodel.LabelCluster]
-	if !ok {
-		return nil, errors.New(fmt.Sprintf("ObjectMeta %s does not generated by CHI", objectMeta.Name))
-	}
-
-	chi, err := c.createChiFromObjectMeta(objectMeta)
-	if err != nil {
-		return nil, err
-	}
-
-	cluster := chi.FindCluster(clusterName)
-	if cluster == nil {
-		return nil, errors.New(fmt.Sprintf("Can't find cluster %s in CHI %s", clusterName, chi.Name))
-	}
-
-	return cluster, nil
 }

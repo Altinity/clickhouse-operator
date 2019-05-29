@@ -25,16 +25,10 @@ const (
 	LabelChop            = clickhousealtinitycom.GroupName + "/chop"
 	LabelChi             = clickhousealtinitycom.GroupName + "/chi"
 	LabelCluster         = clickhousealtinitycom.GroupName + "/cluster"
-	LabelClusterIndex    = clickhousealtinitycom.GroupName + "/clusterIndex"
-	LabelReplicaIndex    = clickhousealtinitycom.GroupName + "/replicaIndex"
+	LabelShard           = clickhousealtinitycom.GroupName + "/shard"
+	LabelReplica         = clickhousealtinitycom.GroupName + "/replica"
 	LabelZkConfigVersion = clickhousealtinitycom.GroupName + "/zkv"
 	LabelStatefulSet     = "StatefulSet"
-)
-
-const (
-	shardInternalReplicationDisabled = "Disabled"
-	stringTrue                       = "true"
-	stringFalse                      = "false"
 )
 
 const (

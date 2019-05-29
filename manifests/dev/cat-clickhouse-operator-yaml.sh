@@ -45,7 +45,7 @@ function render_configmap_header() {
     # ConfigMap name
     CM_NAME="$1"
     # Template file with ConfigMap header/beginning
-    CM_HEADER_FILE="${CUR_DIR}/clickhouse-operator-template-04-section-configmap-header.yaml"
+    CM_HEADER_FILE="${CUR_DIR}/clickhouse-operator-template-03-section-configmap-header.yaml"
 
     # Render ConfigMap header template with vars substitution
     cat ${CM_HEADER_FILE} | \
@@ -82,13 +82,10 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
     if [[ -z "${CHOPERATOR_CONFIG_FILE}" ]]; then
         # No config file specified, render simple deployment
         echo "---"
-        cat ${CUR_DIR}/clickhouse-operator-template-03-section-deployment.yaml | \
+        cat ${CUR_DIR}/clickhouse-operator-template-04-section-deployment.yaml | \
             CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
     else
-        # Config file specified, render deployment with ConfigMap
-        echo "---"
-        cat ${CUR_DIR}/clickhouse-operator-template-03-section-deployment-with-configmap.yaml | \
-            CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
+        # Config file specified, render all ConfigMaps and then render deployment
 
         # Render clickhouse-operator config file
         echo "---"
@@ -130,5 +127,10 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
                 render_configmap_data_section_file "${FILE}"
             done
         fi
+
+        # Render Deployment
+        echo "---"
+        cat ${CUR_DIR}/clickhouse-operator-template-04-section-deployment-with-configmap.yaml | \
+            CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
     fi
 fi

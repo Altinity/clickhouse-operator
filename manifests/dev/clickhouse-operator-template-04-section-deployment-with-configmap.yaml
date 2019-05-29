@@ -42,6 +42,7 @@ spec:
       containers:
         - name: clickhouse-operator
           image: ${CHOPERATOR_IMAGE}
+          imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator

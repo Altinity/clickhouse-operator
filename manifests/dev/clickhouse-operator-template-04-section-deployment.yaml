@@ -26,6 +26,7 @@ spec:
       containers:
         - name: clickhouse-operator
           image: ${CHOPERATOR_IMAGE}
+          imagePullPolicy: Always
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
