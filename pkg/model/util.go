@@ -17,9 +17,18 @@ package model
 import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"io"
+	"strconv"
 )
 
-// fprintf suppresses warning for unused returns of fmt.Fprintf()
-func fprintf(w io.Writer, format string, a ...interface{}) {
-	util.Fprintf(w, format, a...)
+func cline(w io.Writer, i int, format string, a ...interface{}) {
+	if i == 0 {
+		util.Fprintf(w, format, a...)
+		util.Fprintf(w, "\n")
+	} else {
+		// %16s
+		template := "%" + strconv.Itoa(i) + "s"
+		util.Fprintf(w, template, " ")
+		util.Fprintf(w, format, a...)
+		util.Fprintf(w, "\n")
+	}
 }
