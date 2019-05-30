@@ -201,7 +201,7 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 		} else if hasStatefulSetReachedGeneration(statefulSet, targetGeneration) {
 			// StatefulSet is available and generation reached
 			// All is good, job done, exit
-			glog.V(1).Infof("waitStatefulSetGeneration($s/%s)OK:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
+			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)OK:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 			return nil
 		} else if time.Since(start) < (time.Duration(c.chopConfig.StatefulSetUpdateTimeout) * time.Second) {
 			// StatefulSet is available but generation is not yet reached
