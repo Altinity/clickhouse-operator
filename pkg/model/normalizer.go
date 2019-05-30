@@ -57,7 +57,13 @@ func (n *Normalizer) DoChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouse
 	n.doConfiguration(&n.chi.Spec.Configuration)
 	// ChiSpec.Templates
 
-	n.chi.StatusFill(CreateChiServiceFQDN(chi))
+	endpoint := CreateChiServiceFQDN(chi)
+	pods := make([]string, 0)
+	n.chi.WalkReplicas(func(replica *chiv1.ChiReplica) error {
+		pods = append(pods, CreatePodName(replica))
+		return nil
+	})
+	n.chi.StatusFill(endpoint, pods)
 
 	return n.chi, nil
 }

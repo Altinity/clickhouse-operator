@@ -40,11 +40,12 @@ type ChiSpec struct {
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	IsKnown       int    `json:"isKnown"`
-	Version       string `json:"version"`
-	ClustersCount int    `json:"clusters"`
-	ReplicasCount int    `json:"replicas"`
-	Endpoint      string `json:"endpoint"`
+	IsKnown       int      `json:"isKnown"`
+	Version       string   `json:"version"`
+	ClustersCount int      `json:"clusters"`
+	ReplicasCount int      `json:"replicas"`
+	Pods          []string `json:"pods"`
+	Endpoint      string   `json:"endpoint"`
 }
 
 // ChiDefaults defines defaults section of .spec
