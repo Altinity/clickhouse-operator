@@ -25,14 +25,14 @@ func (c *Creator) getLabelsCommonObject() map[string]string {
 	return map[string]string{
 		LabelApp:  LabelAppValue,
 		LabelChop: c.appVersion,
-		LabelChi:  c.chi.Name,
+		LabelChi:  nameSectionChi(c.chi),
 	}
 }
 
 func (c *Creator) getSelectorCommonObject() map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
-		LabelChi: c.chi.Name,
+		LabelChi: nameSectionChi(c.chi),
 	}
 }
 
@@ -40,10 +40,10 @@ func (c *Creator) getLabelsReplica(replica *chi.ChiReplica, zk bool) map[string]
 	labels := map[string]string{
 		LabelApp:         LabelAppValue,
 		LabelChop:        c.appVersion,
-		LabelChi:         replica.Address.ChiName,
-		LabelCluster:     replica.Address.ClusterName,
-		LabelShard:       replica.Address.ShardName,
-		LabelReplica:     replica.Address.ReplicaName,
+		LabelChi:         nameSectionChi(replica),
+		LabelCluster:     nameSectionCluster(replica),
+		LabelShard:       nameSectionShard(replica),
+		LabelReplica:     nameSectionReplica(replica),
 		LabelStatefulSet: CreateStatefulSetName(replica),
 	}
 	if zk {
@@ -56,10 +56,10 @@ func (c *Creator) getSelectorReplica(replica *chi.ChiReplica) map[string]string 
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// skip chop
-		LabelChi:     replica.Address.ChiName,
-		LabelCluster: replica.Address.ClusterName,
-		LabelShard:   replica.Address.ShardName,
-		LabelReplica: replica.Address.ReplicaName,
+		LabelChi:     nameSectionChi(replica),
+		LabelCluster: nameSectionCluster(replica),
+		LabelShard:   nameSectionShard(replica),
+		LabelReplica: nameSectionReplica(replica),
 		// skip StatefulSet
 		// skip Zookeeper
 	}

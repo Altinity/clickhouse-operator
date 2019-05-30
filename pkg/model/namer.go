@@ -16,27 +16,59 @@ package model
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"strconv"
-
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	apps "k8s.io/api/apps/v1"
 )
 
 func createChiNameID(name string) string {
-	return util.CreateStringID(name, 6)
+	//return util.CreateStringID(name, 6)
+	max := 15
+	if len(name) <= max {
+		return name
+	} else {
+		return name[:max]
+	}
 }
 
 func createClusterNameID(name string) string {
-	return util.CreateStringID(name, 4)
+	//return util.CreateStringID(name, 4)
+	max := 15
+	if len(name) <= max {
+		return name
+	} else {
+		return name[:max]
+	}
 }
 
-func nameSectionChiReplica(replica *chop.ChiReplica) string {
-	return createChiNameID(replica.Address.ChiName)
+func createShardNameID(name string) string {
+	max := 10
+	if len(name) <= max {
+		return name
+	} else {
+		return name[:max]
+	}
 }
 
-func nameSectionChi(chi *chop.ClickHouseInstallation) string {
-	return createChiNameID(chi.Name)
+func createReplicaNameID(name string) string {
+	max := 10
+	if len(name) <= max {
+		return name
+	} else {
+		return name[:max]
+	}
+}
+
+func nameSectionChi(obj interface{}) string {
+	switch obj.(type) {
+	case *chop.ChiReplica:
+		replica := obj.(*chop.ChiReplica)
+		return createChiNameID(replica.Address.ChiName)
+	case *chop.ClickHouseInstallation:
+		chi := obj.(*chop.ClickHouseInstallation)
+		return createChiNameID(chi.Name)
+	}
+
+	return "ERROR"
 }
 
 func nameSectionCluster(replica *chop.ChiReplica) string {
@@ -44,18 +76,18 @@ func nameSectionCluster(replica *chop.ChiReplica) string {
 }
 
 func nameSectionShard(replica *chop.ChiReplica) string {
-	return strconv.Itoa(replica.Address.ShardIndex)
+	return createShardNameID(replica.Address.ShardName)
 }
 
 func nameSectionReplica(replica *chop.ChiReplica) string {
-	return strconv.Itoa(replica.Address.ReplicaIndex)
+	return createReplicaNameID(replica.Address.ReplicaName)
 }
 
 // CreateConfigMapPodName returns a name for a ConfigMap for replica's pod
 func CreateConfigMapPodName(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		configMapDeploymentNamePattern,
-		nameSectionChiReplica(replica),
+		nameSectionChi(replica),
 		nameSectionCluster(replica),
 		nameSectionShard(replica),
 		nameSectionReplica(replica),
@@ -99,7 +131,7 @@ func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
 func CreateStatefulSetName(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		statefulSetNamePattern,
-		nameSectionChiReplica(replica),
+		nameSectionChi(replica),
 		nameSectionCluster(replica),
 		nameSectionShard(replica),
 		nameSectionReplica(replica),
@@ -110,7 +142,7 @@ func CreateStatefulSetName(replica *chop.ChiReplica) string {
 func CreateStatefulSetServiceName(replica *chop.ChiReplica) string {
 	return fmt.Sprintf(
 		statefulSetServiceNamePattern,
-		nameSectionChiReplica(replica),
+		nameSectionChi(replica),
 		nameSectionCluster(replica),
 		nameSectionShard(replica),
 		nameSectionReplica(replica),
@@ -159,7 +191,7 @@ func CreatePodFQDNsOfChi(chi *chop.ClickHouseInstallation) []string {
 	return fqdns
 }
 
-// CreatePodName create Pod Name for a Service
+// CreatePodName create Pod name based on specified StatefulSet name
 func CreatePodName(statefulSet *apps.StatefulSet) string {
 	return fmt.Sprintf(podNamePattern, statefulSet.Name)
 
