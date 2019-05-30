@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "update-setup-replication"
+  name: "update-01"
 spec:
   configuration:
     zookeeper: # Add Zookeeper

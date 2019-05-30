@@ -1,17 +1,17 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "standard-04"
+  name: "simple-03"
 spec:
   configuration:
     clusters:
-      - name: "standard-04-not-sharded-replicated"
+      - name: "replicas"
         layout:
           shardsCount: 1
           replicasCount: 2
-      - name: "standard-04-sharded-not-replicated"
+      - name: "shards"
         layout:
           shardsCount: 2
-      - name: "standard-04-sharded-replicated"
+      - name: "shards-replicas"
         layout:
           replicasCount: 2

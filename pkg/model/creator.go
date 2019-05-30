@@ -225,7 +225,7 @@ func (c *Creator) createServiceObjectsPod() ServiceList {
 }
 
 func (c *Creator) createServiceObjectChi(serviceName string) *corev1.Service {
-	glog.V(1).Infof("createServiceObjectChi() for service %s\n", serviceName)
+	glog.V(1).Infof("createServiceObjectChi() for service %s", serviceName)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -254,7 +254,7 @@ func (c *Creator) createServiceObjectForStatefulSet(replica *chiv1.ChiReplica) *
 	serviceName := CreateStatefulSetServiceName(replica)
 	statefulSetName := CreateStatefulSetName(replica)
 
-	glog.V(1).Infof("createServiceObjectForStatefulSet() for service %s %s\n", serviceName, statefulSetName)
+	glog.V(1).Infof("createServiceObjectForStatefulSet() for service %s %s", serviceName, statefulSetName)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -291,7 +291,7 @@ func (c *Creator) createStatefulSetObjects() StatefulSetList {
 	// StatefulSet is created for each replica.Deployment
 
 	replicaProcessor := func(replica *chiv1.ChiReplica) error {
-		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s\n", CreateStatefulSetName(replica))
+		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s", CreateStatefulSetName(replica))
 		// Append new StatefulSet to the list of stateful sets
 		statefulSetList = append(statefulSetList, c.createStatefulSetObject(replica))
 		return nil
@@ -355,11 +355,11 @@ func (c *Creator) setupStatefulSetPodTemplate(
 	if podTemplate, ok := c.getPodTemplate(podTemplateName); ok {
 		// Replica references known PodTemplate
 		copyPodTemplateFrom(statefulSetObject, podTemplate)
-		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - template: %s\n", statefulSetName, podTemplateName)
+		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - template: %s", statefulSetName, podTemplateName)
 	} else {
 		// Replica references UNKNOWN PodTemplate
 		copyPodTemplateFrom(statefulSetObject, createDefaultPodTemplate(statefulSetName))
-		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - default template\n", statefulSetName)
+		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - default template", statefulSetName)
 	}
 
 	c.setupConfigMapVolumes(statefulSetObject, replica)
@@ -441,7 +441,7 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(
 		volumeMount := &statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts[i]
 		if volumeMount.Name == defaultVolumeClaimTemplateName {
 			// This .templates.VolumeClaimTemplate is already used in VolumeMount
-			glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - VC template 1: %s\n", statefulSetName, volumeMount.Name)
+			glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - VC template 1: %s", statefulSetName, volumeMount.Name)
 			return
 		}
 	}
@@ -456,7 +456,7 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(
 		volumeMount := &statefulSetObject.Spec.Template.Spec.Containers[ClickHouseContainerIndex].VolumeMounts[i]
 		if volumeMount.MountPath == dirPathClickHouseData {
 			// /var/lib/clickhouse is already mounted
-			glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - VC template 2: /var/lib/clickhouse already mounte\n", statefulSetName)
+			glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - VC template 2: /var/lib/clickhouse already mounted", statefulSetName)
 			return
 		}
 	}
@@ -473,7 +473,7 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(
 		)
 	}
 
-	glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s\n", statefulSetName, defaultVolumeClaimTemplateName)
+	glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - VC template.useDefaultName: %s", statefulSetName, defaultVolumeClaimTemplateName)
 }
 
 // copyPodTemplateFrom fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate

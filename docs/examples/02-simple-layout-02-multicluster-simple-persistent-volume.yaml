@@ -1,18 +1,18 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "syandard-02-multicluster"
+  name: "simple-02-multi"
 spec:
   defaults:
     templates:
       volumeClaimTemplate: auto-simple-vc
   configuration:
     clusters:
-      - name: "sharded-replicated"
+      - name: "replicas"
         layout:
           shardsCount: 1
           replicasCount: 2
-      - name: "sharded-non-replicated"
+      - name: "shards"
         layout:
           shardsCount: 2
       - name: "replicated"

@@ -184,14 +184,14 @@ func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 			}
 			// Now retry this SQL query on particular host
 			for retryCount := 0; retryCount < maxRetries; retryCount++ {
-				glog.V(1).Infof("applySQL(%s)\n", sql)
+				glog.V(1).Infof("applySQL(%s)", sql)
 				err = conn.Exec(sql)
 				if (err == nil) || !retry {
 					// Either all is good or we are not interested in retries anyway
 					// Move on to the next SQL query on this host
 					break
 				}
-				glog.V(1).Infof("attempt %d failed, sleep and retry\n", retryCount)
+				glog.V(1).Infof("attempt %d of %d failed, sleep and retry", retryCount, maxRetries)
 				seconds := (retryCount + 1) * 5
 				time.Sleep(time.Duration(seconds) * time.Second)
 			}

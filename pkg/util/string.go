@@ -164,3 +164,12 @@ func CreateStringID(str string, hashLen int) string {
 		return hash[len(hash)-hashLen:]
 	}
 }
+
+func StringHead(str string, headLen int) string {
+	if len(str) <= headLen {
+		return str
+	} else {
+		return str[:headLen]
+	}
+
+}
