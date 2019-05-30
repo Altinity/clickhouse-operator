@@ -25,12 +25,13 @@ func (chi *ClickHouseInstallation) IsKnown() bool {
 }
 
 // StatusFill fills .Status
-func (chi *ClickHouseInstallation) StatusFill(endpoint string) {
+func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 	// New CHI does not have FullDeploymentIDs specified
 	chi.Status.IsKnown = 1
 	chi.Status.Version = version.Version
 	chi.Status.ClustersCount = chi.ClustersCount()
 	chi.Status.ReplicasCount = chi.ReplicasCount()
+	chi.Status.Pods = pods
 	chi.Status.Endpoint = endpoint
 }
 

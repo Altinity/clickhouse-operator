@@ -172,8 +172,15 @@ func CreatePodFQDNsOfChi(chi *chop.ClickHouseInstallation) []string {
 	return fqdns
 }
 
-// CreatePodName create Pod name based on specified StatefulSet name
-func CreatePodName(statefulSet *apps.StatefulSet) string {
-	return fmt.Sprintf(podNamePattern, statefulSet.Name)
-
+// CreatePodName create Pod name based on specified StatefulSet or Replica
+func CreatePodName(obj interface{}) string {
+	switch obj.(type) {
+	case *apps.StatefulSet:
+		statefulSet := obj.(*apps.StatefulSet)
+		return fmt.Sprintf(podNamePattern, statefulSet.Name)
+	case *chop.ChiReplica:
+		replica := obj.(*chop.ChiReplica)
+		return fmt.Sprintf(podNamePattern, CreateStatefulSetName(replica))
+	}
+	return "unknown-type"
 }
