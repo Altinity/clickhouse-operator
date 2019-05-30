@@ -138,7 +138,7 @@ const (
 	// Ex.: chi-example02-deploy-confd-33260f1800-2 for chi named as 'example02'
 	configMapDeploymentNamePattern = "chi-%s-deploy-confd-%s-%s-%s"
 
-	distributedDDLPattern = "/clickhouse/%s/task_queue/ddl"
+	distributedDDLPathPattern = "/clickhouse/%s/task_queue/ddl"
 )
 
 const (

@@ -117,7 +117,7 @@ func CreateStatefulSetServiceName(replica *chop.ChiReplica) string {
 	)
 }
 
-// CreatePodHostname returns a name of a Pod resource for replica
+// CreatePodHostname returns a name of a Pod resource for a replica
 func CreatePodHostname(replica *chop.ChiReplica) string {
 	// Pod has no own hostname - redirect to appropriate Service
 	return CreateStatefulSetServiceName(replica)
