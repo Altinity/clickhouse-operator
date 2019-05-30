@@ -41,8 +41,6 @@ spec:
       properties:
         spec:
           type: object
-          required:
-            - configuration
           properties:
             defaults:
               type: object
@@ -64,8 +62,6 @@ spec:
                       type: string
             configuration:
               type: object
-              required:
-                - clusters
               properties:
                 zookeeper:
                   type: object
@@ -96,7 +92,6 @@ spec:
                     type: object
                     required:
                       - name
-                      - layout
                     properties:
                       name:
                         type: string

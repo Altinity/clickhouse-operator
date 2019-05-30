@@ -82,6 +82,16 @@ func (n *Normalizer) doConfiguration(conf *chiv1.ChiConfiguration) {
 
 // doClusters normalizes clusters
 func (n *Normalizer) doClusters() {
+
+	// Introduce default cluster
+	if len(n.chi.Spec.Configuration.Clusters) == 0 {
+		n.chi.Spec.Configuration.Clusters = []chiv1.ChiCluster{
+			{
+				Name: "cluster",
+			},
+		}
+	}
+
 	// Normalize all clusters in this CHI
 	n.chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
 		return n.doCluster(cluster)
