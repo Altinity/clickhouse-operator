@@ -66,7 +66,7 @@ func (c *Controller) reconcileConfigMap(configMap *core.ConfigMap) error {
 
 	if curConfigMap != nil {
 		// Object with such name already exists, this is not an error
-		glog.V(1).Infof("Update ConfigMap %s/%s\n", configMap.Namespace, configMap.Name)
+		glog.V(1).Infof("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		_, err := c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
 		if err != nil {
 			return err
@@ -149,7 +149,7 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 	// Convenience shortcuts
 	namespace := newStatefulSet.Namespace
 	name := newStatefulSet.Name
-	glog.V(1).Infof("updateStatefulSet(%s/%s)\n", namespace, name)
+	glog.V(1).Infof("updateStatefulSet(%s/%s)", namespace, name)
 
 	// Apply newStatefulSet and wait for Generation to change
 	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(newStatefulSet)
@@ -164,11 +164,11 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 
 	if updatedStatefulSet.Generation == oldStatefulSet.Generation {
 		// Generation is not updated - no changes in .spec section were made
-		glog.V(1).Infof("updateStatefulSet(%s/%s) - no generation change\n", namespace, name)
+		glog.V(1).Infof("updateStatefulSet(%s/%s) - no generation change", namespace, name)
 		return nil
 	}
 
-	glog.V(1).Infof("updateStatefulSet(%s/%s) - generation change %d=>%d\n", namespace, name, oldStatefulSet.Generation, updatedStatefulSet.Generation)
+	glog.V(1).Infof("updateStatefulSet(%s/%s) - generation change %d=>%d", namespace, name, oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
 	if err := c.waitStatefulSetGeneration(namespace, name, updatedStatefulSet.Generation); err == nil {
 		// Target generation reached, StatefulSet updated successfully
@@ -191,28 +191,28 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 			// Unable to get StatefulSet
 			if apierrors.IsNotFound(err) {
 				// Object with such name not found - may be is still being created - wait for it
-				glog.V(1).Infof("waitStatefulSetGeneration() - object not yet created, wait for it\n")
+				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s) - object not yet created, wait for it", namespace, name)
 				time.Sleep(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second)
 			} else {
 				// Some kind of total error
-				glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED\n", namespace, name)
+				glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
 				return err
 			}
 		} else if hasStatefulSetReachedGeneration(statefulSet, targetGeneration) {
 			// StatefulSet is available and generation reached
 			// All is good, job done, exit
-			glog.V(1).Infof("waitStatefulSetGeneration(OK):%s\n", strStatefulSetStatus(&statefulSet.Status))
+			glog.V(1).Infof("waitStatefulSetGeneration($s/%s)OK:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 			return nil
 		} else if time.Since(start) < (time.Duration(c.chopConfig.StatefulSetUpdateTimeout) * time.Second) {
 			// StatefulSet is available but generation is not yet reached
 			// Wait some more time
-			glog.V(1).Infof("waitStatefulSetGeneration():%s\n", strStatefulSetStatus(&statefulSet.Status))
+			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s):%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 			time.Sleep(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second)
 		} else {
 			// StatefulSet is available but generation is not yet reached
 			// Timeout reached
 			// Failed, time to quit
-			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) - TIMEOUT reached\n", namespace, name)
+			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) - TIMEOUT reached", namespace, name)
 			return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - wait timeout", namespace, name))
 		}
 	}
@@ -231,16 +231,16 @@ func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulS
 	switch c.chopConfig.OnStatefulSetCreateFailureAction {
 	case config.OnStatefulSetCreateFailureActionAbort:
 		// Do nothing, just report appropriate error
-		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - abort\n", namespace, name)
+		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - abort", namespace, name)
 		return errors.New(fmt.Sprintf("Create failed on %s/%s", namespace, name))
 
 	case config.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully problematic failed StatefulSet
-		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to DELETE FAILED StatefulSet\n", namespace, name)
+		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to DELETE FAILED StatefulSet", namespace, name)
 		c.statefulSetDelete(namespace, name)
 		return c.shouldContinueOnCreateFailed()
 	default:
-		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetCreateFailureAction=%s\n", c.chopConfig.OnStatefulSetCreateFailureAction)
+		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetCreateFailureAction=%s", c.chopConfig.OnStatefulSetCreateFailureAction)
 		return nil
 	}
 
@@ -258,12 +258,12 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 	switch c.chopConfig.OnStatefulSetUpdateFailureAction {
 	case config.OnStatefulSetUpdateFailureActionAbort:
 		// Do nothing, just report appropriate error
-		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort\n", namespace, name)
+		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort", namespace, name)
 		return errors.New(fmt.Sprintf("Update failed on %s/%s", namespace, name))
 
 	case config.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
-		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - going to ROLLBACK FAILED StatefulSet\n", namespace, name)
+		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - going to ROLLBACK FAILED StatefulSet", namespace, name)
 		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {
 			// Unable to get StatefulSet
 			return err
@@ -280,7 +280,7 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 			return c.shouldContinueOnUpdateFailed()
 		}
 	default:
-		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s\n", c.chopConfig.OnStatefulSetUpdateFailureAction)
+		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s", c.chopConfig.OnStatefulSetUpdateFailureAction)
 		return nil
 	}
 

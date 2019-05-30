@@ -17,45 +17,26 @@ package model
 import (
 	"fmt"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	apps "k8s.io/api/apps/v1"
 )
 
 func createChiNameID(name string) string {
 	//return util.CreateStringID(name, 6)
-	max := 15
-	if len(name) <= max {
-		return name
-	} else {
-		return name[:max]
-	}
+	return util.StringHead(name, 15)
 }
 
 func createClusterNameID(name string) string {
 	//return util.CreateStringID(name, 4)
-	max := 15
-	if len(name) <= max {
-		return name
-	} else {
-		return name[:max]
-	}
+	return util.StringHead(name, 15)
 }
 
 func createShardNameID(name string) string {
-	max := 10
-	if len(name) <= max {
-		return name
-	} else {
-		return name[:max]
-	}
+	return util.StringHead(name, 8)
 }
 
 func createReplicaNameID(name string) string {
-	max := 10
-	if len(name) <= max {
-		return name
-	} else {
-		return name[:max]
-	}
+	return util.StringHead(name, 8)
 }
 
 func nameSectionChi(obj interface{}) string {

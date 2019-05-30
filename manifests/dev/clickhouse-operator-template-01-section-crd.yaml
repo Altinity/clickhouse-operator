@@ -95,6 +95,7 @@ spec:
                     properties:
                       name:
                         type: string
+                        pattern: "^[a-zA-Z]([a-zA-Z0-9_-]){0,14}$"
                       shardsCount:
                         type: integer
                         minimum: 1
@@ -125,6 +126,7 @@ spec:
                               properties:
                                 name:
                                   type: string
+                                  pattern: "^([a-zA-Z0-9_-]){0,8}$"
                                 # DEPRECATED - to be removed soon
                                 definitionType:
                                   type: string
@@ -150,6 +152,7 @@ spec:
                                     properties:
                                       name:
                                         type: string
+                                        pattern: "^([a-zA-Z0-9_-]){0,8}$"
                                       port:
                                         type: integer
                                         minimum: 1

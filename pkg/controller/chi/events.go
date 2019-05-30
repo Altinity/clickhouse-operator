@@ -97,6 +97,6 @@ func (c *Controller) eventChi(
 	_, err := c.kubeClient.CoreV1().Events(chi.Namespace).Create(event)
 
 	if err != nil {
-		glog.V(1).Infof("Create Event failed: %v\n", err)
+		glog.V(1).Infof("Create Event failed: %v", err)
 	}
 }

@@ -1,4 +1,4 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "standard-01"
+  name: "simple-01"

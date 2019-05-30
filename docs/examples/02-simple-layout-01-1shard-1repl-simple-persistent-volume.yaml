@@ -1,14 +1,14 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "standard-01-simple-pv"
+  name: "simple-02-pv1"
 spec:
   defaults:
     templates:
       volumeClaimTemplate: volumeclaim-template
   configuration:
     clusters:
-      - name: "standard-01-simple-pv"
+      - name: "simple-pv"
         layout:
           shardsCount: 1
           replicasCount: 1

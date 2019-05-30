@@ -17,14 +17,14 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "aws-zones-pod-per-host"
+  name: "volume-hostpath"
 spec:
   defaults:
     templates:
       podTemplate: clickhouse-per-host-on-servers-with-ssd
   configuration:
     clusters:
-      - name: local-storage-cluster
+      - name: local-storage
         layout:
           shardsCount: 3
 

@@ -410,7 +410,7 @@ func (c *Controller) processNextWorkItem() bool {
 		// Main reconcile loop function sync an item
 		if err := c.syncChi(reconcile); err != nil {
 			// Item will be retried later
-			return fmt.Errorf("unable to sync an object %v\n", err.Error())
+			return fmt.Errorf("unable to sync an object %v", err.Error())
 		}
 
 		// Item is processed, no more retries
@@ -540,17 +540,17 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	//	c.listStatefulSetResources(chi)
 	c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) update resources", old.Namespace, old.Name))
 	if err := c.reconcileChi(new); err != nil {
-		glog.V(1).Infof("reconcileChi() FAILED: %v\n", err)
+		glog.V(1).Infof("reconcileChi() FAILED: %v", err)
 		c.eventChi(old, eventTypeWarning, eventActionUpdate, eventReasonUpdateFailed, fmt.Sprintf("onUpdateChi(%s/%s) update resources failed", old.Namespace, old.Name))
 	} else {
 		c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) migrate schema", old.Namespace, old.Name))
 		new.WalkClusters(func(cluster *chop.ChiCluster) error {
 			dbNames, createDatabaseSQLs, _ := c.schemer.ClusterGetCreateDatabases(new, cluster)
-			glog.V(1).Infof("Creating databases: %v\n", dbNames)
+			glog.V(1).Infof("Creating databases: %v", dbNames)
 			_ = c.schemer.ClusterApplySQLs(cluster, createDatabaseSQLs, false)
 
 			tableNames, createTableSQLs, _ := c.schemer.ClusterGetCreateTables(new, cluster)
-			glog.V(1).Infof("Creating tables: %v\n", tableNames)
+			glog.V(1).Infof("Creating tables: %v", tableNames)
 			_ = c.schemer.ClusterApplySQLs(cluster, createTableSQLs, false)
 			return nil
 		})

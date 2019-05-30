@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "update-replication-stateful-empty-dir"
+  name: "update-emptydir"
 spec:
   configuration:
     clusters:
@@ -9,7 +9,7 @@ spec:
         templates:
           podTemplate: clickhouse-with-empty-dir-volume-template
         layout:
-          shardsCount: 4
+          shardsCount: 2
   templates:
     podTemplates:
       - name: clickhouse-with-empty-dir-volume-template
