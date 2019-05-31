@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "incorrect-settings-create"
+  name: "incorrect-set-1"
 spec:
   configuration:
     users:
