@@ -15,19 +15,22 @@
 package model
 
 import (
-	"fmt"
+	sqlmodule "database/sql"
+
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/util"
+
+	"github.com/MakeNowJust/heredoc"
 	"github.com/golang/glog"
-	"time"
 )
 
 const (
 	// Comma-separated ''-enclosed list of database names to be ignored
 	ignoredDBs = "'system'"
 
-	// Max number of retries for SQL queries
-	maxRetries = 10
+	// Max number of tries for SQL queries
+	maxTries = 10
 )
 
 type Schemer struct {
@@ -48,25 +51,36 @@ func (s *Schemer) newConn(hostname string) *clickhouse.Conn {
 	return clickhouse.New(hostname, s.Username, s.Password, s.Port)
 }
 
-// ClusterGetCreateDatabases returns set of 'CREATE DATABASE ...' SQLs
+// ClusterGetCreateDatabases returns list of DB names and list of 'CREATE DATABASE ...' SQLs for these DBs
 func (s *Schemer) ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
-	sql := `
+	// Results
+	dbNames := make([]string, 0)
+	createStatements := make([]string, 0)
+
+	sql := heredoc.Docf(`
 		SELECT
 			distinct name AS name,
 			concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_db_query
 		FROM cluster('%s', system, databases) 
 		WHERE name not in (%s)
 		ORDER BY name
-		SETTINGS skip_unavailable_shards = 1`
-	sql = fmt.Sprintf(sql, cluster.Name, ignoredDBs)
+		SETTINGS skip_unavailable_shards = 1
+		`,
+		cluster.Name,
+		ignoredDBs)
 
-	dbNames := make([]string, 0)
-	createStatements := make([]string, 0)
 	glog.V(1).Info(CreateChiServiceFQDN(chi))
 	conn := s.newConn(CreateChiServiceFQDN(chi))
-	if rows, err := conn.Query(sql); err != nil {
+	var rows *sqlmodule.Rows = nil
+	var err error
+	err = util.Retry(maxTries, sql, func() error {
+		rows, err = conn.Query(sql)
+		return err
+	})
+	if err != nil {
 		return nil, nil, err
 	} else {
+		// Some data fetched
 		for rows.Next() {
 			var name, create string
 			if err := rows.Scan(&name, &create); err == nil {
@@ -80,9 +94,13 @@ func (s *Schemer) ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, clu
 	return dbNames, createStatements, nil
 }
 
-// ClusterGetCreateTables returns set of 'CREATE TABLE ...' SQLs
+// ClusterGetCreateTables returns list of table names and list of 'CREATE TABLE ...' SQLs for these tables
 func (s *Schemer) ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
-	sql := `
+	// Results
+	tableNames := make([]string, 0)
+	createStatements := make([]string, 0)
+
+	sql := heredoc.Docf(`
 		SELECT
 			distinct name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS') 
@@ -90,16 +108,23 @@ func (s *Schemer) ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluste
 		WHERE database not in (%s)
 			AND name not like '.inner.%%'
 		ORDER BY multiIf(engine not in ('Distributed', 'View', 'MaterializedView'), 1, engine = 'MaterializedView', 2, engine = 'Distributed', 3, 4), name
-		SETTINGS skip_unavailable_shards = 1`
-	sql = fmt.Sprintf(sql, cluster.Name, ignoredDBs)
+		SETTINGS skip_unavailable_shards = 1
+		`,
+		cluster.Name,
+		ignoredDBs)
 
-	tableNames := make([]string, 0)
-	createStatements := make([]string, 0)
 	glog.V(1).Info(CreateChiServiceFQDN(chi))
 	conn := s.newConn(CreateChiServiceFQDN(chi))
-	if rows, err := conn.Query(sql); err != nil {
+	var rows *sqlmodule.Rows = nil
+	var err error
+	err = util.Retry(maxTries, sql, func() error {
+		rows, err = conn.Query(sql)
+		return err
+	})
+	if err != nil {
 		return nil, nil, err
 	} else {
+		// Some data fetched
 		for rows.Next() {
 			var name, create string
 			if err := rows.Scan(&name, &create); err == nil {
@@ -115,25 +140,34 @@ func (s *Schemer) ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluste
 
 // ReplicaGetDropTables returns set of 'DROP TABLE ...' SQLs
 func (s *Schemer) ReplicaGetDropTables(replica *chi.ChiReplica) ([]string, []string, error) {
+	// Results
+	tableNames := make([]string, 0)
+	dropStatements := make([]string, 0)
+
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
-
-	sql := `
+	sql := heredoc.Docf(`
 		SELECT
 			distinct name, 
 			concat('DROP TABLE IF EXISTS ', database, '.', name)
 		FROM system.tables
 		WHERE database not in (%s) 
-			AND engine like 'Replicated%%'`
-	sql = fmt.Sprintf(sql, ignoredDBs)
+			AND engine like 'Replicated%%'
+		`,
+		ignoredDBs)
 
-	tableNames := make([]string, 0)
-	dropStatements := make([]string, 0)
 	glog.V(1).Info(CreatePodFQDN(replica))
 	conn := s.newConn(CreatePodFQDN(replica))
-	if rows, err := conn.Query(sql); err != nil {
+	var rows *sqlmodule.Rows = nil
+	var err error
+	err = util.Retry(maxTries, sql, func() error {
+		rows, err = conn.Query(sql)
+		return err
+	})
+	if err != nil {
 		return nil, nil, err
 	} else {
+		// Some data fetched
 		for rows.Next() {
 			var name, create string
 			if err := rows.Scan(&name, &create); err == nil {
@@ -182,18 +216,13 @@ func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 				// Skip malformed SQL query, move to the next SQL query
 				continue
 			}
-			// Now retry this SQL query on particular host
-			for retryCount := 0; retryCount < maxRetries; retryCount++ {
-				glog.V(1).Infof("applySQL(%s)", sql)
-				err = conn.Exec(sql)
-				if (err == nil) || !retry {
-					// Either all is good or we are not interested in retries anyway
-					// Move on to the next SQL query on this host
-					break
-				}
-				glog.V(1).Infof("attempt %d of %d failed, sleep and retry", retryCount, maxRetries)
-				seconds := (retryCount + 1) * 5
-				time.Sleep(time.Duration(seconds) * time.Second)
+			err = util.Retry(maxTries, sql, func() error {
+				return conn.Exec(sql)
+			})
+			if err != nil {
+				// Do not run any more SQL queries on this host in case of failure
+				// Move to next host
+				break
 			}
 		}
 	}
