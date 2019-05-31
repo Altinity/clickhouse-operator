@@ -19,7 +19,6 @@ GO_FILES_LIST=$(find ${SRC_ROOT} -name \*.go -not -path "${SRC_ROOT}/vendor/*" -
 UNFORMATTED_FILES_LIST=$(gofmt -l ${GO_FILES_LIST})
 
 if [[ ${UNFORMATTED_FILES_LIST} ]]; then
-    echo "These files need to pass through 'go fmt'"
     for FILE in ${UNFORMATTED_FILES_LIST}; do
         echo ${FILE}
     done

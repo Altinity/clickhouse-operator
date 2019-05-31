@@ -4,14 +4,14 @@ FROM golang:1.11.5 AS builder
 
 WORKDIR $GOPATH/src/github.com/altinity/clickhouse-operator
 
-ADD Gopkg.toml Gopkg.toml
-ADD Gopkg.lock Gopkg.lock
+# Reconstruct source tree inside docker
+ADD . .
+# ./vendor is excluded in .dockerignore, reconstruct it with 'dep' tool
 RUN go get -u github.com/golang/dep/cmd/dep
 RUN dep ensure --vendor-only
 
-ADD pkg pkg
-ADD cmd cmd
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /tmp/clickhouse-operator ./cmd/clickhouse-operator
+# Build operator binary with explicitly specified output
+RUN OPERATOR_BIN=/tmp/clickhouse-operator ./dev/binary_build.sh
 
 # === Runner ===
 

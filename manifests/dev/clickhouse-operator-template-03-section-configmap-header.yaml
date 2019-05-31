@@ -1,0 +1,12 @@
+# Possible Template Parameters:
+#
+# ${CHOPERATOR_NAMESPACE}
+# ${CHOPERATOR_IMAGE}
+# ${CONFIGMAP_NAME}
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${CONFIGMAP_NAME}
+  namespace: ${CHOPERATOR_NAMESPACE}
+data:

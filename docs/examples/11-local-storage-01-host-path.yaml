@@ -1,0 +1,76 @@
+#
+# AWS-specific labels, applicable in 'nodeAffinity' statements
+#
+# beta.kubernetes.io/arch=amd64
+# beta.kubernetes.io/instance-type=t2.medium
+# beta.kubernetes.io/os=linux
+#
+# failure-domain.beta.kubernetes.io/region=us-east-1
+# failure-domain.beta.kubernetes.io/zone=us-east-1a
+#
+# kubernetes.io/hostname=ip-172-20-37-97.ec2.internal
+# kubernetes.io/role=node
+# node-role.kubernetes.io/node=
+#
+# kops.k8s.io/instancegroup=nodes2
+#
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "volume-hostpath"
+spec:
+  defaults:
+    templates:
+      podTemplate: clickhouse-per-host-on-servers-with-ssd
+  configuration:
+    clusters:
+      - name: local-storage
+        layout:
+          shardsCount: 3
+
+  templates:
+    podTemplates:
+      # Specify Pod Templates with affinity
+
+      - name: clickhouse-per-host-on-servers-with-ssd
+        spec:
+          affinity:
+            # Specify Pod affinity to nodes with specified properties (disktype=ssd)
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "disktype"
+                        operator: In
+                        values:
+                          - "ssd"
+            # Specify Pod anti-affinity to Pods with the same label "/app" on the same "hostname"
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: "clickhouse.altinity.com/app"
+                        operator: In
+                        values:
+                          - "chop"
+                  topologyKey: "kubernetes.io/hostname"
+          volumes:
+            # Specify volume as path on local filesystem as a directory which will be created, if need be
+            - name: local-path
+              hostPath:
+                path: /mnt/podvolume
+                type: DirectoryOrCreate
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.3.7
+              volumeMounts:
+                # Specify reference to volume on local filesystem
+                - name: local-path
+                  mountPath: /var/lib/clickhouse
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009

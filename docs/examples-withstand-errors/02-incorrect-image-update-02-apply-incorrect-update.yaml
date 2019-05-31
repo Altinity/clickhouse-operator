@@ -1,47 +1,47 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "incorrect-image-version-update"
+  name: "incorrect-image-2"
 spec:
   configuration:
     clusters:
       - name: update
-        deployment:
+        templates:
           podTemplate: clickhouse:19.1.10
         layout:
-          type: Advanced
           shards:
-            - definitionType: Replicas
-              replicas:
+            - replicas:
                 - port: 9000
                 - port: 9000
                 - port: 9000
-                  deployment:
+                  templates:
                     podTemplate: clickhouse:19.1.100
 
   templates:
     podTemplates:
-    # Incorrect image
-    - name: clickhouse:19.1.100
-      containers:
-      - name: clickhouse-pod
-        image: yandex/clickhouse-server:19.1.100
-        ports:
-        - name: http
-          containerPort: 8123
-        - name: client
-          containerPort: 9000
-        - name: interserver
-          containerPort: 9009
+      # Incorrect image
+      - name: clickhouse:19.1.100
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.1.100
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009
 
-    - name: clickhouse:19.1.10
-      containers:
-      - name: clickhouse-pod
-        image: yandex/clickhouse-server:19.1.10
-        ports:
-        - name: http
-          containerPort: 8123
-        - name: client
-          containerPort: 9000
-        - name: interserver
-          containerPort: 9009
+      - name: clickhouse:19.1.10
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.1.10
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+                - name: interserver
+                  containerPort: 9009

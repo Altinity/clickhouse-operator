@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "incorrect-settings-update"
+  name: "incorrect-set-2"
 spec:
   configuration:
     users:
@@ -32,6 +32,5 @@ spec:
     clusters:
       - name: "standard"
         layout:
-          type: Standard
           shardsCount: 1
           replicasCount: 1

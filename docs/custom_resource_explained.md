@@ -1,8 +1,8 @@
 # ClickHouse Installation Custom Resource explained
 
 Let's describe in details ClickHouse [Custom Resource](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
-Full example is available in [examples/clickhouseinstallation-object.yaml](examples/clickhouseinstallation-object.yaml) file.
-The best way to work with this doc is to open [examples/clickhouseinstallation-object.yaml](examples/clickhouseinstallation-object.yaml) in separate tab
+Full example is available in [examples/99-clickhouseinstallation-max.yaml][chi_max_manifest] file. \
+The best way to work with this doc is to open [examples/99-clickhouseinstallation-max.yaml][chi_max_manifest] in separate tab
 and look into it along with reading this explanation.  
 
 ```yaml
@@ -11,14 +11,14 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "clickhouse-installation-test"
 ```
-Create resource of `kind: "ClickHouseInstallation"` named as `"clickhouse-installation-test"`.
+Create resource of `kind: "ClickHouseInstallation"` named as `"clickhouse-installation-max"`.
 Accessible with `kubectl` as:
 ```bash
 kubectl get clickhouseinstallations.clickhouse.altinity.com 
 ```
 ```text
 NAME                           AGE
-clickhouse-installation-test   23h
+clickhouse-installation-max   23h
 ``` 
 
 ## .spec.defaults
@@ -27,23 +27,20 @@ clickhouse-installation-test   23h
     replicasUseFQDN: 0 # 0 - by default, 1 - enabled
     distributedDDL:
       profile: default
-    deployment:
-      zone:
-        matchLabels:
-          clickhouse.altinity.com/zone: zone1
-      podTemplate: clickhouse-installation
-      volumeClaimTemplate: default
+    templates:
+      podTemplate: clickhouse-v18.16.1
+      volumeClaimTemplate: default-volume-claim
 ```
 `.spec.defaults` section represents default values for sections below.
   - `.spec.defaults.replicasUseFQDN` - should replicas be specified by FQDN in `<host></host>`
-  - `.spec.defaults.distributedDDL` - referense to `<yandex><distributed_ddl></distributed_ddl></yandex>`
-  - `.spec.defaults.deployment` would be used everywhere where `deployment` is needed.  
+  - `.spec.defaults.distributedDDL` - reference to `<yandex><distributed_ddl></distributed_ddl></yandex>`
+  - `.spec.defaults.templates` would be used everywhere where `templates` is needed.  
 
 ## .spec.configuration
 ```yaml
   configuration:
 ```
-`.spec.configuration` section refers to config file used by ClickHouse.
+`.spec.configuration` section represents sources for ClickHouse configuration files. Be it users, remote servers and etc configuration files. 
 
 ## .spec.configuration.zookeeper
 ```yaml
@@ -61,12 +58,7 @@ clickhouse-installation-test   23h
 ## .spec.configuration.users
 ```yaml
     users:
-      profiles/readonly/readonly: "1"
-#      <profiles>
-#        <readonly>
-#          <readonly>1</readonly>
-#        </readonly>
-#      </profiles>
+      readonly/profile: readonly
 ```
 `.spec.configuration.users` refers to [&lt;yandex&gt;&lt;profiles&gt;&lt;/profiles&gt;&lt;users&gt;&lt;/users&gt;&lt;/yandex&gt;](https://clickhouse.yandex/docs/en/operations/settings/settings/) settings sections.
 ```yaml
@@ -80,16 +72,25 @@ expands into
         </readonly>
       </profiles>
 ```
-
+```yaml
+      test/networks/ip:
+        - "127.0.0.1"
+        - "::/0"
+```
+expands into
+```xml
+     <users>
+        <test>
+          <networks>
+            <ip>127.0.0.1</ip>
+            <ip>::/0</ip>
+          </networks>
+        </test>
+     </users>
+```
 ## .spec.configuration.settings
 ```yaml
     settings:
-      profiles/default/max_memory_usage: "1000000000"
-#      <profiles>
-#        <default>
-#          <max_memory_usage>1000000000</max_memory_usage>
-#        </default>
-#      </profiles>
       compression/case/method: "zstd"
 #      <compression>
 #       <case>
@@ -105,27 +106,68 @@ expands into
 ```
 `.spec.configuration.clusters` represents array of ClickHouse clusters definitions.
 
-## Clusters and Layout Types
+## Clusters and Layouts
 
-### Standard layout with shards and replicas count specified
-
+ClickHouse instances layout within cluster is described with `.clusters.layout` section
 ```yaml
     - name: sharded-replicated
       layout:
-        type: Standard
         shardsCount: 3
         replicasCount: 2
-      deployment:
-        podTemplate: clickhouse-installation
-#       scanario: Default
-#       zone:
-#         matchLabels:
-#           clickhouse.altinity.com/zone: zone1
-# 
-#       values inherited from global .spec.deployment section
-#
 ```
-ClickHouse cluster named `sharded-replicated` represented with `Standard` layout with 3 shards of 2 replicas each (6 pods total).
+`layout` is specified with basic layout dimensions:
+```yaml
+      layout:
+        shardsCount: 3
+        replicasCount: 2
+```
+or with detailed specification of `shards` and `replicas`:
+```yaml
+      - name: customized
+        templates:
+          podTemplate: clickhouse-v18.16.1
+          volumeClaimTemplate: default-volume-claim
+        layout:
+          shards:
+            - name: shard0
+              replicasCount: 3
+              weight: 1
+              internalReplication: Disabled
+              templates:
+                podTemplate: clickhouse-v18.16.1
+                volumeClaimTemplate: default-volume-claim
+
+            - name: shard1
+              templates:
+                podTemplate: clickhouse-v18.16.1
+                volumeClaimTemplate: default-volume-claim
+              replicas:
+                - name: replica0
+                - name: replica1
+                - name: replica2
+```
+combination is also possible:
+```yaml
+      - name: customized
+        templates:
+          podTemplate: clickhouse-v18.16.1
+          volumeClaimTemplate: default-volume-claim
+        layout:
+          shards:
+          
+            - name: shard2
+              replicasCount: 3
+              templates:
+                podTemplate: clickhouse-v18.16.1
+                volumeClaimTemplate: default-volume-claim
+              replicas:
+                - name: replica0
+                  port: 9000
+                  templates:
+                    podTemplate: clickhouse-v18.16.2
+                    volumeClaimTemplate: default-volume-claim
+```
+ClickHouse cluster named `sharded-replicated` represented by layout with 3 shards of 2 replicas each (6 pods total).
 Pods will be created and fully managed by the operator.
 In ClickHouse config file this would be represented as:
 ```xml
@@ -175,24 +217,14 @@ In ClickHouse config file this would be represented as:
 ``` 
 with full IP and DNS management provided by k8s and operator.
 
-### Standard layout with shards count specified
+### Layout with shards count specified
 
 ```yaml
     - name: sharded-non-replicated
       layout:
-        type: Standard
         shardsCount: 3 # replicasCount = 1, by default
-      deployment:
-        zone:
-          matchLabels:
-            clickhouse.altinity.com/zone: zone2
-#       scenario: Default
-#       podTemplate: clickhouse-installation
-#
-#       values inherited from global .spec.deployment section
-#
 ```
-ClickHouse cluster named `sharded-non-replicated` represented with `Standard` layout with 3 shards of 1 replicas each (3 pods total).
+ClickHouse cluster named `sharded-non-replicated` represented by layout with 3 shards of 1 replicas each (3 pods total).
 Pods will be created and fully managed by the operator.
 In ClickHouse config file this would be represented as:
 ```xml
@@ -226,24 +258,14 @@ In ClickHouse config file this would be represented as:
 </yandex>
 ``` 
 
-### Standard layout with replicas count specified
+### Layout with replicas count specified
 
 ```yaml
     - name: replicated
       layout:
-        type: Standard
         replicasCount: 4 # shardsCount = 1, by default
-#     deployment:
-#       podTemplate: clickhouse-installation
-#       scanario: Default
-#       zone:
-#         matchLabels:
-#           clickhouse.altinity.com/zone: zone1
-# 
-#       values inherited from global .spec.deployment section
-#
 ```
-ClickHouse cluster named `replicated` represented with `Standard` layout with 1 shard of 4 replicas each (4 pods total).
+ClickHouse cluster named `replicated` represented by layout with 1 shard of 4 replicas each (4 pods total).
 Pods will be created and fully managed by the operator.
 In ClickHouse config file this would be represented as:
 ```xml
@@ -276,181 +298,88 @@ In ClickHouse config file this would be represented as:
 </yandex>
 ``` 
 
-### Advanced layout
-Advanced layout provides possibility to explicitly define each shard and replica with
+### Advanced layout techniques
+`layout` provides possibility to explicitly define each shard and replica with
 `.spec.configuration.clusters.layout.shards`
 ```yaml
     - name: customized
-#     deployment:
-#       scenario: Default
-#       zone:
-#         matchLabels:
-#           clickhouse.altinity.com/zone: zone1
-#       podTemplate: clickhouse-installation
-#
-#       values inherited from global .spec.deployment section
-#
       layout:
-        type: Advanced
         shards:
+          - replicas:
 ```
-#### definitionType: ReplicasCount
-Provides possibility to specify custom replicas count for this shard
+so we can specify `shards` and `replicas` explicitly - either all `shards` and `replias` or selectively, 
+only those which we'd like to be different from default template. 
+
+Full specification of `replicas` in a shard. Note - no `replicasCount` specified, all replicas are described by `replicas` array:
 ```yaml        
-        - definitionType: ReplicasCount
-          replicasCount: 2
-          weight: 1
-#         weight - omitted by default
-          internalReplication: Disabled
-#         internalReplication: Enabled - default value
-          deployment:
-            podTemplate: clickhouse-installation
-            zone:
-              matchLabels:
-                clickhouse.altinity.com/zone: zone3
-#           scenario: Default
-#         
-#           values inherited from .spec.configuration.clusters[3].deployment section
-#
+            - name: shard1
+              templates:
+                podTemplate: clickhouse-v18.16.1
+                volumeClaimTemplate: default-volume-claim
+              replicas:
+                - name: replica0
+                - name: replica1
+                - name: replica2
 ```
-Another example with different number of replicas
+Another example with selectively described replicas. Note - `replicasCount` specified and one replica is described explicitly
 ```yaml
-        - definitionType: ReplicasCount
-          replicasCount: 3
-#         deployment:
-#           scenario: Default
-#           zone:
-#             matchLabels:
-#               clickhouse.altinity.com/zone: zone1
-#           podTemplate: clickhouse-installation
-#  
-#         values inherited from .spec.configuration.clusters[3].deployment section
-#
-```
-#### definitionType: Replicas
-Provides possibility to specify custom replicas as array `.spec.configuration.clusters.layout.shards.replicas` with individual replicas specifications.
-
-```yaml  
-        - definitionType: Replicas
-#         deployment:
-#           scenario: Default
-#           zone:
-#             matchLabels:
-#               clickhouse.altinity.com/zone: zone1
-#           podTemplate: clickhouse-installation
-#
-#         values inherited from .spec.configuration.clusters[3].deployment section
-#
-          replicas:
-          - port: 9000
-            deployment:
-              scenario: Default
-#             zone:
-#               matchLabels:
-#                 clickhouse.altinity.com/zone: zone1
-#             podTemplate: clickhouse-installation
-#  
-#           values inherited from .spec.configuration.clusters[3].shards[2].deployment section
-#           
-          - deployment:
-              scenario: NodeMonopoly # 1 pod (CH server instance) per node (zone can be a set of n nodes) -> podAntiAffinity
-              zone:
-                matchLabels:
-                  clickhouse.altinity.com/zone: zone4
-                  clickhouse.altinity.com/kind: ssd
-              podTemplate: clickhouse-installation
-```
-ClickHouse cluster named `customized` represented with `Advanced` layout with 3 shards of 2, 3 and 1 replicas each (6 pods total).
-Pods will be created and fully managed by the operator.
-In ClickHouse config file this would be represented as:
-```xml
-<yandex>
-    <remote_servers>
-        <customized>
-        
-            <shard>
-                <internal_replication>false</internal_replication>
-                <replica>
-                    <host>192.168.1.1</host>
-                    <port>9000</port>
-                </replica>
-                <replica>
-                    <host>192.168.1.2</host>
-                    <port>9000</port>
-                </replica>
-            </shard>
-            
-            <shard>
-                <internal_replication>true</internal_replication>
-                <replica>
-                    <host>192.168.1.3</host>
-                    <port>9000</port>
-                </replica>
-                <replica>
-                    <host>192.168.1.4</host>
-                    <port>9000</port>
-                </replica>
-                <replica>
-                    <host>192.168.1.5</host>
-                    <port>9000</port>
-                </replica>
-            </shard>
-            
-            <shard>
-                <internal_replication>true</internal_replication>
-                <replica>
-                    <host>192.168.1.6</host>
-                    <port>9000</port>
-                </replica>
-            </shard>
-            
-        </sharded-replicated>
-    </customized>
-</yandex>
-``` 
-With first and last shards having personal non-default (i.e. non `.spec.defaults.deployment`) deployments
-
-## .spec.templates
-```yaml
-  templates:
+            - name: shard2
+              replicasCount: 3
+              templates:
+                podTemplate: clickhouse-v18.16.1
+                volumeClaimTemplate: default-volume-claim
+              replicas:
+                - name: replica0
+                  port: 9000
+                  templates:
+                    podTemplate: clickhouse-v18.16.2
+                    volumeClaimTemplate: default-volume-claim
 ```
 
 ## .spec.templates.volumeClaimTemplates
 ```yaml
+  templates:
     volumeClaimTemplates:
-    - name: default
-      template:
-        metadata:
-          name: clickhouse-data
+      - name: default-volume-claim
+        # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
         spec:
+          # 1. If storageClassName is not specified, default StorageClass
+          # (must be specified by cluster administrator) would be used for provisioning
+          # 2. If storageClassName is set to an empty string (‘’), no storage class will be used
+          # dynamic provisioning is disabled for this PVC. Existing, “Available”, PVs
+          # (that do not have a specified storageClassName) will be considered for binding to the PVC
+          #storageClassName: gold
           accessModes:
-          - ReadWriteOnce
+            - ReadWriteOnce
           resources:
             requests:
-              storage: 100Mi
+              storage: 1Gi
 ```
 `.spec.templates.volumeClaimTemplates` represents [PersistentVolumeClaim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims) templates
 
 ## .spec.templates.podTemplates
 ```yaml              
+  templates:
     podTemplates:
-    - name: clickhouse-installation
-      volumes:
-        - name: clickhouse-data
-          mountPath: /var/lib/clickhouse
-      containers:
-      - name: clickhouse
-        image: yandex/clickhouse-server:18.14.19-stable
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "250m"
-          limits:
-            memory: "128Mi"
-            cpu: "500m"
-      - name: client
-        image: yandex/clickhouse-client:18.14.19-stable
-      - name: logwatcher
-        image: path/tologwatcher:1.2.3
+      # multiple pod templates makes possible to update version smoothly
+      # pod template for ClickHouse v18.16.1
+      - name: clickhouse-v18.16.1
+        # type PodSpec struct {} from k8s.io/core/v1
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:18.16.1
+              volumeMounts:
+                - name: default-volume-claim
+                  mountPath: /var/lib/clickhouse
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "64Mi"
+                  cpu: "100m"
 ```
 `.spec.templates.podTemplates` represents [Pod Templates](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#pod-templates) templates
+
+[chi_max_manifest]: ./examples/99-clickhouseinstallation-max.yaml

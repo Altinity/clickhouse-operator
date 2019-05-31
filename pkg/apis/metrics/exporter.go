@@ -15,8 +15,6 @@
 package metrics
 
 import (
-	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/golang/glog"
@@ -34,17 +32,34 @@ type Exporter struct {
 	chInstallations map[string]*chInstallationData
 	mutex           sync.RWMutex
 	cleanup         sync.Map
+	chAccessInfo    ClickHouseAccessInfo
+}
+
+type ClickHouseAccessInfo struct {
+	Username string
+	Password string
+	Port     int
 }
 
 type chInstallationData struct {
 	hostnames []string
 }
 
-// CreateExporter returns a new instance of Exporter type
-func CreateExporter() *Exporter {
+// NewExporter returns a new instance of Exporter type
+func NewExporter(username, password string, port int) *Exporter {
 	return &Exporter{
 		chInstallations: make(map[string]*chInstallationData),
+		chAccessInfo: ClickHouseAccessInfo{
+			Username: username,
+			Password: password,
+			Port:     port,
+		},
 	}
+}
+
+// newFetcher returns new Metrics Fetcher for specified host
+func (e *Exporter) newFetcher(hostname string) *Fetcher {
+	return NewFetcher(hostname, e.chAccessInfo.Username, e.chAccessInfo.Password, e.chAccessInfo.Port)
 }
 
 // Describe implements prometheus.Collector Describe method
@@ -85,7 +100,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 				glog.Infof("Querying metrics for %s\n", hostname)
 				metricsData := make([][]string, 0)
-				if err := clickHouseQueryMetrics(&metricsData, hostname); err != nil {
+				fetcher := e.newFetcher(hostname)
+				if err := fetcher.clickHouseQueryMetrics(&metricsData); err != nil {
 					// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 					glog.Infof("Error querying metrics for %s: %s\n", hostname, err)
 					e.cleanup.Store(name, struct{}{})
@@ -96,7 +112,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 				glog.Infof("Querying table sizes for %s\n", hostname)
 				tableSizes := make([][]string, 0)
-				if err := clickHouseQueryTableSizes(&tableSizes, hostname); err != nil {
+				if err := fetcher.clickHouseQueryTableSizes(&tableSizes); err != nil {
 					// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 					glog.Infof("Error querying table sizes for %s: %s\n", hostname, err)
 					e.cleanup.Store(name, struct{}{})
@@ -110,76 +126,6 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	}
 	wg.Wait()
 	glog.Info("Finished Collect")
-}
-
-// writeMetricsDataToPrometheus pushes set of prometheus.Metric objects created from the ClickHouse system data
-// Expected data structure: metric, value, description, type (gauge|counter)
-func writeMetricsDataToPrometheus(out chan<- prometheus.Metric, data [][]string, chiName, hostname string) {
-	for _, metric := range data {
-		if len(metric) < 2 {
-			continue
-		}
-		var metricType prometheus.ValueType
-		if metric[3] == "counter" {
-			metricType = prometheus.CounterValue
-		} else {
-			metricType = prometheus.GaugeValue
-		}
-		writeSingleMetricToPrometheus(out,
-			convertMetricName(metric[0]),
-			metric[2],
-			metric[1],
-			metricType,
-			[]string{"chi", "hostname"},
-			chiName,
-			hostname,
-		)
-	}
-}
-
-// writeTableSizesDataToPrometheus pushes set of prometheus.Metric objects created from the ClickHouse system data
-// Expected data structure: database, table, partitions, parts, bytes, uncompressed_bytes, rows
-func writeTableSizesDataToPrometheus(out chan<- prometheus.Metric, data [][]string, chiname, hostname string) {
-	for _, metric := range data {
-		if len(metric) < 2 {
-			continue
-		}
-		writeSingleMetricToPrometheus(out, "table_partitions", "Number of partitions of the table", metric[2], prometheus.GaugeValue,
-			[]string{"chi", "hostname", "database", "table"},
-			chiname, hostname, metric[0], metric[1])
-		writeSingleMetricToPrometheus(out, "table_parts", "Number of parts of the table", metric[3], prometheus.GaugeValue,
-			[]string{"chi", "hostname", "database", "table"},
-			chiname, hostname, metric[0], metric[1])
-		writeSingleMetricToPrometheus(out, "table_parts_bytes", "Table size in bytes", metric[4], prometheus.GaugeValue,
-			[]string{"chi", "hostname", "database", "table"},
-			chiname, hostname, metric[0], metric[1])
-		writeSingleMetricToPrometheus(out, "table_parts_bytes_uncompressed", "Table size in bytes uncompressed", metric[5], prometheus.GaugeValue,
-			[]string{"chi", "hostname", "database", "table"},
-			chiname, hostname, metric[0], metric[1])
-		writeSingleMetricToPrometheus(out, "table_parts_rows", "Number of rows in the table", metric[6], prometheus.GaugeValue,
-			[]string{"chi", "hostname", "database", "table"},
-			chiname, hostname, metric[0], metric[1])
-	}
-}
-
-func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, desc string, value string, metricType prometheus.ValueType, labels []string, labelValues ...string) {
-	floatValue, _ := strconv.ParseFloat(value, 64)
-	m, err := prometheus.NewConstMetric(
-		newDescription(name, desc, labels),
-		metricType,
-		floatValue,
-		labelValues...,
-	)
-	if err != nil {
-		glog.Infof("Error creating metric %s: %s", name, err)
-		return
-	}
-	select {
-	case out <- m:
-
-	default:
-		glog.Infof("Error sending metric to the channel %s", name)
-	}
 }
 
 // removeInstallationReference deletes record from Exporter.chInstallation map identified by chiName key
@@ -234,31 +180,4 @@ func (e *Exporter) EnsureControlledValues(chiName string, hostnames []string) {
 		glog.V(2).Infof("ClickHouseInstallation (%q): including hostnames into chopmetrics.Exporter", chiName)
 		e.UpdateControlledState(chiName, hostnames)
 	}
-}
-
-// newDescription creates a new prometheus.Desc object
-func newDescription(name, help string, labels []string) *prometheus.Desc {
-	return prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, subsystem, name),
-		help,
-		labels,
-		nil,
-	)
-}
-
-// convertMetricName converts the given string to snake case following the Golang format:
-// acronyms are converted to lower-case and preceded by an underscore.
-func convertMetricName(in string) string {
-	/*runes := []rune(in)
-	length := len(runes)
-
-	var out []rune
-	for i := 0; i < length; i++ {
-		if i > 0 && unicode.IsUpper(runes[i]) && ((i+1 < length && unicode.IsLower(runes[i+1])) || unicode.IsLower(runes[i-1])) {
-			out = append(out, '_')
-		}
-		out = append(out, unicode.ToLower(runes[i]))
-	}*/
-
-	return strings.Replace(string(in), ".", "_", -1)
 }
