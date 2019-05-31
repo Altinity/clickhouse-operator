@@ -255,10 +255,10 @@ data:
   config.yaml: |
     # Namespaces where clickhouse-operator listens for events.
     # Concurrently running operators should listen on different namespaces
-    namespaces:
-      - dev
-      - info
-      - onemore
+    # namespaces:
+    #  - dev
+    #  - info
+    #  - onemore
     
     ################################################
     ##
@@ -410,6 +410,8 @@ data:
         <users>
             <clickhouse_operator>
                 <networks>
+                    <ip>127.0.0.1</ip>
+                    <ip>0.0.0.0/0</ip>
                     <ip>::/0</ip>
                 </networks>
                 <password>clickhouse_operator_password</password>

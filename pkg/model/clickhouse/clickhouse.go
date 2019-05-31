@@ -70,25 +70,25 @@ func (c *Conn) Query(query string) (*sql.Rows, error) {
 	}
 
 	dsn := c.makeDsn()
-	glog.V(1).Infof("Query ClickHouse DSN: %s", dsn)
+	//glog.V(1).Infof("Query ClickHouse DSN: %s", dsn)
 	connect, err := sql.Open("clickhouse", dsn)
 	if err != nil {
-		glog.V(1).Infof("Q1 %v", err)
+		glog.V(1).Infof("sql.Open(%s) FAILED %v", dsn, err)
 		return nil, err
 	}
 
 	if err := connect.Ping(); err != nil {
-		glog.V(1).Infof("Q2 %v", err)
+		glog.V(1).Infof("connect.Ping(%s) FAILED %v", dsn, err)
 		return nil, err
 	}
 
 	rows, err := connect.Query(query)
 	if err != nil {
-		glog.V(1).Infof("Q3 %v", err)
+		glog.V(1).Infof("connect.Query(%s) FAILED %v", dsn, err)
 		return nil, err
 	}
 
-	glog.V(1).Infof("clickhouseSQL(%s)'%s'", c.Hostname, query)
+	// glog.V(1).Infof("clickhouse.Query(%s):'%s'", c.Hostname, query)
 
 	return rows, nil
 }
@@ -100,26 +100,26 @@ func (c *Conn) Exec(query string) error {
 	}
 
 	dsn := c.makeDsn()
-	glog.V(1).Infof("Exec ClickHouse DSN: %s", dsn)
+	//glog.V(1).Infof("Exec ClickHouse DSN: %s", dsn)
 	connect, err := sql.Open("clickhouse", dsn)
 	if err != nil {
-		glog.V(1).Infof("E1 %v", err)
+		glog.V(1).Infof("sql.Open(%s) FAILED %v", dsn, err)
 		return err
 	}
 
 	if err := connect.Ping(); err != nil {
-		glog.V(1).Infof("E2 %v", err)
+		glog.V(1).Infof("connect.Ping(%d) FAILED %v", dsn, err)
 		return err
 	}
 
 	_, err = connect.Exec(query)
 
 	if err != nil {
-		glog.V(1).Infof("E3 %v", err)
+		glog.V(1).Infof("connect.Exec(%s) FAILED %v", dsn, err)
 		return err
 	}
 
-	glog.V(1).Infof("clickhouse.Exec(%s)'%s'", c.Hostname, query)
+	// glog.V(1).Infof("clickhouse.Exec(%s):'%s'", c.Hostname, query)
 
 	return nil
 }

@@ -14,6 +14,9 @@ SRC_ROOT="$(realpath ${CUR_DIR}/..)"
 DOCKERFILE_DIR="${SRC_ROOT}"
 DOCKERFILE="${DOCKERFILE_DIR}/Dockerfile"
 
+# Build clickhouse-operator install .yaml manifest
+${SRC_ROOT}/manifests/operator/build-clickhouse-operator-yaml.sh
+
 # Build image with Docker
 if [[ "${MINIKUBE}" == "yes" ]]; then
     # We'd like to build for minikube
