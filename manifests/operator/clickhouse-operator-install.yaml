@@ -255,10 +255,10 @@ data:
   config.yaml: |
     # Namespaces where clickhouse-operator listens for events.
     # Concurrently running operators should listen on different namespaces
-    namespaces:
-      - dev
-      - info
-      - onemore
+    # namespaces:
+    #  - dev
+    #  - info
+    #  - onemore
     
     ################################################
     ##
