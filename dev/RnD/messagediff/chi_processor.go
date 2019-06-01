@@ -41,7 +41,7 @@ func processor(diff *messagediff.Diff) {
 	}
 }
 
-func ReplicaAdd(replica ChiClusterLayoutShardReplica) {
+func ReplicaAdd(replica ChiReplica) {
 	fmt.Printf("ReplicaAdd() %d %v\n", replica.Port, replica.Deployment)
 	Reconfigure()
 }
@@ -54,7 +54,7 @@ func ReplicaModify() {
 	Reconfigure()
 }
 
-func ShardAdd(shard ChiClusterLayoutShard) {
+func ShardAdd(shard ChiShard) {
 	fmt.Printf("ShardAdd() %v %v %v", shard.Weight, shard.InternalReplication, shard.Replicas)
 	Reconfigure()
 }

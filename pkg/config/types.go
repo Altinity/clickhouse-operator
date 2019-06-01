@@ -31,13 +31,13 @@ type Config struct {
 	// conf.d
 	// users.d
 	// respectively
-	ChCommonConfigsPath     string `yaml:"chCommonConfigsPath"`
-	ChDeploymentConfigsPath string `yaml:"chDeploymentConfigsPath"`
-	ChUsersConfigsPath      string `yaml:"chUsersConfigsPath"`
+	ChCommonConfigsPath string `yaml:"chCommonConfigsPath"`
+	ChPodConfigsPath    string `yaml:"chPodConfigsPath"`
+	ChUsersConfigsPath  string `yaml:"chUsersConfigsPath"`
 	// Config files fetched from these paths. Maps "file name->file content"
-	ChCommonConfigs     map[string]string
-	ChDeploymentConfigs map[string]string
-	ChUsersConfigs      map[string]string
+	ChCommonConfigs map[string]string
+	ChPodConfigs    map[string]string
+	ChUsersConfigs  map[string]string
 
 	// Path where to look for ClickHouseInstallation templates .yaml files
 	ChiTemplatesPath string `yaml:"chiTemplatesPath"`
@@ -66,6 +66,14 @@ type Config struct {
 	ChConfigUserDefaultQuota      string   `yaml:"chConfigUserDefaultQuota"`
 	ChConfigUserDefaultNetworksIP []string `yaml:"chConfigUserDefaultNetworksIP"`
 	ChConfigUserDefaultPassword   string   `yaml:"chConfigUserDefaultPassword"`
+
+	// Username and Password to be used by operator to connect to ClickHouse instances for
+	// 1. Metrics requests
+	// 2. Schema maintenance
+	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
+	ChUsername string `yaml:"chUsername"`
+	ChPassword string `yaml:"chPassword"`
+	ChPort     int    `yaml:"chPort""`
 }
 
 const (

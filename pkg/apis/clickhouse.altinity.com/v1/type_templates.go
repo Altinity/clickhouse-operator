@@ -20,40 +20,45 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 	}
 
 	if len(from.PodTemplates) > 0 {
-		// Append PodTemplates from `from`
+		// We have templates to copy from
+		// Append PodTemplates from `from` to receiver
 		if templates.PodTemplates == nil {
 			templates.PodTemplates = make([]ChiPodTemplate, 0)
 		}
+		// Loop over all 'from' templates and copy it in case no such template in receiver
 		for fromIndex := range from.PodTemplates {
 			fromPodTemplate := &from.PodTemplates[fromIndex]
 
-			// Try to find equal entry
+			// Try to find equal entry among local templates in receiver
 			equalFound := false
 			for toIndex := range templates.PodTemplates {
 				toPodTemplate := &templates.PodTemplates[toIndex]
 				if toPodTemplate.Name == fromPodTemplate.Name {
-					// Received already have such a node
+					// Receiver already have such a template
 					equalFound = true
 					break
 				}
 			}
 
 			if !equalFound {
-				// Append Node from `from`
+				// Receiver has not such template
+				// Append template from `from`
 				templates.PodTemplates = append(templates.PodTemplates, *fromPodTemplate.DeepCopy())
 			}
 		}
 	}
 
 	if len(from.VolumeClaimTemplates) > 0 {
-		// Append VolumeClaimTemplates from `from`
+		// We have templates to copy from
+		// Append VolumeClaimTemplates from `from` to receiver
 		if templates.VolumeClaimTemplates == nil {
 			templates.VolumeClaimTemplates = make([]ChiVolumeClaimTemplate, 0)
 		}
+		// Loop over all 'from' templates and copy it in case no such template in receiver
 		for fromIndex := range from.VolumeClaimTemplates {
 			fromVolumeClaimTemplate := &from.VolumeClaimTemplates[fromIndex]
 
-			// Try to find equal entry
+			// Try to find equal entry among local templates in receiver
 			equalFound := false
 			for toIndex := range templates.VolumeClaimTemplates {
 				toVolumeClaimTemplate := &templates.VolumeClaimTemplates[toIndex]
@@ -65,6 +70,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 			}
 
 			if !equalFound {
+				// Receiver has not such template
 				// Append Node from `from`
 				templates.VolumeClaimTemplates = append(templates.VolumeClaimTemplates, *fromVolumeClaimTemplate.DeepCopy())
 			}

@@ -1,5 +1,7 @@
 #!/bin/bash
 
-. ./dev-config.sh
+CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-watch -n1 "kubectl -n ${DEV_NAMESPACE} get all,configmap,endpoints"
+source ${CUR_DIR}/dev-config.sh
+
+watch -n1 "kubectl -n ${CHOPERATOR_NAMESPACE} get all,configmap,endpoints"

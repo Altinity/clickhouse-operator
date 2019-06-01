@@ -34,27 +34,27 @@ spec:
                   - key: "app"
                     operator: In
                     values:
-                    - zookeeper
+                      - zookeeper
               topologyKey: "kubernetes.io/hostname"
       containers:
-      - name: kubernetes-zookeeper
-        imagePullPolicy: Always
-        image: "k8s.gcr.io/kubernetes-zookeeper:1.0-3.4.10"
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "0.5"
-        ports:
-        - containerPort: 2181
-          name: client
-        - containerPort: 2888
-          name: server
-        - containerPort: 3888
-          name: leader-election
-        command:
-        - sh
-        - -c
-        - "start-zookeeper \
+        - name: kubernetes-zookeeper
+          imagePullPolicy: Always
+          image: "k8s.gcr.io/kubernetes-zookeeper:1.0-3.4.10"
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
+          ports:
+            - containerPort: 2181
+              name: client
+            - containerPort: 2888
+              name: server
+            - containerPort: 3888
+              name: leader-election
+          command:
+            - sh
+            - -c
+            - "start-zookeeper \
           --servers=3 \
           --data_dir=/var/lib/zookeeper/data \
           --data_log_dir=/var/lib/zookeeper/data/log \
@@ -72,47 +72,47 @@ spec:
           --max_session_timeout=40000 \
           --min_session_timeout=4000 \
           --log_level=INFO"
-        readinessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - "zookeeper-ready 2181"
-          initialDelaySeconds: 10
-          timeoutSeconds: 5
-        livenessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - "zookeeper-ready 2181"
-          initialDelaySeconds: 10
-          timeoutSeconds: 5
-        volumeMounts:
-        - name: datadir-volume
-          mountPath: /var/lib/zookeeper
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "zookeeper-ready 2181"
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "zookeeper-ready 2181"
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: datadir-volume
+              mountPath: /var/lib/zookeeper
       # Run as a non-privileged user
       securityContext:
         runAsUser: 1000
         fsGroup: 1000
-## Mount either emptyDir via volume or PV of 'storageclass-zookeeper' storageClass
-## Uncomment what is required
-#      volumes:
-#      - name: datadir-volume
-#        emptyDir:
-#          medium: "" #accepted values:  empty str (means node's default medium) or Memory
-#          sizeLimit: 1Gi
-## Mount either emptyDir via volume or PV of 'storageclass-zookeeper' storageClass
-## Uncomment what is required
+  ## Mount either emptyDir via volume or PV of 'storageclass-zookeeper' storageClass
+  ## Uncomment what is required
+  #      volumes:
+  #      - name: datadir-volume
+  #        emptyDir:
+  #          medium: "" #accepted values:  empty str (means node's default medium) or Memory
+  #          sizeLimit: 1Gi
+  ## Mount either emptyDir via volume or PV of 'storageclass-zookeeper' storageClass
+  ## Uncomment what is required
   volumeClaimTemplates:
-  - metadata:
-      name: datadir-volume
-    spec:
-      accessModes:
-        - ReadWriteOnce
-      resources:
-        requests:
-          storage: 1Gi
+    - metadata:
+        name: datadir-volume
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
 ## storageClassName has to be coordinated with k8s admin and has to be created as a `kind: StorageClass` resource
 ## In case no storageClassName specified at all - means use default storageClassName
 ## In case storageClassName specified as empty value "" - means do dot use dynamic provisioning

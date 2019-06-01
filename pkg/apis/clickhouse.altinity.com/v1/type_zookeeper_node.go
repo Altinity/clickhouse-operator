@@ -14,7 +14,7 @@
 
 package v1
 
-func (zkNode *ChiConfigurationZookeeperNode) Equal(to *ChiConfigurationZookeeperNode) bool {
+func (zkNode *ChiZookeeperNode) Equal(to *ChiZookeeperNode) bool {
 	if to == nil {
 		return false
 	}

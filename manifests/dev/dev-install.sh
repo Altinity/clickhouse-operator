@@ -1,24 +1,26 @@
 #!/bin/bash
 
-. ./dev-config.sh
+CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-echo "Create ${DEV_NAMESPACE} namespace"
-kubectl create namespace "${DEV_NAMESPACE}"
+source ${CUR_DIR}/dev-config.sh
 
-if [[ ${INSTALL_FROM_ALTINITY_RELEASE_DOCKERHUB} == "yes" ]]; then
-    # Full dev install in k8s
-    kubectl -n "${DEV_NAMESPACE}" apply -f ./clickhouse-operator-install.yaml
+echo "Create ${CHOPERATOR_NAMESPACE} namespace"
+kubectl create namespace "${CHOPERATOR_NAMESPACE}"
+
+if [[ "${INSTALL_FROM_ALTINITY_RELEASE_DOCKERHUB}" == "yes" ]]; then
+    kubectl -n "${CHOPERATOR_NAMESPACE}" apply -f <(CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" ${CUR_DIR}/cat-clickhouse-operator-yaml.sh)
 
     # Installation done
     exit $?
-fi
+else
+    echo "Install operator requirements"
+    echo "CHOPERATOR_NAMESPACE=${CHOPERATOR_NAMESPACE}"
+    echo "CHOPERATOR_IMAGE=${CHOPERATOR_IMAGE}"
 
-# Dev install from all components
-echo "Install operator requirements"
-kubectl -n "${DEV_NAMESPACE}" apply -f ./custom-resource-definition.yaml
-kubectl -n "${DEV_NAMESPACE}" apply -f ./rbac-service.yaml
+    kubectl -n "${CHOPERATOR_NAMESPACE}" apply -f <(CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" MANIFEST_PRINT_DEPLOYMENT="no" ${CUR_DIR}/cat-clickhouse-operator-yaml.sh)
 
-if [[ ${INSTALL_FROM_PERSONAL_DEV_MANIFEST} == "yes" ]]; then
-    # Install operator from Docker Registry (dockerhub or whatever)
-    kubectl -n "${DEV_NAMESPACE}" apply -f <(cat "${PERSONAL_DEV_INSTALL_MANIFEST}" | PERSONAL_DEV_INSTALL_IMAGE="${PERSONAL_DEV_INSTALL_IMAGE}" envsubst)
+    if [[ "${INSTALL_FROM_DEPLOYMENT_MANIFEST}" == "yes" ]]; then
+        # Install operator from Docker Registry (dockerhub or whatever)
+        kubectl -n "${CHOPERATOR_NAMESPACE}" apply -f <(CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" MANIFEST_PRINT_CRD="no" MANIFEST_PRINT_RBAC="no" ${CUR_DIR}/cat-clickhouse-operator-yaml.sh)
+    fi
 fi

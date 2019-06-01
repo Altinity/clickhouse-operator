@@ -3,6 +3,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:6b250e53b3b7b9abd7e62f55875c234d2f8b77b846bff200fecafa2dc09af09a"
+  name = "github.com/MakeNowJust/heredoc"
+  packages = ["."]
+  pruneopts = ""
+  revision = "e9091a26100e9cfb2b6a8f470085bfa541931a91"
+
+[[projects]]
+  branch = "master"
   digest = "1:c0bec5f9b98d0bc872ff5e834fac186b807b656683bd29cb82fb207a1513fabb"
   name = "github.com/beorn7/perks"
   packages = ["quantile"]
@@ -119,6 +127,14 @@
   pruneopts = ""
   revision = "1624edc4454b8682399def8740d46db5e4362ba4"
   version = "v1.1.5"
+
+[[projects]]
+  digest = "1:0ec583a42f28bee6e21323ec543d6dcef2d465d9bf3887c289bacc529d7fa9db"
+  name = "github.com/mailru/go-clickhouse"
+  packages = ["."]
+  pruneopts = ""
+  revision = "1490ca26a370f93bd4365156bfe94cade38f64cd"
+  version = "v1.1"
 
 [[projects]]
   digest = "1:63722a4b1e1717be7b98fc686e0b30d5e7f734b9e93d7dee86293b6deab7ea28"
@@ -589,7 +605,9 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/MakeNowJust/heredoc",
     "github.com/golang/glog",
+    "github.com/mailru/go-clickhouse",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/r3labs/diff",
     "gopkg.in/d4l3k/messagediff.v1",

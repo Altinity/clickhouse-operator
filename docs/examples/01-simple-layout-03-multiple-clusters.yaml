@@ -1,0 +1,17 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "simple-03"
+spec:
+  configuration:
+    clusters:
+      - name: "replicas"
+        layout:
+          shardsCount: 1
+          replicasCount: 2
+      - name: "shards"
+        layout:
+          shardsCount: 2
+      - name: "shards-replicas"
+        layout:
+          replicasCount: 2

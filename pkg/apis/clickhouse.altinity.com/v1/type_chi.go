@@ -14,15 +14,25 @@
 
 package v1
 
+import (
+	"github.com/altinity/clickhouse-operator/pkg/version"
+)
+
 // IsNew checks whether CHI is a new one or already known and was processed/created earlier
 func (chi *ClickHouseInstallation) IsKnown() bool {
 	// New CHI does not have FullDeploymentIDs specified
 	return chi.Status.IsKnown > 0
 }
 
-func (chi *ClickHouseInstallation) SetKnown() {
+// StatusFill fills .Status
+func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 	// New CHI does not have FullDeploymentIDs specified
 	chi.Status.IsKnown = 1
+	chi.Status.Version = version.Version
+	chi.Status.ClustersCount = chi.ClustersCount()
+	chi.Status.ReplicasCount = chi.ReplicasCount()
+	chi.Status.Pods = pods
+	chi.Status.Endpoint = endpoint
 }
 
 func (chi *ClickHouseInstallation) IsFilled() bool {
@@ -38,20 +48,6 @@ func (chi *ClickHouseInstallation) IsFilled() bool {
 	return (clusters > 0) && filled
 }
 
-func (chi *ClickHouseInstallation) DeploymentsCount() int {
-	replicasCount := 0
-
-	shardProcessor := func(
-		shard *ChiClusterLayoutShard,
-	) error {
-		replicasCount += shard.ReplicasCount
-		return nil
-	}
-	chi.WalkShards(shardProcessor)
-
-	return replicasCount
-}
-
 func (chi *ClickHouseInstallation) FillAddressInfo() int {
 	replicasCount := 0
 
@@ -60,26 +56,29 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 		clusterIndex int,
 		cluster *ChiCluster,
 		shardIndex int,
-		shard *ChiClusterLayoutShard,
+		shard *ChiShard,
 		replicaIndex int,
-		replica *ChiClusterLayoutShardReplica,
+		replica *ChiReplica,
 	) error {
 		cluster.Address.Namespace = chi.Namespace
-		cluster.Address.CHIName = chi.Name
+		cluster.Address.ChiName = chi.Name
 		cluster.Address.ClusterName = cluster.Name
 		cluster.Address.ClusterIndex = clusterIndex
 
 		shard.Address.Namespace = chi.Namespace
-		shard.Address.CHIName = chi.Name
+		shard.Address.ChiName = chi.Name
 		shard.Address.ClusterName = cluster.Name
 		shard.Address.ClusterIndex = clusterIndex
+		shard.Address.ShardName = shard.Name
 		shard.Address.ShardIndex = shardIndex
 
 		replica.Address.Namespace = chi.Namespace
 		replica.Address.ChiName = chi.Name
 		replica.Address.ClusterName = cluster.Name
 		replica.Address.ClusterIndex = clusterIndex
+		replica.Address.ShardName = shard.Name
 		replica.Address.ShardIndex = shardIndex
+		replica.Address.ReplicaName = replica.Name
 		replica.Address.ReplicaIndex = replicaIndex
 		replica.Address.GlobalReplicaIndex = replicasCount
 
@@ -123,7 +122,7 @@ func (chi *ClickHouseInstallation) WalkShardsFullPath(
 		clusterIndex int,
 		cluster *ChiCluster,
 		shardIndex int,
-		shard *ChiClusterLayoutShard,
+		shard *ChiShard,
 	) error,
 ) []error {
 
@@ -142,7 +141,7 @@ func (chi *ClickHouseInstallation) WalkShardsFullPath(
 
 func (chi *ClickHouseInstallation) WalkShards(
 	f func(
-		shard *ChiClusterLayoutShard,
+		shard *ChiShard,
 	) error,
 ) []error {
 
@@ -165,9 +164,9 @@ func (chi *ClickHouseInstallation) WalkReplicasFullPath(
 		clusterIndex int,
 		cluster *ChiCluster,
 		shardIndex int,
-		shard *ChiClusterLayoutShard,
+		shard *ChiShard,
 		replicaIndex int,
-		replica *ChiClusterLayoutShardReplica,
+		replica *ChiReplica,
 	) error,
 ) []error {
 
@@ -189,7 +188,7 @@ func (chi *ClickHouseInstallation) WalkReplicasFullPath(
 
 func (chi *ClickHouseInstallation) WalkReplicas(
 	f func(
-		replica *ChiClusterLayoutShardReplica,
+		replica *ChiReplica,
 	) error,
 ) []error {
 
@@ -231,4 +230,22 @@ func (chi *ClickHouseInstallation) FindCluster(name string) *ChiCluster {
 		return nil
 	})
 	return cluster
+}
+
+func (chi *ClickHouseInstallation) ClustersCount() int {
+	count := 0
+	chi.WalkClusters(func(cluster *ChiCluster) error {
+		count++
+		return nil
+	})
+	return count
+}
+
+func (chi *ClickHouseInstallation) ReplicasCount() int {
+	count := 0
+	chi.WalkReplicas(func(replica *ChiReplica) error {
+		count++
+		return nil
+	})
+	return count
 }
