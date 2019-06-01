@@ -248,7 +248,7 @@ func (c *Controller) AddEventHandlers(
 				glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) IP ASSIGNED %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.Subsets)
 				if chi, err := c.createChiFromObjectMeta(&newEndpoints.ObjectMeta); err == nil {
 					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", newEndpoints.Namespace, newEndpoints.Name, chi.Name)
-					c.schemer.ChiDropDnsCache(chi)
+					_ = c.schemer.ChiDropDnsCache(chi)
 				} else {
 					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.ObjectMeta.Labels)
 				}

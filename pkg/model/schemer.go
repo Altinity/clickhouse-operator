@@ -30,7 +30,7 @@ const (
 	ignoredDBs = "'system'"
 
 	// Max number of tries for SQL queries
-	maxTries = 10
+	defaultMaxTries = 10
 )
 
 type Schemer struct {
@@ -73,7 +73,7 @@ func (s *Schemer) ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, clu
 	conn := s.newConn(CreateChiServiceFQDN(chi))
 	var rows *sqlmodule.Rows = nil
 	var err error
-	err = util.Retry(maxTries, sql, func() error {
+	err = util.Retry(defaultMaxTries, sql, func() error {
 		rows, err = conn.Query(sql)
 		return err
 	})
@@ -117,7 +117,7 @@ func (s *Schemer) ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluste
 	conn := s.newConn(CreateChiServiceFQDN(chi))
 	var rows *sqlmodule.Rows = nil
 	var err error
-	err = util.Retry(maxTries, sql, func() error {
+	err = util.Retry(defaultMaxTries, sql, func() error {
 		rows, err = conn.Query(sql)
 		return err
 	})
@@ -160,7 +160,7 @@ func (s *Schemer) ReplicaGetDropTables(replica *chi.ChiReplica) ([]string, []str
 	conn := s.newConn(CreatePodFQDN(replica))
 	var rows *sqlmodule.Rows = nil
 	var err error
-	err = util.Retry(maxTries, sql, func() error {
+	err = util.Retry(defaultMaxTries, sql, func() error {
 		rows, err = conn.Query(sql)
 		return err
 	})
@@ -186,7 +186,12 @@ func (s *Schemer) ChiDropDnsCache(chi *chi.ClickHouseInstallation) error {
 	sqls := []string{
 		`SYSTEM DROP DNS CACHE`,
 	}
-	return s.ChiApplySQLs(chi, sqls)
+	return s.ChiApplySQLs(chi, sqls, false)
+}
+
+// ChiApplySQLs runs set of SQL queries over the whole CHI
+func (s *Schemer) ChiApplySQLs(chi *chi.ClickHouseInstallation, sqls []string, retry bool) error {
+	return s.applySQLs(CreatePodFQDNsOfChi(chi), sqls, retry)
 }
 
 // ClusterApplySQLs runs set of SQL queries over the cluster
@@ -194,15 +199,10 @@ func (s *Schemer) ClusterApplySQLs(cluster *chi.ChiCluster, sqls []string, retry
 	return s.applySQLs(CreatePodFQDNsOfCluster(cluster), sqls, retry)
 }
 
-// ChiApplySQLs runs set of SQL queries over the whole CHI
-func (s *Schemer) ChiApplySQLs(chi *chi.ClickHouseInstallation, sqls []string) error {
-	return s.applySQLs(CreatePodFQDNsOfChi(chi), sqls, true)
-}
-
 // ReplicaApplySQLs runs set of SQL queries over the replica
 func (s *Schemer) ReplicaApplySQLs(replica *chi.ChiReplica, sqls []string, retry bool) error {
 	hosts := []string{CreatePodFQDN(replica)}
-	return s.applySQLs(hosts, sqls, true)
+	return s.applySQLs(hosts, sqls, retry)
 }
 
 // applySQLs runs set of SQL queries on set on hosts
@@ -215,6 +215,10 @@ func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 			if len(sql) == 0 {
 				// Skip malformed SQL query, move to the next SQL query
 				continue
+			}
+			maxTries := 1
+			if retry {
+				maxTries = defaultMaxTries
 			}
 			err = util.Retry(maxTries, sql, func() error {
 				return conn.Exec(sql)
