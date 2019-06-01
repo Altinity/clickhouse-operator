@@ -15,7 +15,7 @@
 package clickhouse
 
 import (
-	"database/sql"
+	sqlmodule "database/sql"
 	"fmt"
 	"github.com/golang/glog"
 	_ "github.com/mailru/go-clickhouse"
@@ -64,62 +64,62 @@ func (c *Conn) makeDsn() string {
 }
 
 // Query runs given sql query
-func (c *Conn) Query(query string) (*sql.Rows, error) {
-	if len(query) == 0 {
+func (c *Conn) Query(sql string) (*sqlmodule.Rows, error) {
+	if len(sql) == 0 {
 		return nil, nil
 	}
 
 	dsn := c.makeDsn()
-	glog.V(1).Infof("Query ClickHouse DSN: %s", dsn)
-	connect, err := sql.Open("clickhouse", dsn)
+	//glog.V(1).Infof("Query ClickHouse DSN: %s", dsn)
+	connect, err := sqlmodule.Open("clickhouse", dsn)
 	if err != nil {
-		glog.V(1).Infof("Q1 %v", err)
+		glog.V(1).Infof("FAILED Open(%s) %v for SQL: %s", dsn, err, sql)
 		return nil, err
 	}
 
 	if err := connect.Ping(); err != nil {
-		glog.V(1).Infof("Q2 %v", err)
+		glog.V(1).Infof("FAILED Ping(%s) %v for SQL: %s", dsn, err, sql)
 		return nil, err
 	}
 
-	rows, err := connect.Query(query)
+	rows, err := connect.Query(sql)
 	if err != nil {
-		glog.V(1).Infof("Q3 %v", err)
+		glog.V(1).Infof("FAILED Query(%s) %v for SQL: %s", dsn, err, sql)
 		return nil, err
 	}
 
-	glog.V(1).Infof("clickhouseSQL(%s)'%s'", c.Hostname, query)
+	// glog.V(1).Infof("clickhouse.Query(%s):'%s'", c.Hostname, sql)
 
 	return rows, nil
 }
 
 // Exec runs given sql query
-func (c *Conn) Exec(query string) error {
-	if len(query) == 0 {
+func (c *Conn) Exec(sql string) error {
+	if len(sql) == 0 {
 		return nil
 	}
 
 	dsn := c.makeDsn()
-	glog.V(1).Infof("Exec ClickHouse DSN: %s", dsn)
-	connect, err := sql.Open("clickhouse", dsn)
+	//glog.V(1).Infof("Exec ClickHouse DSN: %s", dsn)
+	connect, err := sqlmodule.Open("clickhouse", dsn)
 	if err != nil {
-		glog.V(1).Infof("E1 %v", err)
+		glog.V(1).Infof("FAILED Open(%s) %v for SQL: %s", dsn, err, sql)
 		return err
 	}
 
 	if err := connect.Ping(); err != nil {
-		glog.V(1).Infof("E2 %v", err)
+		glog.V(1).Infof("FAILED Ping(%d) %v for SQL: %s", dsn, err, sql)
 		return err
 	}
 
-	_, err = connect.Exec(query)
+	_, err = connect.Exec(sql)
 
 	if err != nil {
-		glog.V(1).Infof("E3 %v", err)
+		glog.V(1).Infof("FAILED Exec(%s) %v for SQL: %s", dsn, err, sql)
 		return err
 	}
 
-	glog.V(1).Infof("clickhouse.Exec(%s)'%s'", c.Hostname, query)
+	// glog.V(1).Infof("clickhouse.Exec(%s):'%s'", c.Hostname, sql)
 
 	return nil
 }

@@ -248,7 +248,7 @@ func (c *Controller) AddEventHandlers(
 				glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) IP ASSIGNED %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.Subsets)
 				if chi, err := c.createChiFromObjectMeta(&newEndpoints.ObjectMeta); err == nil {
 					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", newEndpoints.Namespace, newEndpoints.Name, chi.Name)
-					c.schemer.ChiDropDnsCache(chi)
+					_ = c.schemer.ChiDropDnsCache(chi)
 				} else {
 					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.ObjectMeta.Labels)
 				}
@@ -361,15 +361,8 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 		return
 	}
 
-	// Label operator's Pod with version label
-	podname, ok1 := c.runtimeParams["OPERATOR_POD_NAME"]
-	namespace, ok2 := c.runtimeParams["OPERATOR_POD_NAMESPACE"]
-	if ok1 && ok2 {
-		if pod, err := c.podLister.Pods(namespace).Get(podname); err == nil {
-			pod.Labels["version"] = c.version
-			c.kubeClient.CoreV1().Pods(namespace).Update(pod)
-		}
-	}
+	// Label controller runtime objects with proper labels
+	c.labelMyObjectsTree()
 
 	glog.V(1).Info("ClickHouseInstallation controller: starting workers")
 	for i := 0; i < threadiness; i++ {
