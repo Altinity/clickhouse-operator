@@ -540,11 +540,11 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		new.WalkClusters(func(cluster *chop.ChiCluster) error {
 			dbNames, createDatabaseSQLs, _ := c.schemer.ClusterGetCreateDatabases(new, cluster)
 			glog.V(1).Infof("Creating databases: %v", dbNames)
-			_ = c.schemer.ClusterApplySQLs(cluster, createDatabaseSQLs, false)
+			_ = c.schemer.ClusterApplySQLs(cluster, createDatabaseSQLs, true)
 
 			tableNames, createTableSQLs, _ := c.schemer.ClusterGetCreateTables(new, cluster)
 			glog.V(1).Infof("Creating tables: %v", tableNames)
-			_ = c.schemer.ClusterApplySQLs(cluster, createTableSQLs, false)
+			_ = c.schemer.ClusterApplySQLs(cluster, createTableSQLs, true)
 			return nil
 		})
 		_ = c.updateCHIResource(new)
