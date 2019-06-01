@@ -38,7 +38,7 @@ func (c *Controller) deleteTablesOnReplica(replica *chop.ChiReplica) {
 	// Delete tables on replica
 	tableNames, dropTableSQLs, _ := c.schemer.ReplicaGetDropTables(replica)
 	glog.V(1).Infof("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	_ = c.schemer.ReplicaApplySQLs(replica, dropTableSQLs, false)
+	_ = c.schemer.ReplicaApplySQLs(replica, dropTableSQLs, true)
 }
 
 // deleteReplica deletes all kubernetes resources related to replica *chop.ChiReplica
