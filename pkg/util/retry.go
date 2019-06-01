@@ -28,18 +28,18 @@ func Retry(tries int, desc string, f func() error) error {
 			// All ok, no need to retry more
 			if try > 1 {
 				// Done, but after some retries, this is not 'clean'
-				glog.V(1).Infof("attempt %d of %d is finally DONE: %s", try, tries, desc)
+				glog.V(1).Infof("DONE attempt %d of %d: %s", try, tries, desc)
 			}
 			return nil
 		}
 		if try < tries {
 			// Try failed, need to sleep and retry
 			seconds := try * 5
-			glog.V(1).Infof("attempt %d of %d FAILED, sleep %d sec and retry: %s", try, tries, seconds, desc)
+			glog.V(1).Infof("FAILED attempt %d of %d, sleep %d sec and retry: %s", try, tries, seconds, desc)
 			time.Sleep(time.Duration(seconds) * time.Second)
 		} else {
 			// On last try no need to wait more
-			glog.V(1).Infof("all %d attempts FAILED, ABORT retry: %s", tries, desc)
+			glog.V(1).Infof("FAILED AND ABORT. All %d attempts: %s", tries, desc)
 		}
 	}
 	return err
