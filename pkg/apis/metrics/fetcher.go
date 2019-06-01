@@ -15,6 +15,8 @@
 package metrics
 
 import (
+	"github.com/MakeNowJust/heredoc"
+
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 )
 
@@ -79,7 +81,7 @@ func (f *Fetcher) newConn() *clickhouse.Conn {
 // data is a concealed output
 func (f *Fetcher) clickHouseQueryMetrics(data *[][]string) error {
 	conn := f.newConn()
-	if rows, err := conn.Query(queryMetricsSQL); err != nil {
+	if rows, err := conn.Query(heredoc.Doc(queryMetricsSQL)); err != nil {
 		return err
 	} else {
 		for rows.Next() {
@@ -98,7 +100,7 @@ func (f *Fetcher) clickHouseQueryMetrics(data *[][]string) error {
 // data is a concealed output
 func (f *Fetcher) clickHouseQueryTableSizes(data *[][]string) error {
 	conn := f.newConn()
-	if rows, err := conn.Query(queryTableSizesSQL); err != nil {
+	if rows, err := conn.Query(heredoc.Doc(queryTableSizesSQL)); err != nil {
 		return err
 	} else {
 		for rows.Next() {
