@@ -108,7 +108,7 @@ func (c *Conn) Exec(sql string) error {
 	}
 
 	if err := connect.Ping(); err != nil {
-		glog.V(1).Infof("FAILED Ping(%d) %v for SQL: %s", dsn, err, sql)
+		glog.V(1).Infof("FAILED Ping(%s) %v for SQL: %s", dsn, err, sql)
 		return err
 	}
 
