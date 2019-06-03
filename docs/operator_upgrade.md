@@ -37,6 +37,10 @@ Deployments can be listed using the following command:
 ```
 $ kubectl describe deployment clickhouse-operator -n kube-system
 Name:                   clickhouse-operator
+Namespace:              kube-system
+CreationTimestamp:      Sat, 01 Jun 2019 23:44:46 +0300
+Labels:                 app=clickhouse-operator
+                        version=0.3.0
 <...>
 Pod Template:
   Labels:           app=clickhouse-operator
@@ -46,11 +50,17 @@ Pod Template:
     Image:        altinity/clickhouse-operator:latest
 <...>
 ```
-  
+Version is labeled and can be also displayed with the command:
+```
+$ kubectl get deployment clickhouse-operator -L version -n kube-system
+NAME                  DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE       VERSION
+clickhouse-operator   1         1         1            1           19h       0.3.0
+```
+
 If we want to update to the new version, we can run following command:
   
 ```
-kubectl set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:0.2.1 -n kube-system
+kubectl set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:0.3.0 -n kube-system
 deployment.apps/clickhouse-operator image updated
 ```
   
@@ -70,7 +80,7 @@ Pod Template:
   Service Account:  clickhouse-operator
   Containers:
    clickhouse-operator:
-    Image:        altinity/clickhouse-operator:0.2.1
+    Image:        altinity/clickhouse-operator:0.3.0
 <...>
 ```
 
