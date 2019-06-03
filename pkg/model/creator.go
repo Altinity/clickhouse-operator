@@ -17,33 +17,51 @@ package model
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/config"
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"github.com/golang/glog"
+
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/golang/glog"
 )
 
 // Creator is the base struct to create k8s objects
 type Creator struct {
-	appVersion        string
-	chi               *chiv1.ClickHouseInstallation
-	chopConfig        *config.Config
-	chConfigGenerator *ClickHouseConfigGenerator
+	appVersion                string
+	chi                       *chiv1.ClickHouseInstallation
+	chopConfig                *config.Config
+	chConfigGenerator         *ClickHouseConfigGenerator
+	chConfigSectionsGenerator *configSections
+	labeler                   *Labeler
 
 	podTemplatesIndex         podTemplatesIndex
 	volumeClaimTemplatesIndex volumeClaimTemplatesIndex
+	reconcile                 *ReconcileFuncs
+}
+
+type ReconcileFuncs struct {
+	ConfigMap   func(configMap *corev1.ConfigMap) error
+	Service     func(service *corev1.Service) error
+	StatefulSet func(newStatefulSet *apps.StatefulSet, replica *chiv1.ChiReplica) error
 }
 
 // NewCreator creates new creator
-func NewCreator(chi *chiv1.ClickHouseInstallation, chopConfig *config.Config, appVersion string) *Creator {
+func NewCreator(
+	chi *chiv1.ClickHouseInstallation,
+	chopConfig *config.Config,
+	appVersion string,
+	reconcile *ReconcileFuncs,
+) *Creator {
 	creator := &Creator{
 		chi:               chi,
 		chopConfig:        chopConfig,
 		appVersion:        appVersion,
 		chConfigGenerator: NewClickHouseConfigGenerator(chi),
+		labeler:           NewLabeler(appVersion, chi),
+		reconcile:         reconcile,
 	}
+	creator.chConfigSectionsGenerator = NewConfigSections(creator.chConfigGenerator, creator.chopConfig)
 	creator.createPodTemplatesIndex()
 	creator.createVolumeClaimTemplatesIndex()
 
@@ -51,186 +69,29 @@ func NewCreator(chi *chiv1.ClickHouseInstallation, chopConfig *config.Config, ap
 }
 
 // ChiCreateObjects returns a map of the k8s objects created based on ClickHouseInstallation Object properties
-func (c *Creator) CreateObjects() []interface{} {
-	list := make([]interface{}, 0)
-	list = append(list, c.createServiceObjects())
-	list = append(list, c.createConfigMapObjects())
-	list = append(list, c.createStatefulSetObjects())
-
-	return list
-}
-
-// createConfigMapObjects returns a list of corev1.ConfigMap objects
-func (c *Creator) createConfigMapObjects() ConfigMapList {
-	configMapList := make(ConfigMapList, 0)
-	configMapList = append(
-		configMapList,
-		c.createConfigMapObjectsCommon()...,
-	)
-	configMapList = append(
-		configMapList,
-		c.createConfigMapObjectsPod()...,
-	)
-
-	return configMapList
-}
-
-// createConfigMapObjectsCommon returns a list of corev1.ConfigMap objects
-func (c *Creator) createConfigMapObjectsCommon() ConfigMapList {
-	var configs configSections
-
-	// commonConfigSections maps section name to section XML chopConfig of the following sections:
-	// 1. remote servers
-	// 2. zookeeper
-	// 3. settings
-	configs.commonConfigSections = make(map[string]string)
-	util.IncludeNonEmpty(configs.commonConfigSections, filenameRemoteServersXML, c.chConfigGenerator.GetRemoteServers())
-	util.IncludeNonEmpty(configs.commonConfigSections, filenameZookeeperXML, c.chConfigGenerator.GetZookeeper())
-	util.IncludeNonEmpty(configs.commonConfigSections, filenameSettingsXML, c.chConfigGenerator.GetSettings())
-	// Extra user-specified configs
-	for filename, content := range c.chopConfig.ChCommonConfigs {
-		util.IncludeNonEmpty(configs.commonConfigSections, filename, content)
+func (c *Creator) Reconcile() error {
+	if err := c.reconcileServiceChi(CreateChiServiceName(c.chi)); err != nil {
+		return err
 	}
 
-	// commonConfigSections maps section name to section XML chopConfig of the following sections:
-	// 1. users
-	// 2. quotas
-	// 3. profiles
-	configs.commonUsersConfigSections = make(map[string]string)
-	util.IncludeNonEmpty(configs.commonUsersConfigSections, filenameUsersXML, c.chConfigGenerator.GetUsers())
-	util.IncludeNonEmpty(configs.commonUsersConfigSections, filenameQuotasXML, c.chConfigGenerator.GetQuotas())
-	util.IncludeNonEmpty(configs.commonUsersConfigSections, filenameProfilesXML, c.chConfigGenerator.GetProfiles())
-	// Extra user-specified configs
-	for filename, content := range c.chopConfig.ChUsersConfigs {
-		util.IncludeNonEmpty(configs.commonUsersConfigSections, filename, content)
+	if err := c.reconcileConfigMapsChi(); err != nil {
+		return err
 	}
 
-	// There are two types of configs, kept in ConfigMaps:
-	// 1. Common configs - for all resources in the CHI (remote servers, zookeeper setup, etc)
-	//    consists of common configs and common users configs
-	// 2. Personal configs - macros chopConfig
-	// configMapList contains all configs so we need deploymentsNum+2 ConfigMap objects
-	// personal chopConfig for each deployment and +2 for common chopConfig + common user chopConfig
-	configMapList := make(ConfigMapList, 0)
-
-	// ConfigMap common for all resources in CHI
-	// contains several sections, mapped as separated chopConfig files,
-	// such as remote servers, zookeeper setup, etc
-	configMapList = append(
-		configMapList,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      CreateConfigMapCommonName(c.chi),
-				Namespace: c.chi.Namespace,
-				Labels:    c.getLabelsCommonObject(),
-			},
-			// Data contains several sections which are to be several xml chopConfig files
-			Data: configs.commonConfigSections,
-		},
-	)
-
-	// ConfigMap common for all users resources in CHI
-	configMapList = append(
-		configMapList,
-		&corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      CreateConfigMapCommonUsersName(c.chi),
-				Namespace: c.chi.Namespace,
-				Labels:    c.getLabelsCommonObject(),
-			},
-			// Data contains several sections which are to be several xml chopConfig files
-			Data: configs.commonUsersConfigSections,
-		},
-	)
-
-	return configMapList
-}
-
-// createConfigMapObjectsPod returns a list of corev1.ConfigMap objects
-func (c *Creator) createConfigMapObjectsPod() ConfigMapList {
-	configMapList := make(ConfigMapList, 0)
-	replicaProcessor := func(replica *chiv1.ChiReplica) error {
-		// Prepare for this replica deployment chopConfig files map as filename->content
-		podConfigSections := make(map[string]string)
-		util.IncludeNonEmpty(podConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(replica))
-		// Extra user-specified configs
-		for filename, content := range c.chopConfig.ChPodConfigs {
-			util.IncludeNonEmpty(podConfigSections, filename, content)
-		}
-
-		// Add corev1.ConfigMap object to the list
-		configMapList = append(
-			configMapList,
-			&corev1.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      CreateConfigMapPodName(replica),
-					Namespace: replica.Address.Namespace,
-					Labels:    c.getLabelsReplica(replica, false),
-				},
-				Data: podConfigSections,
-			},
-		)
-
-		return nil
+	if err := c.reconcileReplicas(); err != nil {
+		return err
 	}
-	c.chi.WalkReplicas(replicaProcessor)
-
-	return configMapList
+	return nil
 }
 
-// createServiceObjects returns a list of corev1.Service objects
-func (c *Creator) createServiceObjects() ServiceList {
-	// We'd like to create "number of deployments" + 1 kubernetes services in order to provide access
-	// to each deployment separately and one common predictably-named access point - common service
-	serviceList := make(ServiceList, 0)
-	serviceList = append(
-		serviceList,
-		c.createServiceObjectsCommon()...,
-	)
-	serviceList = append(
-		serviceList,
-		c.createServiceObjectsPod()...,
-	)
+func (c *Creator) reconcileServiceChi(serviceName string) error {
+	glog.V(1).Infof("reconcileServiceObjectChi() for service %s", serviceName)
 
-	return serviceList
-}
-
-func (c *Creator) createServiceObjectsCommon() ServiceList {
-	// Create one predictably-named service to access the whole installation
-	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
-	// service/clickhouse-replcluster   ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
-	return ServiceList{
-		c.createServiceObjectChi(CreateChiServiceName(c.chi)),
-	}
-}
-
-func (c *Creator) createServiceObjectsPod() ServiceList {
-	// Create "number of pods" service - one service for each stateful set
-	// Each replica has its stateful set and each stateful set has it service
-	// NAME                             TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
-	// service/chi-01a1ce7dce-2         ClusterIP   None         <none>        9000/TCP,9009/TCP,8123/TCP   1h
-	serviceList := make(ServiceList, 0)
-
-	replicaProcessor := func(replica *chiv1.ChiReplica) error {
-		// Add corev1.Service object to the list
-		serviceList = append(
-			serviceList,
-			c.createServiceObjectForStatefulSet(replica),
-		)
-		return nil
-	}
-	c.chi.WalkReplicas(replicaProcessor)
-
-	return serviceList
-}
-
-func (c *Creator) createServiceObjectChi(serviceName string) *corev1.Service {
-	glog.V(1).Infof("createServiceObjectChi() for service %s", serviceName)
-	return &corev1.Service{
+	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: c.chi.Namespace,
-			Labels:    c.getLabelsCommonObject(),
+			Labels:    c.labeler.getLabelsCommonObject(),
 		},
 		Spec: corev1.ServiceSpec{
 			// ClusterIP: templateDefaultsServiceClusterIP,
@@ -244,22 +105,88 @@ func (c *Creator) createServiceObjectChi(serviceName string) *corev1.Service {
 					Port: chDefaultClientPortNumber,
 				},
 			},
-			Selector: c.getSelectorCommonObject(),
+			Selector: c.labeler.getSelectorCommonObject(),
 			Type:     "LoadBalancer",
 		},
 	}
+
+	return c.reconcile.Service(service)
 }
 
-func (c *Creator) createServiceObjectForStatefulSet(replica *chiv1.ChiReplica) *corev1.Service {
+// reconcileConfigMapObjectsChi returns a list of corev1.ConfigMap objects
+func (c *Creator) reconcileConfigMapsChi() error {
+	c.chConfigSectionsGenerator.CreateConfigsUsers()
+	c.chConfigSectionsGenerator.CreateConfigsCommon()
+
+	// ConfigMap common for all resources in CHI
+	// contains several sections, mapped as separated chopConfig files,
+	// such as remote servers, zookeeper setup, etc
+	configMapCommon := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      CreateConfigMapCommonName(c.chi),
+			Namespace: c.chi.Namespace,
+			Labels:    c.labeler.getLabelsCommonObject(),
+		},
+		// Data contains several sections which are to be several xml chopConfig files
+		Data: c.chConfigSectionsGenerator.commonConfigSections,
+	}
+	if err := c.reconcile.ConfigMap(configMapCommon); err != nil {
+		return err
+	}
+
+	// ConfigMap common for all users resources in CHI
+	configMapUsers := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      CreateConfigMapCommonUsersName(c.chi),
+			Namespace: c.chi.Namespace,
+			Labels:    c.labeler.getLabelsCommonObject(),
+		},
+		// Data contains several sections which are to be several xml chopConfig files
+		Data: c.chConfigSectionsGenerator.commonUsersConfigSections,
+	}
+	if err := c.reconcile.ConfigMap(configMapUsers); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Creator) reconcileReplicas() error {
+	replicaProcessor := func(replica *chiv1.ChiReplica) error {
+		// Add replica's Service
+		service := c.createService(replica)
+		if err := c.reconcile.Service(service); err != nil {
+			return err
+		}
+
+		// Add replica's ConfigMap
+		configMap := c.createConfigMap(replica)
+		if err := c.reconcile.ConfigMap(configMap); err != nil {
+			return err
+		}
+
+		// Add replica's StatefulSet
+		statefulSet := c.createStatefulSet(replica)
+		if err := c.reconcile.StatefulSet(statefulSet, replica); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	return c.chi.WalkReplicasTillError(replicaProcessor)
+}
+
+func (c *Creator) createService(replica *chiv1.ChiReplica) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(replica)
 	statefulSetName := CreateStatefulSetName(replica)
 
-	glog.V(1).Infof("createServiceObjectForStatefulSet() for service %s %s", serviceName, statefulSetName)
+	glog.V(1).Infof("createService(%s):%s", serviceName, statefulSetName)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
 			Namespace: replica.Address.Namespace,
-			Labels:    c.getLabelsReplica(replica, false),
+			Labels:    c.labeler.getLabelsReplica(replica, false),
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -276,32 +203,25 @@ func (c *Creator) createServiceObjectForStatefulSet(replica *chiv1.ChiReplica) *
 					Port: chDefaultInterServerPortNumber,
 				},
 			},
-			Selector:  c.getSelectorReplica(replica),
+			Selector:  c.labeler.getSelectorReplica(replica),
 			ClusterIP: templateDefaultsServiceClusterIP,
 			Type:      "ClusterIP",
 		},
 	}
 }
 
-// createStatefulSetObjects returns a list of apps.StatefulSet objects
-func (c *Creator) createStatefulSetObjects() StatefulSetList {
-	statefulSetList := make(StatefulSetList, 0)
-
-	// Create list of apps.StatefulSet objects
-	// StatefulSet is created for each replica.Deployment
-
-	replicaProcessor := func(replica *chiv1.ChiReplica) error {
-		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s", CreateStatefulSetName(replica))
-		// Append new StatefulSet to the list of stateful sets
-		statefulSetList = append(statefulSetList, c.createStatefulSetObject(replica))
-		return nil
+func (c *Creator) createConfigMap(replica *chiv1.ChiReplica) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      CreateConfigMapPodName(replica),
+			Namespace: replica.Address.Namespace,
+			Labels:    c.labeler.getLabelsReplica(replica, false),
+		},
+		Data: c.chConfigSectionsGenerator.CreateConfigsPod(replica),
 	}
-	c.chi.WalkReplicas(replicaProcessor)
-
-	return statefulSetList
 }
 
-func (c *Creator) createStatefulSetObject(replica *chiv1.ChiReplica) *apps.StatefulSet {
+func (c *Creator) createStatefulSet(replica *chiv1.ChiReplica) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(replica)
 	serviceName := CreateStatefulSetServiceName(replica)
 
@@ -312,13 +232,13 @@ func (c *Creator) createStatefulSetObject(replica *chiv1.ChiReplica) *apps.State
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      statefulSetName,
 			Namespace: replica.Address.Namespace,
-			Labels:    c.getLabelsReplica(replica, true),
+			Labels:    c.labeler.getLabelsReplica(replica, true),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    &replicasNum,
 			ServiceName: serviceName,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: c.getSelectorReplica(replica),
+				MatchLabels: c.labeler.getSelectorReplica(replica),
 			},
 			// IMPORTANT
 			// VolumeClaimTemplates are to be setup later
@@ -347,7 +267,7 @@ func (c *Creator) setupStatefulSetPodTemplate(
 	// All the rest fields would be filled later
 	statefulSetObject.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: c.getLabelsReplica(replica, true),
+			Labels: c.labeler.getLabelsReplica(replica, true),
 		},
 	}
 

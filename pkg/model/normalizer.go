@@ -55,7 +55,7 @@ func (n *Normalizer) DoChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouse
 	// Walk over ChiSpec datatype fields
 	n.doDefaults(&n.chi.Spec.Defaults)
 	n.doConfiguration(&n.chi.Spec.Configuration)
-	// ChiSpec.Templates
+	n.doTemplates(&n.chi.Spec.Templates)
 
 	endpoint := CreateChiServiceFQDN(chi)
 	pods := make([]string, 0)
@@ -84,6 +84,24 @@ func (n *Normalizer) doConfiguration(conf *chiv1.ChiConfiguration) {
 
 	// ChiConfiguration.Clusters
 	n.doClusters()
+}
+
+// doTemplates normalizes .spec.templates
+func (n *Normalizer) doTemplates(templates *chiv1.ChiTemplates) {
+	for i := range templates.VolumeClaimTemplates {
+		vcTemplate := &templates.VolumeClaimTemplates[i]
+		n.doVolumeClaimTemplate(vcTemplate)
+	}
+}
+
+// doVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
+func (n *Normalizer) doVolumeClaimTemplate(template *chiv1.ChiVolumeClaimTemplate) {
+	// Check name
+	// Check PVCReclaimPolicy
+	if !template.PVCReclaimPolicy.IsValid() {
+		template.PVCReclaimPolicy = chiv1.PVCReclaimPolicyDelete
+	}
+	// Check Spec
 }
 
 // doClusters normalizes clusters

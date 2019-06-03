@@ -16,6 +16,7 @@ package model
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/config"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -32,9 +33,11 @@ type ServiceList []*corev1.Service
 type configSections struct {
 	// commonConfigSections maps section name to section XML chopConfig
 	commonConfigSections map[string]string
-
 	// commonUsersConfigSections maps section name to section XML chopConfig
 	commonUsersConfigSections map[string]string
+
+	chConfigGenerator *ClickHouseConfigGenerator
+	chopConfig        *config.Config
 }
 
 // volumeClaimTemplatesIndex maps volume claim template name - which

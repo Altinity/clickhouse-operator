@@ -166,8 +166,27 @@ type ChiPodTemplate struct {
 
 // ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
 type ChiVolumeClaimTemplate struct {
-	Name string                           `json:"name" yaml:"name"`
-	Spec corev1.PersistentVolumeClaimSpec `json:"spec" yaml:"spec"`
+	Name             string                           `json:"name" yaml:"name"`
+	PVCReclaimPolicy PVCReclaimPolicy                 `json:"reclaimPolicy"`
+	Spec             corev1.PersistentVolumeClaimSpec `json:"spec" yaml:"spec"`
+}
+
+type PVCReclaimPolicy string
+
+const (
+	PVCReclaimPolicyRetain PVCReclaimPolicy = "Retain"
+	PVCReclaimPolicyDelete PVCReclaimPolicy = "Delete"
+)
+
+// isValid checks whether PVCReclaimPolicy is valid
+func (v PVCReclaimPolicy) IsValid() bool {
+	switch v {
+	case PVCReclaimPolicyRetain:
+		return true
+	case PVCReclaimPolicyDelete:
+		return true
+	}
+	return false
 }
 
 // ChiDistributedDDL defines distributedDDL section of .spec.defaults

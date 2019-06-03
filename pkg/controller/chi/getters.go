@@ -23,7 +23,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
@@ -101,16 +101,20 @@ func (c *Controller) getStatefulSet(obj *meta.ObjectMeta) (*apps.StatefulSet, er
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found
 		// Try to find by labels
-		if set, err := chopmodel.GetSelectorReplicaFromObjectMeta(obj); err == nil {
+		if set, err := chopmodel.GetSelectorReplicaFromObjectMeta(obj); err != nil {
+			return nil, err
+		} else {
 			selector := labels.SelectorFromSet(set)
-
-			objects, err := c.statefulSetLister.StatefulSets(obj.Namespace).List(selector)
-			if err != nil {
+			if objects, err := c.statefulSetLister.StatefulSets(obj.Namespace).List(selector); err != nil {
 				return nil, err
-			}
-			if len(objects) == 1 {
+			} else if len(objects) == 1 {
 				// Object found by labels
 				return objects[0], nil
+			} else if len(objects) > 1 {
+				// Object found by labels
+				return nil, fmt.Errorf("ERROR too much objects returned by selector")
+			} else {
+				// Zero? Fall through and return IsNotFound() error
 			}
 		}
 	}
@@ -120,7 +124,7 @@ func (c *Controller) getStatefulSet(obj *meta.ObjectMeta) (*apps.StatefulSet, er
 }
 
 // TODO move labels into models modules
-func (c *Controller) createChiFromObjectMeta(objectMeta *meta.ObjectMeta) (*chi.ClickHouseInstallation, error) {
+func (c *Controller) createChiFromObjectMeta(objectMeta *meta.ObjectMeta) (*chiv1.ClickHouseInstallation, error) {
 	// Parse Labels
 	//			Labels: map[string]string{
 	//				labelChop: AppVersion,
@@ -155,7 +159,7 @@ func (c *Controller) createChiFromObjectMeta(objectMeta *meta.ObjectMeta) (*chi.
 }
 
 // TODO move labels into models modules
-func (c *Controller) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chi.ChiCluster, error) {
+func (c *Controller) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chiv1.ChiCluster, error) {
 	// Parse Labels
 	// 			Labels: map[string]string{
 	//				labelChop: AppVersion,

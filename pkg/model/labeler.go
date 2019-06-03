@@ -21,25 +21,37 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func (c *Creator) getLabelsCommonObject() map[string]string {
+type Labeler struct {
+	version string
+	chi     *chi.ClickHouseInstallation
+}
+
+func NewLabeler(version string, chi *chi.ClickHouseInstallation) *Labeler {
+	return &Labeler{
+		version: version,
+		chi:     chi,
+	}
+}
+
+func (l *Labeler) getLabelsCommonObject() map[string]string {
 	return map[string]string{
 		LabelApp:  LabelAppValue,
-		LabelChop: c.appVersion,
-		LabelChi:  nameSectionChi(c.chi),
+		LabelChop: l.version,
+		LabelChi:  nameSectionChi(l.chi),
 	}
 }
 
-func (c *Creator) getSelectorCommonObject() map[string]string {
+func (l *Labeler) getSelectorCommonObject() map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
-		LabelChi: nameSectionChi(c.chi),
+		LabelChi: nameSectionChi(l.chi),
 	}
 }
 
-func (c *Creator) getLabelsReplica(replica *chi.ChiReplica, zk bool) map[string]string {
+func (l *Labeler) getLabelsReplica(replica *chi.ChiReplica, zk bool) map[string]string {
 	labels := map[string]string{
 		LabelApp:         LabelAppValue,
-		LabelChop:        c.appVersion,
+		LabelChop:        l.version,
 		LabelChi:         nameSectionChi(replica),
 		LabelCluster:     nameSectionCluster(replica),
 		LabelShard:       nameSectionShard(replica),
@@ -52,7 +64,7 @@ func (c *Creator) getLabelsReplica(replica *chi.ChiReplica, zk bool) map[string]
 	return labels
 }
 
-func (c *Creator) getSelectorReplica(replica *chi.ChiReplica) map[string]string {
+func (l *Labeler) getSelectorReplica(replica *chi.ChiReplica) map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// skip chop

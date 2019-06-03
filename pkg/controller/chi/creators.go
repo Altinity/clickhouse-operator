@@ -29,38 +29,21 @@ import (
 )
 
 // reconcileChi reconciles ClickHouseInstallation
-func (c *Controller) reconcileChi(chi *chop.ClickHouseInstallation) error {
-	creator := chopmodel.NewCreator(chi, c.chopConfig, c.version)
-	listOfObjectsLists := creator.CreateObjects()
-
-	for i := range listOfObjectsLists {
-		switch listOfObjectsLists[i].(type) {
-		case chopmodel.ServiceList:
-			for j := range listOfObjectsLists[i].(chopmodel.ServiceList) {
-				if err := c.reconcileService(listOfObjectsLists[i].(chopmodel.ServiceList)[j]); err != nil {
-					return err
-				}
-			}
-		case chopmodel.ConfigMapList:
-			for j := range listOfObjectsLists[i].(chopmodel.ConfigMapList) {
-				if err := c.reconcileConfigMap(listOfObjectsLists[i].(chopmodel.ConfigMapList)[j]); err != nil {
-					return err
-				}
-			}
-		case chopmodel.StatefulSetList:
-			for j := range listOfObjectsLists[i].(chopmodel.StatefulSetList) {
-				if err := c.reconcileStatefulSet(listOfObjectsLists[i].(chopmodel.StatefulSetList)[j]); err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
+func (c *Controller) reconcile(chi *chop.ClickHouseInstallation) error {
+	creator := chopmodel.NewCreator(
+		chi,
+		c.chopConfig,
+		c.version,
+		&chopmodel.ReconcileFuncs{
+			ConfigMap:   c.ReconcileConfigMap,
+			Service:     c.ReconcileService,
+			StatefulSet: c.ReconcileStatefulSet,
+		})
+	return creator.Reconcile()
 }
 
 // reconcileConfigMap reconciles core.ConfigMap
-func (c *Controller) reconcileConfigMap(configMap *core.ConfigMap) error {
+func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
 	// Check whether object with such name already exists in k8s
 	curConfigMap, err := c.getConfigMap(&configMap.ObjectMeta)
 
@@ -89,7 +72,7 @@ func (c *Controller) reconcileConfigMap(configMap *core.ConfigMap) error {
 }
 
 // reconcileService reconciles core.Service
-func (c *Controller) reconcileService(service *core.Service) error {
+func (c *Controller) ReconcileService(service *core.Service) error {
 	// Check whether object with such name already exists in k8s
 	curService, err := c.getService(&service.ObjectMeta)
 
@@ -113,7 +96,7 @@ func (c *Controller) reconcileService(service *core.Service) error {
 }
 
 // reconcileStatefulSet reconciles apps.StatefulSet
-func (c *Controller) reconcileStatefulSet(newStatefulSet *apps.StatefulSet) error {
+func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, replica *chop.ChiReplica) error {
 	// Check whether object with such name already exists in k8s
 	curStatefulSet, err := c.getStatefulSet(&newStatefulSet.ObjectMeta)
 
@@ -124,14 +107,14 @@ func (c *Controller) reconcileStatefulSet(newStatefulSet *apps.StatefulSet) erro
 
 	if apierrors.IsNotFound(err) {
 		// StatefulSet with such name not found - create StatefulSet
-		return c.createStatefulSet(newStatefulSet)
+		return c.createStatefulSet(newStatefulSet, replica)
 	}
 
 	// Error has happened with .Get()
 	return err
 }
 
-func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet) error {
+func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, replica *chop.ChiReplica) error {
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
 		return err
 	} else if err := c.waitStatefulSetGeneration(statefulSet.Namespace, statefulSet.Name, statefulSet.Generation); err == nil {
@@ -139,10 +122,8 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet) error {
 		return nil
 	} else {
 		// Unable to reach target generation, StatefulSet create failed, time to rollback?
-		return c.onStatefulSetCreateFailed(statefulSet)
+		return c.onStatefulSetCreateFailed(statefulSet, replica)
 	}
-
-	return errors.New("createStatefulSet() - unknown position")
 }
 
 func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet) error {
@@ -177,8 +158,6 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 		// Unable to reach target generation, StatefulSet update failed, time to rollback?
 		return c.onStatefulSetUpdateFailed(oldStatefulSet)
 	}
-
-	return errors.New("updateStatefulSet() - unknown position")
 }
 
 // waitStatefulSetGeneration polls StatefulSet for reaching target generation
@@ -216,13 +195,11 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 			return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - wait timeout", namespace, name))
 		}
 	}
-
-	return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - unknown position", namespace, name))
 }
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed
 // It can just delete failed StatefulSet or do nothing
-func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulSet) error {
+func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulSet, replica *chop.ChiReplica) error {
 	// Convenience shortcuts
 	namespace := failedStatefulSet.Namespace
 	name := failedStatefulSet.Name
@@ -237,14 +214,12 @@ func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulS
 	case config.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully problematic failed StatefulSet
 		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to DELETE FAILED StatefulSet", namespace, name)
-		c.statefulSetDelete(namespace, name)
+		_ = c.deleteReplica(replica)
 		return c.shouldContinueOnCreateFailed()
 	default:
 		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetCreateFailureAction=%s", c.chopConfig.OnStatefulSetCreateFailureAction)
 		return nil
 	}
-
-	return errors.New(fmt.Sprintf("onStatefulSetCreateFailed(%s/%s) - unknown position", namespace, name))
 }
 
 // onStatefulSetUpdateFailed handles situation when StatefulSet update failed
@@ -283,8 +258,6 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s", c.chopConfig.OnStatefulSetUpdateFailureAction)
 		return nil
 	}
-
-	return errors.New(fmt.Sprintf("onStatefulSetUpdateFailed(%s/%s) - unknown position", namespace, name))
 }
 
 // shouldContinueOnCreateFailed return nil in case 'continue' or error in case 'do not continue'

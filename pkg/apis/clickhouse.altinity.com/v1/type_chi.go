@@ -208,6 +208,25 @@ func (chi *ClickHouseInstallation) WalkReplicas(
 	return res
 }
 
+func (chi *ClickHouseInstallation) WalkReplicasTillError(
+	f func(replica *ChiReplica) error,
+) error {
+	for clusterIndex := range chi.Spec.Configuration.Clusters {
+		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		for shardIndex := range cluster.Layout.Shards {
+			shard := &cluster.Layout.Shards[shardIndex]
+			for replicaIndex := range shard.Replicas {
+				replica := &shard.Replicas[replicaIndex]
+				if err := f(replica); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation) {
 	if from == nil {
 		return
