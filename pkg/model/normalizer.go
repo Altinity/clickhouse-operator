@@ -18,6 +18,7 @@ import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopconfig "github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+
 	"regexp"
 	"strconv"
 	"strings"
@@ -57,15 +58,20 @@ func (n *Normalizer) DoChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouse
 	n.doConfiguration(&n.chi.Spec.Configuration)
 	n.doTemplates(&n.chi.Spec.Templates)
 
-	endpoint := CreateChiServiceFQDN(chi)
+	n.doStatus()
+
+	return n.chi, nil
+}
+
+// doStatus prepares .status section
+func (n *Normalizer) doStatus() {
+	endpoint := CreateChiServiceFQDN(n.chi)
 	pods := make([]string, 0)
 	n.chi.WalkReplicas(func(replica *chiv1.ChiReplica) error {
 		pods = append(pods, CreatePodName(replica))
 		return nil
 	})
 	n.chi.StatusFill(endpoint, pods)
-
-	return n.chi, nil
 }
 
 // doDefaults normalizes .spec.defaults
@@ -88,10 +94,25 @@ func (n *Normalizer) doConfiguration(conf *chiv1.ChiConfiguration) {
 
 // doTemplates normalizes .spec.templates
 func (n *Normalizer) doTemplates(templates *chiv1.ChiTemplates) {
+	for i := range templates.PodTemplates {
+		podTemplate := &templates.PodTemplates[i]
+		n.doPodTemplate(podTemplate)
+	}
+
 	for i := range templates.VolumeClaimTemplates {
 		vcTemplate := &templates.VolumeClaimTemplates[i]
 		n.doVolumeClaimTemplate(vcTemplate)
 	}
+}
+
+// doPodTemplate normalizes .spec.templates.podTemplates
+func (n *Normalizer) doPodTemplate(template *chiv1.ChiPodTemplate) {
+	// Ensure map is in place
+	if n.chi.Spec.Templates.PodTemplatesIndex == nil {
+		n.chi.Spec.Templates.PodTemplatesIndex = make(map[string]*chiv1.ChiPodTemplate)
+	}
+
+	n.chi.Spec.Templates.PodTemplatesIndex[template.Name] = template
 }
 
 // doVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
@@ -102,6 +123,12 @@ func (n *Normalizer) doVolumeClaimTemplate(template *chiv1.ChiVolumeClaimTemplat
 		template.PVCReclaimPolicy = chiv1.PVCReclaimPolicyDelete
 	}
 	// Check Spec
+
+	// Ensure map is in place
+	if n.chi.Spec.Templates.VolumeClaimTemplatesIndex == nil {
+		n.chi.Spec.Templates.VolumeClaimTemplatesIndex = make(map[string]*chiv1.ChiVolumeClaimTemplate)
+	}
+	n.chi.Spec.Templates.VolumeClaimTemplatesIndex[template.Name] = template
 }
 
 // doClusters normalizes clusters
@@ -121,6 +148,7 @@ func (n *Normalizer) doClusters() {
 		return n.doCluster(cluster)
 	})
 	n.chi.FillAddressInfo()
+	n.chi.FillChiPointer()
 	n.chi.WalkReplicas(func(replica *chiv1.ChiReplica) error {
 		replica.Config.ZkFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
 		return nil
@@ -147,6 +175,13 @@ func (n *Normalizer) doConfigurationUsers(users *map[string]interface{}) {
 	for path := range *users {
 		// Split 'admin/password'
 		tags := strings.Split(path, "/")
+
+		// Basic sanity check - need to have at least "username/something" pair
+		if len(tags) < 2 {
+			// Skip incorrect entry
+			continue
+		}
+
 		username := tags[0]
 		usernameMap[username] = true
 	}

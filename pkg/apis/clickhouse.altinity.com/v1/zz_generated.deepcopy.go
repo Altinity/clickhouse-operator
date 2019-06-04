@@ -30,6 +30,15 @@ func (in *ChiCluster) DeepCopyInto(out *ChiCluster) {
 	in.Layout.DeepCopyInto(&out.Layout)
 	out.Templates = in.Templates
 	out.Address = in.Address
+	if in.Chi != nil {
+		in, out := &in.Chi, &out.Chi
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ClickHouseInstallation)
+			(*in).DeepCopyInto(*out)
+		}
+	}
 	return
 }
 
@@ -207,6 +216,15 @@ func (in *ChiReplica) DeepCopyInto(out *ChiReplica) {
 	out.Templates = in.Templates
 	out.Address = in.Address
 	out.Config = in.Config
+	if in.Chi != nil {
+		in, out := &in.Chi, &out.Chi
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ClickHouseInstallation)
+			(*in).DeepCopyInto(*out)
+		}
+	}
 	return
 }
 
@@ -259,9 +277,20 @@ func (in *ChiShard) DeepCopyInto(out *ChiShard) {
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
 		*out = make([]ChiReplica, len(*in))
-		copy(*out, *in)
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	out.Address = in.Address
+	if in.Chi != nil {
+		in, out := &in.Chi, &out.Chi
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(ClickHouseInstallation)
+			(*in).DeepCopyInto(*out)
+		}
+	}
 	return
 }
 
@@ -362,6 +391,30 @@ func (in *ChiTemplates) DeepCopyInto(out *ChiTemplates) {
 		*out = make([]ChiVolumeClaimTemplate, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.PodTemplatesIndex != nil {
+		in, out := &in.PodTemplatesIndex, &out.PodTemplatesIndex
+		*out = make(map[string]*ChiPodTemplate, len(*in))
+		for key, val := range *in {
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				(*out)[key] = new(ChiPodTemplate)
+				val.DeepCopyInto((*out)[key])
+			}
+		}
+	}
+	if in.VolumeClaimTemplatesIndex != nil {
+		in, out := &in.VolumeClaimTemplatesIndex, &out.VolumeClaimTemplatesIndex
+		*out = make(map[string]*ChiVolumeClaimTemplate, len(*in))
+		for key, val := range *in {
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				(*out)[key] = new(ChiVolumeClaimTemplate)
+				val.DeepCopyInto((*out)[key])
+			}
 		}
 	}
 	return

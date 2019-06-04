@@ -90,6 +90,25 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 	return replicasCount
 }
 
+func (chi *ClickHouseInstallation) FillChiPointer() {
+
+	replicaProcessor := func(
+		chi *ClickHouseInstallation,
+		clusterIndex int,
+		cluster *ChiCluster,
+		shardIndex int,
+		shard *ChiShard,
+		replicaIndex int,
+		replica *ChiReplica,
+	) error {
+		cluster.Chi = chi
+		shard.Chi = chi
+		replica.Chi = chi
+		return nil
+	}
+	chi.WalkReplicasFullPath(replicaProcessor)
+}
+
 func (chi *ClickHouseInstallation) WalkClustersFullPath(
 	f func(chi *ClickHouseInstallation, clusterIndex int, cluster *ChiCluster) error,
 ) []error {
@@ -267,4 +286,16 @@ func (chi *ClickHouseInstallation) ReplicasCount() int {
 		return nil
 	})
 	return count
+}
+
+// GetVolumeClaimTemplate gets VolumeClaimTemplate by name
+func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolumeClaimTemplate, bool) {
+	volumeClaimTemplate, ok := chi.Spec.Templates.VolumeClaimTemplatesIndex[name]
+	return volumeClaimTemplate, ok
+}
+
+// GetPodTemplate gets PodTemplate by name
+func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate, bool) {
+	podTemplate, ok := chi.Spec.Templates.PodTemplatesIndex[name]
+	return podTemplate, ok
 }

@@ -559,6 +559,12 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 }
 
 func (c *Controller) onDeleteChi(chi *chop.ClickHouseInstallation) error {
+	chi, err := c.normalizer.CreateTemplatedChi(chi)
+	if err != nil {
+		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
+		return err
+	}
+
 	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteStarted, fmt.Sprintf("onDeleteChi(%s/%s) started", chi.Namespace, chi.Name))
 	c.deleteChi(chi)
 	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, fmt.Sprintf("onDeleteChi(%s/%s) completed", chi.Namespace, chi.Name))

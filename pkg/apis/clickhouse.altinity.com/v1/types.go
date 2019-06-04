@@ -78,7 +78,9 @@ type ChiCluster struct {
 	Layout    ChiLayout        `json:"layout"`
 	Templates ChiTemplateNames `json:"templates,omitempty"`
 
-	Address ChiClusterAddress `json:"address"`
+	// Internal data
+	Address ChiClusterAddress       `json:"address"`
+	Chi     *ClickHouseInstallation `json:"-"`
 }
 
 // ChiClusterAddress defines address of a cluster within ClickHouseInstallation
@@ -109,7 +111,9 @@ type ChiShard struct {
 	ReplicasCount       int              `json:"replicasCount,omitempty"`
 	Replicas            []ChiReplica     `json:"replicas,omitempty"`
 
-	Address ChiShardAddress `json:"address"`
+	// Internal data
+	Address ChiShardAddress         `json:"address"`
+	Chi     *ClickHouseInstallation `json:"-"`
 }
 
 // ChiShardAddress defines address of a shard within ClickHouseInstallation
@@ -128,8 +132,10 @@ type ChiReplica struct {
 	Port      int32            `json:"port,omitempty"`
 	Templates ChiTemplateNames `json:"templates,omitempty"`
 
-	Address ChiReplicaAddress `json:"address"`
-	Config  ChiReplicaConfig  `json:"config"`
+	// Internal data
+	Address ChiReplicaAddress       `json:"address"`
+	Config  ChiReplicaConfig        `json:"config"`
+	Chi     *ClickHouseInstallation `json:"-"`
 }
 
 // ChiReplicaAddress defines address of a replica within ClickHouseInstallation
@@ -152,10 +158,13 @@ type ChiReplicaConfig struct {
 
 // ChiTemplates defines templates section of .spec
 type ChiTemplates struct {
-	// TODO refactor into [string]ChiPodTemplate
-	PodTemplates []ChiPodTemplate `json:"podTemplates,omitempty" yaml:"podTemplates"`
-	// TODO refactor into [string]ChiVolumeClaimTemplate
+	// Templates
+	PodTemplates         []ChiPodTemplate         `json:"podTemplates,omitempty" yaml:"podTemplates"`
 	VolumeClaimTemplates []ChiVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates"`
+
+	// Index maps template name to template itself
+	PodTemplatesIndex         map[string]*ChiPodTemplate
+	VolumeClaimTemplatesIndex map[string]*ChiVolumeClaimTemplate
 }
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet

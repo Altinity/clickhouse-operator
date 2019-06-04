@@ -20,6 +20,18 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+type configSections struct {
+	// commonConfigSections maps section name to section XML chopConfig
+	commonConfigSections map[string]string
+	// commonUsersConfigSections maps section name to section XML chopConfig
+	commonUsersConfigSections map[string]string
+
+	// ClickHouse config generator
+	chConfigGenerator *ClickHouseConfigGenerator
+	// clickhouse-operator configuration
+	chopConfig *config.Config
+}
+
 func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig *config.Config) *configSections {
 	return &configSections{
 		commonConfigSections:      make(map[string]string),

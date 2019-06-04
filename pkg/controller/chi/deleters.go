@@ -161,15 +161,19 @@ func (c *Controller) statefulSetDelete(replica *chop.ChiReplica) error {
 
 // persistentVolumeClaimDelete deletes PersistentVolumeClaim
 func (c *Controller) persistentVolumeClaimDelete(replica *chop.ChiReplica) error {
+
 	name := "volumeclaim-template-" + chopmodel.CreatePodName(replica)
 	namespace := replica.Address.Namespace
 
-	glog.V(1).Infof("persistentVolumeClaimDelete(%s/%s)", namespace, name)
+	if !chopmodel.ReplicaCanDeletePVC(replica) {
+		glog.V(1).Infof("KEPT PersistentVolumeClaim %s/%s", namespace, name)
+		return nil
+	}
 
 	if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(name, newDeleteOptions()); err == nil {
-		glog.V(1).Infof("PersistentVolumeClaim %s/%s deleted", namespace, name)
+		glog.V(1).Infof("OK delete PersistentVolumeClaim %s/%s", namespace, name)
 	} else {
-		glog.V(1).Infof("PersistentVolumeClaim %s/%s FAILED TO DELETE %v", namespace, name, err)
+		glog.V(1).Infof("FAIL delete PersistentVolumeClaim %s/%s %v", namespace, name, err)
 	}
 
 	return nil

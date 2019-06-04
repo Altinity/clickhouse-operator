@@ -30,16 +30,16 @@ import (
 
 // reconcileChi reconciles ClickHouseInstallation
 func (c *Controller) reconcile(chi *chop.ClickHouseInstallation) error {
-	creator := chopmodel.NewCreator(
+	reconciler := chopmodel.NewReconciler(
 		chi,
 		c.chopConfig,
 		c.version,
 		&chopmodel.ReconcileFuncs{
-			ConfigMap:   c.ReconcileConfigMap,
-			Service:     c.ReconcileService,
-			StatefulSet: c.ReconcileStatefulSet,
+			ReconcileConfigMap:   c.ReconcileConfigMap,
+			ReconcileService:     c.ReconcileService,
+			ReconcileStatefulSet: c.ReconcileStatefulSet,
 		})
-	return creator.Reconcile()
+	return reconciler.Reconcile()
 }
 
 // reconcileConfigMap reconciles core.ConfigMap
@@ -116,6 +116,7 @@ func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, repl
 
 func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, replica *chop.ChiReplica) error {
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
+		// Error call Create()
 		return err
 	} else if err := c.waitStatefulSetGeneration(statefulSet.Namespace, statefulSet.Name, statefulSet.Generation); err == nil {
 		// Target generation reached, StatefulSet created successfully

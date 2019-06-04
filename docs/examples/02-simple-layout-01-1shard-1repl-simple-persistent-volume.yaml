@@ -15,6 +15,7 @@ spec:
   templates:
     volumeClaimTemplates:
       - name: volumeclaim-template
+#        reclaimPolicy: Retain
         spec:
           accessModes:
             - ReadWriteOnce
