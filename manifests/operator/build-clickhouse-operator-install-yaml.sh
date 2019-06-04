@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Full list of available vars check in ${MANIFEST_ROOT}/dev/cat-clickhouse-operator-yaml.sh file
+
+# Here we just build production all-sections-included .yaml manifest with namespace and image parameters
 CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE:-kube-system}"
 CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
 
