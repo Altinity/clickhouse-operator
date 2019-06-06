@@ -1,7 +1,7 @@
 # Possible Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:latest
+# clickhouse-dev-mfs
+# sunsingerus/clickhouse-operator:dev
 #
 # Setup CustomResourceDefinition
 # CustomResourceDefinition is namespace-less and must have unique name
@@ -200,8 +200,8 @@ spec:
 ---
 # Possible Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:latest
+# clickhouse-dev-mfs
+# sunsingerus/clickhouse-operator:dev
 #
 # Setup ServiceAccount
 # ServiceAccount would be created in kubectl-specified namespace
@@ -209,7 +209,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: clickhouse-operator
-  namespace: kube-system
+  namespace: clickhouse-dev-mfs
 ---
 # Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
 # ClusterRoleBinding is namespace-less and must have unique name
@@ -224,7 +224,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: clickhouse-operator
-    namespace: kube-system
+    namespace: clickhouse-dev-mfs
 ---
 # Setup ClusterIP Service to provide monitoring metrics for Prometheus
 # Service would be created in kubectl-specified namespace
@@ -235,7 +235,7 @@ kind: Service
 apiVersion: v1
 metadata:
   name: clickhouse-operator-metrics
-  namespace: kube-system
+  namespace: clickhouse-dev-mfs
   labels:
     app: clickhouse-operator
 spec:
@@ -247,15 +247,15 @@ spec:
 ---
 # Possible Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:latest
+# clickhouse-dev-mfs
+# sunsingerus/clickhouse-operator:dev
 # etc-clickhouse-operator-files
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-files
-  namespace: kube-system
+  namespace: clickhouse-dev-mfs
 data:
   config.yaml: |
     # Namespaces where clickhouse-operator listens for events.
@@ -346,28 +346,28 @@ data:
 ---
 # Possible Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:latest
+# clickhouse-dev-mfs
+# sunsingerus/clickhouse-operator:dev
 # etc-clickhouse-operator-confd-files
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-confd-files
-  namespace: kube-system
+  namespace: clickhouse-dev-mfs
 data:
 ---
 # Possible Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:latest
+# clickhouse-dev-mfs
+# sunsingerus/clickhouse-operator:dev
 # etc-clickhouse-operator-configd-files
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-configd-files
-  namespace: kube-system
+  namespace: clickhouse-dev-mfs
 data:
   01-clickhouse-operator-listen.xml: |
     <yandex>
@@ -387,28 +387,28 @@ data:
 ---
 # Possible Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:latest
+# clickhouse-dev-mfs
+# sunsingerus/clickhouse-operator:dev
 # etc-clickhouse-operator-templatesd-files
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-templatesd-files
-  namespace: kube-system
+  namespace: clickhouse-dev-mfs
 data:
 ---
 # Possible Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:latest
+# clickhouse-dev-mfs
+# sunsingerus/clickhouse-operator:dev
 # etc-clickhouse-operator-usersd-files
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-usersd-files
-  namespace: kube-system
+  namespace: clickhouse-dev-mfs
 data:
   01-clickhouse-operator-user.xml: |
     <yandex>
@@ -429,8 +429,8 @@ data:
 ---
 # Possible Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:latest
+# clickhouse-dev-mfs
+# sunsingerus/clickhouse-operator:dev
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -438,7 +438,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: clickhouse-operator
-  namespace: kube-system
+  namespace: clickhouse-dev-mfs
   labels:
     app: clickhouse-operator
 spec:
@@ -470,7 +470,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:latest
+          image: sunsingerus/clickhouse-operator:dev
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
