@@ -169,8 +169,15 @@ type ChiTemplates struct {
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet
 type ChiPodTemplate struct {
-	Name string         `json:"name" yaml:"name"`
-	Spec corev1.PodSpec `json:"spec" yaml:"spec"`
+	Name         string             `json:"name" yaml:"name"`
+	Zone         ChiPodTemplateZone `json:"zone" yaml:"zone""`
+	Distribution string             `json:"distribution" yaml:"distribution"`
+	Spec         corev1.PodSpec     `json:"spec" yaml:"spec"`
+}
+
+type ChiPodTemplateZone struct {
+	Key    string   `json:"key" yaml:"key"`
+	Values []string `json:"values" yaml:"values"`
 }
 
 // ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet

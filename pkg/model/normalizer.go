@@ -18,6 +18,8 @@ import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopconfig "github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"k8s.io/api/core/v1"
+	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"regexp"
 	"strconv"
@@ -107,12 +109,207 @@ func (n *Normalizer) doTemplates(templates *chiv1.ChiTemplates) {
 
 // doPodTemplate normalizes .spec.templates.podTemplates
 func (n *Normalizer) doPodTemplate(template *chiv1.ChiPodTemplate) {
+	// Name
+
+	// Zone
+	if len(template.Zone.Values) == 0 {
+		// In case no values specified - no key is reasonable
+		template.Zone.Key = ""
+	} else if template.Zone.Key == "" {
+		// We have values specified, but no key
+		// Use default zone key in this case
+		template.Zone.Key = "failure-domain.beta.kubernetes.io/zone"
+	} else {
+		// We have both key and value(s) specified explicitly
+	}
+
+	// Distribution
+	if template.Distribution == podDistributionOnePerHost {
+		// Known distribution, all is fine
+	} else {
+		template.Distribution = podDistributionUnspecified
+	}
+
+	// Spec
+	template.Spec.Affinity = n.mergeAffinity(template.Spec.Affinity, n.buildAffinity(template))
+
+	// Introduce PodTemplate into Index
 	// Ensure map is in place
 	if n.chi.Spec.Templates.PodTemplatesIndex == nil {
 		n.chi.Spec.Templates.PodTemplatesIndex = make(map[string]*chiv1.ChiPodTemplate)
 	}
 
 	n.chi.Spec.Templates.PodTemplatesIndex[template.Name] = template
+}
+
+func (n *Normalizer) buildAffinity(template *chiv1.ChiPodTemplate) *v1.Affinity {
+	nodeAffinity := n.buildNodeAffinity(template)
+	podAntiAffinity := n.buildPodAntiAffinity(template)
+
+	if nodeAffinity == nil && podAntiAffinity == nil {
+		return nil
+	} else {
+		return &v1.Affinity{
+			NodeAffinity:    nodeAffinity,
+			PodAffinity:     nil,
+			PodAntiAffinity: podAntiAffinity,
+		}
+	}
+}
+
+func (n *Normalizer) mergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affinity {
+	if src == nil {
+		// Nothing to merge from
+		return dst
+	}
+
+	if dst == nil {
+		// No receiver, allocate new one
+		dst = &v1.Affinity{
+			NodeAffinity:    n.mergeNodeAffinity(nil, src.NodeAffinity),
+			PodAffinity:     src.PodAffinity,
+			PodAntiAffinity: n.mergePodAntiAffinity(nil, src.PodAntiAffinity),
+		}
+	}
+
+	return dst
+}
+
+func (n *Normalizer) buildNodeAffinity(template *chiv1.ChiPodTemplate) *v1.NodeAffinity {
+	if template.Zone.Key == "" {
+		return nil
+	} else {
+		return &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						// A list of node selector requirements by node's labels.
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      template.Zone.Key,
+								Operator: v1.NodeSelectorOpIn,
+								Values:   template.Zone.Values,
+							},
+						},
+						// A list of node selector requirements by node's fields.
+						//MatchFields: []v1.NodeSelectorRequirement{
+						//	v1.NodeSelectorRequirement{},
+						//},
+					},
+				},
+			},
+
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{},
+		}
+	}
+}
+
+func (n *Normalizer) mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinity) *v1.NodeAffinity {
+	if src == nil {
+		// Nothing to merge from
+		return dst
+	}
+
+	// Check NodeSelectors are available
+	if src.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		return dst
+	}
+	if len(src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
+		return dst
+	}
+
+	if dst == nil {
+		// No receiver, allocate new one
+		dst = &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{},
+			},
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{},
+		}
+	}
+
+	// Copy NodeSelectors
+	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+		dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
+			dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+			src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i],
+		)
+	}
+
+	// Copy PreferredSchedulingTerm
+	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
+		dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			dst.PreferredDuringSchedulingIgnoredDuringExecution,
+			src.PreferredDuringSchedulingIgnoredDuringExecution[i],
+		)
+	}
+
+	return dst
+}
+
+func (n *Normalizer) buildPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodAntiAffinity {
+	if template.Distribution == podDistributionOnePerHost {
+		return &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					LabelSelector: &v12.LabelSelector{
+						// A list of node selector requirements by node's labels.
+						MatchExpressions: []v12.LabelSelectorRequirement{
+							{
+								Key:      LabelApp,
+								Operator: v12.LabelSelectorOpIn,
+								Values: []string{
+									LabelAppValue,
+								},
+							},
+						},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{},
+		}
+	} else {
+		return nil
+	}
+}
+
+func (n *Normalizer) mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.PodAntiAffinity {
+	if src == nil {
+		// Nothing to merge from
+		return dst
+	}
+
+	if len(src.RequiredDuringSchedulingIgnoredDuringExecution) == 0 {
+		return dst
+	}
+
+	if dst == nil {
+		// No receiver, allocate new one
+		dst = &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution:  []v1.PodAffinityTerm{},
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{},
+		}
+	}
+
+	// Copy PodAffinityTerm
+	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution {
+		dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			dst.RequiredDuringSchedulingIgnoredDuringExecution,
+			src.RequiredDuringSchedulingIgnoredDuringExecution[i],
+		)
+	}
+
+	// Copy WeightedPodAffinityTerm
+	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
+		dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			dst.PreferredDuringSchedulingIgnoredDuringExecution,
+			src.PreferredDuringSchedulingIgnoredDuringExecution[i],
+		)
+	}
+
+	return dst
 }
 
 // doVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates

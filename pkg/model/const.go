@@ -163,3 +163,8 @@ const (
 	// Default value for ClusterIP service
 	templateDefaultsServiceClusterIP = "None"
 )
+
+const (
+	podDistributionOnePerHost  = "OnePerHost"
+	podDistributionUnspecified = "Unspecified"
+)
