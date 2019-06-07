@@ -17,6 +17,7 @@ package model
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/config"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -65,54 +66,32 @@ func NewReconciler(
 
 // Reconcile runs reconcile process
 func (r *Reconciler) Reconcile() error {
-	if err := r.reconcileServiceChi(r.chi); err != nil {
+
+	// Reconcile CHI
+	if err := r.reconcileChiService(r.chi); err != nil {
 		return err
 	}
 
-	if err := r.reconcileConfigMapsChi(); err != nil {
+	if err := r.reconcileChiConfigMaps(); err != nil {
 		return err
 	}
 
+	// Reconcile Clusters
 	if err := r.reconcileReplicas(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
-// reconcileServiceChi reconciles global Services belonging to CHI
-func (r *Reconciler) reconcileServiceChi(chi *chiv1.ClickHouseInstallation) error {
-
-	serviceName := CreateChiServiceName(chi)
-
-	glog.V(1).Infof("reconcileServiceObjectChi() for service %s", serviceName)
-	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: r.chi.Namespace,
-			Labels:    r.labeler.getLabelsCommonObject(),
-		},
-		Spec: corev1.ServiceSpec{
-			// ClusterIP: templateDefaultsServiceClusterIP,
-			Ports: []corev1.ServicePort{
-				{
-					Name: chDefaultHTTPPortName,
-					Port: chDefaultHTTPPortNumber,
-				},
-				{
-					Name: chDefaultClientPortName,
-					Port: chDefaultClientPortNumber,
-				},
-			},
-			Selector: r.labeler.getSelectorCommonObject(),
-			Type:     "LoadBalancer",
-		},
-	}
-
+// reconcileChiService reconciles global Services belonging to CHI
+func (r *Reconciler) reconcileChiService(chi *chiv1.ClickHouseInstallation) error {
+	service := r.createChiService(chi)
 	return r.funcs.ReconcileService(service)
 }
 
-// reconcileConfigMapsChi reconciles global ConfigMaps belonging to CHI
-func (r *Reconciler) reconcileConfigMapsChi() error {
+// reconcileChiConfigMaps reconciles global ConfigMaps belonging to CHI
+func (r *Reconciler) reconcileChiConfigMaps() error {
 	r.chConfigSectionsGenerator.CreateConfigsUsers()
 	r.chConfigSectionsGenerator.CreateConfigsCommon()
 
@@ -176,19 +155,19 @@ func (r *Reconciler) reconcileReplicas() error {
 	return r.chi.WalkReplicasTillError(replicaProcessor)
 }
 
-// createService creates new corev1.Service
-func (r *Reconciler) createService(replica *chiv1.ChiReplica) *corev1.Service {
-	serviceName := CreateStatefulSetServiceName(replica)
-	statefulSetName := CreateStatefulSetName(replica)
+// createChiService creates new corev1.Service
+func (r *Reconciler) createChiService(chi *chiv1.ClickHouseInstallation) *corev1.Service {
+	serviceName := CreateChiServiceName(chi)
 
-	glog.V(1).Infof("createService(%s):%s", serviceName, statefulSetName)
+	glog.V(1).Infof("createChiService(%s/%s)", chi.Namespace, serviceName)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
-			Namespace: replica.Address.Namespace,
-			Labels:    r.labeler.getLabelsReplica(replica, false),
+			Namespace: r.chi.Namespace,
+			Labels:    r.labeler.getLabelsCommonObject(),
 		},
 		Spec: corev1.ServiceSpec{
+			// ClusterIP: templateDefaultsServiceClusterIP,
 			Ports: []corev1.ServicePort{
 				{
 					Name: chDefaultHTTPPortName,
@@ -198,15 +177,60 @@ func (r *Reconciler) createService(replica *chiv1.ChiReplica) *corev1.Service {
 					Name: chDefaultClientPortName,
 					Port: chDefaultClientPortNumber,
 				},
-				{
-					Name: chDefaultInterServerPortName,
-					Port: chDefaultInterServerPortNumber,
-				},
 			},
-			Selector:  r.labeler.getSelectorReplica(replica),
-			ClusterIP: templateDefaultsServiceClusterIP,
-			Type:      "ClusterIP",
+			Selector: r.labeler.getSelectorCommonObject(),
+			Type:     "LoadBalancer",
 		},
+	}
+}
+
+// createService creates new corev1.Service
+func (r *Reconciler) createService(replica *chiv1.ChiReplica) *corev1.Service {
+	serviceName := CreateStatefulSetServiceName(replica)
+	statefulSetName := CreateStatefulSetName(replica)
+
+	glog.V(1).Infof("createService(%s/%s) for Set %s", replica.Address.Namespace, serviceName, statefulSetName)
+	if template, ok := replica.Chi.GetServiceTemplate(replica.Templates.ServiceTemplate); ok {
+		// .templates.ServiceTemplate specified
+		service := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serviceName,
+				Namespace: replica.Address.Namespace,
+				Labels:    r.labeler.getLabelsReplica(replica, false),
+			},
+			Spec: *template.Spec.DeepCopy(),
+		}
+		service.Spec.Selector = util.MergeStringMaps(service.Spec.Selector, r.labeler.getSelectorReplica(replica))
+
+		return service
+	} else {
+		// Incorrect/unknown .templates.ServiceTemplate specified
+		return &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serviceName,
+				Namespace: replica.Address.Namespace,
+				Labels:    r.labeler.getLabelsReplica(replica, false),
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{
+					{
+						Name: chDefaultHTTPPortName,
+						Port: chDefaultHTTPPortNumber,
+					},
+					{
+						Name: chDefaultClientPortName,
+						Port: chDefaultClientPortNumber,
+					},
+					{
+						Name: chDefaultInterServerPortName,
+						Port: chDefaultInterServerPortNumber,
+					},
+				},
+				Selector:  r.labeler.getSelectorReplica(replica),
+				ClusterIP: templateDefaultsServiceClusterIP,
+				Type:      "ClusterIP",
+			},
+		}
 	}
 }
 

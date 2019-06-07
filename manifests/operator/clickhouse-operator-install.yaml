@@ -60,6 +60,8 @@ spec:
                       type: string
                     volumeClaimTemplate:
                       type: string
+                    serviceTemplate:
+                      type: string
             configuration:
               type: object
               properties:
@@ -109,6 +111,8 @@ spec:
                             type: string
                           volumeClaimTemplate:
                             type: string
+                          serviceTemplate:
+                            type: string
                       layout:
                         type: object
                         properties:
@@ -145,6 +149,8 @@ spec:
                                       type: string
                                     volumeClaimTemplate:
                                       type: string
+                                    serviceTemplate:
+                                      type: string
                                 replicas:
                                   type: array
                                   items:
@@ -163,27 +169,11 @@ spec:
                                             type: string
                                           volumeClaimTemplate:
                                             type: string
+                                          serviceTemplate:
+                                            type: string
             templates:
               type: object
               properties:
-                volumeClaimTemplates:
-                  type: array
-                  items:
-                    type: object
-                    required:
-                      - name
-                      - spec
-                    properties:
-                      name:
-                        type: string
-                      reclaimPolicy:
-                        type: string
-                        enum:
-                          - Retain
-                          - Delete
-                      spec:
-                        # TODO specify PersistentVolumeClaimSpec
-                        type: object
                 podTemplates:
                   type: array
                   items:
@@ -211,6 +201,37 @@ spec:
                           - OnePerHost
                       spec:
                         # TODO specify PodSpec
+                        type: object
+                volumeClaimTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - spec
+                    properties:
+                      name:
+                        type: string
+                      reclaimPolicy:
+                        type: string
+                        enum:
+                          - Retain
+                          - Delete
+                      spec:
+                        # TODO specify PersistentVolumeClaimSpec
+                        type: object
+                serviceTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - spec
+                    properties:
+                      name:
+                        type: string
+                      spec:
+                        # TODO specify ServiceSpec
                         type: object
 ---
 # Possible Template Parameters:

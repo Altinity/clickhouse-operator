@@ -288,14 +288,20 @@ func (chi *ClickHouseInstallation) ReplicasCount() int {
 	return count
 }
 
-// GetVolumeClaimTemplate gets VolumeClaimTemplate by name
+// GetVolumeClaimTemplate gets ChiVolumeClaimTemplate by name
 func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolumeClaimTemplate, bool) {
 	volumeClaimTemplate, ok := chi.Spec.Templates.VolumeClaimTemplatesIndex[name]
 	return volumeClaimTemplate, ok
 }
 
-// GetPodTemplate gets PodTemplate by name
+// GetPodTemplate gets ChiPodTemplate by name
 func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate, bool) {
 	podTemplate, ok := chi.Spec.Templates.PodTemplatesIndex[name]
+	return podTemplate, ok
+}
+
+// GetServiceTemplate gets ChiServiceTemplate by name
+func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceTemplate, bool) {
+	podTemplate, ok := chi.Spec.Templates.ServiceTemplatesIndex[name]
 	return podTemplate, ok
 }

@@ -105,6 +105,11 @@ func (n *Normalizer) doTemplates(templates *chiv1.ChiTemplates) {
 		vcTemplate := &templates.VolumeClaimTemplates[i]
 		n.doVolumeClaimTemplate(vcTemplate)
 	}
+
+	for i := range templates.ServiceTemplates {
+		serviceTemplate := &templates.ServiceTemplates[i]
+		n.doServiceTemplate(serviceTemplate)
+	}
 }
 
 // doPodTemplate normalizes .spec.templates.podTemplates
@@ -326,6 +331,19 @@ func (n *Normalizer) doVolumeClaimTemplate(template *chiv1.ChiVolumeClaimTemplat
 		n.chi.Spec.Templates.VolumeClaimTemplatesIndex = make(map[string]*chiv1.ChiVolumeClaimTemplate)
 	}
 	n.chi.Spec.Templates.VolumeClaimTemplatesIndex[template.Name] = template
+}
+
+// doServiceTemplate normalizes .spec.templates.serviceTemplates
+func (n *Normalizer) doServiceTemplate(template *chiv1.ChiServiceTemplate) {
+	// Check name
+	// Check GenerateName
+	// Check Spec
+
+	// Ensure map is in place
+	if n.chi.Spec.Templates.ServiceTemplatesIndex == nil {
+		n.chi.Spec.Templates.ServiceTemplatesIndex = make(map[string]*chiv1.ChiServiceTemplate)
+	}
+	n.chi.Spec.Templates.ServiceTemplatesIndex[template.Name] = template
 }
 
 // doClusters normalizes clusters
