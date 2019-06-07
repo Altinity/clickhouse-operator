@@ -52,14 +52,14 @@ type ChiStatus struct {
 type ChiDefaults struct {
 	ReplicasUseFQDN string            `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN"`
 	DistributedDDL  ChiDistributedDDL `json:"distributedDDL,omitempty"  yaml:"distributedDDL"`
-	Templates       ChiTemplateNames  `json:"templates" yaml:"templates"`
+	Templates       ChiTemplateNames  `json:"templates,omitempty"       yaml:"templates"`
 }
 
 // ChiTemplateNames defines references to .spec.templates to be used on current level of cluster
 type ChiTemplateNames struct {
 	PodTemplate         string `json:"podTemplate,omitempty"         yaml:"podTemplate"`
 	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty" yaml:"volumeClaimTemplate"`
-	ServiceTemplate     string `json:"serviceTemplate"               yaml:"serviceTemplate"`
+	ServiceTemplate     string `json:"serviceTemplate,omitempty"     yaml:"serviceTemplate"`
 }
 
 // ChiConfiguration defines configuration section of .spec
@@ -160,9 +160,9 @@ type ChiReplicaConfig struct {
 // ChiTemplates defines templates section of .spec
 type ChiTemplates struct {
 	// Templates
-	PodTemplates         []ChiPodTemplate         `json:"podTemplates,omitempty" yaml:"podTemplates"`
+	PodTemplates         []ChiPodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates"`
 	VolumeClaimTemplates []ChiVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates"`
-	ServiceTemplates     []ChiServiceTemplate     `json:"serviceTemplates" yaml:"serviceTemplates"`
+	ServiceTemplates     []ChiServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates"`
 
 	// Index maps template name to template itself
 	PodTemplatesIndex         map[string]*ChiPodTemplate
@@ -172,10 +172,10 @@ type ChiTemplates struct {
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet
 type ChiPodTemplate struct {
-	Name         string             `json:"name" yaml:"name"`
-	Zone         ChiPodTemplateZone `json:"zone" yaml:"zone""`
+	Name         string             `json:"name"         yaml:"name"`
+	Zone         ChiPodTemplateZone `json:"zone"         yaml:"zone""`
 	Distribution string             `json:"distribution" yaml:"distribution"`
-	Spec         corev1.PodSpec     `json:"spec" yaml:"spec"`
+	Spec         corev1.PodSpec     `json:"spec"         yaml:"spec"`
 }
 
 type ChiPodTemplateZone struct {
@@ -185,9 +185,9 @@ type ChiPodTemplateZone struct {
 
 // ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
 type ChiVolumeClaimTemplate struct {
-	Name             string                           `json:"name" yaml:"name"`
-	PVCReclaimPolicy PVCReclaimPolicy                 `json:"reclaimPolicy"`
-	Spec             corev1.PersistentVolumeClaimSpec `json:"spec" yaml:"spec"`
+	Name             string                           `json:"name"          yaml:"name"`
+	PVCReclaimPolicy PVCReclaimPolicy                 `json:"reclaimPolicy" yaml:"reclaimPolicy"`
+	Spec             corev1.PersistentVolumeClaimSpec `json:"spec"          yaml:"spec"`
 }
 
 type PVCReclaimPolicy string
@@ -209,9 +209,9 @@ func (v PVCReclaimPolicy) IsValid() bool {
 }
 
 type ChiServiceTemplate struct {
-	Name         string             `json:"name" yaml:"name"`
+	Name         string             `json:"name"         yaml:"name"`
 	GenerateName string             `json:"generateName" yaml:"generateName"`
-	Spec         corev1.ServiceSpec `json:"spec" yaml:"spec"`
+	Spec         corev1.ServiceSpec `json:"spec"         yaml:"spec"`
 }
 
 // ChiDistributedDDL defines distributedDDL section of .spec.defaults

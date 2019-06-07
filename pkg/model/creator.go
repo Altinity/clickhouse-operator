@@ -16,7 +16,6 @@ package model
 
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 
 	apps "k8s.io/api/apps/v1"
@@ -27,139 +26,11 @@ import (
 	"github.com/golang/glog"
 )
 
-// Reconciler is the base struct to create k8s objects
-type Reconciler struct {
-	appVersion                string
-	chi                       *chiv1.ClickHouseInstallation
-	chopConfig                *config.Config
-	chConfigGenerator         *ClickHouseConfigGenerator
-	chConfigSectionsGenerator *configSections
-	labeler                   *Labeler
-	funcs                     *ReconcileFuncs
-}
-
-type ReconcileFuncs struct {
-	ReconcileConfigMap   func(configMap *corev1.ConfigMap) error
-	ReconcileService     func(service *corev1.Service) error
-	ReconcileStatefulSet func(newStatefulSet *apps.StatefulSet, replica *chiv1.ChiReplica) error
-}
-
-// NewReconciler creates new creator
-func NewReconciler(
-	chi *chiv1.ClickHouseInstallation,
-	chopConfig *config.Config,
-	appVersion string,
-	funcs *ReconcileFuncs,
-) *Reconciler {
-	reconciler := &Reconciler{
-		chi:               chi,
-		chopConfig:        chopConfig,
-		appVersion:        appVersion,
-		chConfigGenerator: NewClickHouseConfigGenerator(chi),
-		labeler:           NewLabeler(appVersion, chi),
-		funcs:             funcs,
-	}
-	reconciler.chConfigSectionsGenerator = NewConfigSections(reconciler.chConfigGenerator, reconciler.chopConfig)
-
-	return reconciler
-}
-
-// Reconcile runs reconcile process
-func (r *Reconciler) Reconcile() error {
-
-	// Reconcile CHI
-	if err := r.reconcileChiService(r.chi); err != nil {
-		return err
-	}
-
-	if err := r.reconcileChiConfigMaps(); err != nil {
-		return err
-	}
-
-	// Reconcile Clusters
-	if err := r.reconcileReplicas(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// reconcileChiService reconciles global Services belonging to CHI
-func (r *Reconciler) reconcileChiService(chi *chiv1.ClickHouseInstallation) error {
-	service := r.createChiService(chi)
-	return r.funcs.ReconcileService(service)
-}
-
-// reconcileChiConfigMaps reconciles global ConfigMaps belonging to CHI
-func (r *Reconciler) reconcileChiConfigMaps() error {
-	r.chConfigSectionsGenerator.CreateConfigsUsers()
-	r.chConfigSectionsGenerator.CreateConfigsCommon()
-
-	// ConfigMap common for all resources in CHI
-	// contains several sections, mapped as separated chopConfig files,
-	// such as remote servers, zookeeper setup, etc
-	configMapCommon := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      CreateConfigMapCommonName(r.chi),
-			Namespace: r.chi.Namespace,
-			Labels:    r.labeler.getLabelsCommonObject(),
-		},
-		// Data contains several sections which are to be several xml chopConfig files
-		Data: r.chConfigSectionsGenerator.commonConfigSections,
-	}
-	if err := r.funcs.ReconcileConfigMap(configMapCommon); err != nil {
-		return err
-	}
-
-	// ConfigMap common for all users resources in CHI
-	configMapUsers := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      CreateConfigMapCommonUsersName(r.chi),
-			Namespace: r.chi.Namespace,
-			Labels:    r.labeler.getLabelsCommonObject(),
-		},
-		// Data contains several sections which are to be several xml chopConfig files
-		Data: r.chConfigSectionsGenerator.commonUsersConfigSections,
-	}
-	if err := r.funcs.ReconcileConfigMap(configMapUsers); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// reconcileReplicas reconciles all replicas
-func (r *Reconciler) reconcileReplicas() error {
-	replicaProcessor := func(replica *chiv1.ChiReplica) error {
-		// Add replica's Service
-		service := r.createService(replica)
-		if err := r.funcs.ReconcileService(service); err != nil {
-			return err
-		}
-
-		// Add replica's ConfigMap
-		configMap := r.createConfigMap(replica)
-		if err := r.funcs.ReconcileConfigMap(configMap); err != nil {
-			return err
-		}
-
-		// Add replica's StatefulSet
-		statefulSet := r.createStatefulSet(replica)
-		if err := r.funcs.ReconcileStatefulSet(statefulSet, replica); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	return r.chi.WalkReplicasTillError(replicaProcessor)
-}
-
-// createChiService creates new corev1.Service
-func (r *Reconciler) createChiService(chi *chiv1.ClickHouseInstallation) *corev1.Service {
+// createServiceChi creates new corev1.Service
+func (r *Reconciler) createServiceChi(chi *chiv1.ClickHouseInstallation) *corev1.Service {
 	serviceName := CreateChiServiceName(chi)
 
-	glog.V(1).Infof("createChiService(%s/%s)", chi.Namespace, serviceName)
+	glog.V(1).Infof("createServiceChi(%s/%s)", chi.Namespace, serviceName)
 	return &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -184,13 +55,13 @@ func (r *Reconciler) createChiService(chi *chiv1.ClickHouseInstallation) *corev1
 	}
 }
 
-// createService creates new corev1.Service
-func (r *Reconciler) createService(replica *chiv1.ChiReplica) *corev1.Service {
+// createServiceReplica creates new corev1.Service
+func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(replica)
 	statefulSetName := CreateStatefulSetName(replica)
 
-	glog.V(1).Infof("createService(%s/%s) for Set %s", replica.Address.Namespace, serviceName, statefulSetName)
-	if template, ok := replica.Chi.GetServiceTemplate(replica.Templates.ServiceTemplate); ok {
+	glog.V(1).Infof("createServiceReplica(%s/%s) for Set %s", replica.Address.Namespace, serviceName, statefulSetName)
+	if template, ok := r.chi.GetServiceTemplate(replica.Templates.ServiceTemplate); ok {
 		// .templates.ServiceTemplate specified
 		service := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -234,8 +105,8 @@ func (r *Reconciler) createService(replica *chiv1.ChiReplica) *corev1.Service {
 	}
 }
 
-// createConfigMap creates new corev1.ConfigMap
-func (r *Reconciler) createConfigMap(replica *chiv1.ChiReplica) *corev1.ConfigMap {
+// createConfigMapReplica creates new corev1.ConfigMap
+func (r *Reconciler) createConfigMapReplica(replica *chiv1.ChiReplica) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapPodName(replica),

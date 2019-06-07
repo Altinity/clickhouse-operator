@@ -246,6 +246,39 @@ func (chi *ClickHouseInstallation) WalkReplicasTillError(
 	return nil
 }
 
+func (chi *ClickHouseInstallation) WalkClusterTillError(
+	fChi func(chi *ClickHouseInstallation) error,
+	fCluster func(cluster *ChiCluster) error,
+	fShard func(shard *ChiShard) error,
+	fReplica func(replica *ChiReplica) error,
+) error {
+
+	if err := fChi(chi); err != nil {
+		return err
+	}
+
+	for clusterIndex := range chi.Spec.Configuration.Clusters {
+		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		if err := fCluster(cluster); err != nil {
+			return err
+		}
+		for shardIndex := range cluster.Layout.Shards {
+			shard := &cluster.Layout.Shards[shardIndex]
+			if err := fShard(shard); err != nil {
+				return err
+			}
+			for replicaIndex := range shard.Replicas {
+				replica := &shard.Replicas[replicaIndex]
+				if err := fReplica(replica); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation) {
 	if from == nil {
 		return
@@ -288,20 +321,32 @@ func (chi *ClickHouseInstallation) ReplicasCount() int {
 	return count
 }
 
-// GetVolumeClaimTemplate gets ChiVolumeClaimTemplate by name
-func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolumeClaimTemplate, bool) {
-	volumeClaimTemplate, ok := chi.Spec.Templates.VolumeClaimTemplatesIndex[name]
-	return volumeClaimTemplate, ok
-}
-
 // GetPodTemplate gets ChiPodTemplate by name
 func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate, bool) {
-	podTemplate, ok := chi.Spec.Templates.PodTemplatesIndex[name]
-	return podTemplate, ok
+	if chi.Spec.Templates.PodTemplatesIndex == nil {
+		return nil, false
+	} else {
+		template, ok := chi.Spec.Templates.PodTemplatesIndex[name]
+		return template, ok
+	}
+}
+
+// GetVolumeClaimTemplate gets ChiVolumeClaimTemplate by name
+func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolumeClaimTemplate, bool) {
+	if chi.Spec.Templates.VolumeClaimTemplatesIndex == nil {
+		return nil, false
+	} else {
+		template, ok := chi.Spec.Templates.VolumeClaimTemplatesIndex[name]
+		return template, ok
+	}
 }
 
 // GetServiceTemplate gets ChiServiceTemplate by name
 func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceTemplate, bool) {
-	podTemplate, ok := chi.Spec.Templates.ServiceTemplatesIndex[name]
-	return podTemplate, ok
+	if chi.Spec.Templates.ServiceTemplatesIndex == nil {
+		return nil, false
+	} else {
+		template, ok := chi.Spec.Templates.ServiceTemplatesIndex[name]
+		return template, ok
+	}
 }
