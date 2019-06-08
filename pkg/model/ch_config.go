@@ -23,6 +23,8 @@ import (
 )
 
 const (
+	distributedDDLPathPattern = "/clickhouse/%s/task_queue/ddl"
+
 	// Special auto-generated clusters. Each of these clusters lay over all replicas in CHI
 	// 1. Cluster with one shard and all replicas. Used to duplicate data over all replicas.
 	// 2. Cluster with all shards (1 replica). Used to gather/scatter data over all replicas.
@@ -329,7 +331,7 @@ func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(replica *chi
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local
-		return CreatePodHostname(replica) + "." + CreateNamespaceDomainName(replica.Address.Namespace)
+		return CreatePodFQDN(replica)
 	} else {
 		return CreatePodHostname(replica)
 	}

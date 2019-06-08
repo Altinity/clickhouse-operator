@@ -37,14 +37,14 @@ func (l *Labeler) getLabelsCommonObject() map[string]string {
 	return map[string]string{
 		LabelApp:  LabelAppValue,
 		LabelChop: l.version,
-		LabelChi:  nameSectionChi(l.chi),
+		LabelChi:  getNamePartChiName(l.chi),
 	}
 }
 
 func (l *Labeler) getSelectorCommonObject() map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
-		LabelChi: nameSectionChi(l.chi),
+		LabelChi: getNamePartChiName(l.chi),
 	}
 }
 
@@ -52,10 +52,10 @@ func (l *Labeler) getLabelsReplica(replica *chi.ChiReplica, zk bool) map[string]
 	labels := map[string]string{
 		LabelApp:         LabelAppValue,
 		LabelChop:        l.version,
-		LabelChi:         nameSectionChi(replica),
-		LabelCluster:     nameSectionCluster(replica),
-		LabelShard:       nameSectionShard(replica),
-		LabelReplica:     nameSectionReplica(replica),
+		LabelChi:         getNamePartChiName(replica),
+		LabelCluster:     getNamePartClusterName(replica),
+		LabelShard:       getNamePartShardName(replica),
+		LabelReplica:     getNamePartReplicaName(replica),
 		LabelStatefulSet: CreateStatefulSetName(replica),
 	}
 	if zk {
@@ -68,10 +68,10 @@ func (l *Labeler) getSelectorReplica(replica *chi.ChiReplica) map[string]string 
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// skip chop
-		LabelChi:     nameSectionChi(replica),
-		LabelCluster: nameSectionCluster(replica),
-		LabelShard:   nameSectionShard(replica),
-		LabelReplica: nameSectionReplica(replica),
+		LabelChi:     getNamePartChiName(replica),
+		LabelCluster: getNamePartClusterName(replica),
+		LabelShard:   getNamePartShardName(replica),
+		LabelReplica: getNamePartReplicaName(replica),
 		// skip StatefulSet
 		// skip Zookeeper
 	}
