@@ -55,7 +55,7 @@ const (
 	namespaceDomainPattern = "%s.svc.cluster.local"
 
 	// ServiceName.domain.name
-	chiServiceFQDNPattern = "%s" + "." + namespaceDomainPattern
+	serviceFQDNPattern = "%s" + "." + namespaceDomainPattern
 
 	// podFQDNPattern consists of 3 parts:
 	// 1. nameless service of of stateful set
@@ -170,7 +170,7 @@ func CreateChiServiceName(chi *chop.ClickHouseInstallation) string {
 // CreateChiServiceName creates a name of a Installation Service resource
 func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
 	return fmt.Sprintf(
-		chiServiceFQDNPattern,
+		serviceFQDNPattern,
 		CreateChiServiceName(chi),
 		chi.Namespace,
 	)
