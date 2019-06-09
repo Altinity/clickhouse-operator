@@ -272,7 +272,7 @@ func (c *Controller) shouldContinueOnCreateFailed() error {
 	}
 
 	// Do not continue update
-	return errors.New(fmt.Sprintf("Create stopped due to previous errors"))
+	return fmt.Errorf("create stopped due to previous errors")
 }
 
 // shouldContinueOnUpdateFailed return nil in case 'continue' or error in case 'do not continue'
@@ -286,7 +286,7 @@ func (c *Controller) shouldContinueOnUpdateFailed() error {
 	}
 
 	// Do not continue update
-	return errors.New(fmt.Sprintf("Update stopped due to previous errors"))
+	return fmt.Errorf("update stopped due to previous errors")
 }
 
 // hasStatefulSetReachedGeneration returns whether has StatefulSet reached the expected generation after upgrade or not

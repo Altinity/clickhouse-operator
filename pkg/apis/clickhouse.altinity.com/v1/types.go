@@ -107,11 +107,11 @@ type ChiClusterAddress struct {
 // ChiLayout defines layout section of .spec.configuration.clusters
 type ChiLayout struct {
 	// DEPRECATED - to be removed soon
-	Type          string     `json:"type"`
-	ShardsCount   int        `json:"shardsCount,omitempty"`
-	ReplicasCount int        `json:"replicasCount,omitempty"`
+	Type          string `json:"type"`
+	ShardsCount   int    `json:"shardsCount,omitempty"`
+	ReplicasCount int    `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiShard
-	Shards        []ChiShard `json:"shards,omitempty"`
+	Shards []ChiShard `json:"shards,omitempty"`
 }
 
 // ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
@@ -124,7 +124,7 @@ type ChiShard struct {
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 	ReplicasCount       int              `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiReplica
-	Replicas            []ChiReplica     `json:"replicas,omitempty"`
+	Replicas []ChiReplica `json:"replicas,omitempty"`
 
 	// Internal data
 	Address ChiShardAddress         `json:"address"`

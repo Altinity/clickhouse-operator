@@ -512,6 +512,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateStarted, fmt.Sprintf("onUpdateChi(%s/%s):", old.Namespace, old.Name))
 
 	// Deal with removed items
+	// TODO refactor to map[string]object handling, instead of slice
 	for path := range diff.Removed {
 		switch diff.Removed[path].(type) {
 		case chop.ChiCluster:

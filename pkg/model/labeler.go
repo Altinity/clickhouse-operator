@@ -118,3 +118,23 @@ func IsChopGeneratedObject(objectMeta *meta.ObjectMeta) bool {
 
 	return ok
 }
+
+func GetChiNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
+	// ObjectMeta must have LabelChi:  chi.Name label
+	name, ok := meta.Labels[LabelChi]
+	if ok {
+		return name, nil
+	} else {
+		return "", fmt.Errorf("can not find %s label in meta", LabelChi)
+	}
+}
+
+func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
+	// ObjectMeta must have LabelCluster
+	name, ok := meta.Labels[LabelCluster]
+	if ok {
+		return name, nil
+	} else {
+		return "", fmt.Errorf("can not find %s label in meta", LabelChi)
+	}
+}

@@ -76,6 +76,7 @@ func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Ser
 		return service
 	} else {
 		// Incorrect/unknown .templates.ServiceTemplate specified
+		// Create default Service
 		return &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
