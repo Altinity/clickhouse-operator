@@ -15,10 +15,5 @@
 package v1
 
 func (replica *ChiReplica) InheritTemplates(shard *ChiShard) {
-	if replica.Templates.PodTemplate == "" {
-		replica.Templates.PodTemplate = shard.Templates.PodTemplate
-	}
-	if replica.Templates.VolumeClaimTemplate == "" {
-		replica.Templates.VolumeClaimTemplate = shard.Templates.VolumeClaimTemplate
-	}
+	(&replica.Templates).MergeFrom(&shard.Templates)
 }

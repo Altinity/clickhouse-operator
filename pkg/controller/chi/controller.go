@@ -493,11 +493,11 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
-	if !old.IsFilled() {
+	if !old.IsNormalized() {
 		old, _ = c.normalizer.CreateTemplatedChi(old)
 	}
 
-	if !new.IsFilled() {
+	if !new.IsNormalized() {
 		new, _ = c.normalizer.CreateTemplatedChi(new)
 	}
 

@@ -62,6 +62,18 @@ type ChiTemplateNames struct {
 	ServiceTemplate     string `json:"serviceTemplate,omitempty"     yaml:"serviceTemplate"`
 }
 
+func (templates *ChiTemplateNames) MergeFrom(from *ChiTemplateNames) {
+	if templates.PodTemplate == "" {
+		templates.PodTemplate = from.PodTemplate
+	}
+	if templates.VolumeClaimTemplate == "" {
+		templates.VolumeClaimTemplate = from.VolumeClaimTemplate
+	}
+	if templates.ServiceTemplate == "" {
+		templates.ServiceTemplate = from.ServiceTemplate
+	}
+}
+
 // ChiConfiguration defines configuration section of .spec
 type ChiConfiguration struct {
 	Zookeeper ChiZookeeperConfig     `json:"zookeeper,omitempty" yaml:"zookeeper"`
@@ -98,6 +110,7 @@ type ChiLayout struct {
 	Type          string     `json:"type"`
 	ShardsCount   int        `json:"shardsCount,omitempty"`
 	ReplicasCount int        `json:"replicasCount,omitempty"`
+	// TODO refactor into map[string]ChiShard
 	Shards        []ChiShard `json:"shards,omitempty"`
 }
 
@@ -110,6 +123,7 @@ type ChiShard struct {
 	InternalReplication string           `json:"internalReplication,omitempty"`
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 	ReplicasCount       int              `json:"replicasCount,omitempty"`
+	// TODO refactor into map[string]ChiReplica
 	Replicas            []ChiReplica     `json:"replicas,omitempty"`
 
 	// Internal data

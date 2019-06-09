@@ -445,7 +445,7 @@ func (n *Normalizer) doConfigurationSettings(settings *map[string]interface{}) {
 
 // doCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) doCluster(cluster *chiv1.ChiCluster) error {
-	// Inherit PodTemplate from .spec.defaults
+	// Use PodTemplate from .spec.defaults
 	cluster.InheritTemplates(n.chi)
 
 	// Convenience wrapper
@@ -506,7 +506,7 @@ func (n *Normalizer) doShardReplicasCount(shard *chiv1.ChiShard, layoutReplicasC
 			// We have Replicas specified as slice - ok, this means exact ReplicasCount is known
 			shard.ReplicasCount = len(shard.Replicas)
 		} else {
-			// Inherit ReplicasCount from layout
+			// MergeFrom ReplicasCount from layout
 			shard.ReplicasCount = layoutReplicasCount
 		}
 	}
@@ -578,7 +578,7 @@ func (n *Normalizer) doShardReplicas(shard *chiv1.ChiShard) {
 		// Normalize a replica
 		n.doReplicaName(replica, replicaIndex)
 		n.doReplicaPort(replica)
-		// Inherit PodTemplate from shard
+		// Use PodTemplate from shard
 		replica.InheritTemplates(shard)
 	}
 }

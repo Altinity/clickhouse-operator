@@ -15,12 +15,7 @@
 package v1
 
 func (cluster *ChiCluster) InheritTemplates(chi *ClickHouseInstallation) {
-	if cluster.Templates.PodTemplate == "" {
-		cluster.Templates.PodTemplate = chi.Spec.Defaults.Templates.PodTemplate
-	}
-	if cluster.Templates.VolumeClaimTemplate == "" {
-		cluster.Templates.VolumeClaimTemplate = chi.Spec.Defaults.Templates.VolumeClaimTemplate
-	}
+	(&cluster.Templates).MergeFrom(&chi.Spec.Defaults.Templates)
 }
 
 func (cluster *ChiCluster) WalkShards(
