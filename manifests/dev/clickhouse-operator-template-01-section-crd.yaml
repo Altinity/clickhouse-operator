@@ -65,6 +65,15 @@ spec:
             configuration:
               type: object
               properties:
+                templates:
+                  type: object
+                  properties:
+                    podTemplate:
+                      type: string
+                    volumeClaimTemplate:
+                      type: string
+                    serviceTemplate:
+                      type: string
                 zookeeper:
                   type: object
                   properties:

@@ -76,6 +76,7 @@ func (templates *ChiTemplateNames) MergeFrom(from *ChiTemplateNames) {
 
 // ChiConfiguration defines configuration section of .spec
 type ChiConfiguration struct {
+	Templates ChiTemplateNames       `json:"templates"           yaml:"templates"`
 	Zookeeper ChiZookeeperConfig     `json:"zookeeper,omitempty" yaml:"zookeeper"`
 	Users     map[string]interface{} `json:"users,omitempty"     yaml:"users"`
 	Profiles  map[string]interface{} `json:"profiles,omitempty"  yaml:"profiles"`

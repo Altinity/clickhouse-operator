@@ -6,7 +6,7 @@ metadata:
 spec:
 
   defaults:
-    replicasUseFQDN: 0 # 0 - by default, 1 - enabled
+    replicasUseFQDN: "no"
     distributedDDL:
       profile: default
     templates:
@@ -14,13 +14,15 @@ spec:
       volumeClaimTemplate: default-volume-claim
 
   configuration:
+    templates:
+      serviceTemplate: chi-service-template
     zookeeper:
       nodes:
-        - host: zk-statefulset-0.zk-service.default.svc.cluster.local
+        - host: zookeeper-0.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
-        - host: zk-statefulset-1.zk-service.default.svc.cluster.local
+        - host: zookeeper-1.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
-        - host: zk-statefulset-2.zk-service.default.svc.cluster.local
+        - host: zookeeper-2.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
     users:
       readonly/profile: readonly
@@ -69,7 +71,7 @@ spec:
 
     clusters:
 
-      - name: sharded-replicated
+      - name: all-counts
         templates:
           podTemplate: clickhouse-v18.16.1
           volumeClaimTemplate: default-volume-claim
@@ -77,7 +79,7 @@ spec:
           shardsCount: 3
           replicasCount: 2
 
-      - name: sharded-non-replicated
+      - name: shards-only
         templates:
           podTemplate: clickhouse-v18.16.1
           volumeClaimTemplate: default-volume-claim
@@ -85,13 +87,13 @@ spec:
           shardsCount: 3
           # replicasCount not specified, assumed = 1, by default
 
-      - name: replicated
+      - name: replicas-only
         templates:
           podTemplate: clickhouse-v18.16.1
           volumeClaimTemplate: default-volume-claim
         layout:
           # shardsCount not specified, assumed = 1, by default
-          replicasCount: 4
+          replicasCount: 3
 
       - name: customized
         templates:
@@ -121,14 +123,42 @@ spec:
               templates:
                 podTemplate: clickhouse-v18.16.1
                 volumeClaimTemplate: default-volume-claim
+                serviceTemplate: replica-service-template
               replicas:
                 - name: replica0
                   port: 9000
                   templates:
                     podTemplate: clickhouse-v18.16.2
                     volumeClaimTemplate: default-volume-claim
+                    serviceTemplate: replica-service-template
 
   templates:
+    serviceTemplates:
+      - name: chi-service-template
+        generateName: "service-{chi}"
+        # type ServiceSpec struct from k8s.io/core/v1
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: client
+              port: 9000
+          type: LoadBalancer
+
+      - name: replica-service-template
+        # type ServiceSpec struct from k8s.io/core/v1
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: client
+              port: 9000
+            - name: interserver
+              port: 9009
+          type: ClusterIP
+          ClusterIP: None
+
+
     volumeClaimTemplates:
       - name: default-volume-claim
         # type PersistentVolumeClaimSpec struct from k8s.io/core/v1

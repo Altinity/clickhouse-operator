@@ -17,11 +17,11 @@ package model
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	"github.com/golang/glog"
 )
@@ -31,27 +31,44 @@ func (r *Reconciler) createServiceChi(chi *chiv1.ClickHouseInstallation) *corev1
 	serviceName := CreateChiServiceName(chi)
 
 	glog.V(1).Infof("createServiceChi(%s/%s)", chi.Namespace, serviceName)
-	return &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: r.chi.Namespace,
-			Labels:    r.labeler.getLabelsCommonObject(),
-		},
-		Spec: corev1.ServiceSpec{
-			// ClusterIP: templateDefaultsServiceClusterIP,
-			Ports: []corev1.ServicePort{
-				{
-					Name: chDefaultHTTPPortName,
-					Port: chDefaultHTTPPortNumber,
-				},
-				{
-					Name: chDefaultClientPortName,
-					Port: chDefaultClientPortNumber,
-				},
+	if template, ok := r.chi.GetOwnServiceTemplate(); ok {
+		// .templates.ServiceTemplate specified
+		service := &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serviceName,
+				Namespace: r.chi.Namespace,
+				Labels:    r.labeler.getLabelsCommonObject(),
 			},
-			Selector: r.labeler.getSelectorCommonObject(),
-			Type:     "LoadBalancer",
-		},
+			Spec: *template.Spec.DeepCopy(),
+		}
+		service.Spec.Selector = util.MergeStringMaps(service.Spec.Selector, r.labeler.getSelectorCommonObject())
+
+		return service
+	} else {
+		// Incorrect/unknown .templates.ServiceTemplate specified
+		// Create default Service
+		return &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serviceName,
+				Namespace: r.chi.Namespace,
+				Labels:    r.labeler.getLabelsCommonObject(),
+			},
+			Spec: corev1.ServiceSpec{
+				// ClusterIP: templateDefaultsServiceClusterIP,
+				Ports: []corev1.ServicePort{
+					{
+						Name: chDefaultHTTPPortName,
+						Port: chDefaultHTTPPortNumber,
+					},
+					{
+						Name: chDefaultClientPortName,
+						Port: chDefaultClientPortNumber,
+					},
+				},
+				Selector: r.labeler.getSelectorCommonObject(),
+				Type:     "LoadBalancer",
+			},
+		}
 	}
 }
 
@@ -61,7 +78,7 @@ func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Ser
 	statefulSetName := CreateStatefulSetName(replica)
 
 	glog.V(1).Infof("createServiceReplica(%s/%s) for Set %s", replica.Address.Namespace, serviceName, statefulSetName)
-	if template, ok := r.chi.GetServiceTemplate(replica.Templates.ServiceTemplate); ok {
+	if template, ok := replica.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		service := &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -157,7 +174,6 @@ func (r *Reconciler) createStatefulSet(replica *chiv1.ChiReplica) *apps.Stateful
 // setupStatefulSetPodTemplate performs PodTemplate setup of StatefulSet
 func (r *Reconciler) setupStatefulSetPodTemplate(statefulSetObject *apps.StatefulSet, replica *chiv1.ChiReplica) {
 	statefulSetName := CreateStatefulSetName(replica)
-	podTemplateName := replica.Templates.PodTemplate
 
 	// Initial PodTemplateSpec value
 	// All the rest fields would be filled later
@@ -168,10 +184,10 @@ func (r *Reconciler) setupStatefulSetPodTemplate(statefulSetObject *apps.Statefu
 	}
 
 	// Specify pod templates - either explicitly defined or default
-	if podTemplate, ok := r.chi.GetPodTemplate(podTemplateName); ok {
+	if podTemplate, ok := replica.GetPodTemplate(); ok {
 		// Replica references known PodTemplate
 		copyPodTemplateFrom(statefulSetObject, podTemplate)
-		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - template: %s", statefulSetName, podTemplateName)
+		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - template used", statefulSetName)
 	} else {
 		// Replica references UNKNOWN PodTemplate
 		copyPodTemplateFrom(statefulSetObject, createDefaultPodTemplate(statefulSetName))

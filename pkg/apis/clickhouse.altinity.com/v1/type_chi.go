@@ -40,7 +40,7 @@ func (chi *ClickHouseInstallation) IsNormalized() bool {
 	clusters := 0
 	chi.WalkClusters(func(cluster *ChiCluster) error {
 		clusters++
-		if cluster.Address.Namespace == "" {
+		if cluster.Chi == nil {
 			filled = false
 		}
 		return nil
@@ -349,4 +349,11 @@ func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceT
 		template, ok := chi.Spec.Templates.ServiceTemplatesIndex[name]
 		return template, ok
 	}
+}
+
+// GetServiceTemplate gets own ChiServiceTemplate
+func (chi *ClickHouseInstallation) GetOwnServiceTemplate() (*ChiServiceTemplate, bool) {
+	name := chi.Spec.Configuration.Templates.ServiceTemplate
+	template, ok := chi.GetServiceTemplate(name)
+	return template, ok
 }
