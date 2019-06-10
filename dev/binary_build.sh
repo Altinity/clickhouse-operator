@@ -16,6 +16,7 @@ ${SRC_ROOT}/manifests/operator/build-clickhouse-operator-install-yaml.sh
 
 #CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ${CUR_DIR}/clickhouse-operator ${SRC_ROOT}/cmd/clickhouse-operator
 CGO_ENABLED=0 go build \
+    -v -a \
     -ldflags "-X ${REPO}/pkg/version.Version=${VERSION} -X ${REPO}/pkg/version.GitSHA=${GIT_SHA}" \
     -o ${OPERATOR_BIN} \
     ${SRC_ROOT}/cmd/manager/main.go
