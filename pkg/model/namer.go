@@ -164,6 +164,15 @@ func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
 
 // CreateChiServiceName creates a name of a Installation Service resource
 func CreateChiServiceName(chi *chop.ClickHouseInstallation) string {
+	if template, ok := chi.GetOwnServiceTemplate(); ok {
+		// Service template available
+		if template.GenerateName != "" {
+			// Service template has explicitly specified service name template
+			return newReplacerChi(chi).Replace(template.GenerateName)
+		}
+	}
+
+	// Create Service name based on default Service Name template
 	return newReplacerChi(chi).Replace(chiServiceNamePattern)
 }
 
@@ -183,6 +192,15 @@ func CreateStatefulSetName(replica *chop.ChiReplica) string {
 
 // CreateStatefulSetServiceName returns a name of a StatefulSet-related Service for replica
 func CreateStatefulSetServiceName(replica *chop.ChiReplica) string {
+	if template, ok := replica.GetServiceTemplate(); ok {
+		// Service template available
+		if template.GenerateName != "" {
+			// Service template has explicitly specified service name template
+			return newReplacerReplica(replica).Replace(template.GenerateName)
+		}
+	}
+
+	// Create Service name based on default Service Name template
 	return newReplacerReplica(replica).Replace(statefulSetServiceNamePattern)
 }
 
