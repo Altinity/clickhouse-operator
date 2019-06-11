@@ -18,6 +18,12 @@ func (cluster *ChiCluster) InheritTemplates(chi *ClickHouseInstallation) {
 	(&cluster.Templates).MergeFrom(&chi.Spec.Defaults.Templates)
 }
 
+func (cluster *ChiCluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+	name := cluster.Templates.ServiceTemplate
+	template, ok := cluster.Chi.GetServiceTemplate(name)
+	return template, ok
+}
+
 func (cluster *ChiCluster) WalkShards(
 	f func(shardIndex int, shard *ChiShard) error,
 ) []error {

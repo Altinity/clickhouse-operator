@@ -33,7 +33,7 @@ func NewLabeler(version string, chi *chi.ClickHouseInstallation) *Labeler {
 	}
 }
 
-func (l *Labeler) getLabelsCommonObject() map[string]string {
+func (l *Labeler) getLabelsChiScope() map[string]string {
 	return map[string]string{
 		LabelApp:  LabelAppValue,
 		LabelChop: l.version,
@@ -41,14 +41,52 @@ func (l *Labeler) getLabelsCommonObject() map[string]string {
 	}
 }
 
-func (l *Labeler) getSelectorCommonObject() map[string]string {
+func (l *Labeler) getSelectorChiScope() map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		LabelChi: getNamePartChiName(l.chi),
 	}
 }
 
-func (l *Labeler) getLabelsReplica(replica *chi.ChiReplica, zk bool) map[string]string {
+func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]string {
+	return map[string]string{
+		LabelApp:     LabelAppValue,
+		LabelChop:    l.version,
+		LabelChi:     getNamePartChiName(cluster),
+		LabelCluster: getNamePartClusterName(cluster),
+	}
+}
+
+func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]string {
+	return map[string]string{
+		LabelApp: LabelAppValue,
+		// skip chop
+		LabelChi:     getNamePartChiName(cluster),
+		LabelCluster: getNamePartClusterName(cluster),
+	}
+}
+
+func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
+	return map[string]string{
+		LabelApp:     LabelAppValue,
+		LabelChop:    l.version,
+		LabelChi:     getNamePartChiName(shard),
+		LabelCluster: getNamePartClusterName(shard),
+		LabelShard:   getNamePartShardName(shard),
+	}
+}
+
+func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
+	return map[string]string{
+		LabelApp: LabelAppValue,
+		// skip chop
+		LabelChi:     getNamePartChiName(shard),
+		LabelCluster: getNamePartClusterName(shard),
+		LabelShard:   getNamePartShardName(shard),
+	}
+}
+
+func (l *Labeler) getLabelsReplicaScope(replica *chi.ChiReplica, zk bool) map[string]string {
 	labels := map[string]string{
 		LabelApp:         LabelAppValue,
 		LabelChop:        l.version,
@@ -64,7 +102,7 @@ func (l *Labeler) getLabelsReplica(replica *chi.ChiReplica, zk bool) map[string]
 	return labels
 }
 
-func (l *Labeler) getSelectorReplica(replica *chi.ChiReplica) map[string]string {
+func (l *Labeler) getSelectorReplicaScope(replica *chi.ChiReplica) map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// skip chop

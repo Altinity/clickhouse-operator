@@ -34,6 +34,12 @@ const (
 	// chiServiceNamePattern is a template of CHI Service name
 	chiServiceNamePattern = "clickhouse-{chi}"
 
+	// clusterServiceNamePattern is a template of cluster Service name
+	clusterServiceNamePattern = "cluster-{chi}-{cluster}"
+
+	// shardServiceNamePattern is a template of shard Service name
+	shardServiceNamePattern = "cluster-{chi}-{cluster}-{shard}"
+
 	// statefulSetNamePattern is a template of replica's StatefulSet's name
 	statefulSetNamePattern = "chi-{chi}-{cluster}-{shard}-{replica}"
 
@@ -101,27 +107,84 @@ func namePartReplicaNameID(name string) string {
 
 func getNamePartChiName(obj interface{}) string {
 	switch obj.(type) {
-	case *chop.ChiReplica:
-		replica := obj.(*chop.ChiReplica)
-		return namePartChiName(replica.Address.ChiName)
 	case *chop.ClickHouseInstallation:
 		chi := obj.(*chop.ClickHouseInstallation)
 		return namePartChiName(chi.Name)
+	case *chop.ChiCluster:
+		cluster := obj.(*chop.ChiCluster)
+		return namePartChiName(cluster.Address.ChiName)
+	case *chop.ChiShard:
+		shard := obj.(*chop.ChiShard)
+		return namePartChiName(shard.Address.ChiName)
+	case *chop.ChiReplica:
+		replica := obj.(*chop.ChiReplica)
+		return namePartChiName(replica.Address.ChiName)
 	}
 
 	return "ERROR"
 }
 
-func getNamePartClusterName(replica *chop.ChiReplica) string {
-	return namePartClusterName(replica.Address.ClusterName)
+func getNamePartClusterName(obj interface{}) string {
+	switch obj.(type) {
+	case *chop.ChiCluster:
+		cluster := obj.(*chop.ChiCluster)
+		return namePartClusterName(cluster.Address.ClusterName)
+	case *chop.ChiShard:
+		shard := obj.(*chop.ChiShard)
+		return namePartClusterName(shard.Address.ClusterName)
+	case *chop.ChiReplica:
+		replica := obj.(*chop.ChiReplica)
+		return namePartClusterName(replica.Address.ClusterName)
+	}
+
+	return "ERROR"
 }
 
-func getNamePartShardName(replica *chop.ChiReplica) string {
-	return namePartShardName(replica.Address.ShardName)
+func getNamePartShardName(obj interface{}) string {
+	switch obj.(type) {
+	case *chop.ChiShard:
+		shard := obj.(*chop.ChiShard)
+		return namePartShardName(shard.Address.ShardName)
+	case *chop.ChiReplica:
+		replica := obj.(*chop.ChiReplica)
+		return namePartShardName(replica.Address.ShardName)
+	}
+
+	return "ERROR"
 }
 
 func getNamePartReplicaName(replica *chop.ChiReplica) string {
 	return namePartReplicaName(replica.Address.ReplicaName)
+}
+
+func newReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
+	return strings.NewReplacer(
+		"{chi}", namePartChiName(chi.Name),
+		"{chiID}", namePartChiNameID(chi.Name),
+	)
+}
+
+func newReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
+	return strings.NewReplacer(
+		"{chi}", namePartChiName(cluster.Address.ChiName),
+		"{chiID}", namePartChiNameID(cluster.Address.ChiName),
+		"{cluster}", namePartClusterName(cluster.Address.ClusterName),
+		"{clusterID}", namePartClusterNameID(cluster.Address.ClusterName),
+		"{clusterIndex}", strconv.Itoa(cluster.Address.ClusterIndex),
+	)
+}
+
+func newReplacerShard(shard *chop.ChiShard) *strings.Replacer {
+	return strings.NewReplacer(
+		"{chi}", namePartChiName(shard.Address.ChiName),
+		"{chiID}", namePartChiNameID(shard.Address.ChiName),
+		"{cluster}", namePartClusterName(shard.Address.ClusterName),
+		"{clusterID}", namePartClusterNameID(shard.Address.ClusterName),
+		"{clusterIndex}", strconv.Itoa(shard.Address.ClusterIndex),
+		"{shard}", namePartShardName(shard.Address.ShardName),
+		"{shardID}", namePartShardNameID(shard.Address.ShardName),
+		"{shardIndex}", strconv.Itoa(shard.Address.ShardIndex),
+	)
 }
 
 func newReplacerReplica(replica *chop.ChiReplica) *strings.Replacer {
@@ -137,13 +200,6 @@ func newReplacerReplica(replica *chop.ChiReplica) *strings.Replacer {
 		"{replica}", namePartReplicaName(replica.Address.ReplicaName),
 		"{replicaID}", namePartReplicaNameID(replica.Address.ReplicaName),
 		"{replicaIndex}", strconv.Itoa(replica.Address.ReplicaIndex),
-	)
-}
-
-func newReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
-	return strings.NewReplacer(
-		"{chi}", namePartChiName(chi.Name),
-		"{chiID}", namePartChiNameID(chi.Name),
 	)
 }
 
@@ -183,6 +239,34 @@ func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
 		CreateChiServiceName(chi),
 		chi.Namespace,
 	)
+}
+
+// CreateClusterServiceName returns a name of a cluster's Service
+func CreateClusterServiceName(cluster *chop.ChiCluster) string {
+	if template, ok := cluster.GetServiceTemplate(); ok {
+		// Service template available
+		if template.GenerateName != "" {
+			// Service template has explicitly specified service name template
+			return newReplacerCluster(cluster).Replace(template.GenerateName)
+		}
+	}
+
+	// Create Service name based on default Service Name template
+	return newReplacerCluster(cluster).Replace(clusterServiceNamePattern)
+}
+
+// CreateShardServiceName returns a name of a shard's Service
+func CreateShardServiceName(shard *chop.ChiShard) string {
+	if template, ok := shard.GetServiceTemplate(); ok {
+		// Service template available
+		if template.GenerateName != "" {
+			// Service template has explicitly specified service name template
+			return newReplacerShard(shard).Replace(template.GenerateName)
+		}
+	}
+
+	// Create Service name based on default Service Name template
+	return newReplacerShard(shard).Replace(shardServiceNamePattern)
 }
 
 // CreateStatefulSetName creates a name of a StatefulSet for replica

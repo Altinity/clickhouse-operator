@@ -33,17 +33,13 @@ func (r *Reconciler) createServiceChi(chi *chiv1.ClickHouseInstallation) *corev1
 	glog.V(1).Infof("createServiceChi(%s/%s)", chi.Namespace, serviceName)
 	if template, ok := r.chi.GetOwnServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		service := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      serviceName,
-				Namespace: r.chi.Namespace,
-				Labels:    r.labeler.getLabelsCommonObject(),
-			},
-			Spec: *template.Spec.DeepCopy(),
-		}
-		service.Spec.Selector = util.MergeStringMaps(service.Spec.Selector, r.labeler.getSelectorCommonObject())
-
-		return service
+		return r.createServiceFromTemplate(
+			template,
+			r.chi.Namespace,
+			serviceName,
+			r.labeler.getLabelsChiScope(),
+			r.labeler.getSelectorChiScope(),
+		)
 	} else {
 		// Incorrect/unknown .templates.ServiceTemplate specified
 		// Create default Service
@@ -51,7 +47,7 @@ func (r *Reconciler) createServiceChi(chi *chiv1.ClickHouseInstallation) *corev1
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: r.chi.Namespace,
-				Labels:    r.labeler.getLabelsCommonObject(),
+				Labels:    r.labeler.getLabelsChiScope(),
 			},
 			Spec: corev1.ServiceSpec{
 				// ClusterIP: templateDefaultsServiceClusterIP,
@@ -65,10 +61,48 @@ func (r *Reconciler) createServiceChi(chi *chiv1.ClickHouseInstallation) *corev1
 						Port: chDefaultClientPortNumber,
 					},
 				},
-				Selector: r.labeler.getSelectorCommonObject(),
+				Selector: r.labeler.getSelectorChiScope(),
 				Type:     "LoadBalancer",
 			},
 		}
+	}
+}
+
+// createServiceCluster
+func (r *Reconciler) createServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
+	serviceName := CreateClusterServiceName(cluster)
+
+	glog.V(1).Infof("createServiceCluster(%s/%s)", cluster.Address.Namespace, serviceName)
+	if template, ok := cluster.GetServiceTemplate(); ok {
+		// .templates.ServiceTemplate specified
+		return r.createServiceFromTemplate(
+			template,
+			cluster.Address.Namespace,
+			serviceName,
+			r.labeler.getLabelsClusterScope(cluster),
+			r.labeler.getSelectorClusterScope(cluster),
+		)
+	} else {
+		return nil
+	}
+}
+
+// createServiceShard
+func (r *Reconciler) createServiceShard(shard *chiv1.ChiShard) *corev1.Service {
+	serviceName := CreateShardServiceName(shard)
+
+	glog.V(1).Infof("createServiceShard(%s/%s)", shard.Address.Namespace, serviceName)
+	if template, ok := shard.GetServiceTemplate(); ok {
+		// .templates.ServiceTemplate specified
+		return r.createServiceFromTemplate(
+			template,
+			shard.Address.Namespace,
+			serviceName,
+			r.labeler.getLabelsShardScope(shard),
+			r.labeler.getSelectorShardScope(shard),
+		)
+	} else {
+		return nil
 	}
 }
 
@@ -80,17 +114,13 @@ func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Ser
 	glog.V(1).Infof("createServiceReplica(%s/%s) for Set %s", replica.Address.Namespace, serviceName, statefulSetName)
 	if template, ok := replica.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		service := &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      serviceName,
-				Namespace: replica.Address.Namespace,
-				Labels:    r.labeler.getLabelsReplica(replica, false),
-			},
-			Spec: *template.Spec.DeepCopy(),
-		}
-		service.Spec.Selector = util.MergeStringMaps(service.Spec.Selector, r.labeler.getSelectorReplica(replica))
-
-		return service
+		return r.createServiceFromTemplate(
+			template,
+			replica.Address.Namespace,
+			serviceName,
+			r.labeler.getLabelsReplicaScope(replica, false),
+			r.labeler.getSelectorReplicaScope(replica),
+		)
 	} else {
 		// Incorrect/unknown .templates.ServiceTemplate specified
 		// Create default Service
@@ -98,7 +128,7 @@ func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Ser
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: replica.Address.Namespace,
-				Labels:    r.labeler.getLabelsReplica(replica, false),
+				Labels:    r.labeler.getLabelsReplicaScope(replica, false),
 			},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
@@ -115,12 +145,34 @@ func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Ser
 						Port: chDefaultInterServerPortNumber,
 					},
 				},
-				Selector:  r.labeler.getSelectorReplica(replica),
+				Selector:  r.labeler.getSelectorReplicaScope(replica),
 				ClusterIP: templateDefaultsServiceClusterIP,
 				Type:      "ClusterIP",
 			},
 		}
 	}
+}
+
+// createServiceFromTemplate create Service from ChiServiceTemplate and additional info
+func (r *Reconciler) createServiceFromTemplate(
+	template *chiv1.ChiServiceTemplate,
+	namespace string,
+	name string,
+	labels map[string]string,
+	selector map[string]string,
+) *corev1.Service {
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels:    labels,
+		},
+		Spec: *template.Spec.DeepCopy(),
+	}
+	// Append provided Selector to already specified Selector in template
+	service.Spec.Selector = util.MergeStringMaps(service.Spec.Selector, selector)
+
+	return service
 }
 
 // createConfigMapReplica creates new corev1.ConfigMap
@@ -129,7 +181,7 @@ func (r *Reconciler) createConfigMapReplica(replica *chiv1.ChiReplica) *corev1.C
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapPodName(replica),
 			Namespace: replica.Address.Namespace,
-			Labels:    r.labeler.getLabelsReplica(replica, false),
+			Labels:    r.labeler.getLabelsReplicaScope(replica, false),
 		},
 		Data: r.chConfigSectionsGenerator.CreateConfigsPod(replica),
 	}
@@ -147,13 +199,13 @@ func (r *Reconciler) createStatefulSet(replica *chiv1.ChiReplica) *apps.Stateful
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      statefulSetName,
 			Namespace: replica.Address.Namespace,
-			Labels:    r.labeler.getLabelsReplica(replica, true),
+			Labels:    r.labeler.getLabelsReplicaScope(replica, true),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    &replicasNum,
 			ServiceName: serviceName,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: r.labeler.getSelectorReplica(replica),
+				MatchLabels: r.labeler.getSelectorReplicaScope(replica),
 			},
 			// IMPORTANT
 			// VolumeClaimTemplates are to be setup later
@@ -179,7 +231,7 @@ func (r *Reconciler) setupStatefulSetPodTemplate(statefulSetObject *apps.Statefu
 	// All the rest fields would be filled later
 	statefulSetObject.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: r.labeler.getLabelsReplica(replica, true),
+			Labels: r.labeler.getLabelsReplicaScope(replica, true),
 		},
 	}
 

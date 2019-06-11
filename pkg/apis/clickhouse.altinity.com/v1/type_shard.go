@@ -18,6 +18,12 @@ func (shard *ChiShard) InheritTemplates(cluster *ChiCluster) {
 	(&shard.Templates).MergeFrom(&cluster.Templates)
 }
 
+func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+	name := shard.Templates.ServiceTemplate
+	template, ok := shard.Chi.GetServiceTemplate(name)
+	return template, ok
+}
+
 func (shard *ChiShard) WalkReplicas(
 	f func(replica *ChiReplica) error,
 ) []error {

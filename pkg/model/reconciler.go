@@ -84,22 +84,22 @@ func (r *Reconciler) reconcileChi(chi *chiv1.ClickHouseInstallation) error {
 
 // reconcileCluster reconciles Cluster, excluding nested shards
 func (r *Reconciler) reconcileCluster(cluster *chiv1.ChiCluster) error {
-	// Add replica's Service
-	//service := r.createServiceReplica(replica)
-	//if err := r.funcs.ReconcileService(service); err != nil {
-	//	return err
-	//}
-	return nil
+	// Add Cluster's Service
+	if service := r.createServiceCluster(cluster); service != nil {
+		return r.funcs.ReconcileService(service)
+	} else {
+		return nil
+	}
 }
 
 // reconcileShard reconciles Shard, excluding nested replicas
 func (r *Reconciler) reconcileShard(shard *chiv1.ChiShard) error {
-	// Add replica's Service
-	//service := r.createServiceReplica(replica)
-	//if err := r.funcs.ReconcileService(service); err != nil {
-	//	return err
-	//}
-	return nil
+	// Add Shard's Service
+	if service := r.createServiceShard(shard); service != nil {
+		return r.funcs.ReconcileService(service)
+	} else {
+		return nil
+	}
 }
 
 // reconcileReplica reconciles Replica
@@ -143,7 +143,7 @@ func (r *Reconciler) reconcileChiConfigMaps() error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonName(r.chi),
 			Namespace: r.chi.Namespace,
-			Labels:    r.labeler.getLabelsCommonObject(),
+			Labels:    r.labeler.getLabelsChiScope(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: r.chConfigSectionsGenerator.commonConfigSections,
@@ -157,7 +157,7 @@ func (r *Reconciler) reconcileChiConfigMaps() error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonUsersName(r.chi),
 			Namespace: r.chi.Namespace,
-			Labels:    r.labeler.getLabelsCommonObject(),
+			Labels:    r.labeler.getLabelsChiScope(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: r.chConfigSectionsGenerator.commonUsersConfigSections,
