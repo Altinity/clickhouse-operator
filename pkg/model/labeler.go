@@ -102,7 +102,7 @@ func (l *Labeler) getLabelsReplicaScope(replica *chi.ChiReplica, zk bool) map[st
 	return labels
 }
 
-func (l *Labeler) getSelectorReplicaScope(replica *chi.ChiReplica) map[string]string {
+func (l *Labeler) GetSelectorReplicaScope(replica *chi.ChiReplica) map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// skip chop

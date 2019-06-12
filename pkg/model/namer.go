@@ -38,7 +38,7 @@ const (
 	clusterServiceNamePattern = "cluster-{chi}-{cluster}"
 
 	// shardServiceNamePattern is a template of shard Service name
-	shardServiceNamePattern = "cluster-{chi}-{cluster}-{shard}"
+	shardServiceNamePattern = "shard-{chi}-{cluster}-{shard}"
 
 	// statefulSetNamePattern is a template of replica's StatefulSet's name
 	statefulSetNamePattern = "chi-{chi}-{cluster}-{shard}-{replica}"

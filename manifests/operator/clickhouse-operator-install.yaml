@@ -239,6 +239,8 @@ spec:
                     properties:
                       name:
                         type: string
+                      generateName:
+                        type: string
                       spec:
                         # TODO specify ServiceSpec
                         type: object

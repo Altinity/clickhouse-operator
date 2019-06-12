@@ -28,7 +28,6 @@ import (
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -638,22 +637,4 @@ func waitForCacheSync(name string, stopCh <-chan struct{}, cacheSyncs ...cache.I
 	}
 	glog.V(1).Infof("Caches are synced for %s controller", name)
 	return true
-}
-
-// clusterWideSelector returns labels.Selector object
-func clusterWideSelector(name string) labels.Selector {
-	return labels.SelectorFromSet(labels.Set{
-		chopmodels.LabelChop: name,
-	})
-	/*
-		glog.V(2).Infof("ClickHouseInstallation (%q) listing controlled resources", chi.Name)
-		ssList, err := c.statefulSetLister.StatefulSets(chi.Namespace).List(clusterWideSelector(chi.Name))
-		if err != nil {
-			return err
-		}
-		// Listing controlled resources
-		for i := range ssList {
-			glog.V(2).Infof("ClickHouseInstallation (%q) controlls StatefulSet: %q", chi.Name, ssList[i].Name)
-		}
-	*/
 }

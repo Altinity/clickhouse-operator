@@ -19,7 +19,7 @@ func (replica *ChiReplica) InheritTemplates(shard *ChiShard) {
 }
 
 func (replica *ChiReplica) GetPodTemplate() (*ChiPodTemplate, bool) {
-	name := replica.Templates.ServiceTemplate
+	name := replica.Templates.PodTemplate
 	template, ok := replica.Chi.GetPodTemplate(name)
 	return template, ok
 }

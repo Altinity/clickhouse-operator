@@ -119,7 +119,7 @@ func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Ser
 			replica.Address.Namespace,
 			serviceName,
 			r.labeler.getLabelsReplicaScope(replica, false),
-			r.labeler.getSelectorReplicaScope(replica),
+			r.labeler.GetSelectorReplicaScope(replica),
 		)
 	} else {
 		// Incorrect/unknown .templates.ServiceTemplate specified
@@ -145,7 +145,7 @@ func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Ser
 						Port: chDefaultInterServerPortNumber,
 					},
 				},
-				Selector:  r.labeler.getSelectorReplicaScope(replica),
+				Selector:  r.labeler.GetSelectorReplicaScope(replica),
 				ClusterIP: templateDefaultsServiceClusterIP,
 				Type:      "ClusterIP",
 			},
@@ -161,6 +161,15 @@ func (r *Reconciler) createServiceFromTemplate(
 	labels map[string]string,
 	selector map[string]string,
 ) *corev1.Service {
+	// Verify Ports
+	for i := range template.Spec.Ports {
+		servicePort := &template.Spec.Ports[i]
+		if (servicePort.Port < 1) || (servicePort.Port > 65535) {
+			glog.V(1).Infof("createServiceFromTemplate(%s/%s) INCORRECT PORT: %d ", namespace, name, servicePort.Port )
+			return nil
+		}
+	}
+
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -205,7 +214,7 @@ func (r *Reconciler) createStatefulSet(replica *chiv1.ChiReplica) *apps.Stateful
 			Replicas:    &replicasNum,
 			ServiceName: serviceName,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: r.labeler.getSelectorReplicaScope(replica),
+				MatchLabels: r.labeler.GetSelectorReplicaScope(replica),
 			},
 			// IMPORTANT
 			// VolumeClaimTemplates are to be setup later

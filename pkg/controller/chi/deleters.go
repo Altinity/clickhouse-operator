@@ -15,10 +15,9 @@
 package chi
 
 import (
-	"github.com/golang/glog"
-
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -162,18 +161,26 @@ func (c *Controller) statefulSetDelete(replica *chop.ChiReplica) error {
 // persistentVolumeClaimDelete deletes PersistentVolumeClaim
 func (c *Controller) persistentVolumeClaimDelete(replica *chop.ChiReplica) error {
 
-	name := "volumeclaim-template-" + chopmodel.CreatePodName(replica)
-	namespace := replica.Address.Namespace
-
 	if !chopmodel.ReplicaCanDeletePVC(replica) {
-		glog.V(1).Infof("KEPT PersistentVolumeClaim %s/%s", namespace, name)
+		glog.V(1).Infof("PVC should not be deleted, leave them intact")
 		return nil
 	}
 
-	if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(name, newDeleteOptions()); err == nil {
-		glog.V(1).Infof("OK delete PersistentVolumeClaim %s/%s", namespace, name)
+	namespace := replica.Address.Namespace
+	labeler := chopmodel.NewLabeler(c.version, replica.Chi)
+	listOptions := newListOptions(labeler.GetSelectorReplicaScope(replica))
+	if list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(listOptions); err == nil {
+		glog.V(1).Infof("OK get list of PVC for replica %s/%s", namespace, replica.Name)
+		for i := range list.Items {
+			pvc := &list.Items[i]
+			if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, newDeleteOptions()); err == nil {
+				glog.V(1).Infof("OK delete PVC %s/%s", namespace, pvc.Name)
+			} else {
+				glog.V(1).Infof("FAIL delete PVC %s/%s %v", namespace, pvc.Name, err)
+			}
+		}
 	} else {
-		glog.V(1).Infof("FAIL delete PersistentVolumeClaim %s/%s %v", namespace, name, err)
+		glog.V(1).Infof("FAIL get list of PVC for replica %s/%s %v", namespace, replica.Name, err)
 	}
 
 	return nil
