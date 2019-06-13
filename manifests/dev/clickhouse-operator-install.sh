@@ -12,4 +12,4 @@ echo "Setup ClickHouse Operator into ${CHOPERATOR_NAMESPACE} namespace"
 kubectl create namespace "${CHOPERATOR_NAMESPACE}"
 
 # Setup into dedicated namespace
-kubectl apply --namespace="${CHOPERATOR_NAMESPACE}" -f <(CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" ${CUR_DIR}/cat-clickhouse-operator-yaml.sh)
+kubectl apply --namespace="${CHOPERATOR_NAMESPACE}" -f <(CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" ${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh)

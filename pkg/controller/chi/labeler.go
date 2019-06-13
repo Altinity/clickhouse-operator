@@ -51,21 +51,21 @@ func (c *Controller) labelMyObjectsTree() {
 	namespace, ok2 := c.runtimeParams["OPERATOR_POD_NAMESPACE"]
 
 	if !ok1 || !ok2 {
-		glog.V(1).Info("ERROR fetch Pod name out of %s/%s", namespace, podName)
+		glog.V(1).Infof("ERROR fetch Pod name out of %s/%s", namespace, podName)
 		return
 	}
 
 	// Pod namespaced name found, fetch it
 	pod, err := c.podLister.Pods(namespace).Get(podName)
 	if err != nil {
-		glog.V(1).Info("ERROR get Pod %s/%s", namespace, podName)
+		glog.V(1).Infof("ERROR get Pod %s/%s", namespace, podName)
 		return
 	}
 
 	// Put label on the Pod
 	pod.Labels["version"] = c.version
 	if _, err := c.kubeClient.CoreV1().Pods(namespace).Update(pod); err != nil {
-		glog.V(1).Info("ERROR put label on Pod %s/%s", namespace, podName)
+		glog.V(1).Infof("ERROR put label on Pod %s/%s %v", namespace, podName, err)
 	}
 
 	// Find parent ReplicaSet
@@ -81,21 +81,21 @@ func (c *Controller) labelMyObjectsTree() {
 
 	if replicaSetName == "" {
 		// ReplicaSet not found
-		glog.V(1).Info("ERROR ReplicaSet for Pod %s/%s not found", namespace, podName)
+		glog.V(1).Infof("ERROR ReplicaSet for Pod %s/%s not found", namespace, podName)
 		return
 	}
 
 	// ReplicaSet namespaced name found, fetch it
 	replicaSet, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Get(replicaSetName, v1.GetOptions{})
 	if err != nil {
-		glog.V(1).Info("ERROR get ReplicaSet %s/%s", namespace, replicaSetName)
+		glog.V(1).Infof("ERROR get ReplicaSet %s/%s %v", namespace, replicaSetName, err)
 		return
 	}
 
 	// Put label on the ReplicaSet
 	replicaSet.Labels["version"] = c.version
 	if _, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Update(replicaSet); err != nil {
-		glog.V(1).Info("ERROR put label on ReplicaSet %s/%s", namespace, replicaSetName)
+		glog.V(1).Infof("ERROR put label on ReplicaSet %s/%s %v", namespace, replicaSetName, err)
 	}
 
 	// Find parent Deployment
@@ -111,20 +111,20 @@ func (c *Controller) labelMyObjectsTree() {
 
 	if deploymentName == "" {
 		// Deployment not found
-		glog.V(1).Info("ERROR Deployment for %s Pod %s ReplicaSet %s not found", namespace, podName, replicaSetName)
+		glog.V(1).Infof("ERROR Deployment for %s Pod %s ReplicaSet %s not found", namespace, podName, replicaSetName)
 		return
 	}
 
 	// Deployment namespaced name found, fetch it
 	deployment, err := c.kubeClient.AppsV1().Deployments(namespace).Get(deploymentName, v1.GetOptions{})
 	if err != nil {
-		glog.V(1).Info("ERROR get Deployment %s/%s", namespace, deploymentName)
+		glog.V(1).Infof("ERROR get Deployment %s/%s", namespace, deploymentName)
 		return
 	}
 
 	// Put label on the Deployment
 	deployment.Labels["version"] = c.version
 	if _, err := c.kubeClient.AppsV1().Deployments(namespace).Update(deployment); err != nil {
-		glog.V(1).Info("ERROR put label on Deployment %s/%s", namespace, deploymentName)
+		glog.V(1).Infof("ERROR put label on Deployment %s/%s %v", namespace, deploymentName, err)
 	}
 }

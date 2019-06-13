@@ -21,29 +21,79 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-func (c *Creator) getLabelsCommonObject() map[string]string {
+type Labeler struct {
+	version string
+	chi     *chi.ClickHouseInstallation
+}
+
+func NewLabeler(version string, chi *chi.ClickHouseInstallation) *Labeler {
+	return &Labeler{
+		version: version,
+		chi:     chi,
+	}
+}
+
+func (l *Labeler) getLabelsChiScope() map[string]string {
 	return map[string]string{
 		LabelApp:  LabelAppValue,
-		LabelChop: c.appVersion,
-		LabelChi:  nameSectionChi(c.chi),
+		LabelChop: l.version,
+		LabelChi:  getNamePartChiName(l.chi),
 	}
 }
 
-func (c *Creator) getSelectorCommonObject() map[string]string {
+func (l *Labeler) getSelectorChiScope() map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
-		LabelChi: nameSectionChi(c.chi),
+		LabelChi: getNamePartChiName(l.chi),
 	}
 }
 
-func (c *Creator) getLabelsReplica(replica *chi.ChiReplica, zk bool) map[string]string {
+func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]string {
+	return map[string]string{
+		LabelApp:     LabelAppValue,
+		LabelChop:    l.version,
+		LabelChi:     getNamePartChiName(cluster),
+		LabelCluster: getNamePartClusterName(cluster),
+	}
+}
+
+func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]string {
+	return map[string]string{
+		LabelApp: LabelAppValue,
+		// skip chop
+		LabelChi:     getNamePartChiName(cluster),
+		LabelCluster: getNamePartClusterName(cluster),
+	}
+}
+
+func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
+	return map[string]string{
+		LabelApp:     LabelAppValue,
+		LabelChop:    l.version,
+		LabelChi:     getNamePartChiName(shard),
+		LabelCluster: getNamePartClusterName(shard),
+		LabelShard:   getNamePartShardName(shard),
+	}
+}
+
+func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
+	return map[string]string{
+		LabelApp: LabelAppValue,
+		// skip chop
+		LabelChi:     getNamePartChiName(shard),
+		LabelCluster: getNamePartClusterName(shard),
+		LabelShard:   getNamePartShardName(shard),
+	}
+}
+
+func (l *Labeler) getLabelsReplicaScope(replica *chi.ChiReplica, zk bool) map[string]string {
 	labels := map[string]string{
 		LabelApp:         LabelAppValue,
-		LabelChop:        c.appVersion,
-		LabelChi:         nameSectionChi(replica),
-		LabelCluster:     nameSectionCluster(replica),
-		LabelShard:       nameSectionShard(replica),
-		LabelReplica:     nameSectionReplica(replica),
+		LabelChop:        l.version,
+		LabelChi:         getNamePartChiName(replica),
+		LabelCluster:     getNamePartClusterName(replica),
+		LabelShard:       getNamePartShardName(replica),
+		LabelReplica:     getNamePartReplicaName(replica),
 		LabelStatefulSet: CreateStatefulSetName(replica),
 	}
 	if zk {
@@ -52,14 +102,14 @@ func (c *Creator) getLabelsReplica(replica *chi.ChiReplica, zk bool) map[string]
 	return labels
 }
 
-func (c *Creator) getSelectorReplica(replica *chi.ChiReplica) map[string]string {
+func (l *Labeler) GetSelectorReplicaScope(replica *chi.ChiReplica) map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// skip chop
-		LabelChi:     nameSectionChi(replica),
-		LabelCluster: nameSectionCluster(replica),
-		LabelShard:   nameSectionShard(replica),
-		LabelReplica: nameSectionReplica(replica),
+		LabelChi:     getNamePartChiName(replica),
+		LabelCluster: getNamePartClusterName(replica),
+		LabelShard:   getNamePartShardName(replica),
+		LabelReplica: getNamePartReplicaName(replica),
 		// skip StatefulSet
 		// skip Zookeeper
 	}
@@ -105,4 +155,24 @@ func IsChopGeneratedObject(objectMeta *meta.ObjectMeta) bool {
 	_, ok := objectMeta.Labels[LabelChop]
 
 	return ok
+}
+
+func GetChiNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
+	// ObjectMeta must have LabelChi:  chi.Name label
+	name, ok := meta.Labels[LabelChi]
+	if ok {
+		return name, nil
+	} else {
+		return "", fmt.Errorf("can not find %s label in meta", LabelChi)
+	}
+}
+
+func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
+	// ObjectMeta must have LabelCluster
+	name, ok := meta.Labels[LabelCluster]
+	if ok {
+		return name, nil
+	} else {
+		return "", fmt.Errorf("can not find %s label in meta", LabelChi)
+	}
 }

@@ -19,127 +19,279 @@ import (
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	apps "k8s.io/api/apps/v1"
+	"strconv"
+	"strings"
 )
 
-func createChiNameID(name string) string {
-	//return util.CreateStringID(name, 6)
-	return util.StringHead(name, 15)
+const (
+	namePartChiMaxLen     = 15
+	namePartClusterMaxLen = 15
+	namePartShardMaxLen   = 15
+	namePartReplicaMaxLen = 15
+)
+
+const (
+	// chiServiceNamePattern is a template of CHI Service name
+	chiServiceNamePattern = "clickhouse-{chi}"
+
+	// clusterServiceNamePattern is a template of cluster Service name
+	clusterServiceNamePattern = "cluster-{chi}-{cluster}"
+
+	// shardServiceNamePattern is a template of shard Service name
+	shardServiceNamePattern = "shard-{chi}-{cluster}-{shard}"
+
+	// statefulSetNamePattern is a template of replica's StatefulSet's name
+	statefulSetNamePattern = "chi-{chi}-{cluster}-{shard}-{replica}"
+
+	// statefulSetServiceNamePattern is a template of replica's StatefulSet's Service name
+	statefulSetServiceNamePattern = "chi-{chi}-{cluster}-{shard}-{replica}"
+
+	// configMapCommonNamePattern is a template of common settings for the CHI ConfigMap
+	configMapCommonNamePattern = "chi-{chi}-common-configd"
+
+	// configMapCommonUsersNamePattern is a template of common users settings for the CHI ConfigMap
+	configMapCommonUsersNamePattern = "chi-{chi}-common-usersd"
+
+	// configMapDeploymentNamePattern is a template of macros ConfigMap
+	configMapDeploymentNamePattern = "chi-{chi}-deploy-confd-{cluster}-{shard}-{replica}"
+
+	// namespaceDomainPattern presents Domain Name pattern of a namespace
+	// In this pattern "%s" is substituted namespace name's value
+	// Ex.: my-dev-namespace.svc.cluster.local
+	namespaceDomainPattern = "%s.svc.cluster.local"
+
+	// ServiceName.domain.name
+	serviceFQDNPattern = "%s" + "." + namespaceDomainPattern
+
+	// podFQDNPattern consists of 3 parts:
+	// 1. nameless service of of stateful set
+	// 2. namespace name
+	// Hostname.domain.name
+	podFQDNPattern = "%s" + "." + namespaceDomainPattern
+
+	// podNamePattern is a name of a Pod as ServiceName-0
+	podNamePattern = "%s-0"
+)
+
+func namePartChiName(name string) string {
+	return util.StringHead(name, namePartChiMaxLen)
 }
 
-func createClusterNameID(name string) string {
-	//return util.CreateStringID(name, 4)
-	return util.StringHead(name, 15)
+func namePartChiNameID(name string) string {
+	return util.CreateStringID(name, namePartChiMaxLen)
 }
 
-func createShardNameID(name string) string {
-	return util.StringHead(name, 8)
+func namePartClusterName(name string) string {
+	return util.StringHead(name, namePartClusterMaxLen)
 }
 
-func createReplicaNameID(name string) string {
-	return util.StringHead(name, 8)
+func namePartClusterNameID(name string) string {
+	return util.CreateStringID(name, namePartClusterMaxLen)
 }
 
-func nameSectionChi(obj interface{}) string {
+func namePartShardName(name string) string {
+	return util.StringHead(name, namePartShardMaxLen)
+}
+
+func namePartShardNameID(name string) string {
+	return util.CreateStringID(name, namePartShardMaxLen)
+}
+
+func namePartReplicaName(name string) string {
+	return util.StringHead(name, namePartReplicaMaxLen)
+}
+
+func namePartReplicaNameID(name string) string {
+	return util.CreateStringID(name, namePartReplicaMaxLen)
+}
+
+func getNamePartChiName(obj interface{}) string {
 	switch obj.(type) {
-	case *chop.ChiReplica:
-		replica := obj.(*chop.ChiReplica)
-		return createChiNameID(replica.Address.ChiName)
 	case *chop.ClickHouseInstallation:
 		chi := obj.(*chop.ClickHouseInstallation)
-		return createChiNameID(chi.Name)
+		return namePartChiName(chi.Name)
+	case *chop.ChiCluster:
+		cluster := obj.(*chop.ChiCluster)
+		return namePartChiName(cluster.Address.ChiName)
+	case *chop.ChiShard:
+		shard := obj.(*chop.ChiShard)
+		return namePartChiName(shard.Address.ChiName)
+	case *chop.ChiReplica:
+		replica := obj.(*chop.ChiReplica)
+		return namePartChiName(replica.Address.ChiName)
 	}
 
 	return "ERROR"
 }
 
-func nameSectionCluster(replica *chop.ChiReplica) string {
-	return createClusterNameID(replica.Address.ClusterName)
+func getNamePartClusterName(obj interface{}) string {
+	switch obj.(type) {
+	case *chop.ChiCluster:
+		cluster := obj.(*chop.ChiCluster)
+		return namePartClusterName(cluster.Address.ClusterName)
+	case *chop.ChiShard:
+		shard := obj.(*chop.ChiShard)
+		return namePartClusterName(shard.Address.ClusterName)
+	case *chop.ChiReplica:
+		replica := obj.(*chop.ChiReplica)
+		return namePartClusterName(replica.Address.ClusterName)
+	}
+
+	return "ERROR"
 }
 
-func nameSectionShard(replica *chop.ChiReplica) string {
-	return createShardNameID(replica.Address.ShardName)
+func getNamePartShardName(obj interface{}) string {
+	switch obj.(type) {
+	case *chop.ChiShard:
+		shard := obj.(*chop.ChiShard)
+		return namePartShardName(shard.Address.ShardName)
+	case *chop.ChiReplica:
+		replica := obj.(*chop.ChiReplica)
+		return namePartShardName(replica.Address.ShardName)
+	}
+
+	return "ERROR"
 }
 
-func nameSectionReplica(replica *chop.ChiReplica) string {
-	return createReplicaNameID(replica.Address.ReplicaName)
+func getNamePartReplicaName(replica *chop.ChiReplica) string {
+	return namePartReplicaName(replica.Address.ReplicaName)
+}
+
+func newReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
+	return strings.NewReplacer(
+		"{chi}", namePartChiName(chi.Name),
+		"{chiID}", namePartChiNameID(chi.Name),
+	)
+}
+
+func newReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
+	return strings.NewReplacer(
+		"{chi}", namePartChiName(cluster.Address.ChiName),
+		"{chiID}", namePartChiNameID(cluster.Address.ChiName),
+		"{cluster}", namePartClusterName(cluster.Address.ClusterName),
+		"{clusterID}", namePartClusterNameID(cluster.Address.ClusterName),
+		"{clusterIndex}", strconv.Itoa(cluster.Address.ClusterIndex),
+	)
+}
+
+func newReplacerShard(shard *chop.ChiShard) *strings.Replacer {
+	return strings.NewReplacer(
+		"{chi}", namePartChiName(shard.Address.ChiName),
+		"{chiID}", namePartChiNameID(shard.Address.ChiName),
+		"{cluster}", namePartClusterName(shard.Address.ClusterName),
+		"{clusterID}", namePartClusterNameID(shard.Address.ClusterName),
+		"{clusterIndex}", strconv.Itoa(shard.Address.ClusterIndex),
+		"{shard}", namePartShardName(shard.Address.ShardName),
+		"{shardID}", namePartShardNameID(shard.Address.ShardName),
+		"{shardIndex}", strconv.Itoa(shard.Address.ShardIndex),
+	)
+}
+
+func newReplacerReplica(replica *chop.ChiReplica) *strings.Replacer {
+	return strings.NewReplacer(
+		"{chi}", namePartChiName(replica.Address.ChiName),
+		"{chiID}", namePartChiNameID(replica.Address.ChiName),
+		"{cluster}", namePartClusterName(replica.Address.ClusterName),
+		"{clusterID}", namePartClusterNameID(replica.Address.ClusterName),
+		"{clusterIndex}", strconv.Itoa(replica.Address.ClusterIndex),
+		"{shard}", namePartShardName(replica.Address.ShardName),
+		"{shardID}", namePartShardNameID(replica.Address.ShardName),
+		"{shardIndex}", strconv.Itoa(replica.Address.ShardIndex),
+		"{replica}", namePartReplicaName(replica.Address.ReplicaName),
+		"{replicaID}", namePartReplicaNameID(replica.Address.ReplicaName),
+		"{replicaIndex}", strconv.Itoa(replica.Address.ReplicaIndex),
+	)
 }
 
 // CreateConfigMapPodName returns a name for a ConfigMap for replica's pod
 func CreateConfigMapPodName(replica *chop.ChiReplica) string {
-	return fmt.Sprintf(
-		configMapDeploymentNamePattern,
-		nameSectionChi(replica),
-		nameSectionCluster(replica),
-		nameSectionShard(replica),
-		nameSectionReplica(replica),
-	)
+	return newReplacerReplica(replica).Replace(configMapDeploymentNamePattern)
 }
 
 // CreateConfigMapCommonName returns a name for a ConfigMap for replica's common chopConfig
 func CreateConfigMapCommonName(chi *chop.ClickHouseInstallation) string {
-	return fmt.Sprintf(
-		configMapCommonNamePattern,
-		nameSectionChi(chi),
-	)
+	return newReplacerChi(chi).Replace(configMapCommonNamePattern)
 }
 
 // CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common chopConfig
 func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
-	return fmt.Sprintf(
-		configMapCommonUsersNamePattern,
-		nameSectionChi(chi),
-	)
+	return newReplacerChi(chi).Replace(configMapCommonUsersNamePattern)
 }
 
 // CreateChiServiceName creates a name of a Installation Service resource
 func CreateChiServiceName(chi *chop.ClickHouseInstallation) string {
-	return fmt.Sprintf(
-		chiServiceNamePattern,
-		chi.Name,
-	)
+	if template, ok := chi.GetOwnServiceTemplate(); ok {
+		// Service template available
+		if template.GenerateName != "" {
+			// Service template has explicitly specified service name template
+			return newReplacerChi(chi).Replace(template.GenerateName)
+		}
+	}
+
+	// Create Service name based on default Service Name template
+	return newReplacerChi(chi).Replace(chiServiceNamePattern)
 }
 
 // CreateChiServiceName creates a name of a Installation Service resource
 func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
 	return fmt.Sprintf(
-		chiServiceFQDNPattern,
+		serviceFQDNPattern,
 		CreateChiServiceName(chi),
 		chi.Namespace,
 	)
 }
 
+// CreateClusterServiceName returns a name of a cluster's Service
+func CreateClusterServiceName(cluster *chop.ChiCluster) string {
+	if template, ok := cluster.GetServiceTemplate(); ok {
+		// Service template available
+		if template.GenerateName != "" {
+			// Service template has explicitly specified service name template
+			return newReplacerCluster(cluster).Replace(template.GenerateName)
+		}
+	}
+
+	// Create Service name based on default Service Name template
+	return newReplacerCluster(cluster).Replace(clusterServiceNamePattern)
+}
+
+// CreateShardServiceName returns a name of a shard's Service
+func CreateShardServiceName(shard *chop.ChiShard) string {
+	if template, ok := shard.GetServiceTemplate(); ok {
+		// Service template available
+		if template.GenerateName != "" {
+			// Service template has explicitly specified service name template
+			return newReplacerShard(shard).Replace(template.GenerateName)
+		}
+	}
+
+	// Create Service name based on default Service Name template
+	return newReplacerShard(shard).Replace(shardServiceNamePattern)
+}
+
 // CreateStatefulSetName creates a name of a StatefulSet for replica
 func CreateStatefulSetName(replica *chop.ChiReplica) string {
-	return fmt.Sprintf(
-		statefulSetNamePattern,
-		nameSectionChi(replica),
-		nameSectionCluster(replica),
-		nameSectionShard(replica),
-		nameSectionReplica(replica),
-	)
+	return newReplacerReplica(replica).Replace(statefulSetNamePattern)
 }
 
 // CreateStatefulSetServiceName returns a name of a StatefulSet-related Service for replica
 func CreateStatefulSetServiceName(replica *chop.ChiReplica) string {
-	return fmt.Sprintf(
-		statefulSetServiceNamePattern,
-		nameSectionChi(replica),
-		nameSectionCluster(replica),
-		nameSectionShard(replica),
-		nameSectionReplica(replica),
-	)
+	if template, ok := replica.GetServiceTemplate(); ok {
+		// Service template available
+		if template.GenerateName != "" {
+			// Service template has explicitly specified service name template
+			return newReplacerReplica(replica).Replace(template.GenerateName)
+		}
+	}
+
+	// Create Service name based on default Service Name template
+	return newReplacerReplica(replica).Replace(statefulSetServiceNamePattern)
 }
 
 // CreatePodHostname returns a name of a Pod resource for a replica
 func CreatePodHostname(replica *chop.ChiReplica) string {
 	// Pod has no own hostname - redirect to appropriate Service
 	return CreateStatefulSetServiceName(replica)
-}
-
-// CreateNamespaceDomainName creates domain name of a namespace
-// .my-dev-namespace.svc.cluster.local
-func CreateNamespaceDomainName(chiNamespace string) string {
-	return fmt.Sprintf(namespaceDomainPattern, chiNamespace)
 }
 
 // CreatePodFQDN creates a fully qualified domain name of a pod

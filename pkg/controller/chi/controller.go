@@ -28,7 +28,6 @@ import (
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -452,7 +451,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	}
 
 	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateInProgress, fmt.Sprintf("onAddChi(%s/%s) create objects", chi.Namespace, chi.Name))
-	err = c.reconcileChi(chi)
+	err = c.reconcile(chi)
 	if err != nil {
 		glog.V(1).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
 		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to create", chi.Name))
@@ -493,11 +492,11 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
-	if !old.IsFilled() {
+	if !old.IsNormalized() {
 		old, _ = c.normalizer.CreateTemplatedChi(old)
 	}
 
-	if !new.IsFilled() {
+	if !new.IsNormalized() {
 		new, _ = c.normalizer.CreateTemplatedChi(new)
 	}
 
@@ -512,6 +511,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateStarted, fmt.Sprintf("onUpdateChi(%s/%s):", old.Namespace, old.Name))
 
 	// Deal with removed items
+	// TODO refactor to map[string]object handling, instead of slice
 	for path := range diff.Removed {
 		switch diff.Removed[path].(type) {
 		case chop.ChiCluster:
@@ -532,7 +532,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	// Deal with added/updated items
 	//	c.listStatefulSetResources(chi)
 	c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) update resources", old.Namespace, old.Name))
-	if err := c.reconcileChi(new); err != nil {
+	if err := c.reconcile(new); err != nil {
 		glog.V(1).Infof("reconcileChi() FAILED: %v", err)
 		c.eventChi(old, eventTypeWarning, eventActionUpdate, eventReasonUpdateFailed, fmt.Sprintf("onUpdateChi(%s/%s) update resources failed", old.Namespace, old.Name))
 	} else {
@@ -559,6 +559,12 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 }
 
 func (c *Controller) onDeleteChi(chi *chop.ClickHouseInstallation) error {
+	chi, err := c.normalizer.CreateTemplatedChi(chi)
+	if err != nil {
+		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
+		return err
+	}
+
 	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteStarted, fmt.Sprintf("onDeleteChi(%s/%s) started", chi.Namespace, chi.Name))
 	c.deleteChi(chi)
 	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, fmt.Sprintf("onDeleteChi(%s/%s) completed", chi.Namespace, chi.Name))
@@ -631,22 +637,4 @@ func waitForCacheSync(name string, stopCh <-chan struct{}, cacheSyncs ...cache.I
 	}
 	glog.V(1).Infof("Caches are synced for %s controller", name)
 	return true
-}
-
-// clusterWideSelector returns labels.Selector object
-func clusterWideSelector(name string) labels.Selector {
-	return labels.SelectorFromSet(labels.Set{
-		chopmodels.LabelChop: name,
-	})
-	/*
-		glog.V(2).Infof("ClickHouseInstallation (%q) listing controlled resources", chi.Name)
-		ssList, err := c.statefulSetLister.StatefulSets(chi.Namespace).List(clusterWideSelector(chi.Name))
-		if err != nil {
-			return err
-		}
-		// Listing controlled resources
-		for i := range ssList {
-			glog.V(2).Infof("ClickHouseInstallation (%q) controlls StatefulSet: %q", chi.Name, ssList[i].Name)
-		}
-	*/
 }

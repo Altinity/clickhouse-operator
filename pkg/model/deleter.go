@@ -12,16 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v1
+package model
 
-func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults) {
-	if from == nil {
-		return
+import (
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+)
+
+func ReplicaCanDeletePVC(replica *chiv1.ChiReplica) bool {
+	templateName := replica.Templates.VolumeClaimTemplate
+	template, ok := replica.Chi.GetVolumeClaimTemplate(templateName)
+	if !ok {
+		// Unknown template name, however, this is strange
+		return true
 	}
 
-	if from.ReplicasUseFQDN == "" {
-		defaults.ReplicasUseFQDN = from.ReplicasUseFQDN
+	switch template.PVCReclaimPolicy {
+	case chiv1.PVCReclaimPolicyRetain:
+		return false
+	case chiv1.PVCReclaimPolicyDelete:
+		return true
+	default:
+		// Unknown PVCReclaimPolicy
+		return true
 	}
-	(&defaults.DistributedDDL).MergeFrom(&from.DistributedDDL)
-	(&defaults.Templates).MergeFrom(&from.Templates)
+
 }

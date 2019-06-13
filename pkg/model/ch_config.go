@@ -23,6 +23,8 @@ import (
 )
 
 const (
+	distributedDDLPathPattern = "/clickhouse/%s/task_queue/ddl"
+
 	// Special auto-generated clusters. Each of these clusters lay over all replicas in CHI
 	// 1. Cluster with one shard and all replicas. Used to duplicate data over all replicas.
 	// 2. Cluster with all shards (1 replica). Used to gather/scatter data over all replicas.
@@ -284,6 +286,11 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(replica *chiv1.ChiReplica) str
 	// <CLUSTER_NAME-shard>0-based shard index within all-shards-one-replica-cluster would always be GlobalReplicaIndex</CLUSTER_NAME-shard>
 	cline(b, 8, "<%s-shard>%d</%[1]s-shard>", allShardsOneReplicaClusterName, replica.Address.GlobalReplicaIndex)
 
+	// <cluster> and <shard> macros are applicable to main cluster only. All aux clusters do not have ambiguous macros
+	// <cluster></cluster> macro
+	cline(b, 8, "<cluster>%s</cluster>", replica.Address.ClusterName)
+	// <shard></shard> macro
+	cline(b, 8, "<shard>%s</shard>", replica.Address.ShardName)
 	// <replica>replica id = full deployment id</replica>
 	// full deployment id is unique to identify replica within the cluster
 	cline(b, 8, "<replica>%s</replica>", CreatePodHostname(replica))
@@ -329,7 +336,7 @@ func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(replica *chi
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local
-		return CreatePodHostname(replica) + "." + CreateNamespaceDomainName(replica.Address.Namespace)
+		return CreatePodFQDN(replica)
 	} else {
 		return CreatePodHostname(replica)
 	}

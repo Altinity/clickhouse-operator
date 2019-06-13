@@ -7,19 +7,58 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 MANIFEST_ROOT=$(realpath ${CUR_DIR}/..)
 PROJECT_ROOT=$(realpath ${CUR_DIR}/../..)
 
-# clickhouse-operator details
+##########################################
+##
+## clickhouse-operator .yaml configuration
+##
+##########################################
+
+# Namespace to install operator
 CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE:-kube-system}"
+
+# Operator's docker image
 CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
+
+# Local path to operator's config file to be injected into .yaml
 CHOPERATOR_CONFIG_FILE="${PROJECT_ROOT}/config/config.yaml"
+
+# Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
+# as content of /etc/clickhouse-server/conf.d folder
 CHOPERATOR_CONFD_FOLDER="${PROJECT_ROOT}/config/conf.d"
+
+# Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
+# as content of /etc/clickhouse-server/config.d folder
 CHOPERATOR_CONFIGD_FOLDER="${PROJECT_ROOT}/config/config.d"
-CHOPERATOR_TEMPLATESD_FOLDER="${PROJECT_ROOT}/config/templates.d"
+
+# Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
+# as content of /etc/clickhouse-server/users.d folder
 CHOPERATOR_USERSD_FOLDER="${PROJECT_ROOT}/config/users.d"
 
-# .yaml manifest sections to be rendered
+# Local path to folder with operator's .yaml template files which will be injected into .yaml
+# as content of /etc/clickhouse-server/templates.d folder
+CHOPERATOR_TEMPLATESD_FOLDER="${PROJECT_ROOT}/config/templates.d"
+
+
+##
+## .yaml manifest sections to be rendered
+##
+
+# Render operator's CRD
 MANIFEST_PRINT_CRD="${MANIFEST_PRINT_CRD:-yes}"
+
+# Render operator's RBAC and other parts needed during operator's install procedure
 MANIFEST_PRINT_RBAC="${MANIFEST_PRINT_RBAC:-yes}"
+
+# Render operator's Deployment section. May be not required in case of dev localhost run
 MANIFEST_PRINT_DEPLOYMENT="${MANIFEST_PRINT_DEPLOYMENT:-yes}"
+
+
+##################################
+##
+##     Render .yaml manifest
+##
+##################################
+
 
 # Render CRD section
 if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
