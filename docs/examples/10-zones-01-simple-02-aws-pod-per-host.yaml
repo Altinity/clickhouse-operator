@@ -31,29 +31,12 @@ spec:
   templates:
     podTemplates:
       # Specify Pod Templates with affinity
-
       - name: clickhouse-per-host-in-zone-us-east-1a
+        zone:
+          values:
+            - "us-east-1a"
+        distribution: "OnePerHost"
         spec:
-          affinity:
-            # Specify Pod affinity to nodes in specified availability zone
-            nodeAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                nodeSelectorTerms:
-                  - matchExpressions:
-                      - key: "failure-domain.beta.kubernetes.io/zone"
-                        operator: In
-                        values:
-                          - "us-east-1a"
-            # Specify Pod anti-affinity to Pods with the same label "/app" on the same "hostname"
-            podAntiAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                - labelSelector:
-                    matchExpressions:
-                      - key: "clickhouse.altinity.com/app"
-                        operator: In
-                        values:
-                          - "chop"
-                  topologyKey: "kubernetes.io/hostname"
           containers:
             - name: clickhouse-pod
               image: yandex/clickhouse-server:19.3.7

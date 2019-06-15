@@ -35,12 +35,12 @@ func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 	chi.Status.Endpoint = endpoint
 }
 
-func (chi *ClickHouseInstallation) IsFilled() bool {
+func (chi *ClickHouseInstallation) IsNormalized() bool {
 	filled := true
 	clusters := 0
 	chi.WalkClusters(func(cluster *ChiCluster) error {
 		clusters++
-		if cluster.Address.Namespace == "" {
+		if cluster.Chi == nil {
 			filled = false
 		}
 		return nil
@@ -88,6 +88,25 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 	chi.WalkReplicasFullPath(replicaProcessor)
 
 	return replicasCount
+}
+
+func (chi *ClickHouseInstallation) FillChiPointer() {
+
+	replicaProcessor := func(
+		chi *ClickHouseInstallation,
+		clusterIndex int,
+		cluster *ChiCluster,
+		shardIndex int,
+		shard *ChiShard,
+		replicaIndex int,
+		replica *ChiReplica,
+	) error {
+		cluster.Chi = chi
+		shard.Chi = chi
+		replica.Chi = chi
+		return nil
+	}
+	chi.WalkReplicasFullPath(replicaProcessor)
 }
 
 func (chi *ClickHouseInstallation) WalkClustersFullPath(
@@ -208,6 +227,58 @@ func (chi *ClickHouseInstallation) WalkReplicas(
 	return res
 }
 
+func (chi *ClickHouseInstallation) WalkReplicasTillError(
+	f func(replica *ChiReplica) error,
+) error {
+	for clusterIndex := range chi.Spec.Configuration.Clusters {
+		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		for shardIndex := range cluster.Layout.Shards {
+			shard := &cluster.Layout.Shards[shardIndex]
+			for replicaIndex := range shard.Replicas {
+				replica := &shard.Replicas[replicaIndex]
+				if err := f(replica); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (chi *ClickHouseInstallation) WalkClusterTillError(
+	fChi func(chi *ClickHouseInstallation) error,
+	fCluster func(cluster *ChiCluster) error,
+	fShard func(shard *ChiShard) error,
+	fReplica func(replica *ChiReplica) error,
+) error {
+
+	if err := fChi(chi); err != nil {
+		return err
+	}
+
+	for clusterIndex := range chi.Spec.Configuration.Clusters {
+		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		if err := fCluster(cluster); err != nil {
+			return err
+		}
+		for shardIndex := range cluster.Layout.Shards {
+			shard := &cluster.Layout.Shards[shardIndex]
+			if err := fShard(shard); err != nil {
+				return err
+			}
+			for replicaIndex := range shard.Replicas {
+				replica := &shard.Replicas[replicaIndex]
+				if err := fReplica(replica); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation) {
 	if from == nil {
 		return
@@ -248,4 +319,41 @@ func (chi *ClickHouseInstallation) ReplicasCount() int {
 		return nil
 	})
 	return count
+}
+
+// GetPodTemplate gets ChiPodTemplate by name
+func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate, bool) {
+	if chi.Spec.Templates.PodTemplatesIndex == nil {
+		return nil, false
+	} else {
+		template, ok := chi.Spec.Templates.PodTemplatesIndex[name]
+		return template, ok
+	}
+}
+
+// GetVolumeClaimTemplate gets ChiVolumeClaimTemplate by name
+func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolumeClaimTemplate, bool) {
+	if chi.Spec.Templates.VolumeClaimTemplatesIndex == nil {
+		return nil, false
+	} else {
+		template, ok := chi.Spec.Templates.VolumeClaimTemplatesIndex[name]
+		return template, ok
+	}
+}
+
+// GetServiceTemplate gets ChiServiceTemplate by name
+func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceTemplate, bool) {
+	if chi.Spec.Templates.ServiceTemplatesIndex == nil {
+		return nil, false
+	} else {
+		template, ok := chi.Spec.Templates.ServiceTemplatesIndex[name]
+		return template, ok
+	}
+}
+
+// GetServiceTemplate gets own ChiServiceTemplate
+func (chi *ClickHouseInstallation) GetOwnServiceTemplate() (*ChiServiceTemplate, bool) {
+	name := chi.Spec.Configuration.Templates.ServiceTemplate
+	template, ok := chi.GetServiceTemplate(name)
+	return template, ok
 }

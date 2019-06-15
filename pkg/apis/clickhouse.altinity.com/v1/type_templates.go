@@ -27,13 +27,13 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 		}
 		// Loop over all 'from' templates and copy it in case no such template in receiver
 		for fromIndex := range from.PodTemplates {
-			fromPodTemplate := &from.PodTemplates[fromIndex]
+			fromTemplate := &from.PodTemplates[fromIndex]
 
 			// Try to find equal entry among local templates in receiver
 			equalFound := false
 			for toIndex := range templates.PodTemplates {
-				toPodTemplate := &templates.PodTemplates[toIndex]
-				if toPodTemplate.Name == fromPodTemplate.Name {
+				toTemplate := &templates.PodTemplates[toIndex]
+				if toTemplate.Name == fromTemplate.Name {
 					// Receiver already have such a template
 					equalFound = true
 					break
@@ -43,7 +43,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 			if !equalFound {
 				// Receiver has not such template
 				// Append template from `from`
-				templates.PodTemplates = append(templates.PodTemplates, *fromPodTemplate.DeepCopy())
+				templates.PodTemplates = append(templates.PodTemplates, *fromTemplate.DeepCopy())
 			}
 		}
 	}
@@ -56,13 +56,13 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 		}
 		// Loop over all 'from' templates and copy it in case no such template in receiver
 		for fromIndex := range from.VolumeClaimTemplates {
-			fromVolumeClaimTemplate := &from.VolumeClaimTemplates[fromIndex]
+			fromTemplate := &from.VolumeClaimTemplates[fromIndex]
 
 			// Try to find equal entry among local templates in receiver
 			equalFound := false
 			for toIndex := range templates.VolumeClaimTemplates {
-				toVolumeClaimTemplate := &templates.VolumeClaimTemplates[toIndex]
-				if toVolumeClaimTemplate.Name == fromVolumeClaimTemplate.Name {
+				toTemplate := &templates.VolumeClaimTemplates[toIndex]
+				if toTemplate.Name == fromTemplate.Name {
 					// Received already have such a node
 					equalFound = true
 					break
@@ -72,7 +72,36 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 			if !equalFound {
 				// Receiver has not such template
 				// Append Node from `from`
-				templates.VolumeClaimTemplates = append(templates.VolumeClaimTemplates, *fromVolumeClaimTemplate.DeepCopy())
+				templates.VolumeClaimTemplates = append(templates.VolumeClaimTemplates, *fromTemplate.DeepCopy())
+			}
+		}
+	}
+
+	if len(from.ServiceTemplates) > 0 {
+		// We have templates to copy from
+		// Append ServiceTemplates from `from` to receiver
+		if templates.ServiceTemplates == nil {
+			templates.ServiceTemplates = make([]ChiServiceTemplate, 0)
+		}
+		// Loop over all 'from' templates and copy it in case no such template in receiver
+		for fromIndex := range from.ServiceTemplates {
+			fromTemplate := &from.ServiceTemplates[fromIndex]
+
+			// Try to find equal entry among local templates in receiver
+			equalFound := false
+			for toIndex := range templates.ServiceTemplates {
+				toTemplate := &templates.ServiceTemplates[toIndex]
+				if toTemplate.Name == fromTemplate.Name {
+					// Received already have such a node
+					equalFound = true
+					break
+				}
+			}
+
+			if !equalFound {
+				// Receiver has not such template
+				// Append Node from `from`
+				templates.ServiceTemplates = append(templates.ServiceTemplates, *fromTemplate.DeepCopy())
 			}
 		}
 	}

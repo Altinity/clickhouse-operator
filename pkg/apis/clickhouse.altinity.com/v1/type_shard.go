@@ -15,12 +15,13 @@
 package v1
 
 func (shard *ChiShard) InheritTemplates(cluster *ChiCluster) {
-	if shard.Templates.PodTemplate == "" {
-		shard.Templates.PodTemplate = cluster.Templates.PodTemplate
-	}
-	if shard.Templates.VolumeClaimTemplate == "" {
-		shard.Templates.VolumeClaimTemplate = cluster.Templates.VolumeClaimTemplate
-	}
+	(&shard.Templates).MergeFrom(&cluster.Templates)
+}
+
+func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+	name := shard.Templates.ServiceTemplate
+	template, ok := shard.Chi.GetServiceTemplate(name)
+	return template, ok
 }
 
 func (shard *ChiShard) WalkReplicas(

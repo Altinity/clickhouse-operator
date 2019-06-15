@@ -60,9 +60,20 @@ spec:
                       type: string
                     volumeClaimTemplate:
                       type: string
+                    serviceTemplate:
+                      type: string
             configuration:
               type: object
               properties:
+                templates:
+                  type: object
+                  properties:
+                    podTemplate:
+                      type: string
+                    volumeClaimTemplate:
+                      type: string
+                    serviceTemplate:
+                      type: string
                 zookeeper:
                   type: object
                   properties:
@@ -109,6 +120,8 @@ spec:
                             type: string
                           volumeClaimTemplate:
                             type: string
+                          serviceTemplate:
+                            type: string
                       layout:
                         type: object
                         properties:
@@ -145,6 +158,8 @@ spec:
                                       type: string
                                     volumeClaimTemplate:
                                       type: string
+                                    serviceTemplate:
+                                      type: string
                                 replicas:
                                   type: array
                                   items:
@@ -163,22 +178,11 @@ spec:
                                             type: string
                                           volumeClaimTemplate:
                                             type: string
+                                          serviceTemplate:
+                                            type: string
             templates:
               type: object
               properties:
-                volumeClaimTemplates:
-                  type: array
-                  items:
-                    type: object
-                    required:
-                      - name
-                      - spec
-                    properties:
-                      name:
-                        type: string
-                      spec:
-                        # TODO specify PersistentVolumeClaimSpec
-                        type: object
                 podTemplates:
                   type: array
                   items:
@@ -189,6 +193,54 @@ spec:
                     properies:
                       name:
                         type: string
+                      zone:
+                        type: object
+                        required:
+                          - values
+                        properties:
+                          key:
+                            type: string
+                          values:
+                            type: array
+                            items:
+                              type: string
+                      distribution:
+                        type: string
+                        enum:
+                          - OnePerHost
                       spec:
                         # TODO specify PodSpec
+                        type: object
+                volumeClaimTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - spec
+                    properties:
+                      name:
+                        type: string
+                      reclaimPolicy:
+                        type: string
+                        enum:
+                          - Retain
+                          - Delete
+                      spec:
+                        # TODO specify PersistentVolumeClaimSpec
+                        type: object
+                serviceTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - spec
+                    properties:
+                      name:
+                        type: string
+                      generateName:
+                        type: string
+                      spec:
+                        # TODO specify ServiceSpec
                         type: object

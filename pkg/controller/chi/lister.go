@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v1
+package chi
 
-func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults) {
-	if from == nil {
-		return
-	}
+import (
+	"k8s.io/apimachinery/pkg/labels"
 
-	if from.ReplicasUseFQDN == "" {
-		defaults.ReplicasUseFQDN = from.ReplicasUseFQDN
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+func newListOptions(labelsMap map[string]string) metav1.ListOptions {
+	labelSelector := labels.SelectorFromSet(labelsMap)
+	return metav1.ListOptions{
+		LabelSelector: labelSelector.String(),
 	}
-	(&defaults.DistributedDDL).MergeFrom(&from.DistributedDDL)
-	(&defaults.Templates).MergeFrom(&from.Templates)
 }
