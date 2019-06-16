@@ -22,26 +22,54 @@ import (
 
 const (
 	queryMetricsSQL = `
-	SELECT
-		concat('metric.', metric) AS metric,
-		toString(value)           AS value, 
-		''                        AS description, 
-		'gauge'                   AS type   
-	FROM system.asynchronous_metrics
+    SELECT
+        concat('metric.', metric) AS metric,
+        toString(value)           AS value, 
+        ''                        AS description, 
+        'gauge'                   AS type
+    FROM system.asynchronous_metrics
+    UNION ALL 
+    SELECT 
+    concat('metric.', metric) AS metric, 
+        toString(value)           AS value, 
+        description               AS description,       
+        'gauge'                   AS type   
+    FROM system.metrics
 	UNION ALL 
+	SELECT
+        concat('event.', event)   AS metric,
+        toString(value)           AS value,
+        description               AS description,
+        'counter'                 AS type
+	FROM system.events
+	UNION ALL
 	SELECT 
-		concat('metric.', metric) AS metric, 
-		toString(value)           AS value, 
-		description               AS description,       
-		'gauge'                   AS type   
-	FROM system.metrics
-	UNION ALL 
-	SELECT
-		concat('event.', event)   AS metric,
-		toString(value)           AS value,
-		description               AS description,
-		'counter'                 AS type
-	FROM system.events`
+	    'metric.DiskDataBytes'   AS metric,
+	    toString(sum(bytes_on_disk)) AS value,
+	    'Total data size for all ClickHouse tables' AS description,
+	    'gauge'                   AS type
+	FROM system.parts
+	UNION ALL
+	SELECT 
+	    'metric.MemoryPrimaryKeyBytesAllocated' AS metric,
+	    toString(sum(primary_key_bytes_in_memory_allocated)) AS value,
+	    'Memory size allocated for primary keys' AS description,
+	    'gauge'                   AS type
+	FROM system.parts
+	UNION ALL
+	SELECT 
+	    'metric.MemoryDictionaryBytesAllocated' AS metric,
+	    toString(sum(bytes_allocated)) AS value,
+	    'Memory size allocated for dictionaries' AS description,
+	    'gauge'                   AS type
+	FROM system.dictionaries
+	UNION ALL
+    SELECT 
+        'metric.DiskFreeBytes' AS metric,
+	    toString(filesystemFree()) AS value,
+	    'Free disk space available at file system' AS description,
+	    'gauge'                   AS type
+	`
 
 	queryTableSizesSQL = `
 	SELECT
@@ -110,6 +138,24 @@ func (f *Fetcher) clickHouseQueryTableSizes(data *[][]string) error {
 			} else {
 				// Skip erroneous line
 			}
+		}
+	}
+	return nil
+}
+
+// clickHouseDiskFreeSize requests total data disk and free disk sizes
+// data is a concealed output
+func (f *Fetcher) clickHouseDiskFreeSize(data *[]string) error {
+	conn := f.newConn()
+	if rows, err := conn.Query(heredoc.Doc(queryDiskFreeSQL)); err != nil {
+		return err
+	} else {
+		for rows.Next() {
+			var total_bytes, free_bytes string
+			if err := rows.Scan(&total_bytes, &free_bytes); err == nil {
+				*data = []string{total_bytes, free_bytes}
+			}
+			break // only one row is expected
 		}
 	}
 	return nil
