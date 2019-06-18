@@ -18,10 +18,17 @@
 # ClickHouse Operator Installation
 
 Apply `clickhouse-operator` installation manifest. The simplest way - directly from `github`.
+
+In case you are convenient to install operator into `kube-system` namespace just run:
+```bash
+kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator/clickhouse-operator-install.yaml
+``` 
+
+In case you'd like to customize namespace where tro install operator, or customize any operator's or ClickHouse's configuration, feel free to use installer script.
 Please, `cd` into writable folder, because install script would download config files to build `.yaml` manifests from. 
 ```bash
 cd ~
-curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/dev/clickhouse-operator-install.sh | CHOPERATOR_NAMESPACE=test-clickhouse-operator bash
+curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator-installer/clickhouse-operator-install.sh | CHOPERATOR_NAMESPACE=test-clickhouse-operator bash
 ```
 Take into account explicitly specified namespace
 ```bash
@@ -32,11 +39,18 @@ Install script would download some `.yaml` and `.xml` files and install `clickho
 
 Operator installation process
 ```text
-customresourcedefinition.apiextensions.k8s.io/clickhouseinstallations.clickhouse.altinity.com created
+Setup ClickHouse Operator into test-clickhouse-operator namespace
+namespace/test-clickhouse-operator created
+customresourcedefinition.apiextensions.k8s.io/clickhouseinstallations.clickhouse.altinity.com configured
 serviceaccount/clickhouse-operator created
-clusterrolebinding.rbac.authorization.k8s.io/clickhouse-operator created
-deployment.apps/clickhouse-operator created
+clusterrolebinding.rbac.authorization.k8s.io/clickhouse-operator configured
 service/clickhouse-operator-metrics created
+configmap/etc-clickhouse-operator-files created
+configmap/etc-clickhouse-operator-confd-files created
+configmap/etc-clickhouse-operator-configd-files created
+configmap/etc-clickhouse-operator-templatesd-files created
+configmap/etc-clickhouse-operator-usersd-files created
+deployment.apps/clickhouse-operator created
 ```
 
 Check `clickhouse-operator` is running:

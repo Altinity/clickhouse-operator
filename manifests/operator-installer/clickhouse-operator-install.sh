@@ -46,8 +46,7 @@ function download_file() {
     local LOCAL_FILE="${LOCAL_DIR}/${FILE}"
 
     REPO_URL="https://raw.githubusercontent.com/Altinity/clickhouse-operator"
-    #BRANCH="dev-vladislav"
-    BRANCH="master"
+    BRANCH="${BRANCH:-master}"
     FILE_URL="${REPO_URL}/${BRANCH}/${REPO_DIR}/${FILE}"
 
     # Check curl is in place
@@ -78,8 +77,16 @@ ensure_file "${CUR_DIR}" "cat-clickhouse-operator-install-yaml.sh" "manifests/de
 
 echo "Setup ClickHouse Operator into ${CHOPERATOR_NAMESPACE} namespace"
 
-# Let's setup all clickhouse-operator-related stuff into dedicated namespace
-kubectl create namespace "${CHOPERATOR_NAMESPACE}"
+if kubectl get namespace "${CHOPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
+    echo "Namespace ${CHOPERATOR_NAMESPACE} already exists"
+    if kubectl get deployment clickhouse-operator -n "${CHOPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
+        echo "clickhouse-operator is already installed into ${CHOPERATOR_NAMESPACE} namespace. Abort."
+        exit 1
+    fi
+else
+    # Let's setup all clickhouse-operator-related stuff into dedicated namespace
+    kubectl create namespace "${CHOPERATOR_NAMESPACE}"
+fi
 
 # Setup into dedicated namespace
 kubectl apply --namespace="${CHOPERATOR_NAMESPACE}" -f <(CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" /bin/bash "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh")
