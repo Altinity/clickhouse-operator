@@ -58,37 +58,65 @@ MANIFEST_PRINT_DEPLOYMENT="${MANIFEST_PRINT_DEPLOYMENT:-yes}"
 ##################################
 
 function ensure_file() {
-    local FILE="$1"
+    # Params
+    local LOCAL_DIR="$1"
+    local FILE="$2"
+    local REPO_DIR="$3"
 
-    if [[ -f "${FILE}" ]]; then
+    local LOCAL_FILE="${LOCAL_DIR}/${FILE}"
+
+    if [[ -f "${LOCAL_FILE}" ]]; then
         # File found, all is ok
         :
     else
-        # File not found, try to download it
-        if ! curl --version > /dev/null; then
-            echo "curl is not available, can not continue"
-            exit 1
-        fi
-
-        local BASE="$(basename "${FILE}")"
-        ALTINITY_REPO_URL="https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/dev/"
-        ALTINITY_REPO_URL="https://raw.githubusercontent.com/Altinity/clickhouse-operator/dev-vladislav/manifests/dev/"
-        if ! curl --silent "${ALTINITY_REPO_URL}${BASE}" --output "${FILE}"; then
-            echo "curl call to download ${BASE} failed, can not continue"
-            exit 1
-        fi
+        download_file "${LOCAL_DIR}" "${FILE}" "${REPO_DIR}"
     fi
 
-    if [[ -f "${FILE}" ]]; then
+    if [[ -f "${LOCAL_FILE}" ]]; then
         # File found, all is ok
         :
     else
         # File not found
-        echo "Unable to download ${FILE}"
+        echo "Unable to get ${FILE}"
         exit 1
     fi
 }
 
+function download_file() {
+    # Params
+    local LOCAL_DIR="$1"
+    local FILE="$2"
+    local REPO_DIR="$3"
+
+    local LOCAL_FILE="${LOCAL_DIR}/${FILE}"
+
+    REPO_URL="https://raw.githubusercontent.com/Altinity/clickhouse-operator"
+    BRANCH="dev-vladislav"
+    #BRANCH="master"
+    FILE_URL="${REPO_URL}/${BRANCH}/${REPO_DIR}/${FILE}"
+
+    # Check curl is in place
+    if ! curl --version > /dev/null; then
+        echo "curl is not available, can not continue"
+        exit 1
+    fi
+
+    # Download file
+    if ! curl --silent "${FILE_URL}" --output "${LOCAL_FILE}"; then
+        echo "curl call to download ${FILE_URL} failed, can not continue"
+        exit 1
+    fi
+
+    # Check file is in place
+    if [[ -f "${LOCAL_FILE}" ]]; then
+        # File found, all is ok
+        :
+    else
+        # File not found
+        echo "Unable to download ${FILE_URL}"
+        exit 1
+    fi
+}
 ##################################
 ##
 ##     Render .yaml manifest
@@ -98,7 +126,7 @@ function ensure_file() {
 
 # Render CRD section
 if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
-    ensure_file "${CUR_DIR}/clickhouse-operator-template-01-section-crd.yaml"
+    ensure_file "${CUR_DIR}" "clickhouse-operator-template-01-section-crd.yaml" "manifests/dev"
     cat "${CUR_DIR}/clickhouse-operator-template-01-section-crd.yaml" | \
         CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
 fi
@@ -106,7 +134,7 @@ fi
 # Render RBAC section
 if [[ "${MANIFEST_PRINT_RBAC}" == "yes" ]]; then
     echo "---"
-    ensure_file "${CUR_DIR}/clickhouse-operator-template-02-section-rbac-and-service.yaml"
+    ensure_file "${CUR_DIR}" "clickhouse-operator-template-02-section-rbac-and-service.yaml" "manifests/dev"
     cat "${CUR_DIR}/clickhouse-operator-template-02-section-rbac-and-service.yaml" | \
         CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
 fi
@@ -122,13 +150,11 @@ function render_configmap_header() {
     # ConfigMap name
     CM_NAME="$1"
     # Template file with ConfigMap header/beginning
-    CM_HEADER_FILE="${CUR_DIR}/clickhouse-operator-template-03-section-configmap-header.yaml"
 
-    ensure_file "${CM_HEADER_FILE}"
-
+    ensure_file "${CUR_DIR}" "clickhouse-operator-template-03-section-configmap-header.yaml" "manifests/dev"
     # Render ConfigMap header template with vars substitution
-    cat "${CM_HEADER_FILE}" | \
-            CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" CONFIGMAP_NAME="${CM_NAME}" envsubst
+    cat "${CUR_DIR}/clickhouse-operator-template-03-section-configmap-header.yaml" | \
+            CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" CONFIGMAP_NAME="${CM_NAME}" envsubst
 }
 
 # Render one file section in ConfigMap yaml specification:
@@ -162,7 +188,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
     if [[ -z "${CHOPERATOR_CONFIG_FILE}" ]]; then
         # No config file specified, render simple deployment
         echo "---"
-        ensure_file "${CUR_DIR}/clickhouse-operator-template-04-section-deployment.yaml"
+        ensure_file "${CUR_DIR}" "clickhouse-operator-template-04-section-deployment.yaml" "manifests/dev"
         cat "${CUR_DIR}/clickhouse-operator-template-04-section-deployment.yaml" | \
             CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
     else
@@ -176,7 +202,8 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         else
             # Fetch from github and apply
             # config/config.yaml
-            :
+            download_file "${CUR_DIR}" "config.yaml" "config"
+            render_configmap_data_section_file "${CUR_DIR}/config.yaml"
         fi
 
         # Render confd.d files
@@ -198,8 +225,11 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         else
             # Fetch from github and apply
             # config/config.d/01-clickhouse-operator-listen.xml
-            # config/config.d/01-clickhouse-operator-listen.xml
-            :
+            # config/config.d/02-clickhouse-operator-logger.xml
+            download_file "${CUR_DIR}" "01-clickhouse-operator-listen.xml" "config/config.d"
+            download_file "${CUR_DIR}" "02-clickhouse-operator-logger.xml" "config/config.d"
+            render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-operator-listen.xml"
+            render_configmap_data_section_file "${CUR_DIR}/02-clickhouse-operator-logger.xml"
         fi
 
         # Render templates.d files
@@ -221,12 +251,13 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         else
             # Fetch from github and apply
             # config/users.d/01-clickhouse-operator-user.xml
-            :
+            download_file "${CUR_DIR}" "01-clickhouse-operator-user.xml" "config/users.d"
+            render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-operator-user.xml"
         fi
 
         # Render Deployment
         echo "---"
-        ensure_file "${CUR_DIR}/clickhouse-operator-template-04-section-deployment-with-configmap.yaml"
+        ensure_file "${CUR_DIR}" "clickhouse-operator-template-04-section-deployment-with-configmap.yaml" "manifests/dev"
         cat "${CUR_DIR}/clickhouse-operator-template-04-section-deployment-with-configmap.yaml" | \
             CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
     fi
