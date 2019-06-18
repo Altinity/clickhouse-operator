@@ -21,7 +21,7 @@ Apply `clickhouse-operator` installation manifest. The simplest way - directly f
 Please, `cd` into writable folder, because install script would download config files to build `.yaml` manifests from. 
 ```bash
 cd ~
-curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/dev-vladislav/manifests/dev/clickhouse-operator-install.sh | CHOPERATOR_NAMESPACE=test-clickhouse-operator bash
+curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/dev/clickhouse-operator-install.sh | CHOPERATOR_NAMESPACE=test-clickhouse-operator bash
 ```
 Take into account explicitly specified namespace
 ```bash
