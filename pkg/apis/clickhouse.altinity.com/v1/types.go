@@ -52,17 +52,31 @@ type ChiStatus struct {
 type ChiDefaults struct {
 	ReplicasUseFQDN string            `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN"`
 	DistributedDDL  ChiDistributedDDL `json:"distributedDDL,omitempty"  yaml:"distributedDDL"`
-	Templates       ChiTemplateNames  `json:"templates" yaml:"templates"`
+	Templates       ChiTemplateNames  `json:"templates,omitempty"       yaml:"templates"`
 }
 
 // ChiTemplateNames defines references to .spec.templates to be used on current level of cluster
 type ChiTemplateNames struct {
-	PodTemplate         string `json:"podTemplate,omitempty"      yaml:"podTemplate"`
+	PodTemplate         string `json:"podTemplate,omitempty"         yaml:"podTemplate"`
 	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty" yaml:"volumeClaimTemplate"`
+	ServiceTemplate     string `json:"serviceTemplate,omitempty"     yaml:"serviceTemplate"`
+}
+
+func (templates *ChiTemplateNames) MergeFrom(from *ChiTemplateNames) {
+	if templates.PodTemplate == "" {
+		templates.PodTemplate = from.PodTemplate
+	}
+	if templates.VolumeClaimTemplate == "" {
+		templates.VolumeClaimTemplate = from.VolumeClaimTemplate
+	}
+	if templates.ServiceTemplate == "" {
+		templates.ServiceTemplate = from.ServiceTemplate
+	}
 }
 
 // ChiConfiguration defines configuration section of .spec
 type ChiConfiguration struct {
+	Templates ChiTemplateNames       `json:"templates"           yaml:"templates"`
 	Zookeeper ChiZookeeperConfig     `json:"zookeeper,omitempty" yaml:"zookeeper"`
 	Users     map[string]interface{} `json:"users,omitempty"     yaml:"users"`
 	Profiles  map[string]interface{} `json:"profiles,omitempty"  yaml:"profiles"`
@@ -78,7 +92,9 @@ type ChiCluster struct {
 	Layout    ChiLayout        `json:"layout"`
 	Templates ChiTemplateNames `json:"templates,omitempty"`
 
-	Address ChiClusterAddress `json:"address"`
+	// Internal data
+	Address ChiClusterAddress       `json:"address"`
+	Chi     *ClickHouseInstallation `json:"-"`
 }
 
 // ChiClusterAddress defines address of a cluster within ClickHouseInstallation
@@ -92,10 +108,11 @@ type ChiClusterAddress struct {
 // ChiLayout defines layout section of .spec.configuration.clusters
 type ChiLayout struct {
 	// DEPRECATED - to be removed soon
-	Type          string     `json:"type"`
-	ShardsCount   int        `json:"shardsCount,omitempty"`
-	ReplicasCount int        `json:"replicasCount,omitempty"`
-	Shards        []ChiShard `json:"shards,omitempty"`
+	Type          string `json:"type"`
+	ShardsCount   int    `json:"shardsCount,omitempty"`
+	ReplicasCount int    `json:"replicasCount,omitempty"`
+	// TODO refactor into map[string]ChiShard
+	Shards []ChiShard `json:"shards,omitempty"`
 }
 
 // ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
@@ -107,9 +124,12 @@ type ChiShard struct {
 	InternalReplication string           `json:"internalReplication,omitempty"`
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 	ReplicasCount       int              `json:"replicasCount,omitempty"`
-	Replicas            []ChiReplica     `json:"replicas,omitempty"`
+	// TODO refactor into map[string]ChiReplica
+	Replicas []ChiReplica `json:"replicas,omitempty"`
 
-	Address ChiShardAddress `json:"address"`
+	// Internal data
+	Address ChiShardAddress         `json:"address"`
+	Chi     *ClickHouseInstallation `json:"-"`
 }
 
 // ChiShardAddress defines address of a shard within ClickHouseInstallation
@@ -128,8 +148,10 @@ type ChiReplica struct {
 	Port      int32            `json:"port,omitempty"`
 	Templates ChiTemplateNames `json:"templates,omitempty"`
 
-	Address ChiReplicaAddress `json:"address"`
-	Config  ChiReplicaConfig  `json:"config"`
+	// Internal data
+	Address ChiReplicaAddress       `json:"address"`
+	Config  ChiReplicaConfig        `json:"config"`
+	Chi     *ClickHouseInstallation `json:"-"`
 }
 
 // ChiReplicaAddress defines address of a replica within ClickHouseInstallation
@@ -152,22 +174,59 @@ type ChiReplicaConfig struct {
 
 // ChiTemplates defines templates section of .spec
 type ChiTemplates struct {
-	// TODO refactor into [string]ChiPodTemplate
-	PodTemplates []ChiPodTemplate `json:"podTemplates,omitempty" yaml:"podTemplates"`
-	// TODO refactor into [string]ChiVolumeClaimTemplate
+	// Templates
+	PodTemplates         []ChiPodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates"`
 	VolumeClaimTemplates []ChiVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates"`
+	ServiceTemplates     []ChiServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates"`
+
+	// Index maps template name to template itself
+	PodTemplatesIndex         map[string]*ChiPodTemplate
+	VolumeClaimTemplatesIndex map[string]*ChiVolumeClaimTemplate
+	ServiceTemplatesIndex     map[string]*ChiServiceTemplate
 }
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet
 type ChiPodTemplate struct {
-	Name string         `json:"name" yaml:"name"`
-	Spec corev1.PodSpec `json:"spec" yaml:"spec"`
+	Name         string             `json:"name"         yaml:"name"`
+	Zone         ChiPodTemplateZone `json:"zone"         yaml:"zone""`
+	Distribution string             `json:"distribution" yaml:"distribution"`
+	Spec         corev1.PodSpec     `json:"spec"         yaml:"spec"`
+}
+
+type ChiPodTemplateZone struct {
+	Key    string   `json:"key" yaml:"key"`
+	Values []string `json:"values" yaml:"values"`
 }
 
 // ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
 type ChiVolumeClaimTemplate struct {
-	Name string                           `json:"name" yaml:"name"`
-	Spec corev1.PersistentVolumeClaimSpec `json:"spec" yaml:"spec"`
+	Name             string                           `json:"name"          yaml:"name"`
+	PVCReclaimPolicy PVCReclaimPolicy                 `json:"reclaimPolicy" yaml:"reclaimPolicy"`
+	Spec             corev1.PersistentVolumeClaimSpec `json:"spec"          yaml:"spec"`
+}
+
+type PVCReclaimPolicy string
+
+const (
+	PVCReclaimPolicyRetain PVCReclaimPolicy = "Retain"
+	PVCReclaimPolicyDelete PVCReclaimPolicy = "Delete"
+)
+
+// isValid checks whether PVCReclaimPolicy is valid
+func (v PVCReclaimPolicy) IsValid() bool {
+	switch v {
+	case PVCReclaimPolicyRetain:
+		return true
+	case PVCReclaimPolicyDelete:
+		return true
+	}
+	return false
+}
+
+type ChiServiceTemplate struct {
+	Name         string             `json:"name"         yaml:"name"`
+	GenerateName string             `json:"generateName" yaml:"generateName"`
+	Spec         corev1.ServiceSpec `json:"spec"         yaml:"spec"`
 }
 
 // ChiDistributedDDL defines distributedDDL section of .spec.defaults

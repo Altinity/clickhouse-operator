@@ -15,10 +15,23 @@
 package v1
 
 func (replica *ChiReplica) InheritTemplates(shard *ChiShard) {
-	if replica.Templates.PodTemplate == "" {
-		replica.Templates.PodTemplate = shard.Templates.PodTemplate
-	}
-	if replica.Templates.VolumeClaimTemplate == "" {
-		replica.Templates.VolumeClaimTemplate = shard.Templates.VolumeClaimTemplate
-	}
+	(&replica.Templates).MergeFrom(&shard.Templates)
+}
+
+func (replica *ChiReplica) GetPodTemplate() (*ChiPodTemplate, bool) {
+	name := replica.Templates.PodTemplate
+	template, ok := replica.Chi.GetPodTemplate(name)
+	return template, ok
+}
+
+func (replica *ChiReplica) GetVolumeClaimTemplate() (*ChiVolumeClaimTemplate, bool) {
+	name := replica.Templates.VolumeClaimTemplate
+	template, ok := replica.Chi.GetVolumeClaimTemplate(name)
+	return template, ok
+}
+
+func (replica *ChiReplica) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+	name := replica.Templates.ServiceTemplate
+	template, ok := replica.Chi.GetServiceTemplate(name)
+	return template, ok
 }

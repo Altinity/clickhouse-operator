@@ -18,6 +18,9 @@ import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopconfig "github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"k8s.io/api/core/v1"
+	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"regexp"
 	"strconv"
 	"strings"
@@ -55,17 +58,22 @@ func (n *Normalizer) DoChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouse
 	// Walk over ChiSpec datatype fields
 	n.doDefaults(&n.chi.Spec.Defaults)
 	n.doConfiguration(&n.chi.Spec.Configuration)
-	// ChiSpec.Templates
+	n.doTemplates(&n.chi.Spec.Templates)
 
-	endpoint := CreateChiServiceFQDN(chi)
+	n.doStatus()
+
+	return n.chi, nil
+}
+
+// doStatus prepares .status section
+func (n *Normalizer) doStatus() {
+	endpoint := CreateChiServiceFQDN(n.chi)
 	pods := make([]string, 0)
 	n.chi.WalkReplicas(func(replica *chiv1.ChiReplica) error {
 		pods = append(pods, CreatePodName(replica))
 		return nil
 	})
 	n.chi.StatusFill(endpoint, pods)
-
-	return n.chi, nil
 }
 
 // doDefaults normalizes .spec.defaults
@@ -86,6 +94,258 @@ func (n *Normalizer) doConfiguration(conf *chiv1.ChiConfiguration) {
 	n.doClusters()
 }
 
+// doTemplates normalizes .spec.templates
+func (n *Normalizer) doTemplates(templates *chiv1.ChiTemplates) {
+	for i := range templates.PodTemplates {
+		podTemplate := &templates.PodTemplates[i]
+		n.doPodTemplate(podTemplate)
+	}
+
+	for i := range templates.VolumeClaimTemplates {
+		vcTemplate := &templates.VolumeClaimTemplates[i]
+		n.doVolumeClaimTemplate(vcTemplate)
+	}
+
+	for i := range templates.ServiceTemplates {
+		serviceTemplate := &templates.ServiceTemplates[i]
+		n.doServiceTemplate(serviceTemplate)
+	}
+}
+
+// doPodTemplate normalizes .spec.templates.podTemplates
+func (n *Normalizer) doPodTemplate(template *chiv1.ChiPodTemplate) {
+	// Name
+
+	// Zone
+	if len(template.Zone.Values) == 0 {
+		// In case no values specified - no key is reasonable
+		template.Zone.Key = ""
+	} else if template.Zone.Key == "" {
+		// We have values specified, but no key
+		// Use default zone key in this case
+		template.Zone.Key = "failure-domain.beta.kubernetes.io/zone"
+	} else {
+		// We have both key and value(s) specified explicitly
+	}
+
+	// Distribution
+	if template.Distribution == podDistributionOnePerHost {
+		// Known distribution, all is fine
+	} else {
+		template.Distribution = podDistributionUnspecified
+	}
+
+	// Spec
+	template.Spec.Affinity = n.mergeAffinity(template.Spec.Affinity, n.buildAffinity(template))
+
+	// Introduce PodTemplate into Index
+	// Ensure map is in place
+	if n.chi.Spec.Templates.PodTemplatesIndex == nil {
+		n.chi.Spec.Templates.PodTemplatesIndex = make(map[string]*chiv1.ChiPodTemplate)
+	}
+
+	n.chi.Spec.Templates.PodTemplatesIndex[template.Name] = template
+}
+
+func (n *Normalizer) buildAffinity(template *chiv1.ChiPodTemplate) *v1.Affinity {
+	nodeAffinity := n.buildNodeAffinity(template)
+	podAntiAffinity := n.buildPodAntiAffinity(template)
+
+	if nodeAffinity == nil && podAntiAffinity == nil {
+		return nil
+	} else {
+		return &v1.Affinity{
+			NodeAffinity:    nodeAffinity,
+			PodAffinity:     nil,
+			PodAntiAffinity: podAntiAffinity,
+		}
+	}
+}
+
+func (n *Normalizer) mergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affinity {
+	if src == nil {
+		// Nothing to merge from
+		return dst
+	}
+
+	if dst == nil {
+		// No receiver, allocate new one
+		dst = &v1.Affinity{
+			NodeAffinity:    n.mergeNodeAffinity(nil, src.NodeAffinity),
+			PodAffinity:     src.PodAffinity,
+			PodAntiAffinity: n.mergePodAntiAffinity(nil, src.PodAntiAffinity),
+		}
+	}
+
+	return dst
+}
+
+func (n *Normalizer) buildNodeAffinity(template *chiv1.ChiPodTemplate) *v1.NodeAffinity {
+	if template.Zone.Key == "" {
+		return nil
+	} else {
+		return &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{
+						// A list of node selector requirements by node's labels.
+						MatchExpressions: []v1.NodeSelectorRequirement{
+							{
+								Key:      template.Zone.Key,
+								Operator: v1.NodeSelectorOpIn,
+								Values:   template.Zone.Values,
+							},
+						},
+						// A list of node selector requirements by node's fields.
+						//MatchFields: []v1.NodeSelectorRequirement{
+						//	v1.NodeSelectorRequirement{},
+						//},
+					},
+				},
+			},
+
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{},
+		}
+	}
+}
+
+func (n *Normalizer) mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinity) *v1.NodeAffinity {
+	if src == nil {
+		// Nothing to merge from
+		return dst
+	}
+
+	// Check NodeSelectors are available
+	if src.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		return dst
+	}
+	if len(src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
+		return dst
+	}
+
+	if dst == nil {
+		// No receiver, allocate new one
+		dst = &v1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{},
+			},
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{},
+		}
+	}
+
+	// Copy NodeSelectors
+	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+		dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
+			dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+			src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i],
+		)
+	}
+
+	// Copy PreferredSchedulingTerm
+	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
+		dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			dst.PreferredDuringSchedulingIgnoredDuringExecution,
+			src.PreferredDuringSchedulingIgnoredDuringExecution[i],
+		)
+	}
+
+	return dst
+}
+
+func (n *Normalizer) buildPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodAntiAffinity {
+	if template.Distribution == podDistributionOnePerHost {
+		return &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					LabelSelector: &v12.LabelSelector{
+						// A list of node selector requirements by node's labels.
+						MatchExpressions: []v12.LabelSelectorRequirement{
+							{
+								Key:      LabelApp,
+								Operator: v12.LabelSelectorOpIn,
+								Values: []string{
+									LabelAppValue,
+								},
+							},
+						},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{},
+		}
+	} else {
+		return nil
+	}
+}
+
+func (n *Normalizer) mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.PodAntiAffinity {
+	if src == nil {
+		// Nothing to merge from
+		return dst
+	}
+
+	if len(src.RequiredDuringSchedulingIgnoredDuringExecution) == 0 {
+		return dst
+	}
+
+	if dst == nil {
+		// No receiver, allocate new one
+		dst = &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution:  []v1.PodAffinityTerm{},
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{},
+		}
+	}
+
+	// Copy PodAffinityTerm
+	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution {
+		dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			dst.RequiredDuringSchedulingIgnoredDuringExecution,
+			src.RequiredDuringSchedulingIgnoredDuringExecution[i],
+		)
+	}
+
+	// Copy WeightedPodAffinityTerm
+	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
+		dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			dst.PreferredDuringSchedulingIgnoredDuringExecution,
+			src.PreferredDuringSchedulingIgnoredDuringExecution[i],
+		)
+	}
+
+	return dst
+}
+
+// doVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
+func (n *Normalizer) doVolumeClaimTemplate(template *chiv1.ChiVolumeClaimTemplate) {
+	// Check name
+	// Check PVCReclaimPolicy
+	if !template.PVCReclaimPolicy.IsValid() {
+		template.PVCReclaimPolicy = chiv1.PVCReclaimPolicyDelete
+	}
+	// Check Spec
+
+	// Ensure map is in place
+	if n.chi.Spec.Templates.VolumeClaimTemplatesIndex == nil {
+		n.chi.Spec.Templates.VolumeClaimTemplatesIndex = make(map[string]*chiv1.ChiVolumeClaimTemplate)
+	}
+	n.chi.Spec.Templates.VolumeClaimTemplatesIndex[template.Name] = template
+}
+
+// doServiceTemplate normalizes .spec.templates.serviceTemplates
+func (n *Normalizer) doServiceTemplate(template *chiv1.ChiServiceTemplate) {
+	// Check name
+	// Check GenerateName
+	// Check Spec
+
+	// Ensure map is in place
+	if n.chi.Spec.Templates.ServiceTemplatesIndex == nil {
+		n.chi.Spec.Templates.ServiceTemplatesIndex = make(map[string]*chiv1.ChiServiceTemplate)
+	}
+	n.chi.Spec.Templates.ServiceTemplatesIndex[template.Name] = template
+}
+
 // doClusters normalizes clusters
 func (n *Normalizer) doClusters() {
 
@@ -103,6 +363,7 @@ func (n *Normalizer) doClusters() {
 		return n.doCluster(cluster)
 	})
 	n.chi.FillAddressInfo()
+	n.chi.FillChiPointer()
 	n.chi.WalkReplicas(func(replica *chiv1.ChiReplica) error {
 		replica.Config.ZkFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
 		return nil
@@ -129,6 +390,13 @@ func (n *Normalizer) doConfigurationUsers(users *map[string]interface{}) {
 	for path := range *users {
 		// Split 'admin/password'
 		tags := strings.Split(path, "/")
+
+		// Basic sanity check - need to have at least "username/something" pair
+		if len(tags) < 2 {
+			// Skip incorrect entry
+			continue
+		}
+
 		username := tags[0]
 		usernameMap[username] = true
 	}
@@ -177,7 +445,7 @@ func (n *Normalizer) doConfigurationSettings(settings *map[string]interface{}) {
 
 // doCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) doCluster(cluster *chiv1.ChiCluster) error {
-	// Inherit PodTemplate from .spec.defaults
+	// Use PodTemplate from .spec.defaults
 	cluster.InheritTemplates(n.chi)
 
 	// Convenience wrapper
@@ -238,7 +506,7 @@ func (n *Normalizer) doShardReplicasCount(shard *chiv1.ChiShard, layoutReplicasC
 			// We have Replicas specified as slice - ok, this means exact ReplicasCount is known
 			shard.ReplicasCount = len(shard.Replicas)
 		} else {
-			// Inherit ReplicasCount from layout
+			// MergeFrom ReplicasCount from layout
 			shard.ReplicasCount = layoutReplicasCount
 		}
 	}
@@ -310,7 +578,7 @@ func (n *Normalizer) doShardReplicas(shard *chiv1.ChiShard) {
 		// Normalize a replica
 		n.doReplicaName(replica, replicaIndex)
 		n.doReplicaPort(replica)
-		// Inherit PodTemplate from shard
+		// Use PodTemplate from shard
 		replica.InheritTemplates(shard)
 	}
 }

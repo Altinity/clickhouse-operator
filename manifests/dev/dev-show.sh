@@ -2,7 +2,7 @@
 
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-source ${CUR_DIR}/dev-config.sh
+source "${CUR_DIR}/dev-config.sh"
 
 echo "=== Pod ==="
 kubectl -n "${CHOPERATOR_NAMESPACE}" -o wide get pod
