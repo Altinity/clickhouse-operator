@@ -46,8 +46,7 @@ function download_file() {
     local LOCAL_FILE="${LOCAL_DIR}/${FILE}"
 
     REPO_URL="https://raw.githubusercontent.com/Altinity/clickhouse-operator"
-    #BRANCH="dev-vladislav"
-    BRANCH="master"
+    BRANCH="${BRANCH:-master}"
     FILE_URL="${REPO_URL}/${BRANCH}/${REPO_DIR}/${FILE}"
 
     # Check curl is in place
