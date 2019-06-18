@@ -13,13 +13,23 @@
 # Prerequisites
 1. Operational Kubernetes instance
 1. Properly configured `kubectl`
+1. `curl`
 
 # ClickHouse Operator Installation
 
-Apply `clickhouse-operator` installation manifest. The simplest way - directly from github 
+Apply `clickhouse-operator` installation manifest. The simplest way - directly from `github`.
+Please, `cd` into writable folder, because install script would download config files to build `.yaml` manifests from. 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator/clickhouse-operator-install.yaml
+cd ~
+curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/dev-vladislav/manifests/dev/clickhouse-operator-install.sh | CHOPERATOR_NAMESPACE=test-clickhouse-operator bash
 ```
+Take into account explicitly specified namespace
+```bash
+CHOPERATOR_NAMESPACE=test-clickhouse-operator
+```
+This namespace would be created and used to install `clickhouse-operator` into.
+Install script would download some `.yaml` and `.xml` files and install `clickhouse-operator` into specified namespace.
+
 Operator installation process
 ```text
 customresourcedefinition.apiextensions.k8s.io/clickhouseinstallations.clickhouse.altinity.com created
@@ -31,7 +41,7 @@ service/clickhouse-operator-metrics created
 
 Check `clickhouse-operator` is running:
 ```bash
-kubectl get pods -n kube-system
+kubectl get pods -n test-clickhouse-operator
 ```
 ```text
 NAME                                 READY   STATUS    RESTARTS   AGE
@@ -62,7 +72,7 @@ This is the trivial [1 shard 1 replica](./examples/01-standard-layout-01-1shard-
 **WARNING**: Do not use it for anything other than 'Hello, world!', it does not have persistent storage!
  
 ```bash
-kubectl apply -n test -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/01-standard-layout-01-1shard-1repl.yaml
+kubectl apply -n test-clickhouse-operator -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/01-standard-layout-01-1shard-1repl.yaml
 ```
 ```text
 clickhouseinstallation.clickhouse.altinity.com/example-01 created
@@ -86,7 +96,7 @@ spec:
 Once cluster is created, there are two checks to be made.
 
 ```bash
-kubectl get pods -n test
+kubectl get pods -n test-clickhouse-operator
 ```
 ```text
 NAME                    READY   STATUS    RESTARTS   AGE
@@ -96,7 +106,7 @@ chi-b3d29f-a242-0-0-0   1/1     Running   0          10m
 Watch out for 'Running' status. Also check services created by an operator:
 
 ```bash
-kubectl get service -n test
+kubectl get service -n test-clickhouse-operator
 ```
 ```text
 NAME                    TYPE           CLUSTER-IP       EXTERNAL-IP                          PORT(S)                         AGE
@@ -121,7 +131,7 @@ Connected to ClickHouse server version 19.4.3 revision 54416.
 ``` 
 1. In case there is not **EXTERNAL-IP** available, we can access ClickHouse from inside Kubernetes cluster
 ```bash
-kubectl -n test exec -it chi-b3d29f-a242-0-0-0 -- clickhouse-client
+kubectl -n test-clickhouse-operator exec -it chi-b3d29f-a242-0-0-0 -- clickhouse-client
 ```
 ```text
 ClickHouse client version 19.4.3.11.

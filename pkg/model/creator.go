@@ -165,7 +165,7 @@ func (r *Reconciler) createServiceFromTemplate(
 	for i := range template.Spec.Ports {
 		servicePort := &template.Spec.Ports[i]
 		if (servicePort.Port < 1) || (servicePort.Port > 65535) {
-			glog.V(1).Infof("createServiceFromTemplate(%s/%s) INCORRECT PORT: %d ", namespace, name, servicePort.Port )
+			glog.V(1).Infof("createServiceFromTemplate(%s/%s) INCORRECT PORT: %d ", namespace, name, servicePort.Port)
 			return nil
 		}
 	}

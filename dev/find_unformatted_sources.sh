@@ -11,16 +11,16 @@ set -o pipefail
 
 # Source configuration
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-source ${CUR_DIR}/binary_build_config.sh
+source "${CUR_DIR}/binary_build_config.sh"
 
 # Prepare list of all .go files in the project, but exclude all files from /vendor/ folder
-GO_FILES_LIST=$(find ${SRC_ROOT} -name \*.go -not -path "${SRC_ROOT}/vendor/*" -print)
+GO_FILES_LIST=$(find "${SRC_ROOT}" -name \*.go -not -path "${SRC_ROOT}/vendor/*" -print)
 # Prepare unformatted files list
 UNFORMATTED_FILES_LIST=$(gofmt -l ${GO_FILES_LIST})
 
 if [[ ${UNFORMATTED_FILES_LIST} ]]; then
     for FILE in ${UNFORMATTED_FILES_LIST}; do
-        echo ${FILE}
+        echo "${FILE}"
     done
     exit 1
 fi
