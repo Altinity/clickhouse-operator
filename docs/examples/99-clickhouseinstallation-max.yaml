@@ -135,6 +135,42 @@ spec:
   templates:
     serviceTemplates:
       - name: chi-service-template
+        # generateName understands different sets of macroses,
+        # depending on the level of the object, for which Service is being created:
+        #
+        # For CHI-level Service:
+        # 1. {chi} - ClickHouseInstallation name
+        # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+        #
+        # For Cluster-level Service:
+        # 1. {chi} - ClickHouseInstallation name
+        # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+        # 3. {cluster} - cluster name
+        # 4. {clusterID} - short hashed cluster name (BEWARE, this is an experimental feature)
+        # 5. {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+        #
+        # For Shard-level Service:
+        # 1. {chi} - ClickHouseInstallation name
+        # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+        # 3. {cluster} - cluster name
+        # 4. {clusterID} - short hashed cluster name (BEWARE, this is an experimental feature)
+        # 5. {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+        # 6. {shard} - shard name
+        # 7. {shardID} - short hashed shard name (BEWARE, this is an experimental feature)
+        # 8. {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+        #
+        # For Replica-level Service:
+        # 1. {chi} - ClickHouseInstallation name
+        # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+        # 3. {cluster} - cluster name
+        # 4. {clusterID} - short hashed cluster name (BEWARE, this is an experimental feature)
+        # 5. {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+        # 6. {shard} - shard name
+        # 7. {shardID} - short hashed shard name (BEWARE, this is an experimental feature)
+        # 8. {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+        # 9. {replica} - replica name
+        # 10. {replicaD} - short hashed replica name (BEWARE, this is an experimental feature)
+        # 11. {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
         generateName: "service-{chi}"
         # type ServiceSpec struct from k8s.io/core/v1
         spec:
@@ -158,7 +194,6 @@ spec:
           type: ClusterIP
           ClusterIP: None
 
-
     volumeClaimTemplates:
       - name: default-volume-claim
         # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
@@ -174,6 +209,7 @@ spec:
           resources:
             requests:
               storage: 1Gi
+
     podTemplates:
       # multiple pod templates makes possible to update version smoothly
       # pod template for ClickHouse v18.16.1
