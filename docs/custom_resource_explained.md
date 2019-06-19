@@ -24,7 +24,7 @@ clickhouse-installation-max   23h
 ## .spec.defaults
 ```yaml
   defaults:
-    replicasUseFQDN: 0 # 0 - by default, 1 - enabled
+    replicasUseFQDN: "no"
     distributedDDL:
       profile: default
     templates:
@@ -110,18 +110,28 @@ expands into
 
 ClickHouse instances layout within cluster is described with `.clusters.layout` section
 ```yaml
-    - name: sharded-replicated
-      layout:
-        shardsCount: 3
-        replicasCount: 2
+      - name: all-counts
+        templates:
+          podTemplate: clickhouse-v18.16.1
+          volumeClaimTemplate: default-volume-claim
+        layout:
+          shardsCount: 3
+          replicasCount: 2
+```
+Pod and VolumeClaim templates to be used can be specified explicitly for each replica:
+```yaml
+        templates:
+          podTemplate: clickhouse-v18.16.1
+          volumeClaimTemplate: default-volume-claim
 ```
 `layout` is specified with basic layout dimensions:
 ```yaml
-      layout:
-        shardsCount: 3
-        replicasCount: 2
+        layout:
+          shardsCount: 3
+          replicasCount: 2
 ```
-or with detailed specification of `shards` and `replicas`:
+or with detailed specification of `shards` and `replicas`. \
+`shard0` here has `replicasCount` specified, while `shard1` has 3 replicas explicitly specified, with possibility to customized each replica.  
 ```yaml
       - name: customized
         templates:
@@ -146,7 +156,8 @@ or with detailed specification of `shards` and `replicas`:
                 - name: replica1
                 - name: replica2
 ```
-combination is also possible:
+combination is also possible, which is presented in `shard2` specification, where 3 replicas in total are requested with `replicasCount` 
+and one of these replicas is explicitly specified with different `podTemplate`:
 ```yaml
       - name: customized
         templates:
@@ -167,13 +178,13 @@ combination is also possible:
                     podTemplate: clickhouse-v18.16.2
                     volumeClaimTemplate: default-volume-claim
 ```
-ClickHouse cluster named `sharded-replicated` represented by layout with 3 shards of 2 replicas each (6 pods total).
+ClickHouse cluster named `all-counts` represented by layout with 3 shards of 2 replicas each (6 pods total).
 Pods will be created and fully managed by the operator.
 In ClickHouse config file this would be represented as:
 ```xml
 <yandex>
     <remote_servers>
-        <sharded-replicated>
+        <all-counts>
         
             <shard>
                 <internal_replication>true</internal_replication>
@@ -211,7 +222,7 @@ In ClickHouse config file this would be represented as:
                 </replica>
             </shard>
             
-        </sharded-replicated>
+        </all-counts>
     </remote_servers>
 </yandex>
 ``` 
@@ -220,17 +231,17 @@ with full IP and DNS management provided by k8s and operator.
 ### Layout with shards count specified
 
 ```yaml
-    - name: sharded-non-replicated
+    - name: shards-only
       layout:
         shardsCount: 3 # replicasCount = 1, by default
 ```
-ClickHouse cluster named `sharded-non-replicated` represented by layout with 3 shards of 1 replicas each (3 pods total).
+ClickHouse cluster named `shards-only` represented by layout with 3 shards of 1 replicas each (3 pods total).
 Pods will be created and fully managed by the operator.
 In ClickHouse config file this would be represented as:
 ```xml
 <yandex>
     <remote_servers>
-        <sharded-non-replicated>
+        <shards-only>
         
             <shard>
                 <replica>
@@ -253,7 +264,7 @@ In ClickHouse config file this would be represented as:
                 </replica>
             </shard>
             
-        </sharded-non-replicated>
+        </shards-only>
     </remote_servers>
 </yandex>
 ``` 
@@ -261,17 +272,17 @@ In ClickHouse config file this would be represented as:
 ### Layout with replicas count specified
 
 ```yaml
-    - name: replicated
+    - name: replicas-only
       layout:
-        replicasCount: 4 # shardsCount = 1, by default
+        replicasCount: 3 # shardsCount = 1, by default
 ```
-ClickHouse cluster named `replicated` represented by layout with 1 shard of 4 replicas each (4 pods total).
+ClickHouse cluster named `replicas-only` represented by layout with 1 shard of 3 replicas each (3 pods total).
 Pods will be created and fully managed by the operator.
 In ClickHouse config file this would be represented as:
 ```xml
 <yandex>
     <remote_servers>
-        <replicated>
+        <replicas-only>
         
             <shard>
                 <internal_replication>true</internal_replication>
@@ -287,13 +298,9 @@ In ClickHouse config file this would be represented as:
                     <host>192.168.1.3</host>
                     <port>9000</port>
                 </replica>
-                <replica>
-                    <host>192.168.1.4</host>
-                    <port>9000</port>
-                </replica>
             </shard>
             
-        </replicated>
+        </replicas-only>
     </remote_servers>
 </yandex>
 ``` 
@@ -335,6 +342,59 @@ Another example with selectively described replicas. Note - `replicasCount` spec
                     podTemplate: clickhouse-v18.16.2
                     volumeClaimTemplate: default-volume-claim
 ```
+
+## ,spec.templates.serviceTemplates
+```yaml
+  templates:
+    serviceTemplates:
+      - name: chi-service-template
+        # generateName understands different sets of macroses,
+        # depending on the level of the object, for which Service is being created:
+        #
+        # For CHI-level Service:
+        # 1. {chi} - ClickHouseInstallation name
+        # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+        #
+        # For Cluster-level Service:
+        # 1. {chi} - ClickHouseInstallation name
+        # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+        # 3. {cluster} - cluster name
+        # 4. {clusterID} - short hashed cluster name (BEWARE, this is an experimental feature)
+        # 5. {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+        #
+        # For Shard-level Service:
+        # 1. {chi} - ClickHouseInstallation name
+        # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+        # 3. {cluster} - cluster name
+        # 4. {clusterID} - short hashed cluster name (BEWARE, this is an experimental feature)
+        # 5. {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+        # 6. {shard} - shard name
+        # 7. {shardID} - short hashed shard name (BEWARE, this is an experimental feature)
+        # 8. {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+        #
+        # For Replica-level Service:
+        # 1. {chi} - ClickHouseInstallation name
+        # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+        # 3. {cluster} - cluster name
+        # 4. {clusterID} - short hashed cluster name (BEWARE, this is an experimental feature)
+        # 5. {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+        # 6. {shard} - shard name
+        # 7. {shardID} - short hashed shard name (BEWARE, this is an experimental feature)
+        # 8. {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+        # 9. {replica} - replica name
+        # 10. {replicaD} - short hashed replica name (BEWARE, this is an experimental feature)
+        # 11. {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
+        generateName: "service-{chi}"
+        # type ServiceSpec struct from k8s.io/core/v1
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: client
+              port: 9000
+          type: LoadBalancer
+```
+`.spec.templates.serviceTemplates` represents [Service](https://kubernetes.io/docs/concepts/services-networking/service/) templates
 
 ## .spec.templates.volumeClaimTemplates
 ```yaml
