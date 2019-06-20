@@ -267,22 +267,14 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(replica *chiv1.ChiReplica) str
 	cline(b, 0, "    <macros>")
 
 	// <installation>CHI-name-macros-value</installation>
-	cline(b, 8, "<installation>%s</installation>", c.getMacrosInstallation(replica.Address.ChiName))
+	cline(b, 8, "<installation>%s</installation>", replica.Address.ChiName)
 
 	// <CLUSTER_NAME>cluster-name-macros-value</CLUSTER_NAME>
-	cline(b, 8, "<%s>%[2]s</%[1]s>", replica.Address.ClusterName, c.getMacrosCluster(replica.Address.ClusterName))
+	// cline(b, 8, "<%s>%[2]s</%[1]s>", replica.Address.ClusterName, c.getMacrosCluster(replica.Address.ClusterName))
 	// <CLUSTER_NAME-shard>0-based shard index within cluster</CLUSTER_NAME-shard>
-	cline(b, 8, "<%s-shard>%d</%[1]s-shard>", replica.Address.ClusterName, replica.Address.ShardIndex)
-
-	// One Shard All Replicas Cluster
-	// <CLUSTER_NAME>cluster name</CLUSTER_NAME>
-	cline(b, 8, "<%s>%[1]s</%[1]s>", oneShardAllReplicasClusterName)
-	// <CLUSTER_NAME-shard>0-based shard index within one-shard-cluster would always be 0</CLUSTER_NAME-shard>
-	cline(b, 8, "<%s-shard>%d</%[1]s-shard>", oneShardAllReplicasClusterName, 0)
+	// cline(b, 8, "<%s-shard>%d</%[1]s-shard>", replica.Address.ClusterName, replica.Address.ShardIndex)
 
 	// All Shards One Replica Cluster
-	// <CLUSTER_NAME>cluster name</CLUSTER_NAME>
-	cline(b, 8, "<%s>%[1]s</%[1]s>", allShardsOneReplicaClusterName)
 	// <CLUSTER_NAME-shard>0-based shard index within all-shards-one-replica-cluster would always be GlobalReplicaIndex</CLUSTER_NAME-shard>
 	cline(b, 8, "<%s-shard>%d</%[1]s-shard>", allShardsOneReplicaClusterName, replica.Address.GlobalReplicaIndex)
 
