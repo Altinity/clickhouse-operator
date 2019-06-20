@@ -12,11 +12,10 @@ spec:
     templates:
       podTemplate: clickhouse-v18.16.1
       volumeClaimTemplate: default-volume-claim
+      chiServiceTemplate: chi-service-template
 
   configuration:
-    templates:
-      serviceTemplate: chi-service-template
-    zookeeper:
+s    zookeeper:
       nodes:
         - host: zookeeper-0.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
@@ -123,14 +122,14 @@ spec:
               templates:
                 podTemplate: clickhouse-v18.16.1
                 volumeClaimTemplate: default-volume-claim
-                serviceTemplate: replica-service-template
+                replicaServiceTemplate: replica-service-template
               replicas:
                 - name: replica0
                   port: 9000
                   templates:
                     podTemplate: clickhouse-v18.16.2
                     volumeClaimTemplate: default-volume-claim
-                    serviceTemplate: replica-service-template
+                    replicaServiceTemplate: replica-service-template
 
   templates:
     serviceTemplates:
