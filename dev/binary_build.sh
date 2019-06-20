@@ -15,10 +15,16 @@ GIT_SHA=$(cd "${CUR_DIR}"; git rev-parse --short HEAD)
 "${SRC_ROOT}/manifests/operator/build-clickhouse-operator-install-yaml.sh"
 
 #CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ${CUR_DIR}/clickhouse-operator ${SRC_ROOT}/cmd/clickhouse-operator
-CGO_ENABLED=0 go build \
-    -v -a \
+if CGO_ENABLED=0 go build \
+    -a \
     -ldflags "-X ${REPO}/pkg/version.Version=${VERSION} -X ${REPO}/pkg/version.GitSHA=${GIT_SHA}" \
     -o "${OPERATOR_BIN}" \
-    "${SRC_ROOT}/cmd/manager/main.go"
+    "${SRC_ROOT}/cmd/manager/main.go"; then
+    echo "Build OK"
+else
+    echo "WARING!"
+    echo "BUILD FAILED"
+    echo "Check logs for details"
+fi
 
 exit $?
