@@ -1,10 +1,11 @@
 #!/bin/bash
 
-CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE:-dev}"
-CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE:-altinity/clickhouse-operator:dev}"
+CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE:-clickhouse-operator}"
+CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
 
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
+# Check whether kubectl is available
 function ensure_kubectl() {
     if ! kubectl version > /dev/null; then
         echo "kubectl failed, can not continue"
@@ -12,6 +13,8 @@ function ensure_kubectl() {
     fi
 }
 
+# Check whether file is available locally
+# and download it from github repo if need be
 function ensure_file() {
     # Params
     local LOCAL_DIR="$1"
@@ -37,6 +40,7 @@ function ensure_file() {
     fi
 }
 
+# Download file from github repo
 function download_file() {
     # Params
     local LOCAL_DIR="$1"
@@ -45,7 +49,7 @@ function download_file() {
 
     local LOCAL_FILE="${LOCAL_DIR}/${FILE}"
 
-    REPO_URL="https://raw.githubusercontent.com/Altinity/clickhouse-operator"
+    REPO_URL="${REPO_URL:-https://raw.githubusercontent.com/Altinity/clickhouse-operator}"
     BRANCH="${BRANCH:-master}"
     FILE_URL="${REPO_URL}/${BRANCH}/${REPO_DIR}/${FILE}"
 
@@ -72,6 +76,10 @@ function download_file() {
     fi
 }
 
+#
+# Main
+#
+
 ensure_kubectl
 ensure_file "${CUR_DIR}" "cat-clickhouse-operator-install-yaml.sh" "manifests/dev"
 
@@ -84,6 +92,7 @@ if kubectl get namespace "${CHOPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
         exit 1
     fi
 else
+    # No ${CHOPERATOR_NAMESPACE} namespace found, let's create it
     # Let's setup all clickhouse-operator-related stuff into dedicated namespace
     kubectl create namespace "${CHOPERATOR_NAMESPACE}"
 fi
