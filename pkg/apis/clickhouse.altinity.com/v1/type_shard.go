@@ -19,7 +19,7 @@ func (shard *ChiShard) InheritTemplates(cluster *ChiCluster) {
 }
 
 func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
-	name := shard.Templates.ServiceTemplate
+	name := shard.Templates.ShardServiceTemplate
 	template, ok := shard.Chi.GetServiceTemplate(name)
 	return template, ok
 }

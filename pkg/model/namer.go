@@ -157,14 +157,14 @@ func getNamePartReplicaName(replica *chop.ChiReplica) string {
 	return namePartReplicaName(replica.Address.ReplicaName)
 }
 
-func newReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
+func newNameReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
 	return strings.NewReplacer(
 		"{chi}", namePartChiName(chi.Name),
 		"{chiID}", namePartChiNameID(chi.Name),
 	)
 }
 
-func newReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
+func newNameReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 	return strings.NewReplacer(
 		"{chi}", namePartChiName(cluster.Address.ChiName),
 		"{chiID}", namePartChiNameID(cluster.Address.ChiName),
@@ -174,7 +174,7 @@ func newReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 	)
 }
 
-func newReplacerShard(shard *chop.ChiShard) *strings.Replacer {
+func newNameReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 	return strings.NewReplacer(
 		"{chi}", namePartChiName(shard.Address.ChiName),
 		"{chiID}", namePartChiNameID(shard.Address.ChiName),
@@ -187,7 +187,7 @@ func newReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 	)
 }
 
-func newReplacerReplica(replica *chop.ChiReplica) *strings.Replacer {
+func newNameReplacerReplica(replica *chop.ChiReplica) *strings.Replacer {
 	return strings.NewReplacer(
 		"{chi}", namePartChiName(replica.Address.ChiName),
 		"{chiID}", namePartChiNameID(replica.Address.ChiName),
@@ -205,17 +205,17 @@ func newReplacerReplica(replica *chop.ChiReplica) *strings.Replacer {
 
 // CreateConfigMapPodName returns a name for a ConfigMap for replica's pod
 func CreateConfigMapPodName(replica *chop.ChiReplica) string {
-	return newReplacerReplica(replica).Replace(configMapDeploymentNamePattern)
+	return newNameReplacerReplica(replica).Replace(configMapDeploymentNamePattern)
 }
 
 // CreateConfigMapCommonName returns a name for a ConfigMap for replica's common chopConfig
 func CreateConfigMapCommonName(chi *chop.ClickHouseInstallation) string {
-	return newReplacerChi(chi).Replace(configMapCommonNamePattern)
+	return newNameReplacerChi(chi).Replace(configMapCommonNamePattern)
 }
 
 // CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common chopConfig
 func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
-	return newReplacerChi(chi).Replace(configMapCommonUsersNamePattern)
+	return newNameReplacerChi(chi).Replace(configMapCommonUsersNamePattern)
 }
 
 // CreateChiServiceName creates a name of a Installation Service resource
@@ -224,12 +224,12 @@ func CreateChiServiceName(chi *chop.ClickHouseInstallation) string {
 		// Service template available
 		if template.GenerateName != "" {
 			// Service template has explicitly specified service name template
-			return newReplacerChi(chi).Replace(template.GenerateName)
+			return newNameReplacerChi(chi).Replace(template.GenerateName)
 		}
 	}
 
 	// Create Service name based on default Service Name template
-	return newReplacerChi(chi).Replace(chiServiceNamePattern)
+	return newNameReplacerChi(chi).Replace(chiServiceNamePattern)
 }
 
 // CreateChiServiceName creates a name of a Installation Service resource
@@ -247,12 +247,12 @@ func CreateClusterServiceName(cluster *chop.ChiCluster) string {
 		// Service template available
 		if template.GenerateName != "" {
 			// Service template has explicitly specified service name template
-			return newReplacerCluster(cluster).Replace(template.GenerateName)
+			return newNameReplacerCluster(cluster).Replace(template.GenerateName)
 		}
 	}
 
 	// Create Service name based on default Service Name template
-	return newReplacerCluster(cluster).Replace(clusterServiceNamePattern)
+	return newNameReplacerCluster(cluster).Replace(clusterServiceNamePattern)
 }
 
 // CreateShardServiceName returns a name of a shard's Service
@@ -261,17 +261,17 @@ func CreateShardServiceName(shard *chop.ChiShard) string {
 		// Service template available
 		if template.GenerateName != "" {
 			// Service template has explicitly specified service name template
-			return newReplacerShard(shard).Replace(template.GenerateName)
+			return newNameReplacerShard(shard).Replace(template.GenerateName)
 		}
 	}
 
 	// Create Service name based on default Service Name template
-	return newReplacerShard(shard).Replace(shardServiceNamePattern)
+	return newNameReplacerShard(shard).Replace(shardServiceNamePattern)
 }
 
 // CreateStatefulSetName creates a name of a StatefulSet for replica
 func CreateStatefulSetName(replica *chop.ChiReplica) string {
-	return newReplacerReplica(replica).Replace(statefulSetNamePattern)
+	return newNameReplacerReplica(replica).Replace(statefulSetNamePattern)
 }
 
 // CreateStatefulSetServiceName returns a name of a StatefulSet-related Service for replica
@@ -280,12 +280,12 @@ func CreateStatefulSetServiceName(replica *chop.ChiReplica) string {
 		// Service template available
 		if template.GenerateName != "" {
 			// Service template has explicitly specified service name template
-			return newReplacerReplica(replica).Replace(template.GenerateName)
+			return newNameReplacerReplica(replica).Replace(template.GenerateName)
 		}
 	}
 
 	// Create Service name based on default Service Name template
-	return newReplacerReplica(replica).Replace(statefulSetServiceNamePattern)
+	return newNameReplacerReplica(replica).Replace(statefulSetServiceNamePattern)
 }
 
 // CreatePodHostname returns a name of a Pod resource for a replica
