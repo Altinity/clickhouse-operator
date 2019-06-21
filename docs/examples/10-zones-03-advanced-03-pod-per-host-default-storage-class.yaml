@@ -23,9 +23,8 @@ spec:
     templates:
       podTemplate: clickhouse-per-host
       volumeClaimTemplate: storage-vc-template
+      chiServiceTemplate: ch-service
   configuration:
-    templates:
-      serviceTemplate: ch-service
     clusters:
       - name: zoned
         layout:

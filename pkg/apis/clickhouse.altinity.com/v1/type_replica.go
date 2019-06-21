@@ -31,7 +31,7 @@ func (replica *ChiReplica) GetVolumeClaimTemplate() (*ChiVolumeClaimTemplate, bo
 }
 
 func (replica *ChiReplica) GetServiceTemplate() (*ChiServiceTemplate, bool) {
-	name := replica.Templates.ServiceTemplate
+	name := replica.Templates.ReplicaServiceTemplate
 	template, ok := replica.Chi.GetServiceTemplate(name)
 	return template, ok
 }
