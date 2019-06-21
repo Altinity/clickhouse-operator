@@ -60,7 +60,7 @@ spec:
                       type: string
                     volumeClaimTemplate:
                       type: string
-                    chiServiceTemplate:
+                    serviceTemplate:
                       type: string
                     clusterServiceTemplate:
                       type: string
@@ -117,7 +117,7 @@ spec:
                             type: string
                           volumeClaimTemplate:
                             type: string
-                          chiServiceTemplate:
+                          serviceTemplate:
                             type: string
                           clusterServiceTemplate:
                             type: string
@@ -161,7 +161,7 @@ spec:
                                       type: string
                                     volumeClaimTemplate:
                                       type: string
-                                    chiServiceTemplate:
+                                    serviceTemplate:
                                       type: string
                                     clusterServiceTemplate:
                                       type: string
@@ -187,7 +187,7 @@ spec:
                                             type: string
                                           volumeClaimTemplate:
                                             type: string
-                                          chiServiceTemplate:
+                                          serviceTemplate:
                                             type: string
                                           clusterServiceTemplate:
                                             type: string

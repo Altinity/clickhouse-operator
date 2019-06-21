@@ -22,7 +22,7 @@ spec:
   defaults:
     templates:
       podTemplate: clickhouse-per-host-localstorage
-      chiServiceTemplate: ch-service
+      serviceTemplate: ch-service
   configuration:
     clusters:
       - name: ch-localstorage
