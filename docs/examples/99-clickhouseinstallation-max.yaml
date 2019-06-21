@@ -12,7 +12,7 @@ spec:
     templates:
       podTemplate: clickhouse-v18.16.1
       volumeClaimTemplate: default-volume-claim
-      chiServiceTemplate: chi-service-template
+      serviceTemplate: chi-service-template
 
   configuration:
 s    zookeeper:

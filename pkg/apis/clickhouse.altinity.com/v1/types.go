@@ -59,7 +59,7 @@ type ChiDefaults struct {
 type ChiTemplateNames struct {
 	PodTemplate            string `json:"podTemplate,omitempty"         yaml:"podTemplate"`
 	VolumeClaimTemplate    string `json:"volumeClaimTemplate,omitempty" yaml:"volumeClaimTemplate"`
-	ChiServiceTemplate     string `json:"chiServiceTemplate,omitempty"     yaml:"chiServiceTemplate"`
+	serviceTemplate     string `json:"serviceTemplate,omitempty"     yaml:"serviceTemplate"`
 	ClusterServiceTemplate string `json:"clusterServiceTemplate,omitempty"     yaml:"clusterServiceTemplate"`
 	ShardServiceTemplate   string `json:"shardServiceTemplate,omitempty"     yaml:"shardServiceTemplate"`
 	ReplicaServiceTemplate string `json:"replicaServiceTemplate,omitempty"     yaml:"replicaServiceTemplate"`
@@ -72,8 +72,8 @@ func (templates *ChiTemplateNames) MergeFrom(from *ChiTemplateNames) {
 	if templates.VolumeClaimTemplate == "" {
 		templates.VolumeClaimTemplate = from.VolumeClaimTemplate
 	}
-	if templates.ChiServiceTemplate == "" {
-		templates.ChiServiceTemplate = from.ChiServiceTemplate
+	if templates.serviceTemplate == "" {
+		templates.serviceTemplate = from.serviceTemplate
 	}
 	if templates.ClusterServiceTemplate == "" {
 		templates.ClusterServiceTemplate = from.ClusterServiceTemplate

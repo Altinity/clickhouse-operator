@@ -23,7 +23,7 @@ spec:
     templates:
       podTemplate: clickhouse-per-host
       volumeClaimTemplate: storage-vc-template
-      chiServiceTemplate: ch-service
+      serviceTemplate: ch-service
   configuration:
     clusters:
       - name: zoned
