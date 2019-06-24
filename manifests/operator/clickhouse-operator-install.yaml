@@ -62,18 +62,15 @@ spec:
                       type: string
                     serviceTemplate:
                       type: string
+                    clusterServiceTemplate:
+                      type: string
+                    shardServiceTemplate:
+                      type: string
+                    replicaServiceTemplate:
+                      type: string
             configuration:
               type: object
               properties:
-                templates:
-                  type: object
-                  properties:
-                    podTemplate:
-                      type: string
-                    volumeClaimTemplate:
-                      type: string
-                    serviceTemplate:
-                      type: string
                 zookeeper:
                   type: object
                   properties:
@@ -122,6 +119,12 @@ spec:
                             type: string
                           serviceTemplate:
                             type: string
+                          clusterServiceTemplate:
+                            type: string
+                          shardServiceTemplate:
+                            type: string
+                          replicaServiceTemplate:
+                            type: string
                       layout:
                         type: object
                         properties:
@@ -160,6 +163,12 @@ spec:
                                       type: string
                                     serviceTemplate:
                                       type: string
+                                    clusterServiceTemplate:
+                                      type: string
+                                    shardServiceTemplate:
+                                      type: string
+                                    replicaServiceTemplate:
+                                      type: string
                                 replicas:
                                   type: array
                                   items:
@@ -179,6 +188,12 @@ spec:
                                           volumeClaimTemplate:
                                             type: string
                                           serviceTemplate:
+                                            type: string
+                                          clusterServiceTemplate:
+                                            type: string
+                                          shardServiceTemplate:
+                                            type: string
+                                          replicaServiceTemplate:
                                             type: string
             templates:
               type: object

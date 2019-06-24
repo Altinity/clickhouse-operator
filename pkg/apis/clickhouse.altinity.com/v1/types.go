@@ -57,9 +57,12 @@ type ChiDefaults struct {
 
 // ChiTemplateNames defines references to .spec.templates to be used on current level of cluster
 type ChiTemplateNames struct {
-	PodTemplate         string `json:"podTemplate,omitempty"         yaml:"podTemplate"`
-	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty" yaml:"volumeClaimTemplate"`
-	ServiceTemplate     string `json:"serviceTemplate,omitempty"     yaml:"serviceTemplate"`
+	PodTemplate            string `json:"podTemplate,omitempty"         yaml:"podTemplate"`
+	VolumeClaimTemplate    string `json:"volumeClaimTemplate,omitempty" yaml:"volumeClaimTemplate"`
+	serviceTemplate     string `json:"serviceTemplate,omitempty"     yaml:"serviceTemplate"`
+	ClusterServiceTemplate string `json:"clusterServiceTemplate,omitempty"     yaml:"clusterServiceTemplate"`
+	ShardServiceTemplate   string `json:"shardServiceTemplate,omitempty"     yaml:"shardServiceTemplate"`
+	ReplicaServiceTemplate string `json:"replicaServiceTemplate,omitempty"     yaml:"replicaServiceTemplate"`
 }
 
 func (templates *ChiTemplateNames) MergeFrom(from *ChiTemplateNames) {
@@ -69,14 +72,22 @@ func (templates *ChiTemplateNames) MergeFrom(from *ChiTemplateNames) {
 	if templates.VolumeClaimTemplate == "" {
 		templates.VolumeClaimTemplate = from.VolumeClaimTemplate
 	}
-	if templates.ServiceTemplate == "" {
-		templates.ServiceTemplate = from.ServiceTemplate
+	if templates.serviceTemplate == "" {
+		templates.serviceTemplate = from.serviceTemplate
+	}
+	if templates.ClusterServiceTemplate == "" {
+		templates.ClusterServiceTemplate = from.ClusterServiceTemplate
+	}
+	if templates.ShardServiceTemplate == "" {
+		templates.ShardServiceTemplate = from.ShardServiceTemplate
+	}
+	if templates.ReplicaServiceTemplate == "" {
+		templates.ReplicaServiceTemplate = from.ReplicaServiceTemplate
 	}
 }
 
 // ChiConfiguration defines configuration section of .spec
 type ChiConfiguration struct {
-	Templates ChiTemplateNames       `json:"templates"           yaml:"templates"`
 	Zookeeper ChiZookeeperConfig     `json:"zookeeper,omitempty" yaml:"zookeeper"`
 	Users     map[string]interface{} `json:"users,omitempty"     yaml:"users"`
 	Profiles  map[string]interface{} `json:"profiles,omitempty"  yaml:"profiles"`
