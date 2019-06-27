@@ -57,28 +57,48 @@ func (c *Controller) deleteReplica(replica *chop.ChiReplica) error {
 	_ = c.statefulSetDelete(replica)
 	_ = c.persistentVolumeClaimDelete(replica)
 	_ = c.configMapDelete(replica)
-	_ = c.serviceDelete(replica)
+	_ = c.deleteServiceReplica(replica)
+
+	glog.V(1).Infof("End delete replica %s/%s", replica.Address.ClusterName, replica.Name)
 
 	return nil
 }
 
 // deleteShard deletes all kubernetes resources related to shard *chop.ChiShard
-func (c *Controller) deleteShard(shard *chop.ChiShard) {
+func (c *Controller) deleteShard(shard *chop.ChiShard) error {
+	glog.V(1).Infof("Start delete shard %s/%s", shard.Address.Namespace, shard.Name)
+
+	// Delete all replicas
 	shard.WalkReplicas(c.deleteReplica)
+
+	// Delete Shard Service
+	c.deleteServiceShard(shard)
+	glog.V(1).Infof("End delete shard %s/%s", shard.Address.Namespace, shard.Name)
+
+	return nil
 }
 
 // deleteCluster deletes all kubernetes resources related to cluster *chop.ChiCluster
-func (c *Controller) deleteCluster(cluster *chop.ChiCluster) {
-	glog.V(1).Infof("Start delete cluster %s", cluster.Name)
-	cluster.WalkReplicas(c.deleteReplica)
+func (c *Controller) deleteCluster(cluster *chop.ChiCluster) error {
+	glog.V(1).Infof("Start delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
+
+	// Delete all shards
+	cluster.WalkShards(c.deleteShard)
+
+	// Delete Cluster Service
+	c.deleteServiceCluster(cluster)
+	glog.V(1).Infof("End delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
+
+	return nil
 }
 
 // deleteChi deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
-func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
+func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) error {
+	glog.V(1).Infof("Start delete CHI %s/%s", chi.Namespace, chi.Name)
+
 	// Delete all clusters
 	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
-		c.deleteCluster(cluster)
-		return nil
+		return c.deleteCluster(cluster)
 	})
 
 	// Delete common ConfigMap's
@@ -106,14 +126,12 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) {
 		glog.V(1).Infof("FAIL delete ConfigMap %s/%s %v", chi.Namespace, configMapCommonUsersName, err)
 	}
 
-	chiServiceName := chopmodel.CreateChiServiceName(chi)
 	// Delete Service
-	err = c.kubeClient.CoreV1().Services(chi.Namespace).Delete(chiServiceName, newDeleteOptions())
-	if err == nil {
-		glog.V(1).Infof("OK delete Service %s/%s", chi.Namespace, chiServiceName)
-	} else {
-		glog.V(1).Infof("FAIL delete Service %s/%s %v", chi.Namespace, chiServiceName, err)
-	}
+	err = c.deleteServiceChi(chi)
+
+	glog.V(1).Infof("End delete CHI %s/%s", chi.Namespace, chi.Name)
+
+	return nil
 }
 
 // statefulSetDeletePod delete a pod of a StatefulSet. This requests StatefulSet to relaunch deleted pod
@@ -202,17 +220,53 @@ func (c *Controller) configMapDelete(replica *chop.ChiReplica) error {
 	return nil
 }
 
-// serviceDelete deletes Service
-func (c *Controller) serviceDelete(replica *chop.ChiReplica) error {
-	name := chopmodel.CreateStatefulSetServiceName(replica)
+// deleteServiceReplica deletes Service
+func (c *Controller) deleteServiceReplica(replica *chop.ChiReplica) error {
+	serviceName := chopmodel.CreateStatefulSetServiceName(replica)
 	namespace := replica.Address.Namespace
+	glog.V(1).Infof("deleteServiceReplica(%s/%s)", namespace, serviceName)
+	return c.deleteServiceIfExists(namespace, serviceName)
+}
 
-	glog.V(1).Infof("serviceDelete(%s/%s)", namespace, name)
+func (c *Controller) deleteServiceShard(shard *chop.ChiShard) error {
+	serviceName := chopmodel.CreateShardServiceName(shard)
+	namespace := shard.Address.Namespace
+	glog.V(1).Infof("deleteServiceShard(%s/%s)", namespace, serviceName)
+	return c.deleteServiceIfExists(namespace, serviceName)
+}
 
-	if err := c.kubeClient.CoreV1().Services(namespace).Delete(name, newDeleteOptions()); err == nil {
-		glog.V(1).Infof("Service %s/%s deleted", namespace, name)
-	} else {
-		glog.V(1).Infof("Service %s/%s delete FAILED %v", namespace, name, err)
+func (c *Controller) deleteServiceCluster(cluster *chop.ChiCluster) error {
+	serviceName := chopmodel.CreateClusterServiceName(cluster)
+	namespace := cluster.Address.Namespace
+	glog.V(1).Infof("deleteServiceCluster(%s/%s)", namespace, serviceName)
+	return c.deleteServiceIfExists(namespace, serviceName)
+}
+
+func (c *Controller) deleteServiceChi(chi *chop.ClickHouseInstallation) error {
+	serviceName := chopmodel.CreateChiServiceName(chi)
+	namespace := chi.Namespace
+	glog.V(1).Infof("deleteServiceChi(%s/%s)", namespace, serviceName)
+	return c.deleteServiceIfExists(namespace, serviceName)
+}
+
+func (c *Controller) deleteServiceIfExists(namespace, name string) error {
+	// Delete Service in case it does not exist
+
+	// Check service exists
+	_, err := c.kubeClient.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+
+	if err != nil {
+		// No such a service, nothing to delete
+		return nil
 	}
-	return nil
+
+	// Delete service
+	err = c.kubeClient.CoreV1().Services(namespace).Delete(name, newDeleteOptions())
+	if err == nil {
+		glog.V(1).Infof("OK delete Service %s/%s", namespace, name)
+	} else {
+		glog.V(1).Infof("FAIL delete Service %s/%s %v", namespace, name, err)
+	}
+
+	return err
 }
