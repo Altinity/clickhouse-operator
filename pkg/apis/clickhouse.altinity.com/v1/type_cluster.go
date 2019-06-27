@@ -25,13 +25,13 @@ func (cluster *ChiCluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 }
 
 func (cluster *ChiCluster) WalkShards(
-	f func(shardIndex int, shard *ChiShard) error,
+	f func(shard *ChiShard) error,
 ) []error {
 	res := make([]error, 0)
 
 	for shardIndex := range cluster.Layout.Shards {
 		shard := &cluster.Layout.Shards[shardIndex]
-		res = append(res, f(shardIndex, shard))
+		res = append(res, f(shard))
 	}
 
 	return res
