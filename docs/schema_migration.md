@@ -1,19 +1,23 @@
-# Schema migration
+# Schema maintenance
 
-`clickhouse-operator` can resize cluster. After cluster is scaled up and new ClickHouse instances are ready, `clickhouse-operator` migrates schema.
-Schema is unified among all replicas within each cluster. So, suppose we have the following configuration:
- * **replica1** has table `table1`
- * **replica2** has table `table2`
- 
-Please, pay attention, that each replica has its own table. 
+`clickhouse-operator` automates schema management when cluster is scaled up or down
 
-Having specified setup, we decide to add one more replica.
+# Schema auto-creation
 
-`clickhouse-operator` adds one more ClickHouse instance, and, after scale process completed, all three nodes would have both tables created:
- * **replica1** has tables: `table1`, `table2`
- * **replica2** has tables: `table1`, `table2`
- * **replica3** has tables: `table1`, `table2`
+After cluster is scaled up and new ClickHouse instances are ready, `clickhouse-operator` automatically creates schema.
 
-Please note - `clickhouse-operator` does nothing with data, table definition only is migrated. 
-However, in case newly added replica is properly configured, ClickHouse itself would replicate data from master to newly added replica.
-   
+If shard is added:
+  * Other shards in the cluster are analyzed for distributed and corresponding local tables
+  * Databases for local and distributed tables are created
+  * Local tables are created
+  * Distributed tables are created
+  
+If replica is added:
+  * Other replicas **at the same shard** are analyzed for replicated tables
+  * Databases for replicated tables are created
+  * Replicated tables are created
+  * Then the same logic as to adding shard applies
+
+# Schema auto-deletion
+
+If cluster is scaled down and some shards or replicas are deleted, `clickhouse-operator` drops replicated table to make sure nothing is left in ZooKeeper.
