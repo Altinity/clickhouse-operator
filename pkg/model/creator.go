@@ -15,6 +15,7 @@
 package model
 
 import (
+	"fmt"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -26,7 +27,7 @@ import (
 	"github.com/golang/glog"
 )
 
-// createServiceChi creates new corev1.Service
+// createServiceChi creates new corev1.Service for specified CHI
 func (r *Reconciler) createServiceChi(chi *chiv1.ClickHouseInstallation) *corev1.Service {
 	serviceName := CreateChiServiceName(chi)
 
@@ -68,7 +69,7 @@ func (r *Reconciler) createServiceChi(chi *chiv1.ClickHouseInstallation) *corev1
 	}
 }
 
-// createServiceCluster
+// createServiceCluster creates new corev1.Service for specified Cluster
 func (r *Reconciler) createServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
 	serviceName := CreateClusterServiceName(cluster)
 
@@ -87,7 +88,7 @@ func (r *Reconciler) createServiceCluster(cluster *chiv1.ChiCluster) *corev1.Ser
 	}
 }
 
-// createServiceShard
+// createServiceShard creates new corev1.Service for specified Shard
 func (r *Reconciler) createServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 	serviceName := CreateShardServiceName(shard)
 
@@ -106,7 +107,7 @@ func (r *Reconciler) createServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 	}
 }
 
-// createServiceReplica creates new corev1.Service
+// createServiceReplica  creates new corev1.Service for specified Replica
 func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(replica)
 	statefulSetName := CreateStatefulSetName(replica)
@@ -153,6 +154,20 @@ func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Ser
 	}
 }
 
+// verifyServiceTemplatePorts verifies ChiServiceTemplate to have reasonable ports specified
+func (r *Reconciler) verifyServiceTemplatePorts(template *chiv1.ChiServiceTemplate) error {
+	for i := range template.Spec.Ports {
+		servicePort := &template.Spec.Ports[i]
+		if (servicePort.Port < 1) || (servicePort.Port > 65535) {
+			msg := fmt.Sprintf("verifyServiceTemplatePorts(%s) INCORRECT PORT: %d ", template.Name, servicePort.Port)
+			glog.V(1).Infof(msg)
+			return fmt.Errorf(msg)
+		}
+	}
+
+	return nil
+}
+
 // createServiceFromTemplate create Service from ChiServiceTemplate and additional info
 func (r *Reconciler) createServiceFromTemplate(
 	template *chiv1.ChiServiceTemplate,
@@ -161,23 +176,25 @@ func (r *Reconciler) createServiceFromTemplate(
 	labels map[string]string,
 	selector map[string]string,
 ) *corev1.Service {
+
 	// Verify Ports
-	for i := range template.Spec.Ports {
-		servicePort := &template.Spec.Ports[i]
-		if (servicePort.Port < 1) || (servicePort.Port > 65535) {
-			glog.V(1).Infof("createServiceFromTemplate(%s/%s) INCORRECT PORT: %d ", namespace, name, servicePort.Port)
-			return nil
-		}
+	if err := r.verifyServiceTemplatePorts(template); err != nil {
+		return nil
 	}
 
+	// Create Service
 	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels:    labels,
-		},
-		Spec: *template.Spec.DeepCopy(),
+		ObjectMeta: *template.ObjectMeta.DeepCopy(),
+		Spec:       *template.Spec.DeepCopy(),
 	}
+
+	// Overwrite .name and .namespace - they are not allowed to be specified in template
+	service.Name = name
+	service.Namespace = namespace
+
+	// Append provided Labels to already specified Labels in template
+	service.Labels = util.MergeStringMaps(service.Labels, labels)
+
 	// Append provided Selector to already specified Selector in template
 	service.Spec.Selector = util.MergeStringMaps(service.Spec.Selector, selector)
 

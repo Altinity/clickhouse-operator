@@ -256,6 +256,9 @@ spec:
                         type: string
                       generateName:
                         type: string
+                      metadata:
+                        # TODO specify ObjectMeta
+                        type: object
                       spec:
                         # TODO specify ServiceSpec
                         type: object
