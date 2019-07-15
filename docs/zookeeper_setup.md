@@ -1,7 +1,6 @@
-# Task: Setup Zookeeper
+# Setting up Zookeeper
 
-We are going to setup Zookeeper in k8s environment.
-This document assumes k8s cluster already setup and `kubectl` has access to it.
+This document describes how to setup ZooKeeper in k8s environment.
 
 Zookeeper installation is available in two options:
 1. [Quick start](#quick-start) - just run it quickly and ask no questions

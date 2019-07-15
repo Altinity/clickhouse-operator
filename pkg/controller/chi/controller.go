@@ -221,6 +221,7 @@ func (c *Controller) AddEventHandlers(
 			}
 
 			added := false
+			modified := false
 			for path := range diff.Added {
 				glog.V(1).Infof("onUpdateEndpoints(%s/%s): added %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
 				for _, pathnode := range *path {
@@ -234,22 +235,25 @@ func (c *Controller) AddEventHandlers(
 				glog.V(1).Infof("onUpdateEndpoints(%s/%s): removed %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
 			}
 			for path := range diff.Modified {
-				glog.V(1).Infof("onUpdateEndpoints(%s/%s): modified %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
+				glog.V(2).Infof("onUpdateEndpoints(%s/%s): modified %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
 				for _, pathnode := range *path {
 					s := pathnode.String()
 					if s == ".Addresses" {
 						added = true
+						modified = true
 					}
 				}
 			}
 
 			if added {
 				glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) IP ASSIGNED %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.Subsets)
-				if chi, err := c.createChiFromObjectMeta(&newEndpoints.ObjectMeta); err == nil {
-					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", newEndpoints.Namespace, newEndpoints.Name, chi.Name)
-					_ = c.schemer.ChiDropDnsCache(chi)
-				} else {
-					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.ObjectMeta.Labels)
+				if modified {
+					if chi, err := c.createChiFromObjectMeta(&newEndpoints.ObjectMeta); err == nil {
+						glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", newEndpoints.Namespace, newEndpoints.Name, chi.Name)
+						_ = c.schemer.ChiDropDnsCache(chi)
+					} else {
+						glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.ObjectMeta.Labels)
+					}
 				}
 			}
 		},
@@ -477,10 +481,10 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 
 // onUpdateChi sync CHI which was already created earlier
 func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
-	glog.V(1).Infof("onUpdateChi(%s/%s):", old.Namespace, old.Name)
+	glog.V(2).Infof("onUpdateChi(%s/%s):", old.Namespace, old.Name)
 
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		glog.V(1).Infof("onUpdateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		glog.V(2).Infof("onUpdateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
 		// No need to react
 		return nil
 	}
@@ -536,19 +540,38 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		glog.V(1).Infof("reconcileChi() FAILED: %v", err)
 		c.eventChi(old, eventTypeWarning, eventActionUpdate, eventReasonUpdateFailed, fmt.Sprintf("onUpdateChi(%s/%s) update resources failed", old.Namespace, old.Name))
 	} else {
-		c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) migrate schema", old.Namespace, old.Name))
-		new.WalkClusters(func(cluster *chop.ChiCluster) error {
-			dbNames, createDatabaseSQLs, _ := c.schemer.ClusterGetCreateDatabases(new, cluster)
-			glog.V(1).Infof("Creating databases: %v", dbNames)
-			_ = c.schemer.ClusterApplySQLs(cluster, createDatabaseSQLs, true)
+		for path := range diff.Added {
+			switch diff.Added[path].(type) {
+			case chop.ChiCluster:
+				cluster := diff.Added[path].(chop.ChiCluster)
+				glog.V(1).Infof("Added new cluster %s", cluster.Name)
+				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) added cluster %s", old.Namespace, old.Name, cluster.Name))
+			case chop.ChiShard:
+				shard := diff.Added[path].(chop.ChiShard)
+				cluster := new.Spec.Configuration.Clusters[0]
+				// cluster := new.Spec.Configuration.Clusters[0]
+				glog.V(1).Infof("Added new shard %d", shard.Address.ShardIndex)
+				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) added shard %d", old.Namespace, old.Name, shard.Address.ShardIndex))
 
-			tableNames, createTableSQLs, _ := c.schemer.ClusterGetCreateTables(new, cluster)
-			glog.V(1).Infof("Creating tables: %v", tableNames)
-			_ = c.schemer.ClusterApplySQLs(cluster, createTableSQLs, true)
-			return nil
-		})
+				names, createSQLs, _ := c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
+				glog.V(1).Infof("Creating distributed objects: %v", names)
+				_ = c.schemer.ShardApplySQLs(&shard, createSQLs, true)
+			case chop.ChiReplica:
+				replica := diff.Added[path].(chop.ChiReplica)
+				cluster := new.Spec.Configuration.Clusters[0]
+				glog.V(1).Infof("Added new replica %d", replica.Address.ReplicaIndex)
+				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) added replica %d", old.Namespace, old.Name, replica.Address.ReplicaIndex))
+
+				names, createSQLs, _ := c.schemer.GetCreateReplicatedObjects(new, &cluster, &replica)
+				glog.V(1).Infof("Creating replicated objects: %v", names)
+				_ = c.schemer.ReplicaApplySQLs(&replica, createSQLs, true)
+
+				names, createSQLs, _ = c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
+				glog.V(1).Infof("Creating distributed objects: %v", names)
+				_ = c.schemer.ReplicaApplySQLs(&replica, createSQLs, true)
+			}
+		}
 		_ = c.updateCHIResource(new)
-
 		c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateCompleted, fmt.Sprintf("onUpdateChi(%s/%s) completed", old.Namespace, old.Name))
 	}
 

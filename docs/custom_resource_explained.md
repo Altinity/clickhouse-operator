@@ -385,6 +385,16 @@ Another example with selectively described replicas. Note - `replicasCount` spec
         # 10. {replicaD} - short hashed replica name (BEWARE, this is an experimental feature)
         # 11. {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
         generateName: "service-{chi}"
+        # type ObjectMeta struct from k8s.io/meta/v1
+        metadata:
+          labels:
+            custom.label: "custom.value"
+          annotations:
+            cloud.google.com/load-balancer-type: "Internal"
+            service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
+            service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+            service.beta.kubernetes.io/openstack-internal-load-balancer: "true"
+            service.beta.kubernetes.io/cce-load-balancer-internal-vpc: "true"
         # type ServiceSpec struct from k8s.io/core/v1
         spec:
           ports:

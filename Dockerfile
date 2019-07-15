@@ -1,6 +1,6 @@
 # === Builder ===
 
-FROM golang:1.11.5 AS builder
+FROM golang:1.12 AS builder
 
 RUN apt-get update && apt-get install -y -q apt-utils && apt-get install -y -q gettext-base
 WORKDIR $GOPATH/src/github.com/altinity/clickhouse-operator

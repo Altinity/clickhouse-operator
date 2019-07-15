@@ -57,12 +57,12 @@ type ChiDefaults struct {
 
 // ChiTemplateNames defines references to .spec.templates to be used on current level of cluster
 type ChiTemplateNames struct {
-	PodTemplate            string `json:"podTemplate,omitempty"         yaml:"podTemplate"`
-	VolumeClaimTemplate    string `json:"volumeClaimTemplate,omitempty" yaml:"volumeClaimTemplate"`
-	ServiceTemplate        string `json:"serviceTemplate,omitempty"     yaml:"serviceTemplate"`
-	ClusterServiceTemplate string `json:"clusterServiceTemplate,omitempty"     yaml:"clusterServiceTemplate"`
-	ShardServiceTemplate   string `json:"shardServiceTemplate,omitempty"     yaml:"shardServiceTemplate"`
-	ReplicaServiceTemplate string `json:"replicaServiceTemplate,omitempty"     yaml:"replicaServiceTemplate"`
+	PodTemplate            string `json:"podTemplate,omitempty"            yaml:"podTemplate"`
+	VolumeClaimTemplate    string `json:"volumeClaimTemplate,omitempty"    yaml:"volumeClaimTemplate"`
+	ServiceTemplate        string `json:"serviceTemplate,omitempty"        yaml:"serviceTemplate"`
+	ClusterServiceTemplate string `json:"clusterServiceTemplate,omitempty" yaml:"clusterServiceTemplate"`
+	ShardServiceTemplate   string `json:"shardServiceTemplate,omitempty"   yaml:"shardServiceTemplate"`
+	ReplicaServiceTemplate string `json:"replicaServiceTemplate,omitempty" yaml:"replicaServiceTemplate"`
 }
 
 func (templates *ChiTemplateNames) MergeFrom(from *ChiTemplateNames) {
@@ -237,6 +237,7 @@ func (v PVCReclaimPolicy) IsValid() bool {
 type ChiServiceTemplate struct {
 	Name         string             `json:"name"         yaml:"name"`
 	GenerateName string             `json:"generateName" yaml:"generateName"`
+	ObjectMeta   metav1.ObjectMeta  `json:"metadata"     yaml:"metadata"`
 	Spec         corev1.ServiceSpec `json:"spec"         yaml:"spec"`
 }
 
