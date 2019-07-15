@@ -247,8 +247,14 @@ type ChiDistributedDDL struct {
 }
 
 // ChiZookeeperConfig defines zookeeper section of .spec.configuration
+// Refers to
+// https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper
 type ChiZookeeperConfig struct {
-	Nodes []ChiZookeeperNode `json:"nodes,omitempty" yaml:"nodes"`
+	Nodes              []ChiZookeeperNode `json:"nodes,omitempty"                yaml:"nodes"`
+	SessionTimeoutMs   string             `json:"session_timeout_ms,omitempty"   yaml:"session_timeout_ms"`
+	OperationTimeoutMs string             `json:"operation_timeout_ms,omitempty" yaml:"operation_timeout_ms"`
+	Root               string             `json:"root,omitempty"                 yaml:"root"`
+	Identity           string             `json:"identity,omitempty"             yaml:"identity"`
 }
 
 // ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper

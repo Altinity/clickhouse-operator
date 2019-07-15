@@ -20,6 +20,7 @@ import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	xmlbuilder "github.com/altinity/clickhouse-operator/pkg/model/builder/xml"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"strconv"
 )
 
 const (
@@ -66,7 +67,10 @@ func (c *ClickHouseConfigGenerator) GetSettings() string {
 
 // GetZookeeper creates data for "zookeeper.xml"
 func (c *ClickHouseConfigGenerator) GetZookeeper() string {
-	if len(c.chi.Spec.Configuration.Zookeeper.Nodes) == 0 {
+	// Convenience wrapper
+	zk := &c.chi.Spec.Configuration.Zookeeper
+
+	if len(zk.Nodes) == 0 {
 		// No Zookeeper nodes provided
 		return ""
 	}
@@ -76,10 +80,11 @@ func (c *ClickHouseConfigGenerator) GetZookeeper() string {
 	//		<zookeeper>
 	cline(b, 0, "<"+xmlTagYandex+">")
 	cline(b, 4, "<zookeeper>")
+
 	// Append Zookeeper nodes
-	for i := range c.chi.Spec.Configuration.Zookeeper.Nodes {
+	for i := range zk.Nodes {
 		// Convenience wrapper
-		node := &c.chi.Spec.Configuration.Zookeeper.Nodes[i]
+		node := &zk.Nodes[i]
 		// <node>
 		//		<host>HOST</host>
 		//		<port>PORT</port>
@@ -89,6 +94,35 @@ func (c *ClickHouseConfigGenerator) GetZookeeper() string {
 		cline(b, 8, "    <port>%d</port>", node.Port)
 		cline(b, 8, "</node>")
 	}
+
+	// Append session_timeout_ms
+	if timeout, err := strconv.Atoi(zk.SessionTimeoutMs); err == nil {
+		// We have something specified as session_timeout_ms, try to use it
+		// Skip invalid timeout
+		if timeout > 0 {
+			cline(b, 8, "<session_timeout_ms>%d</session_timeout_ms>", timeout)
+		}
+	}
+
+	// Append operation_timeout_ms
+	if timeout, err := strconv.Atoi(zk.OperationTimeoutMs); err == nil {
+		// We have something specified as operation_timeout_ms, try to use it
+		// Skip invalid timeout
+		if timeout > 0 {
+			cline(b, 8, "<operation_timeout_ms>%d</operation_timeout_ms>", timeout)
+		}
+	}
+
+	// Append root
+	if len(zk.Root) > 0 {
+		cline(b, 8, "<root>%s</root>", zk.Root)
+	}
+
+	// Append identity
+	if len(zk.Identity) > 0 {
+		cline(b, 8, "<identity>%s</identity>", zk.Identity)
+	}
+
 	// </zookeeper>
 	cline(b, 4, "</zookeeper>")
 
