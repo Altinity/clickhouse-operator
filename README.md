@@ -9,11 +9,6 @@ The ClickHouse Operator creates, configures and manages ClickHouse clusters runn
 **Warning!** 
 **ClickHouse Operator is in beta. You can use it at your own risk. There may be backwards incompatible API changes up until the first major release.**
 
-**Release 0.3.0 is backward incompatible with 0.2.3 and earlier:**
-* **Pod and volume templates are spec'ed slightly differently (now they correspond to Kubernetes API) -- check corresponding examples, those were updated to reflect the change.**
-* **All managed objects have got the different naming approach, that includes installation and primary instances names.**
-
-
 ## Features
 
 The ClickHouse Operator for Kubernetes currently provides the following:
@@ -44,8 +39,7 @@ The ClickHouse Operator for Kubernetes currently provides the following:
  
 **Maintenance tasks**
  * [Add replication to an existing ClickHouse cluster][update_cluster_add_replication]
- * Add shards and replicas
-   * [Automatic schema creation][schema_migration]
+ * [Automatic schema creation][schema_migration]
  * [Update ClickHouse version][update_clickhouse_version]
  * [Update Operator version][update_operator]
 
