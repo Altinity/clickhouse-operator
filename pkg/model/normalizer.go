@@ -337,6 +337,7 @@ func (n *Normalizer) doVolumeClaimTemplate(template *chiv1.ChiVolumeClaimTemplat
 func (n *Normalizer) doServiceTemplate(template *chiv1.ChiServiceTemplate) {
 	// Check name
 	// Check GenerateName
+	// Check ObjectMeta
 	// Check Spec
 
 	// Ensure map is in place
