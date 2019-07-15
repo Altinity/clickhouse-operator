@@ -46,14 +46,18 @@ clickhouse-installation-max   23h
 ```yaml
     zookeeper:
       nodes:
-        - host: zk-statefulset-0.zk-service.default.svc.cluster.local
+        - host: zookeeper-0.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
-        - host: zk-statefulset-1.zk-service.default.svc.cluster.local
+        - host: zookeeper-1.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
-        - host: zk-statefulset-2.zk-service.default.svc.cluster.local
+        - host: zookeeper-2.zookeepers.zoo3ns.svc.cluster.local
           port: 2181
+      session_timeout_ms: 30000
+      operation_timeout_ms: 10000
+      root: /path/to/zookeeper/node
+      identity: user:password
 ```
-`.spec.configuration.zookeeper` refers to [&lt;yandex&gt;&lt;zookeeper&gt;&lt;/zookeeper&gt;&lt;/yandex&gt;](https://clickhouse.yandex/docs/en/operations/table_engines/replication/) config section
+`.spec.configuration.zookeeper` refers to [&lt;yandex&gt;&lt;zookeeper&gt;&lt;/zookeeper&gt;&lt;/yandex&gt;](https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper) config section
 
 ## .spec.configuration.users
 ```yaml
