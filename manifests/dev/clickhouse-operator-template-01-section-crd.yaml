@@ -86,6 +86,14 @@ spec:
                           port:
                             type: integer
                             minimum: 1
+                    session_timeout_ms:
+                      type: integer
+                    operation_timeout_ms:
+                      type: integer
+                    root:
+                      type: string
+                    identity:
+                      type: string
                 users:
                   type: object
                 profiles:

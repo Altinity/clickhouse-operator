@@ -21,10 +21,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 
+	"fmt"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/golang/glog"
 	"strings"
-	"fmt"
 )
 
 const (
@@ -54,10 +54,10 @@ func (s *Schemer) newConn(hostname string) *clickhouse.Conn {
 }
 
 func (s *Schemer) getObjectListFromCH(serviceUrl string, sql string) ([]string, []string, error) {
-    // Results
+	// Results
 	names := make([]string, 0)
 	sqlStatements := make([]string, 0)
-	
+
 	glog.V(1).Info(serviceUrl)
 	conn := s.newConn(serviceUrl)
 	var rows *sqlmodule.Rows = nil
@@ -128,7 +128,7 @@ FROM
 ANY INNER JOIN (select distinct database, name, create_table_query from system.tables SETTINGS skip_unavailable_shards = 1) USING (database, name)
 ORDER BY order
 `, "system.tables", system_tables)
-	
+
 	names, sqlStatements, _ := s.getObjectListFromCH(CreateChiServiceFQDN(chi), sql)
 	return names, sqlStatements, nil
 }
@@ -140,12 +140,12 @@ func (s *Schemer) GetCreateReplicatedObjects(ch *chi.ClickHouseInstallation, clu
 		shard = &cluster.Layout.Shards[shardIndex]
 		for replicaIndex := range shard.Replicas {
 			shardReplica := &shard.Replicas[replicaIndex]
-			if (shardReplica == replica) {
-				break;
+			if shardReplica == replica {
+				break
 			}
 		}
 	}
-	if (shard == nil) {
+	if shard == nil {
 		glog.V(1).Info("Can not find shard for replica")
 		return nil, nil, nil
 	}
@@ -166,7 +166,7 @@ FROM system.tables
 WHERE engine_full LIKE 'Replicated%%'
 SETTINGS skip_unavailable_shards = 1
 `, "system.tables", system_tables)
-	
+
 	names, sqlStatements, _ := s.getObjectListFromCH(CreateChiServiceFQDN(ch), sql)
 	return names, sqlStatements, nil
 }
@@ -254,7 +254,6 @@ func (s *Schemer) ReplicaApplySQLs(replica *chi.ChiReplica, sqls []string, retry
 func (s *Schemer) ShardApplySQLs(shard *chi.ChiShard, sqls []string, retry bool) error {
 	return s.applySQLs(CreatePodFQDNsOfShard(shard), sqls, retry)
 }
-
 
 // applySQLs runs set of SQL queries on set on hosts
 func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
