@@ -44,6 +44,7 @@ type ChiStatus struct {
 	Version       string   `json:"version"`
 	ClustersCount int      `json:"clusters"`
 	ReplicasCount int      `json:"replicas"`
+	ShardsCount   int      `json:"shards"`
 	Pods          []string `json:"pods"`
 	Endpoint      string   `json:"endpoint"`
 }

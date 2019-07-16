@@ -221,9 +221,8 @@ func (c *Controller) AddEventHandlers(
 			}
 
 			added := false
-			modified := false
 			for path := range diff.Added {
-				glog.V(1).Infof("onUpdateEndpoints(%s/%s): added %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
+				glog.V(2).Infof("onUpdateEndpoints(%s/%s): added %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
 				for _, pathnode := range *path {
 					s := pathnode.String()
 					if s == ".Addresses" {
@@ -232,28 +231,19 @@ func (c *Controller) AddEventHandlers(
 				}
 			}
 			for path := range diff.Removed {
-				glog.V(1).Infof("onUpdateEndpoints(%s/%s): removed %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
+				glog.V(2).Infof("onUpdateEndpoints(%s/%s): removed %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
 			}
 			for path := range diff.Modified {
 				glog.V(2).Infof("onUpdateEndpoints(%s/%s): modified %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
-				for _, pathnode := range *path {
-					s := pathnode.String()
-					if s == ".Addresses" {
-						added = true
-						modified = true
-					}
-				}
 			}
 
 			if added {
 				glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) IP ASSIGNED %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.Subsets)
-				if modified {
-					if chi, err := c.createChiFromObjectMeta(&newEndpoints.ObjectMeta); err == nil {
-						glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", newEndpoints.Namespace, newEndpoints.Name, chi.Name)
-						_ = c.schemer.ChiDropDnsCache(chi)
-					} else {
-						glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.ObjectMeta.Labels)
-					}
+				if chi, err := c.createChiFromObjectMeta(&newEndpoints.ObjectMeta); err == nil {
+					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", newEndpoints.Namespace, newEndpoints.Name, chi.Name)
+					_ = c.schemer.ChiDropDnsCache(chi)
+				} else {
+					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.ObjectMeta.Labels)
 				}
 			}
 		},
@@ -446,32 +436,30 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	// We need to create all resources that are needed to run user's .yaml specification
 	glog.V(1).Infof("onAddChi(%s/%s)", chi.Namespace, chi.Name)
 
-	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateStarted, fmt.Sprintf("onAddChi(%s/%s)", chi.Namespace, chi.Name))
 	chi, err := c.normalizer.CreateTemplatedChi(chi)
 	if err != nil {
 		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
-		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to normalize", chi.Name))
+		c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "unable to normalize configuration")
 		return err
 	}
 
-	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateInProgress, fmt.Sprintf("onAddChi(%s/%s) create objects", chi.Namespace, chi.Name))
 	err = c.reconcile(chi)
 	if err != nil {
 		glog.V(1).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
-		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to create", chi.Name))
+		c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "Unable to create resources")
 		return err
 	}
 
 	// Update CHI status in k8s
-	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateInProgress, fmt.Sprintf("onAddChi(%s/%s) create CHI", chi.Namespace, chi.Name))
 	if err := c.updateCHIResource(chi); err != nil {
 		glog.V(1).Infof("ClickHouseInstallation (%q): unable to update status of CHI resource: %q", chi.Name, err)
-		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, fmt.Sprintf("ClickHouseInstallation (%s): unable to update CHI Resource", chi.Name))
+		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, "Unable to update CHI Resource")
 		return err
 	}
 
 	glog.V(1).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
-	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted, fmt.Sprintf("onAddChi(%s/%s)", chi.Namespace, chi.Name))
+	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted,
+		fmt.Sprintf("created cluster with %d shards and %d replicas", chi.Status.ShardsCount, chi.Status.ReplicasCount))
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
 	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.CreatePodFQDNsOfChi(chi))
@@ -512,55 +500,63 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
-	c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateStarted, fmt.Sprintf("onUpdateChi(%s/%s):", old.Namespace, old.Name))
-
 	// Deal with removed items
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range diff.Removed {
 		switch diff.Removed[path].(type) {
 		case chop.ChiCluster:
 			cluster := diff.Removed[path].(chop.ChiCluster)
-			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete cluster %s", cluster.Name))
+			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
+				fmt.Sprintf("delete cluster %s", cluster.Name))
 			c.deleteCluster(&cluster)
 		case chop.ChiShard:
 			shard := diff.Removed[path].(chop.ChiShard)
-			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete shard %d", shard.Address.ShardIndex))
+			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
+				fmt.Sprintf("delete shard %d in cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName))
 			c.deleteShard(&shard)
 		case chop.ChiReplica:
 			replica := diff.Removed[path].(chop.ChiReplica)
-			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete replica %d", replica.Address.ReplicaIndex))
+			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
+				fmt.Sprintf("delete replica %d from shard %d in cluster %s", replica.Address.ReplicaIndex, replica.Address.ShardIndex, replica.Address.ClusterName))
 			_ = c.deleteReplica(&replica)
 		}
 	}
 
 	// Deal with added/updated items
 	//	c.listStatefulSetResources(chi)
-	c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) update resources", old.Namespace, old.Name))
 	if err := c.reconcile(new); err != nil {
-		glog.V(1).Infof("reconcileChi() FAILED: %v", err)
-		c.eventChi(old, eventTypeWarning, eventActionUpdate, eventReasonUpdateFailed, fmt.Sprintf("onUpdateChi(%s/%s) update resources failed", old.Namespace, old.Name))
+		log := fmt.Sprintf("Update of resources has FAILED: %v", err)
+		glog.V(1).Info(log)
+		c.eventChi(old, eventTypeError, eventActionUpdate, eventReasonUpdateFailed, log)
 	} else {
 		for path := range diff.Added {
 			switch diff.Added[path].(type) {
 			case chop.ChiCluster:
 				cluster := diff.Added[path].(chop.ChiCluster)
-				glog.V(1).Infof("Added new cluster %s", cluster.Name)
-				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) added cluster %s", old.Namespace, old.Name, cluster.Name))
+
+				log := fmt.Sprintf("Added cluster %s", cluster.Name)
+				glog.V(1).Info(log)
+
+				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 			case chop.ChiShard:
 				shard := diff.Added[path].(chop.ChiShard)
-				cluster := new.Spec.Configuration.Clusters[0]
-				// cluster := new.Spec.Configuration.Clusters[0]
-				glog.V(1).Infof("Added new shard %d", shard.Address.ShardIndex)
-				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) added shard %d", old.Namespace, old.Name, shard.Address.ShardIndex))
+				cluster := new.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
+
+				log := fmt.Sprintf("Added shard %d to cluster %s", shard.Address.ShardIndex, cluster.Name)
+				glog.V(1).Info(log)
+				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 
 				names, createSQLs, _ := c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
+
 				glog.V(1).Infof("Creating distributed objects: %v", names)
 				_ = c.schemer.ShardApplySQLs(&shard, createSQLs, true)
 			case chop.ChiReplica:
 				replica := diff.Added[path].(chop.ChiReplica)
-				cluster := new.Spec.Configuration.Clusters[0]
-				glog.V(1).Infof("Added new replica %d", replica.Address.ReplicaIndex)
-				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("onUpdateChi(%s/%s) added replica %d", old.Namespace, old.Name, replica.Address.ReplicaIndex))
+				cluster := new.Spec.Configuration.Clusters[replica.Address.ClusterIndex]
+
+				log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", replica.Address.ReplicaIndex, replica.Address.ShardIndex, cluster.Name)
+				glog.V(1).Info(log)
+				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 
 				names, createSQLs, _ := c.schemer.GetCreateReplicatedObjects(new, &cluster, &replica)
 				glog.V(1).Infof("Creating replicated objects: %v", names)
@@ -572,7 +568,6 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 			}
 		}
 		_ = c.updateCHIResource(new)
-		c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateCompleted, fmt.Sprintf("onUpdateChi(%s/%s) completed", old.Namespace, old.Name))
 	}
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
@@ -588,9 +583,8 @@ func (c *Controller) onDeleteChi(chi *chop.ClickHouseInstallation) error {
 		return err
 	}
 
-	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteStarted, fmt.Sprintf("onDeleteChi(%s/%s) started", chi.Namespace, chi.Name))
 	c.deleteChi(chi)
-	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, fmt.Sprintf("onDeleteChi(%s/%s) completed", chi.Namespace, chi.Name))
+	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, "deleted")
 
 	return nil
 }

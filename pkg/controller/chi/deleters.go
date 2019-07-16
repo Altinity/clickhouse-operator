@@ -37,7 +37,7 @@ func (c *Controller) deleteTablesOnReplica(replica *chop.ChiReplica) error {
 	// Delete tables on replica
 	tableNames, dropTableSQLs, _ := c.schemer.ReplicaGetDropTables(replica)
 	glog.V(1).Infof("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	_ = c.schemer.ReplicaApplySQLs(replica, dropTableSQLs, true)
+	_ = c.schemer.ReplicaApplySQLs(replica, dropTableSQLs, false)
 
 	return nil
 }
