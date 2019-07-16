@@ -87,9 +87,9 @@ spec:
                             type: integer
                             minimum: 1
                     session_timeout_ms:
-                      type: string
+                      type: integer
                     operation_timeout_ms:
-                      type: string
+                      type: integer
                     root:
                       type: string
                     identity:
