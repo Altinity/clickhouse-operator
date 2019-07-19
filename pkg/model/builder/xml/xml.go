@@ -148,9 +148,9 @@ func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) {
 		for _, value := range n.value.([]string) {
 			n.writeTagWithValue(w, value, indent, tabsize)
 		}
-	case string:
-		// value is a string
-		stringValue := n.value.(string)
+	case string, int, int8, int16, int32, int64, uint, uint8, uint32, uint64, float32, float64:
+		// value must be casted to a string
+		stringValue := fmt.Sprint(n.value)
 		n.writeTagWithValue(w, stringValue, indent, tabsize)
 	default:
 		// no value node, may have nested tags
