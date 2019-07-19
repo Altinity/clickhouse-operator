@@ -324,7 +324,6 @@ func CreatePodFQDNsOfShard(shard *chop.ChiShard) []string {
 	return fqdns
 }
 
-
 // CreatePodFQDNsOfChi creates fully qualified domain names of all pods in a CHI
 func CreatePodFQDNsOfChi(chi *chop.ClickHouseInstallation) []string {
 	fqdns := make([]string, 0)

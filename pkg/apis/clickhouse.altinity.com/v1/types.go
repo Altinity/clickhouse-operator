@@ -44,6 +44,7 @@ type ChiStatus struct {
 	Version       string   `json:"version"`
 	ClustersCount int      `json:"clusters"`
 	ReplicasCount int      `json:"replicas"`
+	ShardsCount   int      `json:"shards"`
 	Pods          []string `json:"pods"`
 	Endpoint      string   `json:"endpoint"`
 }
@@ -93,6 +94,7 @@ type ChiConfiguration struct {
 	Profiles  map[string]interface{} `json:"profiles,omitempty"  yaml:"profiles"`
 	Quotas    map[string]interface{} `json:"quotas,omitempty"    yaml:"quotas"`
 	Settings  map[string]interface{} `json:"settings,omitempty"  yaml:"settings"`
+	Files     map[string]string      `json:"files,omitempty"     yaml:"files"`
 	// TODO refactor into map[string]ChiCluster
 	Clusters []ChiCluster `json:"clusters,omitempty"`
 }
@@ -247,8 +249,14 @@ type ChiDistributedDDL struct {
 }
 
 // ChiZookeeperConfig defines zookeeper section of .spec.configuration
+// Refers to
+// https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper
 type ChiZookeeperConfig struct {
-	Nodes []ChiZookeeperNode `json:"nodes,omitempty" yaml:"nodes"`
+	Nodes              []ChiZookeeperNode `json:"nodes,omitempty"                yaml:"nodes"`
+	SessionTimeoutMs   int                `json:"session_timeout_ms,omitempty"   yaml:"session_timeout_ms"`
+	OperationTimeoutMs int                `json:"operation_timeout_ms,omitempty" yaml:"operation_timeout_ms"`
+	Root               string             `json:"root,omitempty"                 yaml:"root"`
+	Identity           string             `json:"identity,omitempty"             yaml:"identity"`
 }
 
 // ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper

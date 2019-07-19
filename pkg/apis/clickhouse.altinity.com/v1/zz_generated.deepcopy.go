@@ -116,6 +116,13 @@ func (in *ChiConfiguration) DeepCopyInto(out *ChiConfiguration) {
 			}
 		}
 	}
+	if in.Files != nil {
+		in, out := &in.Files, &out.Files
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.Clusters != nil {
 		in, out := &in.Clusters, &out.Clusters
 		*out = make([]ChiCluster, len(*in))

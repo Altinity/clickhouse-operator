@@ -131,7 +131,7 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 	// Convenience shortcuts
 	namespace := newStatefulSet.Namespace
 	name := newStatefulSet.Name
-	glog.V(1).Infof("updateStatefulSet(%s/%s)", namespace, name)
+	glog.V(2).Infof("updateStatefulSet(%s/%s)", namespace, name)
 
 	// Apply newStatefulSet and wait for Generation to change
 	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(newStatefulSet)
@@ -146,7 +146,7 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 
 	if updatedStatefulSet.Generation == oldStatefulSet.Generation {
 		// Generation is not updated - no changes in .spec section were made
-		glog.V(1).Infof("updateStatefulSet(%s/%s) - no generation change", namespace, name)
+		glog.V(2).Infof("updateStatefulSet(%s/%s) - no generation change", namespace, name)
 		return nil
 	}
 

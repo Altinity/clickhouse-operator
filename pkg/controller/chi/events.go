@@ -26,6 +26,7 @@ const (
 	// Event type (Normal, Warning) specifies what event type is this
 	eventTypeNormal  = "Normal"
 	eventTypeWarning = "Warning"
+	eventTypeError = "Error"
 )
 
 const (
