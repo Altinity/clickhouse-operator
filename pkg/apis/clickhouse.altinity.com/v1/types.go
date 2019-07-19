@@ -94,6 +94,7 @@ type ChiConfiguration struct {
 	Profiles  map[string]interface{} `json:"profiles,omitempty"  yaml:"profiles"`
 	Quotas    map[string]interface{} `json:"quotas,omitempty"    yaml:"quotas"`
 	Settings  map[string]interface{} `json:"settings,omitempty"  yaml:"settings"`
+	Files     map[string]string      `json:"files,omitempty"     yaml:"files"`
 	// TODO refactor into map[string]ChiCluster
 	Clusters []ChiCluster `json:"clusters,omitempty"`
 }

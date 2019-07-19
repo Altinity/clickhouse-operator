@@ -102,6 +102,8 @@ spec:
                   type: object
                 settings:
                   type: object
+                files:
+                  type: object
                 clusters:
                   type: array
                   items:

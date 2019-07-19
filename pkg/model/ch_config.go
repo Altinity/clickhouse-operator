@@ -64,6 +64,11 @@ func (c *ClickHouseConfigGenerator) GetSettings() string {
 	return c.generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
 }
 
+// GetFiles creates data for custom common config files specified by user in .spec.configuration.files section
+func (c *ClickHouseConfigGenerator) GetFiles() map[string]string {
+	return c.chi.Spec.Configuration.Files
+}
+
 // GetZookeeper creates data for "zookeeper.xml"
 func (c *ClickHouseConfigGenerator) GetZookeeper() string {
 	// Convenience wrapper
