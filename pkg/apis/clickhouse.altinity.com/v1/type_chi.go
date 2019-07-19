@@ -30,7 +30,8 @@ func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 	chi.Status.IsKnown = 1
 	chi.Status.Version = version.Version
 	chi.Status.ClustersCount = chi.ClustersCount()
-	chi.Status.ReplicasCount = chi.ReplicasCount()
+	chi.Status.ShardsCount   = chi.ShardsCount()
+	chi.Status.ReplicasCount = chi.ReplicasCount()/chi.ShardsCount()
 	chi.Status.Pods = pods
 	chi.Status.Endpoint = endpoint
 }
@@ -320,6 +321,16 @@ func (chi *ClickHouseInstallation) ReplicasCount() int {
 	})
 	return count
 }
+
+func (chi *ClickHouseInstallation) ShardsCount() int {
+	count := 0
+	chi.WalkShards(func(replica *ChiShard) error {
+		count++
+		return nil
+	})
+	return count
+}
+
 
 // GetPodTemplate gets ChiPodTemplate by name
 func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate, bool) {
