@@ -21,9 +21,9 @@ import (
 )
 
 type configSections struct {
-	// commonConfigSections maps section name to section XML chopConfig
+	// commonConfigSections maps section name to section XML config string
 	commonConfigSections map[string]string
-	// commonUsersConfigSections maps section name to section XML chopConfig
+	// commonUsersConfigSections maps section name to section XML config string
 	commonUsersConfigSections map[string]string
 
 	// ClickHouse config generator
@@ -46,13 +46,13 @@ func (c *configSections) CreateConfigsCommon() {
 	// 1. remote servers
 	// 2. zookeeper
 	// 3. settings
+	// 4. files
 	util.IncludeNonEmpty(c.commonConfigSections, filenameRemoteServersXML, c.chConfigGenerator.GetRemoteServers())
 	util.IncludeNonEmpty(c.commonConfigSections, filenameZookeeperXML, c.chConfigGenerator.GetZookeeper())
 	util.IncludeNonEmpty(c.commonConfigSections, filenameSettingsXML, c.chConfigGenerator.GetSettings())
-	// Extra user-specified configs
-	for filename, content := range c.chopConfig.ChCommonConfigs {
-		util.IncludeNonEmpty(c.commonConfigSections, filename, content)
-	}
+	util.MergeStringMaps(c.commonConfigSections, c.chConfigGenerator.GetFiles())
+	// Extra user-specified config files
+	util.MergeStringMaps(c.commonConfigSections, c.chopConfig.ChCommonConfigs)
 }
 
 func (c *configSections) CreateConfigsUsers() {
@@ -63,20 +63,16 @@ func (c *configSections) CreateConfigsUsers() {
 	util.IncludeNonEmpty(c.commonUsersConfigSections, filenameUsersXML, c.chConfigGenerator.GetUsers())
 	util.IncludeNonEmpty(c.commonUsersConfigSections, filenameQuotasXML, c.chConfigGenerator.GetQuotas())
 	util.IncludeNonEmpty(c.commonUsersConfigSections, filenameProfilesXML, c.chConfigGenerator.GetProfiles())
-	// Extra user-specified configs
-	for filename, content := range c.chopConfig.ChUsersConfigs {
-		util.IncludeNonEmpty(c.commonUsersConfigSections, filename, content)
-	}
+	// Extra user-specified config files
+	util.MergeStringMaps(c.commonUsersConfigSections, c.chopConfig.ChUsersConfigs)
 }
 
 func (c *configSections) CreateConfigsPod(replica *v1.ChiReplica) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	podConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(podConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(replica))
-	// Extra user-specified configs
-	for filename, content := range c.chopConfig.ChPodConfigs {
-		util.IncludeNonEmpty(podConfigSections, filename, content)
-	}
+	// Extra user-specified config files
+	util.MergeStringMaps(podConfigSections, c.chopConfig.ChPodConfigs)
 
 	return podConfigSections
 }

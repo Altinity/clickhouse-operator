@@ -71,6 +71,16 @@ spec:
       #          <method>zstd</method>
       #        </case>
       #      </compression>
+      disable_internal_dns_cache: 1
+      #      <disable_internal_dns_cache>1</disable_internal_dns_cache>
+    files:
+      dict1.xml: |
+        <yandex>
+            <!-- ref to file /etc/clickhouse-data/config.d/source1.csv -->
+        </yandex>
+      source1.csv: |
+        a1,b1,c1,d1
+        a2,b2,c2,d2
 
     clusters:
 
