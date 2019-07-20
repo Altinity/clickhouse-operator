@@ -366,10 +366,16 @@ func (n *Normalizer) doClusters() {
 	n.chi.FillAddressInfo()
 	n.chi.FillChiPointer()
 	n.chi.WalkReplicas(func(replica *chiv1.ChiReplica) error {
-		replica.Config.ZookeeperFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
-		replica.Config.SettingsFingerprint = fingerprint(n.chi.Spec.Configuration.Settings)
-		return nil
+		return n.calcFingerprints(replica)
 	})
+}
+
+// calcFingerprints calculates fingerprints for ClickHouse configuration data
+func (n *Normalizer) calcFingerprints(replica *chiv1.ChiReplica) error {
+	replica.Config.ZookeeperFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
+	replica.Config.SettingsFingerprint = fingerprint(n.chi.Spec.Configuration.Settings)
+
+	return nil
 }
 
 // doConfigurationZookeeper normalizes .spec.configuration.zookeeper
