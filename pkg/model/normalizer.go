@@ -366,7 +366,8 @@ func (n *Normalizer) doClusters() {
 	n.chi.FillAddressInfo()
 	n.chi.FillChiPointer()
 	n.chi.WalkReplicas(func(replica *chiv1.ChiReplica) error {
-		replica.Config.ZkFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
+		replica.Config.ZookeeperFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
+		replica.Config.SettingsFingerprint = fingerprint(n.chi.Spec.Configuration.Settings)
 		return nil
 	})
 }
