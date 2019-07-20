@@ -373,7 +373,7 @@ func (n *Normalizer) doClusters() {
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
 func (n *Normalizer) calcFingerprints(replica *chiv1.ChiReplica) error {
 	replica.Config.ZookeeperFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
-	replica.Config.SettingsFingerprint = fingerprint(n.chi.Spec.Configuration.Settings)
+	replica.Config.SettingsFingerprint = fingerprint(castToSliceOfStrings(n.chi.Spec.Configuration.Settings))
 
 	return nil
 }
