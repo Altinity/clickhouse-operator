@@ -272,12 +272,12 @@ func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 			}
 			err = util.Retry(maxTries, sql, func() error {
 				sqlerr := conn.Exec(sql)
-				if sqlerr != nil && 
-				   strings.Contains(sqlerr.Error(), "Code: 253,") && 
-				   strings.Contains(sql, "CREATE TABLE") {
-				     glog.V(1).Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
-					 sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
-					 sqlerr = conn.Exec(sqlAttach)
+				if sqlerr != nil &&
+					strings.Contains(sqlerr.Error(), "Code: 253,") &&
+					strings.Contains(sql, "CREATE TABLE") {
+					glog.V(1).Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
+					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
+					sqlerr = conn.Exec(sqlAttach)
 				}
 				return sqlerr
 			})

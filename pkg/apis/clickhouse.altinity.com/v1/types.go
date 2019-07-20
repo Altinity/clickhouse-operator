@@ -182,7 +182,8 @@ type ChiReplicaAddress struct {
 
 // ChiReplicaConfig defines additional data related to replica
 type ChiReplicaConfig struct {
-	ZkFingerprint string `json:"zkfingerprint"`
+	ZookeeperFingerprint string `json:"zookeeperfingerprint"`
+	SettingsFingerprint  string `json:"settingsfingerprint"`
 }
 
 // ChiTemplates defines templates section of .spec
