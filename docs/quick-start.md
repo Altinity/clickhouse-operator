@@ -88,15 +88,15 @@ namespace/test created
 
 ## Trivial example
 
-This is the trivial [1 shard 1 replica](./examples/01-standard-layout-01-1shard-1repl.yaml) example.
+This is the trivial [1 shard 1 replica](./examples/01-simple-layout-01-1shard-1repl.yaml) example.
 
 **WARNING**: Do not use it for anything other than 'Hello, world!', it does not have persistent storage!
  
 ```bash
-kubectl apply -n test-clickhouse-operator -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/01-standard-layout-01-1shard-1repl.yaml
+kubectl apply -n test-clickhouse-operator -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/01-simple-layout-01-1shard-1repl.yaml
 ```
 ```text
-clickhouseinstallation.clickhouse.altinity.com/example-01 created
+clickhouseinstallation.clickhouse.altinity.com/simple-01 created
 ```
 
 Installation specification is straightforward and defines 1-replica cluster:
@@ -104,14 +104,7 @@ Installation specification is straightforward and defines 1-replica cluster:
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "standard-01"
-spec:
-  configuration:
-    clusters:
-      - name: "standard-01-1shard-1repl"
-        layout:
-          shardsCount: 1
-          replicasCount: 1
+  name: "simple-01"
 ```
 
 Once cluster is created, there are two checks to be made.
@@ -163,26 +156,27 @@ Connected to ClickHouse server version 19.4.3 revision 54416.
 ## Simple Persistent Volume Example
 
 In case of having Dynamic Volume Provisioning available - ex.: running on AWS - we are able to use PersistentVolumeClaims
-Manifest is [available in examples](./examples/02-standard-layout-01-1shard-1repl-simple-persistent-volume.yaml)
+Manifest is [available in examples](./examples/02-simple-layout-01-1shard-1repl-simple-persistent-volume.yaml)
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "standard-01-simple-pv"
+  name: "simple-02-pv1"
 spec:
   defaults:
     templates:
       volumeClaimTemplate: volumeclaim-template
   configuration:
     clusters:
-      - name: "standard-01-simple-pv"
+      - name: "simple-pv"
         layout:
           shardsCount: 1
           replicasCount: 1
   templates:
     volumeClaimTemplates:
       - name: volumeclaim-template
+#        reclaimPolicy: Retain
         spec:
           accessModes:
             - ReadWriteOnce
@@ -198,17 +192,17 @@ Let's install more complex example with:
 1. Pod template
 1. VolumeClaim template
 
-Manifest is [available in examples](./examples/02-standard-layout-03-1shard-1repl-deployment-persistent-volume.yaml)
+Manifest is [available in examples](./examples/02-simple-layout-03-1shard-1repl-deployment-persistent-volume.yaml)
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "standard-02-deployment-pv"
+  name: "simple-02-pv2"
 spec:
   configuration:
     clusters:
-      - name: "standard-02-deployment-pv"
+      - name: "deployment-pv"
         # Templates are specified for this cluster explicitly
         templates:
           podTemplate: pod-template-with-volume
@@ -285,6 +279,15 @@ spec:
       test_quota/interval/duration: "3600"
     settings:
       compression/case/method: zstd
+      disable_internal_dns_cache: 1
+    files:
+      dict1.xml: |
+        <yandex>
+            <!-- ref to file /etc/clickhouse-data/config.d/source1.csv -->
+        </yandex>
+      source1.csv: |
+        a1,b1,c1,d1
+        a2,b2,c2,d2
     clusters:
       - name: "standard"
         layout:
