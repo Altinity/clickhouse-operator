@@ -347,7 +347,7 @@ Another example with selectively described replicas. Note - `replicasCount` spec
                     volumeClaimTemplate: default-volume-claim
 ```
 
-## ,spec.templates.serviceTemplates
+## .spec.templates.serviceTemplates
 ```yaml
   templates:
     serviceTemplates:
