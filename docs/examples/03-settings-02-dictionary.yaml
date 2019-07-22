@@ -1,0 +1,44 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: "settings-02"
+
+spec:
+  configuration:
+    settings:
+      dictionaries_config: config.d/*.dict
+    files:
+      dict_one.dict: |
+        <yandex>
+          <dictionary>
+        <name>one</name>
+        <source>
+            <clickhouse>
+                <host>localhost</host>
+                <port>9000</port>
+                <user>default</user>
+                <password/>
+                <db>system</db>
+                <table>one</table>
+            </clickhouse>
+        </source>
+        <lifetime>60</lifetime>
+        <layout><flat/></layout>
+        <structure>
+            <id>
+                <name>dummy</name>
+            </id>
+            <attribute>
+                <name>one</name>
+                <expression>dummy</expression>
+                <type>UInt8</type>
+                <null_value>0</null_value>
+            </attribute>
+        </structure>
+        </dictionary>
+        </yandex>
+    clusters:
+      - name: standard
+        layout:
+          shardsCount: 1
