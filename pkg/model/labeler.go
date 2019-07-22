@@ -44,6 +44,7 @@ func (l *Labeler) getLabelsChiScope() map[string]string {
 func (l *Labeler) getSelectorChiScope() map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
+		// Skip chop
 		LabelChi: getNamePartChiName(l.chi),
 	}
 }
@@ -60,7 +61,7 @@ func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]stri
 func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
-		// skip chop
+		// Skip chop
 		LabelChi:     getNamePartChiName(cluster),
 		LabelCluster: getNamePartClusterName(cluster),
 	}
@@ -79,14 +80,14 @@ func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
 func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
-		// skip chop
+		// Skip chop
 		LabelChi:     getNamePartChiName(shard),
 		LabelCluster: getNamePartClusterName(shard),
 		LabelShard:   getNamePartShardName(shard),
 	}
 }
 
-func (l *Labeler) getLabelsReplicaScope(replica *chi.ChiReplica, zk bool) map[string]string {
+func (l *Labeler) getLabelsReplicaScope(replica *chi.ChiReplica, applySupplementaryServiceLabels bool) map[string]string {
 	labels := map[string]string{
 		LabelApp:         LabelAppValue,
 		LabelChop:        l.version,
@@ -96,8 +97,9 @@ func (l *Labeler) getLabelsReplicaScope(replica *chi.ChiReplica, zk bool) map[st
 		LabelReplica:     getNamePartReplicaName(replica),
 		LabelStatefulSet: CreateStatefulSetName(replica),
 	}
-	if zk {
-		labels[LabelZkConfigVersion] = replica.Config.ZkFingerprint
+	if applySupplementaryServiceLabels {
+		labels[LabelZookeeperConfigVersion] = replica.Config.ZookeeperFingerprint
+		labels[LabelSettingsConfigVersion] = replica.Config.SettingsFingerprint
 	}
 	return labels
 }

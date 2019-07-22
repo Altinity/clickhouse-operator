@@ -21,10 +21,10 @@ import (
 
 func (c *Controller) labelMyObjectsTree() {
 
-	// Operator is running in the Pod. Label Pod
-	// Pod is owned by ReplicaSet. Label ReplicaSet also.
-	// ReplicaSet is owned by Deployment. Label Deployment also.
-	// Deployment is not owned so far.
+	// Operator is running in the Pod. We need to label this Pod
+	// Pod is owned by ReplicaSet. We need to label this ReplicaSet also.
+	// ReplicaSet is owned by Deployment. We need to label this Deployment also.
+	// Deployment is not owned by any entity so far.
 	//
 	// Excerpt from Pod's yaml
 	// metadata:
@@ -55,7 +55,7 @@ func (c *Controller) labelMyObjectsTree() {
 		return
 	}
 
-	// Pod namespaced name found, fetch it
+	// Pod namespaced name found, fetch the Pod
 	pod, err := c.podLister.Pods(namespace).Get(podName)
 	if err != nil {
 		glog.V(1).Infof("ERROR get Pod %s/%s", namespace, podName)
@@ -85,7 +85,7 @@ func (c *Controller) labelMyObjectsTree() {
 		return
 	}
 
-	// ReplicaSet namespaced name found, fetch it
+	// ReplicaSet namespaced name found, fetch the ReplicaSet
 	replicaSet, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Get(replicaSetName, v1.GetOptions{})
 	if err != nil {
 		glog.V(1).Infof("ERROR get ReplicaSet %s/%s %v", namespace, replicaSetName, err)
@@ -115,7 +115,7 @@ func (c *Controller) labelMyObjectsTree() {
 		return
 	}
 
-	// Deployment namespaced name found, fetch it
+	// Deployment namespaced name found, fetch the Deployment
 	deployment, err := c.kubeClient.AppsV1().Deployments(namespace).Get(deploymentName, v1.GetOptions{})
 	if err != nil {
 		glog.V(1).Infof("ERROR get Deployment %s/%s", namespace, deploymentName)
