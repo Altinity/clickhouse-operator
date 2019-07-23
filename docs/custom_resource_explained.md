@@ -462,6 +462,7 @@ Another example with selectively described replicas. Note - `replicasCount` spec
 `.spec.templates.serviceTemplates` represents [Service](https://kubernetes.io/docs/concepts/services-networking/service/) templates
 with additional sections, such as:
 1. `generateName`
+
 **`generateName`** is used to explicitly specify service name to be created. `generateName` provides the following macro substitutions:
 1. `{chi}` - ClickHouseInstallation name
 2. `{chiID}` - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
