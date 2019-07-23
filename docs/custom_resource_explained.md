@@ -104,6 +104,56 @@ expands into
 ``` 
 `.spec.configuration.settings` refers to [&lt;yandex&gt;&lt;profiles&gt;&lt;/profiles&gt;&lt;users&gt;&lt;/users&gt;&lt;/yandex&gt;](https://clickhouse.yandex/docs/en/operations/settings/settings/) settings sections.
 
+## .spec.configuration.files
+```yaml
+    files:
+      dict1.xml: |
+        <yandex>
+            <!-- ref to file /etc/clickhouse-data/config.d/source1.csv -->
+        </yandex>
+      source1.csv: |
+        a1,b1,c1,d1
+        a2,b2,c2,d2
+```
+`.spec.configuration.files` allows to introduce custom files to ClickHouse via YAML manifest. 
+This can be used in order to create complex custom configurations. One possible usage example [is external dictionary](https://clickhouse.yandex/docs/en/query_language/dicts/external_dicts_dict/)
+```yaml
+spec:
+  configuration:
+    settings:
+      dictionaries_config: config.d/*.dict
+    files:
+      dict_one.dict: |
+        <yandex>
+          <dictionary>
+        <name>one</name>
+        <source>
+            <clickhouse>
+                <host>localhost</host>
+                <port>9000</port>
+                <user>default</user>
+                <password/>
+                <db>system</db>
+                <table>one</table>
+            </clickhouse>
+        </source>
+        <lifetime>60</lifetime>
+        <layout><flat/></layout>
+        <structure>
+            <id>
+                <name>dummy</name>
+            </id>
+            <attribute>
+                <name>one</name>
+                <expression>dummy</expression>
+                <type>UInt8</type>
+                <null_value>0</null_value>
+            </attribute>
+        </structure>
+        </dictionary>
+        </yandex>
+```
+
 ## .spec.configuration.clusters
 ```yaml
     clusters:
