@@ -241,7 +241,7 @@ spec:
 
 ## Custom Deployment with Specific ClickHouse Configuration
 
-You can tell operator to configure your ClickHouse, as shown in the example below ([link to the manifest](./examples/03-settings-01.yaml)):
+You can tell operator to configure your ClickHouse, as shown in the example below ([link to the manifest](./examples/03-settings-01-overview.yaml)):
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
