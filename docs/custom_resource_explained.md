@@ -1,6 +1,6 @@
 # ClickHouse Installation Custom Resource explained
 
-Let's describe in details ClickHouse [Custom Resource](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
+Let's describe in details ClickHouse [Custom Resource](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/) \
 Full example is available in [examples/99-clickhouseinstallation-max.yaml][chi_max_manifest] file. \
 The best way to work with this doc is to open [examples/99-clickhouseinstallation-max.yaml][chi_max_manifest] in separate tab
 and look into it along with reading this explanation.  
@@ -30,6 +30,7 @@ clickhouse-installation-max   23h
     templates:
       podTemplate: clickhouse-v18.16.1
       volumeClaimTemplate: default-volume-claim
+      serviceTemplate: chi-service-template
 ```
 `.spec.defaults` section represents default values for sections below.
   - `.spec.defaults.replicasUseFQDN` - should replicas be specified by FQDN in `<host></host>`
@@ -103,6 +104,56 @@ expands into
 #      </compression>
 ``` 
 `.spec.configuration.settings` refers to [&lt;yandex&gt;&lt;profiles&gt;&lt;/profiles&gt;&lt;users&gt;&lt;/users&gt;&lt;/yandex&gt;](https://clickhouse.yandex/docs/en/operations/settings/settings/) settings sections.
+
+## .spec.configuration.files
+```yaml
+    files:
+      dict1.xml: |
+        <yandex>
+            <!-- ref to file /etc/clickhouse-data/config.d/source1.csv -->
+        </yandex>
+      source1.csv: |
+        a1,b1,c1,d1
+        a2,b2,c2,d2
+```
+`.spec.configuration.files` allows to introduce custom files to ClickHouse via YAML manifest. 
+This can be used in order to create complex custom configurations. One possible usage example is [external dictionary](https://clickhouse.yandex/docs/en/query_language/dicts/external_dicts_dict/)
+```yaml
+spec:
+  configuration:
+    settings:
+      dictionaries_config: config.d/*.dict
+    files:
+      dict_one.dict: |
+        <yandex>
+          <dictionary>
+        <name>one</name>
+        <source>
+            <clickhouse>
+                <host>localhost</host>
+                <port>9000</port>
+                <user>default</user>
+                <password/>
+                <db>system</db>
+                <table>one</table>
+            </clickhouse>
+        </source>
+        <lifetime>60</lifetime>
+        <layout><flat/></layout>
+        <structure>
+            <id>
+                <name>dummy</name>
+            </id>
+            <attribute>
+                <name>one</name>
+                <expression>dummy</expression>
+                <type>UInt8</type>
+                <null_value>0</null_value>
+            </attribute>
+        </structure>
+        </dictionary>
+        </yandex>
+```
 
 ## .spec.configuration.clusters
 ```yaml
@@ -179,7 +230,7 @@ and one of these replicas is explicitly specified with different `podTemplate`:
                 - name: replica0
                   port: 9000
                   templates:
-                    podTemplate: clickhouse-v18.16.2
+                    podTemplate: clickhouse-v19.11.3.11
                     volumeClaimTemplate: default-volume-claim
 ```
 ClickHouse cluster named `all-counts` represented by layout with 3 shards of 2 replicas each (6 pods total).
@@ -343,11 +394,11 @@ Another example with selectively described replicas. Note - `replicasCount` spec
                 - name: replica0
                   port: 9000
                   templates:
-                    podTemplate: clickhouse-v18.16.2
+                    podTemplate: clickhouse-v19.11.3.11
                     volumeClaimTemplate: default-volume-claim
 ```
 
-## ,spec.templates.serviceTemplates
+## .spec.templates.serviceTemplates
 ```yaml
   templates:
     serviceTemplates:
@@ -386,7 +437,7 @@ Another example with selectively described replicas. Note - `replicasCount` spec
         # 7. {shardID} - short hashed shard name (BEWARE, this is an experimental feature)
         # 8. {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
         # 9. {replica} - replica name
-        # 10. {replicaD} - short hashed replica name (BEWARE, this is an experimental feature)
+        # 10. {replicaID} - short hashed replica name (BEWARE, this is an experimental feature)
         # 11. {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
         generateName: "service-{chi}"
         # type ObjectMeta struct from k8s.io/meta/v1
@@ -409,6 +460,21 @@ Another example with selectively described replicas. Note - `replicasCount` spec
           type: LoadBalancer
 ```
 `.spec.templates.serviceTemplates` represents [Service](https://kubernetes.io/docs/concepts/services-networking/service/) templates
+with additional sections, such as:
+1. `generateName`
+
+**`generateName`** is used to explicitly specify service name to be created. `generateName` provides the following macro substitutions:
+1. `{chi}` - ClickHouseInstallation name
+2. `{chiID}` - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+3. `{cluster}` - cluster name
+4. `{clusterID}` - short hashed cluster name (BEWARE, this is an experimental feature)
+5. `{clusterIndex}` - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+6. `{shard}` - shard name
+7. `{shardID}` - short hashed shard name (BEWARE, this is an experimental feature)
+8. `{shardIndex}` - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+9. `{replica}` - replica name
+10. `{replicaID}` - short hashed replica name (BEWARE, this is an experimental feature)
+11. `{replicaIndex}` - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
 
 ## .spec.templates.volumeClaimTemplates
 ```yaml
@@ -438,6 +504,22 @@ Another example with selectively described replicas. Note - `replicasCount` spec
       # multiple pod templates makes possible to update version smoothly
       # pod template for ClickHouse v18.16.1
       - name: clickhouse-v18.16.1
+        # We may need to label nodes with clickhouse=allow label for this example to run
+        # See ./label_nodes.sh for this purpose
+        zone:
+          key: "clickhouse"
+          values:
+            - "allow"
+        # Shortcut version for AWS installations
+        #zone:
+        #  values:
+        #    - "us-east-1a"
+
+        # Possible values for distribution are:
+        # Unspecified
+        # OnePerHost
+        distribution: "Unspecified"
+
         # type PodSpec struct {} from k8s.io/core/v1
         spec:
           containers:
@@ -454,6 +536,27 @@ Another example with selectively described replicas. Note - `replicasCount` spec
                   memory: "64Mi"
                   cpu: "100m"
 ```
-`.spec.templates.podTemplates` represents [Pod Templates](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#pod-templates) templates
+`.spec.templates.podTemplates` represents [Pod Templates](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#pod-templates) 
+with additional sections, such as:
+1. `zone`
+1. `distribution`
+
+**`zone`** and **`distribution`** together define zoned layout of ClickHouse instances over nodes. Internally it is a shortcut to `affinity.nodeAffinity` and `affinity.podAntiAffinity` properly filled.
+
+Example - how to place ClickHouse instances in AWS `us-east-1a` availability zone with one ClickHouse per host 
+```yaml
+        zone:
+          values:
+            - "us-east-1a"
+        distribution: "OnePerHost"
+```
+Example - how to place ClickHouse instances on nodes labeled as `clickhouse=allow` with one ClickHouse per host 
+```yaml
+        zone:
+          key: "clickhouse"
+          values:
+            - "allow"
+        distribution: "OnePerHost"
+```
 
 [chi_max_manifest]: ./examples/99-clickhouseinstallation-max.yaml

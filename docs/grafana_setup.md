@@ -43,7 +43,7 @@ Login credentials:
  - username: **admin**
  - password: **admin**
 
-Login credentials are specified in [grafana.yaml][grafana_manifest_yaml] as resource of **kind: Secret** and `base64`-encoded.
+Login credentials are specified in [grafana.yaml][grafana_manifest_yaml] as resource of [**kind: Secret**][grafana_manifest_yaml_secret] and is `base64`-encoded.
 
 Grafana is installed by now.
 
@@ -85,7 +85,8 @@ By now Altinity recommended dashboard should be available for use.
 More Grafana [docs](http://docs.grafana.org/)
 
 [grafana_manifest_folder]: ../manifests/grafana
-[grafana_manifest_yaml]: ../manifests/grafana/grafana.yaml 
+[grafana_manifest_yaml]: ../manifests/grafana/grafana.yaml
+[grafana_manifest_yaml_secret]:  ../manifests/grafana/grafana.yaml#L56
 [create_grafana_script]: ../manifests/grafana/create-grafana.sh 
 [prometheus_setup_doc]: ./prometheus_setup.md 
 [altinity_recommended_dashboard]: ../grafana-dashboard/Altinity%20ClickHouse%20Operator%20dashboard-1556619206528.json 

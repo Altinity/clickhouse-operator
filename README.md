@@ -13,7 +13,7 @@ The ClickHouse Operator creates, configures and manages ClickHouse clusters runn
 
 The ClickHouse Operator for Kubernetes currently provides the following:
 
-- Creates ClickHouse cluster based on Custom Resource [specification][crd_spec] provided
+- Creates ClickHouse cluster based on Custom Resource [specification][chi_max_yaml] provided
 - Storage customization (VolumeClaim templates)
 - Pod template customization (Volume and Container templates)
 - ClickHouse configuration customization (including Zookeeper integration)
@@ -27,19 +27,19 @@ The ClickHouse Operator for Kubernetes currently provides the following:
  
 ## Documentation
 
-[Quick Start Guide][quick_start]
+[Quick Start Guide][quick_start_guide]
 
 **Advanced setups**
- * [Detailed Operator Installation Instructions][detailed]
+ * [Detailed Operator Installation Instructions][detailed_installation_instructions]
    * [Operator Configuration][operator_configuration]
  * [Setup ClickHouse cluster with replication][replication_setup]
    * [Setting up Zookeeper][zookeeper_setup]
- * [Persistent Storage Configuration][storage]
+ * [Persistent Storage Configuration][storage_configuration]
  * [ClickHouse Installation Custom Resource specification][crd_explained]
  
 **Maintenance tasks**
  * [Add replication to an existing ClickHouse cluster][update_cluster_add_replication]
- * [Automatic schema creation][schema_migration]
+ * [Schema maintenance][schema_migration]
  * [Update ClickHouse version][update_clickhouse_version]
  * [Update Operator version][update_operator]
 
@@ -57,16 +57,16 @@ Copyright (c) 2019, Altinity Ltd and/or its affiliates. All rights reserved.
 
 See [LICENSE](./LICENSE) for more details.
  
-[crd_spec]: ./docs/examples/clickhouseinstallation-object.yaml
+[chi_max_yaml]: ./docs/examples/99-clickhouseinstallation-max.yaml
 [intro]: ./docs/introduction.md
-[quick_start]: ./docs/quick-start.md
-[detailed]: ./docs/operator_installation_details.md
+[quick_start_guide]: ./docs/quick-start.md
+[detailed_installation_instructions]: ./docs/operator_installation_details.md
 [replication_setup]: ./docs/replication_setup.md
 [crd_explained]: ./docs/custom_resource_explained.md
 [zookeeper_setup]: ./docs/zookeeper_setup.md
 [prometheus_setup]: ./docs/prometheus_setup.md
 [grafana_setup]: ./docs/grafana_setup.md
-[storage]: ./docs/storage.md
+[storage_configuration]: ./docs/storage.md
 [update_cluster_add_replication]: ./docs/chi_update_add_replication.md
 [update_clickhouse_version]: ./docs/chi_update_clickhouse_version.md
 [update_operator]: ./docs/operator_upgrade.md
