@@ -24,12 +24,12 @@ replicaset.apps/clickhouse-operator-5cbc47484   1         1         1       17s
 ```
 Now let's install ClickHouse from provided examples. 
 There are two **rolling update** examples presented:
-1. Simple stateless cluster: [initial position](./examples/07-rolling-update-stateless-01-initial-position.yaml) and [update](./examples/07-rolling-update-stateless-02-apply-update.yaml)
-1. Stateful cluster with Persistent Volumes: [initial position](./examples/09-rolling-update-stateful-01-initial-position.yaml) and [update](./examples/09-rolling-update-stateful-02-apply-update.yaml) 
+1. Simple stateless cluster: [initial position][stateless_initial_position] and [update][stateless_updated_position]
+1. Stateful cluster with Persistent Volumes: [initial position][stateful_initial_position] and [update][stateful_updated_position] 
 
 ## Simple Rolling Update Example
 
-Let's go with simple stateless cluster. Manifest file with initial position is [07-rolling-update-stateless-01-initial-position.yaml](./examples/07-rolling-update-stateless-01-initial-position.yaml):
+Let's go with simple stateless cluster. Manifest file with [initial position][stateless_initial_position]:
 ```bash
 kubectl -n dev apply -f 07-rolling-update-stateless-01-initial-position.yaml
 ```
@@ -82,7 +82,7 @@ All is well.
 Let's run update and change `.yaml` manifest so we'll have replication available. 
 
 In order to have replication correctly setup, we need to specify `Zookeeper` (which is assumed to be running already) and specify replicas for ClickHouse.
-Manifest file with updates specified is [07-rolling-update-stateless-02-apply-update.yaml](./examples/07-rolling-update-stateless-02-apply-update.yaml):
+Manifest file with [updates specified][stateless_updated_position]:
 ```bash
 kubectl -n dev apply -f 07-rolling-update-stateless-02-apply-update.yaml
 ```
@@ -140,6 +140,11 @@ root@chi-d02eaa-347e-0-0-0:/# cat /etc/clickhouse-server/config.d/zookeeper.xml
 ```
 
 ## Rolling Update with State Example
-Stateful cluster with Persistent Volumes examples are presented as [initial position](./examples/09-rolling-update-stateful-01-initial-position.yaml) and [update](./examples/09-rolling-update-stateful-02-apply-update.yaml)
+Stateful cluster with Persistent Volumes examples are presented as [initial position][stateful_initial_position] and [update][stateful_updated_position]
 The structure of the example is the same as for simple example, but Persistent Volumes are used. So this example is better to be run on cloud provider with Dynamic Volumes Provisioning available.
-  
+
+[stateless_initial_position]: ./examples/07-rolling-update-stateless-01-initial-position.yaml
+[stateless_updated_position]: ./examples/07-rolling-update-stateless-02-apply-update.yaml
+
+[stateful_initial_position]: ./examples/09-rolling-update-emptydir-01-initial-position.yaml
+[stateful_updated_position]: ./examples/09-rolling-update-emptydir-02-apply-update.yaml

@@ -232,6 +232,8 @@ spec:
                       distribution:
                         type: string
                         enum:
+                          # List podDistributionXXX constants from model
+                          - Unspecified
                           - OnePerHost
                       spec:
                         # TODO specify PodSpec

@@ -3,10 +3,10 @@
 ```yaml
 # Namespaces where clickhouse-operator listens for events.
 # Concurrently running operators should listen on different namespaces
-namespaces:
-  - dev
-  - info
-  - onemore
+# namespaces:
+#  - dev
+#  - info
+#  - onemore
 
 ################################################
 ##
@@ -35,10 +35,10 @@ chiTemplatesPath: templates.d
 ################################################
 
 # How many seconds to wait for created/updated StatefulSet to be Ready
-statefulSetUpdateTimeout: 50
+statefulSetUpdateTimeout: 600
 
 # How many seconds to wait between checks for created/updated StatefulSet status
-statefulSetUpdatePollPeriod: 2
+statefulSetUpdatePollPeriod: 10
 
 # What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
 # Possible options:
@@ -69,4 +69,20 @@ chConfigUserDefaultQuota: default
 chConfigUserDefaultNetworksIP:
   - "::/0"
 chConfigUserDefaultPassword: "default"
+
+################################################
+##
+## Operator's access to ClickHouse instances
+##
+################################################
+
+# ClickHouse credentials (username, password and port) to be used by operator to connect to ClickHouse instances for:
+# 1. Metrics requests
+# 2. Schema maintenance
+# 3. DROP DNS CACHE
+# User with such credentials credentials can be specified in additional ClickHouse .xml config files,
+# located in `chUsersConfigsPath` folder
+chUsername: clickhouse_operator
+chPassword: clickhouse_operator_password
+chPort: 8123
 ```
