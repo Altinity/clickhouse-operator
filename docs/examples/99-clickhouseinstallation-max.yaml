@@ -185,7 +185,7 @@ spec:
         # 7. {shardID} - short hashed shard name (BEWARE, this is an experimental feature)
         # 8. {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
         # 9. {replica} - replica name
-        # 10. {replicaD} - short hashed replica name (BEWARE, this is an experimental feature)
+        # 10. {replicaID} - short hashed replica name (BEWARE, this is an experimental feature)
         # 11. {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
         generateName: "service-{chi}"
         # type ObjectMeta struct from k8s.io/meta/v1

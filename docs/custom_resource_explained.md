@@ -1,6 +1,6 @@
 # ClickHouse Installation Custom Resource explained
 
-Let's describe in details ClickHouse [Custom Resource](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/)
+Let's describe in details ClickHouse [Custom Resource](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/) \
 Full example is available in [examples/99-clickhouseinstallation-max.yaml][chi_max_manifest] file. \
 The best way to work with this doc is to open [examples/99-clickhouseinstallation-max.yaml][chi_max_manifest] in separate tab
 and look into it along with reading this explanation.  
@@ -30,6 +30,7 @@ clickhouse-installation-max   23h
     templates:
       podTemplate: clickhouse-v18.16.1
       volumeClaimTemplate: default-volume-claim
+      serviceTemplate: chi-service-template
 ```
 `.spec.defaults` section represents default values for sections below.
   - `.spec.defaults.replicasUseFQDN` - should replicas be specified by FQDN in `<host></host>`
@@ -116,7 +117,7 @@ expands into
         a2,b2,c2,d2
 ```
 `.spec.configuration.files` allows to introduce custom files to ClickHouse via YAML manifest. 
-This can be used in order to create complex custom configurations. One possible usage example [is external dictionary](https://clickhouse.yandex/docs/en/query_language/dicts/external_dicts_dict/)
+This can be used in order to create complex custom configurations. One possible usage example is [external dictionary](https://clickhouse.yandex/docs/en/query_language/dicts/external_dicts_dict/)
 ```yaml
 spec:
   configuration:
@@ -436,7 +437,7 @@ Another example with selectively described replicas. Note - `replicasCount` spec
         # 7. {shardID} - short hashed shard name (BEWARE, this is an experimental feature)
         # 8. {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
         # 9. {replica} - replica name
-        # 10. {replicaD} - short hashed replica name (BEWARE, this is an experimental feature)
+        # 10. {replicaID} - short hashed replica name (BEWARE, this is an experimental feature)
         # 11. {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
         generateName: "service-{chi}"
         # type ObjectMeta struct from k8s.io/meta/v1
@@ -459,6 +460,20 @@ Another example with selectively described replicas. Note - `replicasCount` spec
           type: LoadBalancer
 ```
 `.spec.templates.serviceTemplates` represents [Service](https://kubernetes.io/docs/concepts/services-networking/service/) templates
+with additional sections, such as:
+1. `generateName`
+**`generateName`** is used to explicitly specify service name to be created. `generateName` provides the following macro substitutions:
+1. `{chi}` - ClickHouseInstallation name
+2. `{chiID}` - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+3. `{cluster}` - cluster name
+4. `{clusterID}` - short hashed cluster name (BEWARE, this is an experimental feature)
+5. `{clusterIndex}` - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+6. `{shard}` - shard name
+7. `{shardID}` - short hashed shard name (BEWARE, this is an experimental feature)
+8. `{shardIndex}` - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+9. `{replica}` - replica name
+10. `{replicaID}` - short hashed replica name (BEWARE, this is an experimental feature)
+11. `{replicaIndex}` - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
 
 ## .spec.templates.volumeClaimTemplates
 ```yaml
