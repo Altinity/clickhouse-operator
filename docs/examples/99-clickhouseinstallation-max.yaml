@@ -1,3 +1,6 @@
+# We may need to label nodes with clickhouse=allow label for this example to run
+# See ./label_nodes.sh for this purpose
+
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
@@ -141,7 +144,7 @@ spec:
                 - name: replica0
                   port: 9000
                   templates:
-                    podTemplate: clickhouse-v18.16.2
+                    podTemplate: clickhouse-v19.11.3.11
                     volumeClaimTemplate: default-volume-claim
                     replicaServiceTemplate: replica-service-template
 
@@ -237,6 +240,22 @@ spec:
       # multiple pod templates makes possible to update version smoothly
       # pod template for ClickHouse v18.16.1
       - name: clickhouse-v18.16.1
+        # We may need to label nodes with clickhouse=allow label for this example to run
+        # See ./label_nodes.sh for this purpose
+        zone:
+          key: "clickhouse"
+          values:
+            - "allow"
+        # Shortcut version for AWS installations
+        #zone:
+        #  values:
+        #    - "us-east-1a"
+
+        # Possible values for distribution are:
+        # Unspecified
+        # OnePerHost
+        distribution: "Unspecified"
+
         # type PodSpec struct {} from k8s.io/core/v1
         spec:
           containers:
@@ -253,13 +272,13 @@ spec:
                   memory: "64Mi"
                   cpu: "100m"
 
-      # pod template for ClickHouse v18.16.2
-      - name: clickhouse-v18.16.2
+      # pod template for ClickHouse v19.11.3.11
+      - name: clickhouse-v19.11.3.11
         # type PodSpec struct {} from k8s.io/core/v1
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:18.16.2
+              image: yandex/clickhouse-server:19.11.3.11
               volumeMounts:
                 - name: default-volume-claim
                   mountPath: /var/lib/clickhouse

@@ -179,7 +179,7 @@ and one of these replicas is explicitly specified with different `podTemplate`:
                 - name: replica0
                   port: 9000
                   templates:
-                    podTemplate: clickhouse-v18.16.2
+                    podTemplate: clickhouse-v19.11.3.11
                     volumeClaimTemplate: default-volume-claim
 ```
 ClickHouse cluster named `all-counts` represented by layout with 3 shards of 2 replicas each (6 pods total).
@@ -343,7 +343,7 @@ Another example with selectively described replicas. Note - `replicasCount` spec
                 - name: replica0
                   port: 9000
                   templates:
-                    podTemplate: clickhouse-v18.16.2
+                    podTemplate: clickhouse-v19.11.3.11
                     volumeClaimTemplate: default-volume-claim
 ```
 
@@ -438,6 +438,22 @@ Another example with selectively described replicas. Note - `replicasCount` spec
       # multiple pod templates makes possible to update version smoothly
       # pod template for ClickHouse v18.16.1
       - name: clickhouse-v18.16.1
+        # We may need to label nodes with clickhouse=allow label for this example to run
+        # See ./label_nodes.sh for this purpose
+        zone:
+          key: "clickhouse"
+          values:
+            - "allow"
+        # Shortcut version for AWS installations
+        #zone:
+        #  values:
+        #    - "us-east-1a"
+
+        # Possible values for distribution are:
+        # Unspecified
+        # OnePerHost
+        distribution: "Unspecified"
+
         # type PodSpec struct {} from k8s.io/core/v1
         spec:
           containers:
@@ -454,6 +470,27 @@ Another example with selectively described replicas. Note - `replicasCount` spec
                   memory: "64Mi"
                   cpu: "100m"
 ```
-`.spec.templates.podTemplates` represents [Pod Templates](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#pod-templates) templates
+`.spec.templates.podTemplates` represents [Pod Templates](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#pod-templates) 
+with additional sections, such as:
+1. `zone`
+1. `distribution`
+
+**`zone`** and **`distribution`** together define zoned layout of ClickHouse instances over nodes. Internally it is a shortcut to `affinity.nodeAffinity` and `affinity.podAntiAffinity` properly filled.
+
+Example - how to place ClickHouse instances in AWS `us-east-1a` availability zone with one ClickHouse per host 
+```yaml
+        zone:
+          values:
+            - "us-east-1a"
+        distribution: "OnePerHost"
+```
+Example - how to place ClickHouse instances on nodes labeled as `clickhouse=allow` with one ClickHouse per host 
+```yaml
+        zone:
+          key: "clickhouse"
+          values:
+            - "allow"
+        distribution: "OnePerHost"
+```
 
 [chi_max_manifest]: ./examples/99-clickhouseinstallation-max.yaml
