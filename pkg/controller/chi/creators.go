@@ -79,10 +79,10 @@ func (c *Controller) ReconcileService(service *core.Service) error {
 	if curService != nil {
 		// Object with such name already exists, this is not an error
 		glog.V(1).Infof("Update Service %s/%s", service.Namespace, service.Name)
+		// ResourceVersion is required in order to update Service
 		service.ResourceVersion = curService.ResourceVersion
+		// spec.clusterIP field is immutable, need to use current value
 		service.Spec.ClusterIP = curService.Spec.ClusterIP
-		service.Spec.LoadBalancerIP = curService.Spec.LoadBalancerIP
-		service.Spec.ExternalName = curService.Spec.ExternalName
 		_, err := c.kubeClient.CoreV1().Services(service.Namespace).Update(service)
 		if err != nil {
 			return err
