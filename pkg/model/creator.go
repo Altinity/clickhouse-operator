@@ -134,16 +134,22 @@ func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Ser
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
 					{
-						Name: chDefaultHTTPPortName,
-						Port: chDefaultHTTPPortNumber,
+						Name:       chDefaultHTTPPortName,
+						Protocol:   corev1.ProtocolTCP,
+						Port:       chDefaultHTTPPortNumber,
+						TargetPort: intstr.FromInt(chDefaultHTTPPortNumber),
 					},
 					{
-						Name: chDefaultClientPortName,
-						Port: chDefaultClientPortNumber,
+						Name:       chDefaultClientPortName,
+						Protocol:   corev1.ProtocolTCP,
+						Port:       chDefaultClientPortNumber,
+						TargetPort: intstr.FromInt(chDefaultClientPortNumber),
 					},
 					{
-						Name: chDefaultInterServerPortName,
-						Port: chDefaultInterServerPortNumber,
+						Name:       chDefaultInterServerPortName,
+						Protocol:   corev1.ProtocolTCP,
+						Port:       chDefaultInterServerPortNumber,
+						TargetPort: intstr.FromInt(chDefaultInterServerPortNumber),
 					},
 				},
 				Selector:  r.labeler.GetSelectorReplicaScope(replica),

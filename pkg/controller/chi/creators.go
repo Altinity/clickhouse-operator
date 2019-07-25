@@ -79,9 +79,13 @@ func (c *Controller) ReconcileService(service *core.Service) error {
 	if curService != nil {
 		// Object with such name already exists, this is not an error
 		glog.V(1).Infof("Update Service %s/%s", service.Namespace, service.Name)
-		// ResourceVersion is required in order to update Service
+		// spec.resourceVersion is required in order to update Service
 		service.ResourceVersion = curService.ResourceVersion
-		// spec.clusterIP field is immutable, need to use current value
+		// spec.clusterIP field is immutable, need to use already assigned value
+		// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+		// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
+		// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
 		service.Spec.ClusterIP = curService.Spec.ClusterIP
 		_, err := c.kubeClient.CoreV1().Services(service.Namespace).Update(service)
 		if err != nil {
