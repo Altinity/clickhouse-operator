@@ -152,9 +152,10 @@ func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Ser
 						TargetPort: intstr.FromInt(chDefaultInterServerPortNumber),
 					},
 				},
-				Selector:  r.labeler.GetSelectorReplicaScope(replica),
-				ClusterIP: templateDefaultsServiceClusterIP,
-				Type:      "ClusterIP",
+				Selector:                 r.labeler.GetSelectorReplicaScope(replica),
+				ClusterIP:                templateDefaultsServiceClusterIP,
+				Type:                     "ClusterIP",
+				PublishNotReadyAddresses: true,
 			},
 		}
 	}
@@ -276,6 +277,14 @@ func (r *Reconciler) setupStatefulSetPodTemplate(statefulSetObject *apps.Statefu
 		// Replica references UNKNOWN PodTemplate
 		copyPodTemplateFrom(statefulSetObject, createDefaultPodTemplate(statefulSetName))
 		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - default template", statefulSetName)
+	}
+
+	// Pod created by this StatefulSet has to have alias
+	statefulSetObject.Spec.Template.Spec.HostAliases = []corev1.HostAlias{
+		{
+			IP:        "127.0.0.1",
+			Hostnames: []string{CreatePodHostname(replica)},
+		},
 	}
 
 	r.setupConfigMapVolumes(statefulSetObject, replica)
