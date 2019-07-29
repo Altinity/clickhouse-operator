@@ -30,5 +30,5 @@ spec:
           volumes:
             - name: clickhouse-storage
               emptyDir:
-                medium: "" #accepted values:  empty str (means node's default medium) or Memory
+                medium: "" # accepted values:  empty str (means node's default medium) or "Memory"
                 sizeLimit: 1Gi
