@@ -4,19 +4,19 @@
 ## Prerequisites
 
 1. ClickHouse operator [installed](operator_installation_details.md)
-1. Zookeeper installed as described in [Zookeeper Setup](zookeeper_setup.md)
+1. Zookeeper [installed](zookeeper_setup.md)
 
 
 ## Manifest
 
-The example below creates a cluster with 2 shards and 2 replicas and persistent storage.
+Let's take a look on [example](./examples/04-zookeeper-replication-05-simple-PV.yaml), which creates a cluster with 2 shards and 2 replicas and persistent storage.
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 
 metadata:
-  name: test
+  name: "repl-05"
 
 spec:
   defaults:
@@ -25,10 +25,9 @@ spec:
       podTemplate: clickhouse:19.6
  
   configuration:
-    zookeeper: # Add Zookeeper
+    zookeeper:
       nodes:
       - host: zookeeper.zoo1ns
-        port: 2181
     clusters:
       - name: replicated
         layout:
@@ -62,7 +61,7 @@ Operator provides set of [macros](https://clickhouse.yandex/docs/en/operations/s
  1. `{replica}` -- replica name in the cluster, maps to pod service name
  1. `{shard}` -- shard id
 
-ClickHouse also supports internal macros {database} and {table} that maps to current database.table.
+ClickHouse also supports internal macros `{database}` and `{table}` that maps to current **database** and **table** respectively.
 
 ### Create replicated table
 
@@ -84,7 +83,7 @@ ENGINE = Distributed('{cluster}', default, events_local, rand());
 
 We can generate some data:
 ```sql
-insert into events select today(), rand()%3, number, 'my title' from numbers(100);
+INSERT INTO events SELECT today(), rand()%3, number, 'my title' FROM numbers(100);
 ```
 
 And check how these data are distributed over the cluster
