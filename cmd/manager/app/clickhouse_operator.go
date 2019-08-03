@@ -51,7 +51,7 @@ const (
 )
 
 var (
-	// versionRequest defines versionRequest request
+	// versionRequest defines request for clickhouse-operator version report. Operator should exit after version printed
 	versionRequest bool
 
 	// chopConfigFile defines path to clickhouse-operator config file to be used
@@ -72,7 +72,7 @@ var (
 )
 
 func init() {
-	flag.BoolVar(&versionRequest, "version", false, "Display versionRequest and exit")
+	flag.BoolVar(&versionRequest, "version", false, "Display clickhouse-operator version and exit")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
 	flag.StringVar(&kubeConfigFile, "kube-config", "", "Path to kubernetes config file. Only required if called outside of the cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Only required if called outside of the cluster and not being specified in kube config file.")
@@ -128,8 +128,9 @@ func createClientsets(config *kuberest.Config) (*kube.Clientset, *chopclientset.
 	return kubeClientset, chopClientset
 }
 
+// GetRuntimeParams returns map[string]string of ENV VARS with some runtime parameters
 func GetRuntimeParams() map[string]string {
-	res := make(map[string]string)
+	params := make(map[string]string)
 	// This list of ENV VARS is specified in operator .yaml manifest, section "kind: Deployment"
 	vars := []string{
 		// spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -144,24 +145,41 @@ func GetRuntimeParams() map[string]string {
 		// spec.serviceAccountName: clickhouse-operator
 		"OPERATOR_POD_SERVICE_ACCOUNT",
 
+		// .containers.resources.requests.cpu
 		"OPERATOR_CONTAINER_CPU_REQUEST",
+		// .containers.resources.limits.cpu
 		"OPERATOR_CONTAINER_CPU_LIMIT",
+		// .containers.resources.requests.memory
 		"OPERATOR_CONTAINER_MEM_REQUEST",
+		// .containers.resources.limits.memory
 		"OPERATOR_CONTAINER_MEM_LIMIT",
 	}
 
 	for _, varName := range vars {
-		res[varName] = os.Getenv(varName)
+		params[varName] = os.Getenv(varName)
 	}
 
-	return res
+	return params
 }
 
+// LogRuntimeParams writes runtime parameters into log
 func LogRuntimeParams() {
 	runtimeParams = GetRuntimeParams()
 	for name, value := range runtimeParams {
 		glog.V(1).Infof("%s=%s\n", name, value)
 	}
+}
+
+// startMetricsExporter start Prometheus metrics exporter in background
+func startMetricsExporter(chopConfig *config.Config) *chopmetrics.Exporter {
+	// Initializing Prometheus Metrics Exporter
+	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
+	metricsExporter := chopmetrics.NewExporter(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort)
+	prometheus.MustRegister(metricsExporter)
+	http.Handle(metricsPath, prometheus.Handler())
+	go http.ListenAndServe(metricsEP, nil)
+
+	return metricsExporter
 }
 
 // Run is an entry point of the application
@@ -180,12 +198,7 @@ func Run() {
 		os.Exit(1)
 	}
 
-	// Initializing Prometheus Metrics Exporter
-	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
-	metricsExporter := chopmetrics.NewExporter(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort)
-	prometheus.MustRegister(metricsExporter)
-	http.Handle(metricsPath, prometheus.Handler())
-	go http.ListenAndServe(metricsEP, nil)
+	metricsExporter := startMetricsExporter(chopConfig)
 
 	// Setting OS signals and termination context
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -198,7 +211,7 @@ func Run() {
 		os.Exit(1)
 	}()
 
-	// Initializing ClientSets and Informers
+	// Initialize ClientSets and Informers
 	kubeConfig, err := getConfig(kubeConfigFile, masterURL)
 	if err != nil {
 		glog.Fatalf("Unable to build kube conf: %s", err.Error())
@@ -233,7 +246,7 @@ func Run() {
 		kubeInformerFactory.Core().V1().Pods(),
 	)
 
-	// Starting Informers
+	// Start Informers
 	kubeInformerFactory.Start(ctx.Done())
 	chopInformerFactory.Start(ctx.Done())
 
