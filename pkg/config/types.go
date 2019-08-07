@@ -23,8 +23,8 @@ type Config struct {
 	ConfigFilePath   string
 	ConfigFolderPath string
 
-	// Namespaces where operator watches for events
-	Namespaces []string `yaml:"namespaces"`
+	// WatchNamespaces where operator watches for events
+	WatchNamespaces []string `yaml:"watchNamespaces"`
 
 	// Paths where to look for additional ClickHouse config .xml files to be mounted into Pod
 	// config.d

@@ -335,9 +335,15 @@ metadata:
   namespace: kube-system
 data:
   config.yaml: |
-    # Namespaces where clickhouse-operator listens for events.
-    # Concurrently running operators should listen on different namespaces
-    # namespaces:
+    ################################################
+    ##
+    ## Watch Namespaces Section
+    ##
+    ################################################
+    
+    # List of namespaces where clickhouse-operator watches for events.
+    # Concurrently running operators should watch on different namespaces
+    # watchNamespaces:
     #  - dev
     #  - info
     #  - onemore
