@@ -23,6 +23,7 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"sync"
 	"syscall"
 	"time"
@@ -128,11 +129,10 @@ func createClientsets(config *kuberest.Config) (*kube.Clientset, *chopclientset.
 	return kubeClientset, chopClientset
 }
 
-// GetRuntimeParams returns map[string]string of ENV VARS with some runtime parameters
-func GetRuntimeParams() map[string]string {
-	params := make(map[string]string)
+// getRuntimeParamNames return list of ENV VARS parameter names
+func getRuntimeParamNames() []string {
 	// This list of ENV VARS is specified in operator .yaml manifest, section "kind: Deployment"
-	vars := []string{
+	return []string{
 		// spec.nodeName: ip-172-20-52-62.ec2.internal
 		"OPERATOR_POD_NODE_NAME",
 		// metadata.name: clickhouse-operator-6f87589dbb-ftcsf
@@ -153,21 +153,50 @@ func GetRuntimeParams() map[string]string {
 		"OPERATOR_CONTAINER_MEM_REQUEST",
 		// .containers.resources.limits.memory
 		"OPERATOR_CONTAINER_MEM_LIMIT",
-	}
 
-	for _, varName := range vars {
+		// What namespaces to watch
+		"WATCH_NAMESPACE",
+		"WATCH_NAMESPACES",
+	}
+}
+
+// getRuntimeParams returns map[string]string of ENV VARS with some runtime parameters
+func getRuntimeParams() map[string]string {
+	params := make(map[string]string)
+	// Extract parameters from ENV VARS
+	for _, varName := range getRuntimeParamNames() {
 		params[varName] = os.Getenv(varName)
 	}
 
 	return params
 }
 
-// LogRuntimeParams writes runtime parameters into log
-func LogRuntimeParams() {
-	runtimeParams = GetRuntimeParams()
-	for name, value := range runtimeParams {
-		glog.V(1).Infof("%s=%s\n", name, value)
+// logRuntimeParams writes runtime parameters into log
+func logRuntimeParams() {
+	// Log params according to sorted names
+	// So we need to
+	// 1. Extract and sort names aka keys
+	// 2. Walk over keys and log params
+
+	runtimeParams = getRuntimeParams()
+
+	// Sort names aka keys
+	var keys []string
+	for k := range runtimeParams {
+		keys = append(keys, k)
 	}
+	sort.Strings(keys)
+
+	// Walk over sorted names aka keys
+	glog.V(1).Infof("Parameters num: %d\n", len(runtimeParams))
+	for _, k := range keys {
+		glog.V(1).Infof("%s=%s\n", k, runtimeParams[k])
+	}
+}
+
+// logConfig writes Config into log
+func logConfig(chopConfig *config.Config) {
+	glog.V(1).Infof("Config:\n")
 }
 
 // startMetricsExporter start Prometheus metrics exporter in background
@@ -190,13 +219,14 @@ func Run() {
 	}
 
 	glog.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
-	LogRuntimeParams()
+	logRuntimeParams()
 
 	chopConfig, err := config.GetConfig(chopConfigFile)
 	if err != nil {
 		glog.Fatalf("Unable to build config file %v\n", err)
 		os.Exit(1)
 	}
+	logConfig(chopConfig)
 
 	metricsExporter := startMetricsExporter(chopConfig)
 
