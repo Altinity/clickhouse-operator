@@ -196,7 +196,7 @@ func logRuntimeParams() {
 
 // logConfig writes Config into log
 func logConfig(chopConfig *config.Config) {
-	glog.V(1).Infof("Config:\n")
+	glog.V(1).Infof("Config:\n%s", chopConfig.String())
 }
 
 // startMetricsExporter start Prometheus metrics exporter in background

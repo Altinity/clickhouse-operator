@@ -15,6 +15,7 @@
 package config
 
 import (
+	"bytes"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
@@ -297,7 +298,7 @@ func (config *Config) readChConfigFiles() {
 	config.ChUsersConfigs = readConfigFiles(config.ChUsersConfigsPath, config.isChConfigExt)
 }
 
-// isChConfigExt return true in case specified file has proper extension for a ClickHouse config file
+// isChConfigExt returns true in case specified file has proper extension for a ClickHouse config file
 func (config *Config) isChConfigExt(file string) bool {
 	switch util.ExtToLower(file) {
 	case ".xml":
@@ -311,7 +312,7 @@ func (config *Config) readChiTemplateFiles() {
 	config.ChiTemplates = readConfigFiles(config.ChiTemplatesPath, config.isChiTemplateExt)
 }
 
-// isChiTemplateExt return true in case specified file has proper extension for a CHI template config file
+// isChiTemplateExt returns true in case specified file has proper extension for a CHI template config file
 func (config *Config) isChiTemplateExt(file string) bool {
 	switch util.ExtToLower(file) {
 	case ".yaml":
@@ -320,7 +321,7 @@ func (config *Config) isChiTemplateExt(file string) bool {
 	return false
 }
 
-// IsWatchedNamespace returns is specified namespace in a list of watched
+// IsWatchedNamespace returns whether specified namespace is in a list of watched
 func (config *Config) IsWatchedNamespace(namespace string) bool {
 	// In case no namespaces specified - watch all namespaces
 	if len(config.WatchNamespaces) == 0 {
@@ -328,6 +329,63 @@ func (config *Config) IsWatchedNamespace(namespace string) bool {
 	}
 
 	return util.InArray(namespace, config.WatchNamespaces)
+}
+
+// String returns string representation of a Config
+func (config *Config) String() string {
+	b := &bytes.Buffer{}
+
+	util.Fprintf(b, "ConfigFilePath:   %s\n", config.ConfigFilePath)
+	util.Fprintf(b, "ConfigFolderPath: %s\n", config.ConfigFolderPath)
+
+	util.Fprintf(b, "%s", config.stringSlice("WatchNamespaces", config.WatchNamespaces))
+
+	util.Fprintf(b, "ChCommonConfigsPath: %s\n", config.ChCommonConfigsPath)
+	util.Fprintf(b, "ChPodConfigsPath:    %s\n", config.ChPodConfigsPath)
+	util.Fprintf(b, "ChUsersConfigsPath:  %s\n", config.ChUsersConfigsPath)
+
+	util.Fprintf(b, "%s", config.stringMap("ChCommonConfigs", config.ChCommonConfigs))
+	util.Fprintf(b, "%s", config.stringMap("ChPodConfigs", config.ChPodConfigs))
+	util.Fprintf(b, "%s", config.stringMap("ChUsersConfigs", config.ChUsersConfigs))
+
+	util.Fprintf(b, "ChiTemplatesPath:  %s\n", config.ChiTemplatesPath)
+	util.Fprintf(b, "%s", config.stringMap("ChiTemplates", config.ChiTemplates))
+
+	return b.String()
+}
+
+// stringSlice returns string of named []string Config param
+func (config *Config) stringSlice(name string, sl []string) string {
+	b := &bytes.Buffer{}
+	util.Fprintf(b, "%s (%d):\n", name, len(sl))
+	for i := range sl {
+		util.Fprintf(b, "  - %s\n", sl[i])
+	}
+
+	return b.String()
+}
+
+// stringMap returns string of named map[string]string Config param
+func (config *Config) stringMap(name string, m map[string]string) string {
+	// Write params according to sorted names
+	// So we need to
+	// 1. Extract and sort names aka keys
+	// 2. Walk over keys and log params
+	// Sort names aka keys
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Walk over sorted names aka keys
+	b := &bytes.Buffer{}
+	util.Fprintf(b, "%s (%d):\n", name, len(m))
+	for _, k := range keys {
+		util.Fprintf(b, "  - [%s]=%s\n", k, m[k])
+	}
+
+	return b.String()
 }
 
 // readConfigFiles reads config files from specified path into "file name->file content" map
