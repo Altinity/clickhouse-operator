@@ -35,6 +35,7 @@ import (
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	kube "k8s.io/client-go/kubernetes"
 	kuberest "k8s.io/client-go/rest"
@@ -249,8 +250,17 @@ func Run() {
 	}
 
 	kubeClient, chopClient := createClientsets(kubeConfig)
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, informerFactoryResync)
-	chopInformerFactory := chopinformers.NewSharedInformerFactory(chopClient, informerFactoryResync)
+
+	namespace := metav1.NamespaceAll
+	if len(chopConfig.WatchNamespaces) == 1 {
+		// We have exactly one watch namespace specified
+		// This scenario is implemented in go-client
+		// In any other case just keep metav1.NamespaceAll
+		namespace = chopConfig.WatchNamespaces[0]
+	}
+
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, informerFactoryResync, kubeinformers.WithNamespace(namespace))
+	chopInformerFactory := chopinformers.NewSharedInformerFactoryWithOptions(chopClient, informerFactoryResync, chopinformers.WithNamespace(namespace))
 
 	// Creating resource Controller
 	chiController := chi.NewController(

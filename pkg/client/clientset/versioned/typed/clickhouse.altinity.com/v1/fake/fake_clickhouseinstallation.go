@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ func (c *FakeClickHouseInstallations) List(opts v1.ListOptions) (result *clickho
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &clickhouse_altinity_com_v1.ClickHouseInstallationList{}
+	list := &clickhouse_altinity_com_v1.ClickHouseInstallationList{ListMeta: obj.(*clickhouse_altinity_com_v1.ClickHouseInstallationList).ListMeta}
 	for _, item := range obj.(*clickhouse_altinity_com_v1.ClickHouseInstallationList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
