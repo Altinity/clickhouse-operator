@@ -658,6 +658,10 @@ const (
 	// Status code 406
 	StatusReasonNotAcceptable StatusReason = "NotAcceptable"
 
+	// StatusReasonRequestEntityTooLarge means that the request entity is too large.
+	// Status code 413
+	StatusReasonRequestEntityTooLarge StatusReason = "RequestEntityTooLarge"
+
 	// StatusReasonUnsupportedMediaType means that the content type sent by the client is not acceptable
 	// to the server - for instance, attempting to send protobuf for a resource that supports only json and yaml.
 	// API calls that return UnsupportedMediaType can never succeed.
@@ -799,7 +803,8 @@ type APIGroup struct {
 	// The server returns only those CIDRs that it thinks that the client can match.
 	// For example: the master will return an internal IP CIDR only, if the client reaches the server using an internal IP.
 	// Server looks at X-Forwarded-For header or X-Real-Ip header or request.RemoteAddr (in that order) to get the client IP.
-	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs" protobuf:"bytes,4,rep,name=serverAddressByClientCIDRs"`
+	// +optional
+	ServerAddressByClientCIDRs []ServerAddressByClientCIDR `json:"serverAddressByClientCIDRs,omitempty" protobuf:"bytes,4,rep,name=serverAddressByClientCIDRs"`
 }
 
 // ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.
