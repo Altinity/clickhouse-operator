@@ -72,7 +72,7 @@ func (c *configSections) CreateConfigsPod(replica *v1.ChiReplica) map[string]str
 	podConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(podConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(replica))
 	// Extra user-specified config files
-	util.MergeStringMaps(podConfigSections, c.chopConfig.ChPodConfigs)
+	util.MergeStringMaps(podConfigSections, c.chopConfig.ChHostConfigs)
 
 	return podConfigSections
 }

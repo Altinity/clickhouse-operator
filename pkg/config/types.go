@@ -32,11 +32,11 @@ type Config struct {
 	// users.d
 	// respectively
 	ChCommonConfigsPath string `yaml:"chCommonConfigsPath"`
-	ChPodConfigsPath    string `yaml:"chPodConfigsPath"`
+	ChHostConfigsPath   string `yaml:"chHostConfigsPath"`
 	ChUsersConfigsPath  string `yaml:"chUsersConfigsPath"`
 	// Config files fetched from these paths. Maps "file name->file content"
 	ChCommonConfigs map[string]string
-	ChPodConfigs    map[string]string
+	ChHostConfigs   map[string]string
 	ChUsersConfigs  map[string]string
 
 	// Path where to look for ClickHouseInstallation templates .yaml files

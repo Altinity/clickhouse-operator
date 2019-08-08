@@ -166,7 +166,7 @@ func (config *Config) normalize() error {
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
 	config.prepareConfigPath(&config.ChCommonConfigsPath, "config.d")
-	config.prepareConfigPath(&config.ChPodConfigsPath, "conf.d")
+	config.prepareConfigPath(&config.ChHostConfigsPath, "conf.d")
 	config.prepareConfigPath(&config.ChUsersConfigsPath, "users.d")
 
 	// Process ClickHouseInstallation templates section
@@ -294,7 +294,7 @@ func (config *Config) relativeToConfigFolderPath(relativePath string) string {
 // readChConfigFiles reads all extra user-specified ClickHouse config files
 func (config *Config) readChConfigFiles() {
 	config.ChCommonConfigs = readConfigFiles(config.ChCommonConfigsPath, config.isChConfigExt)
-	config.ChPodConfigs = readConfigFiles(config.ChPodConfigsPath, config.isChConfigExt)
+	config.ChHostConfigs = readConfigFiles(config.ChHostConfigsPath, config.isChConfigExt)
 	config.ChUsersConfigs = readConfigFiles(config.ChUsersConfigsPath, config.isChConfigExt)
 }
 
@@ -341,11 +341,11 @@ func (config *Config) String() string {
 	util.Fprintf(b, "%s", config.stringSlice("WatchNamespaces", config.WatchNamespaces))
 
 	util.Fprintf(b, "ChCommonConfigsPath: %s\n", config.ChCommonConfigsPath)
-	util.Fprintf(b, "ChPodConfigsPath:    %s\n", config.ChPodConfigsPath)
+	util.Fprintf(b, "ChHostConfigsPath:    %s\n", config.ChHostConfigsPath)
 	util.Fprintf(b, "ChUsersConfigsPath:  %s\n", config.ChUsersConfigsPath)
 
 	util.Fprintf(b, "%s", config.stringMap("ChCommonConfigs", config.ChCommonConfigs))
-	util.Fprintf(b, "%s", config.stringMap("ChPodConfigs", config.ChPodConfigs))
+	util.Fprintf(b, "%s", config.stringMap("ChHostConfigs", config.ChHostConfigs))
 	util.Fprintf(b, "%s", config.stringMap("ChUsersConfigs", config.ChUsersConfigs))
 
 	util.Fprintf(b, "ChiTemplatesPath:  %s\n", config.ChiTemplatesPath)
