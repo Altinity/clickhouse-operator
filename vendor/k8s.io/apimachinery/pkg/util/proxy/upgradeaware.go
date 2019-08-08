@@ -398,7 +398,7 @@ func getResponse(r io.Reader) (*http.Response, []byte, error) {
 
 // dial dials the backend at req.URL and writes req to it.
 func dial(req *http.Request, transport http.RoundTripper) (net.Conn, error) {
-	conn, err := DialURL(req.URL, transport)
+	conn, err := DialURL(req.Context(), req.URL, transport)
 	if err != nil {
 		return nil, fmt.Errorf("error dialing backend: %v", err)
 	}

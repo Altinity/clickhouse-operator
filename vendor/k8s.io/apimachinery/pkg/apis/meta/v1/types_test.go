@@ -45,7 +45,7 @@ func TestVerbsUgorjiMarshalJSON(t *testing.T) {
 	}
 }
 
-func TestVerbsJsonIterUnmarshalJSON(t *testing.T) {
+func TestVerbsUJsonIterUnmarshalJSON(t *testing.T) {
 	cases := []struct {
 		input  string
 		result APIResource
