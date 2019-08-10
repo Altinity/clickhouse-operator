@@ -219,6 +219,9 @@ func Run() {
 		os.Exit(0)
 	}
 
+	//
+	// Prepare configuration
+	//
 	glog.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
 	logRuntimeParams()
 
@@ -231,7 +234,7 @@ func Run() {
 
 	metricsExporter := startMetricsExporter(chopConfig)
 
-	// Setting OS signals and termination context
+	// Set OS signals and termination context
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	stopChan := make(chan os.Signal, 2)
 	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
@@ -251,18 +254,37 @@ func Run() {
 
 	kubeClient, chopClient := createClientsets(kubeConfig)
 
+	//
+	// Create Informers
+	//
+
+	// Namespace where informers would watch notifications from
 	namespace := metav1.NamespaceAll
 	if len(chopConfig.WatchNamespaces) == 1 {
 		// We have exactly one watch namespace specified
 		// This scenario is implemented in go-client
 		// In any other case just keep metav1.NamespaceAll
+
+		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
+		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
 		namespace = chopConfig.WatchNamespaces[0]
 	}
 
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(kubeClient, informerFactoryResync, kubeinformers.WithNamespace(namespace))
-	chopInformerFactory := chopinformers.NewSharedInformerFactoryWithOptions(chopClient, informerFactoryResync, chopinformers.WithNamespace(namespace))
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
+		kubeClient,
+		informerFactoryResync,
+		kubeinformers.WithNamespace(namespace),
+	)
+	chopInformerFactory := chopinformers.NewSharedInformerFactoryWithOptions(
+		chopClient,
+		informerFactoryResync,
+		chopinformers.WithNamespace(namespace),
+	)
 
-	// Creating resource Controller
+	//
+	// Create resource Controller
+	//
+
 	chiController := chi.NewController(
 		version.Version,
 		runtimeParams,
@@ -286,11 +308,15 @@ func Run() {
 		kubeInformerFactory.Core().V1().Pods(),
 	)
 
+	//
+	// Start Informers and Controllers
+	//
+
 	// Start Informers
 	kubeInformerFactory.Start(ctx.Done())
 	chopInformerFactory.Start(ctx.Done())
 
-	// Starting CHI resource Controller
+	// Start CHI resource Controller
 	glog.V(1).Info("Starting CHI controller\n")
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
