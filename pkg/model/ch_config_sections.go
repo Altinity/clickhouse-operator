@@ -67,10 +67,10 @@ func (c *configSections) CreateConfigsUsers() {
 	util.MergeStringMaps(c.commonUsersConfigSections, c.chopConfig.ChUsersConfigs)
 }
 
-func (c *configSections) CreateConfigsPod(replica *v1.ChiReplica) map[string]string {
+func (c *configSections) CreateConfigsPod(host *v1.ChiHost) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	podConfigSections := make(map[string]string)
-	util.IncludeNonEmpty(podConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(replica))
+	util.IncludeNonEmpty(podConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(host))
 	// Extra user-specified config files
 	util.MergeStringMaps(podConfigSections, c.chopConfig.ChHostConfigs)
 

@@ -14,24 +14,24 @@
 
 package v1
 
-func (replica *ChiReplica) InheritTemplates(shard *ChiShard) {
-	(&replica.Templates).MergeFrom(&shard.Templates)
+func (host *ChiHost) InheritTemplates(shard *ChiShard) {
+	(&host.Templates).MergeFrom(&shard.Templates)
 }
 
-func (replica *ChiReplica) GetPodTemplate() (*ChiPodTemplate, bool) {
-	name := replica.Templates.PodTemplate
-	template, ok := replica.Chi.GetPodTemplate(name)
+func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
+	name := host.Templates.PodTemplate
+	template, ok := host.Chi.GetPodTemplate(name)
 	return template, ok
 }
 
-func (replica *ChiReplica) GetVolumeClaimTemplate() (*ChiVolumeClaimTemplate, bool) {
-	name := replica.Templates.VolumeClaimTemplate
-	template, ok := replica.Chi.GetVolumeClaimTemplate(name)
+func (host *ChiHost) GetVolumeClaimTemplate() (*ChiVolumeClaimTemplate, bool) {
+	name := host.Templates.VolumeClaimTemplate
+	template, ok := host.Chi.GetVolumeClaimTemplate(name)
 	return template, ok
 }
 
-func (replica *ChiReplica) GetServiceTemplate() (*ChiServiceTemplate, bool) {
-	name := replica.Templates.ReplicaServiceTemplate
-	template, ok := replica.Chi.GetServiceTemplate(name)
+func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+	name := host.Templates.ReplicaServiceTemplate
+	template, ok := host.Chi.GetServiceTemplate(name)
 	return template, ok
 }

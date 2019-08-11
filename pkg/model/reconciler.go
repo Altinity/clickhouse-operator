@@ -36,7 +36,7 @@ type Reconciler struct {
 type ReconcileFuncs struct {
 	ReconcileConfigMap   func(configMap *corev1.ConfigMap) error
 	ReconcileService     func(service *corev1.Service) error
-	ReconcileStatefulSet func(newStatefulSet *apps.StatefulSet, replica *chiv1.ChiReplica) error
+	ReconcileStatefulSet func(newStatefulSet *apps.StatefulSet, host *chiv1.ChiHost) error
 }
 
 // NewReconciler creates new creator
@@ -65,7 +65,7 @@ func (r *Reconciler) Reconcile() error {
 		r.reconcileChi,
 		r.reconcileCluster,
 		r.reconcileShard,
-		r.reconcileReplica,
+		r.reconcileHost,
 	)
 }
 
@@ -102,23 +102,23 @@ func (r *Reconciler) reconcileShard(shard *chiv1.ChiShard) error {
 	}
 }
 
-// reconcileReplica reconciles Replica
-func (r *Reconciler) reconcileReplica(replica *chiv1.ChiReplica) error {
-	// Add replica's Service
-	service := r.createServiceReplica(replica)
+// reconcileHost reconciles ClickHouse host
+func (r *Reconciler) reconcileHost(host *chiv1.ChiHost) error {
+	// Add host's Service
+	service := r.createServiceHost(host)
 	if err := r.funcs.ReconcileService(service); err != nil {
 		return err
 	}
 
-	// Add replica's ConfigMap
-	configMap := r.createConfigMapReplica(replica)
+	// Add host's ConfigMap
+	configMap := r.createConfigMapHost(host)
 	if err := r.funcs.ReconcileConfigMap(configMap); err != nil {
 		return err
 	}
 
-	// Add replica's StatefulSet
-	statefulSet := r.createStatefulSet(replica)
-	if err := r.funcs.ReconcileStatefulSet(statefulSet, replica); err != nil {
+	// Add host's StatefulSet
+	statefulSet := r.createStatefulSet(host)
+	if err := r.funcs.ReconcileStatefulSet(statefulSet, host); err != nil {
 		return err
 	}
 

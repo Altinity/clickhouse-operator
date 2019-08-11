@@ -459,7 +459,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 
 	glog.V(1).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
 	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted,
-		fmt.Sprintf("created cluster with %d shards and %d replicas", chi.Status.ShardsCount, chi.Status.ReplicasCount))
+		fmt.Sprintf("created cluster with %d shards and %d hosts", chi.Status.ShardsCount, chi.Status.HostsCount))
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
 	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.CreatePodFQDNsOfChi(chi))
@@ -508,17 +508,17 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 			cluster := diff.Removed[path].(chop.ChiCluster)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
 				fmt.Sprintf("delete cluster %s", cluster.Name))
-			c.deleteCluster(&cluster)
+			_ = c.deleteCluster(&cluster)
 		case chop.ChiShard:
 			shard := diff.Removed[path].(chop.ChiShard)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
 				fmt.Sprintf("delete shard %d in cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName))
-			c.deleteShard(&shard)
-		case chop.ChiReplica:
-			replica := diff.Removed[path].(chop.ChiReplica)
+			_ = c.deleteShard(&shard)
+		case chop.ChiHost:
+			host := diff.Removed[path].(chop.ChiHost)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
-				fmt.Sprintf("delete replica %d from shard %d in cluster %s", replica.Address.ReplicaIndex, replica.Address.ShardIndex, replica.Address.ClusterName))
-			_ = c.deleteReplica(&replica)
+				fmt.Sprintf("delete replica %d from shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName))
+			_ = c.deleteHost(&host)
 		}
 	}
 
@@ -550,21 +550,21 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 
 				glog.V(1).Infof("Creating distributed objects: %v", names)
 				_ = c.schemer.ShardApplySQLs(&shard, createSQLs, true)
-			case chop.ChiReplica:
-				replica := diff.Added[path].(chop.ChiReplica)
-				cluster := new.Spec.Configuration.Clusters[replica.Address.ClusterIndex]
+			case chop.ChiHost:
+				host := diff.Added[path].(chop.ChiHost)
+				cluster := new.Spec.Configuration.Clusters[host.Address.ClusterIndex]
 
-				log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", replica.Address.ReplicaIndex, replica.Address.ShardIndex, cluster.Name)
+				log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, cluster.Name)
 				glog.V(1).Info(log)
 				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 
-				names, createSQLs, _ := c.schemer.GetCreateReplicatedObjects(new, &cluster, &replica)
+				names, createSQLs, _ := c.schemer.GetCreateReplicatedObjects(new, &cluster, &host)
 				glog.V(1).Infof("Creating replicated objects: %v", names)
-				_ = c.schemer.ReplicaApplySQLs(&replica, createSQLs, true)
+				_ = c.schemer.HostApplySQLs(&host, createSQLs, true)
 
 				names, createSQLs, _ = c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
 				glog.V(1).Infof("Creating distributed objects: %v", names)
-				_ = c.schemer.ReplicaApplySQLs(&replica, createSQLs, true)
+				_ = c.schemer.HostApplySQLs(&host, createSQLs, true)
 			}
 		}
 		_ = c.updateCHIResource(new)
@@ -583,7 +583,7 @@ func (c *Controller) onDeleteChi(chi *chop.ClickHouseInstallation) error {
 		return err
 	}
 
-	c.deleteChi(chi)
+	_ = c.deleteChi(chi)
 	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, "deleted")
 
 	return nil

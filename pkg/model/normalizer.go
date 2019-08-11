@@ -69,8 +69,8 @@ func (n *Normalizer) DoChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouse
 func (n *Normalizer) doStatus() {
 	endpoint := CreateChiServiceFQDN(n.chi)
 	pods := make([]string, 0)
-	n.chi.WalkReplicas(func(replica *chiv1.ChiReplica) error {
-		pods = append(pods, CreatePodName(replica))
+	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
+		pods = append(pods, CreatePodName(host))
 		return nil
 	})
 	n.chi.StatusFill(endpoint, pods)
@@ -365,15 +365,15 @@ func (n *Normalizer) doClusters() {
 	})
 	n.chi.FillAddressInfo()
 	n.chi.FillChiPointer()
-	n.chi.WalkReplicas(func(replica *chiv1.ChiReplica) error {
-		return n.calcFingerprints(replica)
+	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
+		return n.calcFingerprints(host)
 	})
 }
 
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
-func (n *Normalizer) calcFingerprints(replica *chiv1.ChiReplica) error {
-	replica.Config.ZookeeperFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
-	replica.Config.SettingsFingerprint = fingerprint(castToSliceOfStrings(n.chi.Spec.Configuration.Settings))
+func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
+	host.Config.ZookeeperFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
+	host.Config.SettingsFingerprint = fingerprint(castToSliceOfStrings(n.chi.Spec.Configuration.Settings))
 
 	return nil
 }
@@ -565,12 +565,12 @@ func (n *Normalizer) ensureShardReplicas(shard *chiv1.ChiShard) {
 
 	if shard.ReplicasCount == 0 {
 		// No replicas specified - just allocate required number
-		shard.Replicas = make([]chiv1.ChiReplica, shard.ReplicasCount)
+		shard.Replicas = make([]chiv1.ChiHost, shard.ReplicasCount)
 	} else {
 		// Some (may be all) replicas specified, need to append space for unspecified replicas
 		// TODO may be there is better way to append N slots to slice
 		for len(shard.Replicas) < shard.ReplicasCount {
-			shard.Replicas = append(shard.Replicas, chiv1.ChiReplica{})
+			shard.Replicas = append(shard.Replicas, chiv1.ChiHost{})
 		}
 	}
 }
@@ -581,30 +581,31 @@ func (n *Normalizer) doShardReplicas(shard *chiv1.ChiShard) {
 	n.ensureShardReplicas(shard)
 	for replicaIndex := range shard.Replicas {
 		// Convenience wrapper
-		replica := &shard.Replicas[replicaIndex]
+		host := &shard.Replicas[replicaIndex]
 
-		// Normalize a replica
-		n.doReplicaName(replica, replicaIndex)
-		n.doReplicaPort(replica)
+		// Normalize a host/replica
+		n.doHostName(host, replicaIndex)
+		n.doHostPort(host)
 		// Use PodTemplate from shard
-		replica.InheritTemplates(shard)
+		host.InheritTemplates(shard)
 	}
 }
 
-// doReplicaName normalizes replica name
-func (n *Normalizer) doReplicaName(replica *chiv1.ChiReplica, index int) {
-	if len(replica.Name) > 0 {
-		// Already has a name
+// doHostName normalizes host's name
+func (n *Normalizer) doHostName(host *chiv1.ChiHost, index int) {
+	if len(host.Name) > 0 {
+		// Already has a name, do not change it
 		return
+	} else {
+		// No name specified - name this host
+		host.Name = strconv.Itoa(index)
 	}
-
-	replica.Name = strconv.Itoa(index)
 }
 
-// doReplicaPort ensures chiv1.ChiReplica.Port is reasonable
-func (n *Normalizer) doReplicaPort(replica *chiv1.ChiReplica) {
-	if replica.Port <= 0 {
-		replica.Port = chDefaultClientPortNumber
+// doHostPort ensures chiv1.ChiReplica.Port is reasonable
+func (n *Normalizer) doHostPort(host *chiv1.ChiHost) {
+	if host.Port <= 0 {
+		host.Port = chDefaultClientPortNumber
 	}
 }
 

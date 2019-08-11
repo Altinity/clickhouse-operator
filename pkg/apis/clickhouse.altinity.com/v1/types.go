@@ -43,7 +43,7 @@ type ChiStatus struct {
 	IsKnown       int      `json:"isKnown"`
 	Version       string   `json:"version"`
 	ClustersCount int      `json:"clusters"`
-	ReplicasCount int      `json:"replicas"`
+	HostsCount    int      `json:"hosts"`
 	ShardsCount   int      `json:"shards"`
 	Pods          []string `json:"pods"`
 	Endpoint      string   `json:"endpoint"`
@@ -138,7 +138,7 @@ type ChiShard struct {
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 	ReplicasCount       int              `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiReplica
-	Replicas []ChiReplica `json:"replicas,omitempty"`
+	Replicas []ChiHost `json:"replicas,omitempty"`
 
 	// Internal data
 	Address ChiShardAddress         `json:"address"`
@@ -155,33 +155,33 @@ type ChiShardAddress struct {
 	ShardIndex   int    `json:"shardIndex"`
 }
 
-// ChiReplica defines item of a replicas section of .spec.configuration.clusters[n].shards[m]
-type ChiReplica struct {
+// ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
+type ChiHost struct {
 	Name      string           `json:"name,omitempty"`
 	Port      int32            `json:"port,omitempty"`
 	Templates ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data
-	Address ChiReplicaAddress       `json:"address"`
-	Config  ChiReplicaConfig        `json:"config"`
+	Address ChiHostAddress          `json:"address"`
+	Config  ChiHostConfig           `json:"config"`
 	Chi     *ClickHouseInstallation `json:"-"`
 }
 
-// ChiReplicaAddress defines address of a replica within ClickHouseInstallation
-type ChiReplicaAddress struct {
-	Namespace          string `json:"namespace"`
-	ChiName            string `json:"chiName"`
-	ClusterName        string `json:"clusterName"`
-	ClusterIndex       int    `json:"clusterIndex"`
-	ShardName          string `json:"shardName,omitempty"`
-	ShardIndex         int    `json:"shardIndex"`
-	ReplicaName        string `json:"replicaName,omitempty"`
-	ReplicaIndex       int    `json:"replicaIndex"`
-	GlobalReplicaIndex int    `json:"globalReplicaIndex"`
+// ChiHostAddress defines address of a host within ClickHouseInstallation
+type ChiHostAddress struct {
+	Namespace    string `json:"namespace"`
+	ChiName      string `json:"chiName"`
+	ClusterName  string `json:"clusterName"`
+	ClusterIndex int    `json:"clusterIndex"`
+	ShardName    string `json:"shardName,omitempty"`
+	ShardIndex   int    `json:"shardIndex"`
+	ReplicaName  string `json:"replicaName,omitempty"`
+	ReplicaIndex int    `json:"replicaIndex"`
+	HostIndex    int    `json:"hostIndex"`
 }
 
-// ChiReplicaConfig defines additional data related to replica
-type ChiReplicaConfig struct {
+// ChiHostConfig defines additional data related to a host
+type ChiHostConfig struct {
 	ZookeeperFingerprint string `json:"zookeeperfingerprint"`
 	SettingsFingerprint  string `json:"settingsfingerprint"`
 }
