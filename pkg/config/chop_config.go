@@ -335,21 +335,36 @@ func (config *Config) IsWatchedNamespace(namespace string) bool {
 func (config *Config) String() string {
 	b := &bytes.Buffer{}
 
-	util.Fprintf(b, "ConfigFilePath:   %s\n", config.ConfigFilePath)
+	util.Fprintf(b, "ConfigFilePath: %s\n", config.ConfigFilePath)
 	util.Fprintf(b, "ConfigFolderPath: %s\n", config.ConfigFolderPath)
 
 	util.Fprintf(b, "%s", config.stringSlice("WatchNamespaces", config.WatchNamespaces))
 
 	util.Fprintf(b, "ChCommonConfigsPath: %s\n", config.ChCommonConfigsPath)
-	util.Fprintf(b, "ChHostConfigsPath:    %s\n", config.ChHostConfigsPath)
-	util.Fprintf(b, "ChUsersConfigsPath:  %s\n", config.ChUsersConfigsPath)
+	util.Fprintf(b, "ChHostConfigsPath: %s\n", config.ChHostConfigsPath)
+	util.Fprintf(b, "ChUsersConfigsPath: %s\n", config.ChUsersConfigsPath)
 
 	util.Fprintf(b, "%s", config.stringMap("ChCommonConfigs", config.ChCommonConfigs))
 	util.Fprintf(b, "%s", config.stringMap("ChHostConfigs", config.ChHostConfigs))
 	util.Fprintf(b, "%s", config.stringMap("ChUsersConfigs", config.ChUsersConfigs))
 
-	util.Fprintf(b, "ChiTemplatesPath:  %s\n", config.ChiTemplatesPath)
+	util.Fprintf(b, "ChiTemplatesPath: %s\n", config.ChiTemplatesPath)
 	util.Fprintf(b, "%s", config.stringMap("ChiTemplates", config.ChiTemplates))
+
+	util.Fprintf(b, "StatefulSetUpdateTimeout: %d\n", config.StatefulSetUpdateTimeout)
+	util.Fprintf(b, "StatefulSetUpdatePollPeriod: %d\n", config.StatefulSetUpdatePollPeriod)
+
+	util.Fprintf(b, "OnStatefulSetCreateFailureAction: %s\n", config.OnStatefulSetCreateFailureAction)
+	util.Fprintf(b, "OnStatefulSetUpdateFailureAction: %s\n", config.OnStatefulSetUpdateFailureAction)
+
+	util.Fprintf(b, "ChConfigUserDefaultProfile: %s\n", config.ChConfigUserDefaultProfile)
+	util.Fprintf(b, "ChConfigUserDefaultQuota: %s\n", config.ChConfigUserDefaultQuota)
+	util.Fprintf(b, "%s", config.stringSlice("ChConfigUserDefaultNetworksIP", config.ChConfigUserDefaultNetworksIP))
+	util.Fprintf(b, "ChConfigUserDefaultPassword: %s\n", config.ChConfigUserDefaultPassword)
+
+	util.Fprintf(b, "ChUsername: %s\n", config.ChUsername)
+	util.Fprintf(b, "ChPassword: %s\n", config.ChPassword)
+	util.Fprintf(b, "ChPort: %d\n", config.ChPort)
 
 	return b.String()
 }

@@ -18,6 +18,9 @@ import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
+// !!! IMPORTANT !!!
+// Do not forget to update func (config *Config) String() also!
+// !!! IMPORTANT !!!
 type Config struct {
 	// Full path to the config file and folder where this Config originates from
 	ConfigFilePath   string
