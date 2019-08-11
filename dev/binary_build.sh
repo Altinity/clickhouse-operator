@@ -22,8 +22,7 @@ if CGO_ENABLED=0 go build \
     "${SRC_ROOT}/cmd/manager/main.go"; then
     echo "Build OK"
 else
-    echo "WARING!"
-    echo "BUILD FAILED"
+    echo "WARNING! BUILD FAILED!"
     echo "Check logs for details"
 fi
 
