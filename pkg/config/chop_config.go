@@ -24,6 +24,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/golang/glog"
+
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -149,6 +151,7 @@ func (config *Config) buildChiTemplate() {
 		chi := new(chiv1.ClickHouseInstallation)
 		if err := yaml.Unmarshal([]byte(config.ChiTemplates[key]), chi); err != nil {
 			// Unable to unmarshal - skip incorrect template
+			glog.V(1).Infof("FAIL buildChiTemplate() unable to unmarshal file %s %q", key, err)
 			continue
 		}
 		// Create target template, if not exists
@@ -316,6 +319,8 @@ func (config *Config) readChiTemplateFiles() {
 func (config *Config) isChiTemplateExt(file string) bool {
 	switch util.ExtToLower(file) {
 	case ".yaml":
+		return true
+	case ".json":
 		return true
 	}
 	return false

@@ -1,0 +1,17 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "default-volumeclaimtemplate"
+spec:
+  defaults:
+    templates:
+      volumeClaimTemplate: default-volumeclaim-template
+  templates:
+    volumeClaimTemplates:
+      - name: default-volumeclaim-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi
