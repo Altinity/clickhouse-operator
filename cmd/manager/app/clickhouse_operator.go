@@ -43,6 +43,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Prometheus exporter defaults
@@ -206,7 +207,7 @@ func startMetricsExporter(chopConfig *config.Config) *chopmetrics.Exporter {
 	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
 	metricsExporter := chopmetrics.NewExporter(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort)
 	prometheus.MustRegister(metricsExporter)
-	http.Handle(metricsPath, prometheus.Handler())
+	http.Handle(metricsPath, promhttp.Handler())
 	go http.ListenAndServe(metricsEP, nil)
 
 	return metricsExporter
