@@ -9,17 +9,25 @@ import (
 	"time"
 )
 
-func (cl *Changelog) diffStruct(path []string, a, b reflect.Value) error {
+func (d *Differ) diffStruct(path []string, a, b reflect.Value) error {
 	if areType(a, b, reflect.TypeOf(time.Time{})) {
-		return cl.diffTime(path, a, b)
+		return d.diffTime(path, a, b)
 	}
 
 	if a.Kind() == reflect.Invalid {
-		return cl.structValues(CREATE, path, b)
+		if d.DisableStructValues {
+			d.cl.add(CREATE, path, nil, b.Interface())
+			return nil
+		}
+		return d.structValues(CREATE, path, b)
 	}
 
 	if b.Kind() == reflect.Invalid {
-		return cl.structValues(DELETE, path, a)
+		if d.DisableStructValues {
+			d.cl.add(DELETE, path, a.Interface(), nil)
+			return nil
+		}
+		return d.structValues(DELETE, path, a)
 	}
 
 	for i := 0; i < a.NumField(); i++ {
@@ -39,7 +47,7 @@ func (cl *Changelog) diffStruct(path []string, a, b reflect.Value) error {
 
 		fpath := copyAppend(path, tname)
 
-		err := cl.diff(fpath, af, bf)
+		err := d.diff(fpath, af, bf)
 		if err != nil {
 			return err
 		}
@@ -48,8 +56,8 @@ func (cl *Changelog) diffStruct(path []string, a, b reflect.Value) error {
 	return nil
 }
 
-func (cl *Changelog) structValues(t string, path []string, a reflect.Value) error {
-	var ncl Changelog
+func (d *Differ) structValues(t string, path []string, a reflect.Value) error {
+	var nd Differ
 
 	if t != CREATE && t != DELETE {
 		return ErrInvalidChangeType
@@ -83,14 +91,14 @@ func (cl *Changelog) structValues(t string, path []string, a reflect.Value) erro
 
 		fpath := copyAppend(path, tname)
 
-		err := ncl.diff(fpath, xf, af)
+		err := nd.diff(fpath, xf, af)
 		if err != nil {
 			return err
 		}
 	}
 
-	for i := 0; i < len(ncl); i++ {
-		(*cl) = append((*cl), swapChange(t, ncl[i]))
+	for i := 0; i < len(nd.cl); i++ {
+		(d.cl) = append(d.cl, swapChange(t, nd.cl[i]))
 	}
 
 	return nil

@@ -212,7 +212,7 @@ function prevSlide() {
     updateSlides();
   }
 
-  if (notesEnabled) localStorage.setItem('destSlide', curSlide);
+  if (notesEnabled) localStorage.setItem(destSlideKey(), curSlide);
 };
 
 function nextSlide() {
@@ -223,7 +223,7 @@ function nextSlide() {
     updateSlides();
   }
 
-  if (notesEnabled) localStorage.setItem('destSlide', curSlide);
+  if (notesEnabled) localStorage.setItem(destSlideKey(), curSlide);
 };
 
 /* Slide events */
@@ -442,7 +442,7 @@ function handleBodyKeyDown(event) {
 };
 
 function scaleSmallViewports() {
-  var el = document.querySelector('.slides');
+  var el = document.querySelector('section.slides');
   var transform = '';
   var sWidthPx = 1250;
   var sHeightPx = 750;
@@ -468,6 +468,20 @@ function addEventListeners() {
       scaleSmallViewports();
     }, 50);
   });
+
+  // Force reset transform property of section.slides when printing page.
+  // Use both onbeforeprint and matchMedia for compatibility with different browsers.
+  var beforePrint = function() {
+    var el = document.querySelector('section.slides');
+    el.style.transform = '';
+  };
+  window.onbeforeprint = beforePrint;
+  if (window.matchMedia) {
+    var mediaQueryList = window.matchMedia('print');
+    mediaQueryList.addListener(function(mql) {
+      if (mql.matches) beforePrint();
+    });
+  }
 }
 
 /* Initialization */
@@ -588,7 +602,7 @@ function setupNotesSync() {
 
   setupPlayCodeSync();
   setupPlayResizeSync();
-  localStorage.setItem('destSlide', curSlide);
+  localStorage.setItem(destSlideKey(), curSlide);
   window.addEventListener('storage', updateOtherWindow, false);
 }
 
@@ -599,7 +613,7 @@ function updateOtherWindow(e) {
   var isRemoveStorageEvent = !e.newValue;
   if (isRemoveStorageEvent) return;
 
-  var destSlide = localStorage.getItem('destSlide');
+  var destSlide = localStorage.getItem(destSlideKey());
   while (destSlide > curSlide) {
     nextSlide();
   }

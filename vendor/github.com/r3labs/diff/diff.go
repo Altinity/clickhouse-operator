@@ -6,31 +6,39 @@ package diff
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
 )
 
 var (
-	// ErrTypeMismatch : Compared types do not match
+	// ErrTypeMismatch Compared types do not match
 	ErrTypeMismatch = errors.New("types do not match")
-	// ErrInvalidChangeType : The specified change values are not unsupported
+	// ErrInvalidChangeType The specified change values are not unsupported
 	ErrInvalidChangeType = errors.New("change type must be one of 'create' or 'delete'")
 )
 
 const (
-	// CREATE : represents when an element has been added
+	// CREATE represents when an element has been added
 	CREATE = "create"
-	// UPDATE : represents when an element has been updated
+	// UPDATE represents when an element has been updated
 	UPDATE = "update"
-	// DELETE : represents when an element has been removed
+	// DELETE represents when an element has been removed
 	DELETE = "delete"
 )
 
-// Changelog : stores a list of changed items
+// Differ a configurable diff instance
+type Differ struct {
+	SliceOrdering       bool
+	DisableStructValues bool
+	cl                  Changelog
+}
+
+// Changelog stores a list of changed items
 type Changelog []Change
 
-// Change : stores information about a changed item
+// Change stores information about a changed item
 type Change struct {
 	Type string      `json:"type"`
 	Path []string    `json:"path"`
@@ -38,31 +46,44 @@ type Change struct {
 	To   interface{} `json:"to"`
 }
 
-// Changed : returns true if both values differ
+// Changed returns true if both values differ
 func Changed(a, b interface{}) bool {
 	cl, _ := Diff(a, b)
 	return len(cl) > 0
 }
 
-// Diff : returns a changelog of all mutated values from both
+// Diff returns a changelog of all mutated values from both
 func Diff(a, b interface{}) (Changelog, error) {
-	var cl Changelog
+	var d Differ
 
-	return cl, cl.diff([]string{}, reflect.ValueOf(a), reflect.ValueOf(b))
+	return d.cl, d.diff([]string{}, reflect.ValueOf(a), reflect.ValueOf(b))
 }
 
-// StructValues : gets all values from a struct
+// NewDiffer creates a new configurable diffing object
+func NewDiffer(opts ...func(d *Differ) error) (*Differ, error) {
+	var d Differ
+
+	for _, opt := range opts {
+		err := opt(&d)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &d, nil
+}
+
+// StructValues gets all values from a struct
 // values are stored as "created" or "deleted" entries in the changelog,
 // depending on the change type specified
 func StructValues(t string, path []string, s interface{}) (Changelog, error) {
-	var cl Changelog
-
+	var d Differ
 	v := reflect.ValueOf(s)
 
-	return cl, cl.structValues(t, path, v)
+	return d.cl, d.structValues(t, path, v)
 }
 
-// Filter : filter changes based on path. Paths may contain valid regexp to match items
+// Filter filter changes based on path. Paths may contain valid regexp to match items
 func (cl *Changelog) Filter(path []string) Changelog {
 	var ncl Changelog
 
@@ -75,7 +96,12 @@ func (cl *Changelog) Filter(path []string) Changelog {
 	return ncl
 }
 
-func (cl *Changelog) diff(path []string, a, b reflect.Value) error {
+// Diff returns a changelog of all mutated values from both
+func (d *Differ) Diff(a, b interface{}) (Changelog, error) {
+	return d.cl, d.diff([]string{}, reflect.ValueOf(a), reflect.ValueOf(b))
+}
+
+func (d *Differ) diff(path []string, a, b reflect.Value) error {
 	// check if types match or are
 	if invalid(a, b) {
 		return ErrTypeMismatch
@@ -83,25 +109,25 @@ func (cl *Changelog) diff(path []string, a, b reflect.Value) error {
 
 	switch {
 	case are(a, b, reflect.Struct, reflect.Invalid):
-		return cl.diffStruct(path, a, b)
+		return d.diffStruct(path, a, b)
 	case are(a, b, reflect.Slice, reflect.Invalid):
-		return cl.diffSlice(path, a, b)
+		return d.diffSlice(path, a, b)
 	case are(a, b, reflect.String, reflect.Invalid):
-		return cl.diffString(path, a, b)
+		return d.diffString(path, a, b)
 	case are(a, b, reflect.Bool, reflect.Invalid):
-		return cl.diffBool(path, a, b)
+		return d.diffBool(path, a, b)
 	case are(a, b, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Invalid):
-		return cl.diffInt(path, a, b)
+		return d.diffInt(path, a, b)
 	case are(a, b, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Invalid):
-		return cl.diffUint(path, a, b)
+		return d.diffUint(path, a, b)
 	case are(a, b, reflect.Float32, reflect.Float64, reflect.Invalid):
-		return cl.diffFloat(path, a, b)
+		return d.diffFloat(path, a, b)
 	case are(a, b, reflect.Map, reflect.Invalid):
-		return cl.diffMap(path, a, b)
+		return d.diffMap(path, a, b)
 	case are(a, b, reflect.Ptr, reflect.Invalid):
-		return cl.diffPtr(path, a, b)
+		return d.diffPtr(path, a, b)
 	case are(a, b, reflect.Interface, reflect.Invalid):
-		return cl.diffInterface(path, a, b)
+		return d.diffInterface(path, a, b)
 	default:
 		return errors.New("unsupported type: " + a.Kind().String())
 	}
@@ -175,7 +201,7 @@ func idstring(v interface{}) string {
 	case int:
 		return strconv.Itoa(v.(int))
 	default:
-		return ""
+		return fmt.Sprint(v)
 	}
 }
 

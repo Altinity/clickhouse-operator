@@ -1,7 +1,17 @@
-# approval on api packages bubbles to api-approvers
 reviewers:
-- sig-auth-authorizers-approvers
-- sig-auth-authorizers-reviewers
-labels:
-- sig/auth
-
+- thockin
+- lavalamp
+- smarterclayton
+- deads2k
+- sttts
+- ncdc
+- dims
+- krousey
+- mml
+- mbohlool
+- david-mcmahon
+- ericchiang
+- lixiaobing10051267
+- jianhuiz
+- liggitt
+- enj
