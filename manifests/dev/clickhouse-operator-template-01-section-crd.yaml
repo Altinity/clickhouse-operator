@@ -36,6 +36,10 @@ spec:
       type: string
       description: Client access endpoint
       JSONPath: .status.endpoint
+# TODO return to this feature later
+# Pruning unknown fields. FEATURE STATE: Kubernetes v1.15
+# Probably full specification may be needed
+#  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
       properties:
