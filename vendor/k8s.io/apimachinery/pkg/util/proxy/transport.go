@@ -27,9 +27,9 @@ import (
 	"path"
 	"strings"
 
+	"github.com/golang/glog"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
-	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -236,7 +236,7 @@ func (t *Transport) rewriteResponse(req *http.Request, resp *http.Response) (*ht
 		// This is fine
 	default:
 		// Some encoding we don't understand-- don't try to parse this
-		klog.Errorf("Proxy encountered encoding %v for text/html; can't understand this so not fixing links.", encoding)
+		glog.Errorf("Proxy encountered encoding %v for text/html; can't understand this so not fixing links.", encoding)
 		return resp, nil
 	}
 
@@ -245,7 +245,7 @@ func (t *Transport) rewriteResponse(req *http.Request, resp *http.Response) (*ht
 	}
 	err := rewriteHTML(reader, writer, urlRewriter)
 	if err != nil {
-		klog.Errorf("Failed to rewrite URLs: %v", err)
+		glog.Errorf("Failed to rewrite URLs: %v", err)
 		return resp, err
 	}
 

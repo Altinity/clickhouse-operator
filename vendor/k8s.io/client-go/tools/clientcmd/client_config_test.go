@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/imdario/mergo"
-
 	restclient "k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -244,7 +243,7 @@ func TestCertificateData(t *testing.T) {
 
 	config := clientcmdapi.NewConfig()
 	config.Clusters["clean"] = &clientcmdapi.Cluster{
-		Server:                   "https://localhost:8443",
+		Server: "https://localhost:8443",
 		CertificateAuthorityData: caData,
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
@@ -549,30 +548,6 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 			},
 		},
 		{
-			overrides: &ConfigOverrides{
-				ClusterInfo: clientcmdapi.Cluster{
-					Server:               "https://host-from-overrides.com",
-					CertificateAuthority: "/path/to/ca-from-overrides.crt",
-				},
-				AuthInfo: clientcmdapi.AuthInfo{
-					Token:     "token-from-override",
-					TokenFile: "tokenfile-from-override",
-				},
-			},
-		},
-		{
-			overrides: &ConfigOverrides{
-				ClusterInfo: clientcmdapi.Cluster{
-					Server:               "https://host-from-overrides.com",
-					CertificateAuthority: "/path/to/ca-from-overrides.crt",
-				},
-				AuthInfo: clientcmdapi.AuthInfo{
-					Token:     "",
-					TokenFile: "tokenfile-from-override",
-				},
-			},
-		},
-		{
 			overrides: &ConfigOverrides{},
 		},
 	}
@@ -580,15 +555,13 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 	for _, tc := range tt {
 		expectedServer := "https://host-from-cluster.com"
 		expectedToken := "token-from-cluster"
-		expectedTokenFile := "tokenfile-from-cluster"
 		expectedCAFile := "/path/to/ca-from-cluster.crt"
 
 		icc := &inClusterClientConfig{
 			inClusterConfigProvider: func() (*restclient.Config, error) {
 				return &restclient.Config{
-					Host:            expectedServer,
-					BearerToken:     expectedToken,
-					BearerTokenFile: expectedTokenFile,
+					Host:        expectedServer,
+					BearerToken: expectedToken,
 					TLSClientConfig: restclient.TLSClientConfig{
 						CAFile: expectedCAFile,
 					},
@@ -605,9 +578,8 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		if overridenServer := tc.overrides.ClusterInfo.Server; len(overridenServer) > 0 {
 			expectedServer = overridenServer
 		}
-		if len(tc.overrides.AuthInfo.Token) > 0 || len(tc.overrides.AuthInfo.TokenFile) > 0 {
-			expectedToken = tc.overrides.AuthInfo.Token
-			expectedTokenFile = tc.overrides.AuthInfo.TokenFile
+		if overridenToken := tc.overrides.AuthInfo.Token; len(overridenToken) > 0 {
+			expectedToken = overridenToken
 		}
 		if overridenCAFile := tc.overrides.ClusterInfo.CertificateAuthority; len(overridenCAFile) > 0 {
 			expectedCAFile = overridenCAFile
@@ -618,9 +590,6 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		}
 		if clientConfig.BearerToken != expectedToken {
 			t.Errorf("Expected token %v, got %v", expectedToken, clientConfig.BearerToken)
-		}
-		if clientConfig.BearerTokenFile != expectedTokenFile {
-			t.Errorf("Expected tokenfile %v, got %v", expectedTokenFile, clientConfig.BearerTokenFile)
 		}
 		if clientConfig.TLSClientConfig.CAFile != expectedCAFile {
 			t.Errorf("Expected Certificate Authority %v, got %v", expectedCAFile, clientConfig.TLSClientConfig.CAFile)

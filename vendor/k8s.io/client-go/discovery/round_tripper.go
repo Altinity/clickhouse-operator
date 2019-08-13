@@ -18,13 +18,12 @@ package discovery
 
 import (
 	"net/http"
-	"os"
 	"path/filepath"
 
+	"github.com/golang/glog"
 	"github.com/gregjones/httpcache"
 	"github.com/gregjones/httpcache/diskcache"
 	"github.com/peterbourgon/diskv"
-	"k8s.io/klog"
 )
 
 type cacheRoundTripper struct {
@@ -36,8 +35,6 @@ type cacheRoundTripper struct {
 // corresponding requests.
 func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripper {
 	d := diskv.New(diskv.Options{
-		PathPerm: os.FileMode(0750),
-		FilePerm: os.FileMode(0660),
 		BasePath: cacheDir,
 		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
 	})
@@ -58,7 +55,7 @@ func (rt *cacheRoundTripper) CancelRequest(req *http.Request) {
 	if cr, ok := rt.rt.Transport.(canceler); ok {
 		cr.CancelRequest(req)
 	} else {
-		klog.Errorf("CancelRequest not implemented by %T", rt.rt.Transport)
+		glog.Errorf("CancelRequest not implemented by %T", rt.rt.Transport)
 	}
 }
 

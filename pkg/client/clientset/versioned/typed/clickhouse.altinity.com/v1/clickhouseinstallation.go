@@ -19,8 +19,6 @@ limitations under the License.
 package v1
 
 import (
-	"time"
-
 	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	scheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,16 +75,11 @@ func (c *clickHouseInstallations) Get(name string, options metav1.GetOptions) (r
 
 // List takes label and field selectors, and returns the list of ClickHouseInstallations that match those selectors.
 func (c *clickHouseInstallations) List(opts metav1.ListOptions) (result *v1.ClickHouseInstallationList, err error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
 	result = &v1.ClickHouseInstallationList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("clickhouseinstallations").
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -94,16 +87,11 @@ func (c *clickHouseInstallations) List(opts metav1.ListOptions) (result *v1.Clic
 
 // Watch returns a watch.Interface that watches the requested clickHouseInstallations.
 func (c *clickHouseInstallations) Watch(opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("clickhouseinstallations").
 		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
 		Watch()
 }
 
@@ -145,15 +133,10 @@ func (c *clickHouseInstallations) Delete(name string, options *metav1.DeleteOpti
 
 // DeleteCollection deletes a collection of objects.
 func (c *clickHouseInstallations) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
-	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
-	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("clickhouseinstallations").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
-		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()

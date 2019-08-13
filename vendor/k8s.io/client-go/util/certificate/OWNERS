@@ -1,7 +1,8 @@
-approvers:
-- sig-auth-certificates-approvers
 reviewers:
-- sig-auth-certificates-reviewers
-labels:
-- sig/auth
-
+- mikedanese
+- liggit
+- smarterclayton
+approvers:
+- mikedanese
+- liggit
+- smarterclayton
