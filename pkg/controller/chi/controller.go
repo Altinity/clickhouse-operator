@@ -149,7 +149,7 @@ func (c *Controller) AddEventHandlers(
 			if !c.chopConfig.IsWatchedNamespace(chit.Namespace) {
 				return
 			}
-			glog.V(1).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
+			//glog.V(1).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
 			c.enqueueObject(NewReconcileChit(reconcileAdd, nil, chit))
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -158,7 +158,7 @@ func (c *Controller) AddEventHandlers(
 			if !c.chopConfig.IsWatchedNamespace(newChit.Namespace) {
 				return
 			}
-			glog.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
+			//glog.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
 			c.enqueueObject(NewReconcileChit(reconcileUpdate, oldChit, newChit))
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -166,7 +166,7 @@ func (c *Controller) AddEventHandlers(
 			if !c.chopConfig.IsWatchedNamespace(chit.Namespace) {
 				return
 			}
-			glog.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
+			//glog.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
 			c.enqueueObject(NewReconcileChit(reconcileDelete, chit, nil))
 		},
 	})
@@ -450,8 +450,8 @@ func (c *Controller) processWorkItem(item interface{}) error {
 
 // syncChi is the main reconcile loop function - reconcile CHI object
 func (c *Controller) syncChi(reconcile *ReconcileChi) error {
-	glog.V(1).Infof("syncChi(%s) start", reconcile.cmd)
-	defer glog.V(1).Infof("syncChi(%s) end", reconcile.cmd)
+	//glog.V(1).Infof("syncChi(%s) start", reconcile.cmd)
+	//defer glog.V(1).Infof("syncChi(%s) end", reconcile.cmd)
 
 	switch reconcile.cmd {
 	case reconcileAdd:
@@ -467,8 +467,8 @@ func (c *Controller) syncChi(reconcile *ReconcileChi) error {
 
 // syncChit is the main reconcile loop function - reconcile CHIT object
 func (c *Controller) syncChit(reconcile *ReconcileChit) error {
-	glog.V(1).Infof("syncChit(%s) start", reconcile.cmd)
-	defer glog.V(1).Infof("syncChit(%s) end", reconcile.cmd)
+	//glog.V(1).Infof("syncChit(%s) start", reconcile.cmd)
+	//defer glog.V(1).Infof("syncChit(%s) end", reconcile.cmd)
 
 	switch reconcile.cmd {
 	case reconcileAdd:
