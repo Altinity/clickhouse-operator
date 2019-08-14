@@ -114,16 +114,14 @@ func buildConfigFromFile(configFilePath string) (*Config, error) {
 	config.ConfigFolderPath = filepath.Dir(config.ConfigFilePath)
 
 	// Normalize Config struct into fully-and-correctly filled Config struct
-	if err = config.normalize(); err == nil {
-		config.readChConfigFiles()
-		config.readChiTemplateFiles()
-		config.processChiTemplateFiles()
-		config.applyEnvVars()
+	config.normalize()
+	config.readChConfigFiles()
+	config.readChiTemplateFiles()
+	config.processChiTemplateFiles()
+	config.applyEnvVars()
 
-		return config, nil
-	} else {
-		return nil, err
-	}
+	return config, nil
+
 }
 
 // buildDefaultConfig returns default Config
@@ -162,6 +160,17 @@ func (config *Config) insertChiTemplate(template *chiv1.ClickHouseInstallation) 
 	config.ChiTemplates[template.Name] = template
 }
 
+// removeChiTemplate removes template from templates catalog
+func (config *Config) removeChiTemplate(template *chiv1.ClickHouseInstallation) {
+	// Insert template
+	if config.ChiTemplates == nil {
+		return
+	}
+	if _, ok := config.ChiTemplates[template.Name]; ok {
+		delete(config.ChiTemplates, template.Name)
+	}
+}
+
 // buildChiTemplate builds combined CHI Template from templates catalog
 func (config *Config) buildChiTemplate() {
 	// Sort CHI templates by their names and apply one by one
@@ -181,10 +190,32 @@ func (config *Config) buildChiTemplate() {
 		// Merge into accumulated target template from current template
 		config.ChiTemplate.MergeFrom(config.ChiTemplates[templateName])
 	}
+
+	if bytes, err := yaml.Marshal(config.ChiTemplate); err == nil {
+		glog.V(1).Infof("ChiTemplate:\n%s\n", string(bytes))
+	} else {
+		glog.V(1).Infof("FAIL unable to Marshal ChiTemplate", )
+	}
+
+}
+
+func (config *Config) AddChiTemplate(template *chiv1.ClickHouseInstallation) {
+	config.insertChiTemplate(template)
+	config.buildChiTemplate()
+}
+
+func (config *Config) UpdateChiTemplate(template *chiv1.ClickHouseInstallation) {
+	config.insertChiTemplate(template)
+	config.buildChiTemplate()
+}
+
+func (config *Config) DeleteChiTemplate(template *chiv1.ClickHouseInstallation) {
+	config.removeChiTemplate(template)
+	config.buildChiTemplate()
 }
 
 // normalize() makes fully-and-correctly filled Config
-func (config *Config) normalize() error {
+func (config *Config) normalize() {
 
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
@@ -255,12 +286,10 @@ func (config *Config) normalize() error {
 	if config.ChPort == 0 {
 		config.ChPort = defaultChPort
 	}
-
-	return nil
 }
 
 // applyEnvVars applies ENV VARS over config
-func (config *Config) applyEnvVars() error {
+func (config *Config) applyEnvVars() {
 	if ns := os.Getenv("WATCH_NAMESPACE"); len(ns) > 0 {
 		// We have WATCH_NAMESPACE specified
 		config.WatchNamespaces = []string{ns}
@@ -277,8 +306,6 @@ func (config *Config) applyEnvVars() error {
 			}
 		}
 	}
-
-	return nil
 }
 
 // prepareConfigPath - prepares config path absolute/relative with default relative value

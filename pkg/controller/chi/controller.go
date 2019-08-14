@@ -153,12 +153,13 @@ func (c *Controller) AddEventHandlers(
 			c.enqueueObject(NewReconcileChit(reconcileAdd, nil, chit))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			chit := new.(*chop.ClickHouseInstallationTemplate)
-			if !c.chopConfig.IsWatchedNamespace(chit.Namespace) {
+			newChit := new.(*chop.ClickHouseInstallationTemplate)
+			oldChit := old.(*chop.ClickHouseInstallationTemplate)
+			if !c.chopConfig.IsWatchedNamespace(newChit.Namespace) {
 				return
 			}
-			glog.V(1).Infof("chitInformer.UpdateFunc - %s/%s", chit.Namespace, chit.Name)
-			c.enqueueObject(NewReconcileChit(reconcileUpdate, nil, chit))
+			glog.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
+			c.enqueueObject(NewReconcileChit(reconcileUpdate, oldChit, newChit))
 		},
 		DeleteFunc: func(obj interface{}) {
 			chit := obj.(*chop.ClickHouseInstallationTemplate)
@@ -473,7 +474,7 @@ func (c *Controller) syncChit(reconcile *ReconcileChit) error {
 	case reconcileAdd:
 		return c.onAddChit(reconcile.new)
 	case reconcileUpdate:
-		return c.onUpdateChit(reconcile.new)
+		return c.onUpdateChit(reconcile.old, reconcile.new)
 	case reconcileDelete:
 		return c.onDeleteChit(reconcile.old)
 	}
@@ -644,18 +645,27 @@ func (c *Controller) onDeleteChi(chi *chop.ClickHouseInstallation) error {
 // onAddChit sync new CHIT - creates all its resources
 func (c *Controller) onAddChit(chit *chop.ClickHouseInstallationTemplate) error {
 	glog.V(1).Infof("onAddChit(%s/%s)", chit.Namespace, chit.Name)
+	c.chopConfig.AddChiTemplate((*chop.ClickHouseInstallation)(chit))
 	return nil
 }
 
 // onUpdateChit sync CHIT which was already created earlier
-func (c *Controller) onUpdateChit(new *chop.ClickHouseInstallationTemplate) error {
+func (c *Controller) onUpdateChit(old, new *chop.ClickHouseInstallationTemplate) error {
+	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
+		glog.V(2).Infof("onUpdateChit(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		// No need to react
+		return nil
+	}
+
 	glog.V(2).Infof("onUpdateChit(%s/%s):", new.Namespace, new.Name)
+	c.chopConfig.UpdateChiTemplate((*chop.ClickHouseInstallation)(new))
 	return nil
 }
 
 // onDeleteChit deletes CHIT
 func (c *Controller) onDeleteChit(chit *chop.ClickHouseInstallationTemplate) error {
 	glog.V(2).Infof("onDeleteChit(%s/%s):", chit.Namespace, chit.Name)
+	c.chopConfig.DeleteChiTemplate((*chop.ClickHouseInstallation)(chit))
 	return nil
 }
 
