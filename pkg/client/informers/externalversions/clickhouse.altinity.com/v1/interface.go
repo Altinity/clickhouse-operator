@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// ClickHouseInstallations returns a ClickHouseInstallationInformer.
 	ClickHouseInstallations() ClickHouseInstallationInformer
+	// ClickHouseInstallationTemplates returns a ClickHouseInstallationTemplateInformer.
+	ClickHouseInstallationTemplates() ClickHouseInstallationTemplateInformer
 }
 
 type version struct {
@@ -42,4 +44,9 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // ClickHouseInstallations returns a ClickHouseInstallationInformer.
 func (v *version) ClickHouseInstallations() ClickHouseInstallationInformer {
 	return &clickHouseInstallationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ClickHouseInstallationTemplates returns a ClickHouseInstallationTemplateInformer.
+func (v *version) ClickHouseInstallationTemplates() ClickHouseInstallationTemplateInformer {
+	return &clickHouseInstallationTemplateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

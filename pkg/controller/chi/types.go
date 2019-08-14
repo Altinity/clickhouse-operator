@@ -49,6 +49,10 @@ type Controller struct {
 	chiLister choplisters.ClickHouseInstallationLister
 	// chiListerSynced used in waitForCacheSync()
 	chiListerSynced cache.InformerSynced
+
+	chitLister       choplisters.ClickHouseInstallationTemplateLister
+	chitListerSynced cache.InformerSynced
+
 	// serviceLister used as serviceLister.Services(namespace).Get(name)
 	serviceLister corelisters.ServiceLister
 	// serviceListerSynced used in waitForCacheSync()
@@ -102,6 +106,20 @@ type ReconcileChi struct {
 
 func NewReconcileChi(cmd string, old, new *chop.ClickHouseInstallation) *ReconcileChi {
 	return &ReconcileChi{
+		cmd: cmd,
+		old: old,
+		new: new,
+	}
+}
+
+type ReconcileChit struct {
+	cmd string
+	old *chop.ClickHouseInstallationTemplate
+	new *chop.ClickHouseInstallationTemplate
+}
+
+func NewReconcileChit(cmd string, old, new *chop.ClickHouseInstallationTemplate) *ReconcileChit {
+	return &ReconcileChit{
 		cmd: cmd,
 		old: old,
 		new: new,

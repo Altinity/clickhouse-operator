@@ -31,6 +31,12 @@ type ClickHouseInstallation struct {
 	Status            ChiStatus `json:"status"`
 }
 
+// +genclient
+// +genclient:noStatus
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type ClickHouseInstallationTemplate ClickHouseInstallation
+
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
 	Defaults      ChiDefaults      `json:"defaults,omitempty"  yaml:"defaults"`
@@ -275,7 +281,16 @@ type ClickHouseInstallationList struct {
 	Items           []ClickHouseInstallation `json:"items"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type ClickHouseInstallationTemplateList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+	Items           []ClickHouseInstallationTemplate `json:"items"`
+}
+
 const (
 	// ClickHouseInstallationCRDResourceKind defines kind of CRD resource
-	ClickHouseInstallationCRDResourceKind = "ClickHouseInstallation"
+	ClickHouseInstallationCRDResourceKind         = "ClickHouseInstallation"
+	ClickHouseInstallationTemplateCRDResourceKind = "ClickHouseInstallationTemplate"
 )

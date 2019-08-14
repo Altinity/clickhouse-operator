@@ -28,6 +28,7 @@ import (
 type ClickhouseV1Interface interface {
 	RESTClient() rest.Interface
 	ClickHouseInstallationsGetter
+	ClickHouseInstallationTemplatesGetter
 }
 
 // ClickhouseV1Client is used to interact with features provided by the clickhouse.altinity.com group.
@@ -37,6 +38,10 @@ type ClickhouseV1Client struct {
 
 func (c *ClickhouseV1Client) ClickHouseInstallations(namespace string) ClickHouseInstallationInterface {
 	return newClickHouseInstallations(c, namespace)
+}
+
+func (c *ClickhouseV1Client) ClickHouseInstallationTemplates(namespace string) ClickHouseInstallationTemplateInterface {
+	return newClickHouseInstallationTemplates(c, namespace)
 }
 
 // NewForConfig creates a new ClickhouseV1Client for the given config.

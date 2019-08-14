@@ -293,6 +293,7 @@ func Run() {
 		chopClient,
 		kubeClient,
 		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
+		chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates(),
 		kubeInformerFactory.Core().V1().Services(),
 		kubeInformerFactory.Core().V1().Endpoints(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),
@@ -302,6 +303,7 @@ func Run() {
 	)
 	chiController.AddEventHandlers(
 		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
+		chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates(),
 		kubeInformerFactory.Core().V1().Services(),
 		kubeInformerFactory.Core().V1().Endpoints(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),
