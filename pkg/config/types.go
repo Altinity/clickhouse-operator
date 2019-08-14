@@ -44,8 +44,10 @@ type Config struct {
 
 	// Path where to look for ClickHouseInstallation templates .yaml files
 	ChiTemplatesPath string `yaml:"chiTemplatesPath"`
-	// Chi templates fetched from this path. Maps "file name->file content"
-	ChiTemplates map[string]string
+	// Chi template files fetched from this path. Maps "file name->file content"
+	ChiTemplateFiles map[string]string
+	// Chi template objects unmarshalled from ChiTemplateFiles. Maps "metadata.name->object"
+	ChiTemplates map[string]*chiv1.ClickHouseInstallation
 	// ClickHouseInstallation template
 	ChiTemplate *chiv1.ClickHouseInstallation
 

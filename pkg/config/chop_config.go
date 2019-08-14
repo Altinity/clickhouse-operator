@@ -117,7 +117,7 @@ func buildConfigFromFile(configFilePath string) (*Config, error) {
 	if err = config.normalize(); err == nil {
 		config.readChConfigFiles()
 		config.readChiTemplateFiles()
-		config.buildChiTemplate()
+		config.processChiTemplateFiles()
 		config.applyEnvVars()
 
 		return config, nil
@@ -135,31 +135,51 @@ func buildDefaultConfig() (*Config, error) {
 	return config, nil
 }
 
-// buildChiTemplate build Config.ChiTemplate from template files content
-func (config *Config) buildChiTemplate() {
+// processChiTemplateFiles build Config.ChiTemplate from template files content
+func (config *Config) processChiTemplateFiles() {
 
-	// Extract file names into slice and sort it
-	// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
-	var sortedKeys []string
-	for key := range config.ChiTemplates {
-		sortedKeys = append(sortedKeys, key)
-	}
-	sort.Strings(sortedKeys)
-
-	// Extract templates in sorted order - according to sorted file names
-	for _, key := range sortedKeys {
-		chi := new(chiv1.ClickHouseInstallation)
-		if err := yaml.Unmarshal([]byte(config.ChiTemplates[key]), chi); err != nil {
+	// Produce map of CHI templates out of CHI template files
+	for filename := range config.ChiTemplateFiles {
+		template := new(chiv1.ClickHouseInstallation)
+		if err := yaml.Unmarshal([]byte(config.ChiTemplateFiles[filename]), template); err != nil {
 			// Unable to unmarshal - skip incorrect template
-			glog.V(1).Infof("FAIL buildChiTemplate() unable to unmarshal file %s %q", key, err)
+			glog.V(1).Infof("FAIL processChiTemplateFiles() unable to unmarshal file %s %q", filename, err)
 			continue
 		}
-		// Create target template, if not exists
-		if config.ChiTemplate == nil {
-			config.ChiTemplate = new(chiv1.ClickHouseInstallation)
-		}
+		config.insertChiTemplate(template)
+	}
+
+	config.buildChiTemplate()
+}
+
+// insertChiTemplate inserts template into templates catalog
+func (config *Config) insertChiTemplate(template *chiv1.ClickHouseInstallation) {
+	// Insert template
+	if config.ChiTemplates == nil {
+		config.ChiTemplates = make(map[string]*chiv1.ClickHouseInstallation)
+	}
+	// map template name -> template itself
+	config.ChiTemplates[template.Name] = template
+}
+
+// buildChiTemplate builds combined CHI Template from templates catalog
+func (config *Config) buildChiTemplate() {
+	// Sort CHI templates by their names and apply one by one
+	// Extract file names into slice and sort it
+	// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
+	var sortedTemplateNames []string
+	for name := range config.ChiTemplates {
+		sortedTemplateNames = append(sortedTemplateNames, name)
+	}
+	sort.Strings(sortedTemplateNames)
+
+	// Create final combined template
+	config.ChiTemplate = new(chiv1.ClickHouseInstallation)
+
+	// Extract templates in sorted order - according to sorted template names
+	for _, templateName := range sortedTemplateNames {
 		// Merge into accumulated target template from current template
-		config.ChiTemplate.MergeFrom(chi)
+		config.ChiTemplate.MergeFrom(config.ChiTemplates[templateName])
 	}
 }
 
@@ -312,7 +332,7 @@ func (config *Config) isChConfigExt(file string) bool {
 
 // readChConfigFiles reads all CHI templates
 func (config *Config) readChiTemplateFiles() {
-	config.ChiTemplates = readConfigFiles(config.ChiTemplatesPath, config.isChiTemplateExt)
+	config.ChiTemplateFiles = readConfigFiles(config.ChiTemplatesPath, config.isChiTemplateExt)
 }
 
 // isChiTemplateExt returns true in case specified file has proper extension for a CHI template config file
@@ -354,7 +374,7 @@ func (config *Config) String() string {
 	util.Fprintf(b, "%s", config.stringMap("ChUsersConfigs", config.ChUsersConfigs))
 
 	util.Fprintf(b, "ChiTemplatesPath: %s\n", config.ChiTemplatesPath)
-	util.Fprintf(b, "%s", config.stringMap("ChiTemplates", config.ChiTemplates))
+	util.Fprintf(b, "%s", config.stringMap("ChiTemplateFiles", config.ChiTemplateFiles))
 
 	util.Fprintf(b, "StatefulSetUpdateTimeout: %d\n", config.StatefulSetUpdateTimeout)
 	util.Fprintf(b, "StatefulSetUpdatePollPeriod: %d\n", config.StatefulSetUpdatePollPeriod)

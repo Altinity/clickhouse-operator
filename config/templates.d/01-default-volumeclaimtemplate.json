@@ -2,7 +2,7 @@
   "apiVersion": "clickhouse.altinity.com/v1",
   "kind": "ClickHouseInstallation",
   "metadata": {
-    "name": "default-volumeclaimtemplate"
+    "name": "01-default-volumeclaimtemplate"
   },
   "spec": {
     "defaults":{
