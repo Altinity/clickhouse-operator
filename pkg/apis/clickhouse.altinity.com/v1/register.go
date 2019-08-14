@@ -23,7 +23,10 @@ import (
 )
 
 // SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{Group: clickhousealtinitycom.GroupName, Version: "v1"}
+var SchemeGroupVersion = schema.GroupVersion{
+	Group:   clickhousealtinitycom.GroupName,
+	Version: "v1",
+}
 
 // Resource returns schema.GroupResource
 func Resource(resource string) schema.GroupResource {
@@ -47,6 +50,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&ClickHouseInstallation{},
 		&ClickHouseInstallationList{},
+		&ClickHouseInstallationTemplate{},
+		&ClickHouseInstallationTemplateList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

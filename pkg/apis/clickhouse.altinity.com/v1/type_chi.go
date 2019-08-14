@@ -31,7 +31,7 @@ func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 	chi.Status.Version = version.Version
 	chi.Status.ClustersCount = chi.ClustersCount()
 	chi.Status.ShardsCount = chi.ShardsCount()
-	chi.Status.ReplicasCount = chi.ReplicasCount() / chi.ShardsCount()
+	chi.Status.HostsCount = chi.HostsCount()
 	chi.Status.Pods = pods
 	chi.Status.Endpoint = endpoint
 }
@@ -50,16 +50,16 @@ func (chi *ClickHouseInstallation) IsNormalized() bool {
 }
 
 func (chi *ClickHouseInstallation) FillAddressInfo() int {
-	replicasCount := 0
+	hostsCount := 0
 
-	replicaProcessor := func(
+	hostProcessor := func(
 		chi *ClickHouseInstallation,
 		clusterIndex int,
 		cluster *ChiCluster,
 		shardIndex int,
 		shard *ChiShard,
 		replicaIndex int,
-		replica *ChiReplica,
+		host *ChiHost,
 	) error {
 		cluster.Address.Namespace = chi.Namespace
 		cluster.Address.ChiName = chi.Name
@@ -73,41 +73,41 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 		shard.Address.ShardName = shard.Name
 		shard.Address.ShardIndex = shardIndex
 
-		replica.Address.Namespace = chi.Namespace
-		replica.Address.ChiName = chi.Name
-		replica.Address.ClusterName = cluster.Name
-		replica.Address.ClusterIndex = clusterIndex
-		replica.Address.ShardName = shard.Name
-		replica.Address.ShardIndex = shardIndex
-		replica.Address.ReplicaName = replica.Name
-		replica.Address.ReplicaIndex = replicaIndex
-		replica.Address.GlobalReplicaIndex = replicasCount
+		host.Address.Namespace = chi.Namespace
+		host.Address.ChiName = chi.Name
+		host.Address.ClusterName = cluster.Name
+		host.Address.ClusterIndex = clusterIndex
+		host.Address.ShardName = shard.Name
+		host.Address.ShardIndex = shardIndex
+		host.Address.ReplicaName = host.Name
+		host.Address.ReplicaIndex = replicaIndex
+		host.Address.HostIndex = hostsCount
 
-		replicasCount++
+		hostsCount++
 		return nil
 	}
-	chi.WalkReplicasFullPath(replicaProcessor)
+	chi.WalkHostsFullPath(hostProcessor)
 
-	return replicasCount
+	return hostsCount
 }
 
 func (chi *ClickHouseInstallation) FillChiPointer() {
 
-	replicaProcessor := func(
+	hostProcessor := func(
 		chi *ClickHouseInstallation,
 		clusterIndex int,
 		cluster *ChiCluster,
 		shardIndex int,
 		shard *ChiShard,
 		replicaIndex int,
-		replica *ChiReplica,
+		host *ChiHost,
 	) error {
 		cluster.Chi = chi
 		shard.Chi = chi
-		replica.Chi = chi
+		host.Chi = chi
 		return nil
 	}
-	chi.WalkReplicasFullPath(replicaProcessor)
+	chi.WalkHostsFullPath(hostProcessor)
 }
 
 func (chi *ClickHouseInstallation) WalkClustersFullPath(
@@ -178,7 +178,7 @@ func (chi *ClickHouseInstallation) WalkShards(
 	return res
 }
 
-func (chi *ClickHouseInstallation) WalkReplicasFullPath(
+func (chi *ClickHouseInstallation) WalkHostsFullPath(
 	f func(
 		chi *ClickHouseInstallation,
 		clusterIndex int,
@@ -186,7 +186,7 @@ func (chi *ClickHouseInstallation) WalkReplicasFullPath(
 		shardIndex int,
 		shard *ChiShard,
 		replicaIndex int,
-		replica *ChiReplica,
+		host *ChiHost,
 	) error,
 ) []error {
 
@@ -197,8 +197,8 @@ func (chi *ClickHouseInstallation) WalkReplicasFullPath(
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Replicas {
-				replica := &shard.Replicas[replicaIndex]
-				res = append(res, f(chi, clusterIndex, cluster, shardIndex, shard, replicaIndex, replica))
+				host := &shard.Replicas[replicaIndex]
+				res = append(res, f(chi, clusterIndex, cluster, shardIndex, shard, replicaIndex, host))
 			}
 		}
 	}
@@ -206,10 +206,8 @@ func (chi *ClickHouseInstallation) WalkReplicasFullPath(
 	return res
 }
 
-func (chi *ClickHouseInstallation) WalkReplicas(
-	f func(
-		replica *ChiReplica,
-	) error,
+func (chi *ClickHouseInstallation) WalkHosts(
+	f func(host *ChiHost) error,
 ) []error {
 
 	res := make([]error, 0)
@@ -219,8 +217,8 @@ func (chi *ClickHouseInstallation) WalkReplicas(
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Replicas {
-				replica := &shard.Replicas[replicaIndex]
-				res = append(res, f(replica))
+				host := &shard.Replicas[replicaIndex]
+				res = append(res, f(host))
 			}
 		}
 	}
@@ -228,16 +226,16 @@ func (chi *ClickHouseInstallation) WalkReplicas(
 	return res
 }
 
-func (chi *ClickHouseInstallation) WalkReplicasTillError(
-	f func(replica *ChiReplica) error,
+func (chi *ClickHouseInstallation) WalkHostsTillError(
+	f func(host *ChiHost) error,
 ) error {
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
 		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Replicas {
-				replica := &shard.Replicas[replicaIndex]
-				if err := f(replica); err != nil {
+				host := &shard.Replicas[replicaIndex]
+				if err := f(host); err != nil {
 					return err
 				}
 			}
@@ -251,7 +249,7 @@ func (chi *ClickHouseInstallation) WalkClusterTillError(
 	fChi func(chi *ClickHouseInstallation) error,
 	fCluster func(cluster *ChiCluster) error,
 	fShard func(shard *ChiShard) error,
-	fReplica func(replica *ChiReplica) error,
+	fHost func(host *ChiHost) error,
 ) error {
 
 	if err := fChi(chi); err != nil {
@@ -269,8 +267,8 @@ func (chi *ClickHouseInstallation) WalkClusterTillError(
 				return err
 			}
 			for replicaIndex := range shard.Replicas {
-				replica := &shard.Replicas[replicaIndex]
-				if err := fReplica(replica); err != nil {
+				host := &shard.Replicas[replicaIndex]
+				if err := fHost(host); err != nil {
 					return err
 				}
 			}
@@ -313,9 +311,9 @@ func (chi *ClickHouseInstallation) ClustersCount() int {
 	return count
 }
 
-func (chi *ClickHouseInstallation) ReplicasCount() int {
+func (chi *ClickHouseInstallation) HostsCount() int {
 	count := 0
-	chi.WalkReplicas(func(replica *ChiReplica) error {
+	chi.WalkHosts(func(host *ChiHost) error {
 		count++
 		return nil
 	})
@@ -324,7 +322,7 @@ func (chi *ClickHouseInstallation) ReplicasCount() int {
 
 func (chi *ClickHouseInstallation) ShardsCount() int {
 	count := 0
-	chi.WalkShards(func(replica *ChiShard) error {
+	chi.WalkShards(func(shard *ChiShard) error {
 		count++
 		return nil
 	})

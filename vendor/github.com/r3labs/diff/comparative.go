@@ -4,7 +4,9 @@
 
 package diff
 
-import "reflect"
+import (
+	"reflect"
+)
 
 // Comparative ...
 type Comparative struct {

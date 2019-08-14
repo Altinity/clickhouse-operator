@@ -8,7 +8,7 @@ import (
 	"reflect"
 )
 
-func (cl *Changelog) diffComparative(path []string, c *ComparativeList) error {
+func (d *Differ) diffComparative(path []string, c *ComparativeList) error {
 	for _, k := range c.keys {
 		fpath := copyAppend(path, idstring(k))
 
@@ -22,7 +22,7 @@ func (cl *Changelog) diffComparative(path []string, c *ComparativeList) error {
 			c.m[k].B = &nv
 		}
 
-		err := cl.diff(fpath, *c.m[k].A, *c.m[k].B)
+		err := d.diff(fpath, *c.m[k].A, *c.m[k].B)
 		if err != nil {
 			return err
 		}

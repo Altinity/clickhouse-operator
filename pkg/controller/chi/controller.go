@@ -50,6 +50,7 @@ func NewController(
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
 	chiInformer chopinformers.ClickHouseInstallationInformer,
+	chitInformer chopinformers.ClickHouseInstallationTemplateInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer,
 	configMapInformer coreinformers.ConfigMapInformer,
@@ -85,6 +86,8 @@ func NewController(
 		chopClient:              chopClient,
 		chiLister:               chiInformer.Lister(),
 		chiListerSynced:         chiInformer.Informer().HasSynced,
+		chitLister:              chitInformer.Lister(),
+		chitListerSynced:        chitInformer.Informer().HasSynced,
 		serviceLister:           serviceInformer.Lister(),
 		serviceListerSynced:     serviceInformer.Informer().HasSynced,
 		endpointsLister:         endpointsInformer.Lister(),
@@ -105,6 +108,7 @@ func NewController(
 
 func (c *Controller) AddEventHandlers(
 	chiInformer chopinformers.ClickHouseInstallationInformer,
+	chitInformer chopinformers.ClickHouseInstallationTemplateInformer,
 	serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer,
 	configMapInformer coreinformers.ConfigMapInformer,
@@ -136,6 +140,34 @@ func (c *Controller) AddEventHandlers(
 			}
 			//glog.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
 			c.enqueueObject(NewReconcileChi(reconcileDelete, chi, nil))
+		},
+	})
+
+	chitInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			chit := obj.(*chop.ClickHouseInstallationTemplate)
+			if !c.chopConfig.IsWatchedNamespace(chit.Namespace) {
+				return
+			}
+			//glog.V(1).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
+			c.enqueueObject(NewReconcileChit(reconcileAdd, nil, chit))
+		},
+		UpdateFunc: func(old, new interface{}) {
+			newChit := new.(*chop.ClickHouseInstallationTemplate)
+			oldChit := old.(*chop.ClickHouseInstallationTemplate)
+			if !c.chopConfig.IsWatchedNamespace(newChit.Namespace) {
+				return
+			}
+			//glog.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
+			c.enqueueObject(NewReconcileChit(reconcileUpdate, oldChit, newChit))
+		},
+		DeleteFunc: func(obj interface{}) {
+			chit := obj.(*chop.ClickHouseInstallationTemplate)
+			if !c.chopConfig.IsWatchedNamespace(chit.Namespace) {
+				return
+			}
+			//glog.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
+			c.enqueueObject(NewReconcileChit(reconcileDelete, chit, nil))
 		},
 	})
 
@@ -368,55 +400,59 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 	<-ctx.Done()
 }
 
-// runWorker is a convenience wrap over processNextWorkItem()
+// runWorker is an endless work loop
 func (c *Controller) runWorker() {
-	for c.processNextWorkItem() {
+	for {
+		// Get() blocks until it can return an item
+		item, shutdown := c.queue.Get()
+		if shutdown {
+			glog.V(1).Info("runWorker(): shutdown request")
+			return
+		}
+
+		if err := c.processWorkItem(item); err != nil {
+			// code cannot return an error and needs to indicate it has been ignored
+			utilruntime.HandleError(err)
+		}
+		// Must call Done(item) when processing completed
+		c.queue.Done(item)
 	}
 }
 
-// processNextWorkItem processes objects from the workqueue
-func (c *Controller) processNextWorkItem() bool {
-	item, shutdown := c.queue.Get()
-	if shutdown {
-		glog.V(1).Info("processNextWorkItem(): shutdown request")
-		return false
-	}
-
-	err := func(item interface{}) error {
-		defer c.queue.Done(item)
-
-		reconcile, ok := item.(*ReconcileChi)
-		if !ok {
-			// Item is impossible to process, no more retries
-			c.queue.Forget(item)
-			utilruntime.HandleError(fmt.Errorf("unexpected item in the queue - %#v", item))
-			return nil
-		}
-
-		// Main reconcile loop function sync an item
+// processWorkItem processes one work item according to its type
+func (c *Controller) processWorkItem(item interface{}) error {
+	switch item.(type) {
+	case *ReconcileChi:
+		reconcile, _ := item.(*ReconcileChi)
 		if err := c.syncChi(reconcile); err != nil {
 			// Item will be retried later
-			return fmt.Errorf("unable to sync an object %v", err.Error())
+			return fmt.Errorf("unable to sync CHI object %v", err.Error())
 		}
 
-		// Item is processed, no more retries
-		c.queue.Forget(item)
-
-		return nil
-	}(item)
-	if err != nil {
-		utilruntime.HandleError(err)
+	case *ReconcileChit:
+		reconcile, _ := item.(*ReconcileChit)
+		if err := c.syncChit(reconcile); err != nil {
+			// Item will be retried later
+			return fmt.Errorf("unable to sync CHIT object %v", err.Error())
+		}
+	default:
+		// Unknown item type, dont know what to do with it
+		utilruntime.HandleError(fmt.Errorf("unexpected item in the queue - %#v", item))
 	}
 
-	// Continue iteration
-	return true
+	// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
+	// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
+	// still have to call `Done` on the queue.
+	c.queue.Forget(item)
+
+	return nil
 }
 
-// syncChi is the main reconcile loop function - reconcile CHI object identified by `key`
+// syncChi is the main reconcile loop function - reconcile CHI object
 func (c *Controller) syncChi(reconcile *ReconcileChi) error {
-	glog.V(1).Infof("syncChi(%s) start", reconcile.cmd)
+	//glog.V(1).Infof("syncChi(%s) start", reconcile.cmd)
+	//defer glog.V(1).Infof("syncChi(%s) end", reconcile.cmd)
 
-	// Check CHI object already in sync
 	switch reconcile.cmd {
 	case reconcileAdd:
 		return c.onAddChi(reconcile.new)
@@ -424,6 +460,23 @@ func (c *Controller) syncChi(reconcile *ReconcileChi) error {
 		return c.onUpdateChi(reconcile.old, reconcile.new)
 	case reconcileDelete:
 		return c.onDeleteChi(reconcile.old)
+	}
+
+	return nil
+}
+
+// syncChit is the main reconcile loop function - reconcile CHIT object
+func (c *Controller) syncChit(reconcile *ReconcileChit) error {
+	//glog.V(1).Infof("syncChit(%s) start", reconcile.cmd)
+	//defer glog.V(1).Infof("syncChit(%s) end", reconcile.cmd)
+
+	switch reconcile.cmd {
+	case reconcileAdd:
+		return c.onAddChit(reconcile.new)
+	case reconcileUpdate:
+		return c.onUpdateChit(reconcile.old, reconcile.new)
+	case reconcileDelete:
+		return c.onDeleteChit(reconcile.old)
 	}
 
 	return nil
@@ -459,7 +512,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 
 	glog.V(1).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
 	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted,
-		fmt.Sprintf("created cluster with %d shards and %d replicas", chi.Status.ShardsCount, chi.Status.ReplicasCount))
+		fmt.Sprintf("created cluster with %d shards and %d hosts", chi.Status.ShardsCount, chi.Status.HostsCount))
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
 	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.CreatePodFQDNsOfChi(chi))
@@ -508,17 +561,17 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 			cluster := diff.Removed[path].(chop.ChiCluster)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
 				fmt.Sprintf("delete cluster %s", cluster.Name))
-			c.deleteCluster(&cluster)
+			_ = c.deleteCluster(&cluster)
 		case chop.ChiShard:
 			shard := diff.Removed[path].(chop.ChiShard)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
 				fmt.Sprintf("delete shard %d in cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName))
-			c.deleteShard(&shard)
-		case chop.ChiReplica:
-			replica := diff.Removed[path].(chop.ChiReplica)
+			_ = c.deleteShard(&shard)
+		case chop.ChiHost:
+			host := diff.Removed[path].(chop.ChiHost)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
-				fmt.Sprintf("delete replica %d from shard %d in cluster %s", replica.Address.ReplicaIndex, replica.Address.ShardIndex, replica.Address.ClusterName))
-			_ = c.deleteReplica(&replica)
+				fmt.Sprintf("delete replica %d from shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName))
+			_ = c.deleteHost(&host)
 		}
 	}
 
@@ -550,21 +603,21 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 
 				glog.V(1).Infof("Creating distributed objects: %v", names)
 				_ = c.schemer.ShardApplySQLs(&shard, createSQLs, true)
-			case chop.ChiReplica:
-				replica := diff.Added[path].(chop.ChiReplica)
-				cluster := new.Spec.Configuration.Clusters[replica.Address.ClusterIndex]
+			case chop.ChiHost:
+				host := diff.Added[path].(chop.ChiHost)
+				cluster := new.Spec.Configuration.Clusters[host.Address.ClusterIndex]
 
-				log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", replica.Address.ReplicaIndex, replica.Address.ShardIndex, cluster.Name)
+				log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, cluster.Name)
 				glog.V(1).Info(log)
 				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 
-				names, createSQLs, _ := c.schemer.GetCreateReplicatedObjects(new, &cluster, &replica)
+				names, createSQLs, _ := c.schemer.GetCreateReplicatedObjects(new, &cluster, &host)
 				glog.V(1).Infof("Creating replicated objects: %v", names)
-				_ = c.schemer.ReplicaApplySQLs(&replica, createSQLs, true)
+				_ = c.schemer.HostApplySQLs(&host, createSQLs, true)
 
 				names, createSQLs, _ = c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
 				glog.V(1).Infof("Creating distributed objects: %v", names)
-				_ = c.schemer.ReplicaApplySQLs(&replica, createSQLs, true)
+				_ = c.schemer.HostApplySQLs(&host, createSQLs, true)
 			}
 		}
 		_ = c.updateCHIResource(new)
@@ -583,16 +636,42 @@ func (c *Controller) onDeleteChi(chi *chop.ClickHouseInstallation) error {
 		return err
 	}
 
-	c.deleteChi(chi)
+	_ = c.deleteChi(chi)
 	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, "deleted")
 
+	return nil
+}
+
+// onAddChit sync new CHIT - creates all its resources
+func (c *Controller) onAddChit(chit *chop.ClickHouseInstallationTemplate) error {
+	glog.V(1).Infof("onAddChit(%s/%s)", chit.Namespace, chit.Name)
+	c.chopConfig.AddChiTemplate((*chop.ClickHouseInstallation)(chit))
+	return nil
+}
+
+// onUpdateChit sync CHIT which was already created earlier
+func (c *Controller) onUpdateChit(old, new *chop.ClickHouseInstallationTemplate) error {
+	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
+		glog.V(2).Infof("onUpdateChit(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		// No need to react
+		return nil
+	}
+
+	glog.V(2).Infof("onUpdateChit(%s/%s):", new.Namespace, new.Name)
+	c.chopConfig.UpdateChiTemplate((*chop.ClickHouseInstallation)(new))
+	return nil
+}
+
+// onDeleteChit deletes CHIT
+func (c *Controller) onDeleteChit(chit *chop.ClickHouseInstallationTemplate) error {
+	glog.V(2).Infof("onDeleteChit(%s/%s):", chit.Namespace, chit.Name)
+	c.chopConfig.DeleteChiTemplate((*chop.ClickHouseInstallation)(chit))
 	return nil
 }
 
 // updateCHIResource updates ClickHouseInstallation resource
 func (c *Controller) updateCHIResource(chi *chop.ClickHouseInstallation) error {
 	_, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
-
 	return err
 }
 

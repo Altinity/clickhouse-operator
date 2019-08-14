@@ -107,20 +107,20 @@ func (r *Reconciler) createServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 	}
 }
 
-// createServiceReplica  creates new corev1.Service for specified Replica
-func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Service {
-	serviceName := CreateStatefulSetServiceName(replica)
-	statefulSetName := CreateStatefulSetName(replica)
+// createServiceHost creates new corev1.Service for specified host
+func (r *Reconciler) createServiceHost(host *chiv1.ChiHost) *corev1.Service {
+	serviceName := CreateStatefulSetServiceName(host)
+	statefulSetName := CreateStatefulSetName(host)
 
-	glog.V(1).Infof("createServiceReplica(%s/%s) for Set %s", replica.Address.Namespace, serviceName, statefulSetName)
-	if template, ok := replica.GetServiceTemplate(); ok {
+	glog.V(1).Infof("createServiceHost(%s/%s) for Set %s", host.Address.Namespace, serviceName, statefulSetName)
+	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return r.createServiceFromTemplate(
 			template,
-			replica.Address.Namespace,
+			host.Address.Namespace,
 			serviceName,
-			r.labeler.getLabelsReplicaScope(replica, false),
-			r.labeler.GetSelectorReplicaScope(replica),
+			r.labeler.getLabelsHostScope(host, false),
+			r.labeler.GetSelectorHostScope(host),
 		)
 	} else {
 		// Incorrect/unknown .templates.ServiceTemplate specified
@@ -128,8 +128,8 @@ func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Ser
 		return &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
-				Namespace: replica.Address.Namespace,
-				Labels:    r.labeler.getLabelsReplicaScope(replica, false),
+				Namespace: host.Address.Namespace,
+				Labels:    r.labeler.getLabelsHostScope(host, false),
 			},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
@@ -152,7 +152,7 @@ func (r *Reconciler) createServiceReplica(replica *chiv1.ChiReplica) *corev1.Ser
 						TargetPort: intstr.FromInt(chDefaultInterServerPortNumber),
 					},
 				},
-				Selector:                 r.labeler.GetSelectorReplicaScope(replica),
+				Selector:                 r.labeler.GetSelectorHostScope(host),
 				ClusterIP:                templateDefaultsServiceClusterIP,
 				Type:                     "ClusterIP",
 				PublishNotReadyAddresses: true,
@@ -208,22 +208,22 @@ func (r *Reconciler) createServiceFromTemplate(
 	return service
 }
 
-// createConfigMapReplica creates new corev1.ConfigMap
-func (r *Reconciler) createConfigMapReplica(replica *chiv1.ChiReplica) *corev1.ConfigMap {
+// createConfigMapHost creates new corev1.ConfigMap
+func (r *Reconciler) createConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      CreateConfigMapPodName(replica),
-			Namespace: replica.Address.Namespace,
-			Labels:    r.labeler.getLabelsReplicaScope(replica, false),
+			Name:      CreateConfigMapPodName(host),
+			Namespace: host.Address.Namespace,
+			Labels:    r.labeler.getLabelsHostScope(host, false),
 		},
-		Data: r.chConfigSectionsGenerator.CreateConfigsPod(replica),
+		Data: r.chConfigSectionsGenerator.CreateConfigsPod(host),
 	}
 }
 
 // createStatefulSet creates new apps.StatefulSet
-func (r *Reconciler) createStatefulSet(replica *chiv1.ChiReplica) *apps.StatefulSet {
-	statefulSetName := CreateStatefulSetName(replica)
-	serviceName := CreateStatefulSetServiceName(replica)
+func (r *Reconciler) createStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
+	statefulSetName := CreateStatefulSetName(host)
+	serviceName := CreateStatefulSetServiceName(host)
 
 	// Create apps.StatefulSet object
 	replicasNum := int32(1)
@@ -231,14 +231,14 @@ func (r *Reconciler) createStatefulSet(replica *chiv1.ChiReplica) *apps.Stateful
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      statefulSetName,
-			Namespace: replica.Address.Namespace,
-			Labels:    r.labeler.getLabelsReplicaScope(replica, true),
+			Namespace: host.Address.Namespace,
+			Labels:    r.labeler.getLabelsHostScope(host, true),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    &replicasNum,
 			ServiceName: serviceName,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: r.labeler.GetSelectorReplicaScope(replica),
+				MatchLabels: r.labeler.GetSelectorHostScope(host),
 			},
 			// IMPORTANT
 			// VolumeClaimTemplates are to be setup later
@@ -250,26 +250,26 @@ func (r *Reconciler) createStatefulSet(replica *chiv1.ChiReplica) *apps.Stateful
 		},
 	}
 
-	r.setupStatefulSetPodTemplate(statefulSet, replica)
-	r.setupStatefulSetVolumeClaimTemplates(statefulSet, replica)
+	r.setupStatefulSetPodTemplate(statefulSet, host)
+	r.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
 
 	return statefulSet
 }
 
 // setupStatefulSetPodTemplate performs PodTemplate setup of StatefulSet
-func (r *Reconciler) setupStatefulSetPodTemplate(statefulSetObject *apps.StatefulSet, replica *chiv1.ChiReplica) {
-	statefulSetName := CreateStatefulSetName(replica)
+func (r *Reconciler) setupStatefulSetPodTemplate(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
+	statefulSetName := CreateStatefulSetName(host)
 
 	// Initial PodTemplateSpec value
 	// All the rest fields would be filled later
 	statefulSetObject.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: r.labeler.getLabelsReplicaScope(replica, true),
+			Labels: r.labeler.getLabelsHostScope(host, true),
 		},
 	}
 
 	// Specify pod templates - either explicitly defined or default
-	if podTemplate, ok := replica.GetPodTemplate(); ok {
+	if podTemplate, ok := host.GetPodTemplate(); ok {
 		// Replica references known PodTemplate
 		copyPodTemplateFrom(statefulSetObject, podTemplate)
 		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - template used", statefulSetName)
@@ -283,16 +283,16 @@ func (r *Reconciler) setupStatefulSetPodTemplate(statefulSetObject *apps.Statefu
 	statefulSetObject.Spec.Template.Spec.HostAliases = []corev1.HostAlias{
 		{
 			IP:        "127.0.0.1",
-			Hostnames: []string{CreatePodHostname(replica)},
+			Hostnames: []string{CreatePodHostname(host)},
 		},
 	}
 
-	r.setupConfigMapVolumes(statefulSetObject, replica)
+	r.setupConfigMapVolumes(statefulSetObject, host)
 }
 
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
-func (r *Reconciler) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, replica *chiv1.ChiReplica) {
-	configMapMacrosName := CreateConfigMapPodName(replica)
+func (r *Reconciler) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
+	configMapMacrosName := CreateConfigMapPodName(host)
 	configMapCommonName := CreateConfigMapCommonName(r.chi)
 	configMapCommonUsersName := CreateConfigMapCommonUsersName(r.chi)
 
@@ -322,11 +322,11 @@ func (r *Reconciler) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, 
 // setupStatefulSetVolumeClaimTemplates performs VolumeClaimTemplate setup for Containers in PodTemplate of a StatefulSet
 func (r *Reconciler) setupStatefulSetVolumeClaimTemplates(
 	statefulSet *apps.StatefulSet,
-	replica *chiv1.ChiReplica,
+	host *chiv1.ChiHost,
 ) {
 	// Append VolumeClaimTemplates, that are referenced in Containers' VolumeMount object(s)
 	// to StatefulSet's Spec.VolumeClaimTemplates slice, so these
-	statefulSetName := CreateStatefulSetName(replica)
+	statefulSetName := CreateStatefulSetName(host)
 	for i := range statefulSet.Spec.Template.Spec.Containers {
 		// Convenience wrapper
 		container := &statefulSet.Spec.Template.Spec.Containers[i]
@@ -346,7 +346,7 @@ func (r *Reconciler) setupStatefulSetVolumeClaimTemplates(
 	// 1. This default VolumeClaimTemplate is not already mounted with any VolumeMount
 	// 2. And /var/lib/clickhouse is not already mounted with any VolumeMount
 
-	defaultVolumeClaimTemplateName := replica.Templates.VolumeClaimTemplate
+	defaultVolumeClaimTemplateName := host.Templates.VolumeClaimTemplate
 
 	if defaultVolumeClaimTemplateName == "" {
 		// No .templates.VolumeClaimTemplate specified
@@ -393,7 +393,7 @@ func (r *Reconciler) setupStatefulSetVolumeClaimTemplates(
 		// Add VolumeMount to ClickHouse container to /var/lib/clickhouse point
 		clickHouseContainer.VolumeMounts = append(
 			clickHouseContainer.VolumeMounts,
-			createVolumeMount(replica.Templates.VolumeClaimTemplate, dirPathClickHouseData),
+			createVolumeMount(host.Templates.VolumeClaimTemplate, dirPathClickHouseData),
 		)
 	}
 

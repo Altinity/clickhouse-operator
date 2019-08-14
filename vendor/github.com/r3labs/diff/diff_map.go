@@ -9,13 +9,13 @@ import (
 	"reflect"
 )
 
-func (cl *Changelog) diffMap(path []string, a, b reflect.Value) error {
+func (d *Differ) diffMap(path []string, a, b reflect.Value) error {
 	if a.Kind() == reflect.Invalid {
-		return cl.mapValues(CREATE, path, b)
+		return d.mapValues(CREATE, path, b)
 	}
 
 	if b.Kind() == reflect.Invalid {
-		return cl.mapValues(DELETE, path, a)
+		return d.mapValues(DELETE, path, a)
 	}
 
 	c := NewComparativeList()
@@ -30,10 +30,10 @@ func (cl *Changelog) diffMap(path []string, a, b reflect.Value) error {
 		c.addB(k.Interface(), &be)
 	}
 
-	return cl.diffComparative(path, c)
+	return d.diffComparative(path, c)
 }
 
-func (cl *Changelog) mapValues(t string, path []string, a reflect.Value) error {
+func (d *Differ) mapValues(t string, path []string, a reflect.Value) error {
 	if t != CREATE && t != DELETE {
 		return ErrInvalidChangeType
 	}
@@ -52,14 +52,17 @@ func (cl *Changelog) mapValues(t string, path []string, a reflect.Value) error {
 		ae := a.MapIndex(k)
 		xe := x.MapIndex(k)
 
-		err := cl.diff(append(path, fmt.Sprint(k.Interface())), xe, ae)
+		err := d.diff(append(path, fmt.Sprint(k.Interface())), xe, ae)
 		if err != nil {
 			return err
 		}
 	}
 
-	for i := 0; i < len(*cl); i++ {
-		(*cl)[i] = swapChange(t, (*cl)[i])
+	for i := 0; i < len(d.cl); i++ {
+		// only swap changes on the relevant map
+		if pathmatch(path, d.cl[i].Path) {
+			d.cl[i] = swapChange(t, d.cl[i])
+		}
 	}
 
 	return nil

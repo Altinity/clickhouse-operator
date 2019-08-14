@@ -18,9 +18,9 @@ import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-func ReplicaCanDeletePVC(replica *chiv1.ChiReplica) bool {
-	templateName := replica.Templates.VolumeClaimTemplate
-	template, ok := replica.Chi.GetVolumeClaimTemplate(templateName)
+func HostCanDeletePVC(host *chiv1.ChiHost) bool {
+	templateName := host.Templates.VolumeClaimTemplate
+	template, ok := host.Chi.GetVolumeClaimTemplate(templateName)
 	if !ok {
 		// Unknown template name, however, this is strange
 		return true

@@ -1,3 +1,7 @@
+// Copyright 2018 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // Package checker defines the implementation of the checker commands.
 // The same code drives the multi-analysis driver, the single-analysis
 // driver that is conventionally provided for convenience along with
@@ -11,6 +15,7 @@ import (
 	"fmt"
 	"go/token"
 	"go/types"
+	"io/ioutil"
 	"log"
 	"os"
 	"reflect"
@@ -40,9 +45,12 @@ var (
 
 	// Log files for optional performance tracing.
 	CPUProfile, MemProfile, Trace string
+
+	// Fix determines whether to apply all suggested fixes.
+	Fix bool
 )
 
-// RegisterFlags registers command-line flags used the analysis driver.
+// RegisterFlags registers command-line flags used by the analysis driver.
 func RegisterFlags() {
 	// When adding flags here, remember to update
 	// the list of suppressed flags in analysisflags.
@@ -52,6 +60,8 @@ func RegisterFlags() {
 	flag.StringVar(&CPUProfile, "cpuprofile", "", "write CPU profile to this file")
 	flag.StringVar(&MemProfile, "memprofile", "", "write memory profile to this file")
 	flag.StringVar(&Trace, "trace", "", "write trace log to this file")
+
+	flag.BoolVar(&Fix, "fix", false, "apply all suggested fixes")
 }
 
 // Run loads the packages specified by args using go/packages,
@@ -121,6 +131,10 @@ func Run(args []string, analyzers []*analysis.Analyzer) (exitcode int) {
 
 	// Print the results.
 	roots := analyze(initial, analyzers)
+
+	if Fix {
+		applyFixes(roots)
+	}
 
 	return printDiagnostics(roots)
 }
@@ -246,6 +260,125 @@ func analyze(pkgs []*packages.Package, analyzers []*analysis.Analyzer) []*action
 	return roots
 }
 
+func applyFixes(roots []*action) {
+	visited := make(map[*action]bool)
+	var apply func(*action) error
+	var visitAll func(actions []*action) error
+	visitAll = func(actions []*action) error {
+		for _, act := range actions {
+			if !visited[act] {
+				visited[act] = true
+				visitAll(act.deps)
+				if err := apply(act); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	// TODO(matloob): Is this tree business too complicated? (After all this is Go!)
+	// Just create a set (map) of edits, sort by pos and call it a day?
+	type offsetedit struct {
+		start, end int
+		newText    []byte
+	} // TextEdit using byteOffsets instead of pos
+	type node struct {
+		edit        offsetedit
+		left, right *node
+	}
+
+	var insert func(tree **node, edit offsetedit) error
+	insert = func(treeptr **node, edit offsetedit) error {
+		if *treeptr == nil {
+			*treeptr = &node{edit, nil, nil}
+			return nil
+		}
+		tree := *treeptr
+		if edit.end <= tree.edit.start {
+			return insert(&tree.left, edit)
+		} else if edit.start >= tree.edit.end {
+			return insert(&tree.right, edit)
+		}
+
+		// Overlapping text edit.
+		return fmt.Errorf("analyses applying overlapping text edits affecting pos range (%v, %v) and (%v, %v)",
+			edit.start, edit.end, tree.edit.start, tree.edit.end)
+
+	}
+
+	editsForFile := make(map[*token.File]*node)
+
+	apply = func(act *action) error {
+		for _, diag := range act.diagnostics {
+			for _, sf := range diag.SuggestedFixes {
+				for _, edit := range sf.TextEdits {
+					// Validate the edit.
+					if edit.Pos > edit.End {
+						return fmt.Errorf(
+							"diagnostic for analysis %v contains Suggested Fix with malformed edit: pos (%v) > end (%v)",
+							act.a.Name, edit.Pos, edit.End)
+					}
+					file, endfile := act.pkg.Fset.File(edit.Pos), act.pkg.Fset.File(edit.End)
+					if file == nil || endfile == nil || file != endfile {
+						return (fmt.Errorf(
+							"diagnostic for analysis %v contains Suggested Fix with malformed spanning files %v and %v",
+							act.a.Name, file.Name(), endfile.Name()))
+					}
+					start, end := file.Offset(edit.Pos), file.Offset(edit.End)
+
+					// TODO(matloob): Validate that edits do not affect other packages.
+					root := editsForFile[file]
+					if err := insert(&root, offsetedit{start, end, edit.NewText}); err != nil {
+						return err
+					}
+					editsForFile[file] = root // In case the root changed
+				}
+			}
+		}
+		return nil
+	}
+
+	visitAll(roots)
+
+	// Now we've got a set of valid edits for each file. Get the new file contents.
+	for f, tree := range editsForFile {
+		contents, err := ioutil.ReadFile(f.Name())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		cur := 0 // current position in the file
+
+		var out bytes.Buffer
+
+		var recurse func(*node)
+		recurse = func(node *node) {
+			if node.left != nil {
+				recurse(node.left)
+			}
+
+			edit := node.edit
+			if edit.start > cur {
+				out.Write(contents[cur:edit.start])
+				out.Write(edit.newText)
+			}
+			cur = edit.end
+
+			if node.right != nil {
+				recurse(node.right)
+			}
+		}
+		recurse(tree)
+		// Write out the rest of the file.
+		if cur < len(contents) {
+			out.Write(contents[cur:])
+		}
+
+		ioutil.WriteFile(f.Name(), out.Bytes(), 0644)
+	}
+}
+
 // printDiagnostics prints the diagnostics for the root packages in either
 // plain text or JSON format. JSON format also includes errors for any
 // dependencies.
@@ -291,7 +424,8 @@ func printDiagnostics(roots []*action) (exitcode int) {
 		// avoid double-reporting in source files that belong to
 		// multiple packages, such as foo and foo.test.
 		type key struct {
-			token.Position
+			pos token.Position
+			end token.Position
 			*analysis.Analyzer
 			message string
 		}
@@ -309,7 +443,8 @@ func printDiagnostics(roots []*action) (exitcode int) {
 					// as most users don't care.
 
 					posn := act.pkg.Fset.Position(diag.Pos)
-					k := key{posn, act.a, diag.Message}
+					end := act.pkg.Fset.Position(diag.End)
+					k := key{posn, end, act.a, diag.Message}
 					if seen[k] {
 						continue // duplicate
 					}
@@ -499,6 +634,8 @@ func (act *action) execOnce() {
 		ExportObjectFact:  act.exportObjectFact,
 		ImportPackageFact: act.importPackageFact,
 		ExportPackageFact: act.exportPackageFact,
+		AllObjectFacts:    act.allObjectFacts,
+		AllPackageFacts:   act.allPackageFacts,
 	}
 	act.pass = pass
 
@@ -541,11 +678,11 @@ func inheritFacts(act, dep *action) {
 		// Optionally serialize/deserialize fact
 		// to verify that it works across address spaces.
 		if serialize {
-			var err error
-			fact, err = codeFact(fact)
+			encodedFact, err := codeFact(fact)
 			if err != nil {
 				log.Panicf("internal error: encoding of %T fact failed in %v", fact, act)
 			}
+			fact = encodedFact
 		}
 
 		if false {
@@ -563,11 +700,11 @@ func inheritFacts(act, dep *action) {
 		// to verify that it works across address spaces
 		// and is deterministic.
 		if serialize {
-			var err error
-			fact, err = codeFact(fact)
+			encodedFact, err := codeFact(fact)
 			if err != nil {
 				log.Panicf("internal error: encoding of %T fact failed in %v", fact, act)
 			}
+			fact = encodedFact
 		}
 
 		if false {
@@ -662,6 +799,15 @@ func (act *action) exportObjectFact(obj types.Object, fact analysis.Fact) {
 	}
 }
 
+// allObjectFacts implements Pass.AllObjectFacts.
+func (act *action) allObjectFacts() []analysis.ObjectFact {
+	facts := make([]analysis.ObjectFact, 0, len(act.objectFacts))
+	for k := range act.objectFacts {
+		facts = append(facts, analysis.ObjectFact{k.obj, act.objectFacts[k]})
+	}
+	return facts
+}
+
 // importPackageFact implements Pass.ImportPackageFact.
 // Given a non-nil pointer ptr of type *T, where *T satisfies Fact,
 // fact copies the fact value to *ptr.
@@ -697,6 +843,15 @@ func factType(fact analysis.Fact) reflect.Type {
 		log.Fatalf("invalid Fact type: got %T, want pointer", t)
 	}
 	return t
+}
+
+// allObjectFacts implements Pass.AllObjectFacts.
+func (act *action) allPackageFacts() []analysis.PackageFact {
+	facts := make([]analysis.PackageFact, 0, len(act.packageFacts))
+	for k := range act.packageFacts {
+		facts = append(facts, analysis.PackageFact{k.pkg, act.packageFacts[k]})
+	}
+	return facts
 }
 
 func dbg(b byte) bool { return strings.IndexByte(Debug, b) >= 0 }

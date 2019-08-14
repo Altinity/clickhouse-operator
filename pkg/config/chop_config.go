@@ -24,6 +24,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/golang/glog"
+
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -112,16 +114,14 @@ func buildConfigFromFile(configFilePath string) (*Config, error) {
 	config.ConfigFolderPath = filepath.Dir(config.ConfigFilePath)
 
 	// Normalize Config struct into fully-and-correctly filled Config struct
-	if err = config.normalize(); err == nil {
-		config.readChConfigFiles()
-		config.readChiTemplateFiles()
-		config.buildChiTemplate()
-		config.applyEnvVars()
+	config.normalize()
+	config.readChConfigFiles()
+	config.readChiTemplateFiles()
+	config.processChiTemplateFiles()
+	config.applyEnvVars()
 
-		return config, nil
-	} else {
-		return nil, err
-	}
+	return config, nil
+
 }
 
 // buildDefaultConfig returns default Config
@@ -133,35 +133,89 @@ func buildDefaultConfig() (*Config, error) {
 	return config, nil
 }
 
-// buildChiTemplate build Config.ChiTemplate from template files content
-func (config *Config) buildChiTemplate() {
+// processChiTemplateFiles build Config.ChiTemplate from template files content
+func (config *Config) processChiTemplateFiles() {
 
-	// Extract file names into slice and sort it
-	// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
-	var sortedKeys []string
-	for key := range config.ChiTemplates {
-		sortedKeys = append(sortedKeys, key)
-	}
-	sort.Strings(sortedKeys)
-
-	// Extract templates in sorted order - according to sorted file names
-	for _, key := range sortedKeys {
-		chi := new(chiv1.ClickHouseInstallation)
-		if err := yaml.Unmarshal([]byte(config.ChiTemplates[key]), chi); err != nil {
+	// Produce map of CHI templates out of CHI template files
+	for filename := range config.ChiTemplateFiles {
+		template := new(chiv1.ClickHouseInstallation)
+		if err := yaml.Unmarshal([]byte(config.ChiTemplateFiles[filename]), template); err != nil {
 			// Unable to unmarshal - skip incorrect template
+			glog.V(1).Infof("FAIL processChiTemplateFiles() unable to unmarshal file %s %q", filename, err)
 			continue
 		}
-		// Create target template, if not exists
-		if config.ChiTemplate == nil {
-			config.ChiTemplate = new(chiv1.ClickHouseInstallation)
-		}
-		// Merge into accumulated target template from current template
-		config.ChiTemplate.MergeFrom(chi)
+		config.insertChiTemplate(template)
+	}
+
+	config.buildChiTemplate()
+}
+
+// insertChiTemplate inserts template into templates catalog
+func (config *Config) insertChiTemplate(template *chiv1.ClickHouseInstallation) {
+	// Insert template
+	if config.ChiTemplates == nil {
+		config.ChiTemplates = make(map[string]*chiv1.ClickHouseInstallation)
+	}
+	// map template name -> template itself
+	config.ChiTemplates[template.Name] = template
+}
+
+// removeChiTemplate removes template from templates catalog
+func (config *Config) removeChiTemplate(template *chiv1.ClickHouseInstallation) {
+	// Insert template
+	if config.ChiTemplates == nil {
+		return
+	}
+	if _, ok := config.ChiTemplates[template.Name]; ok {
+		delete(config.ChiTemplates, template.Name)
 	}
 }
 
+// buildChiTemplate builds combined CHI Template from templates catalog
+func (config *Config) buildChiTemplate() {
+	// Sort CHI templates by their names and apply one by one
+	// Extract file names into slice and sort it
+	// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
+	var sortedTemplateNames []string
+	for name := range config.ChiTemplates {
+		sortedTemplateNames = append(sortedTemplateNames, name)
+	}
+	sort.Strings(sortedTemplateNames)
+
+	// Create final combined template
+	config.ChiTemplate = new(chiv1.ClickHouseInstallation)
+
+	// Extract templates in sorted order - according to sorted template names
+	for _, templateName := range sortedTemplateNames {
+		// Merge into accumulated target template from current template
+		config.ChiTemplate.MergeFrom(config.ChiTemplates[templateName])
+	}
+
+	if bytes, err := yaml.Marshal(config.ChiTemplate); err == nil {
+		glog.V(1).Infof("ChiTemplate:\n%s\n", string(bytes))
+	} else {
+		glog.V(1).Infof("FAIL unable to Marshal ChiTemplate", )
+	}
+
+}
+
+func (config *Config) AddChiTemplate(template *chiv1.ClickHouseInstallation) {
+	config.insertChiTemplate(template)
+	config.buildChiTemplate()
+}
+
+func (config *Config) UpdateChiTemplate(template *chiv1.ClickHouseInstallation) {
+	config.insertChiTemplate(template)
+	config.buildChiTemplate()
+}
+
+func (config *Config) DeleteChiTemplate(template *chiv1.ClickHouseInstallation) {
+	config.removeChiTemplate(template)
+	config.buildChiTemplate()
+}
+
 // normalize() makes fully-and-correctly filled Config
-func (config *Config) normalize() error {
+func (config *Config) normalize() {
 
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
@@ -232,12 +286,10 @@ func (config *Config) normalize() error {
 	if config.ChPort == 0 {
 		config.ChPort = defaultChPort
 	}
-
-	return nil
 }
 
 // applyEnvVars applies ENV VARS over config
-func (config *Config) applyEnvVars() error {
+func (config *Config) applyEnvVars() {
 	if ns := os.Getenv("WATCH_NAMESPACE"); len(ns) > 0 {
 		// We have WATCH_NAMESPACE specified
 		config.WatchNamespaces = []string{ns}
@@ -254,8 +306,6 @@ func (config *Config) applyEnvVars() error {
 			}
 		}
 	}
-
-	return nil
 }
 
 // prepareConfigPath - prepares config path absolute/relative with default relative value
@@ -309,13 +359,15 @@ func (config *Config) isChConfigExt(file string) bool {
 
 // readChConfigFiles reads all CHI templates
 func (config *Config) readChiTemplateFiles() {
-	config.ChiTemplates = readConfigFiles(config.ChiTemplatesPath, config.isChiTemplateExt)
+	config.ChiTemplateFiles = readConfigFiles(config.ChiTemplatesPath, config.isChiTemplateExt)
 }
 
 // isChiTemplateExt returns true in case specified file has proper extension for a CHI template config file
 func (config *Config) isChiTemplateExt(file string) bool {
 	switch util.ExtToLower(file) {
 	case ".yaml":
+		return true
+	case ".json":
 		return true
 	}
 	return false
@@ -335,21 +387,36 @@ func (config *Config) IsWatchedNamespace(namespace string) bool {
 func (config *Config) String() string {
 	b := &bytes.Buffer{}
 
-	util.Fprintf(b, "ConfigFilePath:   %s\n", config.ConfigFilePath)
+	util.Fprintf(b, "ConfigFilePath: %s\n", config.ConfigFilePath)
 	util.Fprintf(b, "ConfigFolderPath: %s\n", config.ConfigFolderPath)
 
 	util.Fprintf(b, "%s", config.stringSlice("WatchNamespaces", config.WatchNamespaces))
 
 	util.Fprintf(b, "ChCommonConfigsPath: %s\n", config.ChCommonConfigsPath)
-	util.Fprintf(b, "ChHostConfigsPath:    %s\n", config.ChHostConfigsPath)
-	util.Fprintf(b, "ChUsersConfigsPath:  %s\n", config.ChUsersConfigsPath)
+	util.Fprintf(b, "ChHostConfigsPath: %s\n", config.ChHostConfigsPath)
+	util.Fprintf(b, "ChUsersConfigsPath: %s\n", config.ChUsersConfigsPath)
 
 	util.Fprintf(b, "%s", config.stringMap("ChCommonConfigs", config.ChCommonConfigs))
 	util.Fprintf(b, "%s", config.stringMap("ChHostConfigs", config.ChHostConfigs))
 	util.Fprintf(b, "%s", config.stringMap("ChUsersConfigs", config.ChUsersConfigs))
 
-	util.Fprintf(b, "ChiTemplatesPath:  %s\n", config.ChiTemplatesPath)
-	util.Fprintf(b, "%s", config.stringMap("ChiTemplates", config.ChiTemplates))
+	util.Fprintf(b, "ChiTemplatesPath: %s\n", config.ChiTemplatesPath)
+	util.Fprintf(b, "%s", config.stringMap("ChiTemplateFiles", config.ChiTemplateFiles))
+
+	util.Fprintf(b, "StatefulSetUpdateTimeout: %d\n", config.StatefulSetUpdateTimeout)
+	util.Fprintf(b, "StatefulSetUpdatePollPeriod: %d\n", config.StatefulSetUpdatePollPeriod)
+
+	util.Fprintf(b, "OnStatefulSetCreateFailureAction: %s\n", config.OnStatefulSetCreateFailureAction)
+	util.Fprintf(b, "OnStatefulSetUpdateFailureAction: %s\n", config.OnStatefulSetUpdateFailureAction)
+
+	util.Fprintf(b, "ChConfigUserDefaultProfile: %s\n", config.ChConfigUserDefaultProfile)
+	util.Fprintf(b, "ChConfigUserDefaultQuota: %s\n", config.ChConfigUserDefaultQuota)
+	util.Fprintf(b, "%s", config.stringSlice("ChConfigUserDefaultNetworksIP", config.ChConfigUserDefaultNetworksIP))
+	util.Fprintf(b, "ChConfigUserDefaultPassword: %s\n", config.ChConfigUserDefaultPassword)
+
+	util.Fprintf(b, "ChUsername: %s\n", config.ChUsername)
+	util.Fprintf(b, "ChPassword: %s\n", config.ChPassword)
+	util.Fprintf(b, "ChPort: %d\n", config.ChPort)
 
 	return b.String()
 }

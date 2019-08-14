@@ -113,6 +113,43 @@ When marshalling the changelog to json, the output will look like:
 ]
 ```
 
+### Options and Configuration
+
+You can create a new instance of a differ that allows options to be set.
+
+```go
+import "github.com/r3labs/diff"
+
+type Order struct {
+    ID    string `diff:"id"`
+    Items []int  `diff:"items"`
+}
+
+func main() {
+    a := Order{
+        ID: "1234",
+        Items: []int{1, 2, 3, 4},
+    }
+
+    b := Order{
+        ID: "1234",
+        Items: []int{1, 2, 4},
+    }
+
+	d, err := diff.NewDiffer(diff.SliceOrdering(true))
+	if err != nil {
+		panic(err)
+	}
+
+    changelog, err := d.Diff(a, b)
+    ...
+}
+```
+
+Supported options are:
+
+`SliceOrdering` ensures that the ordering of items in a slice is taken into account
+
 
 ## Running Tests
 

@@ -9,26 +9,21 @@ required = [
 ]
 
 [[constraint]]
-  name = "github.com/golang/glog"
-  revision = "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
-
-[[constraint]]
-  branch = "release-1.11"
   name = "k8s.io/apimachinery"
+  version = "kubernetes-1.12.6"
 
 [[constraint]]
   name = "k8s.io/client-go"
-  version = "kubernetes-1.11.9"
+  version = "kubernetes-1.12.6"
 
 [[constraint]]
   name = "k8s.io/code-generator"
-  version = "kubernetes-1.11.9"
+  version = "kubernetes-1.12.6"
+
+[[constraint]]
+  name = "github.com/golang/glog"
+  branch = "master"
 
 [[override]]
   name = "k8s.io/gengo"
-  revision = "b6c426f7730e6d66e6e476a85d1c3eb7633880e0"
-
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/howeyc/gopass"
+  revision = "b90029ef6cd877cb3f422d75b3a07707e3aac6b7"

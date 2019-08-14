@@ -133,14 +133,18 @@ ORDER BY order
 	return names, sqlStatements, nil
 }
 
-// GetCreateReplicatedObjects returns a list of objects that needs to be created on a replica in a cluster
-func (s *Schemer) GetCreateReplicatedObjects(ch *chi.ClickHouseInstallation, cluster *chi.ChiCluster, replica *chi.ChiReplica) ([]string, []string, error) {
+// GetCreateReplicatedObjects returns a list of objects that needs to be created on a host in a cluster
+func (s *Schemer) GetCreateReplicatedObjects(
+	ch *chi.ClickHouseInstallation,
+	cluster *chi.ChiCluster,
+	host *chi.ChiHost,
+) ([]string, []string, error) {
 	var shard *chi.ChiShard = nil
 	for shardIndex := range cluster.Layout.Shards {
 		shard = &cluster.Layout.Shards[shardIndex]
 		for replicaIndex := range shard.Replicas {
-			shardReplica := &shard.Replicas[replicaIndex]
-			if shardReplica == replica {
+			replica := &shard.Replicas[replicaIndex]
+			if replica == host {
 				break
 			}
 		}
@@ -209,7 +213,7 @@ func (s *Schemer) ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluste
 }
 
 // ReplicaGetDropTables returns set of 'DROP TABLE ...' SQLs
-func (s *Schemer) ReplicaGetDropTables(replica *chi.ChiReplica) ([]string, []string, error) {
+func (s *Schemer) HostGetDropTables(host *chi.ChiHost) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Docf(`
@@ -222,7 +226,7 @@ func (s *Schemer) ReplicaGetDropTables(replica *chi.ChiReplica) ([]string, []str
 		`,
 		ignoredDBs)
 
-	names, sqlStatements, _ := s.getObjectListFromCH(CreatePodFQDN(replica), sql)
+	names, sqlStatements, _ := s.getObjectListFromCH(CreatePodFQDN(host), sql)
 	return names, sqlStatements, nil
 }
 
@@ -245,8 +249,8 @@ func (s *Schemer) ClusterApplySQLs(cluster *chi.ChiCluster, sqls []string, retry
 }
 
 // ReplicaApplySQLs runs set of SQL queries over the replica
-func (s *Schemer) ReplicaApplySQLs(replica *chi.ChiReplica, sqls []string, retry bool) error {
-	hosts := []string{CreatePodFQDN(replica)}
+func (s *Schemer) HostApplySQLs(host *chi.ChiHost, sqls []string, retry bool) error {
+	hosts := []string{CreatePodFQDN(host)}
 	return s.applySQLs(hosts, sqls, retry)
 }
 

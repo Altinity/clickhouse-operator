@@ -20,7 +20,7 @@
 # Path to folder where ClickHouse configuration files common for all instances within CHI are located.
 chCommonConfigsPath: config.d
 
-# Path to folder where ClickHouse configuration files unique for each instances within CHI are located.
+# Path to folder where ClickHouse configuration files unique for each instance (host) within CHI are located.
 chHostConfigsPath: conf.d
 
 # Path to folder where ClickHouse configuration files with users settings are located.

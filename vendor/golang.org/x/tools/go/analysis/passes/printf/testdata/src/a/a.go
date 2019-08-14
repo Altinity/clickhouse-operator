@@ -63,6 +63,7 @@ func PrintfTests() {
 	var imap map[int]int
 	var fslice []float64
 	var c complex64
+	var err error
 	// Some good format/argtypes
 	fmt.Printf("")
 	fmt.Printf("%b %b %b", 3, i, x)
@@ -321,6 +322,16 @@ func PrintfTests() {
 
 	// Issue 26486
 	dbg("", 1) // no error "call has arguments but no formatting directive"
+
+	// %w
+	_ = fmt.Errorf("%w", err)
+	_ = fmt.Errorf("%#w", err)
+	_ = fmt.Errorf("%[2]w %[1]s", "x", err)
+	_ = fmt.Errorf("%[2]w %[1]s", e, "x") // want `Errorf format %\[2\]w has arg "x" of wrong type string`
+	_ = fmt.Errorf("%w", "x")             // want `Errorf format %w has arg "x" of wrong type string`
+	_ = fmt.Errorf("%w %w", err, err)     // want `Errorf call has more than one error-wrapping directive %w`
+	fmt.Printf("%w", err)                 // want `Printf call has error-wrapping directive %w`
+	Errorf(0, "%w", err)
 }
 
 func someString() string { return "X" }
@@ -365,13 +376,13 @@ func printf(format string, args ...interface{}) { // want printf:"printfWrapper"
 
 // Errorf is used by the test for a case in which the first parameter
 // is not a format string.
-func Errorf(i int, format string, args ...interface{}) { // want Errorf:"printfWrapper"
+func Errorf(i int, format string, args ...interface{}) { // want Errorf:"errorfWrapper"
 	_ = fmt.Errorf(format, args...)
 }
 
 // errorf is used by the test for a case in which the function accepts multiple
 // string parameters before variadic arguments
-func errorf(level, format string, args ...interface{}) { // want errorf:"printfWrapper"
+func errorf(level, format string, args ...interface{}) { // want errorf:"errorfWrapper"
 	_ = fmt.Errorf(format, args...)
 }
 
@@ -512,6 +523,20 @@ func (p *recursivePtrStringer) String() string {
 	_ = fmt.Sprintf("%v", *p)
 	_ = fmt.Sprint(&p)     // ok; prints address
 	return fmt.Sprintln(p) // want "Sprintln arg p causes recursive call to String method"
+}
+
+// implements a String() method but with non-matching return types
+type nonStringerWrongReturn int
+
+func (s nonStringerWrongReturn) String() (string, error) {
+	return "", fmt.Errorf("%v", s)
+}
+
+// implements a String() method but with non-matching arguments
+type nonStringerWrongArgs int
+
+func (s nonStringerWrongArgs) String(i int) string {
+	return fmt.Sprintf("%d%v", i, s)
 }
 
 type cons struct {
