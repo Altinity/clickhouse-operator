@@ -194,7 +194,7 @@ func (config *Config) buildChiTemplate() {
 	if bytes, err := yaml.Marshal(config.ChiTemplate); err == nil {
 		glog.V(1).Infof("ChiTemplate:\n%s\n", string(bytes))
 	} else {
-		glog.V(1).Infof("FAIL unable to Marshal ChiTemplate", )
+		glog.V(1).Infof("FAIL unable to Marshal ChiTemplate")
 	}
 
 }
