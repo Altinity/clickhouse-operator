@@ -40,7 +40,7 @@ func (c *Controller) getConfigMap(obj *meta.ObjectMeta) (*core.ConfigMap, error)
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found
 		// Try to find by labels
-		if set, err := chopmodel.GetSelectorReplicaFromObjectMeta(obj); err == nil {
+		if set, err := chopmodel.GetSelectorHostFromObjectMeta(obj); err == nil {
 			selector := labels.SelectorFromSet(set)
 			objects, err := c.configMapLister.ConfigMaps(obj.Namespace).List(selector)
 			if err != nil {
@@ -70,7 +70,7 @@ func (c *Controller) getService(obj *meta.ObjectMeta) (*core.Service, error) {
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found
 		// Try to find by labels
-		if set, err := chopmodel.GetSelectorReplicaFromObjectMeta(obj); err == nil {
+		if set, err := chopmodel.GetSelectorHostFromObjectMeta(obj); err == nil {
 			selector := labels.SelectorFromSet(set)
 
 			objects, err := c.serviceLister.Services(obj.Namespace).List(selector)
@@ -101,7 +101,7 @@ func (c *Controller) getStatefulSet(obj *meta.ObjectMeta) (*apps.StatefulSet, er
 	if apierrors.IsNotFound(err) {
 		// Object with such name not found
 		// Try to find by labels
-		if set, err := chopmodel.GetSelectorReplicaFromObjectMeta(obj); err != nil {
+		if set, err := chopmodel.GetSelectorHostFromObjectMeta(obj); err != nil {
 			return nil, err
 		} else {
 			selector := labels.SelectorFromSet(set)

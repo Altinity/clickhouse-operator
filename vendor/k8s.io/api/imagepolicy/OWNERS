@@ -1,7 +1,4 @@
-# approval on api packages bubbles to api-approvers
 reviewers:
-- sig-auth-policy-approvers
-- sig-auth-policy-reviewers
-labels:
-- sig/auth
-
+- deads2k
+- mbohlool
+- jianhuiz

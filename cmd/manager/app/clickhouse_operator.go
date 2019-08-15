@@ -23,6 +23,7 @@ import (
 	"os/signal"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"sync"
 	"syscall"
 	"time"
@@ -34,6 +35,7 @@ import (
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	kube "k8s.io/client-go/kubernetes"
 	kuberest "k8s.io/client-go/rest"
@@ -41,6 +43,7 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Prometheus exporter defaults
@@ -51,7 +54,7 @@ const (
 )
 
 var (
-	// versionRequest defines versionRequest request
+	// versionRequest defines request for clickhouse-operator version report. Operator should exit after version printed
 	versionRequest bool
 
 	// chopConfigFile defines path to clickhouse-operator config file to be used
@@ -72,7 +75,7 @@ var (
 )
 
 func init() {
-	flag.BoolVar(&versionRequest, "version", false, "Display versionRequest and exit")
+	flag.BoolVar(&versionRequest, "version", false, "Display clickhouse-operator version and exit")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
 	flag.StringVar(&kubeConfigFile, "kube-config", "", "Path to kubernetes config file. Only required if called outside of the cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Only required if called outside of the cluster and not being specified in kube config file.")
@@ -128,10 +131,10 @@ func createClientsets(config *kuberest.Config) (*kube.Clientset, *chopclientset.
 	return kubeClientset, chopClientset
 }
 
-func GetRuntimeParams() map[string]string {
-	res := make(map[string]string)
+// getRuntimeParamNames return list of ENV VARS parameter names
+func getRuntimeParamNames() []string {
 	// This list of ENV VARS is specified in operator .yaml manifest, section "kind: Deployment"
-	vars := []string{
+	return []string{
 		// spec.nodeName: ip-172-20-52-62.ec2.internal
 		"OPERATOR_POD_NODE_NAME",
 		// metadata.name: clickhouse-operator-6f87589dbb-ftcsf
@@ -144,24 +147,70 @@ func GetRuntimeParams() map[string]string {
 		// spec.serviceAccountName: clickhouse-operator
 		"OPERATOR_POD_SERVICE_ACCOUNT",
 
+		// .containers.resources.requests.cpu
 		"OPERATOR_CONTAINER_CPU_REQUEST",
+		// .containers.resources.limits.cpu
 		"OPERATOR_CONTAINER_CPU_LIMIT",
+		// .containers.resources.requests.memory
 		"OPERATOR_CONTAINER_MEM_REQUEST",
+		// .containers.resources.limits.memory
 		"OPERATOR_CONTAINER_MEM_LIMIT",
-	}
 
-	for _, varName := range vars {
-		res[varName] = os.Getenv(varName)
+		// What namespaces to watch
+		"WATCH_NAMESPACE",
+		"WATCH_NAMESPACES",
 	}
-
-	return res
 }
 
-func LogRuntimeParams() {
-	runtimeParams = GetRuntimeParams()
-	for name, value := range runtimeParams {
-		glog.V(1).Infof("%s=%s\n", name, value)
+// getRuntimeParams returns map[string]string of ENV VARS with some runtime parameters
+func getRuntimeParams() map[string]string {
+	params := make(map[string]string)
+	// Extract parameters from ENV VARS
+	for _, varName := range getRuntimeParamNames() {
+		params[varName] = os.Getenv(varName)
 	}
+
+	return params
+}
+
+// logRuntimeParams writes runtime parameters into log
+func logRuntimeParams() {
+	// Log params according to sorted names
+	// So we need to
+	// 1. Extract and sort names aka keys
+	// 2. Walk over keys and log params
+
+	runtimeParams = getRuntimeParams()
+
+	// Sort names aka keys
+	var keys []string
+	for k := range runtimeParams {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Walk over sorted names aka keys
+	glog.V(1).Infof("Parameters num: %d\n", len(runtimeParams))
+	for _, k := range keys {
+		glog.V(1).Infof("%s=%s\n", k, runtimeParams[k])
+	}
+}
+
+// logConfig writes Config into log
+func logConfig(chopConfig *config.Config) {
+	glog.V(1).Infof("Config:\n%s", chopConfig.String())
+}
+
+// startMetricsExporter start Prometheus metrics exporter in background
+func startMetricsExporter(chopConfig *config.Config) *chopmetrics.Exporter {
+	// Initializing Prometheus Metrics Exporter
+	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
+	metricsExporter := chopmetrics.NewExporter(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort)
+	prometheus.MustRegister(metricsExporter)
+	http.Handle(metricsPath, promhttp.Handler())
+	go http.ListenAndServe(metricsEP, nil)
+
+	return metricsExporter
 }
 
 // Run is an entry point of the application
@@ -171,23 +220,22 @@ func Run() {
 		os.Exit(0)
 	}
 
+	//
+	// Prepare configuration
+	//
 	glog.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
-	LogRuntimeParams()
+	logRuntimeParams()
 
 	chopConfig, err := config.GetConfig(chopConfigFile)
 	if err != nil {
 		glog.Fatalf("Unable to build config file %v\n", err)
 		os.Exit(1)
 	}
+	logConfig(chopConfig)
 
-	// Initializing Prometheus Metrics Exporter
-	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
-	metricsExporter := chopmetrics.NewExporter(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort)
-	prometheus.MustRegister(metricsExporter)
-	http.Handle(metricsPath, prometheus.Handler())
-	go http.ListenAndServe(metricsEP, nil)
+	metricsExporter := startMetricsExporter(chopConfig)
 
-	// Setting OS signals and termination context
+	// Set OS signals and termination context
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	stopChan := make(chan os.Signal, 2)
 	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
@@ -198,7 +246,7 @@ func Run() {
 		os.Exit(1)
 	}()
 
-	// Initializing ClientSets and Informers
+	// Initialize ClientSets and Informers
 	kubeConfig, err := getConfig(kubeConfigFile, masterURL)
 	if err != nil {
 		glog.Fatalf("Unable to build kube conf: %s", err.Error())
@@ -206,10 +254,38 @@ func Run() {
 	}
 
 	kubeClient, chopClient := createClientsets(kubeConfig)
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, informerFactoryResync)
-	chopInformerFactory := chopinformers.NewSharedInformerFactory(chopClient, informerFactoryResync)
 
-	// Creating resource Controller
+	//
+	// Create Informers
+	//
+
+	// Namespace where informers would watch notifications from
+	namespace := metav1.NamespaceAll
+	if len(chopConfig.WatchNamespaces) == 1 {
+		// We have exactly one watch namespace specified
+		// This scenario is implemented in go-client
+		// In any other case just keep metav1.NamespaceAll
+
+		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
+		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
+		namespace = chopConfig.WatchNamespaces[0]
+	}
+
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
+		kubeClient,
+		informerFactoryResync,
+		kubeinformers.WithNamespace(namespace),
+	)
+	chopInformerFactory := chopinformers.NewSharedInformerFactoryWithOptions(
+		chopClient,
+		informerFactoryResync,
+		chopinformers.WithNamespace(namespace),
+	)
+
+	//
+	// Create resource Controller
+	//
+
 	chiController := chi.NewController(
 		version.Version,
 		runtimeParams,
@@ -217,6 +293,7 @@ func Run() {
 		chopClient,
 		kubeClient,
 		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
+		chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates(),
 		kubeInformerFactory.Core().V1().Services(),
 		kubeInformerFactory.Core().V1().Endpoints(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),
@@ -226,6 +303,7 @@ func Run() {
 	)
 	chiController.AddEventHandlers(
 		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
+		chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates(),
 		kubeInformerFactory.Core().V1().Services(),
 		kubeInformerFactory.Core().V1().Endpoints(),
 		kubeInformerFactory.Core().V1().ConfigMaps(),
@@ -233,11 +311,15 @@ func Run() {
 		kubeInformerFactory.Core().V1().Pods(),
 	)
 
-	// Starting Informers
+	//
+	// Start Informers and Controllers
+	//
+
+	// Start Informers
 	kubeInformerFactory.Start(ctx.Done())
 	chopInformerFactory.Start(ctx.Done())
 
-	// Starting CHI resource Controller
+	// Start CHI resource Controller
 	glog.V(1).Info("Starting CHI controller\n")
 	wg := &sync.WaitGroup{}
 	wg.Add(1)

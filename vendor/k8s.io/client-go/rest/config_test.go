@@ -17,6 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -24,8 +26,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,8 +35,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/flowcontrol"
 
-	"errors"
-
+	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -208,7 +207,7 @@ func (n *fakeNegotiatedSerializer) DecoderToVersion(serializer runtime.Decoder, 
 	return &fakeCodec{}
 }
 
-var fakeDialFunc = func(network, addr string) (net.Conn, error) {
+var fakeDialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
 	return nil, fakeDialerError
 }
 var fakeDialerError = errors.New("fakedialer")
@@ -253,7 +252,7 @@ func TestAnonymousConfig(t *testing.T) {
 			r.Config = map[string]string{}
 		},
 		// Dial does not require fuzzer
-		func(r *func(network, addr string) (net.Conn, error), f fuzz.Continue) {},
+		func(r *func(ctx context.Context, network, addr string) (net.Conn, error), f fuzz.Continue) {},
 	)
 	for i := 0; i < 20; i++ {
 		original := &Config{}
@@ -265,6 +264,7 @@ func TestAnonymousConfig(t *testing.T) {
 		// is added to Config, update AnonymousClientConfig to preserve the field otherwise.
 		expected.Impersonate = ImpersonationConfig{}
 		expected.BearerToken = ""
+		expected.BearerTokenFile = ""
 		expected.Username = ""
 		expected.Password = ""
 		expected.AuthProvider = nil
@@ -284,10 +284,10 @@ func TestAnonymousConfig(t *testing.T) {
 			expected.WrapTransport = nil
 		}
 		if actual.Dial != nil {
-			_, actualError := actual.Dial("", "")
-			_, expectedError := actual.Dial("", "")
+			_, actualError := actual.Dial(context.Background(), "", "")
+			_, expectedError := expected.Dial(context.Background(), "", "")
 			if !reflect.DeepEqual(expectedError, actualError) {
-				t.Fatalf("CopyConfig  dropped the Dial field")
+				t.Fatalf("CopyConfig dropped the Dial field")
 			}
 		} else {
 			actual.Dial = nil
@@ -329,7 +329,7 @@ func TestCopyConfig(t *testing.T) {
 		func(r *AuthProviderConfigPersister, f fuzz.Continue) {
 			*r = fakeAuthProviderConfigPersister{}
 		},
-		func(r *func(network, addr string) (net.Conn, error), f fuzz.Continue) {
+		func(r *func(ctx context.Context, network, addr string) (net.Conn, error), f fuzz.Continue) {
 			*r = fakeDialFunc
 		},
 	)
@@ -351,8 +351,8 @@ func TestCopyConfig(t *testing.T) {
 			expected.WrapTransport = nil
 		}
 		if actual.Dial != nil {
-			_, actualError := actual.Dial("", "")
-			_, expectedError := actual.Dial("", "")
+			_, actualError := actual.Dial(context.Background(), "", "")
+			_, expectedError := expected.Dial(context.Background(), "", "")
 			if !reflect.DeepEqual(expectedError, actualError) {
 				t.Fatalf("CopyConfig  dropped the Dial field")
 			}
@@ -361,7 +361,7 @@ func TestCopyConfig(t *testing.T) {
 		expected.Dial = nil
 		if actual.AuthConfigPersister != nil {
 			actualError := actual.AuthConfigPersister.Persist(nil)
-			expectedError := actual.AuthConfigPersister.Persist(nil)
+			expectedError := expected.AuthConfigPersister.Persist(nil)
 			if !reflect.DeepEqual(expectedError, actualError) {
 				t.Fatalf("CopyConfig  dropped the Dial field")
 			}

@@ -24,14 +24,14 @@ func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	return template, ok
 }
 
-func (shard *ChiShard) WalkReplicas(
-	f func(replica *ChiReplica) error,
+func (shard *ChiShard) WalkHosts(
+	f func(host *ChiHost) error,
 ) []error {
 	res := make([]error, 0)
 
 	for replicaIndex := range shard.Replicas {
-		replica := &shard.Replicas[replicaIndex]
-		res = append(res, f(replica))
+		host := &shard.Replicas[replicaIndex]
+		res = append(res, f(host))
 	}
 
 	return res

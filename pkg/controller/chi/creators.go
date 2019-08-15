@@ -1,4 +1,5 @@
 // Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -109,7 +110,7 @@ func (c *Controller) ReconcileService(service *core.Service) error {
 }
 
 // reconcileStatefulSet reconciles apps.StatefulSet
-func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, replica *chop.ChiReplica) error {
+func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	// Check whether object with such name already exists in k8s
 	curStatefulSet, err := c.getStatefulSet(&newStatefulSet.ObjectMeta)
 
@@ -120,14 +121,14 @@ func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, repl
 
 	if apierrors.IsNotFound(err) {
 		// StatefulSet with such name not found - create StatefulSet
-		return c.createStatefulSet(newStatefulSet, replica)
+		return c.createStatefulSet(newStatefulSet, host)
 	}
 
 	// Error has happened with .Get()
 	return err
 }
 
-func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, replica *chop.ChiReplica) error {
+func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
 		// Error call Create()
 		return err
@@ -136,7 +137,7 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, replica *c
 		return nil
 	} else {
 		// Unable to reach target generation, StatefulSet create failed, time to rollback?
-		return c.onStatefulSetCreateFailed(statefulSet, replica)
+		return c.onStatefulSetCreateFailed(statefulSet, host)
 	}
 }
 
@@ -213,7 +214,7 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed
 // It can just delete failed StatefulSet or do nothing
-func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulSet, replica *chop.ChiReplica) error {
+func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	// Convenience shortcuts
 	namespace := failedStatefulSet.Namespace
 	name := failedStatefulSet.Name
@@ -228,7 +229,7 @@ func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulS
 	case config.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully problematic failed StatefulSet
 		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to DELETE FAILED StatefulSet", namespace, name)
-		_ = c.deleteReplica(replica)
+		_ = c.deleteHost(host)
 		return c.shouldContinueOnCreateFailed()
 	default:
 		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetCreateFailureAction=%s", c.chopConfig.OnStatefulSetCreateFailureAction)

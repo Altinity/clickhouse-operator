@@ -18,7 +18,7 @@ import (
 	"fmt"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
+	kublabels "k8s.io/apimachinery/pkg/labels"
 )
 
 type Labeler struct {
@@ -87,37 +87,37 @@ func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 	}
 }
 
-func (l *Labeler) getLabelsReplicaScope(replica *chi.ChiReplica, applySupplementaryServiceLabels bool) map[string]string {
+func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	labels := map[string]string{
 		LabelApp:         LabelAppValue,
 		LabelChop:        l.version,
-		LabelChi:         getNamePartChiName(replica),
-		LabelCluster:     getNamePartClusterName(replica),
-		LabelShard:       getNamePartShardName(replica),
-		LabelReplica:     getNamePartReplicaName(replica),
-		LabelStatefulSet: CreateStatefulSetName(replica),
+		LabelChi:         getNamePartChiName(host),
+		LabelCluster:     getNamePartClusterName(host),
+		LabelShard:       getNamePartShardName(host),
+		LabelReplica:     getNamePartReplicaName(host),
+		LabelStatefulSet: CreateStatefulSetName(host),
 	}
 	if applySupplementaryServiceLabels {
-		labels[LabelZookeeperConfigVersion] = replica.Config.ZookeeperFingerprint
-		labels[LabelSettingsConfigVersion] = replica.Config.SettingsFingerprint
+		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
+		labels[LabelSettingsConfigVersion] = host.Config.SettingsFingerprint
 	}
 	return labels
 }
 
-func (l *Labeler) GetSelectorReplicaScope(replica *chi.ChiReplica) map[string]string {
+func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// skip chop
-		LabelChi:     getNamePartChiName(replica),
-		LabelCluster: getNamePartClusterName(replica),
-		LabelShard:   getNamePartShardName(replica),
-		LabelReplica: getNamePartReplicaName(replica),
+		LabelChi:     getNamePartChiName(host),
+		LabelCluster: getNamePartClusterName(host),
+		LabelShard:   getNamePartShardName(host),
+		LabelReplica: getNamePartReplicaName(host),
 		// skip StatefulSet
 		// skip Zookeeper
 	}
 }
 
-func GetSelectorReplicaFromObjectMeta(obj *meta.ObjectMeta) (labels.Set, error) {
+func GetSelectorHostFromObjectMeta(obj *meta.ObjectMeta) (kublabels.Set, error) {
 	labelApp, ok1 := obj.Labels[LabelApp]
 	// skip chop
 	labelChi, ok2 := obj.Labels[LabelChi]
@@ -128,7 +128,7 @@ func GetSelectorReplicaFromObjectMeta(obj *meta.ObjectMeta) (labels.Set, error) 
 	// skip Zookeeper
 
 	if ok1 && ok2 && ok3 && ok4 && ok5 {
-		set := labels.Set{
+		set := kublabels.Set{
 			LabelApp: labelApp,
 			// skip chop
 			LabelChi:     labelChi,

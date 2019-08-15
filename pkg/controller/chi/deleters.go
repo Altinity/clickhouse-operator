@@ -32,34 +32,34 @@ func newDeleteOptions() *metav1.DeleteOptions {
 	}
 }
 
-// deleteTablesOnReplica deletes ClickHouse tables on replica before replica is deleted
-func (c *Controller) deleteTablesOnReplica(replica *chop.ChiReplica) error {
+// deleteTablesOnHost deletes ClickHouse tables on a host
+func (c *Controller) deleteTablesOnHost(host *chop.ChiHost) error {
 	// Delete tables on replica
-	tableNames, dropTableSQLs, _ := c.schemer.ReplicaGetDropTables(replica)
+	tableNames, dropTableSQLs, _ := c.schemer.HostGetDropTables(host)
 	glog.V(1).Infof("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	_ = c.schemer.ReplicaApplySQLs(replica, dropTableSQLs, false)
+	_ = c.schemer.HostApplySQLs(host, dropTableSQLs, false)
 
 	return nil
 }
 
 // deleteReplica deletes all kubernetes resources related to replica *chop.ChiReplica
-func (c *Controller) deleteReplica(replica *chop.ChiReplica) error {
-	// Each replica consists of
-	// 1. Tables on replica - we need to delete tables on replica in order to clean Zookeeper data
+func (c *Controller) deleteHost(host *chop.ChiHost) error {
+	// Each host consists of
+	// 1. Tables on host - we need to delete tables on the host in order to clean Zookeeper data
 	// 2. StatefulSet
 	// 3. PersistentVolumeClaim
 	// 4. ConfigMap
 	// 5. Service
 	// Need to delete all these item
-	glog.V(1).Infof("Start delete replica %s/%s", replica.Address.ClusterName, replica.Name)
+	glog.V(1).Infof("Start delete host %s/%s", host.Address.ClusterName, host.Name)
 
-	_ = c.deleteTablesOnReplica(replica)
-	_ = c.statefulSetDelete(replica)
-	_ = c.persistentVolumeClaimDelete(replica)
-	_ = c.configMapDelete(replica)
-	_ = c.deleteServiceReplica(replica)
+	_ = c.deleteTablesOnHost(host)
+	_ = c.statefulSetDelete(host)
+	_ = c.persistentVolumeClaimDelete(host)
+	_ = c.configMapDelete(host)
+	_ = c.deleteServiceHost(host)
 
-	glog.V(1).Infof("End delete replica %s/%s", replica.Address.ClusterName, replica.Name)
+	glog.V(1).Infof("End delete host %s/%s", host.Address.ClusterName, host.Name)
 
 	return nil
 }
@@ -69,10 +69,10 @@ func (c *Controller) deleteShard(shard *chop.ChiShard) error {
 	glog.V(1).Infof("Start delete shard %s/%s", shard.Address.Namespace, shard.Name)
 
 	// Delete all replicas
-	shard.WalkReplicas(c.deleteReplica)
+	shard.WalkHosts(c.deleteHost)
 
 	// Delete Shard Service
-	c.deleteServiceShard(shard)
+	_ = c.deleteServiceShard(shard)
 	glog.V(1).Infof("End delete shard %s/%s", shard.Address.Namespace, shard.Name)
 
 	return nil
@@ -86,7 +86,7 @@ func (c *Controller) deleteCluster(cluster *chop.ChiCluster) error {
 	cluster.WalkShards(c.deleteShard)
 
 	// Delete Cluster Service
-	c.deleteServiceCluster(cluster)
+	_ = c.deleteServiceCluster(cluster)
 	glog.V(1).Infof("End delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
 
 	return nil
@@ -142,15 +142,15 @@ func (c *Controller) statefulSetDeletePod(statefulSet *apps.StatefulSet) error {
 }
 
 // statefulSetDelete gracefully deletes StatefulSet through zeroing Pod's count
-func (c *Controller) statefulSetDelete(replica *chop.ChiReplica) error {
+func (c *Controller) statefulSetDelete(host *chop.ChiHost) error {
 	// IMPORTANT
 	// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
 	// To achieve ordered and graceful termination of the pods in the StatefulSet,
 	// it is possible to scale the StatefulSet down to 0 prior to deletion.
 
 	// Namespaced name
-	name := chopmodel.CreateStatefulSetName(replica)
-	namespace := replica.Address.Namespace
+	name := chopmodel.CreateStatefulSetName(host)
+	namespace := host.Address.Namespace
 
 	glog.V(1).Infof("statefulSetDelete(%s/%s)", namespace, name)
 
@@ -177,18 +177,18 @@ func (c *Controller) statefulSetDelete(replica *chop.ChiReplica) error {
 }
 
 // persistentVolumeClaimDelete deletes PersistentVolumeClaim
-func (c *Controller) persistentVolumeClaimDelete(replica *chop.ChiReplica) error {
+func (c *Controller) persistentVolumeClaimDelete(host *chop.ChiHost) error {
 
-	if !chopmodel.ReplicaCanDeletePVC(replica) {
+	if !chopmodel.HostCanDeletePVC(host) {
 		glog.V(1).Infof("PVC should not be deleted, leave them intact")
 		return nil
 	}
 
-	namespace := replica.Address.Namespace
-	labeler := chopmodel.NewLabeler(c.version, replica.Chi)
-	listOptions := newListOptions(labeler.GetSelectorReplicaScope(replica))
+	namespace := host.Address.Namespace
+	labeler := chopmodel.NewLabeler(c.version, host.Chi)
+	listOptions := newListOptions(labeler.GetSelectorHostScope(host))
 	if list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(listOptions); err == nil {
-		glog.V(1).Infof("OK get list of PVC for replica %s/%s", namespace, replica.Name)
+		glog.V(1).Infof("OK get list of PVC for host %s/%s", namespace, host.Name)
 		for i := range list.Items {
 			pvc := &list.Items[i]
 			if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, newDeleteOptions()); err == nil {
@@ -198,16 +198,16 @@ func (c *Controller) persistentVolumeClaimDelete(replica *chop.ChiReplica) error
 			}
 		}
 	} else {
-		glog.V(1).Infof("FAIL get list of PVC for replica %s/%s %v", namespace, replica.Name, err)
+		glog.V(1).Infof("FAIL get list of PVC for host %s/%s %v", namespace, host.Name, err)
 	}
 
 	return nil
 }
 
 // configMapDelete deletes ConfigMap
-func (c *Controller) configMapDelete(replica *chop.ChiReplica) error {
-	name := chopmodel.CreateConfigMapPodName(replica)
-	namespace := replica.Address.Namespace
+func (c *Controller) configMapDelete(host *chop.ChiHost) error {
+	name := chopmodel.CreateConfigMapPodName(host)
+	namespace := host.Address.Namespace
 
 	glog.V(1).Infof("configMapDelete(%s/%s)", namespace, name)
 
@@ -220,10 +220,10 @@ func (c *Controller) configMapDelete(replica *chop.ChiReplica) error {
 	return nil
 }
 
-// deleteServiceReplica deletes Service
-func (c *Controller) deleteServiceReplica(replica *chop.ChiReplica) error {
-	serviceName := chopmodel.CreateStatefulSetServiceName(replica)
-	namespace := replica.Address.Namespace
+// deleteServiceHost deletes Service
+func (c *Controller) deleteServiceHost(host *chop.ChiHost) error {
+	serviceName := chopmodel.CreateStatefulSetServiceName(host)
+	namespace := host.Address.Namespace
 	glog.V(1).Infof("deleteServiceReplica(%s/%s)", namespace, serviceName)
 	return c.deleteServiceIfExists(namespace, serviceName)
 }

@@ -23,12 +23,12 @@ import (
 )
 
 func TestClassThermalZoneStats(t *testing.T) {
-	fs, err := NewFS("fixtures")
+	fs, err := NewFS(sysTestFixtures)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	thermalTest, err := fs.NewClassThermalZoneStats()
+	thermalTest, err := fs.ClassThermalZoneStats()
 	if err != nil {
 		t.Fatal(err)
 	}

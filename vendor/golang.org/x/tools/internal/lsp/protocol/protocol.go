@@ -6,44 +6,58 @@ package protocol
 
 import (
 	"context"
-	"log"
 
 	"golang.org/x/tools/internal/jsonrpc2"
+	"golang.org/x/tools/internal/lsp/telemetry/log"
+	"golang.org/x/tools/internal/lsp/telemetry/trace"
+	"golang.org/x/tools/internal/xcontext"
 )
 
-func canceller(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
-	conn.Notify(context.Background(), "$/cancelRequest", &CancelParams{ID: *req.ID})
+type DocumentUri = string
+
+type canceller struct{ jsonrpc2.EmptyHandler }
+
+type clientHandler struct {
+	canceller
+	client Client
 }
 
-func RunClient(ctx context.Context, stream jsonrpc2.Stream, client Client, opts ...interface{}) (*jsonrpc2.Conn, Server) {
-	opts = append([]interface{}{clientHandler(client), jsonrpc2.Canceler(canceller)}, opts...)
-	conn := jsonrpc2.NewConn(ctx, stream, opts...)
-	return conn, &serverDispatcher{Conn: conn}
+type serverHandler struct {
+	canceller
+	server Server
 }
 
-func RunServer(ctx context.Context, stream jsonrpc2.Stream, server Server, opts ...interface{}) (*jsonrpc2.Conn, Client) {
-	opts = append([]interface{}{serverHandler(server), jsonrpc2.Canceler(canceller)}, opts...)
-	conn := jsonrpc2.NewConn(ctx, stream, opts...)
-	return conn, &clientDispatcher{Conn: conn}
+func (canceller) Cancel(ctx context.Context, conn *jsonrpc2.Conn, id jsonrpc2.ID, cancelled bool) bool {
+	if cancelled {
+		return false
+	}
+	ctx = xcontext.Detach(ctx)
+	ctx, done := trace.StartSpan(ctx, "protocol.canceller")
+	defer done()
+	conn.Notify(ctx, "$/cancelRequest", &CancelParams{ID: id})
+	return true
 }
 
-func sendParseError(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request, err error) {
+func NewClient(ctx context.Context, stream jsonrpc2.Stream, client Client) (context.Context, *jsonrpc2.Conn, Server) {
+	ctx = WithClient(ctx, client)
+	conn := jsonrpc2.NewConn(stream)
+	conn.AddHandler(&clientHandler{client: client})
+	return ctx, conn, &serverDispatcher{Conn: conn}
+}
+
+func NewServer(ctx context.Context, stream jsonrpc2.Stream, server Server) (context.Context, *jsonrpc2.Conn, Client) {
+	conn := jsonrpc2.NewConn(stream)
+	client := &clientDispatcher{Conn: conn}
+	ctx = WithClient(ctx, client)
+	conn.AddHandler(&serverHandler{server: server})
+	return ctx, conn, client
+}
+
+func sendParseError(ctx context.Context, req *jsonrpc2.Request, err error) {
 	if _, ok := err.(*jsonrpc2.Error); !ok {
 		err = jsonrpc2.NewErrorf(jsonrpc2.CodeParseError, "%v", err)
 	}
-	unhandledError(conn.Reply(ctx, req, nil, err))
-}
-
-// unhandledError is used in places where an error may occur that cannot be handled.
-// This occurs in things like rpc handlers that are a notify, where we cannot
-// reply to the caller, or in a call when we are actually attempting to reply.
-// In these cases, there is nothing we can do with the error except log it, so
-// we do that in this function, and the presence of this function acts as a
-// useful reminder of why we are effectively dropping the error and also a
-// good place to hook in when debugging those kinds of errors.
-func unhandledError(err error) {
-	if err == nil {
-		return
+	if err := req.Reply(ctx, nil, err); err != nil {
+		log.Error(ctx, "", err)
 	}
-	log.Printf("%v", err)
 }

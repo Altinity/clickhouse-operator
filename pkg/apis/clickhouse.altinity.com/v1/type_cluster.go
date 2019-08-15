@@ -37,8 +37,8 @@ func (cluster *ChiCluster) WalkShards(
 	return res
 }
 
-func (cluster *ChiCluster) WalkReplicas(
-	f func(replica *ChiReplica) error,
+func (cluster *ChiCluster) WalkHosts(
+	f func(host *ChiHost) error,
 ) []error {
 
 	res := make([]error, 0)
@@ -46,8 +46,8 @@ func (cluster *ChiCluster) WalkReplicas(
 	for shardIndex := range cluster.Layout.Shards {
 		shard := &cluster.Layout.Shards[shardIndex]
 		for replicaIndex := range shard.Replicas {
-			replica := &shard.Replicas[replicaIndex]
-			res = append(res, f(replica))
+			host := &shard.Replicas[replicaIndex]
+			res = append(res, f(host))
 		}
 	}
 

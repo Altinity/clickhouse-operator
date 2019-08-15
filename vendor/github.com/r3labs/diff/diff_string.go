@@ -6,14 +6,14 @@ package diff
 
 import "reflect"
 
-func (cl *Changelog) diffString(path []string, a, b reflect.Value) error {
+func (d *Differ) diffString(path []string, a, b reflect.Value) error {
 	if a.Kind() == reflect.Invalid {
-		cl.add(CREATE, path, nil, b.Interface())
+		d.cl.add(CREATE, path, nil, b.Interface())
 		return nil
 	}
 
 	if b.Kind() == reflect.Invalid {
-		cl.add(DELETE, path, a.Interface(), nil)
+		d.cl.add(DELETE, path, a.Interface(), nil)
 		return nil
 	}
 
@@ -22,7 +22,7 @@ func (cl *Changelog) diffString(path []string, a, b reflect.Value) error {
 	}
 
 	if a.String() != b.String() {
-		cl.add(UPDATE, path, a.Interface(), b.Interface())
+		d.cl.add(UPDATE, path, a.String(), b.String())
 	}
 
 	return nil

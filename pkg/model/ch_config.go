@@ -166,14 +166,14 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 				cline(b, 16, "<weight>%d</weight>", shard.Weight)
 			}
 
-			shard.WalkReplicas(func(replica *chiv1.ChiReplica) error {
+			shard.WalkHosts(func(host *chiv1.ChiHost) error {
 				// <replica>
 				//		<host>XXX</host>
 				//		<port>XXX</port>
 				// </replica>
 				cline(b, 16, "<replica>")
-				cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(replica))
-				cline(b, 16, "    <port>%d</port>", replica.Port)
+				cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
+				cline(b, 16, "    <port>%d</port>", host.Port)
 				cline(b, 16, "</replica>")
 
 				return nil
@@ -201,14 +201,14 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 	cline(b, 8, "<%s>", clusterName)
 	cline(b, 8, "    <shard>")
 	cline(b, 8, "        <internal_replication>true</internal_replication>")
-	c.chi.WalkReplicas(func(replica *chiv1.ChiReplica) error {
+	c.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		// <replica>
 		//		<host>XXX</host>
 		//		<port>XXX</port>
 		// </replica>
 		cline(b, 16, "<replica>")
-		cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(replica))
-		cline(b, 16, "    <port>%d</port>", replica.Port)
+		cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
+		cline(b, 16, "    <port>%d</port>", host.Port)
 		cline(b, 16, "</replica>")
 
 		return nil
@@ -224,7 +224,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 	// <my_cluster_name>
 	clusterName = allShardsOneReplicaClusterName
 	cline(b, 8, "<%s>", clusterName)
-	c.chi.WalkReplicas(func(replica *chiv1.ChiReplica) error {
+	c.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		// <shard>
 		//     <internal_replication>
 		cline(b, 12, "<shard>")
@@ -235,8 +235,8 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 		//		<port>XXX</port>
 		// </replica>
 		cline(b, 16, "<replica>")
-		cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(replica))
-		cline(b, 16, "    <port>%d</port>", replica.Port)
+		cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
+		cline(b, 16, "    <port>%d</port>", host.Port)
 		cline(b, 16, "</replica>")
 
 		// </shard>
@@ -256,7 +256,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 }
 
 // GetHostMacros creates "macros.xml" content
-func (c *ClickHouseConfigGenerator) GetHostMacros(replica *chiv1.ChiReplica) string {
+func (c *ClickHouseConfigGenerator) GetHostMacros(host *chiv1.ChiHost) string {
 	b := &bytes.Buffer{}
 
 	// <yandex>
@@ -265,7 +265,7 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(replica *chiv1.ChiReplica) str
 	cline(b, 0, "    <macros>")
 
 	// <installation>CHI-name-macros-value</installation>
-	cline(b, 8, "<installation>%s</installation>", replica.Address.ChiName)
+	cline(b, 8, "<installation>%s</installation>", host.Address.ChiName)
 
 	// <CLUSTER_NAME>cluster-name-macros-value</CLUSTER_NAME>
 	// cline(b, 8, "<%s>%[2]s</%[1]s>", replica.Address.ClusterName, c.getMacrosCluster(replica.Address.ClusterName))
@@ -274,16 +274,16 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(replica *chiv1.ChiReplica) str
 
 	// All Shards One Replica Cluster
 	// <CLUSTER_NAME-shard>0-based shard index within all-shards-one-replica-cluster would always be GlobalReplicaIndex</CLUSTER_NAME-shard>
-	cline(b, 8, "<%s-shard>%d</%[1]s-shard>", allShardsOneReplicaClusterName, replica.Address.GlobalReplicaIndex)
+	cline(b, 8, "<%s-shard>%d</%[1]s-shard>", allShardsOneReplicaClusterName, host.Address.HostIndex)
 
 	// <cluster> and <shard> macros are applicable to main cluster only. All aux clusters do not have ambiguous macros
 	// <cluster></cluster> macro
-	cline(b, 8, "<cluster>%s</cluster>", replica.Address.ClusterName)
+	cline(b, 8, "<cluster>%s</cluster>", host.Address.ClusterName)
 	// <shard></shard> macro
-	cline(b, 8, "<shard>%s</shard>", replica.Address.ShardName)
+	cline(b, 8, "<shard>%s</shard>", host.Address.ShardName)
 	// <replica>replica id = full deployment id</replica>
 	// full deployment id is unique to identify replica within the cluster
-	cline(b, 8, "<replica>%s</replica>", CreatePodHostname(replica))
+	cline(b, 8, "<replica>%s</replica>", CreatePodHostname(host))
 
 	// 		</macros>
 	// </yandex>
@@ -321,14 +321,14 @@ func (c *ClickHouseConfigGenerator) getDistributedDDLPath() string {
 
 // getRemoteServersReplicaHostname returns hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
-func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(replica *chiv1.ChiReplica) string {
+func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(host *chiv1.ChiHost) string {
 	if util.IsStringBoolTrue(c.chi.Spec.Defaults.ReplicasUseFQDN) {
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local
-		return CreatePodFQDN(replica)
+		return CreatePodFQDN(host)
 	} else {
-		return CreatePodHostname(replica)
+		return CreatePodHostname(host)
 	}
 }
 

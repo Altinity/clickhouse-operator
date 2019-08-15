@@ -4,10 +4,24 @@
 
 package diff
 
-import "reflect"
+import (
+	"reflect"
+)
 
-func (cl *Changelog) diffPtr(path []string, a, b reflect.Value) error {
+func (d *Differ) diffPtr(path []string, a, b reflect.Value) error {
 	if a.Kind() != b.Kind() {
+		if a.Kind() == reflect.Invalid {
+			if !b.IsNil() {
+				return d.diff(path, reflect.ValueOf(nil), reflect.Indirect(b))
+			}
+		}
+
+		if b.Kind() == reflect.Invalid {
+			if !a.IsNil() {
+				return d.diff(path, reflect.Indirect(a), reflect.ValueOf(nil))
+			}
+		}
+
 		return ErrTypeMismatch
 	}
 
@@ -16,14 +30,14 @@ func (cl *Changelog) diffPtr(path []string, a, b reflect.Value) error {
 	}
 
 	if a.IsNil() {
-		cl.add(UPDATE, path, nil, b.Interface())
+		d.cl.add(UPDATE, path, nil, b.Interface())
 		return nil
 	}
 
 	if b.IsNil() {
-		cl.add(UPDATE, path, a.Interface(), nil)
+		d.cl.add(UPDATE, path, a.Interface(), nil)
 		return nil
 	}
 
-	return cl.diff(path, reflect.Indirect(a), reflect.Indirect(b))
+	return d.diff(path, reflect.Indirect(a), reflect.Indirect(b))
 }

@@ -19,11 +19,16 @@ package aggregator
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/ghodss/yaml"
 	"github.com/go-openapi/spec"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kube-openapi/pkg/handler"
 )
 
 type DebugSpec struct {
@@ -134,8 +139,10 @@ definitions:
 `), &spec1_filtered)
 
 	ast := assert.New(t)
-	FilterSpecByPaths(spec1, []string{"/test"})
-	ast.Equal(DebugSpec{spec1_filtered}, DebugSpec{spec1})
+	orig_spec1, _ := cloneSpec(spec1)
+	new_spec1 := FilterSpecByPathsWithoutSideEffects(spec1, []string{"/test"})
+	ast.Equal(DebugSpec{spec1_filtered}, DebugSpec{new_spec1})
+	ast.Equal(DebugSpec{orig_spec1}, DebugSpec{spec1}, "unexpected mutation of input")
 }
 
 func TestFilterSpecsWithUnusedDefinitions(t *testing.T) {
@@ -239,8 +246,10 @@ definitions:
 `), &spec1Filtered)
 
 	ast := assert.New(t)
-	FilterSpecByPaths(spec1, []string{"/test"})
-	ast.Equal(DebugSpec{spec1Filtered}, DebugSpec{spec1})
+	orig_spec1, _ := cloneSpec(spec1)
+	new_spec1 := FilterSpecByPathsWithoutSideEffects(spec1, []string{"/test"})
+	ast.Equal(DebugSpec{spec1Filtered}, DebugSpec{new_spec1})
+	ast.Equal(DebugSpec{orig_spec1}, DebugSpec{spec1}, "unexpected mutation of input")
 }
 
 func TestMergeSpecsSimple(t *testing.T) {
@@ -370,10 +379,12 @@ definitions:
 `), &expected)
 
 	ast := assert.New(t)
+	orig_spec2, _ := cloneSpec(spec2)
 	if !ast.NoError(MergeSpecs(spec1, spec2)) {
 		return
 	}
 	ast.Equal(DebugSpec{expected}, DebugSpec{spec1})
+	ast.Equal(DebugSpec{orig_spec2}, DebugSpec{spec2}, "unexpected mutation of input")
 }
 
 func TestMergeSpecsEmptyDefinitions(t *testing.T) {
@@ -472,10 +483,12 @@ definitions:
 `), &expected)
 
 	ast := assert.New(t)
+	orig_spec2, _ := cloneSpec(spec2)
 	if !ast.NoError(MergeSpecs(spec1, spec2)) {
 		return
 	}
 	ast.Equal(DebugSpec{expected}, DebugSpec{spec1})
+	ast.Equal(DebugSpec{orig_spec2}, DebugSpec{spec2}, "unexpected mutation of input")
 }
 
 func TestMergeSpecsEmptyPaths(t *testing.T) {
@@ -570,10 +583,12 @@ definitions:
 `), &expected)
 
 	ast := assert.New(t)
+	orig_spec2, _ := cloneSpec(spec2)
 	if !ast.NoError(MergeSpecs(spec1, spec2)) {
 		return
 	}
 	ast.Equal(DebugSpec{expected}, DebugSpec{spec1})
+	ast.Equal(DebugSpec{orig_spec2}, DebugSpec{spec2}, "unexpected mutation of input")
 }
 
 func TestMergeSpecsReuseModel(t *testing.T) {
@@ -701,10 +716,12 @@ definitions:
 `), &expected)
 
 	ast := assert.New(t)
+	orig_spec2, _ := cloneSpec(spec2)
 	if !ast.NoError(MergeSpecs(spec1, spec2)) {
 		return
 	}
 	ast.Equal(DebugSpec{expected}, DebugSpec{spec1})
+	ast.Equal(DebugSpec{orig_spec2}, DebugSpec{spec2}, "unexpected mutation of input")
 }
 
 func TestMergeSpecsRenameModel(t *testing.T) {
@@ -837,10 +854,12 @@ definitions:
 `), &expected)
 
 	ast := assert.New(t)
+	orig_spec2, _ := cloneSpec(spec2)
 	if !ast.NoError(MergeSpecs(spec1, spec2)) {
 		return
 	}
-	ast.Equal(DebugSpec{expected}, DebugSpec{spec1})
+	ast.Equal(DebugSpec{expected}, DebugSpec{spec1}, DebugSpec{spec1}.String())
+	ast.Equal(DebugSpec{orig_spec2}, DebugSpec{spec2}, "unexpected mutation of input")
 }
 
 func TestMergeSpecsRenameModelWithExistingV2InDestination(t *testing.T) {
@@ -916,10 +935,12 @@ definitions:
 `), &expected)
 
 	ast := assert.New(t)
+	orig_spec2, _ := cloneSpec(spec2)
 	if !ast.NoError(MergeSpecs(spec1, spec2)) {
 		return
 	}
 	ast.Equal(DebugSpec{expected}, DebugSpec{spec1})
+	ast.Equal(DebugSpec{orig_spec2}, DebugSpec{spec2}, "unexpected mutation of input")
 }
 
 func TestMergeSpecsRenameModelWithExistingV2InSource(t *testing.T) {
@@ -995,10 +1016,12 @@ definitions:
 `), &expected)
 
 	ast := assert.New(t)
+	orig_spec2, _ := cloneSpec(spec2)
 	if !ast.NoError(MergeSpecs(spec1, spec2)) {
 		return
 	}
 	ast.Equal(DebugSpec{expected}, DebugSpec{spec1})
+	ast.Equal(DebugSpec{orig_spec2}, DebugSpec{spec2}, "unexpected mutation of input")
 }
 
 // This tests if there are three specs, where the first two use the same object definition,
@@ -1082,6 +1105,8 @@ definitions:
 `), &expected)
 
 	ast := assert.New(t)
+	orig_spec2, _ := cloneSpec(spec2)
+	orig_spec3, _ := cloneSpec(spec3)
 	if !ast.NoError(MergeSpecs(spec1, spec2)) {
 		return
 	}
@@ -1089,6 +1114,8 @@ definitions:
 		return
 	}
 	ast.Equal(DebugSpec{expected}, DebugSpec{spec1})
+	ast.Equal(DebugSpec{orig_spec2}, DebugSpec{spec2}, "unexpected mutation of spec2 input")
+	ast.Equal(DebugSpec{orig_spec3}, DebugSpec{spec3}, "unexpected mutation of spec3 input")
 }
 
 // This tests if there are three specs, where the last two use the same object definition,
@@ -1170,6 +1197,8 @@ definitions:
 `), &expected)
 
 	ast := assert.New(t)
+	orig_spec2, _ := cloneSpec(spec2)
+	orig_spec3, _ := cloneSpec(spec3)
 	if !ast.NoError(MergeSpecs(spec1, spec2)) {
 		return
 	}
@@ -1177,6 +1206,9 @@ definitions:
 		return
 	}
 	ast.Equal(DebugSpec{expected}, DebugSpec{spec1})
+	ast.Equal(DebugSpec{orig_spec2}, DebugSpec{spec2}, "unexpected mutation of spec2 input")
+	ast.Equal(DebugSpec{orig_spec3}, DebugSpec{spec3}, "unexpected mutation of spec3 input")
+
 }
 
 func TestSafeMergeSpecsSimple(t *testing.T) {
@@ -1280,14 +1312,15 @@ definitions:
   `), &expected)
 
 	ast := assert.New(t)
-	actual, err := CloneSpec(fooSpec)
+	orig_barSpec, err := cloneSpec(barSpec)
 	if !ast.NoError(err) {
 		return
 	}
-	if !ast.NoError(MergeSpecsFailOnDefinitionConflict(actual, barSpec)) {
+	if !ast.NoError(MergeSpecsFailOnDefinitionConflict(fooSpec, barSpec)) {
 		return
 	}
-	ast.Equal(DebugSpec{expected}, DebugSpec{actual})
+	ast.Equal(DebugSpec{expected}, DebugSpec{fooSpec})
+	ast.Equal(DebugSpec{orig_barSpec}, DebugSpec{barSpec}, "unexpected mutation of input")
 }
 
 func TestSafeMergeSpecsReuseModel(t *testing.T) {
@@ -1385,14 +1418,15 @@ definitions:
   `), &expected)
 
 	ast := assert.New(t)
-	actual, err := CloneSpec(fooSpec)
+	orig_barSpec, err := cloneSpec(barSpec)
 	if !ast.NoError(err) {
 		return
 	}
-	if !ast.NoError(MergeSpecsFailOnDefinitionConflict(actual, barSpec)) {
+	if !ast.NoError(MergeSpecsFailOnDefinitionConflict(fooSpec, barSpec)) {
 		return
 	}
-	ast.Equal(DebugSpec{expected}, DebugSpec{actual})
+	ast.Equal(DebugSpec{expected}, DebugSpec{fooSpec})
+	ast.Equal(DebugSpec{orig_barSpec}, DebugSpec{barSpec}, "unexpected mutation of input")
 }
 
 func TestSafeMergeSpecsReuseModelFails(t *testing.T) {
@@ -1492,11 +1526,7 @@ definitions:
   `), &expected)
 
 	ast := assert.New(t)
-	actual, err := CloneSpec(fooSpec)
-	if !ast.NoError(err) {
-		return
-	}
-	ast.Error(MergeSpecsFailOnDefinitionConflict(actual, barSpec))
+	ast.Error(MergeSpecsFailOnDefinitionConflict(fooSpec, barSpec))
 }
 
 func TestMergeSpecsIgnorePathConflicts(t *testing.T) {
@@ -1603,21 +1633,19 @@ definitions:
   `), &expected)
 
 	ast := assert.New(t)
-	actual, err := CloneSpec(fooSpec)
-	if !ast.NoError(err) {
-		return
-	}
+	actual, _ := cloneSpec(fooSpec)
+	orig_barSpec, _ := cloneSpec(barSpec)
 	if !ast.Error(MergeSpecs(actual, barSpec)) {
 		return
 	}
-	actual, err = CloneSpec(fooSpec)
-	if !ast.NoError(err) {
-		return
-	}
+	ast.Equal(DebugSpec{orig_barSpec}, DebugSpec{barSpec}, "unexpected mutation of input")
+
+	actual, _ = cloneSpec(fooSpec)
 	if !ast.NoError(MergeSpecsIgnorePathConflict(actual, barSpec)) {
 		return
 	}
 	ast.Equal(DebugSpec{expected}, DebugSpec{actual})
+	ast.Equal(DebugSpec{orig_barSpec}, DebugSpec{barSpec}, "unexpected mutation of input")
 }
 
 func TestMergeSpecsIgnorePathConflictsAllConflicting(t *testing.T) {
@@ -1649,15 +1677,74 @@ definitions:
 `), &fooSpec)
 
 	ast := assert.New(t)
-	foo2Spec, err := CloneSpec(fooSpec)
-	actual, err := CloneSpec(fooSpec)
-	if !ast.NoError(err) {
-		return
-	}
+	foo2Spec, _ := cloneSpec(fooSpec)
+	actual, _ := cloneSpec(fooSpec)
 	if !ast.NoError(MergeSpecsIgnorePathConflict(actual, foo2Spec)) {
 		return
 	}
 	ast.Equal(DebugSpec{fooSpec}, DebugSpec{actual})
+	ast.Equal(DebugSpec{fooSpec}, DebugSpec{foo2Spec}, "unexpected mutation of input")
+}
+
+func TestMergeSpecsIgnorePathConflictsWithKubeSpec(t *testing.T) {
+	ast := assert.New(t)
+
+	specs, expected := loadTestData()
+	sp, specs := specs[0], specs[1:]
+
+	origSpecs := make([]*spec.Swagger, len(specs))
+	for i := range specs {
+		cpy, err := cloneSpec(specs[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		ast.NoError(err)
+		origSpecs[i] = cpy
+	}
+
+	for i := range specs {
+		if err := MergeSpecsIgnorePathConflict(sp, specs[i]); err != nil {
+			t.Fatalf("merging spec %d failed: %v", i, err)
+		}
+	}
+
+	ast.Equal(DebugSpec{expected}, DebugSpec{sp})
+
+	for i := range specs {
+		ast.Equal(DebugSpec{origSpecs[i]}, DebugSpec{specs[i]}, "unexpected mutation of specs[%d]", i)
+	}
+}
+
+func BenchmarkMergeSpecsIgnorePathConflictsWithKubeSpec(b *testing.B) {
+	b.StopTimer()
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	specs, _ := loadTestData()
+	start, specs := specs[0], specs[1:]
+
+	for n := 0; n < b.N; n++ {
+		sp, err := cloneSpec(start)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		b.StartTimer()
+		for i := range specs {
+			if err := MergeSpecsIgnorePathConflict(sp, specs[i]); err != nil {
+				panic(err)
+			}
+		}
+
+		specBytes, _ := jsoniter.Marshal(sp)
+		var json map[string]interface{}
+		if err := jsoniter.Unmarshal(specBytes, &json); err != nil {
+			b.Fatal(err)
+		}
+		handler.ToProtoBinary(json)
+
+		b.StopTimer()
+	}
 }
 
 func TestMergeSpecReplacesAllPossibleRefs(t *testing.T) {
@@ -1851,8 +1938,193 @@ definitions:
 `), &expected)
 
 	ast := assert.New(t)
+	orig_spec2, _ := cloneSpec(spec2)
 	if !ast.NoError(MergeSpecs(spec1, spec2)) {
 		return
 	}
 	ast.Equal(DebugSpec{expected}, DebugSpec{spec1})
+	ast.Equal(DebugSpec{orig_spec2}, DebugSpec{spec2}, "unexpected mutation of input")
+}
+
+func loadTestData() ([]*spec.Swagger, *spec.Swagger) {
+	loadSpec := func(fileName string) *spec.Swagger {
+		bs, err := ioutil.ReadFile(filepath.Join("../../test/integration/testdata/aggregator", fileName))
+		if err != nil {
+			panic(err)
+		}
+		sp := spec.Swagger{}
+
+		if err := json.Unmarshal(bs, &sp); err != nil {
+			panic(err)
+		}
+		return &sp
+	}
+
+	specs := []*spec.Swagger{
+		loadSpec("openapi-0.json"),
+		loadSpec("openapi-1.json"),
+		loadSpec("openapi-2.json"),
+	}
+	expected := loadSpec("openapi.json")
+
+	return specs, expected
+}
+
+func TestCloneSpec(t *testing.T) {
+	_, sp := loadTestData()
+	clone, err := cloneSpec(sp)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	ast := assert.New(t)
+	ast.Equal(DebugSpec{sp}, DebugSpec{clone})
+}
+
+func cloneSpec(source *spec.Swagger) (*spec.Swagger, error) {
+	bytes, err := json.Marshal(source)
+	if err != nil {
+		return nil, err
+	}
+	var ret spec.Swagger
+	err = json.Unmarshal(bytes, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return &ret, nil
+}
+
+func TestMergedGVKs(t *testing.T) {
+	gvk1 := map[string]interface{}{"group": "group1", "version": "v1", "kind": "Foo"}
+	gvk2 := map[string]interface{}{"group": "group2", "version": "v1", "kind": "Bar"}
+	gvk3 := map[string]interface{}{"group": "group3", "version": "v1", "kind": "Abc"}
+
+	tests := []struct {
+		name        string
+		gvks1       interface{}
+		gvks2       interface{}
+		want        interface{}
+		wantChanged bool
+		wantErr     bool
+	}{
+		{"nil", nil, nil, nil, false, false},
+		{"first only", []interface{}{gvk1, gvk2}, nil, []interface{}{gvk1, gvk2}, false, false},
+		{"second only", nil, []interface{}{gvk1, gvk2}, []interface{}{gvk1, gvk2}, true, false},
+		{"both", []interface{}{gvk1, gvk2}, []interface{}{gvk3}, []interface{}{gvk1, gvk2, gvk3}, true, false},
+		{"equal, different order", []interface{}{gvk1, gvk2, gvk3}, []interface{}{gvk3, gvk2, gvk1}, []interface{}{gvk1, gvk2, gvk3}, false, false},
+		{"empty", []interface{}{}, []interface{}{}, []interface{}{}, false, false},
+		{"overlapping", []interface{}{gvk1, gvk2}, []interface{}{gvk2, gvk3}, []interface{}{gvk1, gvk2, gvk3}, true, false},
+		{"first no slice", 42, []interface{}{gvk1}, nil, false, true},
+		{"second no slice", []interface{}{gvk1}, 42, nil, false, true},
+		{"no map in slice", []interface{}{42}, []interface{}{gvk1}, nil, false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var ext1, ext2 map[string]interface{}
+			if tt.gvks1 != nil {
+				ext1 = map[string]interface{}{"x-kubernetes-group-version-kind": tt.gvks1}
+			}
+			if tt.gvks2 != nil {
+				ext2 = map[string]interface{}{"x-kubernetes-group-version-kind": tt.gvks2}
+			}
+
+			got, gotChanged, gotErr := mergedGVKs(
+				&spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: ext1}},
+				&spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: ext2}},
+			)
+			if (gotErr != nil) != tt.wantErr {
+				t.Errorf("mergedGVKs() error = %v, wantErr %v", gotErr, tt.wantErr)
+				return
+			}
+			if gotChanged != tt.wantChanged {
+				t.Errorf("mergedGVKs() changed = %v, want %v", gotChanged, tt.wantChanged)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("mergedGVKs() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDeepEqualDefinitionsModuloGVKs(t *testing.T) {
+	tests := []struct {
+		name  string
+		s1    *spec.Schema
+		s2    *spec.Schema
+		equal bool
+	}{
+		{name: "nil", equal: true},
+		{name: "nil, non-nil", s1: nil, s2: &spec.Schema{}},
+		{name: "equal", s1: &spec.Schema{}, s2: &spec.Schema{}, equal: true},
+		{name: "different", s1: &spec.Schema{SchemaProps: spec.SchemaProps{ID: "abc"}}, s2: &spec.Schema{}},
+		{name: "equal modulo: nil, empty",
+			s1:    &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: nil}},
+			s2:    &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: spec.Extensions{}}},
+			equal: true,
+		},
+		{name: "equal modulo: nil, gvk",
+			s1: &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: nil}},
+			s2: &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: spec.Extensions{
+				gvkKey: true,
+			}}},
+			equal: true,
+		},
+		{name: "equal modulo: empty, gvk",
+			s1: &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: spec.Extensions{}}},
+			s2: &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: spec.Extensions{
+				gvkKey: true,
+			}}},
+			equal: true,
+		},
+		{name: "equal modulo: non-empty, gvk",
+			s1: &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: spec.Extensions{"foo": "bar"}}},
+			s2: &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: spec.Extensions{
+				gvkKey: true,
+				"foo":  "bar",
+			}}},
+			equal: true,
+		},
+		{name: "equal modulo: gvk, gvk",
+			s1: &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: spec.Extensions{
+				gvkKey: false,
+				"foo":  "bar",
+			}}},
+			s2: &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: spec.Extensions{
+				gvkKey: true,
+				"foo":  "bar",
+			}}},
+			equal: true,
+		},
+		{name: "different values",
+			s1: &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: spec.Extensions{
+				gvkKey: false,
+				"foo":  "bar",
+			}}},
+			s2: &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: spec.Extensions{
+				gvkKey: true,
+				"foo":  "abc",
+			}}},
+		},
+		{name: "different sizes",
+			s1: &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: spec.Extensions{
+				gvkKey: false,
+				"foo":  "bar",
+				"xyz":  "123",
+			}}},
+			s2: &spec.Schema{VendorExtensible: spec.VendorExtensible{Extensions: spec.Extensions{
+				gvkKey: true,
+				"foo":  "abc",
+			}}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := deepEqualDefinitionsModuloGVKs(tt.s1, tt.s2); got != tt.equal {
+				t.Errorf("deepEqualDefinitionsModuloGVKs(s1, v2) = %v, want %v", got, tt.equal)
+			}
+
+			if got := deepEqualDefinitionsModuloGVKs(tt.s2, tt.s1); got != tt.equal {
+				t.Errorf("deepEqualDefinitionsModuloGVKs(s2, s1) = %v, want %v", got, tt.equal)
+			}
+		})
+	}
 }
