@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<XMI xmlns:UML="http://schema.omg.org/spec/UML/1.3" timestamp="2019-08-19T17:01:48" xmi.version="1.2" verified="false">
+<XMI xmlns:UML="http://schema.omg.org/spec/UML/1.3" timestamp="2019-08-19T18:56:21" xmi.version="1.2" verified="false">
  <XMI.header>
   <XMI.documentation>
    <XMI.exporter>umbrello uml modeller http://umbrello.kde.org</XMI.exporter>
@@ -67,7 +67,7 @@
          <statewidget height="26" textcolor="#000000" xmi.id="VP3j6lsSfkfb" statename="c.updateCHIResource(chi)" usesdiagramfillcolor="0" statetype="1" usesdiagramusefillcolor="0" documentation="" fillcolor="#ffff00" width="164" y="-150.7" localid="dO264kDUQ2Ax" isinstance="0" showstereotype="1" linecolor="#ff0000" usefillcolor="1" x="-49.55" font="Noto Sans,9,-1,5,50,0,0,0,0,0" linewidth="0">
           <Activities/>
          </statewidget>
-         <statewidget height="26" textcolor="#000000" xmi.id="yZTD4LWKQIyW" statename="WalkClusterTillError" usesdiagramfillcolor="0" statetype="1" usesdiagramusefillcolor="0" documentation="" fillcolor="#ffff00" width="131" y="-148.35" localid="NDr3vWeKX34h" isinstance="0" showstereotype="1" linecolor="#ff0000" usefillcolor="1" x="-358.8" font="Noto Sans,9,-1,5,50,0,0,0,0,0" linewidth="0">
+         <statewidget height="26" textcolor="#000000" xmi.id="yZTD4LWKQIyW" statename="WalkTillError" usesdiagramfillcolor="0" statetype="1" usesdiagramusefillcolor="0" documentation="" fillcolor="#ffff00" width="131" y="-148.35" localid="NDr3vWeKX34h" isinstance="0" showstereotype="1" linecolor="#ff0000" usefillcolor="1" x="-358.8" font="Noto Sans,9,-1,5,50,0,0,0,0,0" linewidth="0">
           <Activities/>
          </statewidget>
          <statewidget height="26" textcolor="#000000" xmi.id="ersEePiubTip" statename="reconcileCHI" usesdiagramfillcolor="0" statetype="1" usesdiagramusefillcolor="0" documentation="" fillcolor="#ffff00" width="86" y="-403.65" localid="HslfAiBLEGuM" isinstance="0" showstereotype="1" linecolor="#ff0000" usefillcolor="1" x="-639.4" font="Noto Sans,9,-1,5,50,0,0,0,0,0" linewidth="0">
@@ -82,6 +82,10 @@
          <statewidget height="26" textcolor="#000000" xmi.id="OBk6q2roPwwZ" statename="reconcileHost" usesdiagramfillcolor="0" statetype="1" usesdiagramusefillcolor="0" documentation="" fillcolor="#ffff00" width="92" y="-395.6" localid="bPeyIqwakpU8" isinstance="0" showstereotype="1" linecolor="#ff0000" usefillcolor="1" x="-177.1" font="Noto Sans,9,-1,5,50,0,0,0,0,0" linewidth="0">
           <Activities/>
          </statewidget>
+         <statewidget height="26" textcolor="#000000" xmi.id="hx8koNh8xoHj" statename="waitStatefulSetGeneration" usesdiagramfillcolor="0" statetype="1" usesdiagramusefillcolor="0" documentation="" fillcolor="#ffff00" width="170" y="-589.95" localid="h4kNEvuAw12B" isinstance="0" showstereotype="1" linecolor="#ff0000" usefillcolor="1" x="-202.4" font="Noto Sans,9,-1,5,50,0,0,0,0,0" linewidth="0">
+          <Activities/>
+         </statewidget>
+         <floatingtext height="20" pretext="" textcolor="#000000" xmi.id="SvQPZxsIoY4g" usesdiagramfillcolor="0" usesdiagramusefillcolor="0" text="Waiting HERE most of the time" fillcolor="#ffff00" width="180" role="700" y="-721.05" localid="3gOSoIeHrvjA" isinstance="0" showstereotype="1" linecolor="#ff0000" usefillcolor="1" x="-218.5" font="Noto Sans,9,-1,5,50,0,0,0,0,0" posttext="" linewidth="0"/>
         </widgets>
         <messages/>
         <associations>
@@ -145,7 +149,7 @@
          </assocwidget>
          <assocwidget visibilityA="0" widgetaid="yZTD4LWKQIyW" textcolor="#000000" visibilityB="0" usesdiagramfillcolor="0" widgetbid="yM7AC6RgF4Md" type="514" usesdiagramusefillcolor="0" changeabilityA="900" documentation="" roleAdoc="" fillcolor="#ffff00" indexa="1" totalcountb="2" changeabilityB="900" indexb="1" roleBdoc="" linecolor="#ff0000" usefillcolor="1" seqnum="" font="Noto Sans,9,-1,5,50,0,0,0,0,0" totalcounta="2" linewidth="0">
           <linepath layout="Polyline">
-           <startpoint startx="-309.35" starty="-148.35"/>
+           <startpoint startx="-307.05" starty="-148.35"/>
            <endpoint endy="-373.05" endx="-307.05"/>
           </linepath>
           <floatingtext height="20" pretext="" textcolor="none" xmi.id="zD2oiXXhhABZ" usesdiagramfillcolor="1" usesdiagramusefillcolor="1" text="node type" fillcolor="none" width="64" role="703" y="-252.65" localid="kNwJvULCrE2z" isinstance="0" showstereotype="1" linecolor="#ff0000" usefillcolor="1" x="-345" font="Noto Sans,9,-1,5,50,0,0,0,0,0" posttext="" linewidth="0"/>
@@ -178,6 +182,21 @@
           </linepath>
           <floatingtext height="20" pretext="" textcolor="none" xmi.id="Kuq5iIB4Rv9H" usesdiagramfillcolor="1" usesdiagramusefillcolor="1" text="no more nodes" fillcolor="none" width="93" role="703" y="-146.05" localid="1OEGQar2zUyF" isinstance="0" showstereotype="1" linecolor="#ff0000" usefillcolor="1" x="-189.275" font="Noto Sans,9,-1,5,50,0,0,0,0,0" posttext="" linewidth="0"/>
          </assocwidget>
+         <assocwidget visibilityA="0" widgetaid="OBk6q2roPwwZ" textcolor="none" visibilityB="0" usesdiagramfillcolor="0" widgetbid="hx8koNh8xoHj" type="514" usesdiagramusefillcolor="8" changeabilityA="900" documentation="" roleAdoc="" fillcolor="#ffff00" indexa="1" totalcountb="2" changeabilityB="900" indexb="1" roleBdoc="" linecolor="#ff0000" usefillcolor="1" seqnum="" font="Noto Sans,9,-1,5,50,0,0,0,0,0" totalcounta="2" linewidth="0">
+          <linepath layout="Polyline">
+           <startpoint startx="-117.4" starty="-395.6"/>
+           <endpoint endy="-563.95" endx="-117.4"/>
+          </linepath>
+         </assocwidget>
+         <assocwidget visibilityA="0" widgetaid="hx8koNh8xoHj" textcolor="#000000" visibilityB="0" usesdiagramfillcolor="0" widgetbid="hx8koNh8xoHj" type="514" usesdiagramusefillcolor="0" changeabilityA="900" documentation="" roleAdoc="" fillcolor="#ffff00" indexa="0" totalcountb="0" changeabilityB="900" indexb="0" roleBdoc="" linecolor="#ff0000" usefillcolor="1" seqnum="" font="Noto Sans,9,-1,5,50,0,0,0,0,0" totalcounta="0" linewidth="0">
+          <linepath layout="Polyline">
+           <startpoint startx="-165.6" starty="-589.95"/>
+           <endpoint endy="-591.1" endx="-72.45"/>
+           <point y="-660" x="-165.65"/>
+           <point y="-660" x="-80.65"/>
+          </linepath>
+          <floatingtext height="20" pretext="" textcolor="none" xmi.id="jqiouI7okZfE" usesdiagramfillcolor="1" usesdiagramusefillcolor="1" text="wait / SLEEP" fillcolor="none" width="76" role="703" y="-683.05" localid="VZHSLYBGxgXV" isinstance="0" showstereotype="1" linecolor="#ff0000" usefillcolor="1" x="-166.25" font="Noto Sans,9,-1,5,50,0,0,0,0,0" posttext="" linewidth="0"/>
+         </assocwidget>
         </associations>
        </diagram>
       </diagrams>
@@ -199,7 +218,7 @@
   </UML:Model>
  </XMI.content>
  <XMI.extensions xmi.extender="umbrello">
-  <docsettings uniqueid="Ja9Bo98lNAX3" viewid="9ErjJC9iQ3Nd" documentation=""/>
+  <docsettings uniqueid="TrsIlZQDUra4" viewid="9ErjJC9iQ3Nd" documentation=""/>
   <listview>
    <listitem type="800" open="1" id="Views">
     <listitem type="821" open="1" id="Component View"/>

@@ -400,7 +400,7 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 	<-ctx.Done()
 }
 
-// runWorker is an endless work loop
+// runWorker is an endless work loop running in a thread
 func (c *Controller) runWorker() {
 	for {
 		// Get() blocks until it can return an item
@@ -411,7 +411,7 @@ func (c *Controller) runWorker() {
 		}
 
 		if err := c.processWorkItem(item); err != nil {
-			// code cannot return an error and needs to indicate it has been ignored
+			// this code cannot return an error and needs to indicate error has been ignored
 			utilruntime.HandleError(err)
 		}
 		// Must call Done(item) when processing completed

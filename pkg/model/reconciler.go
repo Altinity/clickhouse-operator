@@ -61,7 +61,7 @@ func NewReconciler(
 
 // Reconcile runs reconcile process
 func (r *Reconciler) Reconcile() error {
-	return r.chi.WalkClusterTillError(
+	return r.chi.WalkTillError(
 		r.reconcileChi,
 		r.reconcileCluster,
 		r.reconcileShard,

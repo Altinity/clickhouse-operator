@@ -245,7 +245,7 @@ func (chi *ClickHouseInstallation) WalkHostsTillError(
 	return nil
 }
 
-func (chi *ClickHouseInstallation) WalkClusterTillError(
+func (chi *ClickHouseInstallation) WalkTillError(
 	fChi func(chi *ClickHouseInstallation) error,
 	fCluster func(cluster *ChiCluster) error,
 	fShard func(shard *ChiShard) error,
