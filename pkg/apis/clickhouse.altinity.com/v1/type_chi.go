@@ -18,16 +18,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
-// IsNew checks whether CHI is a new one or already known and was processed/created earlier
-func (chi *ClickHouseInstallation) IsKnown() bool {
-	// New CHI does not have FullDeploymentIDs specified
-	return chi.Status.IsKnown > 0
-}
-
 // StatusFill fills .Status
 func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
-	// New CHI does not have FullDeploymentIDs specified
-	chi.Status.IsKnown = 1
 	chi.Status.Version = version.Version
 	chi.Status.ClustersCount = chi.ClustersCount()
 	chi.Status.ShardsCount = chi.ShardsCount()

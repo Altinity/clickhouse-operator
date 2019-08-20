@@ -46,7 +46,6 @@ type ChiSpec struct {
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	IsKnown       int      `json:"isKnown"`
 	Version       string   `json:"version"`
 	ClustersCount int      `json:"clusters"`
 	HostsCount    int      `json:"hosts"`

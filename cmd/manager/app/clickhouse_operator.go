@@ -77,7 +77,7 @@ var (
 )
 
 var (
-	runtimeParams map[string]string
+	runtimeParams        map[string]string
 	controllerThreadsNum = defaultControllerThreadsNum
 )
 

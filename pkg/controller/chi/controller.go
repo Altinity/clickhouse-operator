@@ -482,40 +482,30 @@ func (c *Controller) syncChit(reconcile *ReconcileChit) error {
 	return nil
 }
 
-// onAddChi sync new CHI - creates all its resources
+// onAddChi normalize CHI - updates CHI object to normalized
 func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
-	// CHI is a new one - need to create all its objects
+	// CHI is a new one - need to create normalized CHI
 	// Operator receives CHI struct partially filled by data from .yaml file provided by user
-	// We need to create all resources that are needed to run user's .yaml specification
+	// We need to create full normalized specification
 	glog.V(1).Infof("onAddChi(%s/%s)", chi.Namespace, chi.Name)
 
 	chi, err := c.normalizer.CreateTemplatedChi(chi)
 	if err != nil {
-		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
+		glog.V(1).Infof("ClickHouseInstallation (%s): unable to normalize: %q", chi.Name, err)
 		c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "unable to normalize configuration")
 		return err
 	}
 
-	err = c.reconcile(chi)
-	if err != nil {
-		glog.V(1).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
-		c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "Unable to create resources")
-		return err
-	}
-
-	// Update CHI status in k8s
+	// Update CHI object
 	if err := c.updateCHIResource(chi); err != nil {
-		glog.V(1).Infof("ClickHouseInstallation (%q): unable to update status of CHI resource: %q", chi.Name, err)
+		glog.V(1).Infof("ClickHouseInstallation (%s): unable to update CHI object: %q", chi.Name, err)
 		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, "Unable to update CHI Resource")
 		return err
 	}
 
-	glog.V(1).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
-	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted,
-		fmt.Sprintf("created cluster with %d shards and %d hosts", chi.Status.ShardsCount, chi.Status.HostsCount))
-
-	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
-	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.CreatePodFQDNsOfChi(chi))
+	// Report CHI normalized
+	glog.V(1).Infof("ClickHouseInstallation (%s): created", chi.Name)
+	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted, fmt.Sprintf("ClickHouseInstallation (%s): added", chi.Name))
 
 	return nil
 }
@@ -526,13 +516,6 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
 		glog.V(2).Infof("onUpdateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
-		// No need to react
-		return nil
-	}
-
-	if !old.IsKnown() && new.IsKnown() {
-		glog.V(1).Infof("onUpdateChi(%s/%s): This `update` event triggered by `save` filled CHI action", old.Namespace, old.Name)
-		// This `update` event triggered by `save` filled CHI action
 		// No need to react
 		return nil
 	}
