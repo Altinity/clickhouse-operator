@@ -24,7 +24,7 @@ spec:
     - name: version
       type: string
       description: Operator version
-      priority: 1 # show in wide view only
+      priority: 1 # show in wide view
       JSONPath: .status.version
     - name: clusters
       type: integer
@@ -36,10 +36,15 @@ spec:
       description: Hosts count
       priority: 0 # show in standard view
       JSONPath: .status.hosts
+    - name: shards
+      type: integer
+      description: Shards count
+      priority: 1 # show in wide view
+      JSONPath: .status.shards
     - name: endpoint
       type: string
       description: Client access endpoint
-      priority: 1 # show in wide view only
+      priority: 1 # show in wide view
       JSONPath: .status.endpoint
 # TODO return to this feature later
 # Pruning unknown fields. FEATURE STATE: Kubernetes v1.15
