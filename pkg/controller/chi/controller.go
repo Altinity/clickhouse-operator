@@ -513,7 +513,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 // onUpdateChi sync CHI which was already created earlier
 func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	glog.V(2).Infof("onUpdateChi(%s/%s):", old.Namespace, old.Name)
-
+	
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
 		glog.V(2).Infof("onUpdateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
 		// No need to react
@@ -536,7 +536,54 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
-	// Deal with removed items
+	if err := c.reconcile(new); err != nil {
+		log := fmt.Sprintf("Update of resources has FAILED: %v", err)
+		glog.V(1).Info(log)
+		c.eventChi(old, eventTypeError, eventActionUpdate, eventReasonUpdateFailed, log)
+		return nil
+	}
+
+	// Post-process added items
+	for path := range diff.Added {
+		switch diff.Added[path].(type) {
+		case chop.ChiCluster:
+			cluster := diff.Added[path].(chop.ChiCluster)
+
+			log := fmt.Sprintf("Added cluster %s", cluster.Name)
+			glog.V(1).Info(log)
+
+			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
+		case chop.ChiShard:
+			shard := diff.Added[path].(chop.ChiShard)
+			cluster := new.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
+
+			log := fmt.Sprintf("Added shard %d to cluster %s", shard.Address.ShardIndex, cluster.Name)
+			glog.V(1).Info(log)
+			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
+
+			names, createSQLs, _ := c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
+
+			glog.V(1).Infof("Creating distributed objects: %v", names)
+			_ = c.schemer.ShardApplySQLs(&shard, createSQLs, true)
+		case chop.ChiHost:
+			host := diff.Added[path].(chop.ChiHost)
+			cluster := new.Spec.Configuration.Clusters[host.Address.ClusterIndex]
+
+			log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, cluster.Name)
+			glog.V(1).Info(log)
+			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
+
+			names, createSQLs, _ := c.schemer.GetCreateReplicatedObjects(new, &cluster, &host)
+			glog.V(1).Infof("Creating replicated objects: %v", names)
+			_ = c.schemer.HostApplySQLs(&host, createSQLs, true)
+
+			names, createSQLs, _ = c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
+			glog.V(1).Infof("Creating distributed objects: %v", names)
+			_ = c.schemer.HostApplySQLs(&host, createSQLs, true)
+		}
+	}
+
+	// Remove deleted items
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range diff.Removed {
 		switch diff.Removed[path].(type) {
@@ -558,53 +605,8 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		}
 	}
 
-	// Deal with added/updated items
-	//	c.listStatefulSetResources(chi)
-	if err := c.reconcile(new); err != nil {
-		log := fmt.Sprintf("Update of resources has FAILED: %v", err)
-		glog.V(1).Info(log)
-		c.eventChi(old, eventTypeError, eventActionUpdate, eventReasonUpdateFailed, log)
-	} else {
-		for path := range diff.Added {
-			switch diff.Added[path].(type) {
-			case chop.ChiCluster:
-				cluster := diff.Added[path].(chop.ChiCluster)
-
-				log := fmt.Sprintf("Added cluster %s", cluster.Name)
-				glog.V(1).Info(log)
-
-				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
-			case chop.ChiShard:
-				shard := diff.Added[path].(chop.ChiShard)
-				cluster := new.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
-
-				log := fmt.Sprintf("Added shard %d to cluster %s", shard.Address.ShardIndex, cluster.Name)
-				glog.V(1).Info(log)
-				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
-
-				names, createSQLs, _ := c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
-
-				glog.V(1).Infof("Creating distributed objects: %v", names)
-				_ = c.schemer.ShardApplySQLs(&shard, createSQLs, true)
-			case chop.ChiHost:
-				host := diff.Added[path].(chop.ChiHost)
-				cluster := new.Spec.Configuration.Clusters[host.Address.ClusterIndex]
-
-				log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, cluster.Name)
-				glog.V(1).Info(log)
-				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
-
-				names, createSQLs, _ := c.schemer.GetCreateReplicatedObjects(new, &cluster, &host)
-				glog.V(1).Infof("Creating replicated objects: %v", names)
-				_ = c.schemer.HostApplySQLs(&host, createSQLs, true)
-
-				names, createSQLs, _ = c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
-				glog.V(1).Infof("Creating distributed objects: %v", names)
-				_ = c.schemer.HostApplySQLs(&host, createSQLs, true)
-			}
-		}
-		_ = c.updateCHIResource(new)
-	}
+	// Update CHI object
+	_ = c.updateCHIResource(new)
 
 	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
 	c.metricsExporter.EnsureControlledValues(new.Name, chopmodels.CreatePodFQDNsOfChi(new))
