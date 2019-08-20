@@ -53,6 +53,12 @@ const (
 	informerFactoryResync  = 30 * time.Second
 )
 
+// Default number of controller threads running concurrently (used in case no other specified in config)
+const (
+	defaultControllerThreadsNum = 10
+)
+
+// CLI parameter variables
 var (
 	// versionRequest defines request for clickhouse-operator version report. Operator should exit after version printed
 	versionRequest bool
@@ -72,6 +78,7 @@ var (
 
 var (
 	runtimeParams map[string]string
+	controllerThreadsNum = defaultControllerThreadsNum
 )
 
 func init() {
@@ -325,7 +332,7 @@ func Run() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		chiController.Run(ctx, 10)
+		chiController.Run(ctx, controllerThreadsNum)
 	}()
 	<-ctx.Done()
 	wg.Wait()
