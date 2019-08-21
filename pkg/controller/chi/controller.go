@@ -81,6 +81,7 @@ func NewController(
 		runtimeParams:           runtimeParams,
 		normalizer:              chopmodels.NewNormalizer(chopConfig),
 		schemer:                 chopmodels.NewSchemer(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort),
+		creator:                 nil,
 		chopConfig:              chopConfig,
 		kubeClient:              kubeClient,
 		chopClient:              chopClient,
@@ -513,7 +514,7 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 // onUpdateChi sync CHI which was already created earlier
 func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	glog.V(2).Infof("onUpdateChi(%s/%s):", old.Namespace, old.Name)
-	
+
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
 		glog.V(2).Infof("onUpdateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
 		// No need to react

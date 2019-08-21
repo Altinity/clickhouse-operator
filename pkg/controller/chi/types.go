@@ -37,6 +37,7 @@ type Controller struct {
 	runtimeParams map[string]string
 	normalizer    *model.Normalizer
 	schemer       *model.Schemer
+	creator       *model.Creator
 
 	// chopConfig used to keep clickhouse-oprator config
 	chopConfig *config.Config

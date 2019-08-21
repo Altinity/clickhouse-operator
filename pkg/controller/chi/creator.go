@@ -20,7 +20,7 @@ import (
 	"fmt"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/config"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -29,18 +29,87 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-// reconcileChi reconciles ClickHouseInstallation
+// reconcile reconciles ClickHouseInstallation
 func (c *Controller) reconcile(chi *chop.ClickHouseInstallation) error {
-	reconciler := chopmodel.NewReconciler(
-		chi,
-		c.chopConfig,
-		c.version,
-		&chopmodel.ReconcileFuncs{
-			ReconcileConfigMap:   c.ReconcileConfigMap,
-			ReconcileService:     c.ReconcileService,
-			ReconcileStatefulSet: c.ReconcileStatefulSet,
-		})
-	return reconciler.Reconcile()
+	c.creator = model.NewCreator(chi, c.chopConfig, c.version)
+	return chi.WalkTillError(
+		c.reconcileChi,
+		c.reconcileCluster,
+		c.reconcileShard,
+		c.reconcileHost,
+	)
+}
+
+// reconcileChi reconciles CHI global objects
+func (c *Controller) reconcileChi(chi *chop.ClickHouseInstallation) error {
+	// 1. CHI Service
+	service := c.creator.CreateServiceChi()
+	if err := c.ReconcileService(service); err != nil {
+		return err
+	}
+
+	// 2. CHI ConfigMaps
+
+	// ConfigMap common for all resources in CHI
+	// contains several sections, mapped as separated chopConfig files,
+	// such as remote servers, zookeeper setup, etc
+	configMapCommon := c.creator.CreateConfigMapChiCommon()
+	if err := c.ReconcileConfigMap(configMapCommon); err != nil {
+		return err
+	}
+
+	// ConfigMap common for all users resources in CHI
+	configMapUsers := c.creator.CreateConfigMapChiCommonUsers()
+	if err := c.ReconcileConfigMap(configMapUsers); err != nil {
+		return err
+	}
+
+	// Add here other CHI components to be reconciled
+
+	return nil
+}
+
+// reconcileCluster reconciles Cluster, excluding nested shards
+func (c *Controller) reconcileCluster(cluster *chop.ChiCluster) error {
+	// Add Cluster's Service
+	if service := c.creator.CreateServiceCluster(cluster); service != nil {
+		return c.ReconcileService(service)
+	} else {
+		return nil
+	}
+}
+
+// reconcileShard reconciles Shard, excluding nested replicas
+func (c *Controller) reconcileShard(shard *chop.ChiShard) error {
+	// Add Shard's Service
+	if service := c.creator.CreateServiceShard(shard); service != nil {
+		return c.ReconcileService(service)
+	} else {
+		return nil
+	}
+}
+
+// reconcileHost reconciles ClickHouse host
+func (c *Controller) reconcileHost(host *chop.ChiHost) error {
+	// Add host's Service
+	service := c.creator.CreateServiceHost(host)
+	if err := c.ReconcileService(service); err != nil {
+		return err
+	}
+
+	// Add host's ConfigMap
+	configMap := c.creator.CreateConfigMapHost(host)
+	if err := c.ReconcileConfigMap(configMap); err != nil {
+		return err
+	}
+
+	// Add host's StatefulSet
+	statefulSet := c.creator.CreateStatefulSet(host)
+	if err := c.ReconcileStatefulSet(statefulSet, host); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // reconcileConfigMap reconciles core.ConfigMap
