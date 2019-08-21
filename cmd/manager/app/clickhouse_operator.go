@@ -84,7 +84,7 @@ var (
 func init() {
 	flag.BoolVar(&versionRequest, "version", false, "Display clickhouse-operator version and exit")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
-	flag.StringVar(&kubeConfigFile, "kube-config", "", "Path to kubernetes config file. Only required if called outside of the cluster.")
+	flag.StringVar(&kubeConfigFile, "kubeconfig", "", "Path to kubernetes config file. Only required if called outside of the cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Only required if called outside of the cluster and not being specified in kube config file.")
 	flag.StringVar(&metricsEP, "metrics-endpoint", defaultMetricsEndpoint, "The Prometheus exporter endpoint.")
 	flag.Parse()
@@ -97,9 +97,9 @@ func getConfig(kubeConfigFile, masterURL string) (*kuberest.Config, error) {
 		return kubeclientcmd.BuildConfigFromFlags(masterURL, kubeConfigFile)
 	}
 
-	if len(os.Getenv("KUBE_CONFIG")) > 0 {
+	if len(os.Getenv("KUBECONFIG")) > 0 {
 		// kube config file specified as ENV var
-		return kubeclientcmd.BuildConfigFromFlags(masterURL, os.Getenv("KUBE_CONFIG"))
+		return kubeclientcmd.BuildConfigFromFlags(masterURL, os.Getenv("KUBECONFIG"))
 	}
 
 	if conf, err := kuberest.InClusterConfig(); err == nil {
