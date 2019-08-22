@@ -48,9 +48,9 @@ import (
 
 // Prometheus exporter defaults
 const (
-	defaultMetricsEndpoint = ":8888"
-	metricsPath            = "/metrics"
-	informerFactoryResync  = 30 * time.Second
+	defaultMetricsEndpoint       = ":8888"
+	metricsPath                  = "/metrics"
+	defaultInformerFactoryResync = 10 * time.Second
 )
 
 // Default number of controller threads running concurrently (used in case no other specified in config)
@@ -74,6 +74,9 @@ var (
 
 	// metricsEP defines metrics end-point IP address
 	metricsEP string
+
+	kubeInformetFactoryResync = defaultInformerFactoryResync
+	chopInformerFactoryResync = defaultInformerFactoryResync
 )
 
 var (
@@ -280,12 +283,12 @@ func Run() {
 
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
 		kubeClient,
-		informerFactoryResync,
+		kubeInformetFactoryResync,
 		kubeinformers.WithNamespace(namespace),
 	)
 	chopInformerFactory := chopinformers.NewSharedInformerFactoryWithOptions(
 		chopClient,
-		informerFactoryResync,
+		chopInformerFactoryResync,
 		chopinformers.WithNamespace(namespace),
 	)
 
