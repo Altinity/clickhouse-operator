@@ -33,6 +33,7 @@ func newDeleteOptions() *metav1.DeleteOptions {
 }
 
 // deleteTablesOnHost deletes ClickHouse tables on a host
+// TODO move this into Schemer
 func (c *Controller) deleteTablesOnHost(host *chop.ChiHost) error {
 	// Delete tables on replica
 	tableNames, dropTableSQLs, _ := c.schemer.HostGetDropTables(host)

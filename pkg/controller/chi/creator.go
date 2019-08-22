@@ -256,13 +256,14 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 				// All is good, job done, exit
 				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-OK  :%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 				return nil
-			} else {
+			} else if time.Since(start) >= (60 * time.Second) {
 				// Generation not yet reached
+				// Start bothering with messages after some time only
 				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 			}
 		} else if apierrors.IsNotFound(err) {
 			// Object with such name not found - may be is still being created - wait for it
-			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s) - object not yet created, wait for it", namespace, name)
+			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT: object not yet created, need to wait", namespace, name)
 		} else {
 			// Some kind of total error
 			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
@@ -374,6 +375,34 @@ func (c *Controller) shouldContinueOnUpdateFailed() error {
 
 	// Do not continue update
 	return fmt.Errorf("update stopped due to previous errors")
+}
+
+// createTablesOnHost
+// TODO move this into Schemer
+func (c *Controller) createTablesOnHost(chi *chop.ClickHouseInstallation, host *chop.ChiHost) error {
+	cluster := &chi.Spec.Configuration.Clusters[host.Address.ClusterIndex]
+
+	names, createSQLs, _ := c.schemer.GetCreateReplicatedObjects(chi, cluster, host)
+	glog.V(1).Infof("Creating replicated objects: %v", names)
+	_ = c.schemer.HostApplySQLs(host, createSQLs, true)
+
+	names, createSQLs, _ = c.schemer.ClusterGetCreateDistributedObjects(chi, cluster)
+	glog.V(1).Infof("Creating distributed objects: %v", names)
+	_ = c.schemer.HostApplySQLs(host, createSQLs, true)
+
+	return nil
+}
+
+// createTablesOnShard
+// TODO move this into Schemer
+func (c *Controller) createTablesOnShard(chi *chop.ClickHouseInstallation, shard *chop.ChiShard) error {
+	cluster := &chi.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
+
+	names, createSQLs, _ := c.schemer.ClusterGetCreateDistributedObjects(chi, cluster)
+	glog.V(1).Infof("Creating distributed objects: %v", names)
+	_ = c.schemer.ShardApplySQLs(shard, createSQLs, true)
+
+	return nil
 }
 
 // hasStatefulSetReachedGeneration returns whether has StatefulSet reached the expected generation after upgrade or not

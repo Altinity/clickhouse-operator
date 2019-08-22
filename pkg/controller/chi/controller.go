@@ -553,35 +553,23 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 
 			log := fmt.Sprintf("Added cluster %s", cluster.Name)
 			glog.V(1).Info(log)
-
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 		case chop.ChiShard:
 			shard := diff.Added[path].(chop.ChiShard)
-			cluster := new.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
 
-			log := fmt.Sprintf("Added shard %d to cluster %s", shard.Address.ShardIndex, cluster.Name)
+			log := fmt.Sprintf("Added shard %d to cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName)
 			glog.V(1).Info(log)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 
-			names, createSQLs, _ := c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
-
-			glog.V(1).Infof("Creating distributed objects: %v", names)
-			_ = c.schemer.ShardApplySQLs(&shard, createSQLs, true)
+			_ = c.createTablesOnShard(new, &shard)
 		case chop.ChiHost:
 			host := diff.Added[path].(chop.ChiHost)
-			cluster := new.Spec.Configuration.Clusters[host.Address.ClusterIndex]
 
-			log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, cluster.Name)
+			log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 			glog.V(1).Info(log)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 
-			names, createSQLs, _ := c.schemer.GetCreateReplicatedObjects(new, &cluster, &host)
-			glog.V(1).Infof("Creating replicated objects: %v", names)
-			_ = c.schemer.HostApplySQLs(&host, createSQLs, true)
-
-			names, createSQLs, _ = c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
-			glog.V(1).Infof("Creating distributed objects: %v", names)
-			_ = c.schemer.HostApplySQLs(&host, createSQLs, true)
+			_ = c.createTablesOnHost(new, &host)
 		}
 	}
 
@@ -591,18 +579,18 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		switch diff.Removed[path].(type) {
 		case chop.ChiCluster:
 			cluster := diff.Removed[path].(chop.ChiCluster)
-			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
-				fmt.Sprintf("delete cluster %s", cluster.Name))
+			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete cluster %s", cluster.Name))
+
 			_ = c.deleteCluster(&cluster)
 		case chop.ChiShard:
 			shard := diff.Removed[path].(chop.ChiShard)
-			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
-				fmt.Sprintf("delete shard %d in cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName))
+			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete shard %d in cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName))
+
 			_ = c.deleteShard(&shard)
 		case chop.ChiHost:
 			host := diff.Removed[path].(chop.ChiHost)
-			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
-				fmt.Sprintf("delete replica %d from shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName))
+			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete replica %d from shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName))
+
 			_ = c.deleteHost(&host)
 		}
 	}
