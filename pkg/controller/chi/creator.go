@@ -250,33 +250,37 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
 	start := time.Now()
 	for {
-		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {
-			// Unable to get StatefulSet
-			if apierrors.IsNotFound(err) {
-				// Object with such name not found - may be is still being created - wait for it
-				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s) - object not yet created, wait for it", namespace, name)
-				time.Sleep(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second)
+		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err == nil {
+			if hasStatefulSetReachedGeneration(statefulSet, targetGeneration) {
+				// StatefulSet is available and generation reached
+				// All is good, job done, exit
+				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-OK  :%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
+				return nil
 			} else {
-				// Some kind of total error
-				glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
-				return err
+				// Generation not yet reached
+				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 			}
-		} else if hasStatefulSetReachedGeneration(statefulSet, targetGeneration) {
-			// StatefulSet is available and generation reached
-			// All is good, job done, exit
-			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)OK:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
-			return nil
-		} else if time.Since(start) < (time.Duration(c.chopConfig.StatefulSetUpdateTimeout) * time.Second) {
-			// StatefulSet is available but generation is not yet reached
-			// Wait some more time
-			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s):%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
-			time.Sleep(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second)
+		} else if apierrors.IsNotFound(err) {
+			// Object with such name not found - may be is still being created - wait for it
+			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s) - object not yet created, wait for it", namespace, name)
 		} else {
-			// StatefulSet is available but generation is not yet reached
-			// Timeout reached
-			// Failed, time to quit
+			// Some kind of total error
+			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
+			return err
+		}
+
+		// StatefulSet is either not created or generation is not yet reached
+
+		if time.Since(start) >= (time.Duration(c.chopConfig.StatefulSetUpdateTimeout) * time.Second) {
+			// Timeout reached, no good result available, time to quit
 			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) - TIMEOUT reached", namespace, name)
 			return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - wait timeout", namespace, name))
+		}
+
+		// Wait some more time
+		glog.V(2).Infof("waitStatefulSetGeneration(%s/%s):%s", namespace, name)
+		select {
+		case <-time.After(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second):
 		}
 	}
 }
@@ -374,6 +378,10 @@ func (c *Controller) shouldContinueOnUpdateFailed() error {
 
 // hasStatefulSetReachedGeneration returns whether has StatefulSet reached the expected generation after upgrade or not
 func hasStatefulSetReachedGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
+	if statefulSet == nil {
+		return false
+	}
+
 	// StatefulSet has .spec generation we are waiting for
 	return (statefulSet.Generation == generation) &&
 		// and this .spec generation is being applied to replicas - it is observed right now
