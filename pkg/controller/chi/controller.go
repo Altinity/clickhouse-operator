@@ -513,13 +513,14 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 
 // onUpdateChi sync CHI which was already created earlier
 func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
-	glog.V(1).Infof("onUpdateChi(%s/%s): start", old.Namespace, old.Name)
 
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		glog.V(1).Infof("onUpdateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		glog.V(2).Infof("onUpdateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
 		// No need to react
 		return nil
 	}
+
+	glog.V(1).Infof("onUpdateChi(%s/%s)", old.Namespace, old.Name)
 
 	if !old.IsNormalized() {
 		old, _ = c.normalizer.CreateTemplatedChi(old)
