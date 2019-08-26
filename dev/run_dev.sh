@@ -5,11 +5,11 @@
 
 # Source configuration
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-source "${CUR_DIR}/binary_build_config.sh"
+source "${CUR_DIR}/go_build_operator_config.sh"
 LOG_DIR="${CUR_DIR}/log"
 
 echo -n "Building binary, please wait..."
-if "${CUR_DIR}/binary_build.sh"; then
+if "${CUR_DIR}/go_build_operator.sh"; then
     echo "successfully built clickhouse-operator. Starting"
 
     mkdir -p "${LOG_DIR}"

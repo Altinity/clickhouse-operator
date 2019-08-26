@@ -2,7 +2,12 @@
 
 FROM golang:1.12.7 AS builder
 
+# Install required packages
 RUN apt-get update && apt-get install -y apt-utils gettext-base
+
+# Check $GOPATH, for convenience
+RUN echo "GOPATH=$GOPATH"
+RUN echo "WORKDIR=$GOPATH/src/github.com/altinity/clickhouse-operator"
 
 # Reconstruct source tree inside docker
 WORKDIR $GOPATH/src/github.com/altinity/clickhouse-operator
@@ -12,7 +17,7 @@ RUN go get -u github.com/golang/dep/cmd/dep
 RUN dep ensure --vendor-only
 
 # Build operator binary with explicitly specified output
-RUN OPERATOR_BIN=/tmp/clickhouse-operator ./dev/binary_build.sh
+RUN OPERATOR_BIN=/tmp/clickhouse-operator ./dev/go_build_operator.sh
 
 # === Operator ===
 

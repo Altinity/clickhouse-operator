@@ -5,7 +5,7 @@
 
 # Source configuration
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-source "${CUR_DIR}/binary_build_config.sh"
+source "${CUR_DIR}/go_build_operator_config.sh"
 
 REPO="github.com/altinity/clickhouse-operator"
 VERSION=$(cd "${SRC_ROOT}"; cat release)
