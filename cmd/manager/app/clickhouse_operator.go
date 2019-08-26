@@ -18,7 +18,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"net/http"
+	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"os"
 	"os/signal"
 	"os/user"
@@ -31,7 +31,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 
-	chopmetrics "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
@@ -42,8 +41,6 @@ import (
 	kubeclientcmd "k8s.io/client-go/tools/clientcmd"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Prometheus exporter defaults
@@ -213,18 +210,6 @@ func logConfig(chopConfig *config.Config) {
 	glog.V(1).Infof("Config:\n%s", chopConfig.String())
 }
 
-// startMetricsExporter start Prometheus metrics exporter in background
-func startMetricsExporter(chopConfig *config.Config) *chopmetrics.Exporter {
-	// Initializing Prometheus Metrics Exporter
-	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
-	metricsExporter := chopmetrics.NewExporter(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort)
-	prometheus.MustRegister(metricsExporter)
-	http.Handle(metricsPath, promhttp.Handler())
-	go http.ListenAndServe(metricsEP, nil)
-
-	return metricsExporter
-}
-
 // Run is an entry point of the application
 func Run() {
 	if versionRequest {
@@ -244,8 +229,6 @@ func Run() {
 		os.Exit(1)
 	}
 	logConfig(chopConfig)
-
-	metricsExporter := startMetricsExporter(chopConfig)
 
 	// Set OS signals and termination context
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -311,7 +294,7 @@ func Run() {
 		kubeInformerFactory.Core().V1().ConfigMaps(),
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().Pods(),
-		metricsExporter,
+		metrics.StartMetricsExporter(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort, metricsEP, metricsPath),
 	)
 	chiController.AddEventHandlers(
 		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),

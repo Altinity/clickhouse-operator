@@ -598,7 +598,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	// Update CHI object
 	_ = c.updateCHIResource(new)
 
-	c.metricsExporter.UpdateChi(new.Name, chopmodels.CreatePodFQDNsOfChi(new))
+	c.metricsExporter.UpdateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 
 	return nil
 }

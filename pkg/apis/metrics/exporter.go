@@ -15,31 +15,43 @@
 package metrics
 
 import (
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"net/http"
 	"sync"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const (
-	namespace = "chi"
-	subsystem = "clickhouse"
-)
-
 // Exporter implements prometheus.Collector interface
 type Exporter struct {
 	// chInstallations maps CHI name to list of hostnames (of string type) of this installation
-	chInstallations map[string]*chInstallationData
-	mutex           sync.RWMutex
-	cleanup         sync.Map
-	chAccessInfo    ClickHouseAccessInfo
+	chInstallations chInstallationsIndex
+	chAccessInfo    chAccessInfo
+
+	mutex               sync.RWMutex
+	toRemoveFromWatched sync.Map
 }
 
-type ClickHouseAccessInfo struct {
+// startMetricsExporter start Prometheus metrics exporter in background
+func StartMetricsExporter(username, password string, port int, metricsEP, metricsPath string) *Exporter {
+	// Initializing Prometheus Metrics Exporter
+	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
+	exporter := NewExporter(username, password, port)
+	prometheus.MustRegister(exporter)
+	http.Handle(metricsPath, promhttp.Handler())
+	go http.ListenAndServe(metricsEP, nil)
+
+	return exporter
+}
+
+type chAccessInfo struct {
 	Username string
 	Password string
 	Port     int
 }
+
+type chInstallationsIndex map[string]*chInstallationData
 
 type chInstallationData struct {
 	hostnames []string
@@ -49,22 +61,12 @@ type chInstallationData struct {
 func NewExporter(username, password string, port int) *Exporter {
 	return &Exporter{
 		chInstallations: make(map[string]*chInstallationData),
-		chAccessInfo: ClickHouseAccessInfo{
+		chAccessInfo: chAccessInfo{
 			Username: username,
 			Password: password,
 			Port:     port,
 		},
 	}
-}
-
-// newFetcher returns new Metrics Fetcher for specified host
-func (e *Exporter) newFetcher(hostname string) *Fetcher {
-	return NewFetcher(hostname, e.chAccessInfo.Username, e.chAccessInfo.Password, e.chAccessInfo.Port)
-}
-
-// Describe implements prometheus.Collector Describe method
-func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
-	prometheus.DescribeByCollect(e, ch)
 }
 
 // Collect implements prometheus.Collector Collect method
@@ -77,11 +79,11 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.mutex.Lock()
 	defer func() {
 		e.mutex.Unlock()
-		e.cleanup.Range(func(key, value interface{}) bool {
+		e.toRemoveFromWatched.Range(func(key, value interface{}) bool {
 			switch chiName := key.(type) {
 			case string:
-				e.cleanup.Delete(key)
-				e.removeInstallationReference(chiName)
+				e.toRemoveFromWatched.Delete(key)
+				e.removeFromWatched(chiName)
 			}
 			return true
 		})
@@ -89,54 +91,77 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	glog.Info("Starting Collect")
 	var wg = sync.WaitGroup{}
-	// Getting hostnames of Pods and requesting the metrics data from ClickHouse instances within
-	for chiName := range e.chInstallations {
-		// Loop over all hostnames of this installation
-		glog.Infof("Collecting metrics for %s\n", chiName)
-		for _, hostname := range e.chInstallations[chiName].hostnames {
-			wg.Add(1)
-			go func(name, hostname string, c chan<- prometheus.Metric) {
-				defer wg.Done()
-
-				glog.Infof("Querying metrics for %s\n", hostname)
-				metricsData := make([][]string, 0)
-				fetcher := e.newFetcher(hostname)
-				if err := fetcher.clickHouseQueryMetrics(&metricsData); err != nil {
-					// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-					glog.Infof("Error querying metrics for %s: %s\n", hostname, err)
-					e.cleanup.Store(name, struct{}{})
-					return
-				}
-				glog.Infof("Extracted %d metrics for %s\n", len(metricsData), hostname)
-				writeMetricsDataToPrometheus(c, metricsData, name, hostname)
-
-				glog.Infof("Querying table sizes for %s\n", hostname)
-				tableSizes := make([][]string, 0)
-				if err := fetcher.clickHouseQueryTableSizes(&tableSizes); err != nil {
-					// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-					glog.Infof("Error querying table sizes for %s: %s\n", hostname, err)
-					e.cleanup.Store(name, struct{}{})
-					return
-				}
-				glog.Infof("Extracted %d table sizes for %s\n", len(tableSizes), hostname)
-				writeTableSizesDataToPrometheus(c, tableSizes, name, hostname)
-
-			}(chiName, hostname, ch)
-		}
-	}
+	e.WalkCHIIndex(func(chiName, hostname string) {
+		wg.Add(1)
+		go func(chiName, hostname string, c chan<- prometheus.Metric) {
+			defer wg.Done()
+			e.collectFromHost(chiName, hostname, c)
+		}(chiName, hostname, ch)
+	})
 	wg.Wait()
 	glog.Info("Finished Collect")
 }
 
-// removeInstallationReference deletes record from Exporter.chInstallation map identified by chiName key
-func (e *Exporter) removeInstallationReference(chiName string) {
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
-	delete(e.chInstallations, chiName)
+func (e *Exporter) enqueueToRemoveFromWatched(chiName string) {
+	e.toRemoveFromWatched.Store(chiName, struct{}{})
 }
 
-// UpdateControlledState updates Exporter.chInstallation map with values from chInstances slice
-func (e *Exporter) updateControlledState(chiName string, hostnames []string) {
+// collectFromHost collect metrics from one host and write inito chan
+func (e *Exporter) collectFromHost(chiName, hostname string, c chan<- prometheus.Metric) {
+	fetcher := e.newFetcher(hostname)
+	writer := NewPrometheusWriter(c, chiName, hostname)
+
+	glog.Infof("Querying metrics for %s\n", hostname)
+	if metrics, err := fetcher.clickHouseQueryMetrics(); err == nil {
+		glog.Infof("Extracted %d metrics for %s\n", len(metrics), hostname)
+		writer.WriteMetrics(metrics)
+	} else {
+		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
+		glog.Infof("Error querying metrics for %s: %s\n", hostname, err)
+		e.enqueueToRemoveFromWatched(chiName)
+		return
+	}
+
+	glog.Infof("Querying table sizes for %s\n", hostname)
+	if tableSizes, err := fetcher.clickHouseQueryTableSizes(); err == nil {
+		glog.Infof("Extracted %d table sizes for %s\n", len(tableSizes), hostname)
+		writer.WriteTableSizes(tableSizes)
+	} else {
+		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
+		glog.Infof("Error querying table sizes for %s: %s\n", hostname, err)
+		e.enqueueToRemoveFromWatched(chiName)
+		return
+	}
+}
+
+func (e *Exporter) WalkCHIIndex(f func(chiName, hostname string)) {
+	// Loop over ClickHouseInstallations
+	for chiName := range e.chInstallations {
+		// Loop over all hostnames of this installation
+		for _, hostname := range e.chInstallations[chiName].hostnames {
+			f(chiName, hostname)
+		}
+	}
+}
+
+// Describe implements prometheus.Collector Describe method
+func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
+	prometheus.DescribeByCollect(e, ch)
+}
+
+// removeFromWatched deletes record from Exporter.chInstallation map identified by chiName key
+func (e *Exporter) removeFromWatched(chiName string) {
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+	_, ok := e.chInstallations[chiName]
+	if ok {
+		// CHI is known
+		delete(e.chInstallations, chiName)
+	}
+}
+
+// addToWatched updates Exporter.chInstallation map with values from chInstances slice
+func (e *Exporter) addToWatched(chiName string, hostnames []string) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
@@ -146,18 +171,19 @@ func (e *Exporter) updateControlledState(chiName string, hostnames []string) {
 	copy(e.chInstallations[chiName].hostnames, hostnames)
 }
 
-// ControlledValuesExist returns true if Exporter.chInstallation map contains chiName key
+// isWatched returns true if Exporter.chInstallation map contains chiName key
 // and `hostnames` correspond to Exporter.chInstallations[chiName].hostnames
-func (e *Exporter) controlledValuesExist(chiName string, hostnames []string) bool {
+func (e *Exporter) isWatched(chiName string, hostnames []string) bool {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
 	_, ok := e.chInstallations[chiName]
 	if !ok {
+		// CHI is unknown
 		return false
 	}
 
-	// chiName exists
+	// CHI is known
 
 	// Must have the same number of items
 	if len(hostnames) != len(e.chInstallations[chiName].hostnames) {
@@ -175,10 +201,16 @@ func (e *Exporter) controlledValuesExist(chiName string, hostnames []string) boo
 	return true
 }
 
+// newFetcher returns new Metrics Fetcher for specified host
+func (e *Exporter) newFetcher(hostname string) *ClickHouseFetcher {
+	return NewClickHouseFetcher(hostname, e.chAccessInfo.Username, e.chAccessInfo.Password, e.chAccessInfo.Port)
+}
+
 // Ensure hostnames of the Pods from CHI object included into chopmetrics.Exporter state
-func (e *Exporter) UpdateChi(chiName string, hostnames []string) {
-	if !e.controlledValuesExist(chiName, hostnames) {
+// TODO add namespace handling. It is just skipped for now
+func (e *Exporter) UpdateWatch(namespace, chiName string, hostnames []string) {
+	if !e.isWatched(chiName, hostnames) {
 		glog.V(2).Infof("ClickHouseInstallation (%q): including hostnames into chopmetrics.Exporter", chiName)
-		e.updateControlledState(chiName, hostnames)
+		e.addToWatched(chiName, hostnames)
 	}
 }

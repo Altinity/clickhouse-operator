@@ -85,15 +85,15 @@ const (
 	GROUP BY database, table`
 )
 
-type Fetcher struct {
+type ClickHouseFetcher struct {
 	Hostname string
 	Username string
 	Password string
 	Port     int
 }
 
-func NewFetcher(hostname, username, password string, port int) *Fetcher {
-	return &Fetcher{
+func NewClickHouseFetcher(hostname, username, password string, port int) *ClickHouseFetcher {
+	return &ClickHouseFetcher{
 		Hostname: hostname,
 		Username: username,
 		Password: password,
@@ -101,44 +101,46 @@ func NewFetcher(hostname, username, password string, port int) *Fetcher {
 	}
 }
 
-func (f *Fetcher) newConn() *clickhouse.Conn {
+func (f *ClickHouseFetcher) newConn() *clickhouse.Conn {
 	return clickhouse.New(f.Hostname, f.Username, f.Password, f.Port)
 }
 
 // clickHouseQueryMetrics requests metrics data from the ClickHouse database using REST interface
 // data is a concealed output
-func (f *Fetcher) clickHouseQueryMetrics(data *[][]string) error {
+func (f *ClickHouseFetcher) clickHouseQueryMetrics() ([][]string, error) {
+	data := make([][]string, 0)
 	conn := f.newConn()
 	if rows, err := conn.Query(heredoc.Doc(queryMetricsSQL)); err != nil {
-		return err
+		return nil, err
 	} else {
 		for rows.Next() {
 			var metric, value, description, _type string
 			if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
-				*data = append(*data, []string{metric, value, description, _type})
+				data = append(data, []string{metric, value, description, _type})
 			} else {
 				// Skip erroneous line
 			}
 		}
 	}
-	return nil
+	return data, nil
 }
 
 // clickHouseQueryTableSizes requests data sizes from the ClickHouse database using REST interface
 // data is a concealed output
-func (f *Fetcher) clickHouseQueryTableSizes(data *[][]string) error {
+func (f *ClickHouseFetcher) clickHouseQueryTableSizes() ([][]string, error) {
+	data := make([][]string, 0)
 	conn := f.newConn()
 	if rows, err := conn.Query(heredoc.Doc(queryTableSizesSQL)); err != nil {
-		return err
+		return nil, err
 	} else {
 		for rows.Next() {
 			var database, table, partitions, parts, bytes, uncompressed, _rows string
 			if err := rows.Scan(&database, &table, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
-				*data = append(*data, []string{database, table, partitions, parts, bytes, uncompressed, _rows})
+				data = append(data, []string{database, table, partitions, parts, bytes, uncompressed, _rows})
 			} else {
 				// Skip erroneous line
 			}
 		}
 	}
-	return nil
+	return data, nil
 }
