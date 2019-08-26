@@ -28,24 +28,25 @@ const (
 
 type PrometheusWriter struct {
 	out      chan<- prometheus.Metric
-	chiName  string
+	chi      *WatchedChi
 	hostname string
 }
 
 func NewPrometheusWriter(
 	out chan<- prometheus.Metric,
-	chiName string,
+	chi *WatchedChi,
 	hostname string,
 ) *PrometheusWriter {
 	return &PrometheusWriter{
 		out:      out,
-		chiName:  chiName,
+		chi:      chi,
 		hostname: hostname,
 	}
 }
 
 // writeMetricsDataToPrometheus pushes set of prometheus.Metric objects created from the ClickHouse system data
 // Expected data structure: metric, value, description, type (gauge|counter)
+// TODO add namespace handling. It is just skipped for now
 func (w *PrometheusWriter) WriteMetrics(data [][]string) {
 	for _, metric := range data {
 		if len(metric) < 2 {
@@ -63,7 +64,7 @@ func (w *PrometheusWriter) WriteMetrics(data [][]string) {
 			metric[1],
 			metricType,
 			[]string{"chi", "hostname"},
-			w.chiName,
+			w.chi.Name,
 			w.hostname,
 		)
 	}
@@ -71,6 +72,7 @@ func (w *PrometheusWriter) WriteMetrics(data [][]string) {
 
 // writeTableSizesDataToPrometheus pushes set of prometheus.Metric objects created from the ClickHouse system data
 // Expected data structure: database, table, partitions, parts, bytes, uncompressed_bytes, rows
+// TODO add namespace handling. It is just skipped for now
 func (w *PrometheusWriter) WriteTableSizes(data [][]string) {
 	for _, metric := range data {
 		if len(metric) < 2 {
@@ -78,19 +80,19 @@ func (w *PrometheusWriter) WriteTableSizes(data [][]string) {
 		}
 		writeSingleMetricToPrometheus(w.out, "table_partitions", "Number of partitions of the table", metric[2], prometheus.GaugeValue,
 			[]string{"chi", "hostname", "database", "table"},
-			w.chiName, w.hostname, metric[0], metric[1])
+			w.chi.Name, w.hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(w.out, "table_parts", "Number of parts of the table", metric[3], prometheus.GaugeValue,
 			[]string{"chi", "hostname", "database", "table"},
-			w.chiName, w.hostname, metric[0], metric[1])
+			w.chi.Name, w.hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(w.out, "table_parts_bytes", "Table size in bytes", metric[4], prometheus.GaugeValue,
 			[]string{"chi", "hostname", "database", "table"},
-			w.chiName, w.hostname, metric[0], metric[1])
+			w.chi.Name, w.hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(w.out, "table_parts_bytes_uncompressed", "Table size in bytes uncompressed", metric[5], prometheus.GaugeValue,
 			[]string{"chi", "hostname", "database", "table"},
-			w.chiName, w.hostname, metric[0], metric[1])
+			w.chi.Name, w.hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(w.out, "table_parts_rows", "Number of rows in the table", metric[6], prometheus.GaugeValue,
 			[]string{"chi", "hostname", "database", "table"},
-			w.chiName, w.hostname, metric[0], metric[1])
+			w.chi.Name, w.hostname, metric[0], metric[1])
 	}
 }
 
