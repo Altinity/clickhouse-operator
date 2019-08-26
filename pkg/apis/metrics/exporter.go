@@ -136,7 +136,7 @@ func (e *Exporter) removeInstallationReference(chiName string) {
 }
 
 // UpdateControlledState updates Exporter.chInstallation map with values from chInstances slice
-func (e *Exporter) UpdateControlledState(chiName string, hostnames []string) {
+func (e *Exporter) updateControlledState(chiName string, hostnames []string) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
@@ -148,7 +148,7 @@ func (e *Exporter) UpdateControlledState(chiName string, hostnames []string) {
 
 // ControlledValuesExist returns true if Exporter.chInstallation map contains chiName key
 // and `hostnames` correspond to Exporter.chInstallations[chiName].hostnames
-func (e *Exporter) ControlledValuesExist(chiName string, hostnames []string) bool {
+func (e *Exporter) controlledValuesExist(chiName string, hostnames []string) bool {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
@@ -175,9 +175,10 @@ func (e *Exporter) ControlledValuesExist(chiName string, hostnames []string) boo
 	return true
 }
 
-func (e *Exporter) EnsureControlledValues(chiName string, hostnames []string) {
-	if !e.ControlledValuesExist(chiName, hostnames) {
+// Ensure hostnames of the Pods from CHI object included into chopmetrics.Exporter state
+func (e *Exporter) UpdateChi(chiName string, hostnames []string) {
+	if !e.controlledValuesExist(chiName, hostnames) {
 		glog.V(2).Infof("ClickHouseInstallation (%q): including hostnames into chopmetrics.Exporter", chiName)
-		e.UpdateControlledState(chiName, hostnames)
+		e.updateControlledState(chiName, hostnames)
 	}
 }

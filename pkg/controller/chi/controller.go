@@ -598,8 +598,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	// Update CHI object
 	_ = c.updateCHIResource(new)
 
-	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
-	c.metricsExporter.EnsureControlledValues(new.Name, chopmodels.CreatePodFQDNsOfChi(new))
+	c.metricsExporter.UpdateChi(new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 
 	return nil
 }
