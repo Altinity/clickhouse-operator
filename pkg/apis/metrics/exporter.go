@@ -15,14 +15,10 @@
 package metrics
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
 	"sync"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Exporter implements prometheus.Collector interface
@@ -36,13 +32,17 @@ type Exporter struct {
 }
 
 type WatchedChi struct {
-	Namespace string   `json: namespace`
-	Name      string   `json: name`
-	Hostnames []string `json: hostnames`
+	Namespace string   `json:"namespace"`
+	Name      string   `json:"name"`
+	Hostnames []string `json:"hostnames"`
 }
 
 func (chi *WatchedChi) indexKey() string {
 	return chi.Namespace + ":" + chi.Name
+}
+
+func (chi *WatchedChi) empty() bool {
+	return (len(chi.Namespace) == 0) && (len(chi.Name) == 0) && (len(chi.Hostnames) == 0)
 }
 
 func (chi *WatchedChi) equal(chi2 *WatchedChi) bool {
@@ -74,19 +74,6 @@ func (chi *WatchedChi) equal(chi2 *WatchedChi) bool {
 
 var exporter *Exporter
 
-// startMetricsExporter start Prometheus metrics exporter in background
-func StartMetricsExporter(username, password string, port int, metricsEP, metricsPath string) *Exporter {
-	// Initializing Prometheus Metrics Exporter
-	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsEP, metricsPath)
-	exporter = NewExporter(username, password, port)
-	prometheus.MustRegister(exporter)
-	http.Handle(metricsPath, promhttp.Handler())
-	http.Handle("/chi", exporter)
-	go http.ListenAndServe(metricsEP, nil)
-
-	return exporter
-}
-
 type chAccessInfo struct {
 	Username string
 	Password string
@@ -96,7 +83,7 @@ type chAccessInfo struct {
 type chInstallationsIndex map[string]*WatchedChi
 
 func (i chInstallationsIndex) Slice() []*WatchedChi {
-	res := make([]*WatchedChi, len(i))
+	res := make([]*WatchedChi, 0)
 	for _, chi := range i {
 		res = append(res, chi)
 	}
@@ -150,34 +137,6 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 func (e *Exporter) enqueueToRemoveFromWatched(chi *WatchedChi) {
 	e.toRemoveFromWatched.Store(chi, struct{}{})
-}
-
-// collectFromHost collect metrics from one host and write inito chan
-func (e *Exporter) collectFromHost(chi *WatchedChi, hostname string, c chan<- prometheus.Metric) {
-	fetcher := e.newFetcher(hostname)
-	writer := NewPrometheusWriter(c, chi, hostname)
-
-	glog.Infof("Querying metrics for %s\n", hostname)
-	if metrics, err := fetcher.clickHouseQueryMetrics(); err == nil {
-		glog.Infof("Extracted %d metrics for %s\n", len(metrics), hostname)
-		writer.WriteMetrics(metrics)
-	} else {
-		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		glog.Infof("Error querying metrics for %s: %s\n", hostname, err)
-		e.enqueueToRemoveFromWatched(chi)
-		return
-	}
-
-	glog.Infof("Querying table sizes for %s\n", hostname)
-	if tableSizes, err := fetcher.clickHouseQueryTableSizes(); err == nil {
-		glog.Infof("Extracted %d table sizes for %s\n", len(tableSizes), hostname)
-		writer.WriteTableSizes(tableSizes)
-	} else {
-		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		glog.Infof("Error querying table sizes for %s: %s\n", hostname, err)
-		e.enqueueToRemoveFromWatched(chi)
-		return
-	}
 }
 
 func (e *Exporter) WalkWatchedChi(f func(chi *WatchedChi, hostname string)) {
@@ -241,34 +200,30 @@ func (e *Exporter) UpdateWatch(namespace, chiName string, hostnames []string) {
 	e.addToWatched(chi)
 }
 
-func (e *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/chi" {
-		http.Error(w, "404 not found.", http.StatusNotFound)
+// collectFromHost collect metrics from one host and write inito chan
+func (e *Exporter) collectFromHost(chi *WatchedChi, hostname string, c chan<- prometheus.Metric) {
+	fetcher := e.newFetcher(hostname)
+	writer := NewPrometheusWriter(c, chi, hostname)
+
+	glog.Infof("Querying metrics for %s\n", hostname)
+	if metrics, err := fetcher.clickHouseQueryMetrics(); err == nil {
+		glog.Infof("Extracted %d metrics for %s\n", len(metrics), hostname)
+		writer.WriteMetrics(metrics)
+	} else {
+		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
+		glog.Infof("Error querying metrics for %s: %s\n", hostname, err)
+		e.enqueueToRemoveFromWatched(chi)
 		return
 	}
 
-	switch r.Method {
-	case "GET":
-		e.getWatchedChi(w, r)
-	case "POST":
-		e.addWatchedChi(w, r)
-	default:
-		fmt.Fprintf(w, "Sorry, only GET and POST methods are supported.")
-	}
-}
-
-func (e *Exporter) getWatchedChi(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(exporter.chInstallations.Slice())
-}
-
-func (e *Exporter) addWatchedChi(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	chi := &WatchedChi{}
-	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
-		exporter.addToWatched(chi)
-		json.NewEncoder(w).Encode(chi)
+	glog.Infof("Querying table sizes for %s\n", hostname)
+	if tableSizes, err := fetcher.clickHouseQueryTableSizes(); err == nil {
+		glog.Infof("Extracted %d table sizes for %s\n", len(tableSizes), hostname)
+		writer.WriteTableSizes(tableSizes)
 	} else {
-		http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
+		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
+		glog.Infof("Error querying table sizes for %s: %s\n", hostname, err)
+		e.enqueueToRemoveFromWatched(chi)
+		return
 	}
 }

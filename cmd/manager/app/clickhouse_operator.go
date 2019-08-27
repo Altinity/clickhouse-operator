@@ -294,7 +294,11 @@ func Run() {
 		kubeInformerFactory.Core().V1().ConfigMaps(),
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().Pods(),
-		metrics.StartMetricsExporter(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort, metricsEP, metricsPath),
+		metrics.StartMetricsREST(
+			chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort,
+			metricsEP, metricsPath,
+			metricsEP, "/chi",
+		),
 	)
 	chiController.AddEventHandlers(
 		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),

@@ -598,9 +598,18 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	// Update CHI object
 	_ = c.updateCHIResource(new)
 
-	c.metricsExporter.UpdateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
+	//c.metricsExporter.UpdateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
+	go c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 
 	return nil
+}
+
+func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
+	if err := c.metricsExporter.UpdateWatchREST(namespace, name, hostnames); err != nil {
+		glog.V(1).Infof("FAIL update watch (%s/%s): %q", namespace, name, err)
+	} else {
+		glog.V(1).Infof("OK update watch (%s/%s)", namespace, name)
+	}
 }
 
 func (c *Controller) onDeleteChi(chi *chop.ClickHouseInstallation) error {
