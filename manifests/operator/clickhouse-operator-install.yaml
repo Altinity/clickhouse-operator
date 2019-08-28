@@ -858,6 +858,7 @@ data:
 #
 # kube-system
 # altinity/clickhouse-operator:latest
+# altinity/metrics-exporter:latest
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -962,7 +963,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: 
+          image: altinity/metrics-exporter:latest
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder

@@ -11,7 +11,7 @@ MINIKUBE="${MINIKUBE:-no}"
 # Source-dependent options
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 SRC_ROOT="$(realpath "${CUR_DIR}/..")"
-DOCKERFILE_DIR="${SRC_ROOT}/dev/dockerfile/metrics-exporter"
+DOCKERFILE_DIR="${SRC_ROOT}/dockerfile/metrics-exporter"
 DOCKERFILE="${DOCKERFILE_DIR}/Dockerfile"
 
 # Build clickhouse-operator install .yaml manifest
