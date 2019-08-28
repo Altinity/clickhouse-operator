@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build clickhouse-operator
+# Build metrics-exporter
 # Do not forget to update version
 
 # Source configuration
@@ -14,8 +14,8 @@ source "${CUR_DIR}/go_build_config.sh"
 if CGO_ENABLED=0 go build \
     -a \
     -ldflags "-X ${REPO}/pkg/version.Version=${VERSION} -X ${REPO}/pkg/version.GitSHA=${GIT_SHA}" \
-    -o "${OPERATOR_BIN}" \
-    "${SRC_ROOT}/cmd/manager/main.go"; then
+    -o "${METRICS_EXPORTER_BIN}" \
+    "${SRC_ROOT}/cmd/metrics-exporter/main.go"; then
     echo "Build OK"
 else
     echo "WARNING! BUILD FAILED!"

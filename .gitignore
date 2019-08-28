@@ -16,4 +16,7 @@
 
 # Skip log folder
 log
+
+# Skip dev runtime-produced
+dev/bin
 dev/log

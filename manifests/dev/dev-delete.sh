@@ -4,13 +4,13 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 source "${CUR_DIR}/dev-config.sh"
 
-if [[ "${CHOPERATOR_NAMESPACE}" == "kube-system" ]]; then
+if [[ "${OPERATOR_NAMESPACE}" == "kube-system" ]]; then
     echo "Default k8s namespace 'kube-system' must not be deleted"
 
-elif kubectl get namespace "${CHOPERATOR_NAMESPACE}"; then
-    echo "Delete ClickHouse Operator namespace ${CHOPERATOR_NAMESPACE}"
-    kubectl delete namespace "${CHOPERATOR_NAMESPACE}"
+elif kubectl get namespace "${OPERATOR_NAMESPACE}"; then
+    echo "Delete ClickHouse Operator namespace ${OPERATOR_NAMESPACE}"
+    kubectl delete namespace "${OPERATOR_NAMESPACE}"
 
 else
-    echo "No namespace ${CHOPERATOR_NAMESPACE} available"
+    echo "No namespace ${OPERATOR_NAMESPACE} available"
 fi
