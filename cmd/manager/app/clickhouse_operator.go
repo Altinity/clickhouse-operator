@@ -18,7 +18,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"os"
 	"os/signal"
 	"os/user"
@@ -205,11 +204,6 @@ func logRuntimeParams() {
 	}
 }
 
-// logConfig writes Config into log
-func logConfig(chopConfig *config.Config) {
-	glog.V(1).Infof("Config:\n%s", chopConfig.String())
-}
-
 // Run is an entry point of the application
 func Run() {
 	if versionRequest {
@@ -228,7 +222,7 @@ func Run() {
 		glog.Fatalf("Unable to build config file %v\n", err)
 		os.Exit(1)
 	}
-	logConfig(chopConfig)
+	chopConfig.WriteToLog()
 
 	// Set OS signals and termination context
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -294,11 +288,6 @@ func Run() {
 		kubeInformerFactory.Core().V1().ConfigMaps(),
 		kubeInformerFactory.Apps().V1().StatefulSets(),
 		kubeInformerFactory.Core().V1().Pods(),
-		metrics.StartMetricsREST(
-			chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort,
-			metricsEP, metricsPath,
-			metricsEP, "/chi",
-		),
 	)
 	chiController.AddEventHandlers(
 		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),

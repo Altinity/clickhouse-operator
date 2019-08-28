@@ -421,6 +421,11 @@ func (config *Config) String() string {
 	return b.String()
 }
 
+// WriteToLog writes Config into log
+func (config *Config) WriteToLog() {
+	glog.V(1).Infof("Config:\n%s", config.String())
+}
+
 // stringSlice returns string of named []string Config param
 func (config *Config) stringSlice(name string, sl []string) string {
 	b := &bytes.Buffer{}

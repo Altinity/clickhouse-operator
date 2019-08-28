@@ -20,7 +20,6 @@ import (
 	"time"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmetrics "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	choplisters "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 	kube "k8s.io/client-go/kubernetes"
@@ -79,8 +78,6 @@ type Controller struct {
 	queue workqueue.RateLimitingInterface
 	// not used explicitly
 	recorder record.EventRecorder
-	// export metrics to Prometheus
-	metricsExporter *chopmetrics.Exporter
 }
 
 const (

@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmetrics "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
+	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/clickhouse.altinity.com/v1"
@@ -56,7 +56,6 @@ func NewController(
 	configMapInformer coreinformers.ConfigMapInformer,
 	statefulSetInformer appsinformers.StatefulSetInformer,
 	podInformer coreinformers.PodInformer,
-	chopMetricsExporter *chopmetrics.Exporter,
 ) *Controller {
 
 	// Initializations
@@ -101,7 +100,6 @@ func NewController(
 		podListerSynced:         podInformer.Informer().HasSynced,
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
 		recorder:                recorder,
-		metricsExporter:         chopMetricsExporter,
 	}
 
 	return controller
@@ -514,14 +512,6 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 // onUpdateChi sync CHI which was already created earlier
 func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 
-	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		glog.V(2).Infof("onUpdateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
-		// No need to react
-		return nil
-	}
-
-	glog.V(1).Infof("onUpdateChi(%s/%s)", old.Namespace, old.Name)
-
 	if !old.IsNormalized() {
 		old, _ = c.normalizer.CreateTemplatedChi(old)
 	}
@@ -529,6 +519,18 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	if !new.IsNormalized() {
 		new, _ = c.normalizer.CreateTemplatedChi(new)
 	}
+
+	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
+		glog.V(2).Infof("onUpdateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		// No need to react
+
+		// Update hostnames list for monitor
+		c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
+
+		return nil
+	}
+
+	glog.V(1).Infof("onUpdateChi(%s/%s)", old.Namespace, old.Name)
 
 	diff, equal := messagediff.DeepDiff(old, new)
 
@@ -599,13 +601,17 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	_ = c.updateCHIResource(new)
 
 	//c.metricsExporter.UpdateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
-	go c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
+	c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 
 	return nil
 }
 
 func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
-	if err := c.metricsExporter.UpdateWatchREST(namespace, name, hostnames); err != nil {
+	go c.updateWatchAsync(namespace, name, hostnames)
+}
+
+func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string) {
+	if err := metrics.UpdateWatchREST(namespace, name, hostnames); err != nil {
 		glog.V(1).Infof("FAIL update watch (%s/%s): %q", namespace, name, err)
 	} else {
 		glog.V(1).Infof("OK update watch (%s/%s)", namespace, name)

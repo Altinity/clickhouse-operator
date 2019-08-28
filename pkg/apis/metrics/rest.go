@@ -83,7 +83,7 @@ func (e *Exporter) addWatchedChi(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
 }
 
-func (e *Exporter) UpdateWatchREST(namespace, chiName string, hostnames []string) error {
+func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
 	chi := &WatchedChi{
 		Namespace: namespace,
 		Name:      chiName,
@@ -102,12 +102,12 @@ func (e *Exporter) UpdateWatchREST(namespace, chiName string, hostnames []string
 		return err
 	}
 	//req.SetBasicAuth(s.Username, s.Password)
-	_, err = e.doRequest(req)
+	_, err = doRequest(req)
 
 	return err
 }
 
-func (e *Exporter) doRequest(req *http.Request) ([]byte, error) {
+func doRequest(req *http.Request) ([]byte, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
