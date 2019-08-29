@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
@@ -295,12 +294,12 @@ func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulS
 
 	// What to do with StatefulSet - look into chop configuration settings
 	switch c.chopConfig.OnStatefulSetCreateFailureAction {
-	case config.OnStatefulSetCreateFailureActionAbort:
+	case chop.OnStatefulSetCreateFailureActionAbort:
 		// Do nothing, just report appropriate error
 		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - abort", namespace, name)
 		return errors.New(fmt.Sprintf("Create failed on %s/%s", namespace, name))
 
-	case config.OnStatefulSetCreateFailureActionDelete:
+	case chop.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully problematic failed StatefulSet
 		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to DELETE FAILED StatefulSet", namespace, name)
 		_ = c.deleteHost(host)
@@ -320,12 +319,12 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 
 	// What to do with StatefulSet - look into chop configuration settings
 	switch c.chopConfig.OnStatefulSetUpdateFailureAction {
-	case config.OnStatefulSetUpdateFailureActionAbort:
+	case chop.OnStatefulSetUpdateFailureActionAbort:
 		// Do nothing, just report appropriate error
 		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort", namespace, name)
 		return errors.New(fmt.Sprintf("Update failed on %s/%s", namespace, name))
 
-	case config.OnStatefulSetUpdateFailureActionRollback:
+	case chop.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
 		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - going to ROLLBACK FAILED StatefulSet", namespace, name)
 		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {

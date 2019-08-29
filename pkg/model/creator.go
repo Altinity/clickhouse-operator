@@ -17,7 +17,6 @@ package model
 import (
 	"fmt"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -31,7 +30,7 @@ import (
 type Creator struct {
 	appVersion                string
 	chi                       *chiv1.ClickHouseInstallation
-	chopConfig                *config.Config
+	chopConfig                *chiv1.Config
 	chConfigGenerator         *ClickHouseConfigGenerator
 	chConfigSectionsGenerator *configSections
 	labeler                   *Labeler
@@ -39,7 +38,7 @@ type Creator struct {
 
 func NewCreator(
 	chi *chiv1.ClickHouseInstallation,
-	chopConfig *config.Config,
+	chopConfig *chiv1.Config,
 	appVersion string,
 ) *Creator {
 	creator := &Creator{

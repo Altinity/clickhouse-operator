@@ -37,6 +37,17 @@ type ClickHouseInstallation struct {
 
 type ClickHouseInstallationTemplate ClickHouseInstallation
 
+// +genclient
+// +genclient:noStatus
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type ClickHouseOperatorConfiguration struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              Config `json:"spec"`
+	Status            string `json:"status"`
+}
+
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
 	Defaults      ChiDefaults      `json:"defaults,omitempty"  yaml:"defaults"`
@@ -288,8 +299,101 @@ type ClickHouseInstallationTemplateList struct {
 	Items           []ClickHouseInstallationTemplate `json:"items"`
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type ClickHouseOperatorConfigurationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+	Items           []ClickHouseOperatorConfiguration `json:"items"`
+}
+
 const (
 	// ClickHouseInstallationCRDResourceKind defines kind of CRD resource
 	ClickHouseInstallationCRDResourceKind         = "ClickHouseInstallation"
 	ClickHouseInstallationTemplateCRDResourceKind = "ClickHouseInstallationTemplate"
+	ClickHouseOperatorCRDResourceKind             = "ClickHouseOperator"
+)
+
+// !!! IMPORTANT !!!
+// !!! IMPORTANT !!!
+// !!! IMPORTANT !!!
+// !!! IMPORTANT !!!
+// !!! IMPORTANT !!!
+// Do not forget to update func (config *Config) String()
+// Do not forget to update CRD spec
+type Config struct {
+	// Full path to the config file and folder where this Config originates from
+	ConfigFilePath   string
+	ConfigFolderPath string
+
+	// WatchNamespaces where operator watches for events
+	WatchNamespaces []string `json:"watchNamespaces" yaml:"watchNamespaces"`
+
+	// Paths where to look for additional ClickHouse config .xml files to be mounted into Pod
+	// config.d
+	// conf.d
+	// users.d
+	// respectively
+	ChCommonConfigsPath string `json:"chCommonConfigsPath" yaml:"chCommonConfigsPath"`
+	ChHostConfigsPath   string `json:"chHostConfigsPath"   yaml:"chHostConfigsPath"`
+	ChUsersConfigsPath  string `json:"chUsersConfigsPath"  yaml:"chUsersConfigsPath"`
+	// Config files fetched from these paths. Maps "file name->file content"
+	ChCommonConfigs map[string]string
+	ChHostConfigs   map[string]string
+	ChUsersConfigs  map[string]string
+
+	// Path where to look for ClickHouseInstallation templates .yaml files
+	ChiTemplatesPath string `json:"chiTemplatesPath" yaml:"chiTemplatesPath"`
+	// Chi template files fetched from this path. Maps "file name->file content"
+	ChiTemplateFiles map[string]string
+	// Chi template objects unmarshalled from ChiTemplateFiles. Maps "metadata.name->object"
+	ChiTemplates map[string]*ClickHouseInstallation
+	// ClickHouseInstallation template
+	ChiTemplate *ClickHouseInstallation
+
+	// Create/Update StatefulSet behavior - for how long to wait for StatefulSet to reach new Generation
+	StatefulSetUpdateTimeout uint64 `json:"statefulSetUpdateTimeout" yaml:"statefulSetUpdateTimeout"`
+	// Create/Update StatefulSet behavior - for how long to sleep while polling StatefulSet to reach new Generation
+	StatefulSetUpdatePollPeriod uint64 `json:"statefulSetUpdatePollPeriod" yaml:"statefulSetUpdatePollPeriod"`
+
+	// Rolling Create/Update behavior
+	// StatefulSet create behavior - what to do in case StatefulSet can't reach new Generation
+	OnStatefulSetCreateFailureAction string `json:"onStatefulSetCreateFailureAction" yaml:"onStatefulSetCreateFailureAction"`
+	// StatefulSet update behavior - what to do in case StatefulSet can't reach new Generation
+	OnStatefulSetUpdateFailureAction string `json:"onStatefulSetUpdateFailureAction" yaml:"onStatefulSetUpdateFailureAction"`
+
+	// Default values for ClickHouse user configuration
+	// 1. user/profile - string
+	// 2. user/quota - string
+	// 3. user/networks/ip - multiple strings
+	// 4. user/password - string
+	ChConfigUserDefaultProfile    string   `json:"chConfigUserDefaultProfile"    yaml:"chConfigUserDefaultProfile"`
+	ChConfigUserDefaultQuota      string   `json:"chConfigUserDefaultQuota"      yaml:"chConfigUserDefaultQuota"`
+	ChConfigUserDefaultNetworksIP []string `json:"chConfigUserDefaultNetworksIP" yaml:"chConfigUserDefaultNetworksIP"`
+	ChConfigUserDefaultPassword   string   `json:"chConfigUserDefaultPassword"   yaml:"chConfigUserDefaultPassword"`
+
+	// Username and Password to be used by operator to connect to ClickHouse instances for
+	// 1. Metrics requests
+	// 2. Schema maintenance
+	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
+	ChUsername string `json:"chUsername" yaml:"chUsername"`
+	ChPassword string `json:"chPassword" yaml:"chPassword"`
+	ChPort     int    `json:"chPort"     yaml:"chPort""`
+}
+
+const (
+	// What to do in case StatefulSet can't reach new Generation - abort rolling create
+	OnStatefulSetCreateFailureActionAbort = "abort"
+
+	// What to do in case StatefulSet can't reach new Generation - delete newly created problematic StatefulSet
+	OnStatefulSetCreateFailureActionDelete = "delete"
+)
+
+const (
+	// What to do in case StatefulSet can't reach new Generation - abort rolling update
+	OnStatefulSetUpdateFailureActionAbort = "abort"
+
+	// What to do in case StatefulSet can't reach new Generation - delete Pod and rollback StatefulSet to previous Generation
+	// Pod would be recreated by StatefulSet based on rollback-ed configuration
+	OnStatefulSetUpdateFailureActionRollback = "rollback"
 )

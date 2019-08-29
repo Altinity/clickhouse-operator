@@ -33,3 +33,11 @@ type ClickHouseInstallationTemplateListerExpansion interface{}
 // ClickHouseInstallationTemplateNamespaceListerExpansion allows custom methods to be added to
 // ClickHouseInstallationTemplateNamespaceLister.
 type ClickHouseInstallationTemplateNamespaceListerExpansion interface{}
+
+// ClickHouseOperatorConfigurationListerExpansion allows custom methods to be added to
+// ClickHouseOperatorConfigurationLister.
+type ClickHouseOperatorConfigurationListerExpansion interface{}
+
+// ClickHouseOperatorConfigurationNamespaceListerExpansion allows custom methods to be added to
+// ClickHouseOperatorConfigurationNamespaceLister.
+type ClickHouseOperatorConfigurationNamespaceListerExpansion interface{}

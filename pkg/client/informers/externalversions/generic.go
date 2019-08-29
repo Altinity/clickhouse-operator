@@ -57,6 +57,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Clickhouse().V1().ClickHouseInstallations().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("clickhouseinstallationtemplates"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Clickhouse().V1().ClickHouseInstallationTemplates().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("clickhouseoperatorconfigurations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer()}, nil
 
 	}
 

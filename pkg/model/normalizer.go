@@ -16,7 +16,6 @@ package model
 
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopconfig "github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"k8s.io/api/core/v1"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,11 +26,11 @@ import (
 )
 
 type Normalizer struct {
-	config *chopconfig.Config
+	config *chiv1.Config
 	chi    *chiv1.ClickHouseInstallation
 }
 
-func NewNormalizer(config *chopconfig.Config) *Normalizer {
+func NewNormalizer(config *chiv1.Config) *Normalizer {
 	return &Normalizer{
 		config: config,
 	}

@@ -15,7 +15,6 @@
 package chi
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"time"
 
@@ -39,7 +38,7 @@ type Controller struct {
 	creator       *model.Creator
 
 	// chopConfig used to keep clickhouse-oprator config
-	chopConfig *config.Config
+	chopConfig *chop.Config
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 	kubeClient kube.Interface
 	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)

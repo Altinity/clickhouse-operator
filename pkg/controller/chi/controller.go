@@ -22,7 +22,6 @@ import (
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/config"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -46,7 +45,7 @@ import (
 func NewController(
 	version string,
 	runtimeParams map[string]string,
-	chopConfig *config.Config,
+	chopConfig *chop.Config,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
 	chiInformer chopinformers.ClickHouseInstallationInformer,
@@ -59,7 +58,7 @@ func NewController(
 ) *Controller {
 
 	// Initializations
-	chopclientsetscheme.AddToScheme(scheme.Scheme)
+	_ = chopclientsetscheme.AddToScheme(scheme.Scheme)
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(
