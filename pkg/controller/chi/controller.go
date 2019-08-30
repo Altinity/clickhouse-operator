@@ -21,7 +21,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
-	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/clickhouse.altinity.com/v1"
+	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -29,8 +29,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	appsinformers "k8s.io/client-go/informers/apps/v1"
-	coreinformers "k8s.io/client-go/informers/core/v1"
+	kubeinformers "k8s.io/client-go/informers"
 	kube "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -48,13 +47,8 @@ func NewController(
 	chopConfig *chop.Config,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
-	chiInformer chopinformers.ClickHouseInstallationInformer,
-	chitInformer chopinformers.ClickHouseInstallationTemplateInformer,
-	serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer,
-	configMapInformer coreinformers.ConfigMapInformer,
-	statefulSetInformer appsinformers.StatefulSetInformer,
-	podInformer coreinformers.PodInformer,
+	chopInformerFactory chopinformers.SharedInformerFactory,
+	kubeInformerFactory kubeinformers.SharedInformerFactory,
 ) *Controller {
 
 	// Initializations
@@ -83,37 +77,34 @@ func NewController(
 		chopConfig:              chopConfig,
 		kubeClient:              kubeClient,
 		chopClient:              chopClient,
-		chiLister:               chiInformer.Lister(),
-		chiListerSynced:         chiInformer.Informer().HasSynced,
-		chitLister:              chitInformer.Lister(),
-		chitListerSynced:        chitInformer.Informer().HasSynced,
-		serviceLister:           serviceInformer.Lister(),
-		serviceListerSynced:     serviceInformer.Informer().HasSynced,
-		endpointsLister:         endpointsInformer.Lister(),
-		endpointsListerSynced:   endpointsInformer.Informer().HasSynced,
-		configMapLister:         configMapInformer.Lister(),
-		configMapListerSynced:   configMapInformer.Informer().HasSynced,
-		statefulSetLister:       statefulSetInformer.Lister(),
-		statefulSetListerSynced: statefulSetInformer.Informer().HasSynced,
-		podLister:               podInformer.Lister(),
-		podListerSynced:         podInformer.Informer().HasSynced,
+		chiLister:               chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Lister(),
+		chiListerSynced:         chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().HasSynced,
+		chitLister:              chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Lister(),
+		chitListerSynced:        chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Informer().HasSynced,
+		serviceLister:           kubeInformerFactory.Core().V1().Services().Lister(),
+		serviceListerSynced:     kubeInformerFactory.Core().V1().Services().Informer().HasSynced,
+		endpointsLister:         kubeInformerFactory.Core().V1().Endpoints().Lister(),
+		endpointsListerSynced:   kubeInformerFactory.Core().V1().Endpoints().Informer().HasSynced,
+		configMapLister:         kubeInformerFactory.Core().V1().ConfigMaps().Lister(),
+		configMapListerSynced:   kubeInformerFactory.Core().V1().ConfigMaps().Informer().HasSynced,
+		statefulSetLister:       kubeInformerFactory.Apps().V1().StatefulSets().Lister(),
+		statefulSetListerSynced: kubeInformerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
+		podLister:               kubeInformerFactory.Core().V1().Pods().Lister(),
+		podListerSynced:         kubeInformerFactory.Core().V1().Pods().Informer().HasSynced,
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
 		recorder:                recorder,
 	}
 
+	controller.addEventHandlers(chopInformerFactory,kubeInformerFactory)
+
 	return controller
 }
 
-func (c *Controller) AddEventHandlers(
-	chiInformer chopinformers.ClickHouseInstallationInformer,
-	chitInformer chopinformers.ClickHouseInstallationTemplateInformer,
-	serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer,
-	configMapInformer coreinformers.ConfigMapInformer,
-	statefulSetInformer appsinformers.StatefulSetInformer,
-	podInformer coreinformers.PodInformer,
+func (c *Controller) addEventHandlers(
+	chopInformerFactory chopinformers.SharedInformerFactory,
+	kubeInformerFactory kubeinformers.SharedInformerFactory,
 ) {
-	chiInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chi := obj.(*chop.ClickHouseInstallation)
 			if !c.chopConfig.IsWatchedNamespace(chi.Namespace) {
@@ -141,7 +132,7 @@ func (c *Controller) AddEventHandlers(
 		},
 	})
 
-	chitInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chit := obj.(*chop.ClickHouseInstallationTemplate)
 			if !c.chopConfig.IsWatchedNamespace(chit.Namespace) {
@@ -169,7 +160,7 @@ func (c *Controller) AddEventHandlers(
 		},
 	})
 
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	kubeInformerFactory.Core().V1().Services().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
 			if !c.isTrackedObject(&service.ObjectMeta) {
@@ -228,7 +219,7 @@ func (c *Controller) AddEventHandlers(
 		},
 	})
 
-	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	kubeInformerFactory.Core().V1().Endpoints().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			endpoints := obj.(*core.Endpoints)
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
@@ -286,7 +277,7 @@ func (c *Controller) AddEventHandlers(
 		},
 	})
 
-	configMapInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	kubeInformerFactory.Core().V1().ConfigMaps().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
@@ -310,7 +301,7 @@ func (c *Controller) AddEventHandlers(
 		},
 	})
 
-	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	kubeInformerFactory.Apps().V1().StatefulSets().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
@@ -336,7 +327,7 @@ func (c *Controller) AddEventHandlers(
 		},
 	})
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	kubeInformerFactory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
 			if !c.isTrackedObject(&pod.ObjectMeta) {

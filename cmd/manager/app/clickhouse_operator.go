@@ -27,7 +27,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/altinity/clickhouse-operator/pkg/config"
+	chopconfig "github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
@@ -73,7 +73,7 @@ var (
 
 	// Setting to 0 disables resync
 	// Informer fires Update() func to periodically verify current state
-	kubeInformetFactoryResyncPeriod = defaultInformerFactoryResyncPeriod
+	kubeInformerFactoryResyncPeriod = defaultInformerFactoryResyncPeriod
 	chopInformerFactoryResyncPeriod = defaultInformerFactoryResyncPeriod
 )
 
@@ -217,7 +217,7 @@ func Run() {
 	glog.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
 	logRuntimeParams()
 
-	chopConfig, err := config.GetConfig(chopConfigFile)
+	chopConfig, err := chopconfig.GetConfig(chopConfigFile)
 	if err != nil {
 		glog.Fatalf("Unable to build config file %v\n", err)
 		os.Exit(1)
@@ -253,7 +253,7 @@ func Run() {
 	if len(chopConfig.WatchNamespaces) == 1 {
 		// We have exactly one watch namespace specified
 		// This scenario is implemented in go-client
-		// In any other case just keep metav1.NamespaceAll
+		// In any other case, just keep metav1.NamespaceAll
 
 		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
 		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
@@ -262,7 +262,7 @@ func Run() {
 
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
 		kubeClient,
-		kubeInformetFactoryResyncPeriod,
+		kubeInformerFactoryResyncPeriod,
 		kubeinformers.WithNamespace(namespace),
 	)
 	chopInformerFactory := chopinformers.NewSharedInformerFactoryWithOptions(
@@ -281,22 +281,8 @@ func Run() {
 		chopConfig,
 		chopClient,
 		kubeClient,
-		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
-		chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates(),
-		kubeInformerFactory.Core().V1().Services(),
-		kubeInformerFactory.Core().V1().Endpoints(),
-		kubeInformerFactory.Core().V1().ConfigMaps(),
-		kubeInformerFactory.Apps().V1().StatefulSets(),
-		kubeInformerFactory.Core().V1().Pods(),
-	)
-	chiController.AddEventHandlers(
-		chopInformerFactory.Clickhouse().V1().ClickHouseInstallations(),
-		chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates(),
-		kubeInformerFactory.Core().V1().Services(),
-		kubeInformerFactory.Core().V1().Endpoints(),
-		kubeInformerFactory.Core().V1().ConfigMaps(),
-		kubeInformerFactory.Apps().V1().StatefulSets(),
-		kubeInformerFactory.Core().V1().Pods(),
+		chopInformerFactory,
+		kubeInformerFactory,
 	)
 
 	//
