@@ -235,6 +235,23 @@ spec:
           resources:
             requests:
               storage: 1Gi
+      - name: volume-claim-retain-pvc
+        # Keep PVC from being deleted
+        # Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
+        reclaimPolicy: Retain
+        # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
+        spec:
+          # 1. If storageClassName is not specified, default StorageClass
+          # (must be specified by cluster administrator) would be used for provisioning
+          # 2. If storageClassName is set to an empty string (‘’), no storage class will be used
+          # dynamic provisioning is disabled for this PVC. Existing, “Available”, PVs
+          # (that do not have a specified storageClassName) will be considered for binding to the PVC
+          #storageClassName: gold
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
 
     podTemplates:
       # multiple pod templates makes possible to update version smoothly
