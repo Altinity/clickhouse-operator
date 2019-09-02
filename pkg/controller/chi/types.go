@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"time"
 
@@ -37,6 +38,7 @@ type Controller struct {
 	schemer       *model.Schemer
 	creator       *model.Creator
 
+	chopConfigManager *config.ConfigManager
 	// chopConfig used to keep clickhouse-oprator config
 	chopConfig *chop.Config
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
@@ -117,6 +119,20 @@ type ReconcileChit struct {
 
 func NewReconcileChit(cmd string, old, new *chop.ClickHouseInstallationTemplate) *ReconcileChit {
 	return &ReconcileChit{
+		cmd: cmd,
+		old: old,
+		new: new,
+	}
+}
+
+type ReconcileChopConfig struct {
+	cmd string
+	old *chop.ClickHouseOperatorConfiguration
+	new *chop.ClickHouseOperatorConfiguration
+}
+
+func NewReconcileChopConfig(cmd string, old, new *chop.ClickHouseOperatorConfiguration) *ReconcileChopConfig {
+	return &ReconcileChopConfig{
 		cmd: cmd,
 		old: old,
 		new: new,

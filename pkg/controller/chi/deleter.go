@@ -95,7 +95,15 @@ func (c *Controller) deleteCluster(cluster *chop.ChiCluster) error {
 
 // deleteChi deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
 func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) error {
+	var err error
+
 	glog.V(1).Infof("Start delete CHI %s/%s", chi.Namespace, chi.Name)
+
+	chi, err = c.normalizer.CreateTemplatedChi(chi)
+	if err != nil {
+		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
+		return err
+	}
 
 	// Delete all clusters
 	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
@@ -113,7 +121,7 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) error {
 	configMapCommonUsersName := chopmodel.CreateConfigMapCommonUsersName(chi)
 
 	// Delete ConfigMap
-	err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommon, newDeleteOptions())
+	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommon, newDeleteOptions())
 	if err == nil {
 		glog.V(1).Infof("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommon)
 	} else {
@@ -129,6 +137,8 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) error {
 
 	// Delete Service
 	err = c.deleteServiceChi(chi)
+
+	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, "deleted")
 
 	glog.V(1).Infof("End delete CHI %s/%s", chi.Namespace, chi.Name)
 
@@ -229,6 +239,7 @@ func (c *Controller) deleteServiceHost(host *chop.ChiHost) error {
 	return c.deleteServiceIfExists(namespace, serviceName)
 }
 
+// deleteServiceShard
 func (c *Controller) deleteServiceShard(shard *chop.ChiShard) error {
 	serviceName := chopmodel.CreateShardServiceName(shard)
 	namespace := shard.Address.Namespace
@@ -236,6 +247,7 @@ func (c *Controller) deleteServiceShard(shard *chop.ChiShard) error {
 	return c.deleteServiceIfExists(namespace, serviceName)
 }
 
+// deleteServiceCluster
 func (c *Controller) deleteServiceCluster(cluster *chop.ChiCluster) error {
 	serviceName := chopmodel.CreateClusterServiceName(cluster)
 	namespace := cluster.Address.Namespace
@@ -243,6 +255,7 @@ func (c *Controller) deleteServiceCluster(cluster *chop.ChiCluster) error {
 	return c.deleteServiceIfExists(namespace, serviceName)
 }
 
+// deleteServiceChi
 func (c *Controller) deleteServiceChi(chi *chop.ClickHouseInstallation) error {
 	serviceName := chopmodel.CreateChiServiceName(chi)
 	namespace := chi.Namespace
@@ -250,6 +263,7 @@ func (c *Controller) deleteServiceChi(chi *chop.ClickHouseInstallation) error {
 	return c.deleteServiceIfExists(namespace, serviceName)
 }
 
+// deleteServiceIfExists
 func (c *Controller) deleteServiceIfExists(namespace, name string) error {
 	// Delete Service in case it does not exist
 

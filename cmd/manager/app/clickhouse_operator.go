@@ -33,7 +33,6 @@ import (
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	kube "k8s.io/client-go/kubernetes"
 	kuberest "k8s.io/client-go/rest"
@@ -91,8 +90,8 @@ func init() {
 	flag.Parse()
 }
 
-// getConfig creates kuberest.Config object based on current environment
-func getConfig(kubeConfigFile, masterURL string) (*kuberest.Config, error) {
+// getKubeConfig creates kuberest.Config object based on current environment
+func getKubeConfig(kubeConfigFile, masterURL string) (*kuberest.Config, error) {
 	if len(kubeConfigFile) > 0 {
 		// kube config file specified as CLI flag
 		return kubeclientcmd.BuildConfigFromFlags(masterURL, kubeConfigFile)
@@ -217,14 +216,59 @@ func Run() {
 	glog.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
 	logRuntimeParams()
 
-	chopConfig, err := chopconfig.GetConfig(chopConfigFile)
+	//
+	// Initialize ClientSets
+	//
+	kubeConfig, err := getKubeConfig(kubeConfigFile, masterURL)
+	if err != nil {
+		glog.Fatalf("Unable to build kube conf: %s", err.Error())
+		os.Exit(1)
+	}
+
+	kubeClient, chopClient := createClientsets(kubeConfig)
+
+	//
+	// Create operator config
+	//
+	// Look for ClickHouseOperatorConfiguration in the namespace, specified in initial config
+	chopConfigManager := chopconfig.NewConfigManager(chopClient)
+	chopConfig, err := chopConfigManager.GetConfig(chopConfigFile)
 	if err != nil {
 		glog.Fatalf("Unable to build config file %v\n", err)
 		os.Exit(1)
 	}
 	chopConfig.WriteToLog()
+	chopConfigManager.GetChopConfigs(chopConfig.GetInformerNamespace())
 
-	// Set OS signals and termination context
+	//
+	// Create Informers
+	//
+	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
+		kubeClient,
+		kubeInformerFactoryResyncPeriod,
+		kubeinformers.WithNamespace(chopConfig.GetInformerNamespace()),
+	)
+	chopInformerFactory := chopinformers.NewSharedInformerFactoryWithOptions(
+		chopClient,
+		chopInformerFactoryResyncPeriod,
+		chopinformers.WithNamespace(chopConfig.GetInformerNamespace()),
+	)
+
+	//
+	// Create Controller
+	//
+	chiController := chi.NewController(
+		version.Version,
+		runtimeParams,
+		chopConfigManager,
+		chopConfig,
+		chopClient,
+		kubeClient,
+		chopInformerFactory,
+		kubeInformerFactory,
+	)
+
+	// Setup OS signals and termination context
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	stopChan := make(chan os.Signal, 2)
 	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
@@ -235,65 +279,15 @@ func Run() {
 		os.Exit(1)
 	}()
 
-	// Initialize ClientSets and Informers
-	kubeConfig, err := getConfig(kubeConfigFile, masterURL)
-	if err != nil {
-		glog.Fatalf("Unable to build kube conf: %s", err.Error())
-		os.Exit(1)
-	}
-
-	kubeClient, chopClient := createClientsets(kubeConfig)
-
 	//
-	// Create Informers
-	//
-
-	// Namespace where informers would watch notifications from
-	namespace := metav1.NamespaceAll
-	if len(chopConfig.WatchNamespaces) == 1 {
-		// We have exactly one watch namespace specified
-		// This scenario is implemented in go-client
-		// In any other case, just keep metav1.NamespaceAll
-
-		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
-		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
-		namespace = chopConfig.WatchNamespaces[0]
-	}
-
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
-		kubeClient,
-		kubeInformerFactoryResyncPeriod,
-		kubeinformers.WithNamespace(namespace),
-	)
-	chopInformerFactory := chopinformers.NewSharedInformerFactoryWithOptions(
-		chopClient,
-		chopInformerFactoryResyncPeriod,
-		chopinformers.WithNamespace(namespace),
-	)
-
-	//
-	// Create resource Controller
-	//
-
-	chiController := chi.NewController(
-		version.Version,
-		runtimeParams,
-		chopConfig,
-		chopClient,
-		kubeClient,
-		chopInformerFactory,
-		kubeInformerFactory,
-	)
-
-	//
-	// Start Informers and Controllers
-	//
-
 	// Start Informers
+	//
 	kubeInformerFactory.Start(ctx.Done())
 	chopInformerFactory.Start(ctx.Done())
 
-	// Start CHI resource Controller
+	//
+	// Start Controller
+	//
 	glog.V(1).Info("Starting CHI controller\n")
 	wg := &sync.WaitGroup{}
 	wg.Add(1)

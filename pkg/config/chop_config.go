@@ -15,6 +15,7 @@
 package config
 
 import (
+	"github.com/golang/glog"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
@@ -22,10 +23,49 @@ import (
 	"path/filepath"
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type ConfigManager struct {
+	chopClient *chopclientset.Clientset
+	list       *chiv1.ClickHouseOperatorConfigurationList
+}
+
+func NewConfigManager(chopClient *chopclientset.Clientset) *ConfigManager {
+	return &ConfigManager{
+		chopClient: chopClient,
+	}
+}
+
+func (cm *ConfigManager) GetChopConfigs(namespace string) {
+	var err error
+	cm.list, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(metav1.ListOptions{})
+	if err == nil {
+		for i := range cm.list.Items {
+			chOperatorConfiguration := &cm.list.Items[i]
+			glog.V(1).Infof("Reading %s/%s config:", chOperatorConfiguration.Namespace, chOperatorConfiguration.Name)
+			chOperatorConfiguration.Spec.WriteToLog()
+		}
+	}
+}
+
+func (cm *ConfigManager) IsConfigListed(config *chiv1.ClickHouseOperatorConfiguration) bool {
+	for i := range cm.list.Items {
+		chOperatorConfiguration := &cm.list.Items[i]
+
+		if config.Namespace == chOperatorConfiguration.Namespace &&
+			config.Name == chOperatorConfiguration.Name &&
+			config.ResourceVersion == chOperatorConfiguration.ResourceVersion {
+			return true
+		}
+	}
+
+	return false
+}
+
 // GetConfig creates Config object based on current environment
-func GetConfig(configFilePath string) (*chiv1.Config, error) {
+func (cm *ConfigManager) GetConfig(configFilePath string) (*chiv1.Config, error) {
 	if len(configFilePath) > 0 {
 		// Config file explicitly specified as CLI flag
 		if conf, err := buildConfigFromFile(configFilePath); err == nil {

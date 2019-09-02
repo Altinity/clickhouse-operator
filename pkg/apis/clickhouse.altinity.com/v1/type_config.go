@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -374,6 +376,24 @@ func (config *Config) stringMap(name string, m map[string]string) string {
 	}
 
 	return b.String()
+}
+
+// GetInformerNamespace is a TODO stub
+// Namespace where informers would watch notifications from
+func (config *Config) GetInformerNamespace() string {
+	// Namespace where informers would watch notifications from
+	namespace := metav1.NamespaceAll
+	if len(config.WatchNamespaces) == 1 {
+		// We have exactly one watch namespace specified
+		// This scenario is implemented in go-client
+		// In any other case, just keep metav1.NamespaceAll
+
+		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
+		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
+		namespace = config.WatchNamespaces[0]
+	}
+
+	return namespace
 }
 
 // readConfigFiles reads config files from specified path into "file name->file content" map

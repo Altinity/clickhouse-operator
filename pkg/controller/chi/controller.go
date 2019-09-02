@@ -22,6 +22,7 @@ import (
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
+	"github.com/altinity/clickhouse-operator/pkg/config"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"os"
 
 	"github.com/golang/glog"
 )
@@ -44,6 +46,7 @@ import (
 func NewController(
 	version string,
 	runtimeParams map[string]string,
+	chopConfigManager *config.ConfigManager,
 	chopConfig *chop.Config,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
@@ -53,6 +56,8 @@ func NewController(
 
 	// Initializations
 	_ = chopclientsetscheme.AddToScheme(scheme.Scheme)
+
+	// Setup events
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(
@@ -74,6 +79,7 @@ func NewController(
 		normalizer:              chopmodels.NewNormalizer(chopConfig),
 		schemer:                 chopmodels.NewSchemer(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort),
 		creator:                 nil,
+		chopConfigManager:       chopConfigManager,
 		chopConfig:              chopConfig,
 		kubeClient:              kubeClient,
 		chopClient:              chopClient,
@@ -95,7 +101,7 @@ func NewController(
 		recorder:                recorder,
 	}
 
-	controller.addEventHandlers(chopInformerFactory,kubeInformerFactory)
+	controller.addEventHandlers(chopInformerFactory, kubeInformerFactory)
 
 	return controller
 }
@@ -157,6 +163,34 @@ func (c *Controller) addEventHandlers(
 			}
 			//glog.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
 			c.enqueueObject(NewReconcileChit(reconcileDelete, chit, nil))
+		},
+	})
+
+	chopInformerFactory.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			chopConfig := obj.(*chop.ClickHouseOperatorConfiguration)
+			if !c.chopConfig.IsWatchedNamespace(chopConfig.Namespace) {
+				return
+			}
+			//glog.V(1).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
+			c.enqueueObject(NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
+		},
+		UpdateFunc: func(old, new interface{}) {
+			newChopConfig := new.(*chop.ClickHouseOperatorConfiguration)
+			oldChopConfig := old.(*chop.ClickHouseOperatorConfiguration)
+			if !c.chopConfig.IsWatchedNamespace(newChopConfig.Namespace) {
+				return
+			}
+			//glog.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
+			c.enqueueObject(NewReconcileChopConfig(reconcileUpdate, oldChopConfig, newChopConfig))
+		},
+		DeleteFunc: func(obj interface{}) {
+			chopConfig := obj.(*chop.ClickHouseOperatorConfiguration)
+			if !c.chopConfig.IsWatchedNamespace(chopConfig.Namespace) {
+				return
+			}
+			//glog.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
+			c.enqueueObject(NewReconcileChopConfig(reconcileDelete, chopConfig, nil))
 		},
 	})
 
@@ -378,6 +412,9 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 	// Label controller runtime objects with proper labels
 	c.labelMyObjectsTree()
 
+	//
+	// Start threads
+	//
 	glog.V(1).Info("ClickHouseInstallation controller: starting workers")
 	for i := 0; i < threadiness; i++ {
 		glog.V(1).Infof("ClickHouseInstallation controller: starting worker %d with poll period %d", i+1, runWorkerPeriod)
@@ -399,10 +436,18 @@ func (c *Controller) runWorker() {
 			return
 		}
 
-		if err := c.processWorkItem(item); err != nil {
+		if err := c.processWorkItem(item); err == nil {
+			// Item processed
+			// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
+			// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
+			// still have to call `Done` on the queue.
+			c.queue.Forget(item)
+		} else {
+			// Item not processed
 			// this code cannot return an error and needs to indicate error has been ignored
 			utilruntime.HandleError(err)
 		}
+
 		// Must call Done(item) when processing completed
 		c.queue.Done(item)
 	}
@@ -411,72 +456,68 @@ func (c *Controller) runWorker() {
 // processWorkItem processes one work item according to its type
 func (c *Controller) processWorkItem(item interface{}) error {
 	switch item.(type) {
+
 	case *ReconcileChi:
 		reconcile, _ := item.(*ReconcileChi)
-		if err := c.syncChi(reconcile); err != nil {
-			// Item will be retried later
-			return fmt.Errorf("unable to sync CHI object %v", err.Error())
+		switch reconcile.cmd {
+		case reconcileAdd:
+			return c.addChi(reconcile.new)
+		case reconcileUpdate:
+			return c.updateChi(reconcile.old, reconcile.new)
+		case reconcileDelete:
+			return c.deleteChi(reconcile.old)
 		}
+
+		// Unknown item type, don't know what to do with it
+		// Just skip it and behave like it never existed
+		utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", reconcile))
+		return nil
 
 	case *ReconcileChit:
 		reconcile, _ := item.(*ReconcileChit)
-		if err := c.syncChit(reconcile); err != nil {
-			// Item will be retried later
-			return fmt.Errorf("unable to sync CHIT object %v", err.Error())
+		switch reconcile.cmd {
+		case reconcileAdd:
+			return c.addChit(reconcile.new)
+		case reconcileUpdate:
+			return c.updateChit(reconcile.old, reconcile.new)
+		case reconcileDelete:
+			return c.deleteChit(reconcile.old)
 		}
-	default:
-		// Unknown item type, dont know what to do with it
-		utilruntime.HandleError(fmt.Errorf("unexpected item in the queue - %#v", item))
+
+		// Unknown item type, don't know what to do with it
+		// Just skip it and behave like it never existed
+		utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", reconcile))
+		return nil
+
+	case *ReconcileChopConfig:
+		reconcile, _ := item.(*ReconcileChopConfig)
+		switch reconcile.cmd {
+		case reconcileAdd:
+			return c.addChopConfig(reconcile.new)
+		case reconcileUpdate:
+			return c.updateChopConfig(reconcile.old, reconcile.new)
+		case reconcileDelete:
+			return c.deleteChopConfig(reconcile.old)
+		}
+
+		// Unknown item type, don't know what to do with it
+		// Just skip it and behave like it never existed
+		utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", reconcile))
+		return nil
 	}
 
-	// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
-	// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
-	// still have to call `Done` on the queue.
-	c.queue.Forget(item)
-
+	// Unknown item type, don't know what to do with it
+	// Just skip it and behave like it never existed
+	utilruntime.HandleError(fmt.Errorf("unexpected item in the queue - %#v", item))
 	return nil
 }
 
-// syncChi is the main reconcile loop function - reconcile CHI object
-func (c *Controller) syncChi(reconcile *ReconcileChi) error {
-	//glog.V(1).Infof("syncChi(%s) start", reconcile.cmd)
-	//defer glog.V(1).Infof("syncChi(%s) end", reconcile.cmd)
-
-	switch reconcile.cmd {
-	case reconcileAdd:
-		return c.onAddChi(reconcile.new)
-	case reconcileUpdate:
-		return c.onUpdateChi(reconcile.old, reconcile.new)
-	case reconcileDelete:
-		return c.onDeleteChi(reconcile.old)
-	}
-
-	return nil
-}
-
-// syncChit is the main reconcile loop function - reconcile CHIT object
-func (c *Controller) syncChit(reconcile *ReconcileChit) error {
-	//glog.V(1).Infof("syncChit(%s) start", reconcile.cmd)
-	//defer glog.V(1).Infof("syncChit(%s) end", reconcile.cmd)
-
-	switch reconcile.cmd {
-	case reconcileAdd:
-		return c.onAddChit(reconcile.new)
-	case reconcileUpdate:
-		return c.onUpdateChit(reconcile.old, reconcile.new)
-	case reconcileDelete:
-		return c.onDeleteChit(reconcile.old)
-	}
-
-	return nil
-}
-
-// onAddChi normalize CHI - updates CHI object to normalized
-func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
+// addChi normalize CHI - updates CHI object to normalized
+func (c *Controller) addChi(chi *chop.ClickHouseInstallation) error {
 	// CHI is a new one - need to create normalized CHI
 	// Operator receives CHI struct partially filled by data from .yaml file provided by user
 	// We need to create full normalized specification
-	glog.V(1).Infof("onAddChi(%s/%s)", chi.Namespace, chi.Name)
+	glog.V(1).Infof("addChi(%s/%s)", chi.Namespace, chi.Name)
 
 	chi, err := c.normalizer.CreateTemplatedChi(chi)
 	if err != nil {
@@ -499,8 +540,8 @@ func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
 	return nil
 }
 
-// onUpdateChi sync CHI which was already created earlier
-func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
+// updateChi sync CHI which was already created earlier
+func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 	if !old.IsNormalized() {
 		old, _ = c.normalizer.CreateTemplatedChi(old)
@@ -511,7 +552,7 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 	}
 
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		glog.V(2).Infof("onUpdateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		glog.V(2).Infof("updateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
 		// No need to react
 
 		// Update hostnames list for monitor
@@ -520,12 +561,12 @@ func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
-	glog.V(1).Infof("onUpdateChi(%s/%s)", old.Namespace, old.Name)
+	glog.V(1).Infof("updateChi(%s/%s)", old.Namespace, old.Name)
 
 	diff, equal := messagediff.DeepDiff(old, new)
 
 	if equal {
-		glog.V(1).Infof("onUpdateChi(%s/%s): no changes found", old.Namespace, old.Name)
+		glog.V(1).Infof("updateChi(%s/%s): no changes found", old.Namespace, old.Name)
 		// No need to react
 		return nil
 	}
@@ -608,43 +649,64 @@ func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string
 	}
 }
 
-func (c *Controller) onDeleteChi(chi *chop.ClickHouseInstallation) error {
-	chi, err := c.normalizer.CreateTemplatedChi(chi)
-	if err != nil {
-		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
-		return err
-	}
-
-	_ = c.deleteChi(chi)
-	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, "deleted")
-
-	return nil
-}
-
-// onAddChit sync new CHIT - creates all its resources
-func (c *Controller) onAddChit(chit *chop.ClickHouseInstallationTemplate) error {
-	glog.V(1).Infof("onAddChit(%s/%s)", chit.Namespace, chit.Name)
+// addChit sync new CHIT - creates all its resources
+func (c *Controller) addChit(chit *chop.ClickHouseInstallationTemplate) error {
+	glog.V(1).Infof("addChit(%s/%s)", chit.Namespace, chit.Name)
 	c.chopConfig.AddChiTemplate((*chop.ClickHouseInstallation)(chit))
 	return nil
 }
 
-// onUpdateChit sync CHIT which was already created earlier
-func (c *Controller) onUpdateChit(old, new *chop.ClickHouseInstallationTemplate) error {
+// updateChit sync CHIT which was already created earlier
+func (c *Controller) updateChit(old, new *chop.ClickHouseInstallationTemplate) error {
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		glog.V(2).Infof("onUpdateChit(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		glog.V(2).Infof("updateChit(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
 		// No need to react
 		return nil
 	}
 
-	glog.V(2).Infof("onUpdateChit(%s/%s):", new.Namespace, new.Name)
+	glog.V(2).Infof("updateChit(%s/%s):", new.Namespace, new.Name)
 	c.chopConfig.UpdateChiTemplate((*chop.ClickHouseInstallation)(new))
 	return nil
 }
 
-// onDeleteChit deletes CHIT
-func (c *Controller) onDeleteChit(chit *chop.ClickHouseInstallationTemplate) error {
-	glog.V(2).Infof("onDeleteChit(%s/%s):", chit.Namespace, chit.Name)
+// deleteChit deletes CHIT
+func (c *Controller) deleteChit(chit *chop.ClickHouseInstallationTemplate) error {
+	glog.V(2).Infof("deleteChit(%s/%s):", chit.Namespace, chit.Name)
 	c.chopConfig.DeleteChiTemplate((*chop.ClickHouseInstallation)(chit))
+	return nil
+}
+
+// addChopConfig
+func (c *Controller) addChopConfig(chopConfig *chop.ClickHouseOperatorConfiguration) error {
+	if c.chopConfigManager.IsConfigListed(chopConfig) {
+		glog.V(1).Infof("addChopConfig(%s/%s) known config", chopConfig.Namespace, chopConfig.Name)
+	} else {
+		glog.V(1).Infof("addChopConfig(%s/%s) UNKNOWN CONFIG", chopConfig.Namespace, chopConfig.Name)
+		os.Exit(0)
+	}
+
+	return nil
+}
+
+// updateChopConfig
+func (c *Controller) updateChopConfig(old, new *chop.ClickHouseOperatorConfiguration) error {
+	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
+		glog.V(2).Infof("updateChopConfig(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		// No need to react
+		return nil
+	}
+
+	glog.V(2).Infof("updateChopConfig(%s/%s):", new.Namespace, new.Name)
+	os.Exit(0)
+
+	return nil
+}
+
+// deleteChit deletes CHIT
+func (c *Controller) deleteChopConfig(chopConfig *chop.ClickHouseOperatorConfiguration) error {
+	glog.V(2).Infof("deleteChopConfig(%s/%s):", chopConfig.Namespace, chopConfig.Name)
+	os.Exit(0)
+
 	return nil
 }
 
