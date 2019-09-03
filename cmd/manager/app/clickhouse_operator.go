@@ -231,14 +231,11 @@ func Run() {
 	// Create operator config
 	//
 	// Look for ClickHouseOperatorConfiguration in the namespace, specified in initial config
-	chopConfigManager := chopconfig.NewConfigManager(chopClient)
-	chopConfig, err := chopConfigManager.GetConfig(chopConfigFile)
-	if err != nil {
+	chopConfigManager := chopconfig.NewConfigManager(chopClient, chopConfigFile)
+	if err := chopConfigManager.Init(); err != nil {
 		glog.Fatalf("Unable to build config file %v\n", err)
 		os.Exit(1)
 	}
-	chopConfig.WriteToLog()
-	chopConfigManager.GetChopConfigs(chopConfig.GetInformerNamespace())
 
 	//
 	// Create Informers
@@ -246,12 +243,12 @@ func Run() {
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
 		kubeClient,
 		kubeInformerFactoryResyncPeriod,
-		kubeinformers.WithNamespace(chopConfig.GetInformerNamespace()),
+		kubeinformers.WithNamespace(chopConfigManager.Config().GetInformerNamespace()),
 	)
 	chopInformerFactory := chopinformers.NewSharedInformerFactoryWithOptions(
 		chopClient,
 		chopInformerFactoryResyncPeriod,
-		chopinformers.WithNamespace(chopConfig.GetInformerNamespace()),
+		chopinformers.WithNamespace(chopConfigManager.Config().GetInformerNamespace()),
 	)
 
 	//
@@ -261,7 +258,6 @@ func Run() {
 		version.Version,
 		runtimeParams,
 		chopConfigManager,
-		chopConfig,
 		chopClient,
 		kubeClient,
 		chopInformerFactory,

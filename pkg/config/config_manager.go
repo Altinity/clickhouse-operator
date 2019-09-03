@@ -28,31 +28,58 @@ import (
 )
 
 type ConfigManager struct {
-	chopClient *chopclientset.Clientset
-	list       *chiv1.ClickHouseOperatorConfigurationList
+	chopClient     *chopclientset.Clientset
+	chopConfigList *chiv1.ClickHouseOperatorConfigurationList
+
+	initConfigFilePath string
+	config             *chiv1.Config
 }
 
-func NewConfigManager(chopClient *chopclientset.Clientset) *ConfigManager {
+func NewConfigManager(
+	chopClient *chopclientset.Clientset,
+	initConfigFilePath string,
+) *ConfigManager {
 	return &ConfigManager{
-		chopClient: chopClient,
+		chopClient:         chopClient,
+		initConfigFilePath: initConfigFilePath,
 	}
 }
 
-func (cm *ConfigManager) GetChopConfigs(namespace string) {
+func (cm *ConfigManager) Init() error {
 	var err error
-	cm.list, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(metav1.ListOptions{})
+
+	cm.config, err = cm.getConfig(cm.initConfigFilePath)
+	if err != nil {
+		return err
+	}
+	cm.config.WriteToLog()
+
+	cm.getChopConfigs(cm.config.GetInformerNamespace())
+
+	return nil
+}
+
+func (cm *ConfigManager) Config() *chiv1.Config {
+	return cm.config
+}
+
+// GetChopConfigs
+func (cm *ConfigManager) getChopConfigs(namespace string) {
+	var err error
+	cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(metav1.ListOptions{})
 	if err == nil {
-		for i := range cm.list.Items {
-			chOperatorConfiguration := &cm.list.Items[i]
+		for i := range cm.chopConfigList.Items {
+			chOperatorConfiguration := &cm.chopConfigList.Items[i]
 			glog.V(1).Infof("Reading %s/%s config:", chOperatorConfiguration.Namespace, chOperatorConfiguration.Name)
 			chOperatorConfiguration.Spec.WriteToLog()
 		}
 	}
 }
 
+// IsConfigListed
 func (cm *ConfigManager) IsConfigListed(config *chiv1.ClickHouseOperatorConfiguration) bool {
-	for i := range cm.list.Items {
-		chOperatorConfiguration := &cm.list.Items[i]
+	for i := range cm.chopConfigList.Items {
+		chOperatorConfiguration := &cm.chopConfigList.Items[i]
 
 		if config.Namespace == chOperatorConfiguration.Namespace &&
 			config.Name == chOperatorConfiguration.Name &&
@@ -65,10 +92,10 @@ func (cm *ConfigManager) IsConfigListed(config *chiv1.ClickHouseOperatorConfigur
 }
 
 // GetConfig creates Config object based on current environment
-func (cm *ConfigManager) GetConfig(configFilePath string) (*chiv1.Config, error) {
+func (cm *ConfigManager) getConfig(configFilePath string) (*chiv1.Config, error) {
 	if len(configFilePath) > 0 {
 		// Config file explicitly specified as CLI flag
-		if conf, err := buildConfigFromFile(configFilePath); err == nil {
+		if conf, err := cm.buildConfigFromFile(configFilePath); err == nil {
 			return conf, nil
 		} else {
 			return nil, err
@@ -77,7 +104,7 @@ func (cm *ConfigManager) GetConfig(configFilePath string) (*chiv1.Config, error)
 
 	if len(os.Getenv("CHOP_CONFIG")) > 0 {
 		// Config file explicitly specified as ENV var
-		if conf, err := buildConfigFromFile(os.Getenv("CHOP_CONFIG")); err == nil {
+		if conf, err := cm.buildConfigFromFile(os.Getenv("CHOP_CONFIG")); err == nil {
 			return conf, nil
 		} else {
 			return nil, err
@@ -88,24 +115,24 @@ func (cm *ConfigManager) GetConfig(configFilePath string) (*chiv1.Config, error)
 	usr, err := user.Current()
 	if err == nil {
 		// OS user found. Parse ~/.clickhouse-operator/config.yaml file
-		if conf, err := buildConfigFromFile(filepath.Join(usr.HomeDir, ".clickhouse-operator", "config.yaml")); err == nil {
+		if conf, err := cm.buildConfigFromFile(filepath.Join(usr.HomeDir, ".clickhouse-operator", "config.yaml")); err == nil {
 			// Able to build config, all is fine
 			return conf, nil
 		}
 	}
 
 	// Try to find /etc/clickhouse-operator/config.yaml
-	if conf, err := buildConfigFromFile("/etc/clickhouse-operator/config.yaml"); err == nil {
+	if conf, err := cm.buildConfigFromFile("/etc/clickhouse-operator/config.yaml"); err == nil {
 		// Able to build config, all is fine
 		return conf, nil
 	}
 
 	// No config file found, use default one
-	return buildDefaultConfig()
+	return cm.buildDefaultConfig()
 }
 
 // buildConfigFromFile returns Config struct built out of specified file path
-func buildConfigFromFile(configFilePath string) (*chiv1.Config, error) {
+func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.Config, error) {
 	// Read config file content
 	yamlText, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
@@ -135,7 +162,7 @@ func buildConfigFromFile(configFilePath string) (*chiv1.Config, error) {
 }
 
 // buildDefaultConfig returns default Config
-func buildDefaultConfig() (*chiv1.Config, error) {
+func (cm *ConfigManager) buildDefaultConfig() (*chiv1.Config, error) {
 	config := new(chiv1.Config)
 	config.Normalize()
 	config.ApplyEnvVars()

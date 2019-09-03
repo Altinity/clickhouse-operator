@@ -62,14 +62,14 @@ func (config *Config) ProcessChiTemplateFiles() {
 			glog.V(1).Infof("FAIL processChiTemplateFiles() unable to unmarshal file %s %q", filename, err)
 			continue
 		}
-		config.insertChiTemplate(template)
+		config.enlistChiTemplate(template)
 	}
 
 	config.buildChiTemplate()
 }
 
-// insertChiTemplate inserts template into templates catalog
-func (config *Config) insertChiTemplate(template *ClickHouseInstallation) {
+// enlistChiTemplate inserts template into templates catalog
+func (config *Config) enlistChiTemplate(template *ClickHouseInstallation) {
 	// Insert template
 	if config.ChiTemplates == nil {
 		config.ChiTemplates = make(map[string]*ClickHouseInstallation)
@@ -78,8 +78,8 @@ func (config *Config) insertChiTemplate(template *ClickHouseInstallation) {
 	config.ChiTemplates[template.Name] = template
 }
 
-// removeChiTemplate removes template from templates catalog
-func (config *Config) removeChiTemplate(template *ClickHouseInstallation) {
+// unlistChiTemplate removes template from templates catalog
+func (config *Config) unlistChiTemplate(template *ClickHouseInstallation) {
 	// Insert template
 	if config.ChiTemplates == nil {
 		return
@@ -118,17 +118,17 @@ func (config *Config) buildChiTemplate() {
 }
 
 func (config *Config) AddChiTemplate(template *ClickHouseInstallation) {
-	config.insertChiTemplate(template)
+	config.enlistChiTemplate(template)
 	config.buildChiTemplate()
 }
 
 func (config *Config) UpdateChiTemplate(template *ClickHouseInstallation) {
-	config.insertChiTemplate(template)
+	config.enlistChiTemplate(template)
 	config.buildChiTemplate()
 }
 
 func (config *Config) DeleteChiTemplate(template *ClickHouseInstallation) {
-	config.removeChiTemplate(template)
+	config.unlistChiTemplate(template)
 	config.buildChiTemplate()
 }
 

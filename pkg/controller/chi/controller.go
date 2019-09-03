@@ -47,7 +47,6 @@ func NewController(
 	version string,
 	runtimeParams map[string]string,
 	chopConfigManager *config.ConfigManager,
-	chopConfig *chop.Config,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
 	chopInformerFactory chopinformers.SharedInformerFactory,
@@ -76,11 +75,8 @@ func NewController(
 	controller := &Controller{
 		version:                 version,
 		runtimeParams:           runtimeParams,
-		normalizer:              chopmodels.NewNormalizer(chopConfig),
-		schemer:                 chopmodels.NewSchemer(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort),
 		creator:                 nil,
 		chopConfigManager:       chopConfigManager,
-		chopConfig:              chopConfig,
 		kubeClient:              kubeClient,
 		chopClient:              chopClient,
 		chiLister:               chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Lister(),
@@ -101,6 +97,12 @@ func NewController(
 		recorder:                recorder,
 	}
 
+	controller.normalizer = chopmodels.NewNormalizer(controller.chopConfigManager.Config())
+	controller.schemer = chopmodels.NewSchemer(
+		controller.chopConfigManager.Config().ChUsername,
+		controller.chopConfigManager.Config().ChPassword,
+		controller.chopConfigManager.Config().ChPort,
+	)
 	controller.addEventHandlers(chopInformerFactory, kubeInformerFactory)
 
 	return controller
@@ -113,7 +115,7 @@ func (c *Controller) addEventHandlers(
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chi := obj.(*chop.ClickHouseInstallation)
-			if !c.chopConfig.IsWatchedNamespace(chi.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
@@ -122,7 +124,7 @@ func (c *Controller) addEventHandlers(
 		UpdateFunc: func(old, new interface{}) {
 			newChi := new.(*chop.ClickHouseInstallation)
 			oldChi := old.(*chop.ClickHouseInstallation)
-			if !c.chopConfig.IsWatchedNamespace(newChi.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(newChi.Namespace) {
 				return
 			}
 			//glog.V(1).Info("chiInformer.UpdateFunc")
@@ -130,7 +132,7 @@ func (c *Controller) addEventHandlers(
 		},
 		DeleteFunc: func(obj interface{}) {
 			chi := obj.(*chop.ClickHouseInstallation)
-			if !c.chopConfig.IsWatchedNamespace(chi.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
@@ -141,7 +143,7 @@ func (c *Controller) addEventHandlers(
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chit := obj.(*chop.ClickHouseInstallationTemplate)
-			if !c.chopConfig.IsWatchedNamespace(chit.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
@@ -150,7 +152,7 @@ func (c *Controller) addEventHandlers(
 		UpdateFunc: func(old, new interface{}) {
 			newChit := new.(*chop.ClickHouseInstallationTemplate)
 			oldChit := old.(*chop.ClickHouseInstallationTemplate)
-			if !c.chopConfig.IsWatchedNamespace(newChit.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(newChit.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
@@ -158,7 +160,7 @@ func (c *Controller) addEventHandlers(
 		},
 		DeleteFunc: func(obj interface{}) {
 			chit := obj.(*chop.ClickHouseInstallationTemplate)
-			if !c.chopConfig.IsWatchedNamespace(chit.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
@@ -169,7 +171,7 @@ func (c *Controller) addEventHandlers(
 	chopInformerFactory.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chopConfig := obj.(*chop.ClickHouseOperatorConfiguration)
-			if !c.chopConfig.IsWatchedNamespace(chopConfig.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
@@ -178,7 +180,7 @@ func (c *Controller) addEventHandlers(
 		UpdateFunc: func(old, new interface{}) {
 			newChopConfig := new.(*chop.ClickHouseOperatorConfiguration)
 			oldChopConfig := old.(*chop.ClickHouseOperatorConfiguration)
-			if !c.chopConfig.IsWatchedNamespace(newChopConfig.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(newChopConfig.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
@@ -186,7 +188,7 @@ func (c *Controller) addEventHandlers(
 		},
 		DeleteFunc: func(obj interface{}) {
 			chopConfig := obj.(*chop.ClickHouseOperatorConfiguration)
-			if !c.chopConfig.IsWatchedNamespace(chopConfig.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
@@ -388,7 +390,7 @@ func (c *Controller) addEventHandlers(
 
 // isTrackedObject checks whether operator is interested in changes of this object
 func (c *Controller) isTrackedObject(objectMeta *meta.ObjectMeta) bool {
-	return c.chopConfig.IsWatchedNamespace(objectMeta.Namespace) && chopmodels.IsChopGeneratedObject(objectMeta)
+	return c.chopConfigManager.Config().IsWatchedNamespace(objectMeta.Namespace) && chopmodels.IsChopGeneratedObject(objectMeta)
 }
 
 // Run syncs caches, starts workers
@@ -652,7 +654,7 @@ func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string
 // addChit sync new CHIT - creates all its resources
 func (c *Controller) addChit(chit *chop.ClickHouseInstallationTemplate) error {
 	glog.V(1).Infof("addChit(%s/%s)", chit.Namespace, chit.Name)
-	c.chopConfig.AddChiTemplate((*chop.ClickHouseInstallation)(chit))
+	c.chopConfigManager.Config().AddChiTemplate((*chop.ClickHouseInstallation)(chit))
 	return nil
 }
 
@@ -665,14 +667,14 @@ func (c *Controller) updateChit(old, new *chop.ClickHouseInstallationTemplate) e
 	}
 
 	glog.V(2).Infof("updateChit(%s/%s):", new.Namespace, new.Name)
-	c.chopConfig.UpdateChiTemplate((*chop.ClickHouseInstallation)(new))
+	c.chopConfigManager.Config().UpdateChiTemplate((*chop.ClickHouseInstallation)(new))
 	return nil
 }
 
 // deleteChit deletes CHIT
 func (c *Controller) deleteChit(chit *chop.ClickHouseInstallationTemplate) error {
 	glog.V(2).Infof("deleteChit(%s/%s):", chit.Namespace, chit.Name)
-	c.chopConfig.DeleteChiTemplate((*chop.ClickHouseInstallation)(chit))
+	c.chopConfigManager.Config().DeleteChiTemplate((*chop.ClickHouseInstallation)(chit))
 	return nil
 }
 

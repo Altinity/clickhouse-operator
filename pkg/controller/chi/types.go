@@ -39,8 +39,6 @@ type Controller struct {
 	creator       *model.Creator
 
 	chopConfigManager *config.ConfigManager
-	// chopConfig used to keep clickhouse-oprator config
-	chopConfig *chop.Config
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 	kubeClient kube.Interface
 	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
