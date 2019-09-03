@@ -19,7 +19,7 @@ RUN dep ensure --vendor-only
 # Build operator binary with explicitly specified output
 RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter ./dev/go_build_metrics_exporter.sh
 
-# === Operator ===
+# === Metrics exporter ===
 
 FROM alpine:3.10 AS metrics-exporter
 
