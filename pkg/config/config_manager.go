@@ -112,6 +112,18 @@ func (cm *ConfigManager) IsConfigListed(config *chiv1.ClickHouseOperatorConfigur
 
 // GetConfig creates Config object based on current environment
 func (cm *ConfigManager) getConfig(configFilePath string) (*chiv1.Config, error) {
+	if conf, err := cm.getConfigFromFileOrDefault(configFilePath); err == nil {
+		// Config should be post-processed
+		conf.Postprocess()
+		return conf, nil
+	} else {
+		return nil, err
+	}
+}
+
+// getConfigFromFileOrDefault gets config from specified file or builds default
+func (cm *ConfigManager) getConfigFromFileOrDefault(configFilePath string) (*chiv1.Config, error) {
+	// In case we have config file specified - that's it
 	if len(configFilePath) > 0 {
 		// Config file explicitly specified as CLI flag
 		if conf, err := cm.buildConfigFromFile(configFilePath); err == nil {
@@ -121,6 +133,7 @@ func (cm *ConfigManager) getConfig(configFilePath string) (*chiv1.Config, error)
 		}
 	}
 
+	// No file specified - look for ENV var config file path specification
 	if len(os.Getenv("CHOP_CONFIG")) > 0 {
 		// Config file explicitly specified as ENV var
 		if conf, err := cm.buildConfigFromFile(os.Getenv("CHOP_CONFIG")); err == nil {
@@ -130,6 +143,7 @@ func (cm *ConfigManager) getConfig(configFilePath string) (*chiv1.Config, error)
 		}
 	}
 
+	// No ENV var specified - look into user's homedir
 	// Try to find ~/.clickhouse-operator/config.yaml
 	usr, err := user.Current()
 	if err == nil {
@@ -140,6 +154,7 @@ func (cm *ConfigManager) getConfig(configFilePath string) (*chiv1.Config, error)
 		}
 	}
 
+	// No config file in user's homedir - look for global config in /etc/
 	// Try to find /etc/clickhouse-operator/config.yaml
 	if conf, err := cm.buildConfigFromFile("/etc/clickhouse-operator/config.yaml"); err == nil {
 		// Able to build config, all is fine
@@ -169,13 +184,6 @@ func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.Conf
 	config.ConfigFilePath, err = filepath.Abs(configFilePath)
 	config.ConfigFolderPath = filepath.Dir(config.ConfigFilePath)
 
-	// Normalize Config struct into fully-and-correctly filled Config struct
-	config.Normalize()
-	config.ReadChConfigFiles()
-	config.ReadChiTemplateFiles()
-	config.ProcessChiTemplateFiles()
-	config.ApplyEnvVars()
-
 	return config, nil
 
 }
@@ -183,8 +191,6 @@ func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.Conf
 // buildDefaultConfig returns default Config
 func (cm *ConfigManager) buildDefaultConfig() (*chiv1.Config, error) {
 	config := new(chiv1.Config)
-	config.Normalize()
-	config.ApplyEnvVars()
 
 	return config, nil
 }

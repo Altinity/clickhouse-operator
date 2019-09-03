@@ -52,7 +52,7 @@ const (
 )
 
 // processChiTemplateFiles build Config.ChiTemplate from template files content
-func (config *Config) ProcessChiTemplateFiles() {
+func (config *Config) processChiTemplateFiles() {
 
 	// Produce map of CHI templates out of CHI template files
 	for filename := range config.ChiTemplateFiles {
@@ -91,6 +91,11 @@ func (config *Config) unlistChiTemplate(template *ClickHouseInstallation) {
 
 // buildChiTemplate builds combined CHI Template from templates catalog
 func (config *Config) buildChiTemplate() {
+	// Build unified template in case there are templates to build from only
+	if len(config.ChiTemplates) == 0 {
+		return
+	}
+
 	// Sort CHI templates by their names and apply one by one
 	// Extract file names into slice and sort it
 	// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
@@ -132,8 +137,16 @@ func (config *Config) DeleteChiTemplate(template *ClickHouseInstallation) {
 	config.buildChiTemplate()
 }
 
+func (config *Config) Postprocess() {
+	config.normalize()
+	config.readChConfigFiles()
+	config.readChiTemplateFiles()
+	config.processChiTemplateFiles()
+	config.applyEnvVars()
+}
+
 // normalize() makes fully-and-correctly filled Config
-func (config *Config) Normalize() {
+func (config *Config) normalize() {
 
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
@@ -207,7 +220,7 @@ func (config *Config) Normalize() {
 }
 
 // applyEnvVars applies ENV VARS over config
-func (config *Config) ApplyEnvVars() {
+func (config *Config) applyEnvVars() {
 	if ns := os.Getenv("WATCH_NAMESPACE"); len(ns) > 0 {
 		// We have WATCH_NAMESPACE specified
 		config.WatchNamespaces = []string{ns}
@@ -260,7 +273,7 @@ func (config *Config) relativeToConfigFolderPath(relativePath string) string {
 }
 
 // readChConfigFiles reads all extra user-specified ClickHouse config files
-func (config *Config) ReadChConfigFiles() {
+func (config *Config) readChConfigFiles() {
 	config.ChCommonConfigs = readConfigFiles(config.ChCommonConfigsPath, config.isChConfigExt)
 	config.ChHostConfigs = readConfigFiles(config.ChHostConfigsPath, config.isChConfigExt)
 	config.ChUsersConfigs = readConfigFiles(config.ChUsersConfigsPath, config.isChConfigExt)
@@ -276,7 +289,7 @@ func (config *Config) isChConfigExt(file string) bool {
 }
 
 // readChConfigFiles reads all CHI templates
-func (config *Config) ReadChiTemplateFiles() {
+func (config *Config) readChiTemplateFiles() {
 	config.ChiTemplateFiles = readConfigFiles(config.ChiTemplatesPath, config.isChiTemplateExt)
 }
 
