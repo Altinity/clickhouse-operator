@@ -143,6 +143,7 @@ func (config *Config) Postprocess() {
 	config.readChiTemplateFiles()
 	config.processChiTemplateFiles()
 	config.applyEnvVars()
+	config.applyDefaultWatchNamespace()
 }
 
 // normalize() makes fully-and-correctly filled Config
@@ -235,6 +236,17 @@ func (config *Config) applyEnvVars() {
 			if len(namespaces[i]) > 0 {
 				config.WatchNamespaces = append(config.WatchNamespaces, namespaces[i])
 			}
+		}
+	}
+}
+
+// applyDefaultWatchNamespace applies default watch namespace in case none specified earlier
+func (config *Config) applyDefaultWatchNamespace() {
+	// Watch in own namespace only in case no other specified earlier
+	if len(config.WatchNamespaces) == 0 {
+		if ns := os.Getenv("OPERATOR_POD_NAMESPACE"); len(ns) > 0 {
+			// We have WATCH_NAMESPACE specified
+			config.WatchNamespaces = []string{ns}
 		}
 	}
 }
