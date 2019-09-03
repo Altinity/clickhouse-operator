@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sort"
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
@@ -33,8 +34,10 @@ type ConfigManager struct {
 
 	initConfigFilePath string
 	config             *chiv1.Config
+	runtimeParams      map[string]string
 }
 
+// NewConfigManager creates new ConfigManager
 func NewConfigManager(
 	chopClient *chopclientset.Clientset,
 	initConfigFilePath string,
@@ -45,8 +48,12 @@ func NewConfigManager(
 	}
 }
 
+// Init reads config from all sources
 func (cm *ConfigManager) Init() error {
 	var err error
+
+	cm.runtimeParams = cm.getRuntimeParams()
+	cm.logRuntimeParams()
 
 	cm.config, err = cm.getConfig(cm.initConfigFilePath)
 	if err != nil {
@@ -55,28 +62,40 @@ func (cm *ConfigManager) Init() error {
 	cm.config.WriteToLog()
 
 	cm.getChopConfigs(cm.config.GetInformerNamespace())
+	cm.logChopConfigs()
+
+	// TODO somewhere here we need to either
+	// 1. mix
+	// 2. overwrite
+	// 3. skip
+	// chop config read from etcd
 
 	return nil
 }
 
+// Config is an access wrapper
 func (cm *ConfigManager) Config() *chiv1.Config {
 	return cm.config
 }
 
-// GetChopConfigs
+// getChopConfigs reads all ClickHouseOperatorConfiguration objects in specified namespace
 func (cm *ConfigManager) getChopConfigs(namespace string) {
 	var err error
-	cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(metav1.ListOptions{})
-	if err == nil {
-		for i := range cm.chopConfigList.Items {
-			chOperatorConfiguration := &cm.chopConfigList.Items[i]
-			glog.V(1).Infof("Reading %s/%s config:", chOperatorConfiguration.Namespace, chOperatorConfiguration.Name)
-			chOperatorConfiguration.Spec.WriteToLog()
-		}
+	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(metav1.ListOptions{}); err != nil {
+		glog.V(1).Infof("Error read ClickHouseOperatorConfigurations %v", err)
 	}
 }
 
-// IsConfigListed
+// logChopConfigs writes all ClickHouseOperatorConfiguration objects into log
+func (cm *ConfigManager) logChopConfigs() {
+	for i := range cm.chopConfigList.Items {
+		chOperatorConfiguration := &cm.chopConfigList.Items[i]
+		glog.V(1).Infof("Reading %s/%s config:", chOperatorConfiguration.Namespace, chOperatorConfiguration.Name)
+		chOperatorConfiguration.Spec.WriteToLog()
+	}
+}
+
+// IsConfigListed checks whether specified ClickHouseOperatorConfiguration is listed in list of ClickHouseOperatorConfiguration(s)
 func (cm *ConfigManager) IsConfigListed(config *chiv1.ClickHouseOperatorConfiguration) bool {
 	for i := range cm.chopConfigList.Items {
 		chOperatorConfiguration := &cm.chopConfigList.Items[i]
@@ -168,4 +187,67 @@ func (cm *ConfigManager) buildDefaultConfig() (*chiv1.Config, error) {
 	config.ApplyEnvVars()
 
 	return config, nil
+}
+
+// getRuntimeParamNames return list of ENV VARS parameter names
+func (cm *ConfigManager) getRuntimeParamNames() []string {
+	// This list of ENV VARS is specified in operator .yaml manifest, section "kind: Deployment"
+	return []string{
+		// spec.nodeName: ip-172-20-52-62.ec2.internal
+		"OPERATOR_POD_NODE_NAME",
+		// metadata.name: clickhouse-operator-6f87589dbb-ftcsf
+		"OPERATOR_POD_NAME",
+		// metadata.namespace: kube-system
+		"OPERATOR_POD_NAMESPACE",
+		// status.podIP: 100.96.3.2
+		"OPERATOR_POD_IP",
+		// spec.serviceAccount: clickhouse-operator
+		// spec.serviceAccountName: clickhouse-operator
+		"OPERATOR_POD_SERVICE_ACCOUNT",
+
+		// .containers.resources.requests.cpu
+		"OPERATOR_CONTAINER_CPU_REQUEST",
+		// .containers.resources.limits.cpu
+		"OPERATOR_CONTAINER_CPU_LIMIT",
+		// .containers.resources.requests.memory
+		"OPERATOR_CONTAINER_MEM_REQUEST",
+		// .containers.resources.limits.memory
+		"OPERATOR_CONTAINER_MEM_LIMIT",
+
+		// What namespaces to watch
+		"WATCH_NAMESPACE",
+		"WATCH_NAMESPACES",
+	}
+}
+
+// getRuntimeParams returns map[string]string of ENV VARS with some runtime parameters
+func (cm *ConfigManager) getRuntimeParams() map[string]string {
+	params := make(map[string]string)
+	// Extract parameters from ENV VARS
+	for _, varName := range cm.getRuntimeParamNames() {
+		params[varName] = os.Getenv(varName)
+	}
+
+	return params
+}
+
+// logRuntimeParams writes runtime parameters into log
+func (cm *ConfigManager) logRuntimeParams() {
+	// Log params according to sorted names
+	// So we need to
+	// 1. Extract and sort names aka keys
+	// 2. Walk over keys and log params
+
+	// Sort names aka keys
+	var keys []string
+	for k := range cm.runtimeParams {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Walk over sorted names aka keys
+	glog.V(1).Infof("Parameters num: %d\n", len(cm.runtimeParams))
+	for _, k := range keys {
+		glog.V(1).Infof("%s=%s\n", k, cm.runtimeParams[k])
+	}
 }

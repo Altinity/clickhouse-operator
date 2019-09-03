@@ -45,7 +45,6 @@ import (
 // NewController creates instance of Controller
 func NewController(
 	version string,
-	runtimeParams map[string]string,
 	chopConfigManager *config.ConfigManager,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
@@ -74,7 +73,6 @@ func NewController(
 	// Create Controller instance
 	controller := &Controller{
 		version:                 version,
-		runtimeParams:           runtimeParams,
 		creator:                 nil,
 		chopConfigManager:       chopConfigManager,
 		kubeClient:              kubeClient,
