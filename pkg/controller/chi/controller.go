@@ -563,13 +563,18 @@ func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 	glog.V(1).Infof("updateChi(%s/%s)", old.Namespace, old.Name)
 
-	diff, equal := messagediff.DeepDiff(old, new)
+	actionPlan := NewActionPlan(old, new)
 
-	if equal {
+	if actionPlan.HasNoChanges() {
 		glog.V(1).Infof("updateChi(%s/%s): no changes found", old.Namespace, old.Name)
 		// No need to react
 		return nil
 	}
+
+	// We are going to update CHI
+	// Write write declared CHI with initialized .Status, so it would be possible to monitor progress
+	new.Status.DeleteHostsCount = actionPlan.GetRemovedHostsNum()
+	_ = c.updateCHIResource(new)
 
 	if err := c.reconcile(new); err != nil {
 		log := fmt.Sprintf("Update of resources has FAILED: %v", err)
@@ -579,54 +584,43 @@ func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
 	}
 
 	// Post-process added items
-	for path := range diff.Added {
-		switch diff.Added[path].(type) {
-		case chop.ChiCluster:
-			cluster := diff.Added[path].(chop.ChiCluster)
-
+	actionPlan.WalkAdded(
+		func(cluster *chop.ChiCluster) {
 			log := fmt.Sprintf("Added cluster %s", cluster.Name)
 			glog.V(1).Info(log)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
-		case chop.ChiShard:
-			shard := diff.Added[path].(chop.ChiShard)
-
+		},
+		func(shard *chop.ChiShard) {
 			log := fmt.Sprintf("Added shard %d to cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName)
 			glog.V(1).Info(log)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 
-			_ = c.createTablesOnShard(new, &shard)
-		case chop.ChiHost:
-			host := diff.Added[path].(chop.ChiHost)
-
+			_ = c.createTablesOnShard(new, shard)
+		},
+		func(host *chop.ChiHost) {
 			log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 			glog.V(1).Info(log)
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 
-			_ = c.createTablesOnHost(new, &host)
-		}
-	}
+			_ = c.createTablesOnHost(new, host)
+		},
+	)
 
 	// Remove deleted items
-	// TODO refactor to map[string]object handling, instead of slice
-	for path := range diff.Removed {
-		switch diff.Removed[path].(type) {
-		case chop.ChiCluster:
-			cluster := diff.Removed[path].(chop.ChiCluster)
+	actionPlan.WalkRemoved(
+		func(cluster *chop.ChiCluster) {
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete cluster %s", cluster.Name))
-
-			_ = c.deleteCluster(&cluster)
-		case chop.ChiShard:
-			shard := diff.Removed[path].(chop.ChiShard)
+			_ = c.deleteCluster(cluster)
+		},
+		func(shard *chop.ChiShard) {
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete shard %d in cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName))
-
-			_ = c.deleteShard(&shard)
-		case chop.ChiHost:
-			host := diff.Removed[path].(chop.ChiHost)
+			_ = c.deleteShard(shard)
+		},
+		func(host *chop.ChiHost) {
 			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete replica %d from shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName))
-
-			_ = c.deleteHost(&host)
-		}
-	}
+			_ = c.deleteHost(host)
+		},
+	)
 
 	// Update CHI object
 	_ = c.updateCHIResource(new)
@@ -712,7 +706,15 @@ func (c *Controller) deleteChopConfig(chopConfig *chop.ClickHouseOperatorConfigu
 
 // updateCHIResource updates ClickHouseInstallation resource
 func (c *Controller) updateCHIResource(chi *chop.ClickHouseInstallation) error {
-	_, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
+	new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
+	if err != nil {
+		// Error update
+		glog.V(1).Infof("ERROR update CHI (%s/%s):", chi.Namespace, chi.Name)
+	} else if chi.ObjectMeta.ResourceVersion != new.ObjectMeta.ResourceVersion {
+		// Updated
+		chi.ObjectMeta.ResourceVersion = new.ObjectMeta.ResourceVersion
+		glog.V(2).Infof("CHI (%s/%s) bump resource version %d/%d", chi.Namespace, chi.Name, chi.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
+	}
 	return err
 }
 

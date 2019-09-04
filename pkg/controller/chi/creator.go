@@ -108,6 +108,9 @@ func (c *Controller) reconcileHost(host *chop.ChiHost) error {
 		return err
 	}
 
+	host.Chi.Status.ReconciledHostsCount++
+	_ = c.updateCHIResource(host.Chi)
+
 	return nil
 }
 

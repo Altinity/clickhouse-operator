@@ -31,16 +31,31 @@ spec:
       description: Clusters count
       priority: 0 # show in standard view
       JSONPath: .status.clusters
-    - name: hosts
-      type: integer
-      description: Hosts count
-      priority: 0 # show in standard view
-      JSONPath: .status.hosts
     - name: shards
       type: integer
       description: Shards count
       priority: 1 # show in wide view
       JSONPath: .status.shards
+    - name: hosts
+      type: integer
+      description: Hosts count
+      priority: 0 # show in standard view
+      JSONPath: .status.hosts
+    - name: reconciled
+      type: integer
+      description: Reconciled hosts count
+      priority: 1 # show in wide view
+      JSONPath: .status.reconciled
+    - name: delete
+      type: integer
+      description: Hosts to be deleted count
+      priority: 1 # show in wide view
+      JSONPath: .status.delete
+    - name: deleted
+      type: integer
+      description: Hosts deleted count
+      priority: 1 # show in wide view
+      JSONPath: .status.deleted
     - name: endpoint
       type: string
       description: Client access endpoint
@@ -309,22 +324,42 @@ spec:
     - name: version
       type: string
       description: Operator version
-      priority: 1 # show in wide view only
+      priority: 1 # show in wide view
       JSONPath: .status.version
     - name: clusters
       type: integer
       description: Clusters count
       priority: 0 # show in standard view
       JSONPath: .status.clusters
+    - name: shards
+      type: integer
+      description: Shards count
+      priority: 1 # show in wide view
+      JSONPath: .status.shards
     - name: hosts
       type: integer
       description: Hosts count
       priority: 0 # show in standard view
       JSONPath: .status.hosts
+    - name: reconciled
+      type: integer
+      description: Reconciled hosts count
+      priority: 1 # show in wide view
+      JSONPath: .status.reconciled
+    - name: delete
+      type: integer
+      description: Hosts to be deleted count
+      priority: 1 # show in wide view
+      JSONPath: .status.delete
+    - name: deleted
+      type: integer
+      description: Hosts deleted count
+      priority: 1 # show in wide view
+      JSONPath: .status.deleted
     - name: endpoint
       type: string
       description: Client access endpoint
-      priority: 1 # show in wide view only
+      priority: 1 # show in wide view
       JSONPath: .status.endpoint
   # TODO return to this feature later
   # Pruning unknown fields. FEATURE STATE: Kubernetes v1.15

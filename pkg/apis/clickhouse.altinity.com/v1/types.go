@@ -57,12 +57,15 @@ type ChiSpec struct {
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	Version       string   `json:"version"`
-	ClustersCount int      `json:"clusters"`
-	HostsCount    int      `json:"hosts"`
-	ShardsCount   int      `json:"shards"`
-	Pods          []string `json:"pods"`
-	Endpoint      string   `json:"endpoint"`
+	Version              string   `json:"version"`
+	ClustersCount        int      `json:"clusters"`
+	ShardsCount          int      `json:"shards"`
+	HostsCount           int      `json:"hosts"`
+	ReconciledHostsCount int      `json:"reconciled"`
+	DeleteHostsCount     int      `json:"delete"`
+	DeletedHostsCount    int      `json:"deleted"`
+	Pods                 []string `json:"pods"`
+	Endpoint             string   `json:"endpoint"`
 }
 
 // ChiDefaults defines defaults section of .spec

@@ -49,7 +49,7 @@ const (
 
 // Default number of controller threads running concurrently (used in case no other specified in config)
 const (
-	defaultControllerThreadsNum = 10
+	defaultControllerThreadsNum = 1
 )
 
 // CLI parameter variables
