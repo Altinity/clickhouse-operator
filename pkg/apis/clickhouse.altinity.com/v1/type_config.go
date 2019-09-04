@@ -257,9 +257,9 @@ func (config *Config) prepareConfigPath(path *string, defaultRelativePath string
 		// Path not specified, try to build it relative to config file
 		*path = config.relativeToConfigFolderPath(defaultRelativePath)
 	} else if filepath.IsAbs(*path) {
-		// Absolute path already specified - nothing to do here
+		// Absolute path explicitly specified - nothing to do here
 	} else {
-		// Relative path - make it relative to config file itself
+		// Relative path specified - make relative path relative to config file itself
 		*path = config.relativeToConfigFolderPath(*path)
 	}
 

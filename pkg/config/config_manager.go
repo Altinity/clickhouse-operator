@@ -50,25 +50,34 @@ func NewConfigManager(
 
 // Init reads config from all sources
 func (cm *ConfigManager) Init() error {
-	var err error
 
+	// Get ENV vars
 	cm.runtimeParams = cm.getRuntimeParams()
 	cm.logRuntimeParams()
 
-	cm.config, err = cm.getConfig(cm.initConfigFilePath)
+	// Get config from file
+	config, err := cm.getConfig(cm.initConfigFilePath)
 	if err != nil {
 		return err
 	}
-	cm.config.WriteToLog()
+	glog.V(1).Info("File-based ClickHouseOperatorConfigurations")
+	config.WriteToLog()
 
-	cm.getChopConfigs(cm.config.GetInformerNamespace())
+	// Read config CRs
+	cm.readChopConfigs(config.GetInformerNamespace())
 	cm.logChopConfigs()
 
-	// TODO somewhere here we need to either
-	// 1. mix
-	// 2. overwrite
-	// 3. skip
-	// chop config read from etcd
+	// Prepare one unified config
+	cm.prepareConfig(config)
+	glog.V(1).Info("To be post-processed ClickHouseOperatorConfigurations")
+	cm.config.WriteToLog()
+
+	// Finalize config by post-processing
+	cm.config.Postprocess()
+
+	// Config is ready
+	glog.V(1).Info("Final ClickHouseOperatorConfigurations")
+	cm.config.WriteToLog()
 
 	return nil
 }
@@ -78,20 +87,67 @@ func (cm *ConfigManager) Config() *chiv1.Config {
 	return cm.config
 }
 
-// getChopConfigs reads all ClickHouseOperatorConfiguration objects in specified namespace
-func (cm *ConfigManager) getChopConfigs(namespace string) {
+// readChopConfigs reads all ClickHouseOperatorConfiguration objects in specified namespace
+func (cm *ConfigManager) readChopConfigs(namespace string) {
 	var err error
 	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(metav1.ListOptions{}); err != nil {
 		glog.V(1).Infof("Error read ClickHouseOperatorConfigurations %v", err)
 	}
 }
 
-// logChopConfigs writes all ClickHouseOperatorConfiguration objects into log
-func (cm *ConfigManager) logChopConfigs() {
+// getChopConfigs gets name-sorted slice of *chiv1.ClickHouseOperatorConfiguration
+func (cm *ConfigManager) getChopConfigs() []*chiv1.ClickHouseOperatorConfiguration {
+	if cm.chopConfigList == nil {
+		// Nothing to get
+		return nil
+	}
+
+	// Get sorted names of ClickHouseOperatorConfiguration object
+	var names []string
 	for i := range cm.chopConfigList.Items {
 		chOperatorConfiguration := &cm.chopConfigList.Items[i]
-		glog.V(1).Infof("Reading %s/%s config:", chOperatorConfiguration.Namespace, chOperatorConfiguration.Name)
+		names = append(names, chOperatorConfiguration.Name)
+	}
+	sort.Strings(names)
+
+	// Build sorted slice
+	var configs []*chiv1.ClickHouseOperatorConfiguration
+	for _, name := range names {
+		for i := range cm.chopConfigList.Items {
+			chOperatorConfiguration := &cm.chopConfigList.Items[i]
+			if chOperatorConfiguration.Name == name {
+				configs = append(configs, chOperatorConfiguration)
+				continue
+			}
+		}
+	}
+
+	// Return nil or sorted slice
+	if len(configs) > 0 {
+		return configs
+	} else {
+		return nil
+	}
+}
+
+// logChopConfigs writes all ClickHouseOperatorConfiguration objects into log
+func (cm *ConfigManager) logChopConfigs() {
+	for _, chOperatorConfiguration := range cm.getChopConfigs() {
+		glog.V(1).Infof("chop config %s/%s :", chOperatorConfiguration.Namespace, chOperatorConfiguration.Name)
 		chOperatorConfiguration.Spec.WriteToLog()
+	}
+}
+
+// prepareConfig prepares one config from all accumulated parts
+func (cm *ConfigManager) prepareConfig(config *chiv1.Config) {
+	// TODO need to either
+	// 1. mix
+	// 2. overwrite
+	// 3. skip
+	cm.config = config
+	for _, chOperatorConfiguration := range cm.getChopConfigs() {
+		glog.V(1).Infof("chop config %s/%s :", chOperatorConfiguration.Namespace, chOperatorConfiguration.Name)
+		cm.config = &chOperatorConfiguration.Spec
 	}
 }
 
@@ -112,17 +168,6 @@ func (cm *ConfigManager) IsConfigListed(config *chiv1.ClickHouseOperatorConfigur
 
 // GetConfig creates Config object based on current environment
 func (cm *ConfigManager) getConfig(configFilePath string) (*chiv1.Config, error) {
-	if conf, err := cm.getConfigFromFileOrDefault(configFilePath); err == nil {
-		// Config should be post-processed
-		conf.Postprocess()
-		return conf, nil
-	} else {
-		return nil, err
-	}
-}
-
-// getConfigFromFileOrDefault gets config from specified file or builds default
-func (cm *ConfigManager) getConfigFromFileOrDefault(configFilePath string) (*chiv1.Config, error) {
 	// In case we have config file specified - that's it
 	if len(configFilePath) > 0 {
 		// Config file explicitly specified as CLI flag
