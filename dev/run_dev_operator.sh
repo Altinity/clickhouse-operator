@@ -5,8 +5,9 @@
 
 # Source configuration
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-source "${CUR_DIR}/go_build_config.sh"
 LOG_DIR="${CUR_DIR}/log"
+
+source "${CUR_DIR}/go_build_config.sh"
 
 echo -n "Building ${OPERATOR_BIN}, please wait..."
 if "${CUR_DIR}/go_build_operator.sh"; then
@@ -15,6 +16,7 @@ if "${CUR_DIR}/go_build_operator.sh"; then
     mkdir -p "${LOG_DIR}"
     rm -f "${LOG_DIR}"/clickhouse-operator.*.log.*
     "${OPERATOR_BIN}" \
+    	-config="${SRC_ROOT}/config/config.yaml" \
     	-alsologtostderr=true \
     	-log_dir=log \
     	-v=1

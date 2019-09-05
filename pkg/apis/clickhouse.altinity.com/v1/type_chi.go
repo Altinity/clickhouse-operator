@@ -24,7 +24,7 @@ func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 	chi.Status.ClustersCount = chi.ClustersCount()
 	chi.Status.ShardsCount = chi.ShardsCount()
 	chi.Status.HostsCount = chi.HostsCount()
-	chi.Status.ReconciledHostsCount = 0
+	chi.Status.UpdatedHostsCount = 0
 	chi.Status.DeleteHostsCount = 0
 	chi.Status.DeletedHostsCount = 0
 	chi.Status.Pods = pods

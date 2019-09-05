@@ -16,7 +16,7 @@ package chi
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/config"
-	"github.com/altinity/clickhouse-operator/pkg/model"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -34,9 +34,6 @@ import (
 type Controller struct {
 	version       string
 	runtimeParams map[string]string
-	normalizer    *model.Normalizer
-	schemer       *model.Schemer
-	creator       *model.Creator
 
 	chopConfigManager *config.ConfigManager
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
@@ -134,5 +131,15 @@ func NewReconcileChopConfig(cmd string, old, new *chop.ClickHouseOperatorConfigu
 		cmd: cmd,
 		old: old,
 		new: new,
+	}
+}
+
+type DropDns struct {
+	initiator *v1.ObjectMeta
+}
+
+func NewDropDns(initiator *v1.ObjectMeta) *DropDns {
+	return &DropDns{
+		initiator: initiator,
 	}
 }

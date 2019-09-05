@@ -41,21 +41,31 @@ spec:
       description: Hosts count
       priority: 0 # show in standard view
       JSONPath: .status.hosts
-    - name: reconciled
+    - name: status
+      type: string
+      description: CHI status
+      priority: 0 # show in standard view
+      JSONPath: .status.status
+    - name: updated
       type: integer
-      description: Reconciled hosts count
+      description: Updated hosts count
       priority: 1 # show in wide view
-      JSONPath: .status.reconciled
-    - name: delete
+      JSONPath: .status.updated
+    - name: added
       type: integer
-      description: Hosts to be deleted count
+      description: Added hosts count
       priority: 1 # show in wide view
-      JSONPath: .status.delete
+      JSONPath: .status.added
     - name: deleted
       type: integer
       description: Hosts deleted count
       priority: 1 # show in wide view
       JSONPath: .status.deleted
+    - name: delete
+      type: integer
+      description: Hosts to be deleted count
+      priority: 1 # show in wide view
+      JSONPath: .status.delete
     - name: endpoint
       type: string
       description: Client access endpoint
@@ -341,21 +351,31 @@ spec:
       description: Hosts count
       priority: 0 # show in standard view
       JSONPath: .status.hosts
-    - name: reconciled
+    - name: status
+      type: string
+      description: CHI status
+      priority: 0 # show in standard view
+      JSONPath: .status.status
+    - name: updated
       type: integer
-      description: Reconciled hosts count
+      description: Updated hosts count
       priority: 1 # show in wide view
-      JSONPath: .status.reconciled
-    - name: delete
+      JSONPath: .status.updated
+    - name: added
       type: integer
-      description: Hosts to be deleted count
+      description: Added hosts count
       priority: 1 # show in wide view
-      JSONPath: .status.delete
+      JSONPath: .status.added
     - name: deleted
       type: integer
       description: Hosts deleted count
       priority: 1 # show in wide view
       JSONPath: .status.deleted
+    - name: delete
+      type: integer
+      description: Hosts to be deleted count
+      priority: 1 # show in wide view
+      JSONPath: .status.delete
     - name: endpoint
       type: string
       description: Client access endpoint

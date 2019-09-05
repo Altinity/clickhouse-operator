@@ -32,18 +32,7 @@ func newDeleteOptions() *metav1.DeleteOptions {
 	}
 }
 
-// deleteTablesOnHost deletes ClickHouse tables on a host
-// TODO move this into Schemer
-func (c *Controller) deleteTablesOnHost(host *chop.ChiHost) error {
-	// Delete tables on replica
-	tableNames, dropTableSQLs, _ := c.schemer.HostGetDropTables(host)
-	glog.V(1).Infof("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	_ = c.schemer.HostApplySQLs(host, dropTableSQLs, false)
-
-	return nil
-}
-
-// deleteReplica deletes all kubernetes resources related to replica *chop.ChiReplica
+// deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
 func (c *Controller) deleteHost(host *chop.ChiHost) error {
 	// Each host consists of
 	// 1. Tables on host - we need to delete tables on the host in order to clean Zookeeper data
@@ -52,70 +41,31 @@ func (c *Controller) deleteHost(host *chop.ChiHost) error {
 	// 4. ConfigMap
 	// 5. Service
 	// Need to delete all these item
-	glog.V(1).Infof("Start delete host %s/%s", host.Address.ClusterName, host.Name)
+	glog.V(1).Infof("Controller delete host %s/%s", host.Address.ClusterName, host.Name)
 
-	_ = c.deleteTablesOnHost(host)
 	_ = c.statefulSetDelete(host)
 	_ = c.persistentVolumeClaimDelete(host)
 	_ = c.configMapDelete(host)
 	_ = c.deleteServiceHost(host)
+
+	host.Chi.Status.DeletedHostsCount++
+	_ = c.updateChiObjectStatus(host.Chi)
 
 	glog.V(1).Infof("End delete host %s/%s", host.Address.ClusterName, host.Name)
 
 	return nil
 }
 
-// deleteShard deletes all kubernetes resources related to shard *chop.ChiShard
-func (c *Controller) deleteShard(shard *chop.ChiShard) error {
-	glog.V(1).Infof("Start delete shard %s/%s", shard.Address.Namespace, shard.Name)
-
-	// Delete all replicas
-	shard.WalkHosts(c.deleteHost)
-
-	// Delete Shard Service
-	_ = c.deleteServiceShard(shard)
-	glog.V(1).Infof("End delete shard %s/%s", shard.Address.Namespace, shard.Name)
-
-	return nil
-}
-
-// deleteCluster deletes all kubernetes resources related to cluster *chop.ChiCluster
-func (c *Controller) deleteCluster(cluster *chop.ChiCluster) error {
-	glog.V(1).Infof("Start delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
-
-	// Delete all shards
-	cluster.WalkShards(c.deleteShard)
-
-	// Delete Cluster Service
-	_ = c.deleteServiceCluster(cluster)
-	glog.V(1).Infof("End delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
-
-	return nil
-}
-
-// deleteChi deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
-func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) error {
-	var err error
-
-	glog.V(1).Infof("Start delete CHI %s/%s", chi.Namespace, chi.Name)
-
-	chi, err = c.normalizer.CreateTemplatedChi(chi, true)
-	if err != nil {
-		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
-		return err
-	}
-
-	// Delete all clusters
-	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
-		return c.deleteCluster(cluster)
-	})
-
+// deleteConfigMapsChi
+func (c *Controller) deleteConfigMapsChi(chi *chop.ClickHouseInstallation) error {
 	// Delete common ConfigMap's
 	// Delete CHI service
 	//
 	// chi-b3d29f-common-configd   2      61s
 	// chi-b3d29f-common-usersd    0      61s
 	// service/clickhouse-example-01         LoadBalancer   10.106.183.200   <pending>     8123:31607/TCP,9000:31492/TCP,9009:31357/TCP   33s   clickhouse.altinity.com/chi=example-01
+
+	var err error
 
 	configMapCommon := chopmodel.CreateConfigMapCommonName(chi)
 	configMapCommonUsersName := chopmodel.CreateConfigMapCommonUsersName(chi)
@@ -135,14 +85,7 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) error {
 		glog.V(1).Infof("FAIL delete ConfigMap %s/%s %v", chi.Namespace, configMapCommonUsersName, err)
 	}
 
-	// Delete Service
-	err = c.deleteServiceChi(chi)
-
-	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, "deleted")
-
-	glog.V(1).Infof("End delete CHI %s/%s", chi.Namespace, chi.Name)
-
-	return nil
+	return err
 }
 
 // statefulSetDeletePod delete a pod of a StatefulSet. This requests StatefulSet to relaunch deleted pod

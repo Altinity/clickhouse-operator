@@ -19,6 +19,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	StatusInProgress = "InProgress"
+	StatusCompleted  = "Completed"
+)
+
 // +genclient
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -57,15 +62,17 @@ type ChiSpec struct {
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	Version              string   `json:"version"`
-	ClustersCount        int      `json:"clusters"`
-	ShardsCount          int      `json:"shards"`
-	HostsCount           int      `json:"hosts"`
-	ReconciledHostsCount int      `json:"reconciled"`
-	DeleteHostsCount     int      `json:"delete"`
-	DeletedHostsCount    int      `json:"deleted"`
-	Pods                 []string `json:"pods"`
-	Endpoint             string   `json:"endpoint"`
+	Version           string   `json:"version"`
+	ClustersCount     int      `json:"clusters"`
+	ShardsCount       int      `json:"shards"`
+	HostsCount        int      `json:"hosts"`
+	Status            string   `json:"status"`
+	UpdatedHostsCount int      `json:"updated"`
+	AddedHostsCount   int      `json:"added"`
+	DeletedHostsCount int      `json:"deleted"`
+	DeleteHostsCount  int      `json:"delete"`
+	Pods              []string `json:"pods"`
+	Endpoint          string   `json:"endpoint"`
 }
 
 // ChiDefaults defines defaults section of .spec
@@ -126,7 +133,7 @@ type ChiCluster struct {
 
 	// Internal data
 	Address ChiClusterAddress       `json:"address"`
-	Chi     *ClickHouseInstallation `json:"-"`
+	Chi     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiClusterAddress defines address of a cluster within ClickHouseInstallation
@@ -161,7 +168,7 @@ type ChiShard struct {
 
 	// Internal data
 	Address ChiShardAddress         `json:"address"`
-	Chi     *ClickHouseInstallation `json:"-"`
+	Chi     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiShardAddress defines address of a shard within ClickHouseInstallation
@@ -183,7 +190,7 @@ type ChiHost struct {
 	// Internal data
 	Address ChiHostAddress          `json:"address"`
 	Config  ChiHostConfig           `json:"config"`
-	Chi     *ClickHouseInstallation `json:"-"`
+	Chi     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiHostAddress defines address of a host within ClickHouseInstallation
@@ -213,9 +220,9 @@ type ChiTemplates struct {
 	ServiceTemplates     []ChiServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates"`
 
 	// Index maps template name to template itself
-	PodTemplatesIndex         map[string]*ChiPodTemplate
-	VolumeClaimTemplatesIndex map[string]*ChiVolumeClaimTemplate
-	ServiceTemplatesIndex     map[string]*ChiServiceTemplate
+	PodTemplatesIndex         map[string]*ChiPodTemplate         `testdiff:"ignore"`
+	VolumeClaimTemplatesIndex map[string]*ChiVolumeClaimTemplate `testdiff:"ignore"`
+	ServiceTemplatesIndex     map[string]*ChiServiceTemplate     `testdiff:"ignore"`
 }
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet

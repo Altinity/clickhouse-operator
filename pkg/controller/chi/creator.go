@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -27,92 +26,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
-
-// reconcile reconciles ClickHouseInstallation
-func (c *Controller) reconcile(chi *chop.ClickHouseInstallation) error {
-	c.creator = model.NewCreator(chi, c.chopConfigManager.Config(), c.version)
-	return chi.WalkTillError(
-		c.reconcileChi,
-		c.reconcileCluster,
-		c.reconcileShard,
-		c.reconcileHost,
-	)
-}
-
-// reconcileChi reconciles CHI global objects
-func (c *Controller) reconcileChi(chi *chop.ClickHouseInstallation) error {
-	// 1. CHI Service
-	service := c.creator.CreateServiceChi()
-	if err := c.ReconcileService(service); err != nil {
-		return err
-	}
-
-	// 2. CHI ConfigMaps
-
-	// ConfigMap common for all resources in CHI
-	// contains several sections, mapped as separated chopConfig files,
-	// such as remote servers, zookeeper setup, etc
-	configMapCommon := c.creator.CreateConfigMapChiCommon()
-	if err := c.ReconcileConfigMap(configMapCommon); err != nil {
-		return err
-	}
-
-	// ConfigMap common for all users resources in CHI
-	configMapUsers := c.creator.CreateConfigMapChiCommonUsers()
-	if err := c.ReconcileConfigMap(configMapUsers); err != nil {
-		return err
-	}
-
-	// Add here other CHI components to be reconciled
-
-	return nil
-}
-
-// reconcileCluster reconciles Cluster, excluding nested shards
-func (c *Controller) reconcileCluster(cluster *chop.ChiCluster) error {
-	// Add Cluster's Service
-	if service := c.creator.CreateServiceCluster(cluster); service != nil {
-		return c.ReconcileService(service)
-	} else {
-		return nil
-	}
-}
-
-// reconcileShard reconciles Shard, excluding nested replicas
-func (c *Controller) reconcileShard(shard *chop.ChiShard) error {
-	// Add Shard's Service
-	if service := c.creator.CreateServiceShard(shard); service != nil {
-		return c.ReconcileService(service)
-	} else {
-		return nil
-	}
-}
-
-// reconcileHost reconciles ClickHouse host
-func (c *Controller) reconcileHost(host *chop.ChiHost) error {
-	// Add host's Service
-	service := c.creator.CreateServiceHost(host)
-	if err := c.ReconcileService(service); err != nil {
-		return err
-	}
-
-	// Add host's ConfigMap
-	configMap := c.creator.CreateConfigMapHost(host)
-	if err := c.ReconcileConfigMap(configMap); err != nil {
-		return err
-	}
-
-	// Add host's StatefulSet
-	statefulSet := c.creator.CreateStatefulSet(host)
-	if err := c.ReconcileStatefulSet(statefulSet, host); err != nil {
-		return err
-	}
-
-	host.Chi.Status.ReconciledHostsCount++
-	_ = c.updateChiObjectStatus(host.Chi)
-
-	return nil
-}
 
 // reconcileConfigMap reconciles core.ConfigMap
 func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
@@ -187,12 +100,16 @@ func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host
 
 	if curStatefulSet != nil {
 		// StatefulSet already exists - update it
-		return c.updateStatefulSet(curStatefulSet, newStatefulSet)
+		err = c.updateStatefulSet(curStatefulSet, newStatefulSet)
+		host.Chi.Status.UpdatedHostsCount++
+		_ = c.updateChiObjectStatus(host.Chi)
 	}
 
 	if apierrors.IsNotFound(err) {
 		// StatefulSet with such name not found - create StatefulSet
-		return c.createStatefulSet(newStatefulSet, host)
+		err = c.createStatefulSet(newStatefulSet, host)
+		host.Chi.Status.AddedHostsCount++
+		_ = c.updateChiObjectStatus(host.Chi)
 	}
 
 	// Error has happened with .Get()
@@ -377,34 +294,6 @@ func (c *Controller) shouldContinueOnUpdateFailed() error {
 
 	// Do not continue update
 	return fmt.Errorf("update stopped due to previous errors")
-}
-
-// createTablesOnHost
-// TODO move this into Schemer
-func (c *Controller) createTablesOnHost(chi *chop.ClickHouseInstallation, host *chop.ChiHost) error {
-	cluster := &chi.Spec.Configuration.Clusters[host.Address.ClusterIndex]
-
-	names, createSQLs, _ := c.schemer.GetCreateReplicatedObjects(chi, cluster, host)
-	glog.V(1).Infof("Creating replicated objects: %v", names)
-	_ = c.schemer.HostApplySQLs(host, createSQLs, true)
-
-	names, createSQLs, _ = c.schemer.ClusterGetCreateDistributedObjects(chi, cluster)
-	glog.V(1).Infof("Creating distributed objects: %v", names)
-	_ = c.schemer.HostApplySQLs(host, createSQLs, true)
-
-	return nil
-}
-
-// createTablesOnShard
-// TODO move this into Schemer
-func (c *Controller) createTablesOnShard(chi *chop.ClickHouseInstallation, shard *chop.ChiShard) error {
-	cluster := &chi.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
-
-	names, createSQLs, _ := c.schemer.ClusterGetCreateDistributedObjects(chi, cluster)
-	glog.V(1).Infof("Creating distributed objects: %v", names)
-	_ = c.schemer.ShardApplySQLs(shard, createSQLs, true)
-
-	return nil
 }
 
 // hasStatefulSetReachedGeneration returns whether has StatefulSet reached the expected generation after upgrade or not
