@@ -99,7 +99,7 @@ func (c *Controller) deleteChi(chi *chop.ClickHouseInstallation) error {
 
 	glog.V(1).Infof("Start delete CHI %s/%s", chi.Namespace, chi.Name)
 
-	chi, err = c.normalizer.CreateTemplatedChi(chi)
+	chi, err = c.normalizer.CreateTemplatedChi(chi, true)
 	if err != nil {
 		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
 		return err

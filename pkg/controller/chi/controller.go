@@ -513,46 +513,43 @@ func (c *Controller) processWorkItem(item interface{}) error {
 }
 
 // addChi normalize CHI - updates CHI object to normalized
-func (c *Controller) addChi(chi *chop.ClickHouseInstallation) error {
+func (c *Controller) addChi(new *chop.ClickHouseInstallation) error {
 	// CHI is a new one - need to create normalized CHI
 	// Operator receives CHI struct partially filled by data from .yaml file provided by user
 	// We need to create full normalized specification
-	glog.V(1).Infof("addChi(%s/%s)", chi.Namespace, chi.Name)
+	glog.V(1).Infof("addChi(%s/%s)", new.Namespace, new.Name)
+	c.eventChi(new, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted, fmt.Sprintf("ClickHouseInstallation (%s): start add process", new.Name))
 
-	chi, err := c.normalizer.CreateTemplatedChi(chi)
-	if err != nil {
-		glog.V(1).Infof("ClickHouseInstallation (%s): unable to normalize: %q", chi.Name, err)
-		c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "unable to normalize configuration")
-		return err
-	}
-
-	// Update CHI object
-	if err := c.updateCHIResource(chi); err != nil {
-		glog.V(1).Infof("ClickHouseInstallation (%s): unable to update CHI object: %q", chi.Name, err)
-		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, "Unable to update CHI Resource")
-		return err
-	}
-
-	// Report CHI normalized
-	glog.V(1).Infof("ClickHouseInstallation (%s): created", chi.Name)
-	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted, fmt.Sprintf("ClickHouseInstallation (%s): added", chi.Name))
-
-	return nil
+	return c.updateChi(nil, new)
 }
 
 // updateChi sync CHI which was already created earlier
 func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
 
-	if !old.IsNormalized() {
-		old, _ = c.normalizer.CreateTemplatedChi(old)
+	if old == nil {
+		old, _ = c.normalizer.CreateTemplatedChi(&chop.ClickHouseInstallation{}, false)
+	} else if !old.IsNormalized() {
+		old, _ = c.normalizer.CreateTemplatedChi(old, true)
+		//			if err != nil {
+		//				glog.V(1).Infof("ClickHouseInstallation (%s): unable to normalize: %q", chi.Name, err)
+		//				c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "unable to normalize configuration")
+		//				return err
+		//			}
 	}
 
-	if !new.IsNormalized() {
-		new, _ = c.normalizer.CreateTemplatedChi(new)
+	if new == nil {
+		new, _ = c.normalizer.CreateTemplatedChi(&chop.ClickHouseInstallation{}, false)
+	} else if !new.IsNormalized() {
+		new, _ = c.normalizer.CreateTemplatedChi(new, true)
+		//			if err != nil {
+		//				glog.V(1).Infof("ClickHouseInstallation (%s): unable to normalize: %q", chi.Name, err)
+		//				c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "unable to normalize configuration")
+		//				return err
+		//			}
 	}
 
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		glog.V(2).Infof("updateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		glog.V(2).Infof("updateChi(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
 		// No need to react
 
 		// Update hostnames list for monitor
@@ -561,25 +558,28 @@ func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
-	glog.V(1).Infof("updateChi(%s/%s)", old.Namespace, old.Name)
+	glog.V(2).Infof("updateChi(%s/%s)", new.Namespace, new.Name)
 
 	actionPlan := NewActionPlan(old, new)
 
 	if actionPlan.HasNoChanges() {
-		glog.V(1).Infof("updateChi(%s/%s): no changes found", old.Namespace, old.Name)
+		glog.V(2).Infof("updateChi(%s/%s): no changes found", new.Namespace, new.Name)
 		// No need to react
 		return nil
 	}
 
+	glog.V(1).Infof("updateChi(%s/%s) - start reconcile", new.Namespace, new.Name)
+
 	// We are going to update CHI
-	// Write write declared CHI with initialized .Status, so it would be possible to monitor progress
+	// Write declared CHI with initialized .Status, so it would be possible to monitor progress
+	// Write normalized/expanded version
 	new.Status.DeleteHostsCount = actionPlan.GetRemovedHostsNum()
-	_ = c.updateCHIResource(new)
+	_ = c.updateChiObject(new)
 
 	if err := c.reconcile(new); err != nil {
 		log := fmt.Sprintf("Update of resources has FAILED: %v", err)
 		glog.V(1).Info(log)
-		c.eventChi(old, eventTypeError, eventActionUpdate, eventReasonUpdateFailed, log)
+		c.eventChi(new, eventTypeError, eventActionUpdate, eventReasonUpdateFailed, log)
 		return nil
 	}
 
@@ -588,19 +588,19 @@ func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
 		func(cluster *chop.ChiCluster) {
 			log := fmt.Sprintf("Added cluster %s", cluster.Name)
 			glog.V(1).Info(log)
-			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
+			c.eventChi(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 		},
 		func(shard *chop.ChiShard) {
 			log := fmt.Sprintf("Added shard %d to cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName)
 			glog.V(1).Info(log)
-			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
+			c.eventChi(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 
 			_ = c.createTablesOnShard(new, shard)
 		},
 		func(host *chop.ChiHost) {
 			log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 			glog.V(1).Info(log)
-			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
+			c.eventChi(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
 
 			_ = c.createTablesOnHost(new, host)
 		},
@@ -623,7 +623,7 @@ func (c *Controller) updateChi(old, new *chop.ClickHouseInstallation) error {
 	)
 
 	// Update CHI object
-	_ = c.updateCHIResource(new)
+	_ = c.updateChiObjectStatus(new)
 
 	//c.metricsExporter.UpdateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 	c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
@@ -704,8 +704,8 @@ func (c *Controller) deleteChopConfig(chopConfig *chop.ClickHouseOperatorConfigu
 	return nil
 }
 
-// updateCHIResource updates ClickHouseInstallation resource
-func (c *Controller) updateCHIResource(chi *chop.ClickHouseInstallation) error {
+// updateChiObject updates ClickHouseInstallation object
+func (c *Controller) updateChiObject(chi *chop.ClickHouseInstallation) error {
 	new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
 	if err != nil {
 		// Error update
@@ -716,6 +716,11 @@ func (c *Controller) updateCHIResource(chi *chop.ClickHouseInstallation) error {
 		glog.V(2).Infof("CHI (%s/%s) bump resource version %d/%d", chi.Namespace, chi.Name, chi.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
 	}
 	return err
+}
+
+// updateChiObjectStatus updates ClickHouseInstallation object. Naming is pure syntax sugar
+func (c *Controller) updateChiObjectStatus(chi *chop.ClickHouseInstallation) error {
+	return c.updateChiObject(chi)
 }
 
 // enqueueObject adds ClickHouseInstallation object to the workqueue

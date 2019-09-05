@@ -26,8 +26,9 @@ import (
 )
 
 type Normalizer struct {
-	config *chiv1.Config
-	chi    *chiv1.ClickHouseInstallation
+	config             *chiv1.Config
+	chi                *chiv1.ClickHouseInstallation
+	withDefaultCluster bool
 }
 
 func NewNormalizer(config *chiv1.Config) *Normalizer {
@@ -37,7 +38,8 @@ func NewNormalizer(config *chiv1.Config) *Normalizer {
 }
 
 // CreateTemplatedChi produces ready-to-use CHI object
-func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
+func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withDefaultCluster bool) (*chiv1.ClickHouseInstallation, error) {
+	n.withDefaultCluster = withDefaultCluster
 	if n.config.ChiTemplate == nil {
 		// No template specified
 		return n.DoChi(chi.DeepCopy())
@@ -349,12 +351,16 @@ func (n *Normalizer) doServiceTemplate(template *chiv1.ChiServiceTemplate) {
 // doClusters normalizes clusters
 func (n *Normalizer) doClusters() {
 
-	// Introduce default cluster
+	// Introduce default cluster in case it is required
 	if len(n.chi.Spec.Configuration.Clusters) == 0 {
-		n.chi.Spec.Configuration.Clusters = []chiv1.ChiCluster{
-			{
-				Name: "cluster",
-			},
+		if n.withDefaultCluster {
+			n.chi.Spec.Configuration.Clusters = []chiv1.ChiCluster{
+				{
+					Name: "cluster",
+				},
+			}
+		} else {
+			n.chi.Spec.Configuration.Clusters = []chiv1.ChiCluster{}
 		}
 	}
 

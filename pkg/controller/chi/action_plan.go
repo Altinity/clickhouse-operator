@@ -30,13 +30,51 @@ func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
 		old: old,
 		new: new,
 	}
-	ap.diff, ap.equal = messagediff.DeepDiff(ap.old, ap.new)
+	if (old != nil) && (new != nil) {
+		ap.diff, ap.equal = messagediff.DeepDiff(ap.old.Spec, ap.new.Spec)
+	} else if old == nil {
+		ap.diff, ap.equal = messagediff.DeepDiff(nil, ap.new.Spec)
+	} else if new == nil {
+		ap.diff, ap.equal = messagediff.DeepDiff(ap.old.Spec, nil)
+	} else {
+		// Both are nil
+		ap.diff = nil
+		ap.equal = true
+	}
+
+	// Sanitize diff - do not pay attention to ObjectMeta.ResourceVersion changes
+	if ap.diff != nil {
+		exclude := make([]*messagediff.Path, 0)
+		for ptrPath := range ap.diff.Modified {
+			for i := range *ptrPath {
+				pathNodeCurr := (*ptrPath)[i]
+				pathNodePrev := (*ptrPath)[i]
+				if i > 0 {
+					// We have prev node
+					pathNodePrev = (*ptrPath)[i-1]
+				}
+
+				prev := pathNodePrev.String()
+				curr := pathNodeCurr.String()
+				if (prev == "ObjectMeta") && (curr == ".ResourceVersion") {
+					// Exclude this path from Modified
+					exclude = append(exclude, ptrPath)
+				} else if (prev == ".ObjectMeta") && (curr == ".ResourceVersion") {
+					// Exclude this path from Modified
+					exclude = append(exclude, ptrPath)
+				}
+			}
+		}
+		for _, ptrPath := range exclude {
+			delete(ap.diff.Modified, ptrPath)
+		}
+	}
 
 	return ap
 }
 
 func (ap *ActionPlan) HasNoChanges() bool {
-	return ap.equal
+	return ap.equal || ((ap.diff != nil) && (len(ap.diff.Added) == 0) && (len(ap.diff.Removed) == 0) && (len(ap.diff.Modified) == 0))
 }
 
 func (ap *ActionPlan) GetNewHostsNum() int {
@@ -76,6 +114,15 @@ func (ap *ActionPlan) WalkRemoved(
 		case v1.ChiHost:
 			host := ap.diff.Removed[path].(v1.ChiHost)
 			hostFunc(&host)
+		case *v1.ChiCluster:
+			cluster := ap.diff.Removed[path].(*v1.ChiCluster)
+			clusterFunc(cluster)
+		case *v1.ChiShard:
+			shard := ap.diff.Removed[path].(*v1.ChiShard)
+			shardFunc(shard)
+		case *v1.ChiHost:
+			host := ap.diff.Removed[path].(*v1.ChiHost)
+			hostFunc(host)
 		}
 	}
 }
@@ -87,16 +134,25 @@ func (ap *ActionPlan) WalkAdded(
 ) {
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.diff.Added {
-		switch ap.diff.Removed[path].(type) {
+		switch ap.diff.Added[path].(type) {
 		case v1.ChiCluster:
-			cluster := ap.diff.Removed[path].(v1.ChiCluster)
+			cluster := ap.diff.Added[path].(v1.ChiCluster)
 			clusterFunc(&cluster)
 		case v1.ChiShard:
-			shard := ap.diff.Removed[path].(v1.ChiShard)
+			shard := ap.diff.Added[path].(v1.ChiShard)
 			shardFunc(&shard)
 		case v1.ChiHost:
-			host := ap.diff.Removed[path].(v1.ChiHost)
+			host := ap.diff.Added[path].(v1.ChiHost)
 			hostFunc(&host)
+		case *v1.ChiCluster:
+			cluster := ap.diff.Added[path].(*v1.ChiCluster)
+			clusterFunc(cluster)
+		case *v1.ChiShard:
+			shard := ap.diff.Added[path].(*v1.ChiShard)
+			shardFunc(shard)
+		case *v1.ChiHost:
+			host := ap.diff.Added[path].(*v1.ChiHost)
+			hostFunc(host)
 		}
 	}
 }
