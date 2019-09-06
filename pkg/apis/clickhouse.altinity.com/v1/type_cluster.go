@@ -53,3 +53,12 @@ func (cluster *ChiCluster) WalkHosts(
 
 	return res
 }
+
+func (cluster *ChiCluster) HostsCount() int {
+	count := 0
+	cluster.WalkHosts(func(host *ChiHost) error {
+		count++
+		return nil
+	})
+	return count
+}

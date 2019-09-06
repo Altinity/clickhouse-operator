@@ -12,22 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package v1
 
 import (
 	"bytes"
+	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/golang/glog"
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
 	"os"
-	"os/user"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
-
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/util"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -54,114 +51,35 @@ const (
 	defaultChPort     = 8123
 )
 
-// GetConfig creates Config object based on current environment
-func GetConfig(configFilePath string) (*Config, error) {
-	if len(configFilePath) > 0 {
-		// Config file explicitly specified as CLI flag
-		if conf, err := buildConfigFromFile(configFilePath); err == nil {
-			return conf, nil
-		} else {
-			return nil, err
-		}
-	}
-
-	if len(os.Getenv("CHOP_CONFIG")) > 0 {
-		// Config file explicitly specified as ENV var
-		if conf, err := buildConfigFromFile(os.Getenv("CHOP_CONFIG")); err == nil {
-			return conf, nil
-		} else {
-			return nil, err
-		}
-	}
-
-	// Try to find ~/.clickhouse-operator/config.yaml
-	usr, err := user.Current()
-	if err == nil {
-		// OS user found. Parse ~/.clickhouse-operator/config.yaml file
-		if conf, err := buildConfigFromFile(filepath.Join(usr.HomeDir, ".clickhouse-operator", "config.yaml")); err == nil {
-			// Able to build config, all is fine
-			return conf, nil
-		}
-	}
-
-	// Try to find /etc/clickhouse-operator/config.yaml
-	if conf, err := buildConfigFromFile("/etc/clickhouse-operator/config.yaml"); err == nil {
-		// Able to build config, all is fine
-		return conf, nil
-	}
-
-	// No config file found, use default one
-	return buildDefaultConfig()
-}
-
-// buildConfigFromFile returns Config struct built out of specified file path
-func buildConfigFromFile(configFilePath string) (*Config, error) {
-	// Read config file content
-	yamlText, err := ioutil.ReadFile(configFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	// Parse config file content into Config struct
-	config := new(Config)
-	err = yaml.Unmarshal(yamlText, config)
-	if err != nil {
-		return nil, err
-	}
-
-	// Fill Config's paths
-	config.ConfigFilePath, err = filepath.Abs(configFilePath)
-	config.ConfigFolderPath = filepath.Dir(config.ConfigFilePath)
-
-	// Normalize Config struct into fully-and-correctly filled Config struct
-	config.normalize()
-	config.readChConfigFiles()
-	config.readChiTemplateFiles()
-	config.processChiTemplateFiles()
-	config.applyEnvVars()
-
-	return config, nil
-
-}
-
-// buildDefaultConfig returns default Config
-func buildDefaultConfig() (*Config, error) {
-	config := new(Config)
-	config.normalize()
-	config.applyEnvVars()
-
-	return config, nil
-}
-
 // processChiTemplateFiles build Config.ChiTemplate from template files content
 func (config *Config) processChiTemplateFiles() {
 
 	// Produce map of CHI templates out of CHI template files
 	for filename := range config.ChiTemplateFiles {
-		template := new(chiv1.ClickHouseInstallation)
+		template := new(ClickHouseInstallation)
 		if err := yaml.Unmarshal([]byte(config.ChiTemplateFiles[filename]), template); err != nil {
 			// Unable to unmarshal - skip incorrect template
 			glog.V(1).Infof("FAIL processChiTemplateFiles() unable to unmarshal file %s %q", filename, err)
 			continue
 		}
-		config.insertChiTemplate(template)
+		config.enlistChiTemplate(template)
 	}
 
 	config.buildChiTemplate()
 }
 
-// insertChiTemplate inserts template into templates catalog
-func (config *Config) insertChiTemplate(template *chiv1.ClickHouseInstallation) {
+// enlistChiTemplate inserts template into templates catalog
+func (config *Config) enlistChiTemplate(template *ClickHouseInstallation) {
 	// Insert template
 	if config.ChiTemplates == nil {
-		config.ChiTemplates = make(map[string]*chiv1.ClickHouseInstallation)
+		config.ChiTemplates = make(map[string]*ClickHouseInstallation)
 	}
 	// map template name -> template itself
 	config.ChiTemplates[template.Name] = template
 }
 
-// removeChiTemplate removes template from templates catalog
-func (config *Config) removeChiTemplate(template *chiv1.ClickHouseInstallation) {
+// unlistChiTemplate removes template from templates catalog
+func (config *Config) unlistChiTemplate(template *ClickHouseInstallation) {
 	// Insert template
 	if config.ChiTemplates == nil {
 		return
@@ -173,6 +91,11 @@ func (config *Config) removeChiTemplate(template *chiv1.ClickHouseInstallation) 
 
 // buildChiTemplate builds combined CHI Template from templates catalog
 func (config *Config) buildChiTemplate() {
+	// Build unified template in case there are templates to build from only
+	if len(config.ChiTemplates) == 0 {
+		return
+	}
+
 	// Sort CHI templates by their names and apply one by one
 	// Extract file names into slice and sort it
 	// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
@@ -183,7 +106,7 @@ func (config *Config) buildChiTemplate() {
 	sort.Strings(sortedTemplateNames)
 
 	// Create final combined template
-	config.ChiTemplate = new(chiv1.ClickHouseInstallation)
+	config.ChiTemplate = new(ClickHouseInstallation)
 
 	// Extract templates in sorted order - according to sorted template names
 	for _, templateName := range sortedTemplateNames {
@@ -199,19 +122,28 @@ func (config *Config) buildChiTemplate() {
 
 }
 
-func (config *Config) AddChiTemplate(template *chiv1.ClickHouseInstallation) {
-	config.insertChiTemplate(template)
+func (config *Config) AddChiTemplate(template *ClickHouseInstallation) {
+	config.enlistChiTemplate(template)
 	config.buildChiTemplate()
 }
 
-func (config *Config) UpdateChiTemplate(template *chiv1.ClickHouseInstallation) {
-	config.insertChiTemplate(template)
+func (config *Config) UpdateChiTemplate(template *ClickHouseInstallation) {
+	config.enlistChiTemplate(template)
 	config.buildChiTemplate()
 }
 
-func (config *Config) DeleteChiTemplate(template *chiv1.ClickHouseInstallation) {
-	config.removeChiTemplate(template)
+func (config *Config) DeleteChiTemplate(template *ClickHouseInstallation) {
+	config.unlistChiTemplate(template)
 	config.buildChiTemplate()
+}
+
+func (config *Config) Postprocess() {
+	config.normalize()
+	config.readChConfigFiles()
+	config.readChiTemplateFiles()
+	config.processChiTemplateFiles()
+	config.applyEnvVars()
+	config.applyDefaultWatchNamespace()
 }
 
 // normalize() makes fully-and-correctly filled Config
@@ -308,15 +240,26 @@ func (config *Config) applyEnvVars() {
 	}
 }
 
+// applyDefaultWatchNamespace applies default watch namespace in case none specified earlier
+func (config *Config) applyDefaultWatchNamespace() {
+	// Watch in own namespace only in case no other specified earlier
+	if len(config.WatchNamespaces) == 0 {
+		if ns := os.Getenv("OPERATOR_POD_NAMESPACE"); len(ns) > 0 {
+			// We have WATCH_NAMESPACE specified
+			config.WatchNamespaces = []string{ns}
+		}
+	}
+}
+
 // prepareConfigPath - prepares config path absolute/relative with default relative value
 func (config *Config) prepareConfigPath(path *string, defaultRelativePath string) {
 	if *path == "" {
 		// Path not specified, try to build it relative to config file
 		*path = config.relativeToConfigFolderPath(defaultRelativePath)
 	} else if filepath.IsAbs(*path) {
-		// Absolute path already specified - nothing to do here
+		// Absolute path explicitly specified - nothing to do here
 	} else {
-		// Relative path - make it relative to config file itself
+		// Relative path specified - make relative path relative to config file itself
 		*path = config.relativeToConfigFolderPath(*path)
 	}
 
@@ -421,6 +364,11 @@ func (config *Config) String() string {
 	return b.String()
 }
 
+// WriteToLog writes Config into log
+func (config *Config) WriteToLog() {
+	glog.V(1).Infof("Config:\n%s", config.String())
+}
+
 // stringSlice returns string of named []string Config param
 func (config *Config) stringSlice(name string, sl []string) string {
 	b := &bytes.Buffer{}
@@ -453,6 +401,24 @@ func (config *Config) stringMap(name string, m map[string]string) string {
 	}
 
 	return b.String()
+}
+
+// GetInformerNamespace is a TODO stub
+// Namespace where informers would watch notifications from
+func (config *Config) GetInformerNamespace() string {
+	// Namespace where informers would watch notifications from
+	namespace := metav1.NamespaceAll
+	if len(config.WatchNamespaces) == 1 {
+		// We have exactly one watch namespace specified
+		// This scenario is implemented in go-client
+		// In any other case, just keep metav1.NamespaceAll
+
+		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
+		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
+		namespace = config.WatchNamespaces[0]
+	}
+
+	return namespace
 }
 
 // readConfigFiles reads config files from specified path into "file name->file content" map

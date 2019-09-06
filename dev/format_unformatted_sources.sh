@@ -11,7 +11,7 @@ set -o pipefail
 
 # Source configuration
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-source "${CUR_DIR}/binary_build_config.sh"
+source "${CUR_DIR}/go_build_config.sh"
 
 # Iterate over list of unformatted files and format each of them
 "${CUR_DIR}/find_unformatted_sources.sh" | while read -r FILE; do

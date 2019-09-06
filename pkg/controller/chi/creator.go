@@ -19,8 +19,6 @@ import (
 	"errors"
 	"fmt"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/config"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -28,20 +26,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
-
-// reconcileChi reconciles ClickHouseInstallation
-func (c *Controller) reconcile(chi *chop.ClickHouseInstallation) error {
-	reconciler := chopmodel.NewReconciler(
-		chi,
-		c.chopConfig,
-		c.version,
-		&chopmodel.ReconcileFuncs{
-			ReconcileConfigMap:   c.ReconcileConfigMap,
-			ReconcileService:     c.ReconcileService,
-			ReconcileStatefulSet: c.ReconcileStatefulSet,
-		})
-	return reconciler.Reconcile()
-}
 
 // reconcileConfigMap reconciles core.ConfigMap
 func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
@@ -116,12 +100,16 @@ func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host
 
 	if curStatefulSet != nil {
 		// StatefulSet already exists - update it
-		return c.updateStatefulSet(curStatefulSet, newStatefulSet)
+		err = c.updateStatefulSet(curStatefulSet, newStatefulSet)
+		host.Chi.Status.UpdatedHostsCount++
+		_ = c.updateChiObjectStatus(host.Chi)
 	}
 
 	if apierrors.IsNotFound(err) {
 		// StatefulSet with such name not found - create StatefulSet
-		return c.createStatefulSet(newStatefulSet, host)
+		err = c.createStatefulSet(newStatefulSet, host)
+		host.Chi.Status.AddedHostsCount++
+		_ = c.updateChiObjectStatus(host.Chi)
 	}
 
 	// Error has happened with .Get()
@@ -181,33 +169,38 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
 	start := time.Now()
 	for {
-		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {
-			// Unable to get StatefulSet
-			if apierrors.IsNotFound(err) {
-				// Object with such name not found - may be is still being created - wait for it
-				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s) - object not yet created, wait for it", namespace, name)
-				time.Sleep(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second)
-			} else {
-				// Some kind of total error
-				glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
-				return err
+		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err == nil {
+			if hasStatefulSetReachedGeneration(statefulSet, targetGeneration) {
+				// StatefulSet is available and generation reached
+				// All is good, job done, exit
+				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-OK  :%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
+				return nil
+			} else if time.Since(start) >= (60 * time.Second) {
+				// Generation not yet reached
+				// Start bothering with messages after some time only
+				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 			}
-		} else if hasStatefulSetReachedGeneration(statefulSet, targetGeneration) {
-			// StatefulSet is available and generation reached
-			// All is good, job done, exit
-			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)OK:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
-			return nil
-		} else if time.Since(start) < (time.Duration(c.chopConfig.StatefulSetUpdateTimeout) * time.Second) {
-			// StatefulSet is available but generation is not yet reached
-			// Wait some more time
-			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s):%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
-			time.Sleep(time.Duration(c.chopConfig.StatefulSetUpdatePollPeriod) * time.Second)
+		} else if apierrors.IsNotFound(err) {
+			// Object with such name not found - may be is still being created - wait for it
+			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT: object not yet created, need to wait", namespace, name)
 		} else {
-			// StatefulSet is available but generation is not yet reached
-			// Timeout reached
-			// Failed, time to quit
+			// Some kind of total error
+			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
+			return err
+		}
+
+		// StatefulSet is either not created or generation is not yet reached
+
+		if time.Since(start) >= (time.Duration(c.chopConfigManager.Config().StatefulSetUpdateTimeout) * time.Second) {
+			// Timeout reached, no good result available, time to quit
 			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) - TIMEOUT reached", namespace, name)
 			return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - wait timeout", namespace, name))
+		}
+
+		// Wait some more time
+		glog.V(2).Infof("waitStatefulSetGeneration(%s/%s):%s", namespace, name)
+		select {
+		case <-time.After(time.Duration(c.chopConfigManager.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}
 	}
 }
@@ -220,19 +213,19 @@ func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulS
 	name := failedStatefulSet.Name
 
 	// What to do with StatefulSet - look into chop configuration settings
-	switch c.chopConfig.OnStatefulSetCreateFailureAction {
-	case config.OnStatefulSetCreateFailureActionAbort:
+	switch c.chopConfigManager.Config().OnStatefulSetCreateFailureAction {
+	case chop.OnStatefulSetCreateFailureActionAbort:
 		// Do nothing, just report appropriate error
 		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - abort", namespace, name)
 		return errors.New(fmt.Sprintf("Create failed on %s/%s", namespace, name))
 
-	case config.OnStatefulSetCreateFailureActionDelete:
+	case chop.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully problematic failed StatefulSet
 		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to DELETE FAILED StatefulSet", namespace, name)
 		_ = c.deleteHost(host)
 		return c.shouldContinueOnCreateFailed()
 	default:
-		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetCreateFailureAction=%s", c.chopConfig.OnStatefulSetCreateFailureAction)
+		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetCreateFailureAction=%s", c.chopConfigManager.Config().OnStatefulSetCreateFailureAction)
 		return nil
 	}
 }
@@ -245,13 +238,13 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 	name := rollbackStatefulSet.Name
 
 	// What to do with StatefulSet - look into chop configuration settings
-	switch c.chopConfig.OnStatefulSetUpdateFailureAction {
-	case config.OnStatefulSetUpdateFailureActionAbort:
+	switch c.chopConfigManager.Config().OnStatefulSetUpdateFailureAction {
+	case chop.OnStatefulSetUpdateFailureActionAbort:
 		// Do nothing, just report appropriate error
 		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort", namespace, name)
 		return errors.New(fmt.Sprintf("Update failed on %s/%s", namespace, name))
 
-	case config.OnStatefulSetUpdateFailureActionRollback:
+	case chop.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
 		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - going to ROLLBACK FAILED StatefulSet", namespace, name)
 		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {
@@ -270,7 +263,7 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 			return c.shouldContinueOnUpdateFailed()
 		}
 	default:
-		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s", c.chopConfig.OnStatefulSetUpdateFailureAction)
+		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s", c.chopConfigManager.Config().OnStatefulSetUpdateFailureAction)
 		return nil
 	}
 }
@@ -305,6 +298,10 @@ func (c *Controller) shouldContinueOnUpdateFailed() error {
 
 // hasStatefulSetReachedGeneration returns whether has StatefulSet reached the expected generation after upgrade or not
 func hasStatefulSetReachedGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
+	if statefulSet == nil {
+		return false
+	}
+
 	// StatefulSet has .spec generation we are waiting for
 	return (statefulSet.Generation == generation) &&
 		// and this .spec generation is being applied to replicas - it is observed right now

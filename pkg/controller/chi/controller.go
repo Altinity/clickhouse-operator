@@ -18,10 +18,10 @@ import (
 	"context"
 	"fmt"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmetrics "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
+	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
-	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/clickhouse.altinity.com/v1"
+	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/config"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
 	"gopkg.in/d4l3k/messagediff.v1"
@@ -30,14 +30,14 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	appsinformers "k8s.io/client-go/informers/apps/v1"
-	coreinformers "k8s.io/client-go/informers/core/v1"
+	kubeinformers "k8s.io/client-go/informers"
 	kube "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"os"
 
 	"github.com/golang/glog"
 )
@@ -45,22 +45,17 @@ import (
 // NewController creates instance of Controller
 func NewController(
 	version string,
-	runtimeParams map[string]string,
-	chopConfig *config.Config,
+	chopConfigManager *config.ConfigManager,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
-	chiInformer chopinformers.ClickHouseInstallationInformer,
-	chitInformer chopinformers.ClickHouseInstallationTemplateInformer,
-	serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer,
-	configMapInformer coreinformers.ConfigMapInformer,
-	statefulSetInformer appsinformers.StatefulSetInformer,
-	podInformer coreinformers.PodInformer,
-	chopMetricsExporter *chopmetrics.Exporter,
+	chopInformerFactory chopinformers.SharedInformerFactory,
+	kubeInformerFactory kubeinformers.SharedInformerFactory,
 ) *Controller {
 
 	// Initializations
-	chopclientsetscheme.AddToScheme(scheme.Scheme)
+	_ = chopclientsetscheme.AddToScheme(scheme.Scheme)
+
+	// Setup events
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	eventBroadcaster.StartRecordingToSink(
@@ -78,56 +73,48 @@ func NewController(
 	// Create Controller instance
 	controller := &Controller{
 		version:                 version,
-		runtimeParams:           runtimeParams,
-		normalizer:              chopmodels.NewNormalizer(chopConfig),
-		schemer:                 chopmodels.NewSchemer(chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort),
-		chopConfig:              chopConfig,
+		chopConfigManager:       chopConfigManager,
 		kubeClient:              kubeClient,
 		chopClient:              chopClient,
-		chiLister:               chiInformer.Lister(),
-		chiListerSynced:         chiInformer.Informer().HasSynced,
-		chitLister:              chitInformer.Lister(),
-		chitListerSynced:        chitInformer.Informer().HasSynced,
-		serviceLister:           serviceInformer.Lister(),
-		serviceListerSynced:     serviceInformer.Informer().HasSynced,
-		endpointsLister:         endpointsInformer.Lister(),
-		endpointsListerSynced:   endpointsInformer.Informer().HasSynced,
-		configMapLister:         configMapInformer.Lister(),
-		configMapListerSynced:   configMapInformer.Informer().HasSynced,
-		statefulSetLister:       statefulSetInformer.Lister(),
-		statefulSetListerSynced: statefulSetInformer.Informer().HasSynced,
-		podLister:               podInformer.Lister(),
-		podListerSynced:         podInformer.Informer().HasSynced,
+		chiLister:               chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Lister(),
+		chiListerSynced:         chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().HasSynced,
+		chitLister:              chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Lister(),
+		chitListerSynced:        chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Informer().HasSynced,
+		serviceLister:           kubeInformerFactory.Core().V1().Services().Lister(),
+		serviceListerSynced:     kubeInformerFactory.Core().V1().Services().Informer().HasSynced,
+		endpointsLister:         kubeInformerFactory.Core().V1().Endpoints().Lister(),
+		endpointsListerSynced:   kubeInformerFactory.Core().V1().Endpoints().Informer().HasSynced,
+		configMapLister:         kubeInformerFactory.Core().V1().ConfigMaps().Lister(),
+		configMapListerSynced:   kubeInformerFactory.Core().V1().ConfigMaps().Informer().HasSynced,
+		statefulSetLister:       kubeInformerFactory.Apps().V1().StatefulSets().Lister(),
+		statefulSetListerSynced: kubeInformerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
+		podLister:               kubeInformerFactory.Core().V1().Pods().Lister(),
+		podListerSynced:         kubeInformerFactory.Core().V1().Pods().Informer().HasSynced,
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
 		recorder:                recorder,
-		metricsExporter:         chopMetricsExporter,
 	}
+	controller.addEventHandlers(chopInformerFactory, kubeInformerFactory)
 
 	return controller
 }
 
-func (c *Controller) AddEventHandlers(
-	chiInformer chopinformers.ClickHouseInstallationInformer,
-	chitInformer chopinformers.ClickHouseInstallationTemplateInformer,
-	serviceInformer coreinformers.ServiceInformer,
-	endpointsInformer coreinformers.EndpointsInformer,
-	configMapInformer coreinformers.ConfigMapInformer,
-	statefulSetInformer appsinformers.StatefulSetInformer,
-	podInformer coreinformers.PodInformer,
+func (c *Controller) addEventHandlers(
+	chopInformerFactory chopinformers.SharedInformerFactory,
+	kubeInformerFactory kubeinformers.SharedInformerFactory,
 ) {
-	chiInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chi := obj.(*chop.ClickHouseInstallation)
-			if !c.chopConfig.IsWatchedNamespace(chi.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
 			c.enqueueObject(NewReconcileChi(reconcileAdd, nil, chi))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			newChi := new.(*chop.ClickHouseInstallation)
 			oldChi := old.(*chop.ClickHouseInstallation)
-			if !c.chopConfig.IsWatchedNamespace(newChi.Namespace) {
+			newChi := new.(*chop.ClickHouseInstallation)
+			if !c.chopConfigManager.Config().IsWatchedNamespace(newChi.Namespace) {
 				return
 			}
 			//glog.V(1).Info("chiInformer.UpdateFunc")
@@ -135,7 +122,7 @@ func (c *Controller) AddEventHandlers(
 		},
 		DeleteFunc: func(obj interface{}) {
 			chi := obj.(*chop.ClickHouseInstallation)
-			if !c.chopConfig.IsWatchedNamespace(chi.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
@@ -143,19 +130,19 @@ func (c *Controller) AddEventHandlers(
 		},
 	})
 
-	chitInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chit := obj.(*chop.ClickHouseInstallationTemplate)
-			if !c.chopConfig.IsWatchedNamespace(chit.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
 			c.enqueueObject(NewReconcileChit(reconcileAdd, nil, chit))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			newChit := new.(*chop.ClickHouseInstallationTemplate)
 			oldChit := old.(*chop.ClickHouseInstallationTemplate)
-			if !c.chopConfig.IsWatchedNamespace(newChit.Namespace) {
+			newChit := new.(*chop.ClickHouseInstallationTemplate)
+			if !c.chopConfigManager.Config().IsWatchedNamespace(newChit.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
@@ -163,7 +150,7 @@ func (c *Controller) AddEventHandlers(
 		},
 		DeleteFunc: func(obj interface{}) {
 			chit := obj.(*chop.ClickHouseInstallationTemplate)
-			if !c.chopConfig.IsWatchedNamespace(chit.Namespace) {
+			if !c.chopConfigManager.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
@@ -171,7 +158,35 @@ func (c *Controller) AddEventHandlers(
 		},
 	})
 
-	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	chopInformerFactory.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			chopConfig := obj.(*chop.ClickHouseOperatorConfiguration)
+			if !c.chopConfigManager.Config().IsWatchedNamespace(chopConfig.Namespace) {
+				return
+			}
+			//glog.V(1).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
+			c.enqueueObject(NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
+		},
+		UpdateFunc: func(old, new interface{}) {
+			newChopConfig := new.(*chop.ClickHouseOperatorConfiguration)
+			oldChopConfig := old.(*chop.ClickHouseOperatorConfiguration)
+			if !c.chopConfigManager.Config().IsWatchedNamespace(newChopConfig.Namespace) {
+				return
+			}
+			//glog.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
+			c.enqueueObject(NewReconcileChopConfig(reconcileUpdate, oldChopConfig, newChopConfig))
+		},
+		DeleteFunc: func(obj interface{}) {
+			chopConfig := obj.(*chop.ClickHouseOperatorConfiguration)
+			if !c.chopConfigManager.Config().IsWatchedNamespace(chopConfig.Namespace) {
+				return
+			}
+			//glog.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
+			c.enqueueObject(NewReconcileChopConfig(reconcileDelete, chopConfig, nil))
+		},
+	})
+
+	kubeInformerFactory.Core().V1().Services().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
 			if !c.isTrackedObject(&service.ObjectMeta) {
@@ -181,44 +196,8 @@ func (c *Controller) AddEventHandlers(
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldService := old.(*core.Service)
-			newService := new.(*core.Service)
 			if !c.isTrackedObject(&oldService.ObjectMeta) {
 				return
-			}
-
-			diff, equal := messagediff.DeepDiff(oldService, newService)
-			if equal {
-				//glog.V(1).Infof("onUpdateService(%s/%s): no changes found", oldService.Namespace, oldService.Name)
-				// No need tor react
-				return
-			}
-
-			for path := range diff.Added {
-				glog.V(1).Infof("onUpdateService(%s/%s): added %v", oldService.Namespace, oldService.Name, path)
-			}
-			for path := range diff.Removed {
-				glog.V(1).Infof("onUpdateService(%s/%s): removed %v", oldService.Namespace, oldService.Name, path)
-			}
-			for path := range diff.Modified {
-				glog.V(1).Infof("onUpdateService(%s/%s): modified %v", oldService.Namespace, oldService.Name, path)
-			}
-
-			if (oldService.Spec.ClusterIP == "") && (newService.Spec.ClusterIP != "") {
-				// Internal IP address assigned
-				// Pod restart completed?
-				glog.V(1).Infof("serviceInformer UpdateFunc(%s/%s) IP ASSIGNED %s:%s", newService.Namespace, newService.Name, newService.Spec.Type, newService.Spec.ClusterIP)
-				if cluster, err := c.createClusterFromObjectMeta(&newService.ObjectMeta); err != nil {
-					glog.V(1).Infof("serviceInformer UpdateFunc(%s/%s) flushing DNS for cluster %s", newService.Namespace, newService.Name, cluster.Name)
-					//chopmodels.ClusterDropDnsCache(cluster)
-				} else {
-					glog.V(1).Infof("serviceInformer UpdateFunc(%s/%s) unable to find cluster cluster", newService.Namespace, newService.Name)
-				}
-			} else if (oldService.Spec.ClusterIP != "") && (newService.Spec.ClusterIP == "") {
-				// Internal IP address lost
-				// Pod restart?
-				glog.V(1).Infof("serviceInformer UpdateFunc(%s/%s) IP LOST %s:%s", oldService.Namespace, oldService.Name, oldService.Spec.Type, oldService.Spec.ClusterIP)
-			} else {
-				glog.V(1).Infof("serviceInformer UpdateFunc(%s/%s)", oldService.Namespace, oldService.Name)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -230,7 +209,7 @@ func (c *Controller) AddEventHandlers(
 		},
 	})
 
-	endpointsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	kubeInformerFactory.Core().V1().Endpoints().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			endpoints := obj.(*core.Endpoints)
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
@@ -271,12 +250,7 @@ func (c *Controller) AddEventHandlers(
 
 			if added {
 				glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) IP ASSIGNED %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.Subsets)
-				if chi, err := c.createChiFromObjectMeta(&newEndpoints.ObjectMeta); err == nil {
-					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", newEndpoints.Namespace, newEndpoints.Name, chi.Name)
-					_ = c.schemer.ChiDropDnsCache(chi)
-				} else {
-					glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.ObjectMeta.Labels)
-				}
+				c.enqueueObject(NewDropDns(&newEndpoints.ObjectMeta))
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -288,7 +262,7 @@ func (c *Controller) AddEventHandlers(
 		},
 	})
 
-	configMapInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	kubeInformerFactory.Core().V1().ConfigMaps().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
@@ -312,7 +286,7 @@ func (c *Controller) AddEventHandlers(
 		},
 	})
 
-	statefulSetInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	kubeInformerFactory.Apps().V1().StatefulSets().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
@@ -338,7 +312,7 @@ func (c *Controller) AddEventHandlers(
 		},
 	})
 
-	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	kubeInformerFactory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
 			if !c.isTrackedObject(&pod.ObjectMeta) {
@@ -365,7 +339,7 @@ func (c *Controller) AddEventHandlers(
 
 // isTrackedObject checks whether operator is interested in changes of this object
 func (c *Controller) isTrackedObject(objectMeta *meta.ObjectMeta) bool {
-	return c.chopConfig.IsWatchedNamespace(objectMeta.Namespace) && chopmodels.IsChopGeneratedObject(objectMeta)
+	return c.chopConfigManager.Config().IsWatchedNamespace(objectMeta.Namespace) && chopmodels.IsChopGeneratedObject(objectMeta)
 }
 
 // Run syncs caches, starts workers
@@ -389,6 +363,9 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 	// Label controller runtime objects with proper labels
 	c.labelMyObjectsTree()
 
+	//
+	// Start threads
+	//
 	glog.V(1).Info("ClickHouseInstallation controller: starting workers")
 	for i := 0; i < threadiness; i++ {
 		glog.V(1).Infof("ClickHouseInstallation controller: starting worker %d with poll period %d", i+1, runWorkerPeriod)
@@ -400,8 +377,9 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 	<-ctx.Done()
 }
 
-// runWorker is an endless work loop
+// runWorker is an endless work loop running in a thread
 func (c *Controller) runWorker() {
+	worker := c.newWorker()
 	for {
 		// Get() blocks until it can return an item
 		item, shutdown := c.queue.Get()
@@ -410,269 +388,113 @@ func (c *Controller) runWorker() {
 			return
 		}
 
-		if err := c.processWorkItem(item); err != nil {
-			// code cannot return an error and needs to indicate it has been ignored
+		if err := worker.processItem(item); err == nil {
+			// Item processed
+			// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
+			// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
+			// still have to call `Done` on the queue.
+			c.queue.Forget(item)
+		} else {
+			// Item not processed
+			// this code cannot return an error and needs to indicate error has been ignored
 			utilruntime.HandleError(err)
 		}
+
 		// Must call Done(item) when processing completed
 		c.queue.Done(item)
 	}
 }
 
-// processWorkItem processes one work item according to its type
-func (c *Controller) processWorkItem(item interface{}) error {
-	switch item.(type) {
-	case *ReconcileChi:
-		reconcile, _ := item.(*ReconcileChi)
-		if err := c.syncChi(reconcile); err != nil {
-			// Item will be retried later
-			return fmt.Errorf("unable to sync CHI object %v", err.Error())
-		}
-
-	case *ReconcileChit:
-		reconcile, _ := item.(*ReconcileChit)
-		if err := c.syncChit(reconcile); err != nil {
-			// Item will be retried later
-			return fmt.Errorf("unable to sync CHIT object %v", err.Error())
-		}
-	default:
-		// Unknown item type, dont know what to do with it
-		utilruntime.HandleError(fmt.Errorf("unexpected item in the queue - %#v", item))
-	}
-
-	// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
-	// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
-	// still have to call `Done` on the queue.
-	c.queue.Forget(item)
-
-	return nil
+func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
+	go c.updateWatchAsync(namespace, name, hostnames)
 }
 
-// syncChi is the main reconcile loop function - reconcile CHI object
-func (c *Controller) syncChi(reconcile *ReconcileChi) error {
-	//glog.V(1).Infof("syncChi(%s) start", reconcile.cmd)
-	//defer glog.V(1).Infof("syncChi(%s) end", reconcile.cmd)
-
-	switch reconcile.cmd {
-	case reconcileAdd:
-		return c.onAddChi(reconcile.new)
-	case reconcileUpdate:
-		return c.onUpdateChi(reconcile.old, reconcile.new)
-	case reconcileDelete:
-		return c.onDeleteChi(reconcile.old)
-	}
-
-	return nil
-}
-
-// syncChit is the main reconcile loop function - reconcile CHIT object
-func (c *Controller) syncChit(reconcile *ReconcileChit) error {
-	//glog.V(1).Infof("syncChit(%s) start", reconcile.cmd)
-	//defer glog.V(1).Infof("syncChit(%s) end", reconcile.cmd)
-
-	switch reconcile.cmd {
-	case reconcileAdd:
-		return c.onAddChit(reconcile.new)
-	case reconcileUpdate:
-		return c.onUpdateChit(reconcile.old, reconcile.new)
-	case reconcileDelete:
-		return c.onDeleteChit(reconcile.old)
-	}
-
-	return nil
-}
-
-// onAddChi sync new CHI - creates all its resources
-func (c *Controller) onAddChi(chi *chop.ClickHouseInstallation) error {
-	// CHI is a new one - need to create all its objects
-	// Operator receives CHI struct partially filled by data from .yaml file provided by user
-	// We need to create all resources that are needed to run user's .yaml specification
-	glog.V(1).Infof("onAddChi(%s/%s)", chi.Namespace, chi.Name)
-
-	chi, err := c.normalizer.CreateTemplatedChi(chi)
-	if err != nil {
-		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
-		c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "unable to normalize configuration")
-		return err
-	}
-
-	err = c.reconcile(chi)
-	if err != nil {
-		glog.V(1).Infof("ClickHouseInstallation (%q): unable to create controlled resources: %q", chi.Name, err)
-		c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "Unable to create resources")
-		return err
-	}
-
-	// Update CHI status in k8s
-	if err := c.updateCHIResource(chi); err != nil {
-		glog.V(1).Infof("ClickHouseInstallation (%q): unable to update status of CHI resource: %q", chi.Name, err)
-		c.eventChi(chi, eventTypeWarning, eventActionCreate, eventReasonCreateFailed, "Unable to update CHI Resource")
-		return err
-	}
-
-	glog.V(1).Infof("ClickHouseInstallation (%q): controlled resources are synced (created)", chi.Name)
-	c.eventChi(chi, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted,
-		fmt.Sprintf("created cluster with %d shards and %d hosts", chi.Status.ShardsCount, chi.Status.HostsCount))
-
-	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
-	c.metricsExporter.EnsureControlledValues(chi.Name, chopmodels.CreatePodFQDNsOfChi(chi))
-
-	return nil
-}
-
-// onUpdateChi sync CHI which was already created earlier
-func (c *Controller) onUpdateChi(old, new *chop.ClickHouseInstallation) error {
-	glog.V(2).Infof("onUpdateChi(%s/%s):", old.Namespace, old.Name)
-
-	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		glog.V(2).Infof("onUpdateChi(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
-		// No need to react
-		return nil
-	}
-
-	if !old.IsKnown() && new.IsKnown() {
-		glog.V(1).Infof("onUpdateChi(%s/%s): This `update` event triggered by `save` filled CHI action", old.Namespace, old.Name)
-		// This `update` event triggered by `save` filled CHI action
-		// No need to react
-		return nil
-	}
-
-	if !old.IsNormalized() {
-		old, _ = c.normalizer.CreateTemplatedChi(old)
-	}
-
-	if !new.IsNormalized() {
-		new, _ = c.normalizer.CreateTemplatedChi(new)
-	}
-
-	diff, equal := messagediff.DeepDiff(old, new)
-
-	if equal {
-		glog.V(1).Infof("onUpdateChi(%s/%s): no changes found", old.Namespace, old.Name)
-		// No need tor react
-		return nil
-	}
-
-	// Deal with removed items
-	// TODO refactor to map[string]object handling, instead of slice
-	for path := range diff.Removed {
-		switch diff.Removed[path].(type) {
-		case chop.ChiCluster:
-			cluster := diff.Removed[path].(chop.ChiCluster)
-			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
-				fmt.Sprintf("delete cluster %s", cluster.Name))
-			_ = c.deleteCluster(&cluster)
-		case chop.ChiShard:
-			shard := diff.Removed[path].(chop.ChiShard)
-			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
-				fmt.Sprintf("delete shard %d in cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName))
-			_ = c.deleteShard(&shard)
-		case chop.ChiHost:
-			host := diff.Removed[path].(chop.ChiHost)
-			c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress,
-				fmt.Sprintf("delete replica %d from shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName))
-			_ = c.deleteHost(&host)
-		}
-	}
-
-	// Deal with added/updated items
-	//	c.listStatefulSetResources(chi)
-	if err := c.reconcile(new); err != nil {
-		log := fmt.Sprintf("Update of resources has FAILED: %v", err)
-		glog.V(1).Info(log)
-		c.eventChi(old, eventTypeError, eventActionUpdate, eventReasonUpdateFailed, log)
+func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string) {
+	if err := metrics.UpdateWatchREST(namespace, name, hostnames); err != nil {
+		glog.V(1).Infof("FAIL update watch (%s/%s): %q", namespace, name, err)
 	} else {
-		for path := range diff.Added {
-			switch diff.Added[path].(type) {
-			case chop.ChiCluster:
-				cluster := diff.Added[path].(chop.ChiCluster)
-
-				log := fmt.Sprintf("Added cluster %s", cluster.Name)
-				glog.V(1).Info(log)
-
-				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
-			case chop.ChiShard:
-				shard := diff.Added[path].(chop.ChiShard)
-				cluster := new.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
-
-				log := fmt.Sprintf("Added shard %d to cluster %s", shard.Address.ShardIndex, cluster.Name)
-				glog.V(1).Info(log)
-				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
-
-				names, createSQLs, _ := c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
-
-				glog.V(1).Infof("Creating distributed objects: %v", names)
-				_ = c.schemer.ShardApplySQLs(&shard, createSQLs, true)
-			case chop.ChiHost:
-				host := diff.Added[path].(chop.ChiHost)
-				cluster := new.Spec.Configuration.Clusters[host.Address.ClusterIndex]
-
-				log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, cluster.Name)
-				glog.V(1).Info(log)
-				c.eventChi(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
-
-				names, createSQLs, _ := c.schemer.GetCreateReplicatedObjects(new, &cluster, &host)
-				glog.V(1).Infof("Creating replicated objects: %v", names)
-				_ = c.schemer.HostApplySQLs(&host, createSQLs, true)
-
-				names, createSQLs, _ = c.schemer.ClusterGetCreateDistributedObjects(new, &cluster)
-				glog.V(1).Infof("Creating distributed objects: %v", names)
-				_ = c.schemer.HostApplySQLs(&host, createSQLs, true)
-			}
-		}
-		_ = c.updateCHIResource(new)
+		glog.V(2).Infof("OK update watch (%s/%s)", namespace, name)
 	}
+}
 
-	// Check hostnames of the Pods from current CHI object included into chopmetrics.Exporter state
-	c.metricsExporter.EnsureControlledValues(new.Name, chopmodels.CreatePodFQDNsOfChi(new))
-
+// addChit sync new CHIT - creates all its resources
+func (c *Controller) addChit(chit *chop.ClickHouseInstallationTemplate) error {
+	glog.V(1).Infof("addChit(%s/%s)", chit.Namespace, chit.Name)
+	c.chopConfigManager.Config().AddChiTemplate((*chop.ClickHouseInstallation)(chit))
 	return nil
 }
 
-func (c *Controller) onDeleteChi(chi *chop.ClickHouseInstallation) error {
-	chi, err := c.normalizer.CreateTemplatedChi(chi)
-	if err != nil {
-		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
-		return err
-	}
-
-	_ = c.deleteChi(chi)
-	c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, "deleted")
-
-	return nil
-}
-
-// onAddChit sync new CHIT - creates all its resources
-func (c *Controller) onAddChit(chit *chop.ClickHouseInstallationTemplate) error {
-	glog.V(1).Infof("onAddChit(%s/%s)", chit.Namespace, chit.Name)
-	c.chopConfig.AddChiTemplate((*chop.ClickHouseInstallation)(chit))
-	return nil
-}
-
-// onUpdateChit sync CHIT which was already created earlier
-func (c *Controller) onUpdateChit(old, new *chop.ClickHouseInstallationTemplate) error {
+// updateChit sync CHIT which was already created earlier
+func (c *Controller) updateChit(old, new *chop.ClickHouseInstallationTemplate) error {
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		glog.V(2).Infof("onUpdateChit(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		glog.V(2).Infof("updateChit(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
 		// No need to react
 		return nil
 	}
 
-	glog.V(2).Infof("onUpdateChit(%s/%s):", new.Namespace, new.Name)
-	c.chopConfig.UpdateChiTemplate((*chop.ClickHouseInstallation)(new))
+	glog.V(2).Infof("updateChit(%s/%s):", new.Namespace, new.Name)
+	c.chopConfigManager.Config().UpdateChiTemplate((*chop.ClickHouseInstallation)(new))
 	return nil
 }
 
-// onDeleteChit deletes CHIT
-func (c *Controller) onDeleteChit(chit *chop.ClickHouseInstallationTemplate) error {
-	glog.V(2).Infof("onDeleteChit(%s/%s):", chit.Namespace, chit.Name)
-	c.chopConfig.DeleteChiTemplate((*chop.ClickHouseInstallation)(chit))
+// deleteChit deletes CHIT
+func (c *Controller) deleteChit(chit *chop.ClickHouseInstallationTemplate) error {
+	glog.V(2).Infof("deleteChit(%s/%s):", chit.Namespace, chit.Name)
+	c.chopConfigManager.Config().DeleteChiTemplate((*chop.ClickHouseInstallation)(chit))
 	return nil
 }
 
-// updateCHIResource updates ClickHouseInstallation resource
-func (c *Controller) updateCHIResource(chi *chop.ClickHouseInstallation) error {
-	_, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
+// addChopConfig
+func (c *Controller) addChopConfig(chopConfig *chop.ClickHouseOperatorConfiguration) error {
+	if c.chopConfigManager.IsConfigListed(chopConfig) {
+		glog.V(1).Infof("addChopConfig(%s/%s) known config", chopConfig.Namespace, chopConfig.Name)
+	} else {
+		glog.V(1).Infof("addChopConfig(%s/%s) UNKNOWN CONFIG", chopConfig.Namespace, chopConfig.Name)
+		os.Exit(0)
+	}
+
+	return nil
+}
+
+// updateChopConfig
+func (c *Controller) updateChopConfig(old, new *chop.ClickHouseOperatorConfiguration) error {
+	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
+		glog.V(2).Infof("updateChopConfig(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		// No need to react
+		return nil
+	}
+
+	glog.V(2).Infof("updateChopConfig(%s/%s):", new.Namespace, new.Name)
+	os.Exit(0)
+
+	return nil
+}
+
+// deleteChit deletes CHIT
+func (c *Controller) deleteChopConfig(chopConfig *chop.ClickHouseOperatorConfiguration) error {
+	glog.V(2).Infof("deleteChopConfig(%s/%s):", chopConfig.Namespace, chopConfig.Name)
+	os.Exit(0)
+
+	return nil
+}
+
+// updateChiObject updates ClickHouseInstallation object
+func (c *Controller) updateChiObject(chi *chop.ClickHouseInstallation) error {
+	new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
+	if err != nil {
+		// Error update
+		glog.V(1).Infof("ERROR update CHI (%s/%s): %q", chi.Namespace, chi.Name, err)
+	} else if chi.ObjectMeta.ResourceVersion != new.ObjectMeta.ResourceVersion {
+		// Updated
+		chi.ObjectMeta.ResourceVersion = new.ObjectMeta.ResourceVersion
+		glog.V(2).Infof("CHI (%s/%s) bump resource version %d/%d", chi.Namespace, chi.Name, chi.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
+	}
 	return err
+}
+
+// updateChiObjectStatus updates ClickHouseInstallation object. Naming is pure syntax sugar
+func (c *Controller) updateChiObjectStatus(chi *chop.ClickHouseInstallation) error {
+	return c.updateChiObject(chi)
 }
 
 // enqueueObject adds ClickHouseInstallation object to the workqueue

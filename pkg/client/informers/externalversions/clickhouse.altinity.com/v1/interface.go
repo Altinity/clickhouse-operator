@@ -28,6 +28,8 @@ type Interface interface {
 	ClickHouseInstallations() ClickHouseInstallationInformer
 	// ClickHouseInstallationTemplates returns a ClickHouseInstallationTemplateInformer.
 	ClickHouseInstallationTemplates() ClickHouseInstallationTemplateInformer
+	// ClickHouseOperatorConfigurations returns a ClickHouseOperatorConfigurationInformer.
+	ClickHouseOperatorConfigurations() ClickHouseOperatorConfigurationInformer
 }
 
 type version struct {
@@ -49,4 +51,9 @@ func (v *version) ClickHouseInstallations() ClickHouseInstallationInformer {
 // ClickHouseInstallationTemplates returns a ClickHouseInstallationTemplateInformer.
 func (v *version) ClickHouseInstallationTemplates() ClickHouseInstallationTemplateInformer {
 	return &clickHouseInstallationTemplateInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ClickHouseOperatorConfigurations returns a ClickHouseOperatorConfigurationInformer.
+func (v *version) ClickHouseOperatorConfigurations() ClickHouseOperatorConfigurationInformer {
+	return &clickHouseOperatorConfigurationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

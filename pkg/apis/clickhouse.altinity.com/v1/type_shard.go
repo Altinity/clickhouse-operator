@@ -36,3 +36,12 @@ func (shard *ChiShard) WalkHosts(
 
 	return res
 }
+
+func (shard *ChiShard) HostsCount() int {
+	count := 0
+	shard.WalkHosts(func(host *ChiHost) error {
+		count++
+		return nil
+	})
+	return count
+}

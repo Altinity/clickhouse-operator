@@ -16,11 +16,10 @@ package chi
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/config"
-	"github.com/altinity/clickhouse-operator/pkg/model"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmetrics "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	choplisters "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 	kube "k8s.io/client-go/kubernetes"
@@ -35,11 +34,8 @@ import (
 type Controller struct {
 	version       string
 	runtimeParams map[string]string
-	normalizer    *model.Normalizer
-	schemer       *model.Schemer
 
-	// chopConfig used to keep clickhouse-oprator config
-	chopConfig *config.Config
+	chopConfigManager *config.ConfigManager
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 	kubeClient kube.Interface
 	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
@@ -78,8 +74,6 @@ type Controller struct {
 	queue workqueue.RateLimitingInterface
 	// not used explicitly
 	recorder record.EventRecorder
-	// export metrics to Prometheus
-	metricsExporter *chopmetrics.Exporter
 }
 
 const (
@@ -123,5 +117,29 @@ func NewReconcileChit(cmd string, old, new *chop.ClickHouseInstallationTemplate)
 		cmd: cmd,
 		old: old,
 		new: new,
+	}
+}
+
+type ReconcileChopConfig struct {
+	cmd string
+	old *chop.ClickHouseOperatorConfiguration
+	new *chop.ClickHouseOperatorConfiguration
+}
+
+func NewReconcileChopConfig(cmd string, old, new *chop.ClickHouseOperatorConfiguration) *ReconcileChopConfig {
+	return &ReconcileChopConfig{
+		cmd: cmd,
+		old: old,
+		new: new,
+	}
+}
+
+type DropDns struct {
+	initiator *v1.ObjectMeta
+}
+
+func NewDropDns(initiator *v1.ObjectMeta) *DropDns {
+	return &DropDns{
+		initiator: initiator,
 	}
 }

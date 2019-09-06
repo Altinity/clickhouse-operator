@@ -11,7 +11,7 @@ MINIKUBE="${MINIKUBE:-no}"
 # Source-dependent options
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 SRC_ROOT="$(realpath "${CUR_DIR}/..")"
-DOCKERFILE_DIR="${SRC_ROOT}"
+DOCKERFILE_DIR="${SRC_ROOT}/dockerfile/operator"
 DOCKERFILE="${DOCKERFILE_DIR}/Dockerfile"
 
 # Build clickhouse-operator install .yaml manifest
@@ -22,7 +22,7 @@ if [[ "${MINIKUBE}" == "yes" ]]; then
     # We'd like to build for minikube
     eval $(minikube docker-env)
 fi
-cat "${DOCKERFILE}" | envsubst | docker build -t "${TAG}" "${SRC_ROOT}"
+docker build -t "${TAG}" -f "${DOCKERFILE}" "${SRC_ROOT}"
 
 # Publish image
 if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then

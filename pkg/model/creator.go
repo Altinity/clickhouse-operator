@@ -27,19 +27,44 @@ import (
 	"github.com/golang/glog"
 )
 
-// createServiceChi creates new corev1.Service for specified CHI
-func (r *Reconciler) createServiceChi(chi *chiv1.ClickHouseInstallation) *corev1.Service {
-	serviceName := CreateChiServiceName(chi)
+type Creator struct {
+	appVersion                string
+	chi                       *chiv1.ClickHouseInstallation
+	chopConfig                *chiv1.Config
+	chConfigGenerator         *ClickHouseConfigGenerator
+	chConfigSectionsGenerator *configSections
+	labeler                   *Labeler
+}
 
-	glog.V(1).Infof("createServiceChi(%s/%s)", chi.Namespace, serviceName)
-	if template, ok := r.chi.GetOwnServiceTemplate(); ok {
+func NewCreator(
+	chi *chiv1.ClickHouseInstallation,
+	chopConfig *chiv1.Config,
+	appVersion string,
+) *Creator {
+	creator := &Creator{
+		appVersion:        appVersion,
+		chi:               chi,
+		chopConfig:        chopConfig,
+		chConfigGenerator: NewClickHouseConfigGenerator(chi),
+		labeler:           NewLabeler(appVersion, chi),
+	}
+	creator.chConfigSectionsGenerator = NewConfigSections(creator.chConfigGenerator, creator.chopConfig)
+	return creator
+}
+
+// createServiceChi creates new corev1.Service for specified CHI
+func (c *Creator) CreateServiceChi() *corev1.Service {
+	serviceName := CreateChiServiceName(c.chi)
+
+	glog.V(1).Infof("createServiceChi(%s/%s)", c.chi.Namespace, serviceName)
+	if template, ok := c.chi.GetOwnServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return r.createServiceFromTemplate(
+		return c.createServiceFromTemplate(
 			template,
-			r.chi.Namespace,
+			c.chi.Namespace,
 			serviceName,
-			r.labeler.getLabelsChiScope(),
-			r.labeler.getSelectorChiScope(),
+			c.labeler.getLabelsChiScope(),
+			c.labeler.getSelectorChiScope(),
 		)
 	} else {
 		// Incorrect/unknown .templates.ServiceTemplate specified
@@ -47,8 +72,8 @@ func (r *Reconciler) createServiceChi(chi *chiv1.ClickHouseInstallation) *corev1
 		return &corev1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
-				Namespace: r.chi.Namespace,
-				Labels:    r.labeler.getLabelsChiScope(),
+				Namespace: c.chi.Namespace,
+				Labels:    c.labeler.getLabelsChiScope(),
 			},
 			Spec: corev1.ServiceSpec{
 				// ClusterIP: templateDefaultsServiceClusterIP,
@@ -62,7 +87,7 @@ func (r *Reconciler) createServiceChi(chi *chiv1.ClickHouseInstallation) *corev1
 						Port: chDefaultClientPortNumber,
 					},
 				},
-				Selector: r.labeler.getSelectorChiScope(),
+				Selector: c.labeler.getSelectorChiScope(),
 				Type:     "LoadBalancer",
 			},
 		}
@@ -70,18 +95,18 @@ func (r *Reconciler) createServiceChi(chi *chiv1.ClickHouseInstallation) *corev1
 }
 
 // createServiceCluster creates new corev1.Service for specified Cluster
-func (r *Reconciler) createServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
+func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
 	serviceName := CreateClusterServiceName(cluster)
 
 	glog.V(1).Infof("createServiceCluster(%s/%s)", cluster.Address.Namespace, serviceName)
 	if template, ok := cluster.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return r.createServiceFromTemplate(
+		return c.createServiceFromTemplate(
 			template,
 			cluster.Address.Namespace,
 			serviceName,
-			r.labeler.getLabelsClusterScope(cluster),
-			r.labeler.getSelectorClusterScope(cluster),
+			c.labeler.getLabelsClusterScope(cluster),
+			c.labeler.getSelectorClusterScope(cluster),
 		)
 	} else {
 		return nil
@@ -89,18 +114,18 @@ func (r *Reconciler) createServiceCluster(cluster *chiv1.ChiCluster) *corev1.Ser
 }
 
 // createServiceShard creates new corev1.Service for specified Shard
-func (r *Reconciler) createServiceShard(shard *chiv1.ChiShard) *corev1.Service {
+func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 	serviceName := CreateShardServiceName(shard)
 
 	glog.V(1).Infof("createServiceShard(%s/%s)", shard.Address.Namespace, serviceName)
 	if template, ok := shard.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return r.createServiceFromTemplate(
+		return c.createServiceFromTemplate(
 			template,
 			shard.Address.Namespace,
 			serviceName,
-			r.labeler.getLabelsShardScope(shard),
-			r.labeler.getSelectorShardScope(shard),
+			c.labeler.getLabelsShardScope(shard),
+			c.labeler.getSelectorShardScope(shard),
 		)
 	} else {
 		return nil
@@ -108,19 +133,19 @@ func (r *Reconciler) createServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 }
 
 // createServiceHost creates new corev1.Service for specified host
-func (r *Reconciler) createServiceHost(host *chiv1.ChiHost) *corev1.Service {
+func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(host)
 	statefulSetName := CreateStatefulSetName(host)
 
 	glog.V(1).Infof("createServiceHost(%s/%s) for Set %s", host.Address.Namespace, serviceName, statefulSetName)
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return r.createServiceFromTemplate(
+		return c.createServiceFromTemplate(
 			template,
 			host.Address.Namespace,
 			serviceName,
-			r.labeler.getLabelsHostScope(host, false),
-			r.labeler.GetSelectorHostScope(host),
+			c.labeler.getLabelsHostScope(host, false),
+			c.labeler.GetSelectorHostScope(host),
 		)
 	} else {
 		// Incorrect/unknown .templates.ServiceTemplate specified
@@ -129,7 +154,7 @@ func (r *Reconciler) createServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: host.Address.Namespace,
-				Labels:    r.labeler.getLabelsHostScope(host, false),
+				Labels:    c.labeler.getLabelsHostScope(host, false),
 			},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
@@ -152,7 +177,7 @@ func (r *Reconciler) createServiceHost(host *chiv1.ChiHost) *corev1.Service {
 						TargetPort: intstr.FromInt(chDefaultInterServerPortNumber),
 					},
 				},
-				Selector:                 r.labeler.GetSelectorHostScope(host),
+				Selector:                 c.labeler.GetSelectorHostScope(host),
 				ClusterIP:                templateDefaultsServiceClusterIP,
 				Type:                     "ClusterIP",
 				PublishNotReadyAddresses: true,
@@ -162,7 +187,7 @@ func (r *Reconciler) createServiceHost(host *chiv1.ChiHost) *corev1.Service {
 }
 
 // verifyServiceTemplatePorts verifies ChiServiceTemplate to have reasonable ports specified
-func (r *Reconciler) verifyServiceTemplatePorts(template *chiv1.ChiServiceTemplate) error {
+func (c *Creator) verifyServiceTemplatePorts(template *chiv1.ChiServiceTemplate) error {
 	for i := range template.Spec.Ports {
 		servicePort := &template.Spec.Ports[i]
 		if (servicePort.Port < 1) || (servicePort.Port > 65535) {
@@ -176,7 +201,7 @@ func (r *Reconciler) verifyServiceTemplatePorts(template *chiv1.ChiServiceTempla
 }
 
 // createServiceFromTemplate create Service from ChiServiceTemplate and additional info
-func (r *Reconciler) createServiceFromTemplate(
+func (c *Creator) createServiceFromTemplate(
 	template *chiv1.ChiServiceTemplate,
 	namespace string,
 	name string,
@@ -185,7 +210,7 @@ func (r *Reconciler) createServiceFromTemplate(
 ) *corev1.Service {
 
 	// Verify Ports
-	if err := r.verifyServiceTemplatePorts(template); err != nil {
+	if err := c.verifyServiceTemplatePorts(template); err != nil {
 		return nil
 	}
 
@@ -208,20 +233,48 @@ func (r *Reconciler) createServiceFromTemplate(
 	return service
 }
 
+// createConfigMapChiCommon creates new corev1.ConfigMap
+func (c *Creator) CreateConfigMapChiCommon() *corev1.ConfigMap {
+	c.chConfigSectionsGenerator.CreateConfigsCommon()
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      CreateConfigMapCommonName(c.chi),
+			Namespace: c.chi.Namespace,
+			Labels:    c.labeler.getLabelsChiScope(),
+		},
+		// Data contains several sections which are to be several xml chopConfig files
+		Data: c.chConfigSectionsGenerator.commonConfigSections,
+	}
+}
+
+// createConfigMapChiCommonUsers creates new corev1.ConfigMap
+func (c *Creator) CreateConfigMapChiCommonUsers() *corev1.ConfigMap {
+	c.chConfigSectionsGenerator.CreateConfigsUsers()
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      CreateConfigMapCommonUsersName(c.chi),
+			Namespace: c.chi.Namespace,
+			Labels:    c.labeler.getLabelsChiScope(),
+		},
+		// Data contains several sections which are to be several xml chopConfig files
+		Data: c.chConfigSectionsGenerator.commonUsersConfigSections,
+	}
+}
+
 // createConfigMapHost creates new corev1.ConfigMap
-func (r *Reconciler) createConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
+func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapPodName(host),
 			Namespace: host.Address.Namespace,
-			Labels:    r.labeler.getLabelsHostScope(host, false),
+			Labels:    c.labeler.getLabelsHostScope(host, false),
 		},
-		Data: r.chConfigSectionsGenerator.CreateConfigsPod(host),
+		Data: c.chConfigSectionsGenerator.CreateConfigsPod(host),
 	}
 }
 
 // createStatefulSet creates new apps.StatefulSet
-func (r *Reconciler) createStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
+func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(host)
 	serviceName := CreateStatefulSetServiceName(host)
 
@@ -232,13 +285,13 @@ func (r *Reconciler) createStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      statefulSetName,
 			Namespace: host.Address.Namespace,
-			Labels:    r.labeler.getLabelsHostScope(host, true),
+			Labels:    c.labeler.getLabelsHostScope(host, true),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    &replicasNum,
 			ServiceName: serviceName,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: r.labeler.GetSelectorHostScope(host),
+				MatchLabels: c.labeler.GetSelectorHostScope(host),
 			},
 			// IMPORTANT
 			// VolumeClaimTemplates are to be setup later
@@ -250,21 +303,21 @@ func (r *Reconciler) createStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 		},
 	}
 
-	r.setupStatefulSetPodTemplate(statefulSet, host)
-	r.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
+	c.setupStatefulSetPodTemplate(statefulSet, host)
+	c.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
 
 	return statefulSet
 }
 
 // setupStatefulSetPodTemplate performs PodTemplate setup of StatefulSet
-func (r *Reconciler) setupStatefulSetPodTemplate(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
+func (c *Creator) setupStatefulSetPodTemplate(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
 	statefulSetName := CreateStatefulSetName(host)
 
 	// Initial PodTemplateSpec value
 	// All the rest fields would be filled later
 	statefulSetObject.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: r.labeler.getLabelsHostScope(host, true),
+			Labels: c.labeler.getLabelsHostScope(host, true),
 		},
 	}
 
@@ -287,14 +340,14 @@ func (r *Reconciler) setupStatefulSetPodTemplate(statefulSetObject *apps.Statefu
 		},
 	}
 
-	r.setupConfigMapVolumes(statefulSetObject, host)
+	c.setupConfigMapVolumes(statefulSetObject, host)
 }
 
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
-func (r *Reconciler) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
+func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
 	configMapMacrosName := CreateConfigMapPodName(host)
-	configMapCommonName := CreateConfigMapCommonName(r.chi)
-	configMapCommonUsersName := CreateConfigMapCommonUsersName(r.chi)
+	configMapCommonName := CreateConfigMapCommonName(c.chi)
+	configMapCommonUsersName := CreateConfigMapCommonUsersName(c.chi)
 
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
 	statefulSetObject.Spec.Template.Spec.Volumes = append(
@@ -320,7 +373,7 @@ func (r *Reconciler) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, 
 }
 
 // setupStatefulSetVolumeClaimTemplates performs VolumeClaimTemplate setup for Containers in PodTemplate of a StatefulSet
-func (r *Reconciler) setupStatefulSetVolumeClaimTemplates(
+func (c *Creator) setupStatefulSetVolumeClaimTemplates(
 	statefulSet *apps.StatefulSet,
 	host *chiv1.ChiHost,
 ) {
@@ -333,7 +386,7 @@ func (r *Reconciler) setupStatefulSetVolumeClaimTemplates(
 		for j := range container.VolumeMounts {
 			// Convenience wrapper
 			volumeMount := &container.VolumeMounts[j]
-			if volumeClaimTemplate, ok := r.chi.GetVolumeClaimTemplate(volumeMount.Name); ok {
+			if volumeClaimTemplate, ok := c.chi.GetVolumeClaimTemplate(volumeMount.Name); ok {
 				// Found VolumeClaimTemplate to mount by VolumeMount
 				appendVolumeClaimTemplateFrom(statefulSet, volumeClaimTemplate)
 			}
@@ -353,7 +406,7 @@ func (r *Reconciler) setupStatefulSetVolumeClaimTemplates(
 		return
 	}
 
-	if _, ok := r.chi.GetVolumeClaimTemplate(defaultVolumeClaimTemplateName); !ok {
+	if _, ok := c.chi.GetVolumeClaimTemplate(defaultVolumeClaimTemplateName); !ok {
 		// Incorrect/unknown .templates.VolumeClaimTemplate specified
 		return
 	}
@@ -387,7 +440,7 @@ func (r *Reconciler) setupStatefulSetVolumeClaimTemplates(
 
 	// This default volumeClaimTemplate is not used explicitly by name and /var/lib/clickhouse is not mounted also.
 	// Let's mount this default VolumeClaimTemplate into /var/lib/clickhouse
-	if template, ok := r.chi.GetVolumeClaimTemplate(defaultVolumeClaimTemplateName); ok {
+	if template, ok := c.chi.GetVolumeClaimTemplate(defaultVolumeClaimTemplateName); ok {
 		// Add VolumeClaimTemplate to StatefulSet
 		appendVolumeClaimTemplateFrom(statefulSet, template)
 		// Add VolumeMount to ClickHouse container to /var/lib/clickhouse point
@@ -484,7 +537,7 @@ func createVolumeMount(name, mountPath string) corev1.VolumeMount {
 	}
 }
 
-// getClickHouseContainer finds Container with ClickHouse amond all containers of Pod specified in StatefulSet
+// getClickHouseContainer finds Container with ClickHouse among all containers of Pod specified in StatefulSet
 func getClickHouseContainer(statefulSet *apps.StatefulSet) *corev1.Container {
 	return &statefulSet.Spec.Template.Spec.Containers[ClickHouseContainerIndex]
 }

@@ -17,7 +17,7 @@ package model
 import (
 	sqlmodule "database/sql"
 
-	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 
@@ -85,49 +85,52 @@ func (s *Schemer) getObjectListFromCH(serviceUrl string, sql string) ([]string, 
 
 // GetCreateDistributedObjects returns a list of objects that needs to be created on a shard in a cluster
 // That incldues all Distributed tables, corresponding local tables, and databases, if necessary
-func (s *Schemer) ClusterGetCreateDistributedObjects(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
+func (s *Schemer) ClusterGetCreateDistributedObjects(chi *chop.ClickHouseInstallation, cluster *chop.ChiCluster) ([]string, []string, error) {
 	system_tables := fmt.Sprintf("cluster('%s', system, tables)", cluster.Name)
-	sql := strings.ReplaceAll(`
-SELECT DISTINCT 
-    database AS name, 
-    concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_db_query
-FROM 
-(
-    SELECT DISTINCT database
-    FROM system.tables
-    WHERE engine = 'Distributed'
-    SETTINGS skip_unavailable_shards = 1
-    UNION ALL
-    SELECT DISTINCT extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS shard_database
-    FROM system.tables 
-    WHERE engine = 'Distributed'
-    SETTINGS skip_unavailable_shards = 1
-) 
-UNION ALL
-SELECT DISTINCT 
-    name, 
-    replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
-FROM 
-(
-    SELECT 
-        database, 
-        name,
-        2 as order
-    FROM system.tables
-    WHERE engine = 'Distributed'
-    SETTINGS skip_unavailable_shards = 1
-    UNION ALL
-    SELECT 
-        extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS shard_database, 
-        extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS shard_table,
-        1 as order
-    FROM system.tables
-    WHERE engine = 'Distributed'
-    SETTINGS skip_unavailable_shards = 1
-) 
-ANY INNER JOIN (select distinct database, name, create_table_query from system.tables SETTINGS skip_unavailable_shards = 1) USING (database, name)
-ORDER BY order
-`, "system.tables", system_tables)
+	sql := heredoc.Doc(strings.ReplaceAll(`
+		SELECT DISTINCT 
+			database AS name, 
+			concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_db_query
+		FROM 
+		(
+			SELECT DISTINCT database
+			FROM system.tables
+			WHERE engine = 'Distributed'
+			SETTINGS skip_unavailable_shards = 1
+			UNION ALL
+			SELECT DISTINCT extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS shard_database
+			FROM system.tables 
+			WHERE engine = 'Distributed'
+			SETTINGS skip_unavailable_shards = 1
+		) 
+		UNION ALL
+		SELECT DISTINCT 
+			name, 
+			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
+		FROM 
+		(
+			SELECT 
+				database, 
+				name,
+				2 AS order
+			FROM system.tables
+			WHERE engine = 'Distributed'
+			SETTINGS skip_unavailable_shards = 1
+			UNION ALL
+			SELECT 
+				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS shard_database, 
+				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS shard_table,
+				1 AS order
+			FROM system.tables
+			WHERE engine = 'Distributed'
+			SETTINGS skip_unavailable_shards = 1
+		) 
+		ANY INNER JOIN (select distinct database, name, create_table_query from system.tables SETTINGS skip_unavailable_shards = 1) USING (database, name)
+		ORDER BY order
+		`,
+		"system.tables",
+		system_tables,
+	))
 
 	names, sqlStatements, _ := s.getObjectListFromCH(CreateChiServiceFQDN(chi), sql)
 	return names, sqlStatements, nil
@@ -135,11 +138,12 @@ ORDER BY order
 
 // GetCreateReplicatedObjects returns a list of objects that needs to be created on a host in a cluster
 func (s *Schemer) GetCreateReplicatedObjects(
-	ch *chi.ClickHouseInstallation,
-	cluster *chi.ChiCluster,
-	host *chi.ChiHost,
+	chi *chop.ClickHouseInstallation,
+	cluster *chop.ChiCluster,
+	host *chop.ChiHost,
 ) ([]string, []string, error) {
-	var shard *chi.ChiShard = nil
+
+	var shard *chop.ChiShard = nil
 	for shardIndex := range cluster.Layout.Shards {
 		shard = &cluster.Layout.Shards[shardIndex]
 		for replicaIndex := range shard.Replicas {
@@ -155,28 +159,31 @@ func (s *Schemer) GetCreateReplicatedObjects(
 	}
 	replicas := CreatePodFQDNsOfShard(shard)
 	system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(replicas, ","))
-	sql := strings.ReplaceAll(`
-SELECT DISTINCT 
-    database AS name, 
-    concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_db_query
-FROM system.tables
-WHERE engine_full LIKE 'Replicated%'
-SETTINGS skip_unavailable_shards = 1
-UNION ALL
-SELECT DISTINCT 
-    name, 
-    replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
-FROM system.tables
-WHERE engine_full LIKE 'Replicated%%'
-SETTINGS skip_unavailable_shards = 1
-`, "system.tables", system_tables)
+	sql := heredoc.Doc(strings.ReplaceAll(`
+		SELECT DISTINCT 
+			database AS name, 
+			concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_db_query
+		FROM system.tables
+		WHERE engine_full LIKE 'Replicated%'
+		SETTINGS skip_unavailable_shards = 1
+		UNION ALL
+		SELECT DISTINCT 
+			name, 
+			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
+		FROM system.tables
+		WHERE engine_full LIKE 'Replicated%%'
+		SETTINGS skip_unavailable_shards = 1
+		`,
+		"system.tables",
+		system_tables,
+	))
 
-	names, sqlStatements, _ := s.getObjectListFromCH(CreateChiServiceFQDN(ch), sql)
+	names, sqlStatements, _ := s.getObjectListFromCH(CreateChiServiceFQDN(chi), sql)
 	return names, sqlStatements, nil
 }
 
 // ClusterGetCreateDatabases returns list of DB names and list of 'CREATE DATABASE ...' SQLs for these DBs
-func (s *Schemer) ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
+func (s *Schemer) ClusterGetCreateDatabases(chi *chop.ClickHouseInstallation, cluster *chop.ChiCluster) ([]string, []string, error) {
 	sql := heredoc.Docf(`
 		SELECT
 			distinct name AS name,
@@ -194,7 +201,7 @@ func (s *Schemer) ClusterGetCreateDatabases(chi *chi.ClickHouseInstallation, clu
 }
 
 // ClusterGetCreateTables returns list of table names and list of 'CREATE TABLE ...' SQLs for these tables
-func (s *Schemer) ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluster *chi.ChiCluster) ([]string, []string, error) {
+func (s *Schemer) ClusterGetCreateTables(chi *chop.ClickHouseInstallation, cluster *chop.ChiCluster) ([]string, []string, error) {
 	sql := heredoc.Docf(`
 		SELECT
 			distinct name, 
@@ -213,7 +220,7 @@ func (s *Schemer) ClusterGetCreateTables(chi *chi.ClickHouseInstallation, cluste
 }
 
 // ReplicaGetDropTables returns set of 'DROP TABLE ...' SQLs
-func (s *Schemer) HostGetDropTables(host *chi.ChiHost) ([]string, []string, error) {
+func (s *Schemer) HostGetDropTables(host *chop.ChiHost) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Docf(`
@@ -231,7 +238,7 @@ func (s *Schemer) HostGetDropTables(host *chi.ChiHost) ([]string, []string, erro
 }
 
 // ChiDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
-func (s *Schemer) ChiDropDnsCache(chi *chi.ClickHouseInstallation) error {
+func (s *Schemer) ChiDropDnsCache(chi *chop.ClickHouseInstallation) error {
 	sqls := []string{
 		`SYSTEM DROP DNS CACHE`,
 	}
@@ -239,23 +246,23 @@ func (s *Schemer) ChiDropDnsCache(chi *chi.ClickHouseInstallation) error {
 }
 
 // ChiApplySQLs runs set of SQL queries over the whole CHI
-func (s *Schemer) ChiApplySQLs(chi *chi.ClickHouseInstallation, sqls []string, retry bool) error {
+func (s *Schemer) ChiApplySQLs(chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
 	return s.applySQLs(CreatePodFQDNsOfChi(chi), sqls, retry)
 }
 
 // ClusterApplySQLs runs set of SQL queries over the cluster
-func (s *Schemer) ClusterApplySQLs(cluster *chi.ChiCluster, sqls []string, retry bool) error {
+func (s *Schemer) ClusterApplySQLs(cluster *chop.ChiCluster, sqls []string, retry bool) error {
 	return s.applySQLs(CreatePodFQDNsOfCluster(cluster), sqls, retry)
 }
 
 // ReplicaApplySQLs runs set of SQL queries over the replica
-func (s *Schemer) HostApplySQLs(host *chi.ChiHost, sqls []string, retry bool) error {
+func (s *Schemer) HostApplySQLs(host *chop.ChiHost, sqls []string, retry bool) error {
 	hosts := []string{CreatePodFQDN(host)}
 	return s.applySQLs(hosts, sqls, retry)
 }
 
 // ShardApplySQLs runs set of SQL queries over the shard replicas
-func (s *Schemer) ShardApplySQLs(shard *chi.ChiShard, sqls []string, retry bool) error {
+func (s *Schemer) ShardApplySQLs(shard *chop.ChiShard, sqls []string, retry bool) error {
 	return s.applySQLs(CreatePodFQDNsOfShard(shard), sqls, retry)
 }
 
