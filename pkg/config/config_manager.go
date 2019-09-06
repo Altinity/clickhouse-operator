@@ -89,6 +89,10 @@ func (cm *ConfigManager) Config() *chiv1.Config {
 
 // readChopConfigs reads all ClickHouseOperatorConfiguration objects in specified namespace
 func (cm *ConfigManager) readChopConfigs(namespace string) {
+	if cm.chopClient == nil {
+		return
+	}
+
 	var err error
 	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(metav1.ListOptions{}); err != nil {
 		glog.V(1).Infof("Error read ClickHouseOperatorConfigurations %v", err)

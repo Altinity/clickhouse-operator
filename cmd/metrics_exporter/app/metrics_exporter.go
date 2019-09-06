@@ -19,7 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
-	"github.com/altinity/clickhouse-operator/pkg/config"
+	chopconfig "github.com/altinity/clickhouse-operator/pkg/config"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 	"github.com/golang/glog"
 	"os"
@@ -76,17 +76,20 @@ func Run() {
 		os.Exit(1)
 	}()
 
-	chopConfig, err := config.GetConfig(chopConfigFile)
-	if err != nil {
+	//
+	// Create operator config
+	//
+	chopConfigManager := chopconfig.NewConfigManager(nil, chopConfigFile)
+	if err := chopConfigManager.Init(); err != nil {
 		glog.Fatalf("Unable to build config file %v\n", err)
 		os.Exit(1)
 	}
-	chopConfig.WriteToLog()
+
 
 	glog.V(1).Info("Starting metrics exporter\n")
 
 	metrics.StartMetricsREST(
-		chopConfig.ChUsername, chopConfig.ChPassword, chopConfig.ChPort,
+		chopConfigManager.Config().ChUsername, chopConfigManager.Config().ChPassword, chopConfigManager.Config().ChPort,
 		metricsEP, metricsPath,
 		chiListEP, chiListPath,
 	)

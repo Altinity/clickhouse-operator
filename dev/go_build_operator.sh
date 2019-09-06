@@ -15,7 +15,7 @@ if CGO_ENABLED=0 go build \
     -a \
     -ldflags "-X ${REPO}/pkg/version.Version=${VERSION} -X ${REPO}/pkg/version.GitSHA=${GIT_SHA}" \
     -o "${OPERATOR_BIN}" \
-    "${SRC_ROOT}/cmd/manager/main.go"; then
+    "${SRC_ROOT}/cmd/operator/main.go"; then
     echo "Build OK"
 else
     echo "WARNING! BUILD FAILED!"
