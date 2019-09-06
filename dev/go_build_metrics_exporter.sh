@@ -15,7 +15,7 @@ if CGO_ENABLED=0 go build \
     -a \
     -ldflags "-X ${REPO}/pkg/version.Version=${VERSION} -X ${REPO}/pkg/version.GitSHA=${GIT_SHA}" \
     -o "${METRICS_EXPORTER_BIN}" \
-    "${SRC_ROOT}/cmd/metrics-exporter/main.go"; then
+    "${SRC_ROOT}/cmd/metrics_exporter/main.go"; then
     echo "Build OK"
 else
     echo "WARNING! BUILD FAILED!"

@@ -15,7 +15,7 @@
 package main
 
 import (
-	"github.com/altinity/clickhouse-operator/cmd/manager/app"
+	"github.com/altinity/clickhouse-operator/cmd/operator/app"
 )
 
 func main() {
