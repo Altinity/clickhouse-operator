@@ -85,7 +85,6 @@ func Run() {
 		os.Exit(1)
 	}
 
-
 	glog.V(1).Info("Starting metrics exporter\n")
 
 	metrics.StartMetricsREST(
