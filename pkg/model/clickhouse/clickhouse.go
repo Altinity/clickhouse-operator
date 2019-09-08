@@ -15,11 +15,13 @@
 package clickhouse
 
 import (
+	"context"
 	sqlmodule "database/sql"
 	"fmt"
 	"github.com/golang/glog"
 	_ "github.com/mailru/go-clickhouse"
 	"strconv"
+	"time"
 )
 
 const (
@@ -69,6 +71,9 @@ func (c *Conn) Query(sql string) (*sqlmodule.Rows, error) {
 		return nil, nil
 	}
 
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(10*time.Second))
+	defer cancel()
+
 	dsn := c.makeDsn()
 	//glog.V(1).Infof("Query ClickHouse DSN: %s", dsn)
 	connect, err := sqlmodule.Open("clickhouse", dsn)
@@ -77,12 +82,12 @@ func (c *Conn) Query(sql string) (*sqlmodule.Rows, error) {
 		return nil, err
 	}
 
-	if err := connect.Ping(); err != nil {
+	if err := connect.PingContext(ctx); err != nil {
 		glog.V(1).Infof("FAILED Ping(%s) %v for SQL: %s", dsn, err, sql)
 		return nil, err
 	}
 
-	rows, err := connect.Query(sql)
+	rows, err := connect.QueryContext(ctx, sql)
 	if err != nil {
 		glog.V(1).Infof("FAILED Query(%s) %v for SQL: %s", dsn, err, sql)
 		return nil, err
@@ -99,6 +104,9 @@ func (c *Conn) Exec(sql string) error {
 		return nil
 	}
 
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(10*time.Second))
+	defer cancel()
+
 	dsn := c.makeDsn()
 	//glog.V(1).Infof("Exec ClickHouse DSN: %s", dsn)
 	connect, err := sqlmodule.Open("clickhouse", dsn)
@@ -107,12 +115,12 @@ func (c *Conn) Exec(sql string) error {
 		return err
 	}
 
-	if err := connect.Ping(); err != nil {
+	if err := connect.PingContext(ctx); err != nil {
 		glog.V(1).Infof("FAILED Ping(%s) %v for SQL: %s", dsn, err, sql)
 		return err
 	}
 
-	_, err = connect.Exec(sql)
+	_, err = connect.ExecContext(ctx, sql)
 
 	if err != nil {
 		glog.V(1).Infof("FAILED Exec(%s) %v for SQL: %s", dsn, err, sql)
