@@ -15,52 +15,58 @@
 package clickhouse
 
 import (
+	"context"
 	sqlmodule "database/sql"
 	"fmt"
 	"github.com/golang/glog"
 	_ "github.com/mailru/go-clickhouse"
 	"strconv"
+	"time"
 )
 
 const (
 	// http://user:password@host:8123/
 	chDsnUrlPattern = "http://%s%s:%s/"
+	defaultTimeout  = 10 * time.Second
 )
 
 type Conn struct {
-	Hostname string
-	Username string
-	Password string
-	Port     int
+	hostname string
+	username string
+	password string
+	port     int
+
+	timeout time.Duration
 }
 
 func New(hostname, username, password string, port int) *Conn {
 	return &Conn{
-		Hostname: hostname,
-		Username: username,
-		Password: password,
-		Port:     port,
+		hostname: hostname,
+		username: username,
+		password: password,
+		port:     port,
+		timeout:  defaultTimeout,
 	}
 }
 
 // makeUsernamePassword makes "username:password" pair for connection
 func (c *Conn) makeUsernamePassword() string {
-	if c.Username == "" && c.Password == "" {
+	if c.username == "" && c.password == "" {
 		return ""
 	}
 
 	// password may be omitted
-	if c.Password == "" {
-		return c.Username + "@"
+	if c.password == "" {
+		return c.username + "@"
 	}
 
 	// Expecting both username and password to be in place
-	return c.Username + ":" + c.Password + "@"
+	return c.username + ":" + c.password + "@"
 }
 
 // makeDsn makes ClickHouse DSN
 func (c *Conn) makeDsn() string {
-	return fmt.Sprintf(chDsnUrlPattern, c.makeUsernamePassword(), c.Hostname, strconv.Itoa(c.Port))
+	return fmt.Sprintf(chDsnUrlPattern, c.makeUsernamePassword(), c.hostname, strconv.Itoa(c.port))
 }
 
 // Query runs given sql query
@@ -68,6 +74,10 @@ func (c *Conn) Query(sql string) (*sqlmodule.Rows, error) {
 	if len(sql) == 0 {
 		return nil, nil
 	}
+
+	// Query should be deadlined
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(c.timeout))
+	defer cancel()
 
 	dsn := c.makeDsn()
 	//glog.V(1).Infof("Query ClickHouse DSN: %s", dsn)
@@ -77,12 +87,12 @@ func (c *Conn) Query(sql string) (*sqlmodule.Rows, error) {
 		return nil, err
 	}
 
-	if err := connect.Ping(); err != nil {
+	if err := connect.PingContext(ctx); err != nil {
 		glog.V(1).Infof("FAILED Ping(%s) %v for SQL: %s", dsn, err, sql)
 		return nil, err
 	}
 
-	rows, err := connect.Query(sql)
+	rows, err := connect.QueryContext(ctx, sql)
 	if err != nil {
 		glog.V(1).Infof("FAILED Query(%s) %v for SQL: %s", dsn, err, sql)
 		return nil, err
@@ -99,6 +109,10 @@ func (c *Conn) Exec(sql string) error {
 		return nil
 	}
 
+	// Query should be deadlined
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(c.timeout))
+	defer cancel()
+
 	dsn := c.makeDsn()
 	//glog.V(1).Infof("Exec ClickHouse DSN: %s", dsn)
 	connect, err := sqlmodule.Open("clickhouse", dsn)
@@ -107,12 +121,12 @@ func (c *Conn) Exec(sql string) error {
 		return err
 	}
 
-	if err := connect.Ping(); err != nil {
+	if err := connect.PingContext(ctx); err != nil {
 		glog.V(1).Infof("FAILED Ping(%s) %v for SQL: %s", dsn, err, sql)
 		return err
 	}
 
-	_, err = connect.Exec(sql)
+	_, err = connect.ExecContext(ctx, sql)
 
 	if err != nil {
 		glog.V(1).Infof("FAILED Exec(%s) %v for SQL: %s", dsn, err, sql)
