@@ -1,9 +1,42 @@
 # `clickhouse-operator` configuration
 
+## Introduction
+
+Operator provides extensive configuration options via `clickhouse-operator` configuration. 
+Configuration consists of the following main parts:
+1. Operator configuration options - operator's settings
+1. ClickHouse common configuration files - ready-to-use XML files with sections of ClickHouse configuration **as-is**.
+Common configuration typically contains general ClickHouse configuration sections, such as network listen endpoints, logger options, etc
+1. ClickHouse user configuration files - ready-to-use XML files with sections of ClickHouse configuration **as-is**
+User configuration typically contains ClickHouse configuration sections with user accounts specifications
+1. `ClickHouseInstallationTemplate`s specification. Operator provides functionality to specify parts of `ClickHouseInstallation` manifest as a set of templates, which would be used in all `ClickHouseInstallation`s.   
+
+## Config files layout and structure
+
+Typically, operator configuration is located in `/etc/clickhouse-operator` and looks like the following:
+```text
+/etc/clickhouse-operator
+  conf.d
+  config.d
+    ... common configuration files here ...
+  templates.d
+    ... templates specification files here ...
+  users.d
+    ... user configuration files here ...
+  config.yaml
+```
+where [`config.yaml`](../config/config.yaml) is operator [configuration file](../config/config.yaml), of the following structure:
+
 ```yaml
-# Namespaces where clickhouse-operator listens for events.
-# Concurrently running operators should listen on different namespaces
-# namespaces:
+################################################
+##
+## Watch Namespaces Section
+##
+################################################
+
+# List of namespaces where clickhouse-operator watches for events.
+# Concurrently running operators should watch on different namespaces
+# watchNamespaces:
 #  - dev
 #  - info
 #  - onemore
@@ -17,7 +50,7 @@
 # Path to folder where ClickHouse configuration files common for all instances within CHI are located.
 chCommonConfigsPath: config.d
 
-# Path to folder where ClickHouse configuration files unique for each instances within CHI are located.
+# Path to folder where ClickHouse configuration files unique for each instance (host) within CHI are located.
 chHostConfigsPath: conf.d
 
 # Path to folder where ClickHouse configuration files with users settings are located.
@@ -86,3 +119,25 @@ chUsername: clickhouse_operator
 chPassword: clickhouse_operator_password
 chPort: 8123
 ```
+
+## Operator configuration CRDs
+
+In order to provide dynamic configuration `clickhouse-operator` has the following CRDs, specified:
+1. `ClickHouseInstallationTemplate`
+1. `ClickHouseOperatorConfiguration`
+
+`ClickHouseInstallationTemplate` is special flawor of `ClickHouseInstallation`, with the main difference - it can be filled partially for those sections that we'd like to be templated only. 
+In all other parts - it is typical `ClickHouseInstallation`, with the same fields as in [this full example](examples/99-clickhouseinstallation-max.yaml). 
+Initial `ClickHouseInstallationTemplate` is [available](examples/50-simple-template-01.yaml)
+
+`ClickHouseOperatorConfiguration` is a special resource to provide dynamic operator configuration and it mirrors in all details specified earlier operator's configuration.
+Initial `ClickHouseOperatorConfiguration` is [available](examples/70-chop-config.yaml)
+
+### How to use operator configuration CRDs
+
+In case we'd like to customize operator behavior with special configuration options or `ClickHouseInstallationTemplate`s we need to create appropriate manifest and apply it with `kubectl` in namespace. watched by `clickhouse-operator`. 
+In most cases it is the same namespace where operator runs. `clickhouse-operator` sees new/updated object of `kind: ClickHouseInstallationTemplate` or `kind: ClickHouseOperatorConfiguration` and applies these objects over operator's configuration. 
+
+Multiple CRDs application:
+1. Multiple `ClickHouseInstallationTemplate`s observed by operator are merged altogether in alphabetical order. All changes are accumulated. 
+1. Multiple `ClickHouseOperatorConfiguration`s observed by operator are stacked in alphabetical order. The latest config is applied. 

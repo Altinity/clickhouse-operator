@@ -32,8 +32,7 @@ import (
 
 // Controller defines CRO controller
 type Controller struct {
-	version       string
-	runtimeParams map[string]string
+	version string
 
 	chopConfigManager *config.ConfigManager
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
