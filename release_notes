@@ -1,0 +1,18 @@
+Release 0.6.0
+
+New features:
+* Split operator into two binaries/containers - operator and monitor
+* Timeout to Clickhouse connection
+* ActionPlan and .chi.status with progress reports on CHI create/update
+* Default namespace to watch in in case no specified explicitly
+* ClickHouseInstallationTemplate CRD
+* ClickHouseOperatorConfiguration CRD
+
+Improvements:
+* Introduce ConfigurationManager
+* Enhance multi-thread support for concurrent operations
+* Clarify docs and examples
+* Unify "CHI add" and "CHI update" execution paths
+
+Bug fixes:
+
