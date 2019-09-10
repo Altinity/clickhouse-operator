@@ -47,8 +47,8 @@ func (c *Controller) labelMyObjectsTree() {
 	//    uid: a275a8a0-83ae-11e9-b92d-0208b778ea1a
 
 	// Label operator's Pod with version label
-	podName, ok1 := c.runtimeParams["OPERATOR_POD_NAME"]
-	namespace, ok2 := c.runtimeParams["OPERATOR_POD_NAMESPACE"]
+	podName, ok1 := c.chopConfigManager.GetRuntimeParam("OPERATOR_POD_NAME")
+	namespace, ok2 := c.chopConfigManager.GetRuntimeParam("OPERATOR_POD_NAMESPACE")
 
 	if !ok1 || !ok2 {
 		glog.V(1).Infof("ERROR fetch Pod name out of %s/%s", namespace, podName)
