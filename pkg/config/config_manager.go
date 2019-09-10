@@ -52,8 +52,8 @@ func NewConfigManager(
 func (cm *ConfigManager) Init() error {
 
 	// Get ENV vars
-	cm.runtimeParams = cm.getRuntimeParams()
-	cm.logRuntimeParams()
+	cm.runtimeParams = cm.getEnvVarParams()
+	cm.logEnvVarParams()
 
 	// Get config from file
 	config, err := cm.getConfig(cm.initConfigFilePath)
@@ -244,8 +244,8 @@ func (cm *ConfigManager) buildDefaultConfig() (*chiv1.Config, error) {
 	return config, nil
 }
 
-// getRuntimeParamNames return list of ENV VARS parameter names
-func (cm *ConfigManager) getRuntimeParamNames() []string {
+// getEnvVarParamNames return list of ENV VARS parameter names
+func (cm *ConfigManager) getEnvVarParamNames() []string {
 	// This list of ENV VARS is specified in operator .yaml manifest, section "kind: Deployment"
 	return []string{
 		// spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -275,19 +275,19 @@ func (cm *ConfigManager) getRuntimeParamNames() []string {
 	}
 }
 
-// getRuntimeParams returns map[string]string of ENV VARS with some runtime parameters
-func (cm *ConfigManager) getRuntimeParams() map[string]string {
+// getEnvVarParams returns map[string]string of ENV VARS with some runtime parameters
+func (cm *ConfigManager) getEnvVarParams() map[string]string {
 	params := make(map[string]string)
 	// Extract parameters from ENV VARS
-	for _, varName := range cm.getRuntimeParamNames() {
+	for _, varName := range cm.getEnvVarParamNames() {
 		params[varName] = os.Getenv(varName)
 	}
 
 	return params
 }
 
-// logRuntimeParams writes runtime parameters into log
-func (cm *ConfigManager) logRuntimeParams() {
+// logEnvVarParams writes runtime parameters into log
+func (cm *ConfigManager) logEnvVarParams() {
 	// Log params according to sorted names
 	// So we need to
 	// 1. Extract and sort names aka keys
@@ -305,4 +305,11 @@ func (cm *ConfigManager) logRuntimeParams() {
 	for _, k := range keys {
 		glog.V(1).Infof("%s=%s\n", k, cm.runtimeParams[k])
 	}
+}
+
+// GetRuntimeParam gets specified runtime param
+func (cm *ConfigManager) GetRuntimeParam(name string) (string, bool) {
+	_map := cm.getEnvVarParams()
+	nm, ok := _map[name]
+	return nm, ok
 }

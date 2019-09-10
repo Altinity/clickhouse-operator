@@ -142,7 +142,7 @@ func (config *Config) Postprocess() {
 	config.readChConfigFiles()
 	config.readChiTemplateFiles()
 	config.processChiTemplateFiles()
-	config.applyEnvVars()
+	config.applyEnvVarParams()
 	config.applyDefaultWatchNamespace()
 }
 
@@ -220,14 +220,14 @@ func (config *Config) normalize() {
 	}
 }
 
-// applyEnvVars applies ENV VARS over config
-func (config *Config) applyEnvVars() {
+// applyEnvVarParams applies ENV VARS over config
+func (config *Config) applyEnvVarParams() {
 	if ns := os.Getenv("WATCH_NAMESPACE"); len(ns) > 0 {
-		// We have WATCH_NAMESPACE specified
+		// We have WATCH_NAMESPACE explicitly specified
 		config.WatchNamespaces = []string{ns}
 	}
 	if nss := os.Getenv("WATCH_NAMESPACES"); len(nss) > 0 {
-		// We have WATCH_NAMESPACES specified
+		// We have WATCH_NAMESPACES explicitly specified
 		namespaces := strings.FieldsFunc(nss, func(r rune) bool {
 			return r == ':' || r == ','
 		})
@@ -242,12 +242,26 @@ func (config *Config) applyEnvVars() {
 
 // applyDefaultWatchNamespace applies default watch namespace in case none specified earlier
 func (config *Config) applyDefaultWatchNamespace() {
+	// In case we have watched namespaces specified, all is fine
+	// In case we do not have watched namespaces specified, we need to decide, what namespace to watch.
+	// In this case, there are two options:
+	// 1. Operator runs in kube-system namespace - assume this is global installation, need to watch ALL namespaces
+	// 2. Operator runs in other (non kube-system) namespace - assume this is local installation, watch this namespace only
 	// Watch in own namespace only in case no other specified earlier
-	if len(config.WatchNamespaces) == 0 {
-		if ns := os.Getenv("OPERATOR_POD_NAMESPACE"); len(ns) > 0 {
-			// We have WATCH_NAMESPACE specified
-			config.WatchNamespaces = []string{ns}
-		}
+
+	if len(config.WatchNamespaces) > 0 {
+		// We have namespace(s) specified already
+		return
+	}
+
+	// No namespaces specified
+
+	ns := os.Getenv("OPERATOR_POD_NAMESPACE")
+	if ns == "kube-system" {
+		// Do nothing, we already have len(config.WatchNamespaces) == 0
+	} else {
+		// We have WATCH_NAMESPACE specified
+		config.WatchNamespaces = []string{ns}
 	}
 }
 
