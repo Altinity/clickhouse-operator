@@ -14,6 +14,8 @@
 
 package v1
 
+import "github.com/altinity/clickhouse-operator/pkg/util"
+
 func (host *ChiHost) InheritTemplates(shard *ChiShard) {
 	(&host.Templates).MergeFrom(&shard.Templates)
 }
@@ -34,4 +36,12 @@ func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	name := host.Templates.ReplicaServiceTemplate
 	template, ok := host.Chi.GetServiceTemplate(name)
 	return template, ok
+}
+
+func (host *ChiHost) GetReplicasNum() int32 {
+	if util.IsStringBoolTrue(host.Chi.Spec.Stop) {
+		return 0
+	} else {
+		return 1
+	}
 }

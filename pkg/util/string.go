@@ -29,32 +29,37 @@ func RandomString() string {
 	return hex.EncodeToString(b)
 }
 
+const (
+	StringBool0        = "0"
+	StringBool1        = "1"
+	StringBoolFalse    = "false"
+	StringBoolTrue     = "true"
+	StringBoolNo       = "no"
+	StringBoolYes      = "yes"
+	StringBoolOff      = "off"
+	StringBoolOn       = "on"
+	StringBoolDisabled = "disabled"
+	StringBoolEnabled  = "enabled"
+)
+
 // IsStringBool checks whether str is a string as bool value
 func IsStringBool(str string) bool {
 	switch strings.ToLower(str) {
-	case "0":
-		return true
-	case "1":
-		return true
+	case
+		StringBool0,
+		StringBool1,
 
-	case "false":
-		return true
-	case "true":
-		return true
+		StringBoolFalse,
+		StringBoolTrue,
 
-	case "no":
-		return true
-	case "yes":
-		return true
+		StringBoolNo,
+		StringBoolYes,
 
-	case "off":
-		return true
-	case "on":
-		return true
+		StringBoolOff,
+		StringBoolOn,
 
-	case "disabled":
-		return true
-	case "enabled":
+		StringBoolDisabled,
+		StringBoolEnabled:
 		return true
 
 	default:
@@ -65,19 +70,12 @@ func IsStringBool(str string) bool {
 // IsStringBool checks whether str is a string as bool "false" value
 func IsStringBoolFalse(str string) bool {
 	switch strings.ToLower(str) {
-	case "0":
-		return true
-
-	case "false":
-		return true
-
-	case "no":
-		return true
-
-	case "off":
-		return true
-
-	case "disabled":
+	case
+		StringBool0,
+		StringBoolFalse,
+		StringBoolNo,
+		StringBoolOff,
+		StringBoolDisabled:
 		return true
 
 	default:
@@ -88,19 +86,12 @@ func IsStringBoolFalse(str string) bool {
 // IsStringBool checks whether str is a string as bool "true" value
 func IsStringBoolTrue(str string) bool {
 	switch strings.ToLower(str) {
-	case "1":
-		return true
-
-	case "true":
-		return true
-
-	case "yes":
-		return true
-
-	case "on":
-		return true
-
-	case "enabled":
+	case
+		StringBool1,
+		StringBoolTrue,
+		StringBoolYes,
+		StringBoolOn,
+		StringBoolEnabled:
 		return true
 
 	default:
@@ -111,8 +102,8 @@ func IsStringBoolTrue(str string) bool {
 // CastStringBoolTo01 casts string-bool into string "0/1"
 func CastStringBoolTo01(str string, defaultValue bool) string {
 	// True and False values
-	t := "1"
-	f := "0"
+	t := StringBool1
+	f := StringBool0
 
 	if IsStringBoolTrue(str) {
 		return t
@@ -133,8 +124,8 @@ func CastStringBoolTo01(str string, defaultValue bool) string {
 // CastStringBoolToTrueFalse casts string-bool into string "true/false"
 func CastStringBoolToTrueFalse(str string, defaultValue bool) string {
 	// True and False values
-	t := "true"
-	f := "false"
+	t := StringBoolTrue
+	f := StringBoolFalse
 
 	if IsStringBoolTrue(str) {
 		return t

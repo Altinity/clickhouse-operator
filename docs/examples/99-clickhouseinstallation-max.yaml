@@ -8,6 +8,8 @@ metadata:
 
 spec:
 
+  stop: "no"
+
   defaults:
     replicasUseFQDN: "no"
     distributedDDL:

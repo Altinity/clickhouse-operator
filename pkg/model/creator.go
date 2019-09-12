@@ -279,7 +279,7 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	serviceName := CreateStatefulSetServiceName(host)
 
 	// Create apps.StatefulSet object
-	replicasNum := int32(1)
+	replicasNum := host.GetReplicasNum()
 	// StatefulSet has additional label - ZK config fingerprint
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{

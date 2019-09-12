@@ -57,6 +57,7 @@ func (n *Normalizer) DoChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouse
 	n.chi = chi
 
 	// Walk over ChiSpec datatype fields
+	n.doStop(&n.chi.Spec.Stop)
 	n.doDefaults(&n.chi.Spec.Defaults)
 	n.doConfiguration(&n.chi.Spec.Configuration)
 	n.doTemplates(&n.chi.Spec.Templates)
@@ -75,6 +76,15 @@ func (n *Normalizer) doStatus() {
 		return nil
 	})
 	n.chi.StatusFill(endpoint, pods)
+}
+
+// doStop normalizes .spec.stop
+func (n *Normalizer) doStop(stop *string) {
+	// Set defaults for CHI object properties
+	if !util.IsStringBool(*stop) {
+		// In case it is unknown value - just use set it to false
+		*stop = util.StringBoolFalse
+	}
 }
 
 // doDefaults normalizes .spec.defaults

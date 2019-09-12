@@ -81,6 +81,20 @@ spec:
         spec:
           type: object
           properties:
+            stop:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - "0"
+                - "1"
+                - "false"
+                - "true"
+                - "no"
+                - "yes"
+                - "off"
+                - "on"
+                - "disabled"
+                - "enabled"
             defaults:
               type: object
               properties:
@@ -274,8 +288,8 @@ spec:
                         type: string
                         enum:
                           # List podDistributionXXX constants from model
-                          - Unspecified
-                          - OnePerHost
+                          - "Unspecified"
+                          - "OnePerHost"
                       spec:
                         # TODO specify PodSpec
                         type: object
@@ -292,8 +306,8 @@ spec:
                       reclaimPolicy:
                         type: string
                         enum:
-                          - Retain
-                          - Delete
+                          - "Retain"
+                          - "Delete"
                       spec:
                         # TODO specify PersistentVolumeClaimSpec
                         type: object
@@ -391,6 +405,20 @@ spec:
         spec:
           type: object
           properties:
+            stop:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - "0"
+                - "1"
+                - "false"
+                - "true"
+                - "no"
+                - "yes"
+                - "off"
+                - "on"
+                - "disabled"
+                - "enabled"
             defaults:
               type: object
               properties:
@@ -584,8 +612,8 @@ spec:
                         type: string
                         enum:
                           # List podDistributionXXX constants from model
-                          - Unspecified
-                          - OnePerHost
+                          - "Unspecified"
+                          - "OnePerHost"
                       spec:
                         # TODO specify PodSpec
                         type: object
@@ -602,8 +630,8 @@ spec:
                       reclaimPolicy:
                         type: string
                         enum:
-                          - Retain
-                          - Delete
+                          - "Retain"
+                          - "Delete"
                       spec:
                         # TODO specify PersistentVolumeClaimSpec
                         type: object
@@ -677,15 +705,15 @@ spec:
               # TODO enum?
 #              enum:
 #                # List podDistributionXXX constants from model
-#                 - Unspecified
-#                 - OnePerHost
+#                 - "Unspecified"
+#                 - "OnePerHost"
             onStatefulSetUpdateFailureAction:
               type: string
               # TODO enum?
 #              enum:
 #                # List podDistributionXXX constants from model
-#                 - Unspecified
-#                 - OnePerHost
+#                 - "Unspecified"
+#                 - "OnePerHost"
             chConfigUserDefaultProfile:
               type: string
             chConfigUserDefaultQuota:

@@ -81,6 +81,20 @@ spec:
         spec:
           type: object
           properties:
+            stop:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - "0"
+                - "1"
+                - "false"
+                - "true"
+                - "no"
+                - "yes"
+                - "off"
+                - "on"
+                - "disabled"
+                - "enabled"
             defaults:
               type: object
               properties:
@@ -391,6 +405,20 @@ spec:
         spec:
           type: object
           properties:
+            stop:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - "0"
+                - "1"
+                - "false"
+                - "true"
+                - "no"
+                - "yes"
+                - "off"
+                - "on"
+                - "disabled"
+                - "enabled"
             defaults:
               type: object
               properties:
