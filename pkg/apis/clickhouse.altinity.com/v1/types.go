@@ -55,6 +55,7 @@ type ClickHouseOperatorConfiguration struct {
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
+	Stop          string           `json:"stop,omitempty"      yaml:"stop"`
 	Defaults      ChiDefaults      `json:"defaults,omitempty"  yaml:"defaults"`
 	Configuration ChiConfiguration `json:"configuration"       yaml:"configuration"`
 	Templates     ChiTemplates     `json:"templates,omitempty" yaml:"templates"`
