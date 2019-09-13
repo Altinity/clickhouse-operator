@@ -14,13 +14,13 @@ User configuration typically contains ClickHouse configuration sections with use
 ## Operator settings
 
 Operator settings are initialized in-order from 3 sources:
-* /etc/clickhouse-operator/config.yaml
+* `/etc/clickhouse-operator/config.yaml`
 * etc-clickhouse-operator-files configmap (also a part of default [clickhouse-operator-install.yaml](manifests/operator/clickhouse-operator-install.yaml)
 * `ClickHouseOperatorConfiguration` resource. See [example](examples/70-chop-config.yaml) for details.
 
 Next sources merges with the previous one. Changes to `etc-clickhouse-operator-files` are not monitored, but picked up if operator is restarted. Changes to `ClickHouseOperatorConfiguration` are monitored by an operator and applied immediately.
 
-config.yaml has following settings:
+`config.yaml` has following settings:
 
 ```yaml
 ################################################
