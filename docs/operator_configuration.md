@@ -2,30 +2,25 @@
 
 ## Introduction
 
-Operator provides extensive configuration options via `clickhouse-operator` configuration. 
-Configuration consists of the following main parts:
-1. Operator configuration options - operator's settings
+`clickhouse-operator` can be configured in a variety of ways. Configuration consists of the following main parts:
+1. Operator settings -- operator settings control behaviour of operator itself.
 1. ClickHouse common configuration files - ready-to-use XML files with sections of ClickHouse configuration **as-is**.
-Common configuration typically contains general ClickHouse configuration sections, such as network listen endpoints, logger options, etc
+Common configuration typically contains general ClickHouse configuration sections, such as network listen endpoints, logger options, etc. Those are exposed via config maps.
 1. ClickHouse user configuration files - ready-to-use XML files with sections of ClickHouse configuration **as-is**
-User configuration typically contains ClickHouse configuration sections with user accounts specifications
-1. `ClickHouseInstallationTemplate`s specification. Operator provides functionality to specify parts of `ClickHouseInstallation` manifest as a set of templates, which would be used in all `ClickHouseInstallation`s.   
+User configuration typically contains ClickHouse configuration sections with user accounts specifications. Those are exposed via config maps as well.
+1. `ClickHouseOperatorConfiguration` resource.
+1. `ClickHouseInstallationTemplate`s. Operator provides functionality to specify parts of `ClickHouseInstallation` manifest as a set of templates, which would be used in all `ClickHouseInstallation`s.   
 
-## Config files layout and structure
+## Operator settings
 
-Typically, operator configuration is located in `/etc/clickhouse-operator` and looks like the following:
-```text
-/etc/clickhouse-operator
-  conf.d
-  config.d
-    ... common configuration files here ...
-  templates.d
-    ... templates specification files here ...
-  users.d
-    ... user configuration files here ...
-  config.yaml
-```
-where [`config.yaml`](../config/config.yaml) is operator [configuration file](../config/config.yaml), of the following structure:
+Operator settings are initialized in-order from 3 sources:
+* /etc/clickhouse-operator/config.yaml
+* etc-clickhouse-operator-files configmap (also a part of default [clickhouse-operator-install.yaml](manifests/operator/clickhouse-operator-install.yaml)
+* `ClickHouseOperatorConfiguration` resource. See [example](examples/70-chop-config.yaml) for details.
+
+Next sources merges with the previous one. Changes to `etc-clickhouse-operator-files` are not monitored, but picked up if operator is restarted. Changes to `ClickHouseOperatorConfiguration` are monitored by an operator and applied immediately.
+
+config.yaml has following settings:
 
 ```yaml
 ################################################
@@ -120,24 +115,23 @@ chPassword: clickhouse_operator_password
 chPort: 8123
 ```
 
-## Operator configuration CRDs
+## ClickHouse settings
 
-In order to provide dynamic configuration `clickhouse-operator` has the following CRDs, specified:
-1. `ClickHouseInstallationTemplate`
-1. `ClickHouseOperatorConfiguration`
+Operator deploys ClickHouse clusters with different defaults, that can be configured in a flexible way. 
 
-`ClickHouseInstallationTemplate` is special flawor of `ClickHouseInstallation`, with the main difference - it can be filled partially for those sections that we'd like to be templated only. 
-In all other parts - it is typical `ClickHouseInstallation`, with the same fields as in [this full example](examples/99-clickhouseinstallation-max.yaml). 
-Initial `ClickHouseInstallationTemplate` is [available](examples/50-simple-template-01.yaml)
+### Default ClickHouse configuration files
 
-`ClickHouseOperatorConfiguration` is a special resource to provide dynamic operator configuration and it mirrors in all details specified earlier operator's configuration.
-Initial `ClickHouseOperatorConfiguration` is [available](examples/70-chop-config.yaml)
+Default ClickHouse configuration files can be found in the following config maps, that are mounted to corresponding configuration folders of ClickHouse pods:
+* etc-clickhouse-operator-confd-files
+* etc-clickhouse-operator-configd-files
+* etc-clickhouse-operator-usersd-files
 
-### How to use operator configuration CRDs
+Config maps are initialized in default [clickhouse-operator-install.yaml](manifests/operator/clickhouse-operator-install.yaml).
 
-In case we'd like to customize operator behavior with special configuration options or `ClickHouseInstallationTemplate`s we need to create appropriate manifest and apply it with `kubectl` in namespace. watched by `clickhouse-operator`. 
-In most cases it is the same namespace where operator runs. `clickhouse-operator` sees new/updated object of `kind: ClickHouseInstallationTemplate` or `kind: ClickHouseOperatorConfiguration` and applies these objects over operator's configuration. 
+### Defaults for ClickHouseInstallation
 
-Multiple CRDs application:
-1. Multiple `ClickHouseInstallationTemplate`s observed by operator are merged altogether in alphabetical order. All changes are accumulated. 
-1. Multiple `ClickHouseOperatorConfiguration`s observed by operator are stacked in alphabetical order. The latest config is applied. 
+Defaults for ClickHouseInstallation can be provided by `ClickHouseInstallationTemplate` it a variety of ways:
+* etc-clickhouse-operator-templatesd-files configmap
+* `ClickHouseInstallationTemplate` resources.
+
+`ClickHouseInstallationTemplate` has the same structure as `ClickHouseInstallation`, but all parts and fields are optional. Default template is initialized in [clickhouse-operator-install.yaml](manifests/operator/clickhouse-operator-install.yaml) and defines default persistent storage claim to be used with ClickHouse installation. Another example can be also found [here](examples/50-simple-template-01.yaml) 
