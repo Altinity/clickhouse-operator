@@ -288,8 +288,8 @@ spec:
                         type: string
                         enum:
                           # List podDistributionXXX constants from model
-                          - Unspecified
-                          - OnePerHost
+                          - "Unspecified"
+                          - "OnePerHost"
                       spec:
                         # TODO specify PodSpec
                         type: object
@@ -306,8 +306,8 @@ spec:
                       reclaimPolicy:
                         type: string
                         enum:
-                          - Retain
-                          - Delete
+                          - "Retain"
+                          - "Delete"
                       spec:
                         # TODO specify PersistentVolumeClaimSpec
                         type: object
@@ -612,8 +612,8 @@ spec:
                         type: string
                         enum:
                           # List podDistributionXXX constants from model
-                          - Unspecified
-                          - OnePerHost
+                          - "Unspecified"
+                          - "OnePerHost"
                       spec:
                         # TODO specify PodSpec
                         type: object
@@ -630,8 +630,8 @@ spec:
                       reclaimPolicy:
                         type: string
                         enum:
-                          - Retain
-                          - Delete
+                          - "Retain"
+                          - "Delete"
                       spec:
                         # TODO specify PersistentVolumeClaimSpec
                         type: object
@@ -705,15 +705,15 @@ spec:
               # TODO enum?
 #              enum:
 #                # List podDistributionXXX constants from model
-#                 - Unspecified
-#                 - OnePerHost
+#                 - "Unspecified"
+#                 - "OnePerHost"
             onStatefulSetUpdateFailureAction:
               type: string
               # TODO enum?
 #              enum:
 #                # List podDistributionXXX constants from model
-#                 - Unspecified
-#                 - OnePerHost
+#                 - "Unspecified"
+#                 - "OnePerHost"
             chConfigUserDefaultProfile:
               type: string
             chConfigUserDefaultQuota:
@@ -971,18 +971,18 @@ data:
       }
     }
 
-  01-default-volumeclaimtemplate.yaml-back: |
+  02-default-volumeclaimtemplate.yaml: |
     apiVersion: "clickhouse.altinity.com/v1"
     kind: "ClickHouseInstallation"
     metadata:
-      name: "01-default-volumeclaimtemplate"
+      name: "02-default-volumeclaimtemplate"
     spec:
       defaults:
         templates:
-          volumeClaimTemplate: default-volumeclaim-template
+          volumeClaimTemplate: default-volumeclaim-template-02
       templates:
         volumeClaimTemplates:
-          - name: default-volumeclaim-template
+          - name: default-volumeclaim-template-02
             spec:
               accessModes:
                 - ReadWriteOnce
