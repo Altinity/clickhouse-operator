@@ -72,9 +72,9 @@ metadata:
   labels:
     k8s-addon: storage-aws.addons.k8s.io
   name: gp2
+provisioner: kubernetes.io/aws-ebs
 parameters:
   type: gp2
-provisioner: kubernetes.io/aws-ebs
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 ```
@@ -84,9 +84,9 @@ metadata:
   labels:
     k8s-addon: storage-aws.addons.k8s.io
   name: default
+provisioner: kubernetes.io/aws-ebs
 parameters:
   type: gp2
-provisioner: kubernetes.io/aws-ebs
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 ```
@@ -259,6 +259,40 @@ refers directly to:
       resources:
         requests:
           storage: 1Gi
+```
+
+## AWS encrypted volumes
+
+As we have discussed in [AWS-specific](AWS-specific) section, AWS provides **gp2** volumes as default media.
+Let's create **encrypted** volume based on the same **gp2** volume.
+Specify special `StorageClass`
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: encrypted-gp2
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp2
+  fsType: ext4
+  encrypted: "true"
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+```
+and use it with `PersistentVolumeClaim`:
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: encrypted-pvc
+spec:
+  storageClassName: encrypted-gp2
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Block
+  resources:
+    requests:
+      storage: 1Gi
 ```
 
 [PersistentVolumeClaim]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
