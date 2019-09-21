@@ -59,7 +59,7 @@ See [LICENSE](./LICENSE) for more details.
  
 [chi_max_yaml]: ./docs/examples/99-clickhouseinstallation-max.yaml
 [intro]: ./docs/introduction.md
-[quick_start_guide]: ./docs/quick-start.md
+[quick_start_guide]: ./docs/quick_start.md
 [detailed_installation_instructions]: ./docs/operator_installation_details.md
 [replication_setup]: ./docs/replication_setup.md
 [crd_explained]: ./docs/custom_resource_explained.md
