@@ -8,13 +8,14 @@ metadata:
 provisioner: kubernetes.io/aws-ebs
 parameters:
   type: gp2
-# FS ext4 start encrypted disk quickly
+i  # FS ext4 start encrypted disk quickly
   fsType: ext4
-# FS xfs start encrypted disk slow - easy can be said "does not work at all"
+  # FS xfs start encrypted disk very slow - easy can be said "does not work at all for me"
 #  fsType: xfs
   encrypted: "true"
 reclaimPolicy: Delete
 #volumeBindingMode: Immediate
+#allowVolumeExpansion: true
 ---
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
