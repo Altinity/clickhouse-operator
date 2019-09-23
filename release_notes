@@ -1,0 +1,14 @@
+Release 0.6.0
+
+New features:
+* Added spec.stop property to start/stop all ClickHouse pods in installation for maintenance
+* ClickHouseInstallationTemplate custom resource definition
+* ClickHouseOperatorConfiguration custom resource definition
+
+Improvements:
+* Split operator into two binaries/containers - operator and monitor
+* Added 10s timeout to ClickHouse connection
+* Improved create/update logic
+* Operator now looks at its own namespace if not specified explicitly
+* Enhance multi-thread support for concurrent operations
+

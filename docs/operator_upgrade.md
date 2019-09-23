@@ -27,11 +27,12 @@ spec:
       - image: altinity/clickhouse-operator:latest
         name: clickhouse-operator
 ```
-The latest available version is installed by default. If version changes, there are two ways to upgrade the operator:
+The latest available version is installed by default. If version changes, there are three ways to upgrade the operator:
+* Delete existing deployment and re-deploy it using spec file above
 * Specify the new version in operator spec file and reapply
 * Upgrade deployment to the required version using Kubernetes API.
 
-The second approach is probably more convenient, since operator is typically installed using predefined spec file.
+The last approach is probably more convenient, since operator is typically installed using predefined spec file.
 
 Deployments can be listed using the following command:
 ```

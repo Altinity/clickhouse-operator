@@ -8,6 +8,8 @@ metadata:
 
 spec:
 
+  stop: "no"
+
   defaults:
     replicasUseFQDN: "no"
     distributedDDL:
@@ -193,6 +195,8 @@ spec:
           labels:
             custom.label: "custom.value"
           annotations:
+            # For more details on Internal Load Balancer check
+            # https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
             cloud.google.com/load-balancer-type: "Internal"
             service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
             service.beta.kubernetes.io/azure-load-balancer-internal: "true"
@@ -220,8 +224,41 @@ spec:
           type: ClusterIP
           ClusterIP: None
 
+      - name: preserve-client-source-ip
+        # For more details on Preserving Client Source IP check
+        # https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+        spec:
+          selector:
+            app: example
+          ports:
+            - name: http
+              port: 8123
+            - name: client
+              port: 9000
+            - name: interserver
+              port: 9009
+          externalTrafficPolicy: Local
+          type: LoadBalancer
+
     volumeClaimTemplates:
       - name: default-volume-claim
+        # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
+        spec:
+          # 1. If storageClassName is not specified, default StorageClass
+          # (must be specified by cluster administrator) would be used for provisioning
+          # 2. If storageClassName is set to an empty string (‘’), no storage class will be used
+          # dynamic provisioning is disabled for this PVC. Existing, “Available”, PVs
+          # (that do not have a specified storageClassName) will be considered for binding to the PVC
+          #storageClassName: gold
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+      - name: volume-claim-retain-pvc
+        # Keep PVC from being deleted
+        # Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
+        reclaimPolicy: Retain
         # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
         spec:
           # 1. If storageClassName is not specified, default StorageClass

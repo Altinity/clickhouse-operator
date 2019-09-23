@@ -13,29 +13,32 @@ PROJECT_ROOT="$(realpath "${CUR_DIR}/../..")"
 ##########################################
 
 # Namespace to install operator
-CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE:-kube-system}"
+OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
+METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 
 # Operator's docker image
-CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
+OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
+METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:latest}"
+
 
 # Local path to operator's config file to be injected into .yaml
-CHOPERATOR_CONFIG_FILE="${PROJECT_ROOT}/config/config.yaml"
+OPERATOR_CONFIG_FILE="${PROJECT_ROOT}/config/config.yaml"
 
 # Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
 # as content of /etc/clickhouse-server/conf.d folder
-CHOPERATOR_CONFD_FOLDER="${PROJECT_ROOT}/config/conf.d"
+OPERATOR_CONFD_FOLDER="${PROJECT_ROOT}/config/conf.d"
 
 # Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
 # as content of /etc/clickhouse-server/config.d folder
-CHOPERATOR_CONFIGD_FOLDER="${PROJECT_ROOT}/config/config.d"
+OPERATOR_CONFIGD_FOLDER="${PROJECT_ROOT}/config/config.d"
 
 # Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
 # as content of /etc/clickhouse-server/users.d folder
-CHOPERATOR_USERSD_FOLDER="${PROJECT_ROOT}/config/users.d"
+OPERATOR_USERSD_FOLDER="${PROJECT_ROOT}/config/users.d"
 
 # Local path to folder with operator's .yaml template files which will be injected into .yaml
 # as content of /etc/clickhouse-server/templates.d folder
-CHOPERATOR_TEMPLATESD_FOLDER="${PROJECT_ROOT}/config/templates.d"
+OPERATOR_TEMPLATESD_FOLDER="${PROJECT_ROOT}/config/templates.d"
 
 
 ##
@@ -127,7 +130,7 @@ function download_file() {
 if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
     ensure_file "${CUR_DIR}" "clickhouse-operator-template-01-section-crd.yaml" "manifests/dev"
     cat "${CUR_DIR}/clickhouse-operator-template-01-section-crd.yaml" | \
-        CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" envsubst
 fi
 
 # Render RBAC section
@@ -135,7 +138,7 @@ if [[ "${MANIFEST_PRINT_RBAC}" == "yes" ]]; then
     echo "---"
     ensure_file "${CUR_DIR}" "clickhouse-operator-template-02-section-rbac-and-service.yaml" "manifests/dev"
     cat "${CUR_DIR}/clickhouse-operator-template-02-section-rbac-and-service.yaml" | \
-        CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" envsubst
 fi
 
 # Render header/beginning of ConfigMap yaml specification:
@@ -153,7 +156,7 @@ function render_configmap_header() {
     ensure_file "${CUR_DIR}" "clickhouse-operator-template-03-section-configmap-header.yaml" "manifests/dev"
     # Render ConfigMap header template with vars substitution
     cat "${CUR_DIR}/clickhouse-operator-template-03-section-configmap-header.yaml" | \
-            CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" CONFIGMAP_NAME="${CM_NAME}" envsubst
+            OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" CONFIGMAP_NAME="${CM_NAME}" envsubst
 }
 
 # Render one file section in ConfigMap yaml specification:
@@ -184,12 +187,16 @@ function render_configmap_data_section_file() {
 
 # Render Deployment and ConfigMap sections
 if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
-    if [[ -z "${CHOPERATOR_CONFIG_FILE}" ]]; then
+    if [[ -z "${OPERATOR_CONFIG_FILE}" ]]; then
         # No config file specified, render simple deployment
         echo "---"
         ensure_file "${CUR_DIR}" "clickhouse-operator-template-04-section-deployment.yaml" "manifests/dev"
         cat "${CUR_DIR}/clickhouse-operator-template-04-section-deployment.yaml" | \
-            CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
+            OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+            OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+            METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
+            METRICS_EXPORTER_NAMESPACE="${METRICS_EXPORTER_NAMESPACE}" \
+            envsubst
     else
         # Config file specified, render all ConfigMaps and then render deployment
 
@@ -208,8 +215,8 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         # Render confd.d files
         echo "---"
         render_configmap_header "etc-clickhouse-operator-confd-files"
-        if [[ ! -z "${CHOPERATOR_CONFD_FOLDER}" ]] && [[ -d "${CHOPERATOR_CONFD_FOLDER}" ]] && [[ ! -z "$(ls "${CHOPERATOR_CONFD_FOLDER}")" ]]; then
-            for FILE in "${CHOPERATOR_CONFD_FOLDER}"/*; do
+        if [[ ! -z "${OPERATOR_CONFD_FOLDER}" ]] && [[ -d "${OPERATOR_CONFD_FOLDER}" ]] && [[ ! -z "$(ls "${OPERATOR_CONFD_FOLDER}")" ]]; then
+            for FILE in "${OPERATOR_CONFD_FOLDER}"/*; do
                 render_configmap_data_section_file "${FILE}"
             done
         fi
@@ -217,8 +224,8 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         # Render configd.d files
         echo "---"
         render_configmap_header "etc-clickhouse-operator-configd-files"
-        if [[ ! -z "${CHOPERATOR_CONFIGD_FOLDER}" ]] && [[ -d "${CHOPERATOR_CONFIGD_FOLDER}" ]] && [[ ! -z "$(ls "${CHOPERATOR_CONFIGD_FOLDER}")" ]]; then
-            for FILE in "${CHOPERATOR_CONFIGD_FOLDER}"/*; do
+        if [[ ! -z "${OPERATOR_CONFIGD_FOLDER}" ]] && [[ -d "${OPERATOR_CONFIGD_FOLDER}" ]] && [[ ! -z "$(ls "${OPERATOR_CONFIGD_FOLDER}")" ]]; then
+            for FILE in "${OPERATOR_CONFIGD_FOLDER}"/*; do
                 render_configmap_data_section_file "${FILE}"
             done
         else
@@ -234,8 +241,8 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         # Render templates.d files
         echo "---"
         render_configmap_header "etc-clickhouse-operator-templatesd-files"
-        if [[ ! -z "${CHOPERATOR_TEMPLATESD_FOLDER}" ]] && [[ -d "${CHOPERATOR_TEMPLATESD_FOLDER}" ]] && [[ ! -z "$(ls "${CHOPERATOR_TEMPLATESD_FOLDER}")" ]]; then
-            for FILE in "${CHOPERATOR_TEMPLATESD_FOLDER}"/*; do
+        if [[ ! -z "${OPERATOR_TEMPLATESD_FOLDER}" ]] && [[ -d "${OPERATOR_TEMPLATESD_FOLDER}" ]] && [[ ! -z "$(ls "${OPERATOR_TEMPLATESD_FOLDER}")" ]]; then
+            for FILE in "${OPERATOR_TEMPLATESD_FOLDER}"/*; do
                 render_configmap_data_section_file "${FILE}"
             done
         fi
@@ -243,8 +250,8 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         # Render users.d files
         echo "---"
         render_configmap_header "etc-clickhouse-operator-usersd-files"
-        if [[ ! -z "${CHOPERATOR_USERSD_FOLDER}" ]] && [[ -d "${CHOPERATOR_USERSD_FOLDER}" ]] && [[ ! -z "$(ls "${CHOPERATOR_USERSD_FOLDER}")" ]]; then
-            for FILE in "${CHOPERATOR_USERSD_FOLDER}"/*; do
+        if [[ ! -z "${OPERATOR_USERSD_FOLDER}" ]] && [[ -d "${OPERATOR_USERSD_FOLDER}" ]] && [[ ! -z "$(ls "${OPERATOR_USERSD_FOLDER}")" ]]; then
+            for FILE in "${OPERATOR_USERSD_FOLDER}"/*; do
                 render_configmap_data_section_file "${FILE}"
             done
         else
@@ -258,6 +265,10 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         echo "---"
         ensure_file "${CUR_DIR}" "clickhouse-operator-template-04-section-deployment-with-configmap.yaml" "manifests/dev"
         cat "${CUR_DIR}/clickhouse-operator-template-04-section-deployment-with-configmap.yaml" | \
-            CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" envsubst
+            OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+            OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+            METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
+            METRICS_EXPORTER_NAMESPACE="${METRICS_EXPORTER_NAMESPACE}" \
+            envsubst
     fi
 fi

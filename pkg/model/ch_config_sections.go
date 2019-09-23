@@ -15,8 +15,7 @@
 package model
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/config"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -29,10 +28,10 @@ type configSections struct {
 	// ClickHouse config generator
 	chConfigGenerator *ClickHouseConfigGenerator
 	// clickhouse-operator configuration
-	chopConfig *config.Config
+	chopConfig *chi.Config
 }
 
-func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig *config.Config) *configSections {
+func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig *chi.Config) *configSections {
 	return &configSections{
 		commonConfigSections:      make(map[string]string),
 		commonUsersConfigSections: make(map[string]string),
@@ -67,7 +66,7 @@ func (c *configSections) CreateConfigsUsers() {
 	util.MergeStringMaps(c.commonUsersConfigSections, c.chopConfig.ChUsersConfigs)
 }
 
-func (c *configSections) CreateConfigsPod(host *v1.ChiHost) map[string]string {
+func (c *configSections) CreateConfigsPod(host *chi.ChiHost) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	podConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(podConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(host))

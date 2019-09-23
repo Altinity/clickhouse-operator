@@ -1,7 +1,8 @@
 # Possible Template Parameters:
 #
-# ${CHOPERATOR_NAMESPACE}
-# ${CHOPERATOR_IMAGE}
+# ${OPERATOR_NAMESPACE}
+# ${OPERATOR_IMAGE}
+# ${METRICS_EXPORTER_IMAGE}
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -9,7 +10,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: clickhouse-operator
-  namespace: ${CHOPERATOR_NAMESPACE}
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     app: clickhouse-operator
 spec:
@@ -41,7 +42,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: ${CHOPERATOR_IMAGE}
+          image: ${OPERATOR_IMAGE}
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -104,3 +105,18 @@ spec:
                 resourceFieldRef:
                   containerName: clickhouse-operator
                   resource: limits.memory
+
+        - name: metrics-exporter
+          image: ${METRICS_EXPORTER_IMAGE}
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: etc-clickhouse-operator-folder
+              mountPath: /etc/clickhouse-operator
+            - name: etc-clickhouse-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/conf.d
+            - name: etc-clickhouse-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/config.d
+            - name: etc-clickhouse-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/templates.d
+            - name: etc-clickhouse-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/users.d

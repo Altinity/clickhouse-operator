@@ -1,9 +1,37 @@
 # `clickhouse-operator` configuration
 
+## Introduction
+
+`clickhouse-operator` can be configured in a variety of ways. Configuration consists of the following main parts:
+1. Operator settings -- operator settings control behaviour of operator itself.
+1. ClickHouse common configuration files - ready-to-use XML files with sections of ClickHouse configuration **as-is**.
+Common configuration typically contains general ClickHouse configuration sections, such as network listen endpoints, logger options, etc. Those are exposed via config maps.
+1. ClickHouse user configuration files - ready-to-use XML files with sections of ClickHouse configuration **as-is**
+User configuration typically contains ClickHouse configuration sections with user accounts specifications. Those are exposed via config maps as well.
+1. `ClickHouseOperatorConfiguration` resource.
+1. `ClickHouseInstallationTemplate`s. Operator provides functionality to specify parts of `ClickHouseInstallation` manifest as a set of templates, which would be used in all `ClickHouseInstallation`s.   
+
+## Operator settings
+
+Operator settings are initialized in-order from 3 sources:
+* `/etc/clickhouse-operator/config.yaml`
+* etc-clickhouse-operator-files configmap (also a part of default [clickhouse-operator-install.yaml](manifests/operator/clickhouse-operator-install.yaml)
+* `ClickHouseOperatorConfiguration` resource. See [example](examples/70-chop-config.yaml) for details.
+
+Next sources merges with the previous one. Changes to `etc-clickhouse-operator-files` are not monitored, but picked up if operator is restarted. Changes to `ClickHouseOperatorConfiguration` are monitored by an operator and applied immediately.
+
+`config.yaml` has following settings:
+
 ```yaml
-# Namespaces where clickhouse-operator listens for events.
-# Concurrently running operators should listen on different namespaces
-# namespaces:
+################################################
+##
+## Watch Namespaces Section
+##
+################################################
+
+# List of namespaces where clickhouse-operator watches for events.
+# Concurrently running operators should watch on different namespaces
+# watchNamespaces:
 #  - dev
 #  - info
 #  - onemore
@@ -17,7 +45,7 @@
 # Path to folder where ClickHouse configuration files common for all instances within CHI are located.
 chCommonConfigsPath: config.d
 
-# Path to folder where ClickHouse configuration files unique for each instances within CHI are located.
+# Path to folder where ClickHouse configuration files unique for each instance (host) within CHI are located.
 chHostConfigsPath: conf.d
 
 # Path to folder where ClickHouse configuration files with users settings are located.
@@ -86,3 +114,24 @@ chUsername: clickhouse_operator
 chPassword: clickhouse_operator_password
 chPort: 8123
 ```
+
+## ClickHouse settings
+
+Operator deploys ClickHouse clusters with different defaults, that can be configured in a flexible way. 
+
+### Default ClickHouse configuration files
+
+Default ClickHouse configuration files can be found in the following config maps, that are mounted to corresponding configuration folders of ClickHouse pods:
+* etc-clickhouse-operator-confd-files
+* etc-clickhouse-operator-configd-files
+* etc-clickhouse-operator-usersd-files
+
+Config maps are initialized in default [clickhouse-operator-install.yaml](manifests/operator/clickhouse-operator-install.yaml).
+
+### Defaults for ClickHouseInstallation
+
+Defaults for ClickHouseInstallation can be provided by `ClickHouseInstallationTemplate` it a variety of ways:
+* etc-clickhouse-operator-templatesd-files configmap
+* `ClickHouseInstallationTemplate` resources.
+
+`ClickHouseInstallationTemplate` has the same structure as `ClickHouseInstallation`, but all parts and fields are optional. Default template is initialized in [clickhouse-operator-install.yaml](manifests/operator/clickhouse-operator-install.yaml) and defines default persistent storage claim to be used with ClickHouse installation. Another example can be also found [here](examples/50-simple-template-01.yaml) 

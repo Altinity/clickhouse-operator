@@ -36,6 +36,10 @@ func (c *FakeClickhouseV1) ClickHouseInstallationTemplates(namespace string) v1.
 	return &FakeClickHouseInstallationTemplates{c, namespace}
 }
 
+func (c *FakeClickhouseV1) ClickHouseOperatorConfigurations(namespace string) v1.ClickHouseOperatorConfigurationInterface {
+	return &FakeClickHouseOperatorConfigurations{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeClickhouseV1) RESTClient() rest.Interface {

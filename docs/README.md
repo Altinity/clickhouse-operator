@@ -12,7 +12,7 @@
 1. [operator_installation_details.md](./operator_installation_details.md) - how to install operator in details
 1. [operator_upgrade.md](./operator_upgrade.md) - how to upgrade operator to the different version
 1. [prometheus_setup.md](./prometheus_setup.md) - how to setup Prometheus
-1. [quick-start.md](./quick-start.md) - quick start
+1. [quick_start.md](./quick_start.md) - quick start
 1. [replication_setup.md](./replication_setup.md) - how to setup replication
 1. [schema_migration.md](./schema_migration.md) - how operator migrates schema during cluster resize
 1. [storage.md](./storage.md) - storage explained
