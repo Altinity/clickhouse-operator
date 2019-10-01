@@ -91,6 +91,7 @@ func (n *Normalizer) doStop(stop *string) {
 func (n *Normalizer) doDefaults(defaults *chiv1.ChiDefaults) {
 	// Set defaults for CHI object properties
 	n.doDefaultsReplicasUseFQDN(defaults)
+	n.doDefaultsTemplates(defaults)
 }
 
 // doConfiguration normalizes .spec.configuration
@@ -635,6 +636,11 @@ func (n *Normalizer) doShardInternalReplication(shard *chiv1.ChiShard) {
 func (n *Normalizer) doDefaultsReplicasUseFQDN(d *chiv1.ChiDefaults) {
 	// Default value set to false
 	d.ReplicasUseFQDN = util.CastStringBoolToTrueFalse(d.ReplicasUseFQDN, false)
+}
+
+// doDefaultsTemplates ensures chiv1.ChiDefaults.Templates section has proper values
+func (n *Normalizer) doDefaultsTemplates(d *chiv1.ChiDefaults) {
+	d.Templates.HandleDeprecatedFields()
 }
 
 // normalizePath normalizes path in .spec.configuration.{users, profiles, quotas, settings} section

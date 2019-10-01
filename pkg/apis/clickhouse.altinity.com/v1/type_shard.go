@@ -16,6 +16,7 @@ package v1
 
 func (shard *ChiShard) InheritTemplates(cluster *ChiCluster) {
 	(&shard.Templates).MergeFrom(&cluster.Templates)
+	(&shard.Templates).HandleDeprecatedFields()
 }
 
 func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {

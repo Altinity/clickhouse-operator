@@ -344,6 +344,18 @@ func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolu
 	}
 }
 
+// WalkVolumeClaimTemplates walks over all VolumeClaimTemplates
+func (chi *ClickHouseInstallation) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
+	if chi.Spec.Templates.VolumeClaimTemplatesIndex == nil {
+		return
+	}
+
+	for name := range chi.Spec.Templates.VolumeClaimTemplatesIndex {
+		template, _ := chi.Spec.Templates.VolumeClaimTemplatesIndex[name]
+		f(template)
+	}
+}
+
 // GetServiceTemplate gets ChiServiceTemplate by name
 func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceTemplate, bool) {
 	if chi.Spec.Templates.ServiceTemplatesIndex == nil {

@@ -84,8 +84,11 @@ const (
 	// 1. macros
 	dirPathConfd = "/etc/clickhouse-server/conf.d/"
 
-	// dirPathClickHouseData specifies full path of data folder where ClickHouse would place its datastorage
+	// dirPathClickHouseData specifies full path of data folder where ClickHouse would place its data storage
 	dirPathClickHouseData = "/var/lib/clickhouse"
+
+	// dirPathClickHouseLog  specifies full path of data folder where ClickHouse would place its log files
+	dirPathClickHouseLog = "/var/log/clickhouse-server"
 )
 
 const (

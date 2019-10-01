@@ -18,17 +18,12 @@ import "github.com/altinity/clickhouse-operator/pkg/util"
 
 func (host *ChiHost) InheritTemplates(shard *ChiShard) {
 	(&host.Templates).MergeFrom(&shard.Templates)
+	(&host.Templates).HandleDeprecatedFields()
 }
 
 func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
 	name := host.Templates.PodTemplate
 	template, ok := host.Chi.GetPodTemplate(name)
-	return template, ok
-}
-
-func (host *ChiHost) GetVolumeClaimTemplate() (*ChiVolumeClaimTemplate, bool) {
-	name := host.Templates.VolumeClaimTemplate
-	template, ok := host.Chi.GetVolumeClaimTemplate(name)
 	return template, ok
 }
 
