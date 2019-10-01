@@ -22,7 +22,6 @@ spec:
   defaults:
     templates:
       podTemplate: clickhouse-per-host
-      volumeClaimTemplate: storage-vc-template
       serviceTemplate: ch-service
   configuration:
     clusters:

@@ -13,7 +13,6 @@ spec:
     templates:
       # Templates are specified as default for all clusters
       podTemplate: pod-template-resource-limit
-      volumeClaimTemplate: clickhouse-data-storage
 
   templates:
     podTemplates:

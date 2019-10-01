@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "simple-02-pv2"
+  name: "pv-deploy"
 spec:
   configuration:
     clusters:
@@ -9,7 +9,6 @@ spec:
         # Templates are specified for this cluster explicitly
         templates:
           podTemplate: pod-template-with-volume
-          volumeClaimTemplate: storage-vc-template
         layout:
           shardsCount: 1
           replicasCount: 1

@@ -377,9 +377,13 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(
 	statefulSet *apps.StatefulSet,
 	host *chiv1.ChiHost,
 ) {
-	// Append VolumeClaimTemplates, that are referenced in Containers' VolumeMount object(s)
-	// to StatefulSet's Spec.VolumeClaimTemplates slice, so these
+	// StatefulSet name is used all over the place
 	statefulSetName := CreateStatefulSetName(host)
+
+	// Deal with `volumeMounts` of a `container`, a.k.a.
+	// .spec.templates.podTemplates.*.spec.containers.volumeMounts.*
+	// VolumeClaimTemplates, that are referenced in Containers' VolumeMount object(s)
+	// are appended to StatefulSet's Spec.VolumeClaimTemplates slice
 	for i := range statefulSet.Spec.Template.Spec.Containers {
 		// Convenience wrapper
 		container := &statefulSet.Spec.Template.Spec.Containers[i]
@@ -393,11 +397,12 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(
 		}
 	}
 
-	// Now deal with .templates.VolumeClaimTemplate
+	// Deal with .templates.VolumeClaimTemplate
+	// Mount default VolumeClaimTemplate specified in .templates.VolumeClaimTemplate into /var/lib/clickhouse
 	//
-	// We want to mount this default VolumeClaimTemplate into /var/lib/clickhouse in case:
-	// 1. This default VolumeClaimTemplate is not already mounted with any VolumeMount
-	// 2. And /var/lib/clickhouse is not already mounted with any VolumeMount
+	// A container wants to have this default VolumeClaimTemplate mounted into /var/lib/clickhouse in case:
+	// 1. This default VolumeClaimTemplate is not already mounted in the container with any VolumeMount (to avoid double-mount of a VolumeClaimTemplate)
+	// 2. And /var/lib/clickhouse is not already mounted with any VolumeMount (to avoid double-mount into /var/lib/clickhouse)
 
 	defaultVolumeClaimTemplateName := host.Templates.VolumeClaimTemplate
 
@@ -411,7 +416,7 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(
 		return
 	}
 
-	// 1. Check explicit usage - whether this default VolumeClaimTemplate is already listed in VolumeMount
+	// 1. Check whether this default VolumeClaimTemplate is already listed in VolumeMount
 	clickHouseContainer := getClickHouseContainer(statefulSet)
 	for i := range clickHouseContainer.VolumeMounts {
 		// Convenience wrapper
@@ -423,9 +428,9 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(
 		}
 	}
 
-	// This default VolumeClaimTemplate is not used by name - it is unused - what's it's purpose, then?
+	// This default VolumeClaimTemplate is not used explicitly by name in a container
 	// So we want to mount it to /var/lib/clickhouse even more now, because it is unused.
-	// However, mount point /var/lib/clickhouse may be used already explicitly. Need to check
+	// However, mount point /var/lib/clickhouse may be used already by a VolumeMount. Need to check
 
 	// 2. Check whether /var/lib/clickhouse is already mounted
 	for i := range clickHouseContainer.VolumeMounts {
@@ -439,7 +444,7 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(
 	}
 
 	// This default volumeClaimTemplate is not used explicitly by name and /var/lib/clickhouse is not mounted also.
-	// Let's mount this default VolumeClaimTemplate into /var/lib/clickhouse
+	// Let's mount this default VolumeClaimTemplate into /var/lib/clickhouse of a container
 	if template, ok := c.chi.GetVolumeClaimTemplate(defaultVolumeClaimTemplateName); ok {
 		// Add VolumeClaimTemplate to StatefulSet
 		appendVolumeClaimTemplateFrom(statefulSet, template)

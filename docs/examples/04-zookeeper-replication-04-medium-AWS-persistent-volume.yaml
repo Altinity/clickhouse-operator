@@ -16,7 +16,6 @@ spec:
       - name: replcluster
         templates:
           podTemplate: clickhouse-with-volume-template
-          volumeClaimTemplate: clickhouse-storage-template
         layout:
           shardsCount: 3
           replicasCount: 2

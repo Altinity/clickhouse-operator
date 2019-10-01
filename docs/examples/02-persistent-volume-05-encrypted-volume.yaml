@@ -8,7 +8,7 @@ metadata:
 provisioner: kubernetes.io/aws-ebs
 parameters:
   type: gp2
-i  # FS ext4 start encrypted disk quickly
+  # FS ext4 start encrypted disk quickly
   fsType: ext4
   # FS xfs start encrypted disk very slow - easy can be said "does not work at all for me"
 #  fsType: xfs
