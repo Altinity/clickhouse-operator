@@ -111,7 +111,9 @@ spec:
                   properties:
                     podTemplate:
                       type: string
-                    volumeClaimTemplate:
+                    dataVolumeClaimTemplate:
+                      type: string
+                    logVolumeClaimTemplate:
                       type: string
                     serviceTemplate:
                       type: string
@@ -179,7 +181,9 @@ spec:
                         properties:
                           podTemplate:
                             type: string
-                          volumeClaimTemplate:
+                          dataVolumeClaimTemplate:
+                            type: string
+                          logVolumeClaimTemplate:
                             type: string
                           serviceTemplate:
                             type: string
@@ -223,7 +227,9 @@ spec:
                                   properties:
                                     podTemplate:
                                       type: string
-                                    volumeClaimTemplate:
+                                    dataVolumeClaimTemplate:
+                                      type: string
+                                    logVolumeClaimTemplate:
                                       type: string
                                     serviceTemplate:
                                       type: string
@@ -250,7 +256,9 @@ spec:
                                         properties:
                                           podTemplate:
                                             type: string
-                                          volumeClaimTemplate:
+                                          dataVolumeClaimTemplate:
+                                            type: string
+                                          logVolumeClaimTemplate:
                                             type: string
                                           serviceTemplate:
                                             type: string
@@ -435,7 +443,9 @@ spec:
                   properties:
                     podTemplate:
                       type: string
-                    volumeClaimTemplate:
+                    dataVolumeClaimTemplate:
+                      type: string
+                    logVolumeClaimTemplate:
                       type: string
                     serviceTemplate:
                       type: string
@@ -503,7 +513,9 @@ spec:
                         properties:
                           podTemplate:
                             type: string
-                          volumeClaimTemplate:
+                          dataVolumeClaimTemplate:
+                            type: string
+                          logVolumeClaimTemplate:
                             type: string
                           serviceTemplate:
                             type: string
@@ -547,7 +559,9 @@ spec:
                                   properties:
                                     podTemplate:
                                       type: string
-                                    volumeClaimTemplate:
+                                    dataVolumeClaimTemplate:
+                                      type: string
+                                    logVolumeClaimTemplate:
                                       type: string
                                     serviceTemplate:
                                       type: string
@@ -574,7 +588,9 @@ spec:
                                         properties:
                                           podTemplate:
                                             type: string
-                                          volumeClaimTemplate:
+                                          dataVolumeClaimTemplate:
+                                            type: string
+                                          logVolumeClaimTemplate:
                                             type: string
                                           serviceTemplate:
                                             type: string
