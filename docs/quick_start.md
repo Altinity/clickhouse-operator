@@ -162,20 +162,20 @@ Manifest is [available in examples](./examples/02-persistent-volume-01-simple.ya
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "simple-02-pv1"
+  name: "pv-simple"
 spec:
   defaults:
     templates:
-      volumeClaimTemplate: volumeclaim-template
+      dataVolumeClaimTemplate: data-volumeclaim-template
   configuration:
     clusters:
-      - name: "simple-pv"
+      - name: "simple"
         layout:
           shardsCount: 1
           replicasCount: 1
   templates:
     volumeClaimTemplates:
-      - name: volumeclaim-template
+      - name: data-volumeclaim-template
 #        reclaimPolicy: Retain
         spec:
           accessModes:
@@ -198,7 +198,7 @@ Manifest is [available in examples](./examples/02-persistent-volume-03-deploymen
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "simple-02-pv2"
+  name: "pv-deploy"
 spec:
   configuration:
     clusters:
@@ -206,7 +206,6 @@ spec:
         # Templates are specified for this cluster explicitly
         templates:
           podTemplate: pod-template-with-volume
-          volumeClaimTemplate: storage-vc-template
         layout:
           shardsCount: 1
           replicasCount: 1

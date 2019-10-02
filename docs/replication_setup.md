@@ -21,7 +21,7 @@ metadata:
 spec:
   defaults:
     templates: 
-      volumeClaimTemplate: default
+      dataVolumeClaimTemplate: default
       podTemplate: clickhouse:19.6
  
   configuration:

@@ -24,7 +24,7 @@ metadata:
 spec:
   defaults:
     templates:
-      volumeClaimTemplate: volumeclaim-template
+      dataVolumeClaimTemplate: data-volumeclaim-template
   configuration:
     clusters:
       - name: "pv-enc"
@@ -33,7 +33,7 @@ spec:
           replicasCount: 1
   templates:
     volumeClaimTemplates:
-      - name: volumeclaim-template
+      - name: data-volumeclaim-template
         spec:
           storageClassName: gp2-encrypted
           accessModes:

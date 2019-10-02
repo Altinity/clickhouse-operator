@@ -964,7 +964,7 @@ data:
       "spec": {
         "defaults":{
           "templates": {
-            "volumeClaimTemplate": "default-volumeclaim-template"
+            "dataVolumeClaimTemplate": "default-volumeclaim-template"
           }
         },
         "templates": {
@@ -995,7 +995,7 @@ data:
     spec:
       defaults:
         templates:
-          volumeClaimTemplate: default-volumeclaim-template-02
+          dataVolumeClaimTemplate: default-volumeclaim-template-02
       templates:
         volumeClaimTemplates:
           - name: default-volumeclaim-template-02

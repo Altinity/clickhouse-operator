@@ -5,7 +5,7 @@ metadata:
 spec:
   defaults:
     templates:
-      volumeClaimTemplate: auto-simple-vc
+      dataVolumeClaimTemplate: data-volume-template
   configuration:
     clusters:
       - name: "replicas"
@@ -20,7 +20,7 @@ spec:
           replicasCount: 2
   templates:
     volumeClaimTemplates:
-    - name: auto-simple-vc
+    - name: data-volume-template
       spec:
         accessModes:
         - ReadWriteOnce

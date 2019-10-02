@@ -9,7 +9,6 @@ spec:
         # Templates are specified for this cluster explicitly
         templates:
           podTemplate: pod-template-with-volume
-          volumeClaimTemplate: storage-vc-template
         layout:
           shardsCount: 1
           replicasCount: 1

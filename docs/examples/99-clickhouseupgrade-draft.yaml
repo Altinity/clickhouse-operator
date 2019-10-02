@@ -9,7 +9,8 @@ spec:
         matchLabels:
           clickhouse.altinity.com/zone: zone1
       podTemplate: clickhouse-v18.16.1
-      volumeClaimTemplate: default
+      dataVolumeClaimTemplate: default
+      logVolumeClaimTemplate: default
 #     scenario: Default
 
   configuration:

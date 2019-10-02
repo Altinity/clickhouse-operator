@@ -7,7 +7,7 @@
   "spec": {
     "defaults":{
       "templates": {
-        "volumeClaimTemplate": "default-volumeclaim-template"
+        "dataVolumeClaimTemplate": "default-volumeclaim-template"
       }
     },
     "templates": {

@@ -5,7 +5,7 @@ metadata:
 spec:
   defaults:
     templates:
-      volumeClaimTemplate: volumeclaim-template
+      dataVolumeClaimTemplate: data-volumeclaim-template
   configuration:
     clusters:
       - name: "simple"
@@ -14,7 +14,7 @@ spec:
           replicasCount: 1
   templates:
     volumeClaimTemplates:
-      - name: volumeclaim-template
+      - name: data-volumeclaim-template
 #        reclaimPolicy: Retain
         spec:
           accessModes:
