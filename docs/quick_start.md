@@ -156,7 +156,7 @@ Connected to ClickHouse server version 19.4.3 revision 54416.
 ## Simple Persistent Volume Example
 
 In case of having Dynamic Volume Provisioning available - ex.: running on AWS - we are able to use PersistentVolumeClaims
-Manifest is [available in examples](./examples/02-persistent-volume-01-simple.yaml)
+Manifest is [available in examples](./examples/02-persistent-volume-01-default-volume.yaml)
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
@@ -166,23 +166,30 @@ metadata:
 spec:
   defaults:
     templates:
-      dataVolumeClaimTemplate: data-volumeclaim-template
+      dataVolumeClaimTemplate: volume-template
+      logVolumeClaimTemplate: volume-template
   configuration:
     clusters:
       - name: "simple"
         layout:
           shardsCount: 1
           replicasCount: 1
+      - name: "replicas"
+        layout:
+          shardsCount: 1
+          replicasCount: 2
+      - name: "shards"
+        layout:
+          shardsCount: 2
   templates:
     volumeClaimTemplates:
-      - name: data-volumeclaim-template
-#        reclaimPolicy: Retain
+      - name: volume-template
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 500Mi
+              storage: 123Mi
 ```
 
 ## Custom Deployment with Pod and VolumeClaim Templates
@@ -192,27 +199,27 @@ Let's install more complex example with:
 1. Pod template
 1. VolumeClaim template
 
-Manifest is [available in examples](./examples/02-persistent-volume-03-deployment.yaml)
+Manifest is [available in examples](./examples/02-persistent-volume-02-pod-template.yaml)
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "pv-deploy"
+  name: "pv-log"
 spec:
   configuration:
     clusters:
       - name: "deployment-pv"
         # Templates are specified for this cluster explicitly
         templates:
-          podTemplate: pod-template-with-volume
+          podTemplate: pod-template-with-volumes
         layout:
           shardsCount: 1
           replicasCount: 1
 
   templates:
     podTemplates:
-      - name: pod-template-with-volume
+      - name: pod-template-with-volumes
         spec:
           containers:
             - name: clickhouse
@@ -225,17 +232,26 @@ spec:
                 - name: interserver
                   containerPort: 9009
               volumeMounts:
-                - name: storage-vc-template
+                - name: data-storage-vc-template
                   mountPath: /var/lib/clickhouse
+                - name: log-storage-vc-template
+                  mountPath: /var/log/clickhouse-server
 
     volumeClaimTemplates:
-      - name: storage-vc-template
+      - name: data-storage-vc-template
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 1Gi
+              storage: 3Gi
+      - name: log-storage-vc-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi
 ```
 
 ## Custom Deployment with Specific ClickHouse Configuration

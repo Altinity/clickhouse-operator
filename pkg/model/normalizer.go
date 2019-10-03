@@ -396,13 +396,19 @@ func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
 
 // doConfigurationZookeeper normalizes .spec.configuration.zookeeper
 func (n *Normalizer) doConfigurationZookeeper(zk *chiv1.ChiZookeeperConfig) {
+	// In case no ZK port specified - assign default
 	for i := range zk.Nodes {
 		// Convenience wrapper
 		node := &zk.Nodes[i]
 		if node.Port == 0 {
-			node.Port = 2181
+			node.Port = zkDefaultPort
 		}
 	}
+
+	// In case no ZK root specified - assign '/clickhouse/{namespace}/{chi name}'
+	//if zk.Root == "" {
+	//	zk.Root = fmt.Sprintf(zkDefaultRootTemplate, n.chi.Namespace, n.chi.Name)
+	//}
 }
 
 // doConfigurationUsers normalizes .spec.configuration.users

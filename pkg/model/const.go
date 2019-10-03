@@ -118,3 +118,9 @@ const (
 	podDistributionOnePerHost  = "OnePerHost"
 	podDistributionUnspecified = "Unspecified"
 )
+
+const (
+	zkDefaultPort = 2181
+	// zkDefaultRootTemplate specifies default ZK root - /clickhouse/{namespace}/{chi name}
+	zkDefaultRootTemplate = "/clickhouse/%s/%s"
+)
