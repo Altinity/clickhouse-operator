@@ -230,12 +230,12 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
             done
         else
             # Fetch from github and apply
-            # config/config.d/01-clickhouse-operator-listen.xml
-            # config/config.d/02-clickhouse-operator-logger.xml
-            download_file "${CUR_DIR}" "01-clickhouse-operator-listen.xml" "config/config.d"
-            download_file "${CUR_DIR}" "02-clickhouse-operator-logger.xml" "config/config.d"
-            render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-operator-listen.xml"
-            render_configmap_data_section_file "${CUR_DIR}/02-clickhouse-operator-logger.xml"
+            # config/config.d/01-clickhouse-listen.xml
+            # config/config.d/02-clickhouse-logger.xml
+            download_file "${CUR_DIR}" "01-clickhouse-listen.xml" "config/config.d"
+            download_file "${CUR_DIR}" "02-clickhouse-logger.xml" "config/config.d"
+            render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-listen.xml"
+            render_configmap_data_section_file "${CUR_DIR}/02-clickhouse-logger.xml"
         fi
 
         # Render templates.d files
@@ -256,9 +256,9 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
             done
         else
             # Fetch from github and apply
-            # config/users.d/01-clickhouse-operator-user.xml
-            download_file "${CUR_DIR}" "01-clickhouse-operator-user.xml" "config/users.d"
-            render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-operator-user.xml"
+            # config/users.d/01-clickhouse-user.xml
+            download_file "${CUR_DIR}" "01-clickhouse-user.xml" "config/users.d"
+            render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-user.xml"
         fi
 
         # Render Deployment
