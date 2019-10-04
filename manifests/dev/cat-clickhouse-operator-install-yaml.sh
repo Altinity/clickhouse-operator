@@ -60,6 +60,9 @@ MANIFEST_PRINT_DEPLOYMENT="${MANIFEST_PRINT_DEPLOYMENT:-yes}"
 ##
 ##################################
 
+#
+# Ensure file `FILE` is in place in `LOCAL_DIR`, if absent, fetch file from `REPO_DIR`
+#
 function ensure_file() {
     # Params
     local LOCAL_DIR="$1"
@@ -85,6 +88,9 @@ function ensure_file() {
     fi
 }
 
+#
+# Download file `FILE` into `LOCAL_DIR` from `REPO_DIR`
+#
 function download_file() {
     # Params
     local LOCAL_DIR="$1"
@@ -119,12 +125,12 @@ function download_file() {
         exit 1
     fi
 }
+
 ##################################
 ##
 ##     Render .yaml manifest
 ##
 ##################################
-
 
 # Render CRD section
 if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then

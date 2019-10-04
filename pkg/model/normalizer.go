@@ -164,7 +164,8 @@ func (n *Normalizer) newAffinity(template *chiv1.ChiPodTemplate) *v1.Affinity {
 	nodeAffinity := n.newNodeAffinity(template)
 	podAntiAffinity := n.newPodAntiAffinity(template)
 
-	if nodeAffinity == nil && podAntiAffinity == nil {
+	if (nodeAffinity == nil) && (podAntiAffinity == nil) {
+		// Neither Affinity nor AntiAffinity specified
 		return nil
 	}
 

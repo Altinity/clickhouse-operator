@@ -31,8 +31,8 @@ spec:
           port: 2181
       session_timeout_ms: 30000
       operation_timeout_ms: 10000
-      root: /path/to/zookeeper/node
-      identity: user:password
+      root: "/path/to/zookeeper/root/node"
+      identity: "user:password"
     users:
       readonly/profile: readonly
       #     <users>
