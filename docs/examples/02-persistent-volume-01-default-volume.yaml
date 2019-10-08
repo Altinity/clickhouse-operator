@@ -5,8 +5,8 @@ metadata:
 spec:
   defaults:
     templates:
-      dataVolumeClaimTemplate: volume-template
-      logVolumeClaimTemplate: volume-template
+      dataVolumeClaimTemplate: data-volume-template
+      logVolumeClaimTemplate: log-volume-template
   configuration:
     clusters:
       - name: "simple"
@@ -22,10 +22,17 @@ spec:
           shardsCount: 2
   templates:
     volumeClaimTemplates:
-      - name: volume-template
+      - name: data-volume-template
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 123Mi
+              storage: 3Gi
+      - name: log-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
