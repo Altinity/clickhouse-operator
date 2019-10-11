@@ -36,8 +36,10 @@ type Manager struct {
 
 	// fileConfig is a file-based config
 	fileConfig *chiv1.Config
+
 	// crConfigs is a slice of Custom Resource based configs
 	crConfigs []*chiv1.Config
+
 	// config is the final, unified config
 	config *chiv1.Config
 
@@ -154,6 +156,7 @@ func (cm *Manager) buildUnifiedConfig() {
 
 	// Start with file config
 	cm.config = cm.fileConfig
+	// Merge/unify with CR-based configs
 	for _, chOperatorConfiguration := range cm.crConfigs {
 		glog.V(1).Infof("chop config %s/%s :", chOperatorConfiguration.ConfigFolderPath, chOperatorConfiguration.ConfigFilePath)
 		cm.config = chOperatorConfiguration

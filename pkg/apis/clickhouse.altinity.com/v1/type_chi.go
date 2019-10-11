@@ -286,6 +286,19 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation) {
 	chi.Status = from.Status
 }
 
+func (spec *ChiSpec) MergeFrom(from *ChiSpec) {
+	if from == nil {
+		return
+	}
+
+	if spec.Stop == "" {
+		spec.Stop = from.Stop
+	}
+	(&spec.Defaults).MergeFrom(&from.Defaults)
+	(&spec.Configuration).MergeFrom(&from.Configuration)
+	(&spec.Templates).MergeFrom(&from.Templates)
+}
+
 func (chi *ClickHouseInstallation) FindCluster(name string) *ChiCluster {
 	var cluster *ChiCluster
 	chi.WalkClusters(func(c *ChiCluster) error {
