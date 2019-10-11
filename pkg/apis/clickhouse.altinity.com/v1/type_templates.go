@@ -14,6 +14,8 @@
 
 package v1
 
+import "github.com/imdario/mergo"
+
 func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 	if from == nil {
 		return
@@ -37,7 +39,8 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 					// Receiver already have such a template
 					sameNameFound = true
 					// Override `to` template with `from` template
-					templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
+					//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
+					mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride)
 					break
 				}
 			}
@@ -68,7 +71,8 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 					// Receiver already have such a template
 					sameNameFound = true
 					// Override `to` template with `from` template
-					templates.VolumeClaimTemplates[toIndex] = *fromTemplate.DeepCopy()
+					//templates.VolumeClaimTemplates[toIndex] = *fromTemplate.DeepCopy()
+					mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride)
 					break
 				}
 			}
@@ -99,7 +103,8 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 					// Receiver already have such a template
 					sameNameFound = true
 					// Override `to` template with `from` template
-					templates.ServiceTemplates[toIndex] = *fromTemplate.DeepCopy()
+					//templates.ServiceTemplates[toIndex] = *fromTemplate.DeepCopy()
+					mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride)
 					break
 				}
 			}
