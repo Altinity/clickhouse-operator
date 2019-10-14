@@ -134,7 +134,7 @@ function download_file() {
 
 # Render CRD section
 if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-01-section-crd.yaml" "manifests/dev"
+    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-01-section-crd.yaml" "deploy/dev"
     cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-01-section-crd.yaml" | \
         OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" envsubst
 fi
@@ -142,7 +142,7 @@ fi
 # Render RBAC section
 if [[ "${MANIFEST_PRINT_RBAC}" == "yes" ]]; then
     echo "---"
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-02-section-rbac-and-service.yaml" "manifests/dev"
+    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-02-section-rbac-and-service.yaml" "deploy/dev"
     cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-02-section-rbac-and-service.yaml" | \
         OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" envsubst
 fi
@@ -159,7 +159,7 @@ function render_configmap_header() {
     CM_NAME="$1"
     # Template file with ConfigMap header/beginning
 
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" "manifests/dev"
+    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" "deploy/dev"
     # Render ConfigMap header template with vars substitution
     cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" CONFIGMAP_NAME="${CM_NAME}" envsubst
@@ -196,7 +196,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
     if [[ -z "${OPERATOR_CONFIG_FILE}" ]]; then
         # No config file specified, render simple deployment
         echo "---"
-        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment.yaml" "manifests/dev"
+        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment.yaml" "deploy/dev"
         cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-04-section-deployment.yaml" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
@@ -269,7 +269,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
 
         # Render Deployment
         echo "---"
-        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" "manifests/dev"
+        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" "deploy/dev"
         cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \

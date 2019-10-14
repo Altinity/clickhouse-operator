@@ -3,7 +3,7 @@
 **Note:** Before you upgrade check releases notes if there are any backward incompatible changes between your version and the latest version.
 
 ClickHouse operator is deployed as Deployment Kubernetes resource (see: [Operator Installation Guide](https://github.com/Altinity/clickhouse-operator/blob/master/docs/operator_installation_details.md)
-for more details). Supplied [clickhouse-operator-install.yaml](https://github.com/Altinity/clickhouse-operator/blob/master/manifests/operator/clickhouse-operator-install.yaml) contains the following deployment spec:
+for more details). Supplied [clickhouse-operator-install.yaml](https://github.com/Altinity/clickhouse-operator/blob/master/deploy/operator/clickhouse-operator-install.yaml) contains the following deployment spec:
 ```
 kind: Deployment
 apiVersion: apps/v1

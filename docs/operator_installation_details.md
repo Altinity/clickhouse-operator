@@ -1,13 +1,13 @@
 # Install ClickHouse Operator
 
-Verify [clickhouse-operator-install.yaml](../manifests/operator/clickhouse-operator-install.yaml) file availability.
-In is located in `manifests/operator` folder inside `clickhouse-operator` sources.
+Verify [clickhouse-operator-install.yaml](../deploy/operator/clickhouse-operator-install.yaml) file availability.
+In is located in `deploy/operator` folder inside `clickhouse-operator` sources.
 
 ## Install
 Operator installation process is quite straightforward and consists of one main step - deploy **ClickHouse operator**.
 We'll apply operator manifest directly from github repo
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator/clickhouse-operator-install.yaml
+kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install.yaml
 ```
 
 The following results are expected:

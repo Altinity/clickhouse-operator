@@ -21,14 +21,14 @@ Apply `clickhouse-operator` installation manifest. The simplest way - directly f
 
 In case you are convenient to install operator into `kube-system` namespace just run:
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator/clickhouse-operator-install.yaml
+kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install.yaml
 ``` 
 
 In case you'd like to customize namespace where to install operator, or customize any operator's or ClickHouse's configuration, feel free to use installer script.
 Please, `cd` into writable folder, because install script would download config files to build `.yaml` manifests from into current dir. 
 ```bash
 cd ~
-curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator-installer/clickhouse-operator-install.sh | CHOPERATOR_NAMESPACE=test-clickhouse-operator bash
+curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-installer/clickhouse-operator-install.sh | CHOPERATOR_NAMESPACE=test-clickhouse-operator bash
 ```
 Take into account explicitly specified namespace
 ```bash
@@ -40,7 +40,7 @@ Install script would download some `.yaml` and `.xml` files and install `clickho
 In case no `CHOPERATOR_NAMESPACE` specified, as:
 ```bash
 cd ~
-curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator-installer/clickhouse-operator-install.sh | bash
+curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-installer/clickhouse-operator-install.sh | bash
 ```
 installer will create namespace `clickhouse-operator` and install **clickhouse-operator** into it.
 

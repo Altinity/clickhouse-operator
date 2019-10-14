@@ -81,13 +81,21 @@ function download_file() {
 #
 
 ensure_kubectl
-ensure_file "${CUR_DIR}" "cat-clickhouse-operator-install-yaml.sh" "manifests/dev"
+ensure_file "${CUR_DIR}" "cat-clickhouse-operator-install-yaml.sh" "deploy/dev"
 
-if [[ "${CHOPERATOR_NAMESPACE}" == "kube-system" ]]; then
-    echo "Default k8s namespace 'kube-system' must not be deleted"
-    echo "Delete components only"
-    kubectl delete --namespace="${CHOPERATOR_NAMESPACE}" -f <(CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh")
+echo "Setup ClickHouse Operator into ${CHOPERATOR_NAMESPACE} namespace"
+
+if kubectl get namespace "${CHOPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
+    echo "Namespace ${CHOPERATOR_NAMESPACE} already exists"
+    if kubectl get deployment clickhouse-operator -n "${CHOPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
+        echo "clickhouse-operator is already installed into ${CHOPERATOR_NAMESPACE} namespace. Abort."
+        exit 1
+    fi
 else
-    echo "Delete ClickHouse Operator namespace ${CHOPERATOR_NAMESPACE}"
-    kubectl delete namespace "${CHOPERATOR_NAMESPACE}"
+    # No ${CHOPERATOR_NAMESPACE} namespace found, let's create it
+    # Let's setup all clickhouse-operator-related stuff into dedicated namespace
+    kubectl create namespace "${CHOPERATOR_NAMESPACE}"
 fi
+
+# Setup into dedicated namespace
+kubectl apply --namespace="${CHOPERATOR_NAMESPACE}" -f <(CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" /bin/bash "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh")
