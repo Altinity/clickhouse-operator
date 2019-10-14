@@ -74,7 +74,8 @@ func (cm *Manager) Init() error {
 	cm.fileConfig.WriteToLog()
 
 	// Read config all Custom Resources
-	cm.getCRBasedConfigs(cm.config.GetInformerNamespace())
+	watchedNamespace := cm.fileConfig.GetInformerNamespace()
+	cm.getCRBasedConfigs(watchedNamespace)
 	cm.logCRBasedConfigs()
 
 	// Prepare one unified config
