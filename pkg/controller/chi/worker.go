@@ -164,7 +164,7 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 	actionPlan := NewActionPlan(old, new)
 
-	if actionPlan.HasNoChanges() {
+	if actionPlan.IsNoChanges() {
 		glog.V(2).Infof("updateChi(%s/%s): no changes found", new.Namespace, new.Name)
 		// No need to react
 		return nil

@@ -85,17 +85,32 @@ type ChiDefaults struct {
 
 // ChiTemplateNames defines references to .spec.templates to be used on current level of cluster
 type ChiTemplateNames struct {
-	PodTemplate            string `json:"podTemplate,omitempty"            yaml:"podTemplate"`
-	VolumeClaimTemplate    string `json:"volumeClaimTemplate,omitempty"    yaml:"volumeClaimTemplate"`
-	ServiceTemplate        string `json:"serviceTemplate,omitempty"        yaml:"serviceTemplate"`
-	ClusterServiceTemplate string `json:"clusterServiceTemplate,omitempty" yaml:"clusterServiceTemplate"`
-	ShardServiceTemplate   string `json:"shardServiceTemplate,omitempty"   yaml:"shardServiceTemplate"`
-	ReplicaServiceTemplate string `json:"replicaServiceTemplate,omitempty" yaml:"replicaServiceTemplate"`
+	PodTemplate             string `json:"podTemplate,omitempty"             yaml:"podTemplate"`
+	DataVolumeClaimTemplate string `json:"dataVolumeClaimTemplate,omitempty" yaml:"dataVolumeClaimTemplate"`
+	LogVolumeClaimTemplate  string `json:"logVolumeClaimTemplate,omitempty"  yaml:"logVolumeClaimTemplate"`
+	// DEPRECATED!!!  VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate
+	VolumeClaimTemplate    string `json:"volumeClaimTemplate,omitempty"     yaml:"volumeClaimTemplate"`
+	ServiceTemplate        string `json:"serviceTemplate,omitempty"         yaml:"serviceTemplate"`
+	ClusterServiceTemplate string `json:"clusterServiceTemplate,omitempty"  yaml:"clusterServiceTemplate"`
+	ShardServiceTemplate   string `json:"shardServiceTemplate,omitempty"    yaml:"shardServiceTemplate"`
+	ReplicaServiceTemplate string `json:"replicaServiceTemplate,omitempty"  yaml:"replicaServiceTemplate"`
+}
+
+func (templates *ChiTemplateNames) HandleDeprecatedFields() {
+	if templates.DataVolumeClaimTemplate == "" {
+		templates.DataVolumeClaimTemplate = templates.VolumeClaimTemplate
+	}
 }
 
 func (templates *ChiTemplateNames) MergeFrom(from *ChiTemplateNames) {
 	if templates.PodTemplate == "" {
 		templates.PodTemplate = from.PodTemplate
+	}
+	if templates.DataVolumeClaimTemplate == "" {
+		templates.DataVolumeClaimTemplate = from.DataVolumeClaimTemplate
+	}
+	if templates.LogVolumeClaimTemplate == "" {
+		templates.LogVolumeClaimTemplate = from.LogVolumeClaimTemplate
 	}
 	if templates.VolumeClaimTemplate == "" {
 		templates.VolumeClaimTemplate = from.VolumeClaimTemplate

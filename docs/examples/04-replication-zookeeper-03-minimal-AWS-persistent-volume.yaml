@@ -1,25 +1,26 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "simple-02-pv2"
+  name: "repl-03"
 spec:
   configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper.zoo1ns
+          port: 2181
     clusters:
-      - name: "deployment-pv"
-        # Templates are specified for this cluster explicitly
+      - name: replcluster
         templates:
-          podTemplate: pod-template-with-volume
-          volumeClaimTemplate: storage-vc-template
+          podTemplate: clickhouse-with-volume-template
         layout:
           shardsCount: 1
-          replicasCount: 1
-
+          replicasCount: 2
   templates:
     podTemplates:
-      - name: pod-template-with-volume
+      - name: clickhouse-with-volume-template
         spec:
           containers:
-            - name: clickhouse
+            - name: clickhouse-pod
               image: yandex/clickhouse-server:19.3.7
               ports:
                 - name: http
@@ -29,14 +30,15 @@ spec:
                 - name: interserver
                   containerPort: 9009
               volumeMounts:
-                - name: storage-vc-template
+                - name: clickhouse-storage-template
                   mountPath: /var/lib/clickhouse
-
     volumeClaimTemplates:
-      - name: storage-vc-template
+      - name: clickhouse-storage-template
         spec:
+          # no storageClassName - means use default storageClassName
+          #storageClassName: default
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 1Gi
+              storage: 50Gi

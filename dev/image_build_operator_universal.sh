@@ -11,11 +11,13 @@ MINIKUBE="${MINIKUBE:-no}"
 # Source-dependent options
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 SRC_ROOT="$(realpath "${CUR_DIR}/..")"
+source "${CUR_DIR}/go_build_config.sh"
+
 DOCKERFILE_DIR="${SRC_ROOT}/dockerfile/operator"
 DOCKERFILE="${DOCKERFILE_DIR}/Dockerfile"
 
 # Build clickhouse-operator install .yaml manifest
-"${SRC_ROOT}/manifests/operator/build-clickhouse-operator-install-yaml.sh"
+"${MANIFESTS_ROOT}/operator/build-clickhouse-operator-install-yaml.sh"
 
 # Build image with Docker
 if [[ "${MINIKUBE}" == "yes" ]]; then

@@ -8,7 +8,7 @@ metadata:
 provisioner: kubernetes.io/aws-ebs
 parameters:
   type: gp2
-i  # FS ext4 start encrypted disk quickly
+  # FS ext4 start encrypted disk quickly
   fsType: ext4
   # FS xfs start encrypted disk very slow - easy can be said "does not work at all for me"
 #  fsType: xfs
@@ -24,7 +24,7 @@ metadata:
 spec:
   defaults:
     templates:
-      volumeClaimTemplate: volumeclaim-template
+      dataVolumeClaimTemplate: data-volumeclaim-template
   configuration:
     clusters:
       - name: "pv-enc"
@@ -33,7 +33,7 @@ spec:
           replicasCount: 1
   templates:
     volumeClaimTemplates:
-      - name: volumeclaim-template
+      - name: data-volumeclaim-template
         spec:
           storageClassName: gp2-encrypted
           accessModes:

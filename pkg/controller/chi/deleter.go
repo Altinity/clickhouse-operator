@@ -133,11 +133,6 @@ func (c *Controller) statefulSetDelete(host *chop.ChiHost) error {
 // persistentVolumeClaimDelete deletes PersistentVolumeClaim
 func (c *Controller) persistentVolumeClaimDelete(host *chop.ChiHost) error {
 
-	if !chopmodel.HostCanDeletePVC(host) {
-		glog.V(1).Infof("PVC should not be deleted, leave them intact")
-		return nil
-	}
-
 	namespace := host.Address.Namespace
 	labeler := chopmodel.NewLabeler(c.version, host.Chi)
 	listOptions := newListOptions(labeler.GetSelectorHostScope(host))
@@ -145,11 +140,17 @@ func (c *Controller) persistentVolumeClaimDelete(host *chop.ChiHost) error {
 		glog.V(1).Infof("OK get list of PVC for host %s/%s", namespace, host.Name)
 		for i := range list.Items {
 			pvc := &list.Items[i]
-			if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, newDeleteOptions()); err == nil {
-				glog.V(1).Infof("OK delete PVC %s/%s", namespace, pvc.Name)
+
+			if chopmodel.HostCanDeletePVC(host, pvc.Name) {
+				if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, newDeleteOptions()); err == nil {
+					glog.V(1).Infof("OK delete PVC %s/%s", namespace, pvc.Name)
+				} else {
+					glog.V(1).Infof("FAIL delete PVC %s/%s %v", namespace, pvc.Name, err)
+				}
 			} else {
-				glog.V(1).Infof("FAIL delete PVC %s/%s %v", namespace, pvc.Name, err)
+				glog.V(1).Infof("PVC should not be deleted, leave them intact")
 			}
+
 		}
 	} else {
 		glog.V(1).Infof("FAIL get list of PVC for host %s/%s %v", namespace, host.Name, err)

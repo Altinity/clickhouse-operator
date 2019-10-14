@@ -16,7 +16,8 @@ spec:
       profile: default
     templates:
       podTemplate: clickhouse-v18.16.1
-      volumeClaimTemplate: default-volume-claim
+      dataVolumeClaimTemplate: default-volume-claim
+      logVolumeClaimTemplate: default-volume-claim
       serviceTemplate: chi-service-template
 
   configuration:
@@ -30,8 +31,8 @@ spec:
           port: 2181
       session_timeout_ms: 30000
       operation_timeout_ms: 10000
-      root: /path/to/zookeeper/node
-      identity: user:password
+      root: "/path/to/zookeeper/root/node"
+      identity: "user:password"
     users:
       readonly/profile: readonly
       #     <users>
@@ -92,7 +93,8 @@ spec:
       - name: all-counts
         templates:
           podTemplate: clickhouse-v18.16.1
-          volumeClaimTemplate: default-volume-claim
+          dataVolumeClaimTemplate: default-volume-claim
+          logVolumeClaimTemplate: default-volume-claim
         layout:
           shardsCount: 3
           replicasCount: 2
@@ -100,7 +102,8 @@ spec:
       - name: shards-only
         templates:
           podTemplate: clickhouse-v18.16.1
-          volumeClaimTemplate: default-volume-claim
+          dataVolumeClaimTemplate: default-volume-claim
+          logVolumeClaimTemplate: default-volume-claim
         layout:
           shardsCount: 3
           # replicasCount not specified, assumed = 1, by default
@@ -108,7 +111,8 @@ spec:
       - name: replicas-only
         templates:
           podTemplate: clickhouse-v18.16.1
-          volumeClaimTemplate: default-volume-claim
+          dataVolumeClaimTemplate: default-volume-claim
+          logVolumeClaimTemplate: default-volume-claim
         layout:
           # shardsCount not specified, assumed = 1, by default
           replicasCount: 3
@@ -116,7 +120,8 @@ spec:
       - name: customized
         templates:
           podTemplate: clickhouse-v18.16.1
-          volumeClaimTemplate: default-volume-claim
+          dataVolumeClaimTemplate: default-volume-claim
+          logVolumeClaimTemplate: default-volume-claim
         layout:
           shards:
             - name: shard0
@@ -125,12 +130,14 @@ spec:
               internalReplication: Disabled
               templates:
                 podTemplate: clickhouse-v18.16.1
-                volumeClaimTemplate: default-volume-claim
+                dataVolumeClaimTemplate: default-volume-claim
+                logVolumeClaimTemplate: default-volume-claim
 
             - name: shard1
               templates:
                 podTemplate: clickhouse-v18.16.1
-                volumeClaimTemplate: default-volume-claim
+                dataVolumeClaimTemplate: default-volume-claim
+                logVolumeClaimTemplate: default-volume-claim
               replicas:
                 - name: replica0
                 - name: replica1
@@ -140,14 +147,16 @@ spec:
               replicasCount: 3
               templates:
                 podTemplate: clickhouse-v18.16.1
-                volumeClaimTemplate: default-volume-claim
+                dataVolumeClaimTemplate: default-volume-claim
+                logVolumeClaimTemplate: default-volume-claim
                 replicaServiceTemplate: replica-service-template
               replicas:
                 - name: replica0
                   port: 9000
                   templates:
                     podTemplate: clickhouse-v19.11.3.11
-                    volumeClaimTemplate: default-volume-claim
+                    dataVolumeClaimTemplate: default-volume-claim
+                    logVolumeClaimTemplate: default-volume-claim
                     replicaServiceTemplate: replica-service-template
 
   templates:

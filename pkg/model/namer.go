@@ -346,3 +346,8 @@ func CreatePodName(obj interface{}) string {
 	}
 	return "unknown-type"
 }
+
+// CreatePVCName create PVC name from PVC Template and host, to which PVC belongs to
+func CreatePVCName(template *chop.ChiVolumeClaimTemplate, host *chop.ChiHost) string {
+	return template.Name + "-" + CreatePodName(host)
+}

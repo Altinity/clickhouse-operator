@@ -51,21 +51,21 @@ const (
 	defaultChPort     = 8123
 )
 
-// processChiTemplateFiles build Config.ChiTemplate from template files content
-func (config *Config) processChiTemplateFiles() {
+// readChiTemplates build Config.ChiTemplate from template files content
+func (config *Config) readChiTemplates() {
+	// Read CHI template files
+	config.ChiTemplateFiles = readConfigFiles(config.ChiTemplatesPath, config.isChiTemplateExt)
 
 	// Produce map of CHI templates out of CHI template files
 	for filename := range config.ChiTemplateFiles {
 		template := new(ClickHouseInstallation)
 		if err := yaml.Unmarshal([]byte(config.ChiTemplateFiles[filename]), template); err != nil {
 			// Unable to unmarshal - skip incorrect template
-			glog.V(1).Infof("FAIL processChiTemplateFiles() unable to unmarshal file %s %q", filename, err)
+			glog.V(1).Infof("FAIL readChiTemplates() unable to unmarshal file %s %q", filename, err)
 			continue
 		}
 		config.enlistChiTemplate(template)
 	}
-
-	config.buildChiTemplate()
 }
 
 // enlistChiTemplate inserts template into templates catalog
@@ -89,14 +89,14 @@ func (config *Config) unlistChiTemplate(template *ClickHouseInstallation) {
 	}
 }
 
-// buildChiTemplate builds combined CHI Template from templates catalog
-func (config *Config) buildChiTemplate() {
+// buildUnifiedChiTemplate builds combined CHI Template from templates catalog
+func (config *Config) buildUnifiedChiTemplate() {
 	// Build unified template in case there are templates to build from only
 	if len(config.ChiTemplates) == 0 {
 		return
 	}
 
-	// Sort CHI templates by their names and apply one by one
+	// Sort CHI templates by their names and in order to apply orderly
 	// Extract file names into slice and sort it
 	// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
 	var sortedTemplateNames []string
@@ -114,34 +114,34 @@ func (config *Config) buildChiTemplate() {
 		config.ChiTemplate.MergeFrom(config.ChiTemplates[templateName])
 	}
 
+	// Log final CHI template obtained
 	if bytes, err := yaml.Marshal(config.ChiTemplate); err == nil {
 		glog.V(1).Infof("ChiTemplate:\n%s\n", string(bytes))
 	} else {
 		glog.V(1).Infof("FAIL unable to Marshal ChiTemplate")
 	}
-
 }
 
 func (config *Config) AddChiTemplate(template *ClickHouseInstallation) {
 	config.enlistChiTemplate(template)
-	config.buildChiTemplate()
+	config.buildUnifiedChiTemplate()
 }
 
 func (config *Config) UpdateChiTemplate(template *ClickHouseInstallation) {
 	config.enlistChiTemplate(template)
-	config.buildChiTemplate()
+	config.buildUnifiedChiTemplate()
 }
 
 func (config *Config) DeleteChiTemplate(template *ClickHouseInstallation) {
 	config.unlistChiTemplate(template)
-	config.buildChiTemplate()
+	config.buildUnifiedChiTemplate()
 }
 
 func (config *Config) Postprocess() {
 	config.normalize()
-	config.readChConfigFiles()
-	config.readChiTemplateFiles()
-	config.processChiTemplateFiles()
+	config.readClickHouseCustomConfigFiles()
+	config.readChiTemplates()
+	config.buildUnifiedChiTemplate()
 	config.applyEnvVarParams()
 	config.applyDefaultWatchNamespace()
 }
@@ -298,8 +298,8 @@ func (config *Config) relativeToConfigFolderPath(relativePath string) string {
 	}
 }
 
-// readChConfigFiles reads all extra user-specified ClickHouse config files
-func (config *Config) readChConfigFiles() {
+// readClickHouseCustomConfigFiles reads all extra user-specified ClickHouse config files
+func (config *Config) readClickHouseCustomConfigFiles() {
 	config.ChCommonConfigs = readConfigFiles(config.ChCommonConfigsPath, config.isChConfigExt)
 	config.ChHostConfigs = readConfigFiles(config.ChHostConfigsPath, config.isChConfigExt)
 	config.ChUsersConfigs = readConfigFiles(config.ChUsersConfigsPath, config.isChConfigExt)
@@ -312,11 +312,6 @@ func (config *Config) isChConfigExt(file string) bool {
 		return true
 	}
 	return false
-}
-
-// readChConfigFiles reads all CHI templates
-func (config *Config) readChiTemplateFiles() {
-	config.ChiTemplateFiles = readConfigFiles(config.ChiTemplatesPath, config.isChiTemplateExt)
 }
 
 // isChiTemplateExt returns true in case specified file has proper extension for a CHI template config file

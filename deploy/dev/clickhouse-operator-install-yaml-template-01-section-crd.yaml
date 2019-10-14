@@ -1,7 +1,7 @@
 # Possible Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:latest
+# ${OPERATOR_NAMESPACE}
+# ${OPERATOR_IMAGE}
 #
 # Setup CustomResourceDefinition(s)
 # CustomResourceDefinition is namespace-less and must have unique name
@@ -111,7 +111,9 @@ spec:
                   properties:
                     podTemplate:
                       type: string
-                    volumeClaimTemplate:
+                    dataVolumeClaimTemplate:
+                      type: string
+                    logVolumeClaimTemplate:
                       type: string
                     serviceTemplate:
                       type: string
@@ -179,7 +181,9 @@ spec:
                         properties:
                           podTemplate:
                             type: string
-                          volumeClaimTemplate:
+                          dataVolumeClaimTemplate:
+                            type: string
+                          logVolumeClaimTemplate:
                             type: string
                           serviceTemplate:
                             type: string
@@ -223,7 +227,9 @@ spec:
                                   properties:
                                     podTemplate:
                                       type: string
-                                    volumeClaimTemplate:
+                                    dataVolumeClaimTemplate:
+                                      type: string
+                                    logVolumeClaimTemplate:
                                       type: string
                                     serviceTemplate:
                                       type: string
@@ -250,7 +256,9 @@ spec:
                                         properties:
                                           podTemplate:
                                             type: string
-                                          volumeClaimTemplate:
+                                          dataVolumeClaimTemplate:
+                                            type: string
+                                          logVolumeClaimTemplate:
                                             type: string
                                           serviceTemplate:
                                             type: string
@@ -435,7 +443,9 @@ spec:
                   properties:
                     podTemplate:
                       type: string
-                    volumeClaimTemplate:
+                    dataVolumeClaimTemplate:
+                      type: string
+                    logVolumeClaimTemplate:
                       type: string
                     serviceTemplate:
                       type: string
@@ -503,7 +513,9 @@ spec:
                         properties:
                           podTemplate:
                             type: string
-                          volumeClaimTemplate:
+                          dataVolumeClaimTemplate:
+                            type: string
+                          logVolumeClaimTemplate:
                             type: string
                           serviceTemplate:
                             type: string
@@ -547,7 +559,9 @@ spec:
                                   properties:
                                     podTemplate:
                                       type: string
-                                    volumeClaimTemplate:
+                                    dataVolumeClaimTemplate:
+                                      type: string
+                                    logVolumeClaimTemplate:
                                       type: string
                                     serviceTemplate:
                                       type: string
@@ -574,7 +588,9 @@ spec:
                                         properties:
                                           podTemplate:
                                             type: string
-                                          volumeClaimTemplate:
+                                          dataVolumeClaimTemplate:
+                                            type: string
+                                          logVolumeClaimTemplate:
                                             type: string
                                           serviceTemplate:
                                             type: string
@@ -732,413 +748,3 @@ spec:
               type: integer
               minimum: 1
               maximum: 65535
----
-# Possible Template Parameters:
-#
-# kube-system
-# altinity/clickhouse-operator:latest
-#
-# Setup ServiceAccount
-# ServiceAccount would be created in kubectl-specified namespace
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: clickhouse-operator
-  namespace: kube-system
----
-# Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
-# ClusterRoleBinding is namespace-less and must have unique name
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: clickhouse-operator
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: cluster-admin
-subjects:
-  - kind: ServiceAccount
-    name: clickhouse-operator
-    namespace: kube-system
----
-# Setup ClusterIP Service to provide monitoring metrics for Prometheus
-# Service would be created in kubectl-specified namespace
-# In order to get access outside of k8s it should be exposed as:
-# kubectl --namespace prometheus port-forward service/prometheus 9090
-# and point browser to localhost:9090
-kind: Service
-apiVersion: v1
-metadata:
-  name: clickhouse-operator-metrics
-  namespace: kube-system
-  labels:
-    app: clickhouse-operator
-spec:
-  ports:
-    - port: 8888
-      name: clickhouse-operator-metrics
-  selector:
-    app: clickhouse-operator
----
-# Possible Template Parameters:
-#
-# kube-system
-# altinity/clickhouse-operator:latest
-# etc-clickhouse-operator-files
-#
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: etc-clickhouse-operator-files
-  namespace: kube-system
-data:
-  config.yaml: |
-    ################################################
-    ##
-    ## Watch Namespaces Section
-    ##
-    ################################################
-    
-    # List of namespaces where clickhouse-operator watches for events.
-    # Concurrently running operators should watch on different namespaces
-    # watchNamespaces:
-    #  - dev
-    #  - info
-    #  - onemore
-    
-    ################################################
-    ##
-    ## Additional Configuration Files Section
-    ##
-    ################################################
-    
-    # Path to folder where ClickHouse configuration files common for all instances within CHI are located.
-    chCommonConfigsPath: config.d
-    
-    # Path to folder where ClickHouse configuration files unique for each instance (host) within CHI are located.
-    chHostConfigsPath: conf.d
-    
-    # Path to folder where ClickHouse configuration files with users settings are located.
-    # Files are common for all instances within CHI
-    chUsersConfigsPath: users.d
-    
-    # Path to folder where ClickHouseInstallation .yaml manifests are located.
-    # Manifests are applied in sorted alpha-numeric order
-    chiTemplatesPath: templates.d
-    
-    ################################################
-    ##
-    ## Cluster Create/Update/Delete Objects Section
-    ##
-    ################################################
-    
-    # How many seconds to wait for created/updated StatefulSet to be Ready
-    statefulSetUpdateTimeout: 600
-    
-    # How many seconds to wait between checks for created/updated StatefulSet status
-    statefulSetUpdatePollPeriod: 10
-    
-    # What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
-    # Possible options:
-    # 1. abort - do nothing, just break the process and wait for admin
-    # 2. delete - delete newly created problematic StatefulSet
-    onStatefulSetCreateFailureAction: delete
-    
-    # What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
-    # Possible options:
-    # 1. abort - do nothing, just break the process and wait for admin
-    # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
-    # Pod would be recreated by StatefulSet based on rollback-ed configuration
-    onStatefulSetUpdateFailureAction: rollback
-    
-    ################################################
-    ##
-    ## ClickHouse Settings Section
-    ##
-    ################################################
-    
-    # Default values for ClickHouse user configuration
-    # 1. user/profile - string
-    # 2. user/quota - string
-    # 3. user/networks/ip - multiple strings
-    # 4. user/password - string
-    chConfigUserDefaultProfile: default
-    chConfigUserDefaultQuota: default
-    chConfigUserDefaultNetworksIP:
-      - "::/0"
-    chConfigUserDefaultPassword: "default"
-    
-    ################################################
-    ##
-    ## Operator's access to ClickHouse instances
-    ##
-    ################################################
-    
-    # ClickHouse credentials (username, password and port) to be used by operator to connect to ClickHouse instances for:
-    # 1. Metrics requests
-    # 2. Schema maintenance
-    # 3. DROP DNS CACHE
-    # User with such credentials credentials can be specified in additional ClickHouse .xml config files,
-    # located in `chUsersConfigsPath` folder
-    chUsername: clickhouse_operator
-    chPassword: clickhouse_operator_password
-    chPort: 8123
-
----
-# Possible Template Parameters:
-#
-# kube-system
-# altinity/clickhouse-operator:latest
-# etc-clickhouse-operator-confd-files
-#
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: etc-clickhouse-operator-confd-files
-  namespace: kube-system
-data:
----
-# Possible Template Parameters:
-#
-# kube-system
-# altinity/clickhouse-operator:latest
-# etc-clickhouse-operator-configd-files
-#
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: etc-clickhouse-operator-configd-files
-  namespace: kube-system
-data:
-  01-clickhouse-operator-listen.xml: |
-    <yandex>
-        <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
-        <listen_host>::</listen_host>
-        <listen_host>0.0.0.0</listen_host>
-        <listen_try>1</listen_try>
-    </yandex>
-
-  02-clickhouse-operator-logger.xml: |
-    <yandex>
-        <logger>
-            <console>1</console>
-        </logger>
-    </yandex>
-
----
-# Possible Template Parameters:
-#
-# kube-system
-# altinity/clickhouse-operator:latest
-# etc-clickhouse-operator-templatesd-files
-#
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: etc-clickhouse-operator-templatesd-files
-  namespace: kube-system
-data:
-  01-default-volumeclaimtemplate.json: |
-    {
-      "apiVersion": "clickhouse.altinity.com/v1",
-      "kind": "ClickHouseInstallation",
-      "metadata": {
-        "name": "01-default-volumeclaimtemplate"
-      },
-      "spec": {
-        "defaults":{
-          "templates": {
-            "volumeClaimTemplate": "default-volumeclaim-template"
-          }
-        },
-        "templates": {
-          "volumeClaimTemplates": [
-            {
-              "name": "default-volumeclaim-template",
-              "spec": {
-                "accessModes": [
-                  "ReadWriteOnce"
-                ],
-                "resources": {
-                  "requests": {
-                    "storage": "2Gi"
-                  }
-                }
-              }
-            }
-          ]
-        }
-      }
-    }
-
-  02-default-volumeclaimtemplate.yaml: |
-    apiVersion: "clickhouse.altinity.com/v1"
-    kind: "ClickHouseInstallation"
-    metadata:
-      name: "02-default-volumeclaimtemplate"
-    spec:
-      defaults:
-        templates:
-          volumeClaimTemplate: default-volumeclaim-template-02
-      templates:
-        volumeClaimTemplates:
-          - name: default-volumeclaim-template-02
-            spec:
-              accessModes:
-                - ReadWriteOnce
-              resources:
-                requests:
-                  storage: 2Gi
-
----
-# Possible Template Parameters:
-#
-# kube-system
-# altinity/clickhouse-operator:latest
-# etc-clickhouse-operator-usersd-files
-#
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: etc-clickhouse-operator-usersd-files
-  namespace: kube-system
-data:
-  01-clickhouse-operator-user.xml: |
-    <yandex>
-        <users>
-            <clickhouse_operator>
-                <networks>
-                    <ip>127.0.0.1</ip>
-                    <ip>0.0.0.0/0</ip>
-                    <ip>::/0</ip>
-                </networks>
-                <password>clickhouse_operator_password</password>
-                <profile>default</profile>
-                <quota>default</quota>
-            </clickhouse_operator>
-        </users>
-    </yandex>
-
----
-# Possible Template Parameters:
-#
-# kube-system
-# altinity/clickhouse-operator:latest
-# altinity/metrics-exporter:latest
-#
-# Setup Deployment for clickhouse-operator
-# Deployment would be created in kubectl-specified namespace
-kind: Deployment
-apiVersion: apps/v1
-metadata:
-  name: clickhouse-operator
-  namespace: kube-system
-  labels:
-    app: clickhouse-operator
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: clickhouse-operator
-  template:
-    metadata:
-      labels:
-        app: clickhouse-operator
-    spec:
-      serviceAccountName: clickhouse-operator
-      volumes:
-        - name: etc-clickhouse-operator-folder
-          configMap:
-            name: etc-clickhouse-operator-files
-        - name: etc-clickhouse-operator-confd-folder
-          configMap:
-            name: etc-clickhouse-operator-confd-files
-        - name: etc-clickhouse-operator-configd-folder
-          configMap:
-            name: etc-clickhouse-operator-configd-files
-        - name: etc-clickhouse-operator-templatesd-folder
-          configMap:
-            name: etc-clickhouse-operator-templatesd-files
-        - name: etc-clickhouse-operator-usersd-folder
-          configMap:
-            name: etc-clickhouse-operator-usersd-files
-      containers:
-        - name: clickhouse-operator
-          image: altinity/clickhouse-operator:latest
-          imagePullPolicy: Always
-          volumeMounts:
-            - name: etc-clickhouse-operator-folder
-              mountPath: /etc/clickhouse-operator
-            - name: etc-clickhouse-operator-confd-folder
-              mountPath: /etc/clickhouse-operator/conf.d
-            - name: etc-clickhouse-operator-configd-folder
-              mountPath: /etc/clickhouse-operator/config.d
-            - name: etc-clickhouse-operator-templatesd-folder
-              mountPath: /etc/clickhouse-operator/templates.d
-            - name: etc-clickhouse-operator-usersd-folder
-              mountPath: /etc/clickhouse-operator/users.d
-          env:
-            # Pod-specific
-            # spec.nodeName: ip-172-20-52-62.ec2.internal
-            - name: OPERATOR_POD_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            # metadata.name: clickhouse-operator-6f87589dbb-ftcsf
-            - name: OPERATOR_POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            # metadata.namespace: kube-system
-            - name: OPERATOR_POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            # status.podIP: 100.96.3.2
-            - name: OPERATOR_POD_IP
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
-            # spec.serviceAccount: clickhouse-operator
-            # spec.serviceAccountName: clickhouse-operator
-            - name: OPERATOR_POD_SERVICE_ACCOUNT
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.serviceAccountName
-
-            # Container-specific
-            - name: OPERATOR_CONTAINER_CPU_REQUEST
-              valueFrom:
-                resourceFieldRef:
-                  containerName: clickhouse-operator
-                  resource: requests.cpu
-            - name: OPERATOR_CONTAINER_CPU_LIMIT
-              valueFrom:
-                resourceFieldRef:
-                  containerName: clickhouse-operator
-                  resource: limits.cpu
-            - name: OPERATOR_CONTAINER_MEM_REQUEST
-              valueFrom:
-                resourceFieldRef:
-                  containerName: clickhouse-operator
-                  resource: requests.memory
-            - name: OPERATOR_CONTAINER_MEM_LIMIT
-              valueFrom:
-                resourceFieldRef:
-                  containerName: clickhouse-operator
-                  resource: limits.memory
-
-        - name: metrics-exporter
-          image: altinity/metrics-exporter:latest
-          imagePullPolicy: Always
-          volumeMounts:
-            - name: etc-clickhouse-operator-folder
-              mountPath: /etc/clickhouse-operator
-            - name: etc-clickhouse-operator-confd-folder
-              mountPath: /etc/clickhouse-operator/conf.d
-            - name: etc-clickhouse-operator-configd-folder
-              mountPath: /etc/clickhouse-operator/config.d
-            - name: etc-clickhouse-operator-templatesd-folder
-              mountPath: /etc/clickhouse-operator/templates.d
-            - name: etc-clickhouse-operator-usersd-folder
-              mountPath: /etc/clickhouse-operator/users.d
