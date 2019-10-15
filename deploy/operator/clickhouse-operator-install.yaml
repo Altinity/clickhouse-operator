@@ -961,7 +961,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
 data:
-  01-templates.json: |
+  001-templates.json: |
     {
       "apiVersion": "clickhouse.altinity.com/v1",
       "kind": "ClickHouseInstallation",
@@ -1023,7 +1023,7 @@ data:
       }
     }
 
-  02-templates.yaml: |
+  002-templates.yaml: |
     apiVersion: "clickhouse.altinity.com/v1"
     kind: "ClickHouseInstallation"
     metadata:
