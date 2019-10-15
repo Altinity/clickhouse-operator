@@ -73,8 +73,14 @@ const (
 	podNamePattern = "%s-0"
 )
 
+// sanitize makes string fulfil kubernetes naming restrictions
+// String can't end with '-'
+func sanitize(s string) string {
+	return strings.Trim(s, "-")
+}
+
 func namePartChiName(name string) string {
-	return util.StringHead(name, namePartChiMaxLen)
+	return sanitize(util.StringHead(name, namePartChiMaxLen))
 }
 
 func namePartChiNameID(name string) string {
@@ -82,7 +88,7 @@ func namePartChiNameID(name string) string {
 }
 
 func namePartClusterName(name string) string {
-	return util.StringHead(name, namePartClusterMaxLen)
+	return sanitize(util.StringHead(name, namePartClusterMaxLen))
 }
 
 func namePartClusterNameID(name string) string {
@@ -90,7 +96,7 @@ func namePartClusterNameID(name string) string {
 }
 
 func namePartShardName(name string) string {
-	return util.StringHead(name, namePartShardMaxLen)
+	return sanitize(util.StringHead(name, namePartShardMaxLen))
 }
 
 func namePartShardNameID(name string) string {
@@ -98,7 +104,7 @@ func namePartShardNameID(name string) string {
 }
 
 func namePartReplicaName(name string) string {
-	return util.StringHead(name, namePartReplicaMaxLen)
+	return sanitize(util.StringHead(name, namePartReplicaMaxLen))
 }
 
 func namePartReplicaNameID(name string) string {
