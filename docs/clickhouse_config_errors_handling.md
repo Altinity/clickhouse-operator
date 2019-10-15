@@ -31,22 +31,22 @@ Regarding should operator continue with rolling update/create in case of failed 
 # Misconfiguration Examples
 Let's take a look on real-life examples of misconfiguration opeartor can deal with.
 There are several erroneous configurations located in 
-[docs/examples-withstand-errors folder](./examples-withstand-errors)
+[examples which demonstrate how to withstand errors](./chi-examples-withstand-errors)
 Operator can withstand this misconfiguration and continue to serve ClickHouse installation.  
 - Incorrect ClickHouse image specified. Create new `ClickHouseInstallation` with incorrect image. Kubernetes can't create container with incorrect image.\
-[manifest](./examples-withstand-errors/01-incorrect-image-create.yaml)
+[manifest](./chi-examples-withstand-errors/01-incorrect-image-create.yaml)
 - Incorrect ClickHouse image specified. Update existing `ClickHouseInstallation` with incorrect image. Kubernetes can't create container with incorrect image.\
-[initial position](./examples-withstand-errors/02-incorrect-image-update-01-initial-position.yaml)\
-[apply incorrect update](./examples-withstand-errors/02-incorrect-image-update-02-apply-incorrect-update.yaml)\
-[revert back](./examples-withstand-errors/02-incorrect-image-update-03-revert-and-apply.yaml)
+[initial position](./chi-examples-withstand-errors/02-incorrect-image-update-01-initial-position.yaml)\
+[apply incorrect update](./chi-examples-withstand-errors/02-incorrect-image-update-02-apply-incorrect-update.yaml)\
+[revert back](./chi-examples-withstand-errors/02-incorrect-image-update-03-revert-and-apply.yaml)
 - Incorrect ClickHouse settings specified. Create new `ClickHouseInstallation` with incorrect ClickHouse settings. ClickHouse instance can't start.\
-[manifest](./examples-withstand-errors/03-incorrect-settings-create.yaml)
+[manifest](./chi-examples-withstand-errors/03-incorrect-settings-create.yaml)
 - Incorrect ClickHouse settings specified. Update existing `ClickHouseInstallation` with incorrect ClickHouse settings. ClickHouse instance can't start.\
-[initial position](./examples-withstand-errors/04-incorrect-settings-update-01-initial-position.yaml)\
-[apply incorrect update](./examples-withstand-errors/04-incorrect-settings-update-02-apply-incorrect-update.yaml)\
-[revert back](./examples-withstand-errors/04-incorrect-settings-update-03-revert-and-apply.yaml)
+[initial position](./chi-examples-withstand-errors/04-incorrect-settings-update-01-initial-position.yaml)\
+[apply incorrect update](./chi-examples-withstand-errors/04-incorrect-settings-update-02-apply-incorrect-update.yaml)\
+[revert back](./chi-examples-withstand-errors/04-incorrect-settings-update-03-revert-and-apply.yaml)
 - Incorrect `PodTemplate` specified. Create new `ClickHouseInstallation` with incorrect `PodTemplate`. Kubernetes can't create Pod.\
-[manifest](./examples-withstand-errors/05-incorrect-pod-template.yaml)
+[manifest](./chi-examples-withstand-errors/05-incorrect-pod-template.yaml)
 
 `clickhouse-operator` is able to detect unsuccessful create/update operation. Exact behavior of `clickhouse-operator` deals with the situation depends on 
 ```yaml
