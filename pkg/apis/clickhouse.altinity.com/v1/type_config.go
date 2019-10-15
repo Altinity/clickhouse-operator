@@ -115,10 +115,11 @@ func (config *Config) buildUnifiedChiTemplate() {
 	}
 
 	// Log final CHI template obtained
+	// Marshaling is done just to print nice yaml
 	if bytes, err := yaml.Marshal(config.ChiTemplate); err == nil {
-		glog.V(1).Infof("ChiTemplate:\n%s\n", string(bytes))
+		glog.V(1).Infof("Unified ChiTemplate:\n%s\n", string(bytes))
 	} else {
-		glog.V(1).Infof("FAIL unable to Marshal ChiTemplate")
+		glog.V(1).Infof("FAIL unable to Marshal Unified ChiTemplate")
 	}
 }
 

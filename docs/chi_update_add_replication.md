@@ -143,8 +143,8 @@ root@chi-d02eaa-347e-0-0-0:/# cat /etc/clickhouse-server/config.d/zookeeper.xml
 Stateful cluster with Persistent Volumes examples are presented as [initial position][stateful_initial_position] and [update][stateful_updated_position]
 The structure of the example is the same as for simple example, but Persistent Volumes are used. So this example is better to be run on cloud provider with Dynamic Volumes Provisioning available.
 
-[stateless_initial_position]: ./examples/07-rolling-update-stateless-01-initial-position.yaml
-[stateless_updated_position]: ./examples/07-rolling-update-stateless-02-apply-update.yaml
+[stateless_initial_position]: ./chi-examples/07-rolling-update-stateless-01-initial-position.yaml
+[stateless_updated_position]: ./chi-examples/07-rolling-update-stateless-02-apply-update.yaml
 
-[stateful_initial_position]: ./examples/09-rolling-update-emptydir-01-initial-position.yaml
-[stateful_updated_position]: ./examples/09-rolling-update-emptydir-02-apply-update.yaml
+[stateful_initial_position]: ./chi-examples/09-rolling-update-emptydir-01-initial-position.yaml
+[stateful_updated_position]: ./chi-examples/09-rolling-update-emptydir-02-apply-update.yaml

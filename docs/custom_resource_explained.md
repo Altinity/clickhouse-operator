@@ -1,8 +1,8 @@
 # ClickHouse Installation Custom Resource explained
 
 Let's describe in details ClickHouse [Custom Resource](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/) \
-Full example is available in [examples/99-clickhouseinstallation-max.yaml][chi_max_manifest] file. \
-The best way to work with this doc is to open [examples/99-clickhouseinstallation-max.yaml][chi_max_manifest] in separate tab
+Full example is available in [99-clickhouseinstallation-max.yaml][chi_max_manifest] file. \
+The best way to work with this doc is to open [99-clickhouseinstallation-max.yaml][chi_max_manifest] in separate tab
 and look into it along with reading this explanation.  
 
 ```yaml
@@ -571,4 +571,4 @@ Example - how to place ClickHouse instances on nodes labeled as `clickhouse=allo
         distribution: "OnePerHost"
 ```
 
-[chi_max_manifest]: ./examples/99-clickhouseinstallation-max.yaml
+[chi_max_manifest]: ./chi-examples/99-clickhouseinstallation-max.yaml

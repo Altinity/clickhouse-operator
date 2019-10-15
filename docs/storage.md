@@ -1,9 +1,10 @@
 # Storage
 
-Examples are available in [examples](./examples) folder:
-1. [Simple Default Persistent Volume](./examples/02-persistent-volume-01-default-volume.yaml)
-1. [Pod Template with Persistent Volume](./examples/02-persistent-volume-02-pod-template.yaml)
-1. AWS-based cluster with data replication and Persistent Volumes [minimal](./examples/04-replication-zookeeper-03-minimal-AWS-persistent-volume.yaml) and [medium](./examples/04-replication-zookeeper-04-medium-AWS-persistent-volume.yaml) Zookeeper installations
+Examples are available in [examples](./chi-examples) folder:
+1. [Simple Default Persistent Volume](./chi-examples/02-persistent-volume-01-default-volume.yaml)
+1. [Pod Template with Persistent Volume](./chi-examples/02-persistent-volume-02-pod-template.yaml)
+1. AWS-based cluster with data replication and Persistent Volumes [minimal](./chi-examples/04-replication-zookeeper-03-minimal-AWS-persistent-volume.yaml) 
+and [medium](./chi-examples/04-replication-zookeeper-04-medium-AWS-persistent-volume.yaml) Zookeeper installations
 
 ## Persistent Volumes
 k8s cluster administrator provision storage to applications (users) via `PersistentVolume` objects. 
@@ -298,4 +299,4 @@ spec:
 [PersistentVolumeClaim]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
 [storageClassName]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1
 [StatefulSet]: https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/#creating-a-statefulset
-[example_aws_pv]: ./examples/chi-example-03-zk-replication-aws-PV.yaml
+[example_aws_pv]: ./chi-examples/chi-example-03-zk-replication-aws-PV.yaml

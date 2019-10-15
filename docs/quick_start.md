@@ -75,7 +75,7 @@ Complete instructions on how to build ClickHouse operator from sources as well a
 
 # Examples
 
-There are several ready-to-use [examples](./examples/). Below are few ones to start with.
+There are several ready-to-use [ClickHouseInstallation examples](./chi-examples/). Below are few ones to start with.
 
 ## Create Custom Namespace
 It is a good practice to have all components run in dedicated namespaces. Let's run examples in `test` namespace
@@ -88,7 +88,7 @@ namespace/test created
 
 ## Trivial example
 
-This is the trivial [1 shard 1 replica](./examples/01-simple-layout-01-1shard-1repl.yaml) example.
+This is the trivial [1 shard 1 replica](./chi-examples/01-simple-layout-01-1shard-1repl.yaml) example.
 
 **WARNING**: Do not use it for anything other than 'Hello, world!', it does not have persistent storage!
  
@@ -156,7 +156,7 @@ Connected to ClickHouse server version 19.4.3 revision 54416.
 ## Simple Persistent Volume Example
 
 In case of having Dynamic Volume Provisioning available - ex.: running on AWS - we are able to use PersistentVolumeClaims
-Manifest is [available in examples](./examples/02-persistent-volume-01-default-volume.yaml)
+Manifest is [available in examples](./chi-examples/02-persistent-volume-01-default-volume.yaml)
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
@@ -199,7 +199,7 @@ Let's install more complex example with:
 1. Pod template
 1. VolumeClaim template
 
-Manifest is [available in examples](./examples/02-persistent-volume-02-pod-template.yaml)
+Manifest is [available in examples](./chi-examples/02-persistent-volume-02-pod-template.yaml)
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
@@ -256,7 +256,7 @@ spec:
 
 ## Custom Deployment with Specific ClickHouse Configuration
 
-You can tell operator to configure your ClickHouse, as shown in the example below ([link to the manifest](./examples/05-settings-01-overview.yaml)):
+You can tell operator to configure your ClickHouse, as shown in the example below ([link to the manifest](./chi-examples/05-settings-01-overview.yaml)):
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"

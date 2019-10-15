@@ -16,7 +16,7 @@ User configuration typically contains ClickHouse configuration sections with use
 Operator settings are initialized in-order from 3 sources:
 * `/etc/clickhouse-operator/config.yaml`
 * etc-clickhouse-operator-files configmap (also a part of default [clickhouse-operator-install.yaml](deploy/operator/clickhouse-operator-install.yaml)
-* `ClickHouseOperatorConfiguration` resource. See [example](examples/70-chop-config.yaml) for details.
+* `ClickHouseOperatorConfiguration` resource. See [example](chi-examples/70-chop-config.yaml) for details.
 
 Next sources merges with the previous one. Changes to `etc-clickhouse-operator-files` are not monitored, but picked up if operator is restarted. Changes to `ClickHouseOperatorConfiguration` are monitored by an operator and applied immediately.
 
@@ -134,4 +134,7 @@ Defaults for ClickHouseInstallation can be provided by `ClickHouseInstallationTe
 * etc-clickhouse-operator-templatesd-files configmap
 * `ClickHouseInstallationTemplate` resources.
 
-`ClickHouseInstallationTemplate` has the same structure as `ClickHouseInstallation`, but all parts and fields are optional. Default template is initialized in [clickhouse-operator-install.yaml](deploy/operator/clickhouse-operator-install.yaml) and defines default persistent storage claim to be used with ClickHouse installation. Another example can be also found [here](examples/50-simple-template-01.yaml) 
+`ClickHouseInstallationTemplate` has the same structure as `ClickHouseInstallation`, but all parts and fields are optional. 
+Default template is initialized in [clickhouse-operator-install.yaml](deploy/operator/clickhouse-operator-install.yaml) 
+and defines default persistent storage claim to be used with ClickHouse installation. 
+Another example can be also found [here](chi-examples/50-simple-template-01.yaml) 
