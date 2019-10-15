@@ -1,5 +1,10 @@
 #!/bin/bash
 
+LABELS=(\
+    "clickhouse=allow" \
+    "CHOP=test" \
+)
+
 # Get all nodes with output header
 # Skip master node
 # Skip output header
@@ -12,7 +17,8 @@ awk '{print $1}' | \
 while read -r LINE; do
     # Label each node
     NODE="${LINE}"
-    #kubectl label nodes <node-name> <label-key>=<label-value>
-    #kubectl label nodes --overwrite=true "${NODE}" clickhouse=allow
-    kubectl label nodes "${NODE}" clickhouse=allow
+    for LABEL in ${LABELS[@]}; do
+        #kubectl label nodes [--overwrite=true] <node-name> <label-key>=<label-value>
+        kubectl label nodes "${NODE}" "${LABEL}"
+    done
 done

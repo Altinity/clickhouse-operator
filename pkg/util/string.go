@@ -156,6 +156,7 @@ func CreateStringID(str string, hashLen int) string {
 	}
 }
 
+// StringHead returns beginning of the string of requested length
 func StringHead(str string, headLen int) string {
 	if len(str) <= headLen {
 		return str
