@@ -81,6 +81,7 @@ spec:
         spec:
           type: object
           properties:
+            # Need to be StringBool
             stop:
               type: string
               enum:
@@ -98,9 +99,21 @@ spec:
             defaults:
               type: object
               properties:
-                # Need to be string-bool
+                # Need to be StringBool
                 replicasUseFQDN:
                   type: string
+                  enum:
+                    # List StringBoolXXX constants from model
+                    - "0"
+                    - "1"
+                    - "false"
+                    - "true"
+                    - "no"
+                    - "yes"
+                    - "off"
+                    - "on"
+                    - "disabled"
+                    - "enabled"
                 distributedDDL:
                   type: object
                   properties:
@@ -169,7 +182,10 @@ spec:
                     properties:
                       name:
                         type: string
-                        pattern: "^[a-zA-Z]([a-zA-Z0-9_-]){0,14}$"
+                        minLength: 1
+                        # See namePartClusterMaxLen const
+                        maxLength: 15
+                        pattern: "^[a-zA-Z0-9-]{0,15}$"
                       shardsCount:
                         type: integer
                         minimum: 1
@@ -210,7 +226,10 @@ spec:
                               properties:
                                 name:
                                   type: string
-                                  pattern: "^([a-zA-Z0-9_-]){0,8}$"
+                                  minLength: 1
+                                  # See namePartShardMaxLen const
+                                  maxLength: 15
+                                  pattern: "^[a-zA-Z0-9-]{0,15}$"
                                 # DEPRECATED - to be removed soon
                                 definitionType:
                                   type: string
@@ -219,9 +238,21 @@ spec:
                                   minimum: 1
                                 weight:
                                   type: integer
-                                # Need to be string-bool
+                                # Need to be StringBool
                                 internalReplication:
                                   type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - "0"
+                                    - "1"
+                                    - "false"
+                                    - "true"
+                                    - "no"
+                                    - "yes"
+                                    - "off"
+                                    - "on"
+                                    - "disabled"
+                                    - "enabled"
                                 templates:
                                   type: object
                                   properties:
@@ -246,7 +277,10 @@ spec:
                                     properties:
                                       name:
                                         type: string
-                                        pattern: "^([a-zA-Z0-9_-]){0,8}$"
+                                        minLength: 1
+                                        # See namePartReplicaMaxLen const
+                                        maxLength: 15
+                                        pattern: "^[a-zA-Z0-9-]{0,15}$"
                                       port:
                                         type: integer
                                         minimum: 1
@@ -347,11 +381,11 @@ spec:
   version: v1
   scope: Namespaced
   names:
-    kind: ClickHouseInstallationTemplate
-    singular: clickhouseinstallationtemplate
-    plural: clickhouseinstallationtemplates
+    kind: ClickHouseInstallation
+    singular: clickhouseinstallation
+    plural: clickhouseinstallations
     shortNames:
-      - chit
+      - chi
   additionalPrinterColumns:
     - name: version
       type: string
@@ -413,6 +447,7 @@ spec:
         spec:
           type: object
           properties:
+            # Need to be StringBool
             stop:
               type: string
               enum:
@@ -430,9 +465,21 @@ spec:
             defaults:
               type: object
               properties:
-                # Need to be string-bool
+                # Need to be StringBool
                 replicasUseFQDN:
                   type: string
+                  enum:
+                    # List StringBoolXXX constants from model
+                    - "0"
+                    - "1"
+                    - "false"
+                    - "true"
+                    - "no"
+                    - "yes"
+                    - "off"
+                    - "on"
+                    - "disabled"
+                    - "enabled"
                 distributedDDL:
                   type: object
                   properties:
@@ -501,7 +548,10 @@ spec:
                     properties:
                       name:
                         type: string
-                        pattern: "^[a-zA-Z]([a-zA-Z0-9_-]){0,14}$"
+                        minLength: 1
+                        # See namePartClusterMaxLen const
+                        maxLength: 15
+                        pattern: "^[a-zA-Z0-9-]{0,15}$"
                       shardsCount:
                         type: integer
                         minimum: 1
@@ -542,7 +592,10 @@ spec:
                               properties:
                                 name:
                                   type: string
-                                  pattern: "^([a-zA-Z0-9_-]){0,8}$"
+                                  minLength: 1
+                                  # See namePartShardMaxLen const
+                                  maxLength: 15
+                                  pattern: "^[a-zA-Z0-9-]{0,15}$"
                                 # DEPRECATED - to be removed soon
                                 definitionType:
                                   type: string
@@ -551,9 +604,21 @@ spec:
                                   minimum: 1
                                 weight:
                                   type: integer
-                                # Need to be string-bool
+                                # Need to be StringBool
                                 internalReplication:
                                   type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - "0"
+                                    - "1"
+                                    - "false"
+                                    - "true"
+                                    - "no"
+                                    - "yes"
+                                    - "off"
+                                    - "on"
+                                    - "disabled"
+                                    - "enabled"
                                 templates:
                                   type: object
                                   properties:
@@ -578,7 +643,10 @@ spec:
                                     properties:
                                       name:
                                         type: string
-                                        pattern: "^([a-zA-Z0-9_-]){0,8}$"
+                                        minLength: 1
+                                        # See namePartReplicaMaxLen const
+                                        maxLength: 15
+                                        pattern: "^[a-zA-Z0-9-]{0,15}$"
                                       port:
                                         type: integer
                                         minimum: 1
