@@ -24,36 +24,64 @@ import (
 )
 
 const (
-	namePartChiMaxLen     = 15
+	namePartChiMaxLen     = 60
 	namePartClusterMaxLen = 15
 	namePartShardMaxLen   = 15
 	namePartReplicaMaxLen = 15
 )
 
 const (
-	// chiServiceNamePattern is a template of CHI Service name
-	chiServiceNamePattern = "clickhouse-{chi}"
+	// macrosChiName is a sanitized ClickHouseInstallation name
+	macrosChiName = "{chi}"
+	// macrosChiID is a sanitized ID made of original ClickHouseInstallation name
+	macrosChiID = "{chiID}"
 
-	// clusterServiceNamePattern is a template of cluster Service name
-	clusterServiceNamePattern = "cluster-{chi}-{cluster}"
+	// macrosClusterName is a sanitized cluster name
+	macrosClusterName = "{cluster}"
+	// macrosClusterID is a sanitized ID made of original cluster name
+	macrosClusterID = "{clusterID}"
+	// macrosClusterIndex is an index of the cluster in the CHI - integer number, converted into string
+	macrosClusterIndex = "{clusterIndex}"
 
-	// shardServiceNamePattern is a template of shard Service name
-	shardServiceNamePattern = "shard-{chi}-{cluster}-{shard}"
+	// macrosShardName is a sanitized shard name
+	macrosShardName = "{shard}"
+	// macrosShardID is a sanitized ID made of original shard name
+	macrosShardID = "{shardID}"
+	// macrosShardIndex is an index of the shard in the cluster - integer number, converted into string
+	macrosShardIndex = "{shardIndex}"
 
-	// statefulSetNamePattern is a template of replica's StatefulSet's name
-	statefulSetNamePattern = "chi-{chi}-{cluster}-{shard}-{replica}"
+	// macrosReplicaName is a sanitized replica name
+	macrosReplicaName = "{replica}"
+	// macrosReplicaID is a sanitized ID made of original replica name
+	macrosReplicaID = "{replicaID}"
+	// macrosReplicaIndex is an index of the replica in the shard - integer number, converted into string
+	macrosReplicaIndex = "{replicaIndex}"
+)
 
-	// statefulSetServiceNamePattern is a template of replica's StatefulSet's Service name
-	statefulSetServiceNamePattern = "chi-{chi}-{cluster}-{shard}-{replica}"
+const (
+	// chiServiceNamePattern is a template of CHI Service name. "clickhouse-{chi}"
+	chiServiceNamePattern = "clickhouse-" + macrosChiName
 
-	// configMapCommonNamePattern is a template of common settings for the CHI ConfigMap
-	configMapCommonNamePattern = "chi-{chi}-common-configd"
+	// clusterServiceNamePattern is a template of cluster Service name. "cluster-{chi}-{cluster}"
+	clusterServiceNamePattern = "cluster-" + macrosChiName + "-" + macrosClusterName
 
-	// configMapCommonUsersNamePattern is a template of common users settings for the CHI ConfigMap
-	configMapCommonUsersNamePattern = "chi-{chi}-common-usersd"
+	// shardServiceNamePattern is a template of shard Service name. "shard-{chi}-{cluster}-{shard}"
+	shardServiceNamePattern = "shard-" + macrosChiName + "-" + macrosClusterName + "-" + macrosShardName
 
-	// configMapDeploymentNamePattern is a template of macros ConfigMap
-	configMapDeploymentNamePattern = "chi-{chi}-deploy-confd-{cluster}-{shard}-{replica}"
+	// statefulSetNamePattern is a template of replica's StatefulSet's name. "chi-{chi}-{cluster}-{shard}-{replica}"
+	statefulSetNamePattern = "chi-" + macrosChiName + "-" + macrosClusterName + "-" + macrosShardName + "-" + macrosReplicaName
+
+	// statefulSetServiceNamePattern is a template of replica's StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{replica}"
+	statefulSetServiceNamePattern = "chi-" + macrosChiName + "-" + macrosClusterName + "-" + macrosShardName + "-" + macrosReplicaName
+
+	// configMapCommonNamePattern is a template of common settings for the CHI ConfigMap. "chi-{chi}-common-configd"
+	configMapCommonNamePattern = "chi-" + macrosChiName + "-common-configd"
+
+	// configMapCommonUsersNamePattern is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
+	configMapCommonUsersNamePattern = "chi-" + macrosChiName + "-common-usersd"
+
+	// configMapDeploymentNamePattern is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{replica}"
+	configMapDeploymentNamePattern = "chi-" + macrosChiName + "-deploy-confd-" + macrosClusterName + "-" + macrosShardName + "-" + macrosReplicaName
 
 	// namespaceDomainPattern presents Domain Name pattern of a namespace
 	// In this pattern "%s" is substituted namespace name's value
@@ -74,9 +102,9 @@ const (
 )
 
 // sanitize makes string fulfil kubernetes naming restrictions
-// String can't end with '-'
+// String can't end with '-', '_' and '.'
 func sanitize(s string) string {
-	return strings.Trim(s, "-")
+	return strings.Trim(s, "-_.")
 }
 
 func namePartChiName(name string) string {
@@ -165,47 +193,47 @@ func getNamePartReplicaName(host *chop.ChiHost) string {
 
 func newNameReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
 	return strings.NewReplacer(
-		"{chi}", namePartChiName(chi.Name),
-		"{chiID}", namePartChiNameID(chi.Name),
+		macrosChiName, namePartChiName(chi.Name),
+		macrosChiID, namePartChiNameID(chi.Name),
 	)
 }
 
 func newNameReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 	return strings.NewReplacer(
-		"{chi}", namePartChiName(cluster.Address.ChiName),
-		"{chiID}", namePartChiNameID(cluster.Address.ChiName),
-		"{cluster}", namePartClusterName(cluster.Address.ClusterName),
-		"{clusterID}", namePartClusterNameID(cluster.Address.ClusterName),
-		"{clusterIndex}", strconv.Itoa(cluster.Address.ClusterIndex),
+		macrosChiName, namePartChiName(cluster.Address.ChiName),
+		macrosChiID, namePartChiNameID(cluster.Address.ChiName),
+		macrosClusterName, namePartClusterName(cluster.Address.ClusterName),
+		macrosClusterID, namePartClusterNameID(cluster.Address.ClusterName),
+		macrosClusterIndex, strconv.Itoa(cluster.Address.ClusterIndex),
 	)
 }
 
 func newNameReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 	return strings.NewReplacer(
-		"{chi}", namePartChiName(shard.Address.ChiName),
-		"{chiID}", namePartChiNameID(shard.Address.ChiName),
-		"{cluster}", namePartClusterName(shard.Address.ClusterName),
-		"{clusterID}", namePartClusterNameID(shard.Address.ClusterName),
-		"{clusterIndex}", strconv.Itoa(shard.Address.ClusterIndex),
-		"{shard}", namePartShardName(shard.Address.ShardName),
-		"{shardID}", namePartShardNameID(shard.Address.ShardName),
-		"{shardIndex}", strconv.Itoa(shard.Address.ShardIndex),
+		macrosChiName, namePartChiName(shard.Address.ChiName),
+		macrosChiID, namePartChiNameID(shard.Address.ChiName),
+		macrosClusterName, namePartClusterName(shard.Address.ClusterName),
+		macrosClusterID, namePartClusterNameID(shard.Address.ClusterName),
+		macrosClusterIndex, strconv.Itoa(shard.Address.ClusterIndex),
+		macrosShardName, namePartShardName(shard.Address.ShardName),
+		macrosShardID, namePartShardNameID(shard.Address.ShardName),
+		macrosShardIndex, strconv.Itoa(shard.Address.ShardIndex),
 	)
 }
 
 func newNameReplacerHost(host *chop.ChiHost) *strings.Replacer {
 	return strings.NewReplacer(
-		"{chi}", namePartChiName(host.Address.ChiName),
-		"{chiID}", namePartChiNameID(host.Address.ChiName),
-		"{cluster}", namePartClusterName(host.Address.ClusterName),
-		"{clusterID}", namePartClusterNameID(host.Address.ClusterName),
-		"{clusterIndex}", strconv.Itoa(host.Address.ClusterIndex),
-		"{shard}", namePartShardName(host.Address.ShardName),
-		"{shardID}", namePartShardNameID(host.Address.ShardName),
-		"{shardIndex}", strconv.Itoa(host.Address.ShardIndex),
-		"{replica}", namePartReplicaName(host.Address.ReplicaName),
-		"{replicaID}", namePartReplicaNameID(host.Address.ReplicaName),
-		"{replicaIndex}", strconv.Itoa(host.Address.ReplicaIndex),
+		macrosChiName, namePartChiName(host.Address.ChiName),
+		macrosChiID, namePartChiNameID(host.Address.ChiName),
+		macrosClusterName, namePartClusterName(host.Address.ClusterName),
+		macrosClusterID, namePartClusterNameID(host.Address.ClusterName),
+		macrosClusterIndex, strconv.Itoa(host.Address.ClusterIndex),
+		macrosShardName, namePartShardName(host.Address.ShardName),
+		macrosShardID, namePartShardNameID(host.Address.ShardName),
+		macrosShardIndex, strconv.Itoa(host.Address.ShardIndex),
+		macrosReplicaName, namePartReplicaName(host.Address.ReplicaName),
+		macrosReplicaID, namePartReplicaNameID(host.Address.ReplicaName),
+		macrosReplicaIndex, strconv.Itoa(host.Address.ReplicaIndex),
 	)
 }
 

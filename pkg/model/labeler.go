@@ -89,13 +89,12 @@ func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 
 func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	labels := map[string]string{
-		LabelApp:         LabelAppValue,
-		LabelChop:        l.version,
-		LabelChi:         getNamePartChiName(host),
-		LabelCluster:     getNamePartClusterName(host),
-		LabelShard:       getNamePartShardName(host),
-		LabelReplica:     getNamePartReplicaName(host),
-		LabelStatefulSet: CreateStatefulSetName(host),
+		LabelApp:     LabelAppValue,
+		LabelChop:    l.version,
+		LabelChi:     getNamePartChiName(host),
+		LabelCluster: getNamePartClusterName(host),
+		LabelShard:   getNamePartShardName(host),
+		LabelReplica: getNamePartReplicaName(host),
 	}
 	if applySupplementaryServiceLabels {
 		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
