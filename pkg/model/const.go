@@ -30,7 +30,6 @@ const (
 	// Supplementary service labels - used to cooperate with k8s
 	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/zookeeper-version"
 	LabelSettingsConfigVersion  = clickhousealtinitycom.GroupName + "/settings-version"
-	LabelStatefulSet            = "StatefulSet"
 )
 
 const (

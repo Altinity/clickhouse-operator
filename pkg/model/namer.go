@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	namePartChiMaxLen     = 15
+	namePartChiMaxLen     = 60
 	namePartClusterMaxLen = 15
 	namePartShardMaxLen   = 15
 	namePartReplicaMaxLen = 15
