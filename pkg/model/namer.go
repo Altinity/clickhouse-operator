@@ -102,9 +102,9 @@ const (
 )
 
 // sanitize makes string fulfil kubernetes naming restrictions
-// String can't end with '-'
+// String can't end with '-', '_' and '.'
 func sanitize(s string) string {
-	return strings.Trim(s, "-")
+	return strings.Trim(s, "-_.")
 }
 
 func namePartChiName(name string) string {
