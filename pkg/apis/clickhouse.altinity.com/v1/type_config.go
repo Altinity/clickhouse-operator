@@ -18,7 +18,7 @@ import (
 	"bytes"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/golang/glog"
-	"gopkg.in/yaml.v2"
+	"github.com/kubernetes-sigs/yaml"
 	"os"
 	"path/filepath"
 	"sort"
@@ -61,7 +61,7 @@ func (config *Config) readChiTemplates() {
 		template := new(ClickHouseInstallation)
 		if err := yaml.Unmarshal([]byte(config.ChiTemplateFiles[filename]), template); err != nil {
 			// Unable to unmarshal - skip incorrect template
-			glog.V(1).Infof("FAIL readChiTemplates() unable to unmarshal file %s %q", filename, err)
+			glog.V(1).Infof("FAIL readChiTemplates() unable to unmarshal file %s Error: %q", filename, err)
 			continue
 		}
 		config.enlistChiTemplate(template)
@@ -76,6 +76,7 @@ func (config *Config) enlistChiTemplate(template *ClickHouseInstallation) {
 	}
 	// map template name -> template itself
 	config.ChiTemplates[template.Name] = template
+	glog.V(1).Infof("enlistChiTemplate(%s/%s)", template.Namespace, template.Name)
 }
 
 // unlistChiTemplate removes template from templates catalog
@@ -85,6 +86,7 @@ func (config *Config) unlistChiTemplate(template *ClickHouseInstallation) {
 		return
 	}
 	if _, ok := config.ChiTemplates[template.Name]; ok {
+		glog.V(1).Infof("unlistChiTemplate(%s/%s)", template.Namespace, template.Name)
 		delete(config.ChiTemplates, template.Name)
 	}
 }
