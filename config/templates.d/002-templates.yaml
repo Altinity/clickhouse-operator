@@ -3,13 +3,9 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "02-default-volumeclaimtemplate"
 spec:
-  defaults:
-    templates:
-      dataVolumeClaimTemplate: default-volumeclaim-template
-      podTemplate: default-oneperhost-pod-template
   templates:
     volumeClaimTemplates:
-      - name: default-volumeclaim-template
+      - name: chi-default-volume-claim-template
         spec:
           accessModes:
             - ReadWriteOnce
@@ -17,7 +13,7 @@ spec:
             requests:
               storage: 2Gi
     podTemplates:
-      - name: default-oneperhost-pod-template
+      - name: chi-default-oneperhost-pod-template
         distribution: "OnePerHost"
         spec:
           containers:

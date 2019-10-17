@@ -16,7 +16,7 @@ package config
 
 import (
 	"github.com/golang/glog"
-	"gopkg.in/yaml.v2"
+	"github.com/kubernetes-sigs/yaml"
 	"io/ioutil"
 	"os"
 	"os/user"

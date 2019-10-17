@@ -381,11 +381,11 @@ spec:
   version: v1
   scope: Namespaced
   names:
-    kind: ClickHouseInstallation
-    singular: clickhouseinstallation
-    plural: clickhouseinstallations
+    kind: ClickHouseInstallationTemplate
+    singular: clickhouseinstallationtemplate
+    plural: clickhouseinstallationtemplates
     shortNames:
-      - chi
+      - chit
   additionalPrinterColumns:
     - name: version
       type: string

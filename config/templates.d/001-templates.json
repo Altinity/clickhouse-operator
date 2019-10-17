@@ -5,16 +5,10 @@
     "name": "01-default-volumeclaimtemplate"
   },
   "spec": {
-    "defaults":{
-      "templates": {
-        "dataVolumeClaimTemplate": "default-volumeclaim-template",
-        "podTemplate": "default-oneperhost-pod-template"
-      }
-    },
     "templates": {
       "volumeClaimTemplates": [
         {
-          "name": "default-volumeclaim-template",
+          "name": "chi-default-volume-claim-template",
           "spec": {
             "accessModes": [
               "ReadWriteOnce"
@@ -29,7 +23,7 @@
       ],
       "podTemplates": [
         {
-          "name": "default-oneperhost-pod-template",
+          "name": "chi-default-oneperhost-pod-template",
           "distribution": "OnePerHost",
           "spec": {
             "containers" : [
