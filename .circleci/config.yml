@@ -1,12 +1,8 @@
 version: 2
 jobs:
   build:
-    branches:
-      only:
-        - master
     machine:
       enabled: true
-      docker_layer_caching: true
     steps:
       - checkout
       - run:
@@ -15,9 +11,14 @@ jobs:
             echo 'export CHO_RELEASE=$(cat release)' >> $BASH_ENV
             docker build -f dockerfile/operator/Dockerfile -t clickhouse-operator:latest .
             docker build -f dockerfile/metrics-exporter/Dockerfile -t metrics-exporter:latest .
+  deploy_release:
+    machine:
+      enabled: true
+    steps:
       - run:
           name: Pushing Docker image
           command: |
+            echo 'export CHO_RELEASE=$(cat release)' >> $BASH_ENV
             docker tag clickhouse-operator:latest $COMPANY_REPO/clickhouse-operator:latest
             docker tag clickhouse-operator:latest $COMPANY_REPO/clickhouse-operator:$CHO_RELEASE
             docker tag metrics-exporter:latest $COMPANY_REPO/metrics-exporter:latest
@@ -29,3 +30,40 @@ jobs:
             docker push $COMPANY_REPO/clickhouse-operator:$CHO_RELEASE
             docker push $COMPANY_REPO/metrics-exporter:latest
             docker push $COMPANY_REPO/metrics-exporter:$CHO_RELEASE
+  deploy_dev:
+    machine:
+      enabled: true
+    steps:
+      - run:
+          requires: build
+          name: Pushing Docker image
+          command: |
+            docker tag clickhouse-operator:latest $COMPANY_REPO/clickhouse-operator:dev
+            docker tag metrics-exporter:latest $COMPANY_REPO/metrics-exporter:dev
+
+            docker login -u $DOCKER_USER -p $DOCKER_PASS
+
+            docker push $COMPANY_REPO/clickhouse-operator:dev
+            docker push $COMPANY_REPO/metrics-exporter:dev
+workflows:
+  version: 2
+  deploy:
+    jobs:
+      - build:
+          filters:
+            branches:
+              ignore:
+                - vladislav-dev
+      - deploy_release:
+          requires: 
+            - build
+          filters:
+            branches:
+              only: master
+      - deploy_dev:
+          requires: 
+            - build
+          filters:
+            branches:
+              ignore:
+                - master
