@@ -45,12 +45,15 @@ jobs:
 
             docker push $COMPANY_REPO/clickhouse-operator:dev
             docker push $COMPANY_REPO/metrics-exporter:dev
-
 workflows:
   version: 2
   deploy:
     jobs:
       - build:
+          filters:
+            branches:
+              ignore:
+                - vladislav-dev
       - deploy_release:
           requires: 
             - build
