@@ -34,8 +34,8 @@ In case we do not have Prometheus available, we can setup it directly into k8s a
 
 We are going to setup and manage Prometheus with [Prometheus Operator](https://coreos.com/operators/prometheus/docs/latest/)
 
-We already have [manifests available](../manifests/prometheus/). 
-We can either run [create-prometheus.sh](../manifests/prometheus/create-prometheus.sh) or setup the whole process by hands, in case we need to edit configuration.
+We already have [manifests available](../deploy/prometheus/). 
+We can either run [create-prometheus.sh](../deploy/prometheus/create-prometheus.sh) or setup the whole process by hands, in case we need to edit configuration.
 
   - We'd like to setup all Prometheus-related components into dedicated `namespace`. Let's create it
   ```bash

@@ -16,6 +16,7 @@ package v1
 
 func (cluster *ChiCluster) InheritTemplates(chi *ClickHouseInstallation) {
 	(&cluster.Templates).MergeFrom(&chi.Spec.Defaults.Templates)
+	(&cluster.Templates).HandleDeprecatedFields()
 }
 
 func (cluster *ChiCluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {

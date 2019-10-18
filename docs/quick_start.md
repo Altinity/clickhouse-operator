@@ -21,14 +21,14 @@ Apply `clickhouse-operator` installation manifest. The simplest way - directly f
 
 In case you are convenient to install operator into `kube-system` namespace just run:
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator/clickhouse-operator-install.yaml
+kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install.yaml
 ``` 
 
 In case you'd like to customize namespace where to install operator, or customize any operator's or ClickHouse's configuration, feel free to use installer script.
 Please, `cd` into writable folder, because install script would download config files to build `.yaml` manifests from into current dir. 
 ```bash
 cd ~
-curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator-installer/clickhouse-operator-install.sh | CHOPERATOR_NAMESPACE=test-clickhouse-operator bash
+curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-installer/clickhouse-operator-install.sh | CHOPERATOR_NAMESPACE=test-clickhouse-operator bash
 ```
 Take into account explicitly specified namespace
 ```bash
@@ -40,7 +40,7 @@ Install script would download some `.yaml` and `.xml` files and install `clickho
 In case no `CHOPERATOR_NAMESPACE` specified, as:
 ```bash
 cd ~
-curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/manifests/operator-installer/clickhouse-operator-install.sh | bash
+curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-installer/clickhouse-operator-install.sh | bash
 ```
 installer will create namespace `clickhouse-operator` and install **clickhouse-operator** into it.
 
@@ -75,7 +75,7 @@ Complete instructions on how to build ClickHouse operator from sources as well a
 
 # Examples
 
-There are several ready-to-use [examples](./examples/). Below are few ones to start with.
+There are several ready-to-use [ClickHouseInstallation examples](./chi-examples/). Below are few ones to start with.
 
 ## Create Custom Namespace
 It is a good practice to have all components run in dedicated namespaces. Let's run examples in `test` namespace
@@ -88,7 +88,7 @@ namespace/test created
 
 ## Trivial example
 
-This is the trivial [1 shard 1 replica](./examples/01-simple-layout-01-1shard-1repl.yaml) example.
+This is the trivial [1 shard 1 replica](./chi-examples/01-simple-layout-01-1shard-1repl.yaml) example.
 
 **WARNING**: Do not use it for anything other than 'Hello, world!', it does not have persistent storage!
  
@@ -156,33 +156,40 @@ Connected to ClickHouse server version 19.4.3 revision 54416.
 ## Simple Persistent Volume Example
 
 In case of having Dynamic Volume Provisioning available - ex.: running on AWS - we are able to use PersistentVolumeClaims
-Manifest is [available in examples](./examples/02-persistent-volume-01-simple.yaml)
+Manifest is [available in examples](./chi-examples/02-persistent-volume-01-default-volume.yaml)
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "simple-02-pv1"
+  name: "pv-simple"
 spec:
   defaults:
     templates:
-      volumeClaimTemplate: volumeclaim-template
+      dataVolumeClaimTemplate: volume-template
+      logVolumeClaimTemplate: volume-template
   configuration:
     clusters:
-      - name: "simple-pv"
+      - name: "simple"
         layout:
           shardsCount: 1
           replicasCount: 1
+      - name: "replicas"
+        layout:
+          shardsCount: 1
+          replicasCount: 2
+      - name: "shards"
+        layout:
+          shardsCount: 2
   templates:
     volumeClaimTemplates:
-      - name: volumeclaim-template
-#        reclaimPolicy: Retain
+      - name: volume-template
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 500Mi
+              storage: 123Mi
 ```
 
 ## Custom Deployment with Pod and VolumeClaim Templates
@@ -192,28 +199,27 @@ Let's install more complex example with:
 1. Pod template
 1. VolumeClaim template
 
-Manifest is [available in examples](./examples/02-persistent-volume-03-deployment.yaml)
+Manifest is [available in examples](./chi-examples/02-persistent-volume-02-pod-template.yaml)
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "simple-02-pv2"
+  name: "pv-log"
 spec:
   configuration:
     clusters:
       - name: "deployment-pv"
         # Templates are specified for this cluster explicitly
         templates:
-          podTemplate: pod-template-with-volume
-          volumeClaimTemplate: storage-vc-template
+          podTemplate: pod-template-with-volumes
         layout:
           shardsCount: 1
           replicasCount: 1
 
   templates:
     podTemplates:
-      - name: pod-template-with-volume
+      - name: pod-template-with-volumes
         spec:
           containers:
             - name: clickhouse
@@ -226,22 +232,31 @@ spec:
                 - name: interserver
                   containerPort: 9009
               volumeMounts:
-                - name: storage-vc-template
+                - name: data-storage-vc-template
                   mountPath: /var/lib/clickhouse
+                - name: log-storage-vc-template
+                  mountPath: /var/log/clickhouse-server
 
     volumeClaimTemplates:
-      - name: storage-vc-template
+      - name: data-storage-vc-template
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 1Gi
+              storage: 3Gi
+      - name: log-storage-vc-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi
 ```
 
 ## Custom Deployment with Specific ClickHouse Configuration
 
-You can tell operator to configure your ClickHouse, as shown in the example below ([link to the manifest](./examples/05-settings-01-overview.yaml)):
+You can tell operator to configure your ClickHouse, as shown in the example below ([link to the manifest](./chi-examples/05-settings-01-overview.yaml)):
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"

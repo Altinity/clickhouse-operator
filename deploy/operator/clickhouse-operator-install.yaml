@@ -1,0 +1,1279 @@
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+#
+# Setup CustomResourceDefinition(s)
+# CustomResourceDefinition is namespace-less and must have unique name
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhouseinstallations.clickhouse.altinity.com
+spec:
+  group: clickhouse.altinity.com
+  version: v1
+  scope: Namespaced
+  names:
+    kind: ClickHouseInstallation
+    singular: clickhouseinstallation
+    plural: clickhouseinstallations
+    shortNames:
+      - chi
+  additionalPrinterColumns:
+    - name: version
+      type: string
+      description: Operator version
+      priority: 1 # show in wide view
+      JSONPath: .status.version
+    - name: clusters
+      type: integer
+      description: Clusters count
+      priority: 0 # show in standard view
+      JSONPath: .status.clusters
+    - name: shards
+      type: integer
+      description: Shards count
+      priority: 1 # show in wide view
+      JSONPath: .status.shards
+    - name: hosts
+      type: integer
+      description: Hosts count
+      priority: 0 # show in standard view
+      JSONPath: .status.hosts
+    - name: status
+      type: string
+      description: CHI status
+      priority: 0 # show in standard view
+      JSONPath: .status.status
+    - name: updated
+      type: integer
+      description: Updated hosts count
+      priority: 1 # show in wide view
+      JSONPath: .status.updated
+    - name: added
+      type: integer
+      description: Added hosts count
+      priority: 1 # show in wide view
+      JSONPath: .status.added
+    - name: deleted
+      type: integer
+      description: Hosts deleted count
+      priority: 1 # show in wide view
+      JSONPath: .status.deleted
+    - name: delete
+      type: integer
+      description: Hosts to be deleted count
+      priority: 1 # show in wide view
+      JSONPath: .status.delete
+    - name: endpoint
+      type: string
+      description: Client access endpoint
+      priority: 1 # show in wide view
+      JSONPath: .status.endpoint
+# TODO return to this feature later
+# Pruning unknown fields. FEATURE STATE: Kubernetes v1.15
+# Probably full specification may be needed
+#  preserveUnknownFields: false
+  validation:
+    openAPIV3Schema:
+      properties:
+        spec:
+          type: object
+          properties:
+            # Need to be StringBool
+            stop:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - "0"
+                - "1"
+                - "false"
+                - "true"
+                - "no"
+                - "yes"
+                - "off"
+                - "on"
+                - "disabled"
+                - "enabled"
+            defaults:
+              type: object
+              properties:
+                # Need to be StringBool
+                replicasUseFQDN:
+                  type: string
+                  enum:
+                    # List StringBoolXXX constants from model
+                    - "0"
+                    - "1"
+                    - "false"
+                    - "true"
+                    - "no"
+                    - "yes"
+                    - "off"
+                    - "on"
+                    - "disabled"
+                    - "enabled"
+                distributedDDL:
+                  type: object
+                  properties:
+                    profile:
+                      type: string
+                templates:
+                  type: object
+                  properties:
+                    podTemplate:
+                      type: string
+                    dataVolumeClaimTemplate:
+                      type: string
+                    logVolumeClaimTemplate:
+                      type: string
+                    serviceTemplate:
+                      type: string
+                    clusterServiceTemplate:
+                      type: string
+                    shardServiceTemplate:
+                      type: string
+                    replicaServiceTemplate:
+                      type: string
+            configuration:
+              type: object
+              properties:
+                zookeeper:
+                  type: object
+                  properties:
+                    nodes:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - host
+                        properties:
+                          host:
+                            type: string
+                          port:
+                            type: integer
+                            minimum: 1
+                            maximum: 65535
+                    session_timeout_ms:
+                      type: integer
+                    operation_timeout_ms:
+                      type: integer
+                    root:
+                      type: string
+                    identity:
+                      type: string
+                users:
+                  type: object
+                profiles:
+                  type: object
+                quotas:
+                  type: object
+                settings:
+                  type: object
+                files:
+                  type: object
+                clusters:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                        minLength: 1
+                        # See namePartClusterMaxLen const
+                        maxLength: 15
+                        pattern: "^[a-zA-Z0-9-]{0,15}$"
+                      shardsCount:
+                        type: integer
+                        minimum: 1
+                      replicasCount:
+                        type: integer
+                        minimum: 1
+                      templates:
+                        type: object
+                        properties:
+                          podTemplate:
+                            type: string
+                          dataVolumeClaimTemplate:
+                            type: string
+                          logVolumeClaimTemplate:
+                            type: string
+                          serviceTemplate:
+                            type: string
+                          clusterServiceTemplate:
+                            type: string
+                          shardServiceTemplate:
+                            type: string
+                          replicaServiceTemplate:
+                            type: string
+                      layout:
+                        type: object
+                        properties:
+                          # DEPRECATED - to be removed soon
+                          type:
+                            type: string
+                          shardsCount:
+                            type: integer
+                          replicasCount:
+                            type: integer
+                          shards:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+                                  minLength: 1
+                                  # See namePartShardMaxLen const
+                                  maxLength: 15
+                                  pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                # DEPRECATED - to be removed soon
+                                definitionType:
+                                  type: string
+                                replicasCount:
+                                  type: integer
+                                  minimum: 1
+                                weight:
+                                  type: integer
+                                # Need to be StringBool
+                                internalReplication:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - "0"
+                                    - "1"
+                                    - "false"
+                                    - "true"
+                                    - "no"
+                                    - "yes"
+                                    - "off"
+                                    - "on"
+                                    - "disabled"
+                                    - "enabled"
+                                templates:
+                                  type: object
+                                  properties:
+                                    podTemplate:
+                                      type: string
+                                    dataVolumeClaimTemplate:
+                                      type: string
+                                    logVolumeClaimTemplate:
+                                      type: string
+                                    serviceTemplate:
+                                      type: string
+                                    clusterServiceTemplate:
+                                      type: string
+                                    shardServiceTemplate:
+                                      type: string
+                                    replicaServiceTemplate:
+                                      type: string
+                                replicas:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      name:
+                                        type: string
+                                        minLength: 1
+                                        # See namePartReplicaMaxLen const
+                                        maxLength: 15
+                                        pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                      port:
+                                        type: integer
+                                        minimum: 1
+                                        maximum: 65535
+                                      templates:
+                                        type: object
+                                        properties:
+                                          podTemplate:
+                                            type: string
+                                          dataVolumeClaimTemplate:
+                                            type: string
+                                          logVolumeClaimTemplate:
+                                            type: string
+                                          serviceTemplate:
+                                            type: string
+                                          clusterServiceTemplate:
+                                            type: string
+                                          shardServiceTemplate:
+                                            type: string
+                                          replicaServiceTemplate:
+                                            type: string
+            templates:
+              type: object
+              properties:
+                podTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - spec
+                    properies:
+                      name:
+                        type: string
+                      zone:
+                        type: object
+                        required:
+                          - values
+                        properties:
+                          key:
+                            type: string
+                          values:
+                            type: array
+                            items:
+                              type: string
+                      distribution:
+                        type: string
+                        enum:
+                          # List podDistributionXXX constants from model
+                          - "Unspecified"
+                          - "OnePerHost"
+                      spec:
+                        # TODO specify PodSpec
+                        type: object
+                volumeClaimTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - spec
+                    properties:
+                      name:
+                        type: string
+                      reclaimPolicy:
+                        type: string
+                        enum:
+                          - "Retain"
+                          - "Delete"
+                      spec:
+                        # TODO specify PersistentVolumeClaimSpec
+                        type: object
+                serviceTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - spec
+                    properties:
+                      name:
+                        type: string
+                      generateName:
+                        type: string
+                      metadata:
+                        # TODO specify ObjectMeta
+                        type: object
+                      spec:
+                        # TODO specify ServiceSpec
+                        type: object
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhouseinstallationtemplates.clickhouse.altinity.com
+spec:
+  group: clickhouse.altinity.com
+  version: v1
+  scope: Namespaced
+  names:
+    kind: ClickHouseInstallationTemplate
+    singular: clickhouseinstallationtemplate
+    plural: clickhouseinstallationtemplates
+    shortNames:
+      - chit
+  additionalPrinterColumns:
+    - name: version
+      type: string
+      description: Operator version
+      priority: 1 # show in wide view
+      JSONPath: .status.version
+    - name: clusters
+      type: integer
+      description: Clusters count
+      priority: 0 # show in standard view
+      JSONPath: .status.clusters
+    - name: shards
+      type: integer
+      description: Shards count
+      priority: 1 # show in wide view
+      JSONPath: .status.shards
+    - name: hosts
+      type: integer
+      description: Hosts count
+      priority: 0 # show in standard view
+      JSONPath: .status.hosts
+    - name: status
+      type: string
+      description: CHI status
+      priority: 0 # show in standard view
+      JSONPath: .status.status
+    - name: updated
+      type: integer
+      description: Updated hosts count
+      priority: 1 # show in wide view
+      JSONPath: .status.updated
+    - name: added
+      type: integer
+      description: Added hosts count
+      priority: 1 # show in wide view
+      JSONPath: .status.added
+    - name: deleted
+      type: integer
+      description: Hosts deleted count
+      priority: 1 # show in wide view
+      JSONPath: .status.deleted
+    - name: delete
+      type: integer
+      description: Hosts to be deleted count
+      priority: 1 # show in wide view
+      JSONPath: .status.delete
+    - name: endpoint
+      type: string
+      description: Client access endpoint
+      priority: 1 # show in wide view
+      JSONPath: .status.endpoint
+  # TODO return to this feature later
+  # Pruning unknown fields. FEATURE STATE: Kubernetes v1.15
+  # Probably full specification may be needed
+  #  preserveUnknownFields: false
+  validation:
+    openAPIV3Schema:
+      properties:
+        spec:
+          type: object
+          properties:
+            # Need to be StringBool
+            stop:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - "0"
+                - "1"
+                - "false"
+                - "true"
+                - "no"
+                - "yes"
+                - "off"
+                - "on"
+                - "disabled"
+                - "enabled"
+            defaults:
+              type: object
+              properties:
+                # Need to be StringBool
+                replicasUseFQDN:
+                  type: string
+                  enum:
+                    # List StringBoolXXX constants from model
+                    - "0"
+                    - "1"
+                    - "false"
+                    - "true"
+                    - "no"
+                    - "yes"
+                    - "off"
+                    - "on"
+                    - "disabled"
+                    - "enabled"
+                distributedDDL:
+                  type: object
+                  properties:
+                    profile:
+                      type: string
+                templates:
+                  type: object
+                  properties:
+                    podTemplate:
+                      type: string
+                    dataVolumeClaimTemplate:
+                      type: string
+                    logVolumeClaimTemplate:
+                      type: string
+                    serviceTemplate:
+                      type: string
+                    clusterServiceTemplate:
+                      type: string
+                    shardServiceTemplate:
+                      type: string
+                    replicaServiceTemplate:
+                      type: string
+            configuration:
+              type: object
+              properties:
+                zookeeper:
+                  type: object
+                  properties:
+                    nodes:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                          - host
+                        properties:
+                          host:
+                            type: string
+                          port:
+                            type: integer
+                            minimum: 1
+                            maximum: 65535
+                    session_timeout_ms:
+                      type: integer
+                    operation_timeout_ms:
+                      type: integer
+                    root:
+                      type: string
+                    identity:
+                      type: string
+                users:
+                  type: object
+                profiles:
+                  type: object
+                quotas:
+                  type: object
+                settings:
+                  type: object
+                files:
+                  type: object
+                clusters:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                        minLength: 1
+                        # See namePartClusterMaxLen const
+                        maxLength: 15
+                        pattern: "^[a-zA-Z0-9-]{0,15}$"
+                      shardsCount:
+                        type: integer
+                        minimum: 1
+                      replicasCount:
+                        type: integer
+                        minimum: 1
+                      templates:
+                        type: object
+                        properties:
+                          podTemplate:
+                            type: string
+                          dataVolumeClaimTemplate:
+                            type: string
+                          logVolumeClaimTemplate:
+                            type: string
+                          serviceTemplate:
+                            type: string
+                          clusterServiceTemplate:
+                            type: string
+                          shardServiceTemplate:
+                            type: string
+                          replicaServiceTemplate:
+                            type: string
+                      layout:
+                        type: object
+                        properties:
+                          # DEPRECATED - to be removed soon
+                          type:
+                            type: string
+                          shardsCount:
+                            type: integer
+                          replicasCount:
+                            type: integer
+                          shards:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+                                  minLength: 1
+                                  # See namePartShardMaxLen const
+                                  maxLength: 15
+                                  pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                # DEPRECATED - to be removed soon
+                                definitionType:
+                                  type: string
+                                replicasCount:
+                                  type: integer
+                                  minimum: 1
+                                weight:
+                                  type: integer
+                                # Need to be StringBool
+                                internalReplication:
+                                  type: string
+                                  enum:
+                                    # List StringBoolXXX constants from model
+                                    - "0"
+                                    - "1"
+                                    - "false"
+                                    - "true"
+                                    - "no"
+                                    - "yes"
+                                    - "off"
+                                    - "on"
+                                    - "disabled"
+                                    - "enabled"
+                                templates:
+                                  type: object
+                                  properties:
+                                    podTemplate:
+                                      type: string
+                                    dataVolumeClaimTemplate:
+                                      type: string
+                                    logVolumeClaimTemplate:
+                                      type: string
+                                    serviceTemplate:
+                                      type: string
+                                    clusterServiceTemplate:
+                                      type: string
+                                    shardServiceTemplate:
+                                      type: string
+                                    replicaServiceTemplate:
+                                      type: string
+                                replicas:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      name:
+                                        type: string
+                                        minLength: 1
+                                        # See namePartReplicaMaxLen const
+                                        maxLength: 15
+                                        pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                      port:
+                                        type: integer
+                                        minimum: 1
+                                        maximum: 65535
+                                      templates:
+                                        type: object
+                                        properties:
+                                          podTemplate:
+                                            type: string
+                                          dataVolumeClaimTemplate:
+                                            type: string
+                                          logVolumeClaimTemplate:
+                                            type: string
+                                          serviceTemplate:
+                                            type: string
+                                          clusterServiceTemplate:
+                                            type: string
+                                          shardServiceTemplate:
+                                            type: string
+                                          replicaServiceTemplate:
+                                            type: string
+            templates:
+              type: object
+              properties:
+                podTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - spec
+                    properies:
+                      name:
+                        type: string
+                      zone:
+                        type: object
+                        required:
+                          - values
+                        properties:
+                          key:
+                            type: string
+                          values:
+                            type: array
+                            items:
+                              type: string
+                      distribution:
+                        type: string
+                        enum:
+                          # List podDistributionXXX constants from model
+                          - "Unspecified"
+                          - "OnePerHost"
+                      spec:
+                        # TODO specify PodSpec
+                        type: object
+                volumeClaimTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - spec
+                    properties:
+                      name:
+                        type: string
+                      reclaimPolicy:
+                        type: string
+                        enum:
+                          - "Retain"
+                          - "Delete"
+                      spec:
+                        # TODO specify PersistentVolumeClaimSpec
+                        type: object
+                serviceTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - spec
+                    properties:
+                      name:
+                        type: string
+                      generateName:
+                        type: string
+                      metadata:
+                        # TODO specify ObjectMeta
+                        type: object
+                      spec:
+                        # TODO specify ServiceSpec
+                        type: object
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhouseoperatorconfigurations.clickhouse.altinity.com
+spec:
+  group: clickhouse.altinity.com
+  version: v1
+  scope: Namespaced
+  names:
+    kind: ClickHouseOperatorConfiguration
+    singular: clickhouseoperatorconfiguration
+    plural: clickhouseoperatorconfigurations
+    shortNames:
+      - chopconf
+  additionalPrinterColumns:
+    - name: namespaces
+      type: string
+      description: Watch namespaces
+      priority: 0 # show in standard view
+      JSONPath: .status
+  # TODO return to this feature later
+  # Pruning unknown fields. FEATURE STATE: Kubernetes v1.15
+  # Probably full specification may be needed
+  #  preserveUnknownFields: false
+  validation:
+    openAPIV3Schema:
+      properties:
+        spec:
+          type: object
+          properties:
+            watchNamespaces:
+              type: array
+              items:
+                type: string
+            chCommonConfigsPath:
+              type: string
+            chHostConfigsPath:
+              type: string
+            chUsersConfigsPath:
+              type: string
+            chiTemplatesPath:
+              type: string
+            statefulSetUpdateTimeout:
+              type: integer
+            statefulSetUpdatePollPeriod:
+              type: integer
+            onStatefulSetCreateFailureAction:
+              type: string
+              # TODO enum?
+#              enum:
+#                # List podDistributionXXX constants from model
+#                 - "Unspecified"
+#                 - "OnePerHost"
+            onStatefulSetUpdateFailureAction:
+              type: string
+              # TODO enum?
+#              enum:
+#                # List podDistributionXXX constants from model
+#                 - "Unspecified"
+#                 - "OnePerHost"
+            chConfigUserDefaultProfile:
+              type: string
+            chConfigUserDefaultQuota:
+              type: string
+            chConfigUserDefaultNetworksIP:
+              type: array
+              items:
+                type: string
+            chConfigUserDefaultPassword:
+              type: string
+            chUsername:
+              type: string
+            chPassword:
+              type: string
+            chPort:
+              type: integer
+              minimum: 1
+              maximum: 65535
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+#
+# Setup ServiceAccount
+# ServiceAccount would be created in kubectl-specified namespace
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: clickhouse-operator
+  namespace: kube-system
+---
+# Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
+# ClusterRoleBinding is namespace-less and must have unique name
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: clickhouse-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: clickhouse-operator
+    namespace: kube-system
+---
+# Setup ClusterIP Service to provide monitoring metrics for Prometheus
+# Service would be created in kubectl-specified namespace
+# In order to get access outside of k8s it should be exposed as:
+# kubectl --namespace prometheus port-forward service/prometheus 9090
+# and point browser to localhost:9090
+kind: Service
+apiVersion: v1
+metadata:
+  name: clickhouse-operator-metrics
+  namespace: kube-system
+  labels:
+    app: clickhouse-operator
+spec:
+  ports:
+    - port: 8888
+      name: clickhouse-operator-metrics
+  selector:
+    app: clickhouse-operator
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+# etc-clickhouse-operator-files
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-clickhouse-operator-files
+  namespace: kube-system
+data:
+  config.yaml: |
+    ################################################
+    ##
+    ## Watch Namespaces Section
+    ##
+    ################################################
+    
+    # List of namespaces where clickhouse-operator watches for events.
+    # Concurrently running operators should watch on different namespaces
+    # watchNamespaces:
+    #  - dev
+    #  - info
+    #  - onemore
+    
+    ################################################
+    ##
+    ## Additional Configuration Files Section
+    ##
+    ################################################
+    
+    # Path to folder where ClickHouse configuration files common for all instances within CHI are located.
+    chCommonConfigsPath: config.d
+    
+    # Path to folder where ClickHouse configuration files unique for each instance (host) within CHI are located.
+    chHostConfigsPath: conf.d
+    
+    # Path to folder where ClickHouse configuration files with users settings are located.
+    # Files are common for all instances within CHI
+    chUsersConfigsPath: users.d
+    
+    # Path to folder where ClickHouseInstallation .yaml manifests are located.
+    # Manifests are applied in sorted alpha-numeric order
+    chiTemplatesPath: templates.d
+    
+    ################################################
+    ##
+    ## Cluster Create/Update/Delete Objects Section
+    ##
+    ################################################
+    
+    # How many seconds to wait for created/updated StatefulSet to be Ready
+    statefulSetUpdateTimeout: 600
+    
+    # How many seconds to wait between checks for created/updated StatefulSet status
+    statefulSetUpdatePollPeriod: 10
+    
+    # What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+    # Possible options:
+    # 1. abort - do nothing, just break the process and wait for admin
+    # 2. delete - delete newly created problematic StatefulSet
+    onStatefulSetCreateFailureAction: delete
+    
+    # What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+    # Possible options:
+    # 1. abort - do nothing, just break the process and wait for admin
+    # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
+    # Pod would be recreated by StatefulSet based on rollback-ed configuration
+    onStatefulSetUpdateFailureAction: rollback
+    
+    ################################################
+    ##
+    ## ClickHouse Settings Section
+    ##
+    ################################################
+    
+    # Default values for ClickHouse user configuration
+    # 1. user/profile - string
+    # 2. user/quota - string
+    # 3. user/networks/ip - multiple strings
+    # 4. user/password - string
+    chConfigUserDefaultProfile: default
+    chConfigUserDefaultQuota: default
+    chConfigUserDefaultNetworksIP:
+      - "::/0"
+    chConfigUserDefaultPassword: "default"
+    
+    ################################################
+    ##
+    ## Operator's access to ClickHouse instances
+    ##
+    ################################################
+    
+    # ClickHouse credentials (username, password and port) to be used by operator to connect to ClickHouse instances for:
+    # 1. Metrics requests
+    # 2. Schema maintenance
+    # 3. DROP DNS CACHE
+    # User with such credentials credentials can be specified in additional ClickHouse .xml config files,
+    # located in `chUsersConfigsPath` folder
+    chUsername: clickhouse_operator
+    chPassword: clickhouse_operator_password
+    chPort: 8123
+
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+# etc-clickhouse-operator-confd-files
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-clickhouse-operator-confd-files
+  namespace: kube-system
+data:
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+# etc-clickhouse-operator-configd-files
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-clickhouse-operator-configd-files
+  namespace: kube-system
+data:
+  01-clickhouse-listen.xml: |
+    <yandex>
+        <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
+        <listen_host>::</listen_host>
+        <listen_host>0.0.0.0</listen_host>
+        <listen_try>1</listen_try>
+    </yandex>
+
+  02-clickhouse-logger.xml: |
+    <yandex>
+        <logger>
+            <!-- Possible levels: https://github.com/pocoproject/poco/blob/develop/Foundation/include/Poco/Logger.h#L105 -->
+            <level>trace</level>
+            <log>/var/log/clickhouse-server/clickhouse-server.log</log>
+            <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
+            <size>1000M</size>
+            <count>10</count>
+            <!-- Default behavior is autodetection (log to console if not daemon mode and is tty) -->
+            <console>1</console>
+        </logger>
+    </yandex>
+
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+# etc-clickhouse-operator-templatesd-files
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-clickhouse-operator-templatesd-files
+  namespace: kube-system
+data:
+  001-templates.json: |
+    {
+      "apiVersion": "clickhouse.altinity.com/v1",
+      "kind": "ClickHouseInstallation",
+      "metadata": {
+        "name": "01-default-volumeclaimtemplate"
+      },
+      "spec": {
+        "defaults":{
+          "templates": {
+            "dataVolumeClaimTemplate": "default-volumeclaim-template",
+            "podTemplate": "default-oneperhost-pod-template"
+          }
+        },
+        "templates": {
+          "volumeClaimTemplates": [
+            {
+              "name": "default-volumeclaim-template",
+              "spec": {
+                "accessModes": [
+                  "ReadWriteOnce"
+                ],
+                "resources": {
+                  "requests": {
+                    "storage": "2Gi"
+                  }
+                }
+              }
+            }
+          ],
+          "podTemplates": [
+            {
+              "name": "default-oneperhost-pod-template",
+              "distribution": "OnePerHost",
+              "spec": {
+                "containers" : [
+                  {
+                    "name": "clickhouse",
+                    "image": "yandex/clickhouse-server:19.3.7",
+                    "ports": [
+                      {
+                        "name": "http",
+                        "containerPort": 8123
+                      },
+                      {
+                        "name": "client",
+                        "containerPort": 9000
+                      },
+                      {
+                        "name": "interserver",
+                        "containerPort": 9009
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+
+  002-templates.yaml: |
+    apiVersion: "clickhouse.altinity.com/v1"
+    kind: "ClickHouseInstallation"
+    metadata:
+      name: "02-default-volumeclaimtemplate"
+    spec:
+      defaults:
+        templates:
+          dataVolumeClaimTemplate: default-volumeclaim-template
+          podTemplate: default-oneperhost-pod-template
+      templates:
+        volumeClaimTemplates:
+          - name: default-volumeclaim-template
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 2Gi
+        podTemplates:
+          - name: default-oneperhost-pod-template
+            distribution: "OnePerHost"
+            spec:
+              containers:
+                - name: clickhouse
+                  image: yandex/clickhouse-server:19.3.7
+                  ports:
+                    - name: http
+                      containerPort: 8123
+                    - name: client
+                      containerPort: 9000
+                    - name: interserver
+                      containerPort: 9009
+
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+# etc-clickhouse-operator-usersd-files
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-clickhouse-operator-usersd-files
+  namespace: kube-system
+data:
+  01-clickhouse-user.xml: |
+    <yandex>
+        <users>
+            <clickhouse_operator>
+                <networks>
+                    <ip>127.0.0.1</ip>
+                    <ip>0.0.0.0/0</ip>
+                    <ip>::/0</ip>
+                </networks>
+                <password>clickhouse_operator_password</password>
+                <profile>default</profile>
+                <quota>default</quota>
+            </clickhouse_operator>
+        </users>
+    </yandex>
+
+---
+# Possible Template Parameters:
+#
+# kube-system
+# altinity/clickhouse-operator:latest
+# altinity/metrics-exporter:latest
+#
+# Setup Deployment for clickhouse-operator
+# Deployment would be created in kubectl-specified namespace
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: clickhouse-operator
+  namespace: kube-system
+  labels:
+    app: clickhouse-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clickhouse-operator
+  template:
+    metadata:
+      labels:
+        app: clickhouse-operator
+    spec:
+      serviceAccountName: clickhouse-operator
+      volumes:
+        - name: etc-clickhouse-operator-folder
+          configMap:
+            name: etc-clickhouse-operator-files
+        - name: etc-clickhouse-operator-confd-folder
+          configMap:
+            name: etc-clickhouse-operator-confd-files
+        - name: etc-clickhouse-operator-configd-folder
+          configMap:
+            name: etc-clickhouse-operator-configd-files
+        - name: etc-clickhouse-operator-templatesd-folder
+          configMap:
+            name: etc-clickhouse-operator-templatesd-files
+        - name: etc-clickhouse-operator-usersd-folder
+          configMap:
+            name: etc-clickhouse-operator-usersd-files
+      containers:
+        - name: clickhouse-operator
+          image: altinity/clickhouse-operator:latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: etc-clickhouse-operator-folder
+              mountPath: /etc/clickhouse-operator
+            - name: etc-clickhouse-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/conf.d
+            - name: etc-clickhouse-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/config.d
+            - name: etc-clickhouse-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/templates.d
+            - name: etc-clickhouse-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/users.d
+          env:
+            # Pod-specific
+            # spec.nodeName: ip-172-20-52-62.ec2.internal
+            - name: OPERATOR_POD_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            # metadata.name: clickhouse-operator-6f87589dbb-ftcsf
+            - name: OPERATOR_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # metadata.namespace: kube-system
+            - name: OPERATOR_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            # status.podIP: 100.96.3.2
+            - name: OPERATOR_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            # spec.serviceAccount: clickhouse-operator
+            # spec.serviceAccountName: clickhouse-operator
+            - name: OPERATOR_POD_SERVICE_ACCOUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+
+            # Container-specific
+            - name: OPERATOR_CONTAINER_CPU_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: clickhouse-operator
+                  resource: requests.cpu
+            - name: OPERATOR_CONTAINER_CPU_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: clickhouse-operator
+                  resource: limits.cpu
+            - name: OPERATOR_CONTAINER_MEM_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: clickhouse-operator
+                  resource: requests.memory
+            - name: OPERATOR_CONTAINER_MEM_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: clickhouse-operator
+                  resource: limits.memory
+
+        - name: metrics-exporter
+          image: altinity/metrics-exporter:latest
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: etc-clickhouse-operator-folder
+              mountPath: /etc/clickhouse-operator
+            - name: etc-clickhouse-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/conf.d
+            - name: etc-clickhouse-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/config.d
+            - name: etc-clickhouse-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/templates.d
+            - name: etc-clickhouse-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/users.d

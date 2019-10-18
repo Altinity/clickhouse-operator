@@ -1,8 +1,8 @@
 # ClickHouse Installation Custom Resource explained
 
 Let's describe in details ClickHouse [Custom Resource](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/) \
-Full example is available in [examples/99-clickhouseinstallation-max.yaml][chi_max_manifest] file. \
-The best way to work with this doc is to open [examples/99-clickhouseinstallation-max.yaml][chi_max_manifest] in separate tab
+Full example is available in [99-clickhouseinstallation-max.yaml][chi_max_manifest] file. \
+The best way to work with this doc is to open [99-clickhouseinstallation-max.yaml][chi_max_manifest] in separate tab
 and look into it along with reading this explanation.  
 
 ```yaml
@@ -29,7 +29,8 @@ clickhouse-installation-max   23h
       profile: default
     templates:
       podTemplate: clickhouse-v18.16.1
-      volumeClaimTemplate: default-volume-claim
+      dataVolumeClaimTemplate: default-volume-claim
+      logVolumeClaimTemplate: default-volume-claim
       serviceTemplate: chi-service-template
 ```
 `.spec.defaults` section represents default values for sections below.
@@ -168,7 +169,8 @@ ClickHouse instances layout within cluster is described with `.clusters.layout` 
       - name: all-counts
         templates:
           podTemplate: clickhouse-v18.16.1
-          volumeClaimTemplate: default-volume-claim
+          dataVolumeClaimTemplate: default-volume-claim
+          logVolumeClaimTemplate: default-volume-claim
         layout:
           shardsCount: 3
           replicasCount: 2
@@ -177,7 +179,8 @@ Pod and VolumeClaim templates to be used can be specified explicitly for each re
 ```yaml
         templates:
           podTemplate: clickhouse-v18.16.1
-          volumeClaimTemplate: default-volume-claim
+          dataVolumeClaimTemplate: default-volume-claim
+          logVolumeClaimTemplate: default-volume-claim
 ```
 `layout` is specified with basic layout dimensions:
 ```yaml
@@ -191,7 +194,8 @@ or with detailed specification of `shards` and `replicas`. \
       - name: customized
         templates:
           podTemplate: clickhouse-v18.16.1
-          volumeClaimTemplate: default-volume-claim
+          dataVolumeClaimTemplate: default-volume-claim
+          logVolumeClaimTemplate: default-volume-claim
         layout:
           shards:
             - name: shard0
@@ -200,12 +204,14 @@ or with detailed specification of `shards` and `replicas`. \
               internalReplication: Disabled
               templates:
                 podTemplate: clickhouse-v18.16.1
-                volumeClaimTemplate: default-volume-claim
+                dataVolumeClaimTemplate: default-volume-claim
+                logVolumeClaimTemplate: default-volume-claim
 
             - name: shard1
               templates:
                 podTemplate: clickhouse-v18.16.1
-                volumeClaimTemplate: default-volume-claim
+                dataVolumeClaimTemplate: default-volume-claim
+                logVolumeClaimTemplate: default-volume-claim
               replicas:
                 - name: replica0
                 - name: replica1
@@ -217,7 +223,8 @@ and one of these replicas is explicitly specified with different `podTemplate`:
       - name: customized
         templates:
           podTemplate: clickhouse-v18.16.1
-          volumeClaimTemplate: default-volume-claim
+          dataVolumeClaimTemplate: default-volume-claim
+          logVolumeClaimTemplate: default-volume-claim
         layout:
           shards:
           
@@ -225,13 +232,15 @@ and one of these replicas is explicitly specified with different `podTemplate`:
               replicasCount: 3
               templates:
                 podTemplate: clickhouse-v18.16.1
-                volumeClaimTemplate: default-volume-claim
+                dataVolumeClaimTemplate: default-volume-claim
+                logVolumeClaimTemplate: default-volume-claim
               replicas:
                 - name: replica0
                   port: 9000
                   templates:
                     podTemplate: clickhouse-v19.11.3.11
-                    volumeClaimTemplate: default-volume-claim
+                    dataVolumeClaimTemplate: default-volume-claim
+                    logVolumeClaimTemplate: default-volume-claim
 ```
 ClickHouse cluster named `all-counts` represented by layout with 3 shards of 2 replicas each (6 pods total).
 Pods will be created and fully managed by the operator.
@@ -377,7 +386,8 @@ Full specification of `replicas` in a shard. Note - no `replicasCount` specified
             - name: shard1
               templates:
                 podTemplate: clickhouse-v18.16.1
-                volumeClaimTemplate: default-volume-claim
+                dataVolumeClaimTemplate: default-volume-claim
+                logVolumeClaimTemplate: default-volume-claim
               replicas:
                 - name: replica0
                 - name: replica1
@@ -389,13 +399,15 @@ Another example with selectively described replicas. Note - `replicasCount` spec
               replicasCount: 3
               templates:
                 podTemplate: clickhouse-v18.16.1
-                volumeClaimTemplate: default-volume-claim
+                dataVolumeClaimTemplate: default-volume-claim
+                logVolumeClaimTemplate: default-volume-claim
               replicas:
                 - name: replica0
                   port: 9000
                   templates:
                     podTemplate: clickhouse-v19.11.3.11
-                    volumeClaimTemplate: default-volume-claim
+                    dataVolumeClaimTemplate: default-volume-claim
+                    logVolumeClaimTemplate: default-volume-claim
 ```
 
 ## .spec.templates.serviceTemplates
@@ -559,4 +571,4 @@ Example - how to place ClickHouse instances on nodes labeled as `clickhouse=allo
         distribution: "OnePerHost"
 ```
 
-[chi_max_manifest]: ./examples/99-clickhouseinstallation-max.yaml
+[chi_max_manifest]: ./chi-examples/99-clickhouseinstallation-max.yaml

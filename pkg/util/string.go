@@ -144,23 +144,35 @@ func CastStringBoolToTrueFalse(str string, defaultValue bool) string {
 }
 
 // CreateStringID creates HEX hash ID out of string.
-// In case hashLen == 0 the whole hash is returned
-func CreateStringID(str string, hashLen int) string {
-	hasher := sha1.New()
-	hasher.Write([]byte(str))
-	hash := hex.EncodeToString(hasher.Sum(nil))
-	if hashLen == 0 {
+// In case maxHashLen == 0 the whole hash is returned
+func CreateStringID(str string, maxHashLen int) string {
+	sha := sha1.New()
+	sha.Write([]byte(str))
+	hash := hex.EncodeToString(sha.Sum(nil))
+
+	if maxHashLen == 0 {
+		// Explicitly requested to return everything
 		return hash
-	} else {
-		return hash[len(hash)-hashLen:]
 	}
+
+	if maxHashLen >= len(hash) {
+		// Requested hash len is greater than we have
+		// Return whole hash - everything what we have
+		return hash
+	}
+
+	// Requested hash len is smaller that the hash
+	// Return last part of the hash
+	return hash[len(hash)-maxHashLen:]
 }
 
-func StringHead(str string, headLen int) string {
-	if len(str) <= headLen {
+// StringHead returns beginning of the string of requested length
+func StringHead(str string, maxHeadLen int) string {
+	if len(str) <= maxHeadLen {
+		// String is shorter than head requested - return everything
 		return str
-	} else {
-		return str[:headLen]
 	}
 
+	// Return beginning of the string
+	return str[:maxHeadLen]
 }

@@ -24,6 +24,10 @@ required = [
   name = "github.com/golang/glog"
   branch = "master"
 
+[[constraint]]
+  name = "github.com/imdario/mergo"
+  branch = "master"
+
 [[override]]
   name = "k8s.io/gengo"
   revision = "b90029ef6cd877cb3f422d75b3a07707e3aac6b7"

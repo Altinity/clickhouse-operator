@@ -34,7 +34,7 @@ import (
 type Controller struct {
 	version string
 
-	chopConfigManager *config.ConfigManager
+	chopConfigManager *config.Manager
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 	kubeClient kube.Interface
 	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)

@@ -18,22 +18,13 @@ import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-func HostCanDeletePVC(host *chiv1.ChiHost) bool {
-	templateName := host.Templates.VolumeClaimTemplate
-	template, ok := host.Chi.GetVolumeClaimTemplate(templateName)
-	if !ok {
-		// Unknown template name, however, this is strange
-		return true
-	}
+func HostCanDeletePVC(host *chiv1.ChiHost, pvcName string) bool {
+	policy := chiv1.PVCReclaimPolicyRetain
+	host.Chi.WalkVolumeClaimTemplates(func(template *chiv1.ChiVolumeClaimTemplate) {
+		if pvcName == CreatePVCName(template, host) {
+			policy = template.PVCReclaimPolicy
+		}
+	})
 
-	switch template.PVCReclaimPolicy {
-	case chiv1.PVCReclaimPolicyRetain:
-		return false
-	case chiv1.PVCReclaimPolicyDelete:
-		return true
-	default:
-		// Unknown PVCReclaimPolicy
-		return true
-	}
-
+	return policy == chiv1.PVCReclaimPolicyDelete
 }

@@ -1,0 +1,116 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseUpgrade"
+metadata:
+  name: "clickhouse-installation-test"
+spec:
+  defaults:
+    deployment:
+      zone:
+        matchLabels:
+          clickhouse.altinity.com/zone: zone1
+      podTemplate: clickhouse-v18.16.1
+      dataVolumeClaimTemplate: default
+      logVolumeClaimTemplate: default
+#     scenario: Default
+
+  configuration:
+    clusters:
+    - name: customized
+#     deployment:
+#       scenario: Default
+#       zone:
+#         matchLabels:
+#           clickhouse.altinity.com/zone: zone1
+#       podTemplate: clickhouse-v18.16.1
+#
+#       values inherited from global .spec.deployment section
+#
+      layout:
+        shards:
+        - index: 5
+#         deployment:
+#           scenario: Default
+#           zone:
+#             matchLabels:
+#               clickhouse.altinity.com/zone: zone1
+#           podTemplate: clickhouse-v18.16.1
+#
+#         values inherited from .spec.configuration.clusters[3].deployment section
+#
+          replicas:
+          - index: 2
+            port: 9000
+            deployment:
+              scenario: Default
+#             zone:
+#               matchLabels:
+#                 clickhouse.altinity.com/zone: zone1
+#             podTemplate: clickhouse-v18.16.1
+#  
+#           values inherited from .spec.configuration.clusters[3].shards[2].deployment section
+#
+        - index: 6
+            deployment:
+              scenario: NodeMonopoly # 1 pod (CH server instance) per node (zone can be a set of n nodes) -> podAntiAffinity
+              zone:
+                matchLabels:
+                  clickhouse.altinity.com/zone: zone4
+                  clickhouse.altinity.com/kind: ssd
+              podTemplate: clickhouse-v18.16.1
+
+            replicas:
+              - index: 2
+
+  templates:
+    volumeClaimTemplates:
+    - name: default
+      persistentVolumeClaim:
+        metadata:
+          name: clickhouse-data-test
+          # namespace: testnamespace
+        spec:
+          # 1. if  storageClassName is not specified, default StorageClass
+          # (must be specified by cluster administrator) would be used for provisioning
+          # 2. if storageClassName is set to an empty string (‘’), no storage class will be used
+          # dynamic provisioning is disabled for this PVC. Existing, “Available”, PVs
+          # (that do not have a specified storageClassName) will be considered for binding to the PVC
+          #storageClassName: gold
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+    podTemplates:
+    # multiple pod templates makes possible to update version smoothly
+    # pod template for ClickHouse v18.16.1
+    - name: clickhouse-v18.16.1
+    # volumes: are missing
+      containers:
+      - name: clickhouse
+        image: yandex/clickhouse-server:18.16.1
+        volumeMounts:
+        - name: clickhouse-data-test
+          mountPath: /var/lib/clickhouse
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
+    # pod template for ClickHouse v18.16.2
+    - name: clickhouse-v18.16.2
+    # volumes: are missing
+      containers:
+      - name: clickhouse
+        image: yandex/clickhouse-server:18.16.2
+        volumeMounts:
+        - name: clickhouse-data-test
+          mountPath: /var/lib/clickhouse
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "64Mi"
+            cpu: "100m"

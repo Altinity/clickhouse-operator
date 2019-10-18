@@ -1,0 +1,337 @@
+# We may need to label nodes with clickhouse=allow label for this example to run
+# See ./label_nodes.sh for this purpose
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "clickhouse-installation-max"
+
+spec:
+
+  stop: "no"
+
+  defaults:
+    replicasUseFQDN: "no"
+    distributedDDL:
+      profile: default
+    templates:
+      podTemplate: clickhouse-v18.16.1
+      dataVolumeClaimTemplate: default-volume-claim
+      logVolumeClaimTemplate: default-volume-claim
+      serviceTemplate: chi-service-template
+
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper-0.zookeepers.zoo3ns.svc.cluster.local
+          port: 2181
+        - host: zookeeper-1.zookeepers.zoo3ns.svc.cluster.local
+          port: 2181
+        - host: zookeeper-2.zookeepers.zoo3ns.svc.cluster.local
+          port: 2181
+      session_timeout_ms: 30000
+      operation_timeout_ms: 10000
+      root: "/path/to/zookeeper/root/node"
+      identity: "user:password"
+    users:
+      readonly/profile: readonly
+      #     <users>
+      #        <readonly>
+      #          <profile>readonly</profile>
+      #        </readonly>
+      #     </users>
+      test/networks/ip:
+        - "127.0.0.1"
+        - "::/0"
+      #     <users>
+      #        <test>
+      #          <networks>
+      #            <ip>127.0.0.1</ip>
+      #            <ip>::/0</ip>
+      #          </networks>
+      #        </test>
+      #     </users>
+      test/profile: default
+      test/quotas: default
+    profiles:
+      readonly/readonly: "1"
+      #      <profiles>
+      #        <readonly>
+      #          <readonly>1</readonly>
+      #        </readonly>
+      #      </profiles>
+      default/max_memory_usage: "1000000000"
+    quotas:
+      default/interval/duration: "3600"
+      #     <quotas>
+      #       <default>
+      #         <interval>
+      #           <duration>3600</duration>
+      #         </interval>
+      #       </default>
+      #     </quotas>
+    settings:
+      compression/case/method: zstd
+      #      <compression>
+      #        <case>
+      #          <method>zstd</method>
+      #        </case>
+      #      </compression>
+      disable_internal_dns_cache: 1
+      #      <disable_internal_dns_cache>1</disable_internal_dns_cache>
+    files:
+      dict1.xml: |
+        <yandex>
+            <!-- ref to file /etc/clickhouse-data/config.d/source1.csv -->
+        </yandex>
+      source1.csv: |
+        a1,b1,c1,d1
+        a2,b2,c2,d2
+
+    clusters:
+
+      - name: all-counts
+        templates:
+          podTemplate: clickhouse-v18.16.1
+          dataVolumeClaimTemplate: default-volume-claim
+          logVolumeClaimTemplate: default-volume-claim
+        layout:
+          shardsCount: 3
+          replicasCount: 2
+
+      - name: shards-only
+        templates:
+          podTemplate: clickhouse-v18.16.1
+          dataVolumeClaimTemplate: default-volume-claim
+          logVolumeClaimTemplate: default-volume-claim
+        layout:
+          shardsCount: 3
+          # replicasCount not specified, assumed = 1, by default
+
+      - name: replicas-only
+        templates:
+          podTemplate: clickhouse-v18.16.1
+          dataVolumeClaimTemplate: default-volume-claim
+          logVolumeClaimTemplate: default-volume-claim
+        layout:
+          # shardsCount not specified, assumed = 1, by default
+          replicasCount: 3
+
+      - name: customized
+        templates:
+          podTemplate: clickhouse-v18.16.1
+          dataVolumeClaimTemplate: default-volume-claim
+          logVolumeClaimTemplate: default-volume-claim
+        layout:
+          shards:
+            - name: shard0
+              replicasCount: 3
+              weight: 1
+              internalReplication: Disabled
+              templates:
+                podTemplate: clickhouse-v18.16.1
+                dataVolumeClaimTemplate: default-volume-claim
+                logVolumeClaimTemplate: default-volume-claim
+
+            - name: shard1
+              templates:
+                podTemplate: clickhouse-v18.16.1
+                dataVolumeClaimTemplate: default-volume-claim
+                logVolumeClaimTemplate: default-volume-claim
+              replicas:
+                - name: replica0
+                - name: replica1
+                - name: replica2
+
+            - name: shard2
+              replicasCount: 3
+              templates:
+                podTemplate: clickhouse-v18.16.1
+                dataVolumeClaimTemplate: default-volume-claim
+                logVolumeClaimTemplate: default-volume-claim
+                replicaServiceTemplate: replica-service-template
+              replicas:
+                - name: replica0
+                  port: 9000
+                  templates:
+                    podTemplate: clickhouse-v19.11.3.11
+                    dataVolumeClaimTemplate: default-volume-claim
+                    logVolumeClaimTemplate: default-volume-claim
+                    replicaServiceTemplate: replica-service-template
+
+  templates:
+    serviceTemplates:
+      - name: chi-service-template
+        # generateName understands different sets of macroses,
+        # depending on the level of the object, for which Service is being created:
+        #
+        # For CHI-level Service:
+        # 1. {chi} - ClickHouseInstallation name
+        # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+        #
+        # For Cluster-level Service:
+        # 1. {chi} - ClickHouseInstallation name
+        # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+        # 3. {cluster} - cluster name
+        # 4. {clusterID} - short hashed cluster name (BEWARE, this is an experimental feature)
+        # 5. {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+        #
+        # For Shard-level Service:
+        # 1. {chi} - ClickHouseInstallation name
+        # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+        # 3. {cluster} - cluster name
+        # 4. {clusterID} - short hashed cluster name (BEWARE, this is an experimental feature)
+        # 5. {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+        # 6. {shard} - shard name
+        # 7. {shardID} - short hashed shard name (BEWARE, this is an experimental feature)
+        # 8. {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+        #
+        # For Replica-level Service:
+        # 1. {chi} - ClickHouseInstallation name
+        # 2. {chiID} - short hashed ClickHouseInstallation name (BEWARE, this is an experimental feature)
+        # 3. {cluster} - cluster name
+        # 4. {clusterID} - short hashed cluster name (BEWARE, this is an experimental feature)
+        # 5. {clusterIndex} - 0-based index of the cluster in the CHI (BEWARE, this is an experimental feature)
+        # 6. {shard} - shard name
+        # 7. {shardID} - short hashed shard name (BEWARE, this is an experimental feature)
+        # 8. {shardIndex} - 0-based index of the shard in the cluster (BEWARE, this is an experimental feature)
+        # 9. {replica} - replica name
+        # 10. {replicaID} - short hashed replica name (BEWARE, this is an experimental feature)
+        # 11. {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
+        generateName: "service-{chi}"
+        # type ObjectMeta struct from k8s.io/meta/v1
+        metadata:
+          labels:
+            custom.label: "custom.value"
+          annotations:
+            # For more details on Internal Load Balancer check
+            # https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
+            cloud.google.com/load-balancer-type: "Internal"
+            service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
+            service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+            service.beta.kubernetes.io/openstack-internal-load-balancer: "true"
+            service.beta.kubernetes.io/cce-load-balancer-internal-vpc: "true"
+        # type ServiceSpec struct from k8s.io/core/v1
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: client
+              port: 9000
+          type: LoadBalancer
+
+      - name: replica-service-template
+        # type ServiceSpec struct from k8s.io/core/v1
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: client
+              port: 9000
+            - name: interserver
+              port: 9009
+          type: ClusterIP
+          ClusterIP: None
+
+      - name: preserve-client-source-ip
+        # For more details on Preserving Client Source IP check
+        # https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+        spec:
+          selector:
+            app: example
+          ports:
+            - name: http
+              port: 8123
+            - name: client
+              port: 9000
+            - name: interserver
+              port: 9009
+          externalTrafficPolicy: Local
+          type: LoadBalancer
+
+    volumeClaimTemplates:
+      - name: default-volume-claim
+        # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
+        spec:
+          # 1. If storageClassName is not specified, default StorageClass
+          # (must be specified by cluster administrator) would be used for provisioning
+          # 2. If storageClassName is set to an empty string (‘’), no storage class will be used
+          # dynamic provisioning is disabled for this PVC. Existing, “Available”, PVs
+          # (that do not have a specified storageClassName) will be considered for binding to the PVC
+          #storageClassName: gold
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+      - name: volume-claim-retain-pvc
+        # Keep PVC from being deleted
+        # Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
+        reclaimPolicy: Retain
+        # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
+        spec:
+          # 1. If storageClassName is not specified, default StorageClass
+          # (must be specified by cluster administrator) would be used for provisioning
+          # 2. If storageClassName is set to an empty string (‘’), no storage class will be used
+          # dynamic provisioning is disabled for this PVC. Existing, “Available”, PVs
+          # (that do not have a specified storageClassName) will be considered for binding to the PVC
+          #storageClassName: gold
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+
+    podTemplates:
+      # multiple pod templates makes possible to update version smoothly
+      # pod template for ClickHouse v18.16.1
+      - name: clickhouse-v18.16.1
+        # We may need to label nodes with clickhouse=allow label for this example to run
+        # See ./label_nodes.sh for this purpose
+        zone:
+          key: "clickhouse"
+          values:
+            - "allow"
+        # Shortcut version for AWS installations
+        #zone:
+        #  values:
+        #    - "us-east-1a"
+
+        # Possible values for distribution are:
+        # Unspecified
+        # OnePerHost
+        distribution: "Unspecified"
+
+        # type PodSpec struct {} from k8s.io/core/v1
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:18.16.1
+              volumeMounts:
+                - name: default-volume-claim
+                  mountPath: /var/lib/clickhouse
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "64Mi"
+                  cpu: "100m"
+
+      # pod template for ClickHouse v19.11.3.11
+      - name: clickhouse-v19.11.3.11
+        # type PodSpec struct {} from k8s.io/core/v1
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:19.11.3.11
+              volumeMounts:
+                - name: default-volume-claim
+                  mountPath: /var/lib/clickhouse
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "64Mi"
+                  cpu: "100m"

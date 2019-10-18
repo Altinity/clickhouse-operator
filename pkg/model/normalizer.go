@@ -91,6 +91,7 @@ func (n *Normalizer) doStop(stop *string) {
 func (n *Normalizer) doDefaults(defaults *chiv1.ChiDefaults) {
 	// Set defaults for CHI object properties
 	n.doDefaultsReplicasUseFQDN(defaults)
+	n.doDefaultsTemplates(defaults)
 }
 
 // doConfiguration normalizes .spec.configuration
@@ -143,11 +144,12 @@ func (n *Normalizer) doPodTemplate(template *chiv1.ChiPodTemplate) {
 	if template.Distribution == podDistributionOnePerHost {
 		// Known distribution, all is fine
 	} else {
+		// Default Pod Distribution
 		template.Distribution = podDistributionUnspecified
 	}
 
 	// Spec
-	template.Spec.Affinity = n.mergeAffinity(template.Spec.Affinity, n.buildAffinity(template))
+	template.Spec.Affinity = n.mergeAffinity(template.Spec.Affinity, n.newAffinity(template))
 
 	// Introduce PodTemplate into Index
 	// Ensure map is in place
@@ -158,18 +160,19 @@ func (n *Normalizer) doPodTemplate(template *chiv1.ChiPodTemplate) {
 	n.chi.Spec.Templates.PodTemplatesIndex[template.Name] = template
 }
 
-func (n *Normalizer) buildAffinity(template *chiv1.ChiPodTemplate) *v1.Affinity {
-	nodeAffinity := n.buildNodeAffinity(template)
-	podAntiAffinity := n.buildPodAntiAffinity(template)
+func (n *Normalizer) newAffinity(template *chiv1.ChiPodTemplate) *v1.Affinity {
+	nodeAffinity := n.newNodeAffinity(template)
+	podAntiAffinity := n.newPodAntiAffinity(template)
 
-	if nodeAffinity == nil && podAntiAffinity == nil {
+	if (nodeAffinity == nil) && (podAntiAffinity == nil) {
+		// Neither Affinity nor AntiAffinity specified
 		return nil
-	} else {
-		return &v1.Affinity{
-			NodeAffinity:    nodeAffinity,
-			PodAffinity:     nil,
-			PodAntiAffinity: podAntiAffinity,
-		}
+	}
+
+	return &v1.Affinity{
+		NodeAffinity:    nodeAffinity,
+		PodAffinity:     nil,
+		PodAntiAffinity: podAntiAffinity,
 	}
 }
 
@@ -191,32 +194,32 @@ func (n *Normalizer) mergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affin
 	return dst
 }
 
-func (n *Normalizer) buildNodeAffinity(template *chiv1.ChiPodTemplate) *v1.NodeAffinity {
+func (n *Normalizer) newNodeAffinity(template *chiv1.ChiPodTemplate) *v1.NodeAffinity {
 	if template.Zone.Key == "" {
 		return nil
-	} else {
-		return &v1.NodeAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-				NodeSelectorTerms: []v1.NodeSelectorTerm{
-					{
-						// A list of node selector requirements by node's labels.
-						MatchExpressions: []v1.NodeSelectorRequirement{
-							{
-								Key:      template.Zone.Key,
-								Operator: v1.NodeSelectorOpIn,
-								Values:   template.Zone.Values,
-							},
+	}
+
+	return &v1.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					// A list of node selector requirements by node's labels.
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      template.Zone.Key,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   template.Zone.Values,
 						},
-						// A list of node selector requirements by node's fields.
-						//MatchFields: []v1.NodeSelectorRequirement{
-						//	v1.NodeSelectorRequirement{},
-						//},
 					},
+					// A list of node selector requirements by node's fields.
+					//MatchFields: []v1.NodeSelectorRequirement{
+					//	v1.NodeSelectorRequirement{},
+					//},
 				},
 			},
+		},
 
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{},
-		}
+		PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{},
 	}
 }
 
@@ -263,7 +266,7 @@ func (n *Normalizer) mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinit
 	return dst
 }
 
-func (n *Normalizer) buildPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodAntiAffinity {
+func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodAntiAffinity {
 	if template.Distribution == podDistributionOnePerHost {
 		return &v1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
@@ -286,9 +289,9 @@ func (n *Normalizer) buildPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.Po
 
 			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{},
 		}
-	} else {
-		return nil
 	}
+
+	return nil
 }
 
 func (n *Normalizer) mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.PodAntiAffinity {
@@ -395,13 +398,19 @@ func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
 
 // doConfigurationZookeeper normalizes .spec.configuration.zookeeper
 func (n *Normalizer) doConfigurationZookeeper(zk *chiv1.ChiZookeeperConfig) {
+	// In case no ZK port specified - assign default
 	for i := range zk.Nodes {
 		// Convenience wrapper
 		node := &zk.Nodes[i]
 		if node.Port == 0 {
-			node.Port = 2181
+			node.Port = zkDefaultPort
 		}
 	}
+
+	// In case no ZK root specified - assign '/clickhouse/{namespace}/{chi name}'
+	//if zk.Root == "" {
+	//	zk.Root = fmt.Sprintf(zkDefaultRootTemplate, n.chi.Namespace, n.chi.Name)
+	//}
 }
 
 // doConfigurationUsers normalizes .spec.configuration.users
@@ -635,6 +644,11 @@ func (n *Normalizer) doShardInternalReplication(shard *chiv1.ChiShard) {
 func (n *Normalizer) doDefaultsReplicasUseFQDN(d *chiv1.ChiDefaults) {
 	// Default value set to false
 	d.ReplicasUseFQDN = util.CastStringBoolToTrueFalse(d.ReplicasUseFQDN, false)
+}
+
+// doDefaultsTemplates ensures chiv1.ChiDefaults.Templates section has proper values
+func (n *Normalizer) doDefaultsTemplates(d *chiv1.ChiDefaults) {
+	d.Templates.HandleDeprecatedFields()
 }
 
 // normalizePath normalizes path in .spec.configuration.{users, profiles, quotas, settings} section

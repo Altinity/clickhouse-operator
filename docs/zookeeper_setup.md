@@ -17,20 +17,20 @@ During ZooKeeper installation the following items are created/configured:
 
 ## Quick start
 Quick start is represented in two flavors:
-1. With persistent volume - good for AWS. File are located in [manifests/zookeeper/quick-start-persistent-volume][quickstart_persistent] 
+1. With persistent volume - good for AWS. File are located in [deploy/zookeeper/quick-start-persistent-volume][quickstart_persistent] 
 1. With local [`emptyDir`][k8sdoc_emptydir] storage - good for standalone local run, however has to true persistence. \
-Files are located in [manifests/zookeeper/quick-start-volume-emptyDir][quickstart_emptydir] 
+Files are located in [deploy/zookeeper/quick-start-volume-emptyDir][quickstart_emptydir] 
 
 Each quick start flavor provides the following installation options:
 1. 1-node Zookeeper cluster (**zookeeper-1-** files). No failover provided.
 1. 3-node Zookeeper cluster (**zookeeper-3-** files). Failover provided.
 
-In case you'd like to test with AWS or any other cloud provider, we recommend to go with [manifests/zookeeper/quick-start-persistent-volume][quickstart_persistent] persistent storage.
-In case of local test, you'd may prefer to go with [manifests/zookeeper/quick-start-volume-emptyDir][quickstart_emptydir] `emptyDir`.
+In case you'd like to test with AWS or any other cloud provider, we recommend to go with [deploy/zookeeper/quick-start-persistent-volume][quickstart_persistent] persistent storage.
+In case of local test, you'd may prefer to go with [deploy/zookeeper/quick-start-volume-emptyDir][quickstart_emptydir] `emptyDir`.
 
 ### Script-based Installation 
-In this example we'll go with simple 1-node Zookeeper cluster on AWS and pick [manifests/zookeeper/quick-start-persistent-volume][quickstart_persistent].
-Both [create](../manifests/zookeeper/quick-start-persistent-volume/zookeeper-1-node-create.sh) and [delete](../manifests/zookeeper/quick-start-persistent-volume/zookeeper-1-node-delete.sh)
+In this example we'll go with simple 1-node Zookeeper cluster on AWS and pick [deploy/zookeeper/quick-start-persistent-volume][quickstart_persistent].
+Both [create](../deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node-create.sh) and [delete](../deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node-delete.sh)
 shell scripts are available for simplification.  
 
 ### Manual Installation
@@ -54,7 +54,7 @@ Now Zookeeper should be up and running. Let's [explore Zookeeper cluster](#explo
 For fine-tuned Zookeeper setup please refer to [advanced setup](#advanced-setup) options.  
 
 ## Advanced setup
-Advanced files are are located in [manifests/zookeeper/advanced](../manifests/zookeeper/advanced) folder. 
+Advanced files are are located in [deploy/zookeeper/advanced](../deploy/zookeeper/advanced) folder. 
 All resources are separated into different files so it is easy to modify them and setup required options.  
 
 Advanced setup is available in two options:
@@ -62,8 +62,8 @@ Advanced setup is available in two options:
 1. With [emptyDir volume][k8sdoc_emptydir]
 
 Each of these options have both `create` and `delete` scripts provided
-1. Persistent volume  [create](../manifests/zookeeper/advanced/zookeeper-persistent-volume-create.sh) and [delete](../manifests/zookeeper/advanced/zookeeper-persistent-volume-delete.sh) scripts
-1. EmptyDir volume  [create](../manifests/zookeeper/advanced/zookeeper-volume-emptyDir-create.sh) and [delete](../manifests/zookeeper/advanced/zookeeper-volume-emptyDir-delete.sh) scripts
+1. Persistent volume  [create](../deploy/zookeeper/advanced/zookeeper-persistent-volume-create.sh) and [delete](../deploy/zookeeper/advanced/zookeeper-persistent-volume-delete.sh) scripts
+1. EmptyDir volume  [create](../deploy/zookeeper/advanced/zookeeper-volume-emptyDir-create.sh) and [delete](../deploy/zookeeper/advanced/zookeeper-volume-emptyDir-delete.sh) scripts
 
 Step-by-step explanations:
 
@@ -108,17 +108,17 @@ This part is not that straightforward and may require communication with k8s ins
 
 First of all, we need to decide, whether Zookeeper would use [Persistent Volume][k8sdoc_persistent_volume] as a storage or just stick to more simple [Volume][k8sdoc_volume] (In doc [emptyDir][k8sdoc_emptydir] type is used)
 
-In case we'd prefer to stick with simpler solution and go with [Volume of type emptyDir][k8sdoc_emptydir], we need to go with **emptyDir StatefulSet config** [05-stateful-set-volume-emptyDir.yaml](../manifests/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) as described in next [Stateful Set unit](#stateful-set). Just move to [it](#stateful-set).
+In case we'd prefer to stick with simpler solution and go with [Volume of type emptyDir][k8sdoc_emptydir], we need to go with **emptyDir StatefulSet config** [05-stateful-set-volume-emptyDir.yaml](../deploy/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) as described in next [Stateful Set unit](#stateful-set). Just move to [it](#stateful-set).
 
-In case we'd prefer to go with [Persistent Volume][k8sdoc_persistent_volume] storage, we need to go with **Persistent Volume StatefulSet config** [05-stateful-set-persistent-volume.yaml](../manifests/zookeeper/advanced/05-stateful-set-persistent-volume.yaml)
+In case we'd prefer to go with [Persistent Volume][k8sdoc_persistent_volume] storage, we need to go with **Persistent Volume StatefulSet config** [05-stateful-set-persistent-volume.yaml](../deploy/zookeeper/advanced/05-stateful-set-persistent-volume.yaml)
 
 Shortly, [Storage Class][k8sdoc_storage_class] is used to bind together [Persistent Volumes][k8sdoc_persistent_volume],
 which are created either by k8s admin manually or automatically by [Provisioner][k8sdocs_dynamic_provisioning]. In any case, Persistent Volumes are provided externally to an application to be deployed into k8s. 
 So, this application has to know **Storage Class Name** to ask for from the k8s in application's claim for new persistent volume - [Persistent Volume Claim][k8sdoc_persistent_volume_claim].
-This **Storage Class Name** should be asked from k8s admin and written as application's **Persistent Volume Claim** `.spec.volumeClaimTemplates.storageClassName` parameter in `StatefulSet` configuration. **StatefulSet manifest with emptyDir** [05-stateful-set-volume-emptyDir.yaml](../manifests/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) and/or **StatefulSet manifest with Persistent Volume** [05-stateful-set-persistent-volume.yaml](../manifests/zookeeper/advanced/05-stateful-set-persistent-volume.yaml). 
+This **Storage Class Name** should be asked from k8s admin and written as application's **Persistent Volume Claim** `.spec.volumeClaimTemplates.storageClassName` parameter in `StatefulSet` configuration. **StatefulSet manifest with emptyDir** [05-stateful-set-volume-emptyDir.yaml](../deploy/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) and/or **StatefulSet manifest with Persistent Volume** [05-stateful-set-persistent-volume.yaml](../deploy/zookeeper/advanced/05-stateful-set-persistent-volume.yaml). 
 
 ### Stateful Set
-Edit **StatefulSet manifest with emptyDir** [05-stateful-set-volume-emptyDir.yaml](../manifests/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) and/or **StatefulSet manifest with Persistent Volume** [05-stateful-set-persistent-volume.yaml](../manifests/zookeeper/advanced/05-stateful-set-persistent-volume.yaml) according to your Storage Preferences.
+Edit **StatefulSet manifest with emptyDir** [05-stateful-set-volume-emptyDir.yaml](../deploy/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) and/or **StatefulSet manifest with Persistent Volume** [05-stateful-set-persistent-volume.yaml](../deploy/zookeeper/advanced/05-stateful-set-persistent-volume.yaml) according to your Storage Preferences.
 
 In case we'd go with [Volume of type emptyDir][k8sdoc_emptydir], ensure `.spec.template.spec.containers.volumes` is in place and look like the following:
 ```yaml
@@ -236,5 +236,5 @@ In case all looks fine Zookeeper cluster is up and running
 [k8sdoc_persistent_volume_claim]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
 [k8sdocs_dynamic_provisioning]: https://kubernetes.io/docs/concepts/storage/dynamic-provisioning/
 
-[quickstart_persistent]: ../manifests/zookeeper/quick-start-persistent-volume
-[quickstart_emptydir]: ../manifests/zookeeper/quick-start-volume-emptyDir
+[quickstart_persistent]: ../deploy/zookeeper/quick-start-persistent-volume
+[quickstart_emptydir]: ../deploy/zookeeper/quick-start-volume-emptyDir

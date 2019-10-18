@@ -42,45 +42,69 @@ func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
 		ap.equal = true
 	}
 
-	// Sanitize diff - do not pay attention to ObjectMeta.ResourceVersion changes
-	if ap.diff != nil {
-		exclude := make([]*messagediff.Path, 0)
-		for ptrPath := range ap.diff.Modified {
-			for i := range *ptrPath {
-				pathNodeCurr := (*ptrPath)[i]
-				pathNodePrev := (*ptrPath)[i]
-				if i > 0 {
-					// We have prev node
-					pathNodePrev = (*ptrPath)[i-1]
-				}
-
-				prev := pathNodePrev.String()
-				curr := pathNodeCurr.String()
-				if (prev == "ObjectMeta") && (curr == ".ResourceVersion") {
-					// Exclude this path from Modified
-					exclude = append(exclude, ptrPath)
-				} else if (prev == ".ObjectMeta") && (curr == ".ResourceVersion") {
-					// Exclude this path from Modified
-					exclude = append(exclude, ptrPath)
-				}
-			}
-		}
-		for _, ptrPath := range exclude {
-			delete(ap.diff.Modified, ptrPath)
-		}
-	}
+	ap.excludePaths()
 
 	return ap
 }
 
-func (ap *ActionPlan) HasNoChanges() bool {
-	return ap.equal || ((ap.diff != nil) && (len(ap.diff.Added) == 0) && (len(ap.diff.Removed) == 0) && (len(ap.diff.Modified) == 0))
+// excludePaths - sanitize diff - do not pay attention to changes in some paths, such as
+// ObjectMeta.ResourceVersion
+func (ap *ActionPlan) excludePaths() {
+	if ap.diff == nil {
+		return
+	}
+
+	excludePaths := make([]*messagediff.Path, 0)
+	// Walk over all .diff.Modified paths and find .ObjectMeta.ResourceVersion path
+	for ptrPath := range ap.diff.Modified {
+		for i := range *ptrPath {
+			pathNodeCurr := (*ptrPath)[i]
+			pathNodePrev := (*ptrPath)[i]
+			if i > 0 {
+				// We have prev node
+				pathNodePrev = (*ptrPath)[i-1]
+			}
+
+			prev := pathNodePrev.String()
+			curr := pathNodeCurr.String()
+			if ((prev == "ObjectMeta") && (curr == ".ResourceVersion")) ||
+				((prev == ".ObjectMeta") && (curr == ".ResourceVersion")) {
+				// This path should be excluded from Modified
+				excludePaths = append(excludePaths, ptrPath)
+			}
+		}
+	}
+
+	// Exclude paths from diff.Modified
+	for _, ptrPath := range excludePaths {
+		delete(ap.diff.Modified, ptrPath)
+	}
 }
 
+// IsNoChanges are there any changes
+func (ap *ActionPlan) IsNoChanges() bool {
+
+	if ap.equal {
+		// Already checked - equal
+		return false
+	}
+
+	if ap.diff == nil {
+		// No diff to check with
+		return false
+	}
+
+	// Have some changes
+
+	return (len(ap.diff.Added) == 0) && (len(ap.diff.Removed) == 0) && (len(ap.diff.Modified) == 0)
+}
+
+// GetNewHostsNum - total number of hosts to be achieved
 func (ap *ActionPlan) GetNewHostsNum() int {
 	return ap.new.HostsCount()
 }
 
+// GetRemovedHostsNum - how many hosts would be removed
 func (ap *ActionPlan) GetRemovedHostsNum() int {
 	var count int
 	ap.WalkRemoved(
@@ -97,6 +121,7 @@ func (ap *ActionPlan) GetRemovedHostsNum() int {
 	return count
 }
 
+// WalkRemoved walk removed hosts
 func (ap *ActionPlan) WalkRemoved(
 	clusterFunc func(cluster *v1.ChiCluster),
 	shardFunc func(shard *v1.ChiShard),
@@ -127,6 +152,7 @@ func (ap *ActionPlan) WalkRemoved(
 	}
 }
 
+// WalkAdded walk added hosts
 func (ap *ActionPlan) WalkAdded(
 	clusterFunc func(cluster *v1.ChiCluster),
 	shardFunc func(shard *v1.ChiShard),
