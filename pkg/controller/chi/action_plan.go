@@ -81,8 +81,8 @@ func (ap *ActionPlan) excludePaths() {
 	}
 }
 
-// AreActionsToDo checks whether there are any actions to do - meaning changes between states to reconcile
-func (ap *ActionPlan) AreActionsToDo() bool {
+// HasActionsToDo checks whether there are any actions to do - meaning changes between states to reconcile
+func (ap *ActionPlan) HasActionsToDo() bool {
 
 	if ap.equal {
 		// Already checked - equal - no actions to do
@@ -111,7 +111,7 @@ func (ap *ActionPlan) AreActionsToDo() bool {
 		return true
 	}
 
-	// We should not be here, actually, because this means that thare are some changes (diff is not empty),
+	// We should not be here, actually, because this means that there are some changes (diff is not empty),
 	// but we were unable to find out what exactly changed
 	return false
 }
