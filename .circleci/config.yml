@@ -58,5 +58,5 @@ workflows:
             branches:
               ignore:
                 - master
-                - vladislav-dev
+                - /.*dev.*/
   
