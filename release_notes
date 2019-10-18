@@ -1,3 +1,12 @@
+Release 0.7.0
+
+New features:
+* Separated 'podVolumeClaimTemplate' and 'logVolumeClaimTemplate' to retain ClickHouse logs
+* New templates model and 'useTemplates' extension
+
+Bug fixes:
+* Fixed bug with installation name being truncated to 15 chars. The current limit is 60 chars. Cluster name is limited to 15.
+
 Release 0.6.0
 
 New features:
