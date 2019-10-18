@@ -16,6 +16,7 @@ package config
 
 import (
 	"github.com/golang/glog"
+	"github.com/imdario/mergo"
 	"github.com/kubernetes-sigs/yaml"
 	"io/ioutil"
 	"os"
@@ -150,17 +151,17 @@ func (cm *Manager) logCRBasedConfigs() {
 
 // buildUnifiedConfig prepares one config from all accumulated parts
 func (cm *Manager) buildUnifiedConfig() {
-	// TODO need to either
-	// 1. mix
-	// 2. overwrite
-	// 3. skip
-
-	// Start with file config
+	// Start with file config as a base
 	cm.config = cm.fileConfig
-	// Merge/unify with CR-based configs
+	cm.fileConfig = nil
+
+	// Merge all the rest CR-based configs into base config
 	for _, chOperatorConfiguration := range cm.crConfigs {
-		glog.V(1).Infof("chop config %s/%s :", chOperatorConfiguration.ConfigFolderPath, chOperatorConfiguration.ConfigFilePath)
-		cm.config = chOperatorConfiguration
+		if err := mergo.Merge(cm.config, *chOperatorConfiguration, mergo.WithOverride); err == nil {
+			glog.V(1).Infof("merge chop config %s/%s", chOperatorConfiguration.ConfigFolderPath, chOperatorConfiguration.ConfigFilePath)
+		} else {
+			glog.V(1).Infof("FAIL merge chop config %s/%s err: %v", chOperatorConfiguration.ConfigFolderPath, chOperatorConfiguration.ConfigFilePath, err)
+		}
 	}
 }
 
@@ -172,6 +173,7 @@ func (cm *Manager) IsConfigListed(config *chiv1.ClickHouseOperatorConfiguration)
 		if config.Namespace == chOperatorConfiguration.Namespace &&
 			config.Name == chOperatorConfiguration.Name &&
 			config.ResourceVersion == chOperatorConfiguration.ResourceVersion {
+			// Yes, this config already listed with the same resource version
 			return true
 		}
 	}
@@ -319,6 +321,6 @@ func (cm *Manager) logEnvVarParams() {
 // GetRuntimeParam gets specified runtime param
 func (cm *Manager) GetRuntimeParam(name string) (string, bool) {
 	_map := cm.getEnvVarParams()
-	nm, ok := _map[name]
-	return nm, ok
+	value, ok := _map[name]
+	return value, ok
 }

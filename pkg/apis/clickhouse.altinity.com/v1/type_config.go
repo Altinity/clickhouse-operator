@@ -28,6 +28,10 @@ import (
 )
 
 const (
+	defaultCHITemplateNamespace = "defaultCHITemplateNamespace"
+)
+
+const (
 	// Default values for update timeout and polling period in seconds
 	defaultStatefulSetUpdateTimeout    = 300
 	defaultStatefulSetUpdatePollPeriod = 15
@@ -63,6 +67,10 @@ func (config *Config) readChiTemplates() {
 			// Unable to unmarshal - skip incorrect template
 			glog.V(1).Infof("FAIL readChiTemplates() unable to unmarshal file %s Error: %q", filename, err)
 			continue
+		}
+		if template.Namespace == "" {
+			// Template from config file may have no namespace specified
+			template.Namespace = defaultCHITemplateNamespace
 		}
 		config.enlistChiTemplate(template)
 	}
@@ -103,7 +111,9 @@ func (config *Config) buildUnifiedChiTemplate() {
 	// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
 	var sortedTemplateNames []string
 	for name := range config.ChiTemplates {
-		sortedTemplateNames = append(sortedTemplateNames, name)
+		// Convenience wrapper
+		template := config.ChiTemplates[name]
+		sortedTemplateNames = append(sortedTemplateNames, template.Name)
 	}
 	sort.Strings(sortedTemplateNames)
 
@@ -111,9 +121,11 @@ func (config *Config) buildUnifiedChiTemplate() {
 	config.ChiTemplate = new(ClickHouseInstallation)
 
 	// Extract templates in sorted order - according to sorted template names
-	for _, templateName := range sortedTemplateNames {
+	for _, name := range sortedTemplateNames {
+		// Convenience wrapper
+		template := config.ChiTemplates[name]
 		// Merge into accumulated target template from current template
-		config.ChiTemplate.MergeFrom(config.ChiTemplates[templateName])
+		config.ChiTemplate.MergeFrom(template)
 	}
 
 	// Log final CHI template obtained
@@ -259,12 +271,12 @@ func (config *Config) applyDefaultWatchNamespace() {
 
 	// No namespaces specified
 
-	ns := os.Getenv("OPERATOR_POD_NAMESPACE")
-	if ns == "kube-system" {
+	namespace := os.Getenv("OPERATOR_POD_NAMESPACE")
+	if namespace == "kube-system" {
 		// Do nothing, we already have len(config.WatchNamespaces) == 0
 	} else {
 		// We have WATCH_NAMESPACE specified
-		config.WatchNamespaces = []string{ns}
+		config.WatchNamespaces = []string{namespace}
 	}
 }
 
