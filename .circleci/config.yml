@@ -1,6 +1,6 @@
 version: 2
 jobs:
-  build:
+  build_release:
     machine:
       enabled: true
     steps:
@@ -8,13 +8,8 @@ jobs:
       - run:
           name: Building Docker images
           command: |
-            echo 'export CHO_RELEASE=$(cat release)' >> $BASH_ENV
             docker build -f dockerfile/operator/Dockerfile -t clickhouse-operator:latest .
             docker build -f dockerfile/metrics-exporter/Dockerfile -t metrics-exporter:latest .
-  deploy_release:
-    machine:
-      enabled: true
-    steps:
       - run:
           name: Pushing Docker image
           command: |
@@ -30,16 +25,21 @@ jobs:
             docker push $COMPANY_REPO/clickhouse-operator:$CHO_RELEASE
             docker push $COMPANY_REPO/metrics-exporter:latest
             docker push $COMPANY_REPO/metrics-exporter:$CHO_RELEASE
-  deploy_dev:
+  build_dev:
     machine:
       enabled: true
     steps:
+      - checkout
       - run:
-          requires: build
+          name: Building Docker images
+          command: |
+            docker build -f dockerfile/operator/Dockerfile -t clickhouse-operator:dev .
+            docker build -f dockerfile/metrics-exporter/Dockerfile -t metrics-exporter:dev .
+      - run:
           name: Pushing Docker image
           command: |
-            docker tag clickhouse-operator:latest $COMPANY_REPO/clickhouse-operator:dev
-            docker tag metrics-exporter:latest $COMPANY_REPO/metrics-exporter:dev
+            docker tag clickhouse-operator:dev $COMPANY_REPO/clickhouse-operator:dev
+            docker tag metrics-exporter:dev $COMPANY_REPO/metrics-exporter:dev
 
             docker login -u $DOCKER_USER -p $DOCKER_PASS
 
@@ -47,23 +47,16 @@ jobs:
             docker push $COMPANY_REPO/metrics-exporter:dev
 workflows:
   version: 2
-  deploy:
+  build_and_deploy:
     jobs:
-      - build:
-          filters:
-            branches:
-              ignore:
-                - vladislav-dev
-      - deploy_release:
-          requires: 
-            - build
+      - build_release:
           filters:
             branches:
               only: master
-      - deploy_dev:
-          requires: 
-            - build
+      - build_dev:
           filters:
             branches:
               ignore:
                 - master
+                - vladislav-dev
+  
