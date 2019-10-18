@@ -81,22 +81,39 @@ func (ap *ActionPlan) excludePaths() {
 	}
 }
 
-// IsNoChanges are there any changes
-func (ap *ActionPlan) IsNoChanges() bool {
+// HasActionsToDo checks whether there are any actions to do - meaning changes between states to reconcile
+func (ap *ActionPlan) HasActionsToDo() bool {
 
 	if ap.equal {
-		// Already checked - equal
+		// Already checked - equal - no actions to do
 		return false
 	}
 
 	if ap.diff == nil {
-		// No diff to check with
+		// No diff to check with - no actions to do
 		return false
 	}
 
-	// Have some changes
+	// Looks like Have some changes
 
-	return (len(ap.diff.Added) == 0) && (len(ap.diff.Removed) == 0) && (len(ap.diff.Modified) == 0)
+	if len(ap.diff.Added) > 0 {
+		// Something added
+		return true
+	}
+
+	if len(ap.diff.Removed) > 0 {
+		// Something removed
+		return true
+	}
+
+	if len(ap.diff.Modified) > 0 {
+		// Something modified
+		return true
+	}
+
+	// We should not be here, actually, because this means that there are some changes (diff is not empty),
+	// but we were unable to find out what exactly changed
+	return false
 }
 
 // GetNewHostsNum - total number of hosts to be achieved
