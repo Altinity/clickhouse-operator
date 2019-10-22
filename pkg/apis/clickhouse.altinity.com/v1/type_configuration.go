@@ -14,12 +14,12 @@
 
 package v1
 
-func (configuration *ChiConfiguration) MergeFrom(from *ChiConfiguration) {
+func (configuration *ChiConfiguration) MergeFrom(from *ChiConfiguration, _type MergeType) {
 	if from == nil {
 		return
 	}
 
-	(&configuration.Zookeeper).MergeFrom(&from.Zookeeper)
+	(&configuration.Zookeeper).MergeFrom(&from.Zookeeper, _type)
 	mapStringInterfaceMergeFrom(&configuration.Users, &from.Users)
 	mapStringInterfaceMergeFrom(&configuration.Profiles, &from.Profiles)
 	mapStringInterfaceMergeFrom(&configuration.Quotas, &from.Quotas)

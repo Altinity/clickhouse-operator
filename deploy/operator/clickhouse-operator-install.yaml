@@ -1029,10 +1029,10 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
 data:
-  001-templates.json: |
+  001-templates.json.example: |
     {
       "apiVersion": "clickhouse.altinity.com/v1",
-      "kind": "ClickHouseInstallation",
+      "kind": "ClickHouseInstallationTemplate",
       "metadata": {
         "name": "01-default-volumeclaimtemplate"
       },
@@ -1085,36 +1085,34 @@ data:
       }
     }
 
-  002-templates.yaml: |
+  default-pod-template.yaml.example: |
     apiVersion: "clickhouse.altinity.com/v1"
-    kind: "ClickHouseInstallation"
+    kind: "ClickHouseInstallationTemplate"
     metadata:
-      name: "02-default-volumeclaimtemplate"
+      name: "default-oneperhost-pod-template"
+    spec:
+      templates:
+        podTemplates:
+          - name: default-oneperhost-pod-template
+            distribution: "OnePerHost"
+  default-storage-template.yaml.example: |
+    apiVersion: "clickhouse.altinity.com/v1"
+    kind: "ClickHouseInstallationTemplate"
+    metadata:
+      name: "default-storage-template-2Gi"
     spec:
       templates:
         volumeClaimTemplates:
-          - name: chi-default-volume-claim-template
+          - name: default-storage-template-2Gi
             spec:
               accessModes:
                 - ReadWriteOnce
               resources:
                 requests:
                   storage: 2Gi
-        podTemplates:
-          - name: chi-default-oneperhost-pod-template
-            distribution: "OnePerHost"
-            spec:
-              containers:
-                - name: clickhouse
-                  image: yandex/clickhouse-server:19.3.7
-                  ports:
-                    - name: http
-                      containerPort: 8123
-                    - name: client
-                      containerPort: 9000
-                    - name: interserver
-                      containerPort: 9009
 
+  readme: |
+    Templates in this folder are packaged with an operator and available via 'useTemplate'
 ---
 # Possible Template Parameters:
 #

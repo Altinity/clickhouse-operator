@@ -440,7 +440,7 @@ func (w *worker) createChiFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.Cli
 		return nil, err
 	}
 
-	chi, err = w.normalizer.DoChi(chi)
+	chi, err = w.normalizer.NormalizeChi(chi)
 	if err != nil {
 		return nil, err
 	}
