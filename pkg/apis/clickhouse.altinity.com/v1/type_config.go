@@ -105,13 +105,15 @@ func (config *Config) unlistChiTemplate(template *ClickHouseInstallation) {
 		}
 	}
 	// Compact the slice
-	// TODO
+	// TODO compact the slice
 }
 
 func (config *Config) FindTemplate(use *ChiUseTemplate, namespace string) *ClickHouseInstallation {
 	// Try to find direct match
 	for _, _template := range config.ChiTemplates {
-		if (_template.Name == use.Name) && (_template.Namespace == use.Namespace) {
+		if _template == nil {
+			// Skip
+		} else if _template.MatchFullName(use.Namespace, use.Name) {
 			// Direct match
 			return _template
 		}
@@ -127,7 +129,9 @@ func (config *Config) FindTemplate(use *ChiUseTemplate, namespace string) *Click
 	// Improvise with use.Namespace
 
 	for _, _template := range config.ChiTemplates {
-		if (_template.Name == use.Name) && (_template.Namespace == namespace) {
+		if _template == nil {
+			// Skip
+		} else if _template.MatchFullName(namespace, use.Name) {
 			// Found template with searched name in specified namespace
 			return _template
 		}

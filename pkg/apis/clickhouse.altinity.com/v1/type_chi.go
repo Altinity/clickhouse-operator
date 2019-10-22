@@ -393,3 +393,10 @@ func (chi *ClickHouseInstallation) GetOwnServiceTemplate() (*ChiServiceTemplate,
 	template, ok := chi.GetServiceTemplate(name)
 	return template, ok
 }
+
+func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
+	if chi == nil {
+		return false
+	}
+	return (chi.Namespace == namespace) && (chi.Name == name)
+}
