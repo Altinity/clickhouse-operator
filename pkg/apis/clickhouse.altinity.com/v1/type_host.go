@@ -16,8 +16,8 @@ package v1
 
 import "github.com/altinity/clickhouse-operator/pkg/util"
 
-func (host *ChiHost) InheritTemplates(shard *ChiShard) {
-	(&host.Templates).MergeFrom(&shard.Templates)
+func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard) {
+	(&host.Templates).MergeFrom(&shard.Templates, MergeTypeFillEmptyValues)
 	(&host.Templates).HandleDeprecatedFields()
 }
 

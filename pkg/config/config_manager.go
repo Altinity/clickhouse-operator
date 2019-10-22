@@ -16,7 +16,6 @@ package config
 
 import (
 	"github.com/golang/glog"
-	"github.com/imdario/mergo"
 	"github.com/kubernetes-sigs/yaml"
 	"io/ioutil"
 	"os"
@@ -157,11 +156,7 @@ func (cm *Manager) buildUnifiedConfig() {
 
 	// Merge all the rest CR-based configs into base config
 	for _, chOperatorConfiguration := range cm.crConfigs {
-		if err := mergo.Merge(cm.config, *chOperatorConfiguration, mergo.WithOverride); err == nil {
-			glog.V(1).Infof("merge chop config %s/%s", chOperatorConfiguration.ConfigFolderPath, chOperatorConfiguration.ConfigFilePath)
-		} else {
-			glog.V(1).Infof("FAIL merge chop config %s/%s err: %v", chOperatorConfiguration.ConfigFolderPath, chOperatorConfiguration.ConfigFilePath, err)
-		}
+		cm.config.MergeFrom(chOperatorConfiguration, chiv1.MergeTypeOverride)
 	}
 }
 

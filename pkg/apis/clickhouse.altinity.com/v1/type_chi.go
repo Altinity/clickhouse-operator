@@ -273,30 +273,38 @@ func (chi *ClickHouseInstallation) WalkTillError(
 	return nil
 }
 
-func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation) {
+func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type MergeType) {
 	if from == nil {
 		return
 	}
 
 	// Copy ObjectMeta for now
 	chi.ObjectMeta = from.ObjectMeta
+
 	// Do actual merge for Spec
-	(&chi.Spec).MergeFrom(&from.Spec)
+	(&chi.Spec).MergeFrom(&from.Spec, _type)
+
 	// Copy Status for now
 	chi.Status = from.Status
 }
 
-func (spec *ChiSpec) MergeFrom(from *ChiSpec) {
+func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	if from == nil {
 		return
 	}
 
-	if spec.Stop == "" {
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if spec.Stop == "" {
+			spec.Stop = from.Stop
+		}
+	case MergeTypeOverride:
 		spec.Stop = from.Stop
 	}
-	(&spec.Defaults).MergeFrom(&from.Defaults)
-	(&spec.Configuration).MergeFrom(&from.Configuration)
-	(&spec.Templates).MergeFrom(&from.Templates)
+
+	(&spec.Defaults).MergeFrom(&from.Defaults, _type)
+	(&spec.Configuration).MergeFrom(&from.Configuration, _type)
+	(&spec.Templates).MergeFrom(&from.Templates, _type)
 }
 
 func (chi *ClickHouseInstallation) FindCluster(name string) *ChiCluster {

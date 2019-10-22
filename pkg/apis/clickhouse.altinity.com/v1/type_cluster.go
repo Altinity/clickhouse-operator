@@ -14,8 +14,8 @@
 
 package v1
 
-func (cluster *ChiCluster) InheritTemplates(chi *ClickHouseInstallation) {
-	(&cluster.Templates).MergeFrom(&chi.Spec.Defaults.Templates)
+func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
+	(&cluster.Templates).MergeFrom(&chi.Spec.Defaults.Templates, MergeTypeFillEmptyValues)
 	(&cluster.Templates).HandleDeprecatedFields()
 }
 
