@@ -298,13 +298,18 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		if spec.Stop == "" {
 			spec.Stop = from.Stop
 		}
-	case MergeTypeOverride:
-		spec.Stop = from.Stop
+	case MergeTypeOverrideByNonEmptyValues:
+		if from.Stop != "" {
+			// Override by non-empty values only
+			spec.Stop = from.Stop
+		}
 	}
 
 	(&spec.Defaults).MergeFrom(&from.Defaults, _type)
 	(&spec.Configuration).MergeFrom(&from.Configuration, _type)
 	(&spec.Templates).MergeFrom(&from.Templates, _type)
+	// TODO may be it would be wiser to make more intelligent merge
+	spec.UseTemplates = append(spec.UseTemplates, from.UseTemplates...)
 }
 
 func (chi *ClickHouseInstallation) FindCluster(name string) *ChiCluster {

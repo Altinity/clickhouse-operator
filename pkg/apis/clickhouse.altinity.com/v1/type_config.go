@@ -59,7 +59,7 @@ func (config *Config) MergeFrom(from *Config, _type MergeType) {
 		if err := mergo.Merge(config, *from); err != nil {
 			glog.V(1).Infof("FAIL merge config Error: %q", err)
 		}
-	case MergeTypeOverride:
+	case MergeTypeOverrideByNonEmptyValues:
 		if err := mergo.Merge(config, *from, mergo.WithOverride); err != nil {
 			glog.V(1).Infof("FAIL merge config Error: %q", err)
 		}

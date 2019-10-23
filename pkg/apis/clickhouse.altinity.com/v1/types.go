@@ -27,8 +27,8 @@ const (
 type MergeType string
 
 const (
-	MergeTypeFillEmptyValues = "fillempty"
-	MergeTypeOverride        = "override"
+	MergeTypeFillEmptyValues          = "fillempty"
+	MergeTypeOverrideByNonEmptyValues = "override"
 )
 
 // +genclient
@@ -62,11 +62,11 @@ type ClickHouseOperatorConfiguration struct {
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
-	Stop          string           `json:"stop,omitempty"      yaml:"stop"`
-	Defaults      ChiDefaults      `json:"defaults,omitempty"  yaml:"defaults"`
-	Configuration ChiConfiguration `json:"configuration"       yaml:"configuration"`
-	Templates     ChiTemplates     `json:"templates,omitempty" yaml:"templates"`
-	UseTemplates  []ChiUseTemplate `json:"useTemplates"        yaml:"useTemplates"`
+	Stop          string           `json:"stop,omitempty"         yaml:"stop"`
+	Defaults      ChiDefaults      `json:"defaults,omitempty"     yaml:"defaults"`
+	Configuration ChiConfiguration `json:"configuration"          yaml:"configuration"`
+	Templates     ChiTemplates     `json:"templates,omitempty"    yaml:"templates"`
+	UseTemplates  []ChiUseTemplate `json:"useTemplates,omitempty" yaml:"useTemplates"`
 }
 
 // ChiUseTemplates defines UseTemplates section of ClickHouseInstallation resource
@@ -144,15 +144,32 @@ func (templates *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type Merge
 		if templates.ReplicaServiceTemplate == "" {
 			templates.ReplicaServiceTemplate = from.ReplicaServiceTemplate
 		}
-	case MergeTypeOverride:
-		templates.PodTemplate = from.PodTemplate
-		templates.DataVolumeClaimTemplate = from.DataVolumeClaimTemplate
-		templates.LogVolumeClaimTemplate = from.LogVolumeClaimTemplate
-		templates.VolumeClaimTemplate = from.VolumeClaimTemplate
-		templates.ServiceTemplate = from.ServiceTemplate
-		templates.ClusterServiceTemplate = from.ClusterServiceTemplate
-		templates.ShardServiceTemplate = from.ShardServiceTemplate
-		templates.ReplicaServiceTemplate = from.ReplicaServiceTemplate
+	case MergeTypeOverrideByNonEmptyValues:
+		// Override by non-empty values only
+		if from.PodTemplate != "" {
+			templates.PodTemplate = from.PodTemplate
+		}
+		if from.DataVolumeClaimTemplate != "" {
+			templates.DataVolumeClaimTemplate = from.DataVolumeClaimTemplate
+		}
+		if from.LogVolumeClaimTemplate != "" {
+			templates.LogVolumeClaimTemplate = from.LogVolumeClaimTemplate
+		}
+		if from.VolumeClaimTemplate != "" {
+			templates.VolumeClaimTemplate = from.VolumeClaimTemplate
+		}
+		if from.ServiceTemplate != "" {
+			templates.ServiceTemplate = from.ServiceTemplate
+		}
+		if from.ClusterServiceTemplate != "" {
+			templates.ClusterServiceTemplate = from.ClusterServiceTemplate
+		}
+		if from.ShardServiceTemplate != "" {
+			templates.ShardServiceTemplate = from.ShardServiceTemplate
+		}
+		if from.ReplicaServiceTemplate != "" {
+			templates.ReplicaServiceTemplate = from.ReplicaServiceTemplate
+		}
 	}
 }
 

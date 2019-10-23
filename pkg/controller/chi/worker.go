@@ -183,7 +183,7 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 	_ = w.c.updateChiObject(new)
 
 	if err := w.reconcile(new); err != nil {
-		log := fmt.Sprintf("Update of resources has FAILED: %v", err)
+		log := fmt.Sprintf("FAILED update: %v", err)
 		glog.V(1).Info(log)
 		w.c.eventChi(new, eventTypeError, eventActionUpdate, eventReasonUpdateFailed, log)
 		return nil

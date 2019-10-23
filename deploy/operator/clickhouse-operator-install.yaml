@@ -96,6 +96,22 @@ spec:
                 - "on"
                 - "disabled"
                 - "enabled"
+            useTemplates:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  useType:
+                    type: string
+                    enum:
+                      # List useTypeXXX constants from model
+                      - "merge"
             defaults:
               type: object
               properties:
@@ -462,6 +478,22 @@ spec:
                 - "on"
                 - "disabled"
                 - "enabled"
+            useTemplates:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  useType:
+                    type: string
+                    enum:
+                      # List useTypeXXX constants from model
+                      - "merge"
             defaults:
               type: object
               properties:
