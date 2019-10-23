@@ -129,5 +129,6 @@ const (
 )
 
 const (
+	// .spec.useTemplate.useType
 	useTypeMerge = "merge"
 )

@@ -42,9 +42,10 @@ import (
 
 // Prometheus exporter defaults
 const (
-	defaultMetricsEndpoint             = ":8888"
-	metricsPath                        = "/metrics"
-	defaultInformerFactoryResyncPeriod = 10 * time.Second
+	defaultMetricsEndpoint                  = ":8888"
+	metricsPath                             = "/metrics"
+	defaultInformerFactoryResyncPeriod      = 60 * time.Second
+	defaultInformerFactoryResyncDebugPeriod = 600 * time.Second
 )
 
 // Default number of controller threads running concurrently (used in case no other specified in config)
@@ -56,6 +57,9 @@ const (
 var (
 	// versionRequest defines request for clickhouse-operator version report. Operator should exit after version printed
 	versionRequest bool
+
+	// debugRequest defines request for clickhouse-operator debug run
+	debugRequest bool
 
 	// chopConfigFile defines path to clickhouse-operator config file to be used
 	chopConfigFile string
@@ -81,6 +85,7 @@ var (
 
 func init() {
 	flag.BoolVar(&versionRequest, "version", false, "Display clickhouse-operator version and exit")
+	flag.BoolVar(&debugRequest, "debug", false, "Debug run")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
 	flag.StringVar(&kubeConfigFile, "kubeconfig", "", "Path to kubernetes config file. Only required if called outside of the cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Only required if called outside of the cluster and not being specified in kube config file.")
@@ -141,6 +146,11 @@ func Run() {
 	if versionRequest {
 		fmt.Printf("%s\n", version.Version)
 		os.Exit(0)
+	}
+
+	if debugRequest {
+		kubeInformerFactoryResyncPeriod = defaultInformerFactoryResyncDebugPeriod
+		chopInformerFactoryResyncPeriod = defaultInformerFactoryResyncDebugPeriod
 	}
 
 	glog.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)

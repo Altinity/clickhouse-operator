@@ -60,10 +60,23 @@ func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
 func (c *Controller) ReconcileService(service *core.Service) error {
 	// Check whether object with such name already exists in k8s
 	curService, err := c.getService(&service.ObjectMeta)
+	if err != nil {
+		glog.V(1).Infof("Service %s/%s lookup ended with error: %v", service.Namespace, service.Name, err)
+	}
 
-	if curService != nil {
+	if curService == nil {
+		glog.V(1).Infof("Creating service %s/%s", service.Namespace, service.Name)
+		// Object with such name not found - create it
+		if _, err := c.kubeClient.CoreV1().Services(service.Namespace).Create(service); err != nil {
+			glog.V(1).Infof("FAILED create service %s/%s: %v", service.Namespace, service.Name, err)
+			return err
+		}
+
+		// Object created
+		return nil
+	} else {
 		// Object with such name already exists, this is not an error
-		glog.V(1).Infof("Update Service %s/%s", service.Namespace, service.Name)
+		glog.V(1).Infof("Updating Service %s/%s", service.Namespace, service.Name)
 		// spec.resourceVersion is required in order to update Service
 		service.ResourceVersion = curService.ResourceVersion
 		// spec.clusterIP field is immutable, need to use already assigned value
@@ -72,24 +85,16 @@ func (c *Controller) ReconcileService(service *core.Service) error {
 		// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
 		service.Spec.ClusterIP = curService.Spec.ClusterIP
-		_, err := c.kubeClient.CoreV1().Services(service.Namespace).Update(service)
-		if err != nil {
+		if _, err := c.kubeClient.CoreV1().Services(service.Namespace).Update(service); err != nil {
+			glog.V(1).Infof("FAILED update service %s/%s: %v", service.Namespace, service.Name, err)
 			return err
 		}
+
+		// Object updated
 		return nil
 	}
 
-	// Object with such name does not exist or error happened
-
-	if apierrors.IsNotFound(err) {
-		// Object with such name not found - create it
-		_, err = c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
-	}
-	if err != nil {
-		return err
-	}
-
-	// Object created
+	// Should not be here
 	return nil
 }
 

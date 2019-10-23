@@ -16,7 +16,7 @@ if "${CUR_DIR}/go_build_operator.sh"; then
     mkdir -p "${LOG_DIR}"
     rm -f "${LOG_DIR}"/clickhouse-operator.*.log.*
     "${OPERATOR_BIN}" \
-    	-config="${SRC_ROOT}/config/config.yaml" \
+    	-config="${SRC_ROOT}/config/config-dev.yaml" \
     	-alsologtostderr=true \
     	-log_dir=log \
     	-v=1

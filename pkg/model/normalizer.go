@@ -51,22 +51,30 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withD
 		n.chi = n.config.ChiTemplate.DeepCopy()
 	}
 
-	// Normalize UseTemplates
-	n.normalizeUseTemplates(&n.chi.Spec.UseTemplates)
+	// At this moment n.chi is either empty or a system-wide template
+	// However, we need to apply all templates from useTemplates,
+	var useTemplates []chiv1.ChiUseTemplate
+	if len(chi.Spec.UseTemplates) > 0 {
+		useTemplates = make([]chiv1.ChiUseTemplate, len(chi.Spec.UseTemplates))
+		copy(useTemplates, chi.Spec.UseTemplates)
+
+		// Normalize UseTemplates
+		n.normalizeUseTemplates(&useTemplates)
+	}
 
 	// Apply CHOP-specified templates
 	// TODO
 
 	// Apply CHI-specified templates
-	for i := range n.chi.Spec.UseTemplates {
-		useTemplate := &n.chi.Spec.UseTemplates[i]
-		if template := n.config.FindTemplate(useTemplate, n.chi.Namespace); template != nil {
-			n.chi.MergeFrom(template, chiv1.MergeTypeOverride)
+	for i := range useTemplates {
+		useTemplate := &useTemplates[i]
+		if template := n.config.FindTemplate(useTemplate, chi.Namespace); template != nil {
+			(&n.chi.Spec).MergeFrom(&template.Spec, chiv1.MergeTypeOverrideByNonEmptyValues)
 		}
 	}
 
 	// And place provided CHI on top of the whole stack
-	n.chi.MergeFrom(chi, chiv1.MergeTypeOverride)
+	n.chi.MergeFrom(chi, chiv1.MergeTypeOverrideByNonEmptyValues)
 
 	return n.NormalizeChi(nil)
 }
