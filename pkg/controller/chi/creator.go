@@ -29,54 +29,33 @@ import (
 
 // reconcileConfigMap reconciles core.ConfigMap
 func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
+	glog.V(1).Infof("Reconcile ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 	// Check whether object with such name already exists in k8s
-	curConfigMap, err := c.getConfigMap(&configMap.ObjectMeta)
-
-	if curConfigMap != nil {
+	if curConfigMap, err := c.getConfigMap(&configMap.ObjectMeta, true); curConfigMap != nil {
 		// Object with such name already exists, this is not an error
 		glog.V(1).Infof("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		_, err := c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-
-	// Object with such name does not exist or error happened
-
-	if apierrors.IsNotFound(err) {
+		// Object updated
+		return err
+	} else if apierrors.IsNotFound(err) {
 		// Object with such name not found - create it
-		_, err = c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
-	}
-	if err != nil {
+		glog.V(1).Infof("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+		_, err := c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
+		return err
+	} else {
 		return err
 	}
 
-	// Object created
-	return nil
+	return fmt.Errorf("unexpected flow")
 }
 
 // reconcileService reconciles core.Service
 func (c *Controller) ReconcileService(service *core.Service) error {
+	glog.V(1).Infof("Reconcile Service %s/%s", service.Namespace, service.Name)
 	// Check whether object with such name already exists in k8s
-	curService, err := c.getService(&service.ObjectMeta)
-	if err != nil {
-		glog.V(1).Infof("Service %s/%s lookup ended with error: %v", service.Namespace, service.Name, err)
-	}
-
-	if curService == nil {
-		glog.V(1).Infof("Creating service %s/%s", service.Namespace, service.Name)
-		// Object with such name not found - create it
-		if _, err := c.kubeClient.CoreV1().Services(service.Namespace).Create(service); err != nil {
-			glog.V(1).Infof("FAILED create service %s/%s: %v", service.Namespace, service.Name, err)
-			return err
-		}
-
-		// Object created
-		return nil
-	} else {
+	if curService, err := c.getService(&service.ObjectMeta, true); curService != nil {
 		// Object with such name already exists, this is not an error
-		glog.V(1).Infof("Updating Service %s/%s", service.Namespace, service.Name)
+		glog.V(1).Infof("Update Service %s/%s", service.Namespace, service.Name)
 		// spec.resourceVersion is required in order to update Service
 		service.ResourceVersion = curService.ResourceVersion
 		// spec.clusterIP field is immutable, need to use already assigned value
@@ -85,40 +64,40 @@ func (c *Controller) ReconcileService(service *core.Service) error {
 		// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
 		service.Spec.ClusterIP = curService.Spec.ClusterIP
-		if _, err := c.kubeClient.CoreV1().Services(service.Namespace).Update(service); err != nil {
-			glog.V(1).Infof("FAILED update service %s/%s: %v", service.Namespace, service.Name, err)
-			return err
-		}
-
-		// Object updated
-		return nil
+		_, err := c.kubeClient.CoreV1().Services(service.Namespace).Update(service)
+		return err
+	} else if apierrors.IsNotFound(err) {
+		glog.V(1).Infof("Create service %s/%s", service.Namespace, service.Name)
+		// Object with such name not found - create it
+		_, err := c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
+		return err
+	} else {
+		return err
 	}
 
-	// Should not be here
-	return nil
+	return fmt.Errorf("unexpected flow")
 }
 
 // reconcileStatefulSet reconciles apps.StatefulSet
 func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	// Check whether object with such name already exists in k8s
-	curStatefulSet, err := c.getStatefulSet(&newStatefulSet.ObjectMeta)
-
-	if curStatefulSet != nil {
+	if curStatefulSet, err := c.getStatefulSet(&newStatefulSet.ObjectMeta, true); curStatefulSet != nil {
 		// StatefulSet already exists - update it
-		err = c.updateStatefulSet(curStatefulSet, newStatefulSet)
+		err := c.updateStatefulSet(curStatefulSet, newStatefulSet)
 		host.Chi.Status.UpdatedHostsCount++
 		_ = c.updateChiObjectStatus(host.Chi)
-	}
-
-	if apierrors.IsNotFound(err) {
+		return err
+	} else if apierrors.IsNotFound(err) {
 		// StatefulSet with such name not found - create StatefulSet
-		err = c.createStatefulSet(newStatefulSet, host)
+		err := c.createStatefulSet(newStatefulSet, host)
 		host.Chi.Status.AddedHostsCount++
 		_ = c.updateChiObjectStatus(host.Chi)
+		return err
+	} else {
+		return err
 	}
 
-	// Error has happened with .Get()
-	return err
+	return fmt.Errorf("unexpected flow")
 }
 
 func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
@@ -132,6 +111,8 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 		// Unable to reach target generation, StatefulSet create failed, time to rollback?
 		return c.onStatefulSetCreateFailed(statefulSet, host)
 	}
+
+	return fmt.Errorf("unexpected flow")
 }
 
 func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet) error {
@@ -166,6 +147,8 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 		// Unable to reach target generation, StatefulSet update failed, time to rollback?
 		return c.onStatefulSetUpdateFailed(oldStatefulSet)
 	}
+
+	return fmt.Errorf("unexpected flow")
 }
 
 // waitStatefulSetGeneration polls StatefulSet for reaching target generation
@@ -208,6 +191,8 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 		case <-time.After(time.Duration(c.chopConfigManager.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}
 	}
+
+	return fmt.Errorf("unexpected flow")
 }
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed
@@ -233,6 +218,8 @@ func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulS
 		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetCreateFailureAction=%s", c.chopConfigManager.Config().OnStatefulSetCreateFailureAction)
 		return nil
 	}
+
+	return fmt.Errorf("unexpected flow")
 }
 
 // onStatefulSetUpdateFailed handles situation when StatefulSet update failed
@@ -271,6 +258,8 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s", c.chopConfigManager.Config().OnStatefulSetUpdateFailureAction)
 		return nil
 	}
+
+	return fmt.Errorf("unexpected flow")
 }
 
 // shouldContinueOnCreateFailed return nil in case 'continue' or error in case 'do not continue'
