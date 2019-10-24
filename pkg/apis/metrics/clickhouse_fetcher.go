@@ -68,14 +68,7 @@ const (
         'metric.DiskFreeBytes'    AS metric,
         toString(filesystemFree()) AS value,
         'Free disk space available at file system' AS description,
-		'gauge'                   AS type
-	UNION ALL
-	SELECT
-        concat('metric.IsSessionExpired', '{', 'database=', database, ',table=', table, '}') AS metric,
-        toString(is_session_expired)                                                         AS value,
-        'Whether the Zookeeper session has expired'                                          AS description,
-        'gauge'                                                                              AS type
-    FROM system.replicas
+        'gauge'                   AS type
 	`
 
 	queryTableSizesSQL = `
@@ -92,7 +85,6 @@ const (
 	GROUP BY database, table`
 )
 
-// ClickHouseFetcher describes a fetcher for a particular ClickHouse host
 type ClickHouseFetcher struct {
 	Hostname string
 	Username string
@@ -100,7 +92,6 @@ type ClickHouseFetcher struct {
 	Port     int
 }
 
-// NewClickHouseFetcher creates a new fetcher to retrieve metrics from a particular ClickHouse host
 func NewClickHouseFetcher(hostname, username, password string, port int) *ClickHouseFetcher {
 	return &ClickHouseFetcher{
 		Hostname: hostname,
@@ -119,16 +110,16 @@ func (f *ClickHouseFetcher) newConn() *clickhouse.Conn {
 func (f *ClickHouseFetcher) clickHouseQueryMetrics() ([][]string, error) {
 	data := make([][]string, 0)
 	conn := f.newConn()
-	rows, err := conn.Query(heredoc.Doc(queryMetricsSQL))
-	if err != nil {
+	if rows, err := conn.Query(heredoc.Doc(queryMetricsSQL)); err != nil {
 		return nil, err
-	}
-	for rows.Next() {
-		var metric, value, description, _type string
-		if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
-			data = append(data, []string{metric, value, description, _type})
-		} else {
-			// Skip erroneous line
+	} else {
+		for rows.Next() {
+			var metric, value, description, _type string
+			if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
+				data = append(data, []string{metric, value, description, _type})
+			} else {
+				// Skip erroneous line
+			}
 		}
 	}
 	return data, nil
@@ -139,16 +130,16 @@ func (f *ClickHouseFetcher) clickHouseQueryMetrics() ([][]string, error) {
 func (f *ClickHouseFetcher) clickHouseQueryTableSizes() ([][]string, error) {
 	data := make([][]string, 0)
 	conn := f.newConn()
-	rows, err := conn.Query(heredoc.Doc(queryTableSizesSQL))
-	if err != nil {
+	if rows, err := conn.Query(heredoc.Doc(queryTableSizesSQL)); err != nil {
 		return nil, err
-	}
-	for rows.Next() {
-		var database, table, partitions, parts, bytes, uncompressed, _rows string
-		if err := rows.Scan(&database, &table, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
-			data = append(data, []string{database, table, partitions, parts, bytes, uncompressed, _rows})
-		} else {
-			// Skip erroneous line
+	} else {
+		for rows.Next() {
+			var database, table, partitions, parts, bytes, uncompressed, _rows string
+			if err := rows.Scan(&database, &table, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
+				data = append(data, []string{database, table, partitions, parts, bytes, uncompressed, _rows})
+			} else {
+				// Skip erroneous line
+			}
 		}
 	}
 	return data, nil

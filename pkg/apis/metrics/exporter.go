@@ -190,7 +190,7 @@ func (e *Exporter) newFetcher(hostname string) *ClickHouseFetcher {
 	return NewClickHouseFetcher(hostname, e.chAccessInfo.Username, e.chAccessInfo.Password, e.chAccessInfo.Port)
 }
 
-// UpdateWatch ensures hostnames of the Pods from CHI object included into chopmetrics.Exporter state
+// Ensure hostnames of the Pods from CHI object included into chopmetrics.Exporter state
 func (e *Exporter) UpdateWatch(namespace, chiName string, hostnames []string) {
 	chi := &WatchedChi{
 		Namespace: namespace,
