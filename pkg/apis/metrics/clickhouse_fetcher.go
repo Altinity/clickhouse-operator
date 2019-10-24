@@ -21,6 +21,13 @@ import (
 )
 
 const (
+	querySystemReplicasSQL = `
+	SELECT
+		database,
+		table,
+		toString(is_session_expired) AS is_session_expired
+	FROM system.replicas`
+
 	queryMetricsSQL = `
     SELECT
         concat('metric.', metric) AS metric,
@@ -110,16 +117,14 @@ func (f *ClickHouseFetcher) newConn() *clickhouse.Conn {
 func (f *ClickHouseFetcher) clickHouseQueryMetrics() ([][]string, error) {
 	data := make([][]string, 0)
 	conn := f.newConn()
-	if rows, err := conn.Query(heredoc.Doc(queryMetricsSQL)); err != nil {
+	rows, err := conn.Query(heredoc.Doc(queryMetricsSQL))
+	if err != nil {
 		return nil, err
-	} else {
-		for rows.Next() {
-			var metric, value, description, _type string
-			if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
-				data = append(data, []string{metric, value, description, _type})
-			} else {
-				// Skip erroneous line
-			}
+	}
+	for rows.Next() {
+		var metric, value, description, _type string
+		if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
+			data = append(data, []string{metric, value, description, _type})
 		}
 	}
 	return data, nil
@@ -130,16 +135,32 @@ func (f *ClickHouseFetcher) clickHouseQueryMetrics() ([][]string, error) {
 func (f *ClickHouseFetcher) clickHouseQueryTableSizes() ([][]string, error) {
 	data := make([][]string, 0)
 	conn := f.newConn()
-	if rows, err := conn.Query(heredoc.Doc(queryTableSizesSQL)); err != nil {
+	rows, err := conn.Query(heredoc.Doc(queryTableSizesSQL))
+	if err != nil {
 		return nil, err
-	} else {
-		for rows.Next() {
-			var database, table, partitions, parts, bytes, uncompressed, _rows string
-			if err := rows.Scan(&database, &table, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
-				data = append(data, []string{database, table, partitions, parts, bytes, uncompressed, _rows})
-			} else {
-				// Skip erroneous line
-			}
+	}
+	for rows.Next() {
+		var database, table, partitions, parts, bytes, uncompressed, _rows string
+		if err := rows.Scan(&database, &table, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
+			data = append(data, []string{database, table, partitions, parts, bytes, uncompressed, _rows})
+		}
+	}
+	return data, nil
+}
+
+// clickHouseQuerySystemReplicas requests replica information from the ClickHouse database using REST interface
+// data is a concealed output
+func (f *ClickHouseFetcher) clickHouseQuerySystemReplicas() ([][]string, error) {
+	data := make([][]string, 0)
+	conn := f.newConn()
+	rows, err := conn.Query(heredoc.Doc(querySystemReplicasSQL))
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var database, table, isSessionExpired string
+		if err := rows.Scan(&database, &table, &isSessionExpired); err == nil {
+			data = append(data, []string{database, table, isSessionExpired})
 		}
 	}
 	return data, nil
