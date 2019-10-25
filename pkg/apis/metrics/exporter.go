@@ -226,4 +226,15 @@ func (e *Exporter) collectFromHost(chi *WatchedChi, hostname string, c chan<- pr
 		e.enqueueToRemoveFromWatched(chi)
 		return
 	}
+
+	glog.Infof("Querying system replicas for %s\n", hostname)
+	if systemReplicas, err := fetcher.clickHouseQuerySystemReplicas(); err == nil {
+		glog.Infof("Extracted %d system replicas for %s\n", len(systemReplicas), hostname)
+		writer.WriteSystemReplicas(systemReplicas)
+	} else {
+		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
+		glog.Infof("Error querying system replicas for %s: %s\n", hostname, err)
+		e.enqueueToRemoveFromWatched(chi)
+		return
+	}
 }
