@@ -15,10 +15,11 @@
 package metrics
 
 import (
-	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 	"strconv"
 	"strings"
+
+	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -44,7 +45,7 @@ func NewPrometheusWriter(
 	}
 }
 
-// writeMetricsDataToPrometheus pushes set of prometheus.Metric objects created from the ClickHouse system data
+// WriteMetrics pushes set of prometheus.Metric objects created from the ClickHouse system data
 // Expected data structure: metric, value, description, type (gauge|counter)
 // TODO add namespace handling. It is just skipped for now
 func (w *PrometheusWriter) WriteMetrics(data [][]string) {
@@ -70,7 +71,7 @@ func (w *PrometheusWriter) WriteMetrics(data [][]string) {
 	}
 }
 
-// writeTableSizesDataToPrometheus pushes set of prometheus.Metric objects created from the ClickHouse system data
+// WriteTableSizes pushes set of prometheus.Metric objects created from the ClickHouse system data
 // Expected data structure: database, table, partitions, parts, bytes, uncompressed_bytes, rows
 // TODO add namespace handling. It is just skipped for now
 func (w *PrometheusWriter) WriteTableSizes(data [][]string) {
@@ -91,6 +92,14 @@ func (w *PrometheusWriter) WriteTableSizes(data [][]string) {
 			[]string{"chi", "hostname", "database", "table"},
 			w.chi.Name, w.hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(w.out, "table_parts_rows", "Number of rows in the table", metric[6], prometheus.GaugeValue,
+			[]string{"chi", "hostname", "database", "table"},
+			w.chi.Name, w.hostname, metric[0], metric[1])
+	}
+}
+
+func (w *PrometheusWriter) WriteSystemReplicas(data [][]string) {
+	for _, metric := range data {
+		writeSingleMetricToPrometheus(w.out, "system_replicas_is_session_expired", "Number of expired Zookeeper sessions of the table", metric[2], prometheus.GaugeValue,
 			[]string{"chi", "hostname", "database", "table"},
 			w.chi.Name, w.hostname, metric[0], metric[1])
 	}
