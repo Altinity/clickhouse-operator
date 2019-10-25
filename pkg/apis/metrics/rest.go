@@ -26,7 +26,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// startMetricsExporter start Prometheus metrics exporter in background
+// StartMetricsREST start Prometheus metrics exporter in background
 func StartMetricsREST(
 	username, password string, port int,
 	metricsAddress, metricsPath string,
