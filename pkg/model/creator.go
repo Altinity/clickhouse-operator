@@ -434,7 +434,7 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplate(
 
 	container := getContainerByName(statefulSet, containerName)
 	if container == nil {
-		glog.V(1).Info("Can not find container %s. Volume claim can not be mounted", containerName)
+		glog.V(1).Infof("Can not find container %s. Volume claim can not be mounted", containerName)
 		return nil
 	}
 
