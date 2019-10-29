@@ -433,9 +433,13 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplate(
 	}
 
 	container := getContainerByName(statefulSet, containerName)
+	if container == nil {
+		glog.V(1).Info("Can not find container %s. Volume claim can not be mounted", containerName)
+		return nil
+	}
 
 	// 1. Check whether this VolumeClaimTemplate is already listed in VolumeMount of this container
-	for _, i := range container.VolumeMounts {
+	for i := range container.VolumeMounts {
 		// Convenience wrapper
 		volumeMount := &container.VolumeMounts[i]
 		if volumeMount.Name == volumeClaimTemplateName {
@@ -454,7 +458,7 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplate(
 	// However, `mountPath` (say /var/lib/clickhouse) may be used already by a VolumeMount. Need to check this
 
 	// 2. Check whether `mountPath` (say /var/lib/clickhouse) is already mounted
-	for _, i := range container.VolumeMounts {
+	for i := range container.VolumeMounts {
 		// Convenience wrapper
 		volumeMount := &container.VolumeMounts[i]
 		if volumeMount.MountPath == mountPath {
