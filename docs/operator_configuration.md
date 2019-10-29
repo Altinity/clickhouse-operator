@@ -115,7 +115,7 @@ chPassword: clickhouse_operator_password
 chPort: 8123
 ```
 
-## ClickHouse settings
+## ClickHouse Installation settings
 
 Operator deploys ClickHouse clusters with different defaults, that can be configured in a flexible way. 
 
@@ -134,7 +134,32 @@ Defaults for ClickHouseInstallation can be provided by `ClickHouseInstallationTe
 * etc-clickhouse-operator-templatesd-files configmap
 * `ClickHouseInstallationTemplate` resources.
 
-`ClickHouseInstallationTemplate` has the same structure as `ClickHouseInstallation`, but all parts and fields are optional. 
-Default template is initialized in [clickhouse-operator-install.yaml](deploy/operator/clickhouse-operator-install.yaml) 
-and defines default persistent storage claim to be used with ClickHouse installation. 
-Another example can be also found [here](chi-examples/50-simple-template-01.yaml) 
+`ClickHouseInstallationTemplate` has the same structure as `ClickHouseInstallation`, but all parts and fields are optional. Templates are included into an installation with 'useTemplates' syntax. For example, one can define a template for ClickHouse pod:
+
+```apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: clickhouse-stable
+
+spec:
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.11.8.46
+```
+
+Template needs to be deployed to some namespace, and later on used in the installation:
+```
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+...
+spec:
+  useTemplates:
+    - name: clickhouse-stable
+...
+```
+
