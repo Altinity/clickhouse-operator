@@ -325,11 +325,11 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSetObject *apps.StatefulSe
 	if podTemplate, ok := host.GetPodTemplate(); ok {
 		// Replica references known PodTemplate
 		statefulSetCopyPodTemplate(statefulSetObject, podTemplate)
-		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - template used", statefulSetName)
+		glog.V(1).Infof("setupStatefulSetPodTemplate() for statefulSet %s - template used", statefulSetName)
 	} else {
 		// Replica references UNKNOWN PodTemplate
 		statefulSetCopyPodTemplate(statefulSetObject, newDefaultPodTemplate(statefulSetName))
-		glog.V(1).Infof("createStatefulSetObjects() for statefulSet %s - default template", statefulSetName)
+		glog.V(1).Infof("setupStatefulSetPodTemplate() for statefulSet %s - default template", statefulSetName)
 	}
 
 	// Pod created by this StatefulSet has to have alias
@@ -354,6 +354,7 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSetObject *apps.StatefulSe
 				"while true; do sleep 30; done;",
 			},
 		})
+		glog.V(1).Infof("setupStatefulSetPodTemplate() add log container for statefulSet %s", statefulSetName)
 	}
 }
 
@@ -387,7 +388,7 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 }
 
 // setupStatefulSetApplyVolumeMounts applies `volumeMounts` of a `container`
-func (c *Creator) setupStatefulSetApplyVolumeMounts(statefulSet *apps.StatefulSet) error {
+func (c *Creator) setupStatefulSetApplyVolumeMounts(statefulSet *apps.StatefulSet) {
 	// Deal with `volumeMounts` of a `container`, a.k.a.
 	// .spec.templates.podTemplates.*.spec.containers.volumeMounts.*
 	// VolumeClaimTemplates, that are referenced in Containers' VolumeMount object(s)
@@ -404,8 +405,17 @@ func (c *Creator) setupStatefulSetApplyVolumeMounts(statefulSet *apps.StatefulSe
 			}
 		}
 	}
+}
 
-	return nil
+// setupStatefulSetApplyVolumeClaimTemplates applies Data and Log VolumeClaimTemplates on all containers
+func (c *Creator) setupStatefulSetApplyVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	// Mount all named (data and log so far) VolumeClaimTemplates into all containers
+	for i := range statefulSet.Spec.Template.Spec.Containers {
+		// Convenience wrapper
+		container := &statefulSet.Spec.Template.Spec.Containers[i]
+		_ = c.setupStatefulSetApplyVolumeClaimTemplate(statefulSet, container.Name, host.Templates.DataVolumeClaimTemplate, dirPathClickHouseData)
+		_ = c.setupStatefulSetApplyVolumeClaimTemplate(statefulSet, container.Name, host.Templates.LogVolumeClaimTemplate, dirPathClickHouseLog)
+	}
 }
 
 // setupStatefulSetApplyVolumeClaimTemplate applies .templates.volumeClaimTemplates.* to a StatefulSet
@@ -415,20 +425,27 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplate(
 	volumeClaimTemplateName string,
 	mountPath string,
 ) error {
-	// Deal with Volume Template
+
+	// Sanity checks
 	if volumeClaimTemplateName == "" {
 		// No VolumeClaimTemplate specified
 		return nil
 	}
 
-	// Mount specified (by volumeClaimTemplateName) VolumeClaimTemplate into mountPath (say /var/lib/clickhouse)
+	if mountPath == "" {
+		// No mount path specified
+		return nil
+	}
+
+	// Mount specified (by volumeClaimTemplateName) VolumeClaimTemplate into mountPath (say into '/var/lib/clickhouse')
 	//
 	// A container wants to have this VolumeClaimTemplate mounted into `mountPath` in case:
 	// 1. This VolumeClaimTemplate is not already mounted in the container with any VolumeMount (to avoid double-mount of a VolumeClaimTemplate)
-	// 2. And specified `mountPath` (say /var/lib/clickhouse) is not already mounted with any VolumeMount (to avoid double-mount into `mountPath`)
+	// 2. And specified `mountPath` (say '/var/lib/clickhouse') is not already mounted with any VolumeMount (to avoid double-mount into `mountPath`)
 
 	if _, ok := c.chi.GetVolumeClaimTemplate(volumeClaimTemplateName); !ok {
 		// Incorrect/unknown .templates.VolumeClaimTemplate specified
+		glog.V(1).Infof("Can not find volumeClaimTemplate %s. Volume claim can not be mounted", volumeClaimTemplateName)
 		return nil
 	}
 
@@ -454,10 +471,10 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplate(
 	}
 
 	// This VolumeClaimTemplate is not used explicitly by name in a container
-	// So we want to mount it to `mountPath` (say /var/lib/clickhouse) even more now, because it is unused.
+	// So we want to mount it to `mountPath` (say '/var/lib/clickhouse') even more now, because it is unused.
 	// However, `mountPath` (say /var/lib/clickhouse) may be used already by a VolumeMount. Need to check this
 
-	// 2. Check whether `mountPath` (say /var/lib/clickhouse) is already mounted
+	// 2. Check whether `mountPath` (say '/var/lib/clickhouse') is already mounted
 	for i := range container.VolumeMounts {
 		// Convenience wrapper
 		volumeMount := &container.VolumeMounts[i]
@@ -473,7 +490,7 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplate(
 	}
 
 	// This VolumeClaimTemplate is not used explicitly by name and `mountPath` (say /var/lib/clickhouse) is not used also.
-	// Let's mount this VolumeClaimTemplate into `mountPath` (say /var/lib/clickhouse) of a container
+	// Let's mount this VolumeClaimTemplate into `mountPath` (say '/var/lib/clickhouse') of a container
 	if template, ok := c.chi.GetVolumeClaimTemplate(volumeClaimTemplateName); ok {
 		// Add VolumeClaimTemplate to StatefulSet
 		statefulSetAppendVolumeClaimTemplate(statefulSet, template)
@@ -496,12 +513,8 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplate(
 
 // setupStatefulSetVolumeClaimTemplates performs VolumeClaimTemplate setup for Containers in PodTemplate of a StatefulSet
 func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	_ = c.setupStatefulSetApplyVolumeMounts(statefulSet)
-
-	_ = c.setupStatefulSetApplyVolumeClaimTemplate(statefulSet, ClickHouseContainerName, host.Templates.DataVolumeClaimTemplate, dirPathClickHouseData)
-	_ = c.setupStatefulSetApplyVolumeClaimTemplate(statefulSet, ClickHouseContainerName, host.Templates.LogVolumeClaimTemplate, dirPathClickHouseLog)
-
-	_ = c.setupStatefulSetApplyVolumeClaimTemplate(statefulSet, ClickHouseLogContainerName, host.Templates.LogVolumeClaimTemplate, dirPathClickHouseLog)
+	c.setupStatefulSetApplyVolumeMounts(statefulSet)
+	c.setupStatefulSetApplyVolumeClaimTemplates(statefulSet, host)
 }
 
 // statefulSetCopyPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate

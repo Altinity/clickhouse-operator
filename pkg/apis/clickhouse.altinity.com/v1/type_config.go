@@ -114,7 +114,7 @@ func (config *Config) FindTemplate(use *ChiUseTemplate, namespace string) *Click
 		if _template == nil {
 			// Skip
 		} else if _template.MatchFullName(use.Namespace, use.Name) {
-			// Direct match
+			// Direct match, found result
 			return _template
 		}
 	}
@@ -122,7 +122,9 @@ func (config *Config) FindTemplate(use *ChiUseTemplate, namespace string) *Click
 	// Direct match is not possible.
 
 	if use.Namespace != "" {
-		// With fully-specified use template direct only match is applicable, and it is not possible
+		// With fully-specified use template direct (full name) only match is applicable, and it is not possible
+		// This is strange situation, however
+		glog.V(1).Infof("STRANGE FindTemplate(%s/%s) - unexpected position", use.Namespace, use.Name)
 		return nil
 	}
 
