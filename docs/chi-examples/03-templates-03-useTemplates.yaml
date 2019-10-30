@@ -4,9 +4,10 @@ metadata:
   name: "use-template"
 spec:
   useTemplates:
-    - name: "100-default-template"
-    - name: "101-default-volumeclaimtemplate"
-    - name: "102-default-pod-template"
+    - name: "100-default-templates"
+    - name: "101-default-data-volumeclaimtemplate"
+    - name: "102-default-log-volumeclaimtemplate"
+    - name: "103-default-pod-template"
   configuration:
     clusters:
       - name: "c1"

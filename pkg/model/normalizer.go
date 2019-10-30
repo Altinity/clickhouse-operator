@@ -17,6 +17,7 @@ package model
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -68,8 +69,11 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withD
 	// Apply CHI-specified templates
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
-		if template := n.config.FindTemplate(useTemplate, chi.Namespace); template != nil {
+		if template := n.config.FindTemplate(useTemplate, chi.Namespace); template == nil {
+			glog.V(1).Infof("UNABLE to find template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
+		} else {
 			(&n.chi.Spec).MergeFrom(&template.Spec, chiv1.MergeTypeOverrideByNonEmptyValues)
+			glog.V(1).Infof("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
 		}
 	}
 
