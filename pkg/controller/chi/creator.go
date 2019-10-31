@@ -168,10 +168,11 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 				// Start bothering with messages after some time only
 				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 			}
-		} else if apierrors.IsNotFound(err) {
-			// Object with such name not found - may be is still being created - wait for it
-			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT: object not yet created, need to wait", namespace, name)
-		} else {
+		 } else {
+		 	if apierrors.IsNotFound(err) {
+			   // Object with such name not found - may be is still being created - wait for it
+			   glog.V(1).Infof("waitStatefulSetGeneration(%s/%s): object not found, aborting", namespace, name)
+		    }
 			// Some kind of total error
 			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
 			return err
@@ -188,7 +189,7 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 		// Wait some more time
 		glog.V(2).Infof("waitStatefulSetGeneration(%s/%s):%s", namespace, name)
 		select {
-		case <-time.After(time.Duration(c.chopConfigManager.Config().StatefulSetUpdatePollPeriod) * time.Second):
+		    case <-time.After(time.Duration(c.chopConfigManager.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}
 	}
 
