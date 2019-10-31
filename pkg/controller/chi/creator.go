@@ -174,8 +174,9 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 			}
 		} else if apierrors.IsNotFound(err) {
+			// Object is not found - it either failed to be created or just still not created
 			if time.Since(start) >= (time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second) {
-				// Some kind of total error
+				// No more wait for object to be created. Consider create as failed.
 				glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED - StatefulSet still not found, abort", namespace, name)
 				return err
 			} else {
@@ -199,7 +200,7 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 		// Wait some more time
 		glog.V(2).Infof("waitStatefulSetGeneration(%s/%s):%s", namespace, name)
 		select {
-		case <-time.After(time.Duration(c.chopConfigManager.Config().StatefulSetUpdatePollPeriod) * time.Second):
+		    case <-time.After(time.Duration(c.chopConfigManager.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}
 	}
 
