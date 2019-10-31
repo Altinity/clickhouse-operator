@@ -27,6 +27,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
+const (
+	waitStatefulSetGenerationTimeoutBeforeStartBothering = 60
+	waitStatefulSetGenerationTimeoutToCreateStatefulSet  = 30
+)
+
 // reconcileConfigMap reconciles core.ConfigMap
 func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
 	glog.V(1).Infof("Reconcile ConfigMap %s/%s", configMap.Namespace, configMap.Name)
@@ -164,17 +169,19 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 				// All is good, job done, exit
 				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-OK  :%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 				return nil
-			} else if time.Since(start) >= (60 * time.Second) {
+			} else if time.Since(start) >= (time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second) {
 				// Generation not yet reached
 				// Start bothering with messages after some time only
 				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 			}
 		} else if apierrors.IsNotFound(err) {
-			// Object with such name not found - may be is still being created - wait for it, but not for long
-			if time.Since(start) >= (30 * time.Second) {
-				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s): object not found, aborting", namespace, name)
+			// Object is not found - it either failed to be created or just still not created
+			if time.Since(start) >= (time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second) {
+				// No more wait for object to be created. Consider create as failed.
+				glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED - StatefulSet still not found, abort", namespace, name)
 				return err
 			}
+			// Object with such name not found - may be is still being created - wait for it
 			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT: object not yet created, need to wait", namespace, name)
 		} else {
 			// Some kind of total error
@@ -193,7 +200,7 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 		// Wait some more time
 		glog.V(2).Infof("waitStatefulSetGeneration(%s/%s):%s", namespace, name)
 		select {
-		    case <-time.After(time.Duration(c.chopConfigManager.Config().StatefulSetUpdatePollPeriod) * time.Second):
+		case <-time.After(time.Duration(c.chopConfigManager.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}
 	}
 

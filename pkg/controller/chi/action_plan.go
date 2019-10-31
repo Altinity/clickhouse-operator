@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"gopkg.in/d4l3k/messagediff.v1"
 )
@@ -114,6 +115,52 @@ func (ap *ActionPlan) HasActionsToDo() bool {
 	// We should not be here, actually, because this means that there are some changes (diff is not empty),
 	// but we were unable to find out what exactly changed
 	return false
+}
+
+func (ap *ActionPlan) String() string {
+	if !ap.HasActionsToDo() {
+		return ""
+	}
+
+	str := ""
+
+	if len(ap.diff.Added) > 0 {
+		// Something added
+		str += fmt.Sprintf("added items: %d\n", len(ap.diff.Added))
+		str += fmt.Sprintf("---\n")
+		for pathPtr := range ap.diff.Added {
+			for _, pathNode := range *pathPtr {
+				str += fmt.Sprintf("%s\n", pathNode.String())
+			}
+			str += fmt.Sprintf("---\n")
+		}
+	}
+
+	if len(ap.diff.Removed) > 0 {
+		// Something removed
+		str += fmt.Sprintf("removed items: %d\n", len(ap.diff.Removed))
+		str += fmt.Sprintf("---\n")
+		for pathPtr := range ap.diff.Added {
+			for _, pathNode := range *pathPtr {
+				str += fmt.Sprintf("%s\n", pathNode.String())
+			}
+			str += fmt.Sprintf("---\n")
+		}
+	}
+
+	if len(ap.diff.Modified) > 0 {
+		// Something modified
+		str += fmt.Sprintf("modified items: %d\n", len(ap.diff.Modified))
+		str += fmt.Sprintf("---\n")
+		for pathPtr := range ap.diff.Modified {
+			for _, pathNode := range *pathPtr {
+				str += fmt.Sprintf("%s\n", pathNode.String())
+			}
+			str += fmt.Sprintf("---\n")
+		}
+	}
+
+	return str
 }
 
 // GetNewHostsNum - total number of hosts to be achieved
