@@ -29,7 +29,7 @@ import (
 
 const(
 	waitStatefulSetGenerationTimeoutBeforeStartBothering = 60
-	waitStatefulSetGenerationTimeoutToCreateStatefulSet = 5
+	waitStatefulSetGenerationTimeoutToCreateStatefulSet = 15
 )
 
 // reconcileConfigMap reconciles core.ConfigMap
