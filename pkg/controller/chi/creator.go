@@ -101,6 +101,7 @@ func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host
 }
 
 func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+	glog.V(1).Infof("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
 		// Error call Create()
 		return err
@@ -168,11 +169,14 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 				// Start bothering with messages after some time only
 				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 			}
-		 } else {
-		 	if apierrors.IsNotFound(err) {
-			   // Object with such name not found - may be is still being created - wait for it
-			   glog.V(1).Infof("waitStatefulSetGeneration(%s/%s): object not found, aborting", namespace, name)
-		    }
+		} else if apierrors.IsNotFound(err) {
+			// Object with such name not found - may be is still being created - wait for it, but not for long
+			if time.Since(start) >= (30 * time.Second) {
+				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s): object not found, aborting", namespace, name)
+				return err
+			}
+			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT: object not yet created, need to wait", namespace, name)
+		} else {
 			// Some kind of total error
 			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
 			return err
