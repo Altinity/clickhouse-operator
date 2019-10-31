@@ -130,24 +130,14 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 	if old == nil {
 		old, _ = w.normalizer.CreateTemplatedChi(&chop.ClickHouseInstallation{}, false)
-	} else if !old.IsNormalized() {
+	} else {
 		old, _ = w.normalizer.CreateTemplatedChi(old, true)
-		//			if err != nil {
-		//				glog.V(1).Infof("ClickHouseInstallation (%s): unable to normalize: %q", chi.Name, err)
-		//				c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "unable to normalize configuration")
-		//				return err
-		//			}
 	}
 
 	if new == nil {
 		new, _ = w.normalizer.CreateTemplatedChi(&chop.ClickHouseInstallation{}, false)
-	} else if !new.IsNormalized() {
+	} else {
 		new, _ = w.normalizer.CreateTemplatedChi(new, true)
-		//			if err != nil {
-		//				glog.V(1).Infof("ClickHouseInstallation (%s): unable to normalize: %q", chi.Name, err)
-		//				c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "unable to normalize configuration")
-		//				return err
-		//			}
 	}
 
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
@@ -159,7 +149,16 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 		return nil
 	}
-
+	/*
+		cur, _ := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(new.Name, meta.GetOptions{})
+		if cur != nil {
+			glog.V(1).Infof("updateChi(%s/%s): generations arrived %d cur %d", new.Namespace, new.Name, new.ObjectMeta.Generation, cur.ObjectMeta.Generation)
+			if cur.ObjectMeta.Generation > new.ObjectMeta.Generation {
+				glog.V(1).Infof("updateChi(%s/%s): generation already ahead. Arrived %d cur %d. No change required", new.Namespace, new.Name, new.ObjectMeta.Generation, cur.ObjectMeta.Generation)
+				return nil
+			}
+		}
+	*/
 	glog.V(2).Infof("updateChi(%s/%s)", new.Namespace, new.Name)
 
 	actionPlan := NewActionPlan(old, new)
@@ -170,7 +169,8 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
-	glog.V(1).Infof("updateChi(%s/%s) - start reconcile", new.Namespace, new.Name)
+	glog.V(1).Infof("updateChi(%s/%s) - start reconcile >>>", new.Namespace, new.Name)
+	glog.V(1).Infof("updateChi(%s/%s) - action plan:\n%s", new.Namespace, new.Name, actionPlan.String())
 
 	// We are going to update CHI
 	// Write declared CHI with initialized .Status, so it would be possible to monitor progress
@@ -234,6 +234,8 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 	//c.metricsExporter.UpdateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 	w.c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
+
+	glog.V(1).Infof("updateChi(%s/%s) - complete reconcile <<<", new.Namespace, new.Name)
 
 	return nil
 }

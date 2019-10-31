@@ -31,19 +31,6 @@ func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 	chi.Status.Endpoint = endpoint
 }
 
-func (chi *ClickHouseInstallation) IsNormalized() bool {
-	filled := true
-	clusters := 0
-	chi.WalkClusters(func(cluster *ChiCluster) error {
-		clusters++
-		if cluster.Chi == nil {
-			filled = false
-		}
-		return nil
-	})
-	return (clusters > 0) && filled
-}
-
 func (chi *ClickHouseInstallation) FillAddressInfo() int {
 	hostsCount := 0
 

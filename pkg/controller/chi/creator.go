@@ -27,9 +27,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
-const(
+const (
 	waitStatefulSetGenerationTimeoutBeforeStartBothering = 60
-	waitStatefulSetGenerationTimeoutToCreateStatefulSet = 15
+	waitStatefulSetGenerationTimeoutToCreateStatefulSet  = 15
 )
 
 // reconcileConfigMap reconciles core.ConfigMap
@@ -200,7 +200,7 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 		// Wait some more time
 		glog.V(2).Infof("waitStatefulSetGeneration(%s/%s):%s", namespace, name)
 		select {
-		    case <-time.After(time.Duration(c.chopConfigManager.Config().StatefulSetUpdatePollPeriod) * time.Second):
+		case <-time.After(time.Duration(c.chopConfigManager.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}
 	}
 
