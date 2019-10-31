@@ -29,7 +29,7 @@ import (
 
 const (
 	waitStatefulSetGenerationTimeoutBeforeStartBothering = 60
-	waitStatefulSetGenerationTimeoutToCreateStatefulSet  = 15
+	waitStatefulSetGenerationTimeoutToCreateStatefulSet  = 30
 )
 
 // reconcileConfigMap reconciles core.ConfigMap
@@ -106,6 +106,7 @@ func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host
 }
 
 func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+	glog.V(1).Infof("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
 		// Error call Create()
 		return err
@@ -179,10 +180,9 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 				// No more wait for object to be created. Consider create as failed.
 				glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED - StatefulSet still not found, abort", namespace, name)
 				return err
-			} else {
-				// Object with such name not found - may be is still being created - wait for it
-				glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT: object not yet created, need to wait", namespace, name)
 			}
+			// Object with such name not found - may be is still being created - wait for it
+			glog.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT: object not yet created, need to wait", namespace, name)
 		} else {
 			// Some kind of total error
 			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
