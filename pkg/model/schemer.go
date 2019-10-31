@@ -62,10 +62,7 @@ func (s *Schemer) getObjectListFromClickHouse(serviceUrl string, sql string) ([]
 	conn := s.newConn(serviceUrl)
 	var rows *sqlmodule.Rows = nil
 	var err error
-	err = util.Retry(defaultMaxTries, sql, func() error {
-		rows, err = conn.Query(sql)
-		return err
-	})
+	rows, err = conn.Query(sql)
 	if err != nil {
 		return nil, nil, err
 	}
