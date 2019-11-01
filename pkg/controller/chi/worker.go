@@ -230,7 +230,7 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 	// Update CHI object
 	new.Status.Status = chop.StatusCompleted
-	_ = w.c.updateChiObjectStatus(new)
+	_ = w.c.updateChiObjectStatus(new, false)
 
 	//c.metricsExporter.UpdateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 	w.c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))

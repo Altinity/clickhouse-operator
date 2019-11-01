@@ -90,13 +90,13 @@ func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host
 		// StatefulSet already exists - update it
 		err := c.updateStatefulSet(curStatefulSet, newStatefulSet)
 		host.Chi.Status.UpdatedHostsCount++
-		_ = c.updateChiObjectStatus(host.Chi)
+		_ = c.updateChiObjectStatus(host.Chi, false)
 		return err
 	} else if apierrors.IsNotFound(err) {
 		// StatefulSet with such name not found - create StatefulSet
 		err := c.createStatefulSet(newStatefulSet, host)
 		host.Chi.Status.AddedHostsCount++
-		_ = c.updateChiObjectStatus(host.Chi)
+		_ = c.updateChiObjectStatus(host.Chi, false)
 		return err
 	} else {
 		return err
