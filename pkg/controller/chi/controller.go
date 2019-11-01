@@ -493,17 +493,25 @@ func (c *Controller) updateChiObject(chi *chop.ClickHouseInstallation) error {
 }
 
 // updateChiObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) updateChiObjectStatus(chi *chop.ClickHouseInstallation) error {
+func (c *Controller) updateChiObjectStatus(chi *chop.ClickHouseInstallation, tolerateAbsence bool) error {
 	glog.V(1).Infof("Update CHI status (%s/%s)", chi.Namespace, chi.Name)
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(chi.Name, meta.GetOptions{})
 	if err != nil {
+		if tolerateAbsence {
+			return nil
+		}
 		glog.V(1).Infof("ERROR GetCHI (%s/%s): %q", chi.Namespace, chi.Name, err)
 		return err
-	} else if cur == nil {
+	}
+	if cur == nil {
+		if tolerateAbsence {
+			return nil
+		}
 		glog.V(1).Infof("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
+		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
-	// Update status
+	// Update status of a real object
 	cur.Status = chi.Status
 	return c.updateChiObject(cur)
 }
