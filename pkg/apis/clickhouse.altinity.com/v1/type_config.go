@@ -102,7 +102,7 @@ func (config *Config) unlistChiTemplate(template *ClickHouseInstallation) {
 	// Nullify found template entry
 	for _, _template := range config.ChiTemplates {
 		if (_template.Name == template.Name) && (_template.Namespace == template.Namespace) {
-			glog.V(1).Infof("unlistChiTemplate(%s/%s) - found", template.Namespace, template.Name)
+			glog.V(1).Infof("unlistChiTemplate(%s/%s) - found, unlisting", template.Namespace, template.Name)
 			// TODO normalize
 			//config.ChiTemplates[i] = nil
 			_template.Name = ""
