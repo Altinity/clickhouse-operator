@@ -11,8 +11,14 @@ METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:late
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 MANIFEST_ROOT="$(realpath ${CUR_DIR}/..)"
 
-# Build installation .yaml manifest - run generator with params
+# Build prod installation .yaml manifest - run generator with params
 OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
 METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
 "${MANIFEST_ROOT}/dev/cat-clickhouse-operator-install-yaml.sh" > "${CUR_DIR}/clickhouse-operator-install.yaml"
+
+# Build dev installation .yaml manifest - run generator with params
+OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
+OPERATOR_NAMESPACE="dev" \
+"${MANIFEST_ROOT}/dev/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/dev/clickhouse-operator-install-dev.yaml"
