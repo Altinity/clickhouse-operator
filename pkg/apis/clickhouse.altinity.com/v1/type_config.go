@@ -97,11 +97,16 @@ func (config *Config) unlistChiTemplate(template *ClickHouseInstallation) {
 	if config.ChiTemplates == nil {
 		return
 	}
+
+	glog.V(1).Infof("unlistChiTemplate(%s/%s)", template.Namespace, template.Name)
 	// Nullify found template entry
-	for i, _template := range config.ChiTemplates {
+	for _, _template := range config.ChiTemplates {
 		if (_template.Name == template.Name) && (_template.Namespace == template.Namespace) {
-			glog.V(1).Infof("unlistChiTemplate(%s/%s)", template.Namespace, template.Name)
-			config.ChiTemplates[i] = nil
+			glog.V(1).Infof("unlistChiTemplate(%s/%s) - found", template.Namespace, template.Name)
+			// TODO normalize
+			//config.ChiTemplates[i] = nil
+			_template.Name = ""
+			_template.Namespace = ""
 		}
 	}
 	// Compact the slice
