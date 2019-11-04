@@ -209,7 +209,7 @@ func (f *ClickHouseFetcher) clickHouseQuerySystemReplicas() ([][]string, error) 
 func (f *ClickHouseFetcher) clickHouseQueryScanRows(sql string, scan func(rows *sqlmodule.Rows, data *[][]string) error) ([][]string, error) {
 	data := make([][]string, 0)
 	conn := f.newConn()
-	if rows, err := conn.Query(heredoc.Doc(querySystemReplicasSQL)); err != nil {
+	if rows, err := conn.Query(heredoc.Doc(sql)); err != nil {
 		return nil, err
 	} else {
 		for rows.Next() {
