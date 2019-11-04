@@ -1,6 +1,6 @@
 # Possible Template Parameters:
 #
-# kube-system
+# dev
 # altinity/clickhouse-operator:latest
 #
 # Setup CustomResourceDefinition(s)
@@ -849,7 +849,7 @@ spec:
 ---
 # Possible Template Parameters:
 #
-# kube-system
+# dev
 # altinity/clickhouse-operator:latest
 #
 # Setup ServiceAccount
@@ -858,7 +858,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: clickhouse-operator
-  namespace: kube-system
+  namespace: dev
 ---
 # Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
 # ClusterRoleBinding is namespace-less and must have unique name
@@ -873,7 +873,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: clickhouse-operator
-    namespace: kube-system
+    namespace: dev
 ---
 # Setup ClusterIP Service to provide monitoring metrics for Prometheus
 # Service would be created in kubectl-specified namespace
@@ -884,7 +884,7 @@ kind: Service
 apiVersion: v1
 metadata:
   name: clickhouse-operator-metrics
-  namespace: kube-system
+  namespace: dev
   labels:
     app: clickhouse-operator
 spec:
@@ -896,7 +896,7 @@ spec:
 ---
 # Possible Template Parameters:
 #
-# kube-system
+# dev
 # altinity/clickhouse-operator:latest
 # etc-clickhouse-operator-files
 #
@@ -904,7 +904,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-files
-  namespace: kube-system
+  namespace: dev
 data:
   config.yaml: |
     ################################################
@@ -1001,7 +1001,7 @@ data:
 ---
 # Possible Template Parameters:
 #
-# kube-system
+# dev
 # altinity/clickhouse-operator:latest
 # etc-clickhouse-operator-confd-files
 #
@@ -1009,12 +1009,12 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-confd-files
-  namespace: kube-system
+  namespace: dev
 data:
 ---
 # Possible Template Parameters:
 #
-# kube-system
+# dev
 # altinity/clickhouse-operator:latest
 # etc-clickhouse-operator-configd-files
 #
@@ -1022,7 +1022,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-configd-files
-  namespace: kube-system
+  namespace: dev
 data:
   01-clickhouse-listen.xml: |
     <yandex>
@@ -1049,7 +1049,7 @@ data:
 ---
 # Possible Template Parameters:
 #
-# kube-system
+# dev
 # altinity/clickhouse-operator:latest
 # etc-clickhouse-operator-templatesd-files
 #
@@ -1057,7 +1057,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-templatesd-files
-  namespace: kube-system
+  namespace: dev
 data:
   001-templates.json.example: |
     {
@@ -1146,7 +1146,7 @@ data:
 ---
 # Possible Template Parameters:
 #
-# kube-system
+# dev
 # altinity/clickhouse-operator:latest
 # etc-clickhouse-operator-usersd-files
 #
@@ -1154,7 +1154,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-usersd-files
-  namespace: kube-system
+  namespace: dev
 data:
   01-clickhouse-user.xml: |
     <yandex>
@@ -1175,7 +1175,7 @@ data:
 ---
 # Possible Template Parameters:
 #
-# kube-system
+# dev
 # altinity/clickhouse-operator:latest
 # altinity/metrics-exporter:latest
 #
@@ -1185,7 +1185,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: clickhouse-operator
-  namespace: kube-system
+  namespace: dev
   labels:
     app: clickhouse-operator
 spec:

@@ -128,6 +128,12 @@ func (w *worker) addChi(new *chop.ClickHouseInstallation) error {
 // updateChi sync CHI which was already created earlier
 func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
+	if (old != nil) && (new != nil) && (old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion) {
+		glog.V(2).Infof("updateChi(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
+		// No need to react
+		return nil
+	}
+
 	if old == nil {
 		old, _ = w.normalizer.CreateTemplatedChi(&chop.ClickHouseInstallation{}, false)
 	} else {
@@ -140,15 +146,6 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 		new, _ = w.normalizer.CreateTemplatedChi(new, true)
 	}
 
-	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		glog.V(2).Infof("updateChi(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
-		// No need to react
-
-		// Update hostnames list for monitor
-		w.c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
-
-		return nil
-	}
 	/*
 		cur, _ := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(new.Name, meta.GetOptions{})
 		if cur != nil {

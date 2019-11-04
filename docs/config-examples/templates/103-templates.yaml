@@ -5,8 +5,7 @@ metadata:
 spec:
   templates:
     podTemplates:
-      - name: default-oneperhost-pod-template
-        distribution: "OnePerHost"
+      - name: default-pod-template
         spec:
           containers:
             - name: clickhouse-pod

@@ -327,7 +327,6 @@ spec:
                     type: object
                     required:
                       - name
-                      - spec
                     properies:
                       name:
                         type: string
@@ -709,7 +708,6 @@ spec:
                     type: object
                     required:
                       - name
-                      - spec
                     properies:
                       name:
                         type: string

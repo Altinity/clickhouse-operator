@@ -7,4 +7,4 @@ spec:
     templates:
       dataVolumeClaimTemplate: default-data-volumeclaim-template
       logVolumeClaimTemplate: default-log-volumeclaim-template
-      podTemplate: default-oneperhost-pod-template
+      podTemplate: default-pod-template
