@@ -5,11 +5,13 @@
  * Sidecar clickhouse-logs container to view logs
  * Significantly cleaned up templates model and 'useTemplates' extension
  * new system_replicas_is_session_expired monitoring metric ([#187][a187] by @teralype)
- * Added 10 second timeout for queries to ClickHouse ([#159][a159] by @kcking)
 
 ### Bug fixes:
  * Fixed bug with installation name being truncated to 15 chars. The current limit is 60 chars. Cluster name is limited to 15.
  * General stability improvements and fixes for corner cases
+
+**Upgrade notes:**
+There were changes in ClickHouseInstallation CRD, so it is recommended to remove and re-install the operator. Existing ClickHouse clusters will be picked up automatically.
 
 ## Release 0.6.0
 
@@ -20,7 +22,7 @@
 
 ### Improvements:
  * Split operator into two binaries/containers - operator and monitor
- * Added 10s timeout to ClickHouse connection
+ * Added 10 second timeout for queries to ClickHouse ([#159][a159] by @kcking)
  * Improved create/update logic
  * Operator now looks at its own namespace if not specified explicitly
  * Enhance multi-thread support for concurrent operations
