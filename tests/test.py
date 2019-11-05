@@ -96,7 +96,13 @@ def test7():
                       "apply_templates": {"configs/tpl-clickhouse-stable.yaml", "configs/tpl-one-per-host.yaml"},
                       "pod_image": "yandex/clickhouse-server:19.11.8.46",
                       "pod_podAntiAffinity": 1})
-        
+@TestScenario
+@Name("Compatibility test if old syntax with volumeClaimTemplate is still supported")
+def test8():
+    create_and_check("configs/test-004-tpl.yaml", 
+                     {"object_counts": [1,1,2],
+                      "pod_volumes": {"/var/lib/clickhouse"}})
+            
 if main():
     with Module("regression"):
         with Given("clickhouse-operator in installed"):
@@ -106,8 +112,8 @@ if main():
                 with And(f"Create namespace {namespace}"):
                     kube_createns(namespace)
 
-        all_tests = [test1, test2, test3, test4, test5, test6, test7]
-        # all_tests = [test7]
+        all_tests = [test1, test2, test3, test4, test5, test6, test7, test8]
+        # all_tests = [test8]
         
         for t in all_tests:
             run(test=t)
