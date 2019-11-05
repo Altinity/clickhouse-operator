@@ -1,14 +1,15 @@
 ## Release 0.7.0
 
 ### New features:
- * Separated 'podVolumeClaimTemplate' and 'logVolumeClaimTemplate' to retain ClickHouse logs. 
+ * Added 'podVolumeClaimTemplate' and 'logVolumeClaimTemplate' in order to map data and logs separately. Old syntax is deprecated but supported.
  * Sidecar clickhouse-logs container to view logs
  * Significantly cleaned up templates model and 'useTemplates' extension
- * new system_replicas_is_session_expired monitoring metric (#187 by @teralype)
+ * new system_replicas_is_session_expired monitoring metric ([#187][a187] by @teralype)
+ * Added 10 second timeout for queries to ClickHouse ([#159][a159] by @kcking)
 
 ### Bug fixes:
  * Fixed bug with installation name being truncated to 15 chars. The current limit is 60 chars. Cluster name is limited to 15.
- * General stability improvements in corner cases
+ * General stability improvements and fixes for corner cases
 
 ## Release 0.6.0
 
@@ -24,3 +25,5 @@
  * Operator now looks at its own namespace if not specified explicitly
  * Enhance multi-thread support for concurrent operations
 
+[a187]: https://github.com/Altinity/clickhouse-operator/pull/187
+[a159]: https://github.com/Altinity/clickhouse-operator/pull/159
