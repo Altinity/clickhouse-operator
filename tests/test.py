@@ -122,11 +122,12 @@ def test_006():
     with Then("Use different podTemplate and confirm that pod image is updated"):  
         create_and_check("configs/test-006-ch-upgrade-2.yaml", 
                          {"object_counts": [2,2,3],
-                          "pod_image": "yandex/clickhouse-server:latest"})
+                          "pod_image": "yandex/clickhouse-server:latest",
+                          "do_not_delete": 1})
         with Then("Change image in podTemplate itself and confirm that pod image is updated"):
             create_and_check("configs/test-006-ch-upgrade-3.yaml", 
                              {"object_counts": [2,2,3],
-                              "pod_image": "clickhouse-server:19.11.8.46"})
+                              "pod_image": "yandex/clickhouse-server:19.11.8.46"})
                     
 if main():
     with Module("regression"):
