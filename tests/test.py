@@ -49,39 +49,39 @@ def create_and_check(test_file, checks):
         kube_delete(config, namespace)
         kube_wait_objects(chi_name, namespace, [0,0,0])
 
-@TestScenario
-@Name("1 node")
-def test1():
-    create_and_check("configs/test-001.yaml", {"object_counts": [1,1,2]})
 
 @TestScenario
 @Name("Empty installation, creates 1 node")
-def test2():
+def test_examples01_1():
     create_and_check("../docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml", {"object_counts": [1,1,2]})
 
 @TestScenario
 @Name("1 shard 2 replicas")
-def test3():
+def test_examples01_2():
     create_and_check("../docs/chi-examples/01-simple-layout-02-1shard-2repl.yaml", {"object_counts": [2,2,3]})
 
 @TestScenario
 @Name("Persistent volume mapping via defaults")
-def test4():
+def test_examples02_1():
     create_and_check("../docs/chi-examples/02-persistent-volume-01-default-volume.yaml", 
                      {"object_counts": [1,1,2],
                       "pod_volumes": {"/var/lib/clickhouse", "/var/log/clickhouse-server"}})
 
 @TestScenario
 @Name("Persistent volume mapping via podTemplate")
-def test5():
+def test_examples02_2():
     create_and_check("../docs/chi-examples/02-persistent-volume-02-pod-template.yaml", 
                      {"object_counts": [1,1,2],
                       "pod_image": "yandex/clickhouse-server:19.3.7",
                       "pod_volumes": {"/var/lib/clickhouse", "/var/log/clickhouse-server"}})
-
+@TestScenario
+@Name("1 node")
+def test_001():
+    create_and_check("configs/test-001.yaml", {"object_counts": [1,1,2]})
+    
 @TestScenario
 @Name("useTemplates for pod and volume templates")
-def test6():
+def test_002():
     create_and_check("configs/test-002-tpl.yaml", 
                      {"object_counts": [1,1,2],
                       "apply_templates": {"configs/tpl-clickhouse-stable.yaml", "configs/tpl-log-volume.yaml"},
@@ -90,19 +90,44 @@ def test6():
 
 @TestScenario
 @Name("useTemplates for pod and distribution templates")
-def test7():
+def test_003():
     create_and_check("configs/test-003-tpl.yaml", 
                      {"object_counts": [1,1,2],
                       "apply_templates": {"configs/tpl-clickhouse-stable.yaml", "configs/tpl-one-per-host.yaml"},
                       "pod_image": "yandex/clickhouse-server:19.11.8.46",
                       "pod_podAntiAffinity": 1})
+
 @TestScenario
 @Name("Compatibility test if old syntax with volumeClaimTemplate is still supported")
-def test8():
+def test_004():
     create_and_check("configs/test-004-tpl.yaml", 
                      {"object_counts": [1,1,2],
                       "pod_volumes": {"/var/lib/clickhouse"}})
-            
+
+@TestScenario
+@Name("Test manifest created by ACM")
+def test_005():
+    create_and_check("configs/test-005-acm.yaml", 
+                     {"object_counts": [1,1,2],
+                      "pod_image": "yandex/clickhouse-server:19.11.8.46",
+                      "pod_volumes": {"/var/lib/clickhouse"}})
+
+@TestScenario
+@Name("Test clickhouse version upgrade from one version to another using podTemplate change")
+def test_006():
+    create_and_check("configs/test-006-ch-upgrade-1.yaml", 
+                     {"object_counts": [2,2,3],
+                      "pod_image": "yandex/clickhouse-server:19.11.8.46",
+                      "do_not_delete": 1})
+    with Then("Use different podTemplate and confirm that pod image is updated"):  
+        create_and_check("configs/test-006-ch-upgrade-2.yaml", 
+                         {"object_counts": [2,2,3],
+                          "pod_image": "yandex/clickhouse-server:latest"})
+        with Then("Change image in podTemplate itself and confirm that pod image is updated"):
+            create_and_check("configs/test-006-ch-upgrade-3.yaml", 
+                             {"object_counts": [2,2,3],
+                              "pod_image": "clickhouse-server:19.11.8.46"})
+                    
 if main():
     with Module("regression"):
         with Given("clickhouse-operator in installed"):
@@ -112,8 +137,11 @@ if main():
                 with And(f"Create namespace {namespace}"):
                     kube_createns(namespace)
 
-        all_tests = [test1, test2, test3, test4, test5, test6, test7, test8]
-        # all_tests = [test8]
+        tests = [test_001, test_002, test_003, test_004, test_005, test_006]
+        examples=[test_examples01_1, test_examples01_2, test_examples02_1, test_examples02_2]
+        
+        all_tests = examples + tests
+        all_tests = [test_006]
         
         for t in all_tests:
             run(test=t)

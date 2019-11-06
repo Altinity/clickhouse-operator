@@ -1,0 +1,55 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: acmtest
+spec:
+  templates:
+    podTemplates:
+    - name: clickhouse-v19.11.8.46
+      spec:
+        containers:
+        - name: clickhouse-pod
+          image: yandex/clickhouse-server:19.11.8.46
+          ports:
+          - name: http
+            containerPort: 8123
+          - name: client
+            containerPort: 9000
+          - name: interserver
+            containerPort: 9009
+          resources:
+            requests:
+              memory: 300Mi
+            limits:
+              memory: 300Mi
+    volumeClaimTemplates:
+    - name: default-volumeclaim-template
+      reclaimPolicy: Delete
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+  defaults:
+    templates:
+      podTemplate: pod-template-resource-limit
+      volumeClaimTemplate: default-volumeclaim-template
+  configuration:
+    profiles:
+      readonly/readonly: "1"
+    users:
+      readonly/profile: readonly
+      readonly/quota: default
+      admin/profile: default
+      admin/quota: default
+      admin/networks/ip:
+      - 0.0.0.0/0
+      - ::/0
+    clusters:
+    - name: acmtest
+      layout:
+        shardsCount: 1
+        replicasCount: 1
+      templates:
+        podTemplate: clickhouse-v19.11.8.46
