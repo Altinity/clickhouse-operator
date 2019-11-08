@@ -31,19 +31,6 @@ func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 	chi.Status.Endpoint = endpoint
 }
 
-func (chi *ClickHouseInstallation) IsNormalized() bool {
-	filled := true
-	clusters := 0
-	chi.WalkClusters(func(cluster *ChiCluster) error {
-		clusters++
-		if cluster.Chi == nil {
-			filled = false
-		}
-		return nil
-	})
-	return (clusters > 0) && filled
-}
-
 func (chi *ClickHouseInstallation) FillAddressInfo() int {
 	hostsCount := 0
 
@@ -273,30 +260,43 @@ func (chi *ClickHouseInstallation) WalkTillError(
 	return nil
 }
 
-func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation) {
+func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type MergeType) {
 	if from == nil {
 		return
 	}
 
 	// Copy ObjectMeta for now
 	chi.ObjectMeta = from.ObjectMeta
+
 	// Do actual merge for Spec
-	(&chi.Spec).MergeFrom(&from.Spec)
+	(&chi.Spec).MergeFrom(&from.Spec, _type)
+
 	// Copy Status for now
 	chi.Status = from.Status
 }
 
-func (spec *ChiSpec) MergeFrom(from *ChiSpec) {
+func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	if from == nil {
 		return
 	}
 
-	if spec.Stop == "" {
-		spec.Stop = from.Stop
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if spec.Stop == "" {
+			spec.Stop = from.Stop
+		}
+	case MergeTypeOverrideByNonEmptyValues:
+		if from.Stop != "" {
+			// Override by non-empty values only
+			spec.Stop = from.Stop
+		}
 	}
-	(&spec.Defaults).MergeFrom(&from.Defaults)
-	(&spec.Configuration).MergeFrom(&from.Configuration)
-	(&spec.Templates).MergeFrom(&from.Templates)
+
+	(&spec.Defaults).MergeFrom(&from.Defaults, _type)
+	(&spec.Configuration).MergeFrom(&from.Configuration, _type)
+	(&spec.Templates).MergeFrom(&from.Templates, _type)
+	// TODO may be it would be wiser to make more intelligent merge
+	spec.UseTemplates = append(spec.UseTemplates, from.UseTemplates...)
 }
 
 func (chi *ClickHouseInstallation) FindCluster(name string) *ChiCluster {
@@ -384,4 +384,11 @@ func (chi *ClickHouseInstallation) GetOwnServiceTemplate() (*ChiServiceTemplate,
 	name := chi.Spec.Defaults.Templates.ServiceTemplate
 	template, ok := chi.GetServiceTemplate(name)
 	return template, ok
+}
+
+func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
+	if chi == nil {
+		return false
+	}
+	return (chi.Namespace == namespace) && (chi.Name == name)
 }

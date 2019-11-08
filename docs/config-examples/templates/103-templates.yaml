@@ -1,23 +1,14 @@
 apiVersion: "clickhouse.altinity.com/v1"
-kind: "ClickHouseInstallation"
+kind: "ClickHouseInstallationTemplate"
 metadata:
-  name: "02-default-volumeclaimtemplate"
+  name: "103-default-pod-template"
 spec:
   templates:
-    volumeClaimTemplates:
-      - name: chi-default-volume-claim-template
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 2Gi
     podTemplates:
-      - name: chi-default-oneperhost-pod-template
-        distribution: "OnePerHost"
+      - name: default-pod-template
         spec:
           containers:
-            - name: clickhouse
+            - name: clickhouse-pod
               image: yandex/clickhouse-server:19.3.7
               ports:
                 - name: http

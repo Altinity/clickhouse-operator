@@ -128,49 +128,46 @@ func (w *worker) addChi(new *chop.ClickHouseInstallation) error {
 // updateChi sync CHI which was already created earlier
 func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
+	if (old != nil) && (new != nil) && (old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion) {
+		glog.V(2).Infof("updateChi(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
+		// No need to react
+		return nil
+	}
+
 	if old == nil {
 		old, _ = w.normalizer.CreateTemplatedChi(&chop.ClickHouseInstallation{}, false)
-	} else if !old.IsNormalized() {
+	} else {
 		old, _ = w.normalizer.CreateTemplatedChi(old, true)
-		//			if err != nil {
-		//				glog.V(1).Infof("ClickHouseInstallation (%s): unable to normalize: %q", chi.Name, err)
-		//				c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "unable to normalize configuration")
-		//				return err
-		//			}
 	}
 
 	if new == nil {
 		new, _ = w.normalizer.CreateTemplatedChi(&chop.ClickHouseInstallation{}, false)
-	} else if !new.IsNormalized() {
+	} else {
 		new, _ = w.normalizer.CreateTemplatedChi(new, true)
-		//			if err != nil {
-		//				glog.V(1).Infof("ClickHouseInstallation (%s): unable to normalize: %q", chi.Name, err)
-		//				c.eventChi(chi, eventTypeError, eventActionCreate, eventReasonCreateFailed, "unable to normalize configuration")
-		//				return err
-		//			}
 	}
 
-	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		glog.V(2).Infof("updateChi(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
-		// No need to react
-
-		// Update hostnames list for monitor
-		w.c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
-
-		return nil
-	}
-
+	/*
+		cur, _ := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(new.Name, meta.GetOptions{})
+		if cur != nil {
+			glog.V(1).Infof("updateChi(%s/%s): generations arrived %d cur %d", new.Namespace, new.Name, new.ObjectMeta.Generation, cur.ObjectMeta.Generation)
+			if cur.ObjectMeta.Generation > new.ObjectMeta.Generation {
+				glog.V(1).Infof("updateChi(%s/%s): generation already ahead. Arrived %d cur %d. No change required", new.Namespace, new.Name, new.ObjectMeta.Generation, cur.ObjectMeta.Generation)
+				return nil
+			}
+		}
+	*/
 	glog.V(2).Infof("updateChi(%s/%s)", new.Namespace, new.Name)
 
 	actionPlan := NewActionPlan(old, new)
 
-	if actionPlan.IsNoChanges() {
+	if !actionPlan.HasActionsToDo() {
+		// Nothing to do - no changes found - no need to react
 		glog.V(2).Infof("updateChi(%s/%s): no changes found", new.Namespace, new.Name)
-		// No need to react
 		return nil
 	}
 
-	glog.V(1).Infof("updateChi(%s/%s) - start reconcile", new.Namespace, new.Name)
+	glog.V(1).Infof("updateChi(%s/%s) - start reconcile >>>", new.Namespace, new.Name)
+	glog.V(1).Infof("updateChi(%s/%s) - action plan:\n%s", new.Namespace, new.Name, actionPlan.String())
 
 	// We are going to update CHI
 	// Write declared CHI with initialized .Status, so it would be possible to monitor progress
@@ -183,7 +180,7 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 	_ = w.c.updateChiObject(new)
 
 	if err := w.reconcile(new); err != nil {
-		log := fmt.Sprintf("Update of resources has FAILED: %v", err)
+		log := fmt.Sprintf("FAILED update: %v", err)
 		glog.V(1).Info(log)
 		w.c.eventChi(new, eventTypeError, eventActionUpdate, eventReasonUpdateFailed, log)
 		return nil
@@ -230,10 +227,12 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 	// Update CHI object
 	new.Status.Status = chop.StatusCompleted
-	_ = w.c.updateChiObjectStatus(new)
+	_ = w.c.updateChiObjectStatus(new, false)
 
 	//c.metricsExporter.UpdateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 	w.c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
+
+	glog.V(1).Infof("updateChi(%s/%s) - complete reconcile <<<", new.Namespace, new.Name)
 
 	return nil
 }
@@ -440,7 +439,7 @@ func (w *worker) createChiFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.Cli
 		return nil, err
 	}
 
-	chi, err = w.normalizer.DoChi(chi)
+	chi, err = w.normalizer.NormalizeChi(chi)
 	if err != nil {
 		return nil, err
 	}

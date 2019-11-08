@@ -14,9 +14,12 @@
 
 package v1
 
-import "github.com/imdario/mergo"
+import (
+	"github.com/golang/glog"
+	"github.com/imdario/mergo"
+)
 
-func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
+func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) {
 	if from == nil {
 		return
 	}
@@ -40,7 +43,9 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 					sameNameFound = true
 					// Override `to` template with `from` template
 					//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
-					mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride)
+					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
+						glog.V(1).Infof("ERROR merge template(%s): %v", toTemplate.Name, err)
+					}
 					break
 				}
 			}
@@ -72,7 +77,9 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 					sameNameFound = true
 					// Override `to` template with `from` template
 					//templates.VolumeClaimTemplates[toIndex] = *fromTemplate.DeepCopy()
-					mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride)
+					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
+						glog.V(1).Infof("ERROR merge template(%s): %v", toTemplate.Name, err)
+					}
 					break
 				}
 			}
@@ -104,7 +111,9 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates) {
 					sameNameFound = true
 					// Override `to` template with `from` template
 					//templates.ServiceTemplates[toIndex] = *fromTemplate.DeepCopy()
-					mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride)
+					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
+						glog.V(1).Infof("ERROR merge template(%s): %v", toTemplate.Name, err)
+					}
 					break
 				}
 			}

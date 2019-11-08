@@ -13,13 +13,6 @@ spec:
         layout:
           shardsCount: 1
           replicasCount: 1
-      - name: "replicas"
-        layout:
-          shardsCount: 1
-          replicasCount: 2
-      - name: "shards"
-        layout:
-          shardsCount: 2
   templates:
     volumeClaimTemplates:
       - name: data-volume-template
@@ -28,11 +21,11 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 3Gi
+              storage: 1Gi
       - name: log-volume-template
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 1Gi
+              storage: 100Mi

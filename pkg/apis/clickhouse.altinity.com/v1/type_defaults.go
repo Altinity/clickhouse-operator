@@ -14,14 +14,24 @@
 
 package v1
 
-func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults) {
+func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults, _type MergeType) {
 	if from == nil {
 		return
 	}
 
-	if from.ReplicasUseFQDN == "" {
-		defaults.ReplicasUseFQDN = from.ReplicasUseFQDN
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if from.ReplicasUseFQDN == "" {
+			defaults.ReplicasUseFQDN = from.ReplicasUseFQDN
+		}
+	case MergeTypeOverrideByNonEmptyValues:
+		if from.ReplicasUseFQDN != "" {
+			// Override by non-empty values only
+			defaults.ReplicasUseFQDN = from.ReplicasUseFQDN
+		}
 	}
-	(&defaults.DistributedDDL).MergeFrom(&from.DistributedDDL)
-	(&defaults.Templates).MergeFrom(&from.Templates)
+
+	(&defaults.DistributedDDL).MergeFrom(&from.DistributedDDL, _type)
+	(&defaults.Templates).MergeFrom(&from.Templates, _type)
+
 }

@@ -48,8 +48,9 @@ func (c *Controller) deleteHost(host *chop.ChiHost) error {
 	_ = c.configMapDelete(host)
 	_ = c.deleteServiceHost(host)
 
+	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
 	host.Chi.Status.DeletedHostsCount++
-	_ = c.updateChiObjectStatus(host.Chi)
+	_ = c.updateChiObjectStatus(host.Chi, true)
 
 	glog.V(1).Infof("End delete host %s/%s", host.Address.ClusterName, host.Name)
 

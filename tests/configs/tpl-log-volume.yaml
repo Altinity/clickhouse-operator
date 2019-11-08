@@ -1,14 +1,17 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallationTemplate"
 metadata:
-  name: "102-default-log-volumeclaimtemplate"
+  name: "clickhouse-log-volume-mount"
 spec:
+  defaults:
+    templates:
+      logVolumeClaimTemplate: logs10m
   templates:
     volumeClaimTemplates:
-      - name: default-log-volumeclaim-template
+      - name: logs10m
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 2Gi
+              storage: 10Mi

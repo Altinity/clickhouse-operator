@@ -14,7 +14,7 @@
 
 package v1
 
-func (zoo *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig) {
+func (zoo *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeType) {
 	if from == nil {
 		return
 	}

@@ -127,3 +127,8 @@ const (
 	// zkDefaultRootTemplate specifies default ZK root - /clickhouse/{namespace}/{chi name}
 	zkDefaultRootTemplate = "/clickhouse/%s/%s"
 )
+
+const (
+	// .spec.useTemplate.useType
+	useTypeMerge = "merge"
+)

@@ -1,0 +1,9 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+metadata:
+  name: "104-default-pod-template"
+spec:
+  templates:
+    podTemplates:
+      - name: default-pod-template
+        distribution: "OnePerHost"

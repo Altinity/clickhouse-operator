@@ -24,6 +24,13 @@ const (
 	StatusCompleted  = "Completed"
 )
 
+type MergeType string
+
+const (
+	MergeTypeFillEmptyValues          = "fillempty"
+	MergeTypeOverrideByNonEmptyValues = "override"
+)
+
 // +genclient
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -55,10 +62,18 @@ type ClickHouseOperatorConfiguration struct {
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
-	Stop          string           `json:"stop,omitempty"      yaml:"stop"`
-	Defaults      ChiDefaults      `json:"defaults,omitempty"  yaml:"defaults"`
-	Configuration ChiConfiguration `json:"configuration"       yaml:"configuration"`
-	Templates     ChiTemplates     `json:"templates,omitempty" yaml:"templates"`
+	Stop          string           `json:"stop,omitempty"         yaml:"stop"`
+	Defaults      ChiDefaults      `json:"defaults,omitempty"     yaml:"defaults"`
+	Configuration ChiConfiguration `json:"configuration"          yaml:"configuration"`
+	Templates     ChiTemplates     `json:"templates,omitempty"    yaml:"templates"`
+	UseTemplates  []ChiUseTemplate `json:"useTemplates,omitempty" yaml:"useTemplates"`
+}
+
+// ChiUseTemplates defines UseTemplates section of ClickHouseInstallation resource
+type ChiUseTemplate struct {
+	Name      string `json:"name"      yaml:"name"`
+	Namespace string `json:"namespace" yaml:"namespace"`
+	UseType   string `json:"useType"   yaml:"useType"`
 }
 
 // ChiStatus defines status section of ClickHouseInstallation resource
@@ -102,30 +117,59 @@ func (templates *ChiTemplateNames) HandleDeprecatedFields() {
 	}
 }
 
-func (templates *ChiTemplateNames) MergeFrom(from *ChiTemplateNames) {
-	if templates.PodTemplate == "" {
-		templates.PodTemplate = from.PodTemplate
-	}
-	if templates.DataVolumeClaimTemplate == "" {
-		templates.DataVolumeClaimTemplate = from.DataVolumeClaimTemplate
-	}
-	if templates.LogVolumeClaimTemplate == "" {
-		templates.LogVolumeClaimTemplate = from.LogVolumeClaimTemplate
-	}
-	if templates.VolumeClaimTemplate == "" {
-		templates.VolumeClaimTemplate = from.VolumeClaimTemplate
-	}
-	if templates.ServiceTemplate == "" {
-		templates.ServiceTemplate = from.ServiceTemplate
-	}
-	if templates.ClusterServiceTemplate == "" {
-		templates.ClusterServiceTemplate = from.ClusterServiceTemplate
-	}
-	if templates.ShardServiceTemplate == "" {
-		templates.ShardServiceTemplate = from.ShardServiceTemplate
-	}
-	if templates.ReplicaServiceTemplate == "" {
-		templates.ReplicaServiceTemplate = from.ReplicaServiceTemplate
+func (templates *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type MergeType) {
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if templates.PodTemplate == "" {
+			templates.PodTemplate = from.PodTemplate
+		}
+		if templates.DataVolumeClaimTemplate == "" {
+			templates.DataVolumeClaimTemplate = from.DataVolumeClaimTemplate
+		}
+		if templates.LogVolumeClaimTemplate == "" {
+			templates.LogVolumeClaimTemplate = from.LogVolumeClaimTemplate
+		}
+		if templates.VolumeClaimTemplate == "" {
+			templates.VolumeClaimTemplate = from.VolumeClaimTemplate
+		}
+		if templates.ServiceTemplate == "" {
+			templates.ServiceTemplate = from.ServiceTemplate
+		}
+		if templates.ClusterServiceTemplate == "" {
+			templates.ClusterServiceTemplate = from.ClusterServiceTemplate
+		}
+		if templates.ShardServiceTemplate == "" {
+			templates.ShardServiceTemplate = from.ShardServiceTemplate
+		}
+		if templates.ReplicaServiceTemplate == "" {
+			templates.ReplicaServiceTemplate = from.ReplicaServiceTemplate
+		}
+	case MergeTypeOverrideByNonEmptyValues:
+		// Override by non-empty values only
+		if from.PodTemplate != "" {
+			templates.PodTemplate = from.PodTemplate
+		}
+		if from.DataVolumeClaimTemplate != "" {
+			templates.DataVolumeClaimTemplate = from.DataVolumeClaimTemplate
+		}
+		if from.LogVolumeClaimTemplate != "" {
+			templates.LogVolumeClaimTemplate = from.LogVolumeClaimTemplate
+		}
+		if from.VolumeClaimTemplate != "" {
+			templates.VolumeClaimTemplate = from.VolumeClaimTemplate
+		}
+		if from.ServiceTemplate != "" {
+			templates.ServiceTemplate = from.ServiceTemplate
+		}
+		if from.ClusterServiceTemplate != "" {
+			templates.ClusterServiceTemplate = from.ClusterServiceTemplate
+		}
+		if from.ShardServiceTemplate != "" {
+			templates.ShardServiceTemplate = from.ShardServiceTemplate
+		}
+		if from.ReplicaServiceTemplate != "" {
+			templates.ReplicaServiceTemplate = from.ReplicaServiceTemplate
+		}
 	}
 }
 
@@ -373,7 +417,7 @@ type Config struct {
 	// Chi template files fetched from this path. Maps "file name->file content"
 	ChiTemplateFiles map[string]string
 	// Chi template objects unmarshalled from ChiTemplateFiles. Maps "metadata.name->object"
-	ChiTemplates map[string]*ClickHouseInstallation
+	ChiTemplates []*ClickHouseInstallation
 	// ClickHouseInstallation template
 	ChiTemplate *ClickHouseInstallation
 

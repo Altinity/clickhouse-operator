@@ -14,12 +14,20 @@
 
 package v1
 
-func (d *ChiDistributedDDL) MergeFrom(from *ChiDistributedDDL) {
+func (d *ChiDistributedDDL) MergeFrom(from *ChiDistributedDDL, _type MergeType) {
 	if from == nil {
 		return
 	}
 
-	if d.Profile == "" {
-		d.Profile = from.Profile
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if d.Profile == "" {
+			d.Profile = from.Profile
+		}
+	case MergeTypeOverrideByNonEmptyValues:
+		if from.Profile != "" {
+			// Override by non-empty values only
+			d.Profile = from.Profile
+		}
 	}
 }

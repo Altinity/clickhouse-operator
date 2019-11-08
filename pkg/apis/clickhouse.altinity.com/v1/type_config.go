@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/golang/glog"
+	"github.com/imdario/mergo"
 	"github.com/kubernetes-sigs/yaml"
 	"os"
 	"path/filepath"
@@ -51,6 +52,20 @@ const (
 	defaultChPort     = 8123
 )
 
+// MergeFrom merges
+func (config *Config) MergeFrom(from *Config, _type MergeType) {
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if err := mergo.Merge(config, *from); err != nil {
+			glog.V(1).Infof("FAIL merge config Error: %q", err)
+		}
+	case MergeTypeOverrideByNonEmptyValues:
+		if err := mergo.Merge(config, *from, mergo.WithOverride); err != nil {
+			glog.V(1).Infof("FAIL merge config Error: %q", err)
+		}
+	}
+}
+
 // readChiTemplates build Config.ChiTemplate from template files content
 func (config *Config) readChiTemplates() {
 	// Read CHI template files
@@ -70,59 +85,108 @@ func (config *Config) readChiTemplates() {
 
 // enlistChiTemplate inserts template into templates catalog
 func (config *Config) enlistChiTemplate(template *ClickHouseInstallation) {
-	// Insert template
 	if config.ChiTemplates == nil {
-		config.ChiTemplates = make(map[string]*ClickHouseInstallation)
+		config.ChiTemplates = make([]*ClickHouseInstallation, 0)
 	}
-	// map template name -> template itself
-	config.ChiTemplates[template.Name] = template
+	config.ChiTemplates = append(config.ChiTemplates, template)
 	glog.V(1).Infof("enlistChiTemplate(%s/%s)", template.Namespace, template.Name)
 }
 
 // unlistChiTemplate removes template from templates catalog
 func (config *Config) unlistChiTemplate(template *ClickHouseInstallation) {
-	// Insert template
 	if config.ChiTemplates == nil {
 		return
 	}
-	if _, ok := config.ChiTemplates[template.Name]; ok {
-		glog.V(1).Infof("unlistChiTemplate(%s/%s)", template.Namespace, template.Name)
-		delete(config.ChiTemplates, template.Name)
+
+	glog.V(1).Infof("unlistChiTemplate(%s/%s)", template.Namespace, template.Name)
+	// Nullify found template entry
+	for _, _template := range config.ChiTemplates {
+		if (_template.Name == template.Name) && (_template.Namespace == template.Namespace) {
+			glog.V(1).Infof("unlistChiTemplate(%s/%s) - found, unlisting", template.Namespace, template.Name)
+			// TODO normalize
+			//config.ChiTemplates[i] = nil
+			_template.Name = ""
+			_template.Namespace = ""
+		}
 	}
+	// Compact the slice
+	// TODO compact the slice
+}
+
+func (config *Config) FindTemplate(use *ChiUseTemplate, namespace string) *ClickHouseInstallation {
+	// Try to find direct match
+	for _, _template := range config.ChiTemplates {
+		if _template == nil {
+			// Skip
+		} else if _template.MatchFullName(use.Namespace, use.Name) {
+			// Direct match, found result
+			return _template
+		}
+	}
+
+	// Direct match is not possible.
+
+	if use.Namespace != "" {
+		// With fully-specified use template direct (full name) only match is applicable, and it is not possible
+		// This is strange situation, however
+		glog.V(1).Infof("STRANGE FindTemplate(%s/%s) - unexpected position", use.Namespace, use.Name)
+		return nil
+	}
+
+	// Improvise with use.Namespace
+
+	for _, _template := range config.ChiTemplates {
+		if _template == nil {
+			// Skip
+		} else if _template.MatchFullName(namespace, use.Name) {
+			// Found template with searched name in specified namespace
+			return _template
+		}
+	}
+
+	return nil
 }
 
 // buildUnifiedChiTemplate builds combined CHI Template from templates catalog
 func (config *Config) buildUnifiedChiTemplate() {
-	// Build unified template in case there are templates to build from only
-	if len(config.ChiTemplates) == 0 {
-		return
-	}
 
-	// Sort CHI templates by their names and in order to apply orderly
-	// Extract file names into slice and sort it
-	// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
-	var sortedTemplateNames []string
-	for name := range config.ChiTemplates {
-		sortedTemplateNames = append(sortedTemplateNames, name)
-	}
-	sort.Strings(sortedTemplateNames)
+	return
+	/*
+		// Build unified template in case there are templates to build from only
+		if len(config.ChiTemplates) == 0 {
+			return
+		}
 
-	// Create final combined template
-	config.ChiTemplate = new(ClickHouseInstallation)
+		// Sort CHI templates by their names and in order to apply orderly
+		// Extract file names into slice and sort it
+		// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
+		var sortedTemplateNames []string
+		for name := range config.ChiTemplates {
+			// Convenience wrapper
+			template := config.ChiTemplates[name]
+			sortedTemplateNames = append(sortedTemplateNames, template.Name)
+		}
+		sort.Strings(sortedTemplateNames)
 
-	// Extract templates in sorted order - according to sorted template names
-	for _, templateName := range sortedTemplateNames {
-		// Merge into accumulated target template from current template
-		config.ChiTemplate.MergeFrom(config.ChiTemplates[templateName])
-	}
+		// Create final combined template
+		config.ChiTemplate = new(ClickHouseInstallation)
 
-	// Log final CHI template obtained
-	// Marshaling is done just to print nice yaml
-	if bytes, err := yaml.Marshal(config.ChiTemplate); err == nil {
-		glog.V(1).Infof("Unified ChiTemplate:\n%s\n", string(bytes))
-	} else {
-		glog.V(1).Infof("FAIL unable to Marshal Unified ChiTemplate")
-	}
+		// Extract templates in sorted order - according to sorted template names
+		for _, name := range sortedTemplateNames {
+			// Convenience wrapper
+			template := config.ChiTemplates[name]
+			// Merge into accumulated target template from current template
+			config.ChiTemplate.MergeFrom(template)
+		}
+
+		// Log final CHI template obtained
+		// Marshaling is done just to print nice yaml
+		if bytes, err := yaml.Marshal(config.ChiTemplate); err == nil {
+			glog.V(1).Infof("Unified ChiTemplate:\n%s\n", string(bytes))
+		} else {
+			glog.V(1).Infof("FAIL unable to Marshal Unified ChiTemplate")
+		}
+	*/
 }
 
 func (config *Config) AddChiTemplate(template *ClickHouseInstallation) {
@@ -259,12 +323,12 @@ func (config *Config) applyDefaultWatchNamespace() {
 
 	// No namespaces specified
 
-	ns := os.Getenv("OPERATOR_POD_NAMESPACE")
-	if ns == "kube-system" {
+	namespace := os.Getenv("OPERATOR_POD_NAMESPACE")
+	if namespace == "kube-system" {
 		// Do nothing, we already have len(config.WatchNamespaces) == 0
 	} else {
 		// We have WATCH_NAMESPACE specified
-		config.WatchNamespaces = []string{ns}
+		config.WatchNamespaces = []string{namespace}
 	}
 }
 

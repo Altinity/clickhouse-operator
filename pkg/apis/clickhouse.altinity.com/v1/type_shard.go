@@ -14,8 +14,8 @@
 
 package v1
 
-func (shard *ChiShard) InheritTemplates(cluster *ChiCluster) {
-	(&shard.Templates).MergeFrom(&cluster.Templates)
+func (shard *ChiShard) InheritTemplatesFrom(cluster *ChiCluster) {
+	(&shard.Templates).MergeFrom(&cluster.Templates, MergeTypeFillEmptyValues)
 	(&shard.Templates).HandleDeprecatedFields()
 }
 

@@ -1,0 +1,10 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+metadata:
+  name: "105-default-templates"
+spec:
+  defaults:
+    templates:
+      dataVolumeClaimTemplate: default-data-volumeclaim-template
+      logVolumeClaimTemplate: default-log-volumeclaim-template
+      podTemplate: default-pod-template
