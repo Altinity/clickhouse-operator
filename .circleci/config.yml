@@ -14,6 +14,8 @@ jobs:
           name: Pushing Docker image
           command: |
             echo 'export CHO_RELEASE=$(cat release)' >> $BASH_ENV
+            echo $CHO_RELEASE
+            
             docker tag clickhouse-operator:latest $COMPANY_REPO/clickhouse-operator:latest
             docker tag clickhouse-operator:latest $COMPANY_REPO/clickhouse-operator:$CHO_RELEASE
             docker tag metrics-exporter:latest $COMPANY_REPO/metrics-exporter:latest
