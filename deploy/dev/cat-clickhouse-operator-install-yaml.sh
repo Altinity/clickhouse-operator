@@ -152,7 +152,7 @@ fi
 # kind: ConfigMap
 # metadata:
 #  name: ${CONFIGMAP_NAME}
-#  namespace: ${CHOPERATOR_NAMESPACE}
+#  namespace: ${OPERATOR_NAMESPACE}
 # data:
 function render_configmap_header() {
     # ConfigMap name

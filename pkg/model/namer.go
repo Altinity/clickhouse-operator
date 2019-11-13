@@ -254,7 +254,7 @@ func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
 
 // CreateChiServiceName creates a name of a Installation Service resource
 func CreateChiServiceName(chi *chop.ClickHouseInstallation) string {
-	if template, ok := chi.GetOwnServiceTemplate(); ok {
+	if template, ok := chi.GetChiServiceTemplate(); ok {
 		// Service template available
 		if template.GenerateName != "" {
 			// Service template has explicitly specified service name template
