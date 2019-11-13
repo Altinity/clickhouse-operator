@@ -379,8 +379,8 @@ func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceT
 	}
 }
 
-// GetServiceTemplate gets own ChiServiceTemplate
-func (chi *ClickHouseInstallation) GetOwnServiceTemplate() (*ChiServiceTemplate, bool) {
+// GetServiceTemplate gets ChiServiceTemplate of a CHI
+func (chi *ClickHouseInstallation) GetChiServiceTemplate() (*ChiServiceTemplate, bool) {
 	name := chi.Spec.Defaults.Templates.ServiceTemplate
 	template, ok := chi.GetServiceTemplate(name)
 	return template, ok
