@@ -57,7 +57,7 @@ func (c *Creator) CreateServiceChi() *corev1.Service {
 	serviceName := CreateChiServiceName(c.chi)
 
 	glog.V(1).Infof("createServiceChi(%s/%s)", c.chi.Namespace, serviceName)
-	if template, ok := c.chi.GetOwnServiceTemplate(); ok {
+	if template, ok := c.chi.GetChiServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,

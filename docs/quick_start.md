@@ -28,16 +28,16 @@ In case you'd like to customize namespace where to install operator, or customiz
 Please, `cd` into writable folder, because install script would download config files to build `.yaml` manifests from into current dir. 
 ```bash
 cd ~
-curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-installer/clickhouse-operator-install.sh | CHOPERATOR_NAMESPACE=test-clickhouse-operator bash
+curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-installer/clickhouse-operator-install.sh | OPERATOR_NAMESPACE=test-clickhouse-operator bash
 ```
 Take into account explicitly specified namespace
 ```bash
-CHOPERATOR_NAMESPACE=test-clickhouse-operator
+OPERATOR_NAMESPACE=test-clickhouse-operator
 ```
 This namespace would be created and used to install `clickhouse-operator` into.
 Install script would download some `.yaml` and `.xml` files and install `clickhouse-operator` into specified namespace.
 
-In case no `CHOPERATOR_NAMESPACE` specified, as:
+In case no `OPERATOR_NAMESPACE` specified, as:
 ```bash
 cd ~
 curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-installer/clickhouse-operator-install.sh | bash

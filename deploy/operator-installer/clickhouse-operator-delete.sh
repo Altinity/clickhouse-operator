@@ -1,7 +1,7 @@
 #!/bin/bash
 
-CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE:-clickhouse-operator}"
-CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
+OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-clickhouse-operator}"
+OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
 
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
@@ -83,11 +83,11 @@ function download_file() {
 ensure_kubectl
 ensure_file "${CUR_DIR}" "cat-clickhouse-operator-install-yaml.sh" "deploy/dev"
 
-if [[ "${CHOPERATOR_NAMESPACE}" == "kube-system" ]]; then
+if [[ "${OPERATOR_NAMESPACE}" == "kube-system" ]]; then
     echo "Default k8s namespace 'kube-system' must not be deleted"
     echo "Delete components only"
-    kubectl delete --namespace="${CHOPERATOR_NAMESPACE}" -f <(CHOPERATOR_IMAGE="${CHOPERATOR_IMAGE}" CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE}" "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh")
+    kubectl delete --namespace="${OPERATOR_NAMESPACE}" -f <(OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh")
 else
-    echo "Delete ClickHouse Operator namespace ${CHOPERATOR_NAMESPACE}"
-    kubectl delete namespace "${CHOPERATOR_NAMESPACE}"
+    echo "Delete ClickHouse Operator namespace ${OPERATOR_NAMESPACE}"
+    kubectl delete namespace "${OPERATOR_NAMESPACE}"
 fi
