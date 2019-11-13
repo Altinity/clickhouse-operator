@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PROMETHEUS_NAMESPACE="${PROMETHEUS_NAMESPACE:-prometheus}"
-CHOPERATOR_NAMESPACE="${CHOPERATOR_NAMESPACE:-kube-system}"
+OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
 
 echo "Setup Prometheus into ${PROMETHEUS_NAMESPACE} namespace"
 
@@ -23,7 +23,7 @@ kubectl apply --namespace="${PROMETHEUS_NAMESPACE}" -f prometheus.yaml
 # IMPORTANT: clickhouse-operator should be installed and running prior to this step,
 # otherwise Prometheus would not be able to setup integration with clickhouse-operator
 
-if kubectl --namespace="${CHOPERATOR_NAMESPACE}" get service clickhouse-operator-metrics; then
+if kubectl --namespace="${OPERATOR_NAMESPACE}" get service clickhouse-operator-metrics; then
     echo "clickhouse-operator-metrics endpoint found. Configuring integration with clickhouse-operator"
     # clickhouse-operator-metrics service found, can setup integration
     kubectl apply --namespace="${PROMETHEUS_NAMESPACE}" -f prometheus-clickhouse-operator-service-monitor.yaml
