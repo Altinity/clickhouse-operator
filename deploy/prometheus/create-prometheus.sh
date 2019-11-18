@@ -1,22 +1,48 @@
 #!/bin/bash
 
+echo "External value for \$PROMETHEUS_NAMESPACE=$PROMETHEUS_NAMESPACE"
+echo "External value for \$OPERATOR_NAMESPACE=$OPERATOR_NAMESPACE"
+
 PROMETHEUS_NAMESPACE="${PROMETHEUS_NAMESPACE:-prometheus}"
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
 
-echo "Setup Prometheus into ${PROMETHEUS_NAMESPACE} namespace"
+echo "Setup Prometheus into '${PROMETHEUS_NAMESPACE}' namespace"
+echo "Expecting operator in '${OPERATOR_NAMESPACE}' namespace"
+sleep 10
 
 # Let's setup all prometheus-related stuff into dedicated namespace called "prometheus"
 kubectl create namespace "${PROMETHEUS_NAMESPACE}"
 
-# Create CRD for kind:Prometheus and kind:PrometheusRule Would be handled by prometheus-operator
-kubectl apply --namespace="${PROMETHEUS_NAMESPACE}" -f prometheus.crd.yaml
-kubectl apply --namespace="${PROMETHEUS_NAMESPACE}" -f prometheusrule.crd.yaml
+# Create prometheus-operator's CRDs
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/alertmanager.crd.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/podmonitor.crd.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/prometheus.crd.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/prometheusrule.crd.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/servicemonitor.crd.yaml
 
-# Setup prometheus-operator into dedicated namespace. Would manage prometheus instance
-kubectl apply --namespace="${PROMETHEUS_NAMESPACE}" -f prometheus-operator.yaml
+# Setup prometheus-operator into specified namespace. Would manage prometheus instances
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f  <( \
+    wget -qO- https://raw.githubusercontent.com/coreos/prometheus-operator/master/bundle.yaml | \
+    PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
+)
+
+# Setup RBAC
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f <( \
+    wget -qO- https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/rbac/prometheus/prometheus-cluster-role-binding.yaml | \
+    PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
+)
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/rbac/prometheus/prometheus-cluster-role.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/rbac/prometheus/prometheus-service-account.yaml
 
 # Setup Prometheus instance via prometheus-operator into dedicated namespace
-kubectl apply --namespace="${PROMETHEUS_NAMESPACE}" -f prometheus.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f prometheus.yaml
 
 # Setup "Prometheus - clickhouse-operator" integration.
 # Specify endpoint, where Prometheus can gather data from clickhouse-operator
@@ -26,7 +52,11 @@ kubectl apply --namespace="${PROMETHEUS_NAMESPACE}" -f prometheus.yaml
 if kubectl --namespace="${OPERATOR_NAMESPACE}" get service clickhouse-operator-metrics; then
     echo "clickhouse-operator-metrics endpoint found. Configuring integration with clickhouse-operator"
     # clickhouse-operator-metrics service found, can setup integration
-    kubectl apply --namespace="${PROMETHEUS_NAMESPACE}" -f prometheus-clickhouse-operator-service-monitor.yaml
+    kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f <( \
+        cat ./prometheus-clickhouse-operator-service-monitor.yaml | \
+        OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} sed "s/- kube-system/- ${OPERATOR_NAMESPACE}/" \
+    )
 else
-    echo "Unable to find clickhouse-operator-metrics endpoint. Please setup clickhouse-operator and restart this script."
+    echo "ERROR install prometheus. Unable to find service '${OPERATOR_NAMESPACE}/clickhouse-operator-metrics'."
+    echo "Please setup clickhouse-operator into ${OPERATOR_NAMESPACE} namespace and restart this script."
 fi

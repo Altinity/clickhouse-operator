@@ -8,15 +8,19 @@ metadata:
     app: prometheus
     service: clickhouse-operator
 spec:
+  # IMPORTANT
+  # Specify namespace where clickhouse-operator-metrics service is located
+  namespaceSelector:
+    matchNames:
+      - kube-system
+  # Specify labels of clickhouse-operator-metrics
   selector:
     matchLabels:
       app: clickhouse-operator
-# IMPORTANT
-# Specify namespace where clickhouse-operator service is located
-  namespaceSelector:
-    matchNames:
-    - kube-system
-# IMPORTANT
-# Specify service name where clickhouse-operator reports metrics
+  # Specify port where clickhouse-operator-metrics service listens
   endpoints:
-  - port: clickhouse-operator-metrics
+    # This is port name from clickhouse-operator-metrics service (it is the same as service name in there)
+    - port: clickhouse-operator-metrics
+#    - targetPort: 8888
+#      interval: 10s
+#      scheme: http
