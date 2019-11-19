@@ -17,6 +17,11 @@ METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
 "${MANIFEST_ROOT}/dev/cat-clickhouse-operator-install-yaml.sh" > "${CUR_DIR}/clickhouse-operator-install.yaml"
 
+OPERATOR_IMAGE="\$OPERATOR_IMAGE" \
+METRICS_EXPORTER_IMAGE="\$METRICS_EXPORTER_IMAGE" \
+OPERATOR_NAMESPACE="\$OPERATOR_NAMESPACE" \
+"${MANIFEST_ROOT}/dev/cat-clickhouse-operator-install-yaml.sh" > "${CUR_DIR}/clickhouse-operator-install-template.yaml"
+
 # Build dev installation .yaml manifest - run generator with params
 OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
 METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \

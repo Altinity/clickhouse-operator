@@ -1,87 +1,50 @@
 #!/bin/bash
 
+# Namespace to install operator
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-clickhouse-operator}"
+METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
+
+# Operator's docker image
 OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
+METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:latest}"
 
-CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-
+#
 # Check whether kubectl is available
-function ensure_kubectl() {
+#
+function is_kubectl_available() {
     if ! kubectl version > /dev/null; then
-        echo "kubectl failed, can not continue"
+        echo "kubectl is unavailable, can not continue"
         exit 1
     fi
 }
 
-# Check whether file is available locally
-# and download it from github repo if need be
-function ensure_file() {
-    # Params
-    local LOCAL_DIR="$1"
-    local FILE="$2"
-    local REPO_DIR="$3"
-
-    local LOCAL_FILE="${LOCAL_DIR}/${FILE}"
-
-    if [[ -f "${LOCAL_FILE}" ]]; then
-        # File found, all is ok
-        :
-    else
-        download_file "${LOCAL_DIR}" "${FILE}" "${REPO_DIR}"
-    fi
-
-    if [[ -f "${LOCAL_FILE}" ]]; then
-        # File found, all is ok
-        :
-    else
-        # File not found
-        echo "Unable to get ${FILE}"
-        exit 1
-    fi
-}
-
-# Download file from github repo
-function download_file() {
-    # Params
-    local LOCAL_DIR="$1"
-    local FILE="$2"
-    local REPO_DIR="$3"
-
-    local LOCAL_FILE="${LOCAL_DIR}/${FILE}"
-
-    REPO_URL="${REPO_URL:-https://raw.githubusercontent.com/Altinity/clickhouse-operator}"
-    BRANCH="${BRANCH:-master}"
-    FILE_URL="${REPO_URL}/${BRANCH}/${REPO_DIR}/${FILE}"
-
-    # Check curl is in place
+#
+# Check whether curl is available
+#
+function is_curl_available() {
     if ! curl --version > /dev/null; then
-        echo "curl is not available, can not continue"
-        exit 1
-    fi
-
-    # Download file
-    if ! curl --silent "${FILE_URL}" --output "${LOCAL_FILE}"; then
-        echo "curl call to download ${FILE_URL} failed, can not continue"
-        exit 1
-    fi
-
-    # Check file is in place
-    if [[ -f "${LOCAL_FILE}" ]]; then
-        # File found, all is ok
-        :
-    else
-        # File not found
-        echo "Unable to download ${FILE_URL}"
+        echo "curl is unavailable, can not continue"
         exit 1
     fi
 }
 
 #
-# Main
+# Check whether envsubst is available
 #
+function is_envsubst_available() {
+    if ! envsubst --version > /dev/null; then
+        echo "curl is unavailable, can not continue"
+        exit 1
+    fi
+}
 
-ensure_kubectl
-ensure_file "${CUR_DIR}" "cat-clickhouse-operator-install-yaml.sh" "deploy/dev"
+##
+## Main
+##
+
+is_curl_available
+is_kubectl_available
+is_envsubst_available
 
 echo "Setup ClickHouse Operator into ${OPERATOR_NAMESPACE} namespace"
 
@@ -90,12 +53,20 @@ if kubectl get namespace "${OPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
     if kubectl get deployment clickhouse-operator -n "${OPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
         echo "clickhouse-operator is already installed into ${OPERATOR_NAMESPACE} namespace. Abort."
         exit 1
+    else
+        echo "Looks like clickhouse-operator is not installed in ${OPERATOR_NAMESPACE} namespace. Going to install"
     fi
 else
-    # No ${OPERATOR_NAMESPACE} namespace found, let's create it
-    # Let's setup all clickhouse-operator-related stuff into dedicated namespace
+    echo "No ${OPERATOR_NAMESPACE} namespace found. Going to create"
     kubectl create namespace "${OPERATOR_NAMESPACE}"
 fi
 
-# Setup into dedicated namespace
-kubectl apply --namespace="${OPERATOR_NAMESPACE}" -f <(OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" /bin/bash "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh")
+# Setup clickhouse-operator into specified namespace
+kubectl apply --namespace="${OPERATOR_NAMESPACE}" -f <( \
+    curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-template.yaml | \
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+        METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
+        METRICS_EXPORTER_NAMESPACE="${METRICS_EXPORTER_NAMESPACE}" \
+        envsubst \
+)
