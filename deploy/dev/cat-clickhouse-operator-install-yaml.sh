@@ -67,19 +67,20 @@ function ensure_file() {
     # Params
     local LOCAL_DIR="$1"
     local FILE="$2"
-    local REPO_DIR="$3"
+    local GITHUB_REPO_DIR="$3"
 
     local LOCAL_FILE="${LOCAL_DIR}/${FILE}"
 
     if [[ -f "${LOCAL_FILE}" ]]; then
-        # File found, all is ok
+        # Local file found, can use it as is
         :
     else
-        download_file "${LOCAL_DIR}" "${FILE}" "${REPO_DIR}"
+        # Download file into local dir from github dir
+        download_file "${LOCAL_DIR}" "${FILE}" "${GITHUB_REPO_DIR}"
     fi
 
     if [[ -f "${LOCAL_FILE}" ]]; then
-        # File found, all is ok
+        # Local file found - must have been downloaded, can use now
         :
     else
         # File not found
@@ -95,13 +96,13 @@ function download_file() {
     # Params
     local LOCAL_DIR="$1"
     local FILE="$2"
-    local REPO_DIR="$3"
+    local GITHUB_REPO_DIR="$3"
 
     local LOCAL_FILE="${LOCAL_DIR}/${FILE}"
 
-    REPO_URL="https://raw.githubusercontent.com/Altinity/clickhouse-operator"
+    GITHUB_REPO_BASE_URL="https://raw.githubusercontent.com/Altinity/clickhouse-operator"
     BRANCH="${BRANCH:-master}"
-    FILE_URL="${REPO_URL}/${BRANCH}/${REPO_DIR}/${FILE}"
+    FILE_URL="${GITHUB_REPO_BASE_URL}/${BRANCH}/${GITHUB_REPO_DIR}/${FILE}"
 
     # Check curl is in place
     if ! curl --version > /dev/null; then
@@ -132,9 +133,12 @@ function download_file() {
 ##
 ##################################
 
+REPO_PATH_DEPLOY_DEV_FOLDER="deploy/dev"
+REPO_PATH_OPERATOR_CONFIG_FOLDER="config"
+
 # Render CRD section
 if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-01-section-crd.yaml" "deploy/dev"
+    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-01-section-crd.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
     cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-01-section-crd.yaml" | \
         OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" envsubst
 fi
@@ -142,7 +146,7 @@ fi
 # Render RBAC section
 if [[ "${MANIFEST_PRINT_RBAC}" == "yes" ]]; then
     echo "---"
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-02-section-rbac-and-service.yaml" "deploy/dev"
+    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-02-section-rbac-and-service.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
     cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-02-section-rbac-and-service.yaml" | \
         OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" envsubst
 fi
@@ -159,7 +163,7 @@ function render_configmap_header() {
     CM_NAME="$1"
     # Template file with ConfigMap header/beginning
 
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" "deploy/dev"
+    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
     # Render ConfigMap header template with vars substitution
     cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" CONFIGMAP_NAME="${CM_NAME}" envsubst
@@ -185,6 +189,8 @@ function render_configmap_data_section_file() {
     #    line 1
     #    line 2
     #    etc
+    # Add some spaces to the beginning of each line - proper indent for .yaml file
+    # Build ConfigMap section
     FILE_NAME="$(basename "${FILE_PATH}")"
     echo "  ${FILE_NAME}: |"
     cat "${FILE_PATH}" | sed 's/^/    /'
@@ -194,9 +200,9 @@ function render_configmap_data_section_file() {
 # Render Deployment and ConfigMap sections
 if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
     if [[ -z "${OPERATOR_CONFIG_FILE}" ]]; then
-        # No config file specified, render simple deployment
+        # No config file specified, render simple deployment, w/o ConfigMaps
         echo "---"
-        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment.yaml" "deploy/dev"
+        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
         cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-04-section-deployment.yaml" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
@@ -214,7 +220,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         else
             # Fetch from github and apply
             # config/config.yaml
-            download_file "${CUR_DIR}" "config.yaml" "config"
+            download_file "${CUR_DIR}" "config.yaml" "${REPO_PATH_OPERATOR_CONFIG_FOLDER}"
             render_configmap_data_section_file "${CUR_DIR}/config.yaml"
         fi
 
@@ -238,8 +244,8 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
             # Fetch from github and apply
             # config/config.d/01-clickhouse-listen.xml
             # config/config.d/02-clickhouse-logger.xml
-            download_file "${CUR_DIR}" "01-clickhouse-listen.xml" "config/config.d"
-            download_file "${CUR_DIR}" "02-clickhouse-logger.xml" "config/config.d"
+            download_file "${CUR_DIR}" "01-clickhouse-listen.xml" "${REPO_PATH_OPERATOR_CONFIG_FOLDER}/config.d"
+            download_file "${CUR_DIR}" "02-clickhouse-logger.xml" "${REPO_PATH_OPERATOR_CONFIG_FOLDER}/config.d"
             render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-listen.xml"
             render_configmap_data_section_file "${CUR_DIR}/02-clickhouse-logger.xml"
         fi
@@ -263,13 +269,13 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         else
             # Fetch from github and apply
             # config/users.d/01-clickhouse-user.xml
-            download_file "${CUR_DIR}" "01-clickhouse-user.xml" "config/users.d"
+            download_file "${CUR_DIR}" "01-clickhouse-user.xml" "${REPO_PATH_OPERATOR_CONFIG_FOLDER}/users.d"
             render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-user.xml"
         fi
 
         # Render Deployment
         echo "---"
-        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" "deploy/dev"
+        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
         cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \

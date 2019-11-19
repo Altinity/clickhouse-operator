@@ -24,11 +24,10 @@ In case you are convenient to install operator into `kube-system` namespace just
 kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install.yaml
 ``` 
 
-In case you'd like to customize namespace where to install operator, or customize any operator's or ClickHouse's configuration, feel free to use installer script.
-Please, `cd` into writable folder, because install script would download config files to build `.yaml` manifests from into current dir. 
+In case you'd like to customize installation parameters, such as namespace where to install operator or operator's image,
+ use the special installer script.
 ```bash
-cd ~
-curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-installer/clickhouse-operator-install.sh | OPERATOR_NAMESPACE=test-clickhouse-operator bash
+curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-installer/clickhouse-operator-install.sh | OPERATOR_NAMESPACE=test-clickhouse-operator sh
 ```
 Take into account explicitly specified namespace
 ```bash
