@@ -128,7 +128,16 @@ def test_006():
             create_and_check("configs/test-006-ch-upgrade-3.yaml", 
                              {"object_counts": [2,2,3],
                               "pod_image": "yandex/clickhouse-server:19.11.8.46"})
-                    
+
+@TestScenario
+@Name("Test template with custom clickhouse ports")
+def test_007():
+    create_and_check("configs/test-007-custom-ports.yaml", 
+                     {"object_counts": [1,1,2],
+                      "apply_templates": {"configs/tpl-custom-ports.yaml"},
+                      "pod_image": "yandex/clickhouse-server:19.11.8.46",
+                      "do_not_delete": 1})
+                        
 if main():
     with Module("regression"):
         with Given("clickhouse-operator in installed"):
@@ -142,7 +151,7 @@ if main():
         examples=[test_examples01_1, test_examples01_2, test_examples02_1, test_examples02_2]
         
         all_tests = examples + tests
-        all_tests = [test_006]
+        all_tests = [test_007]
         
         for t in all_tests:
             run(test=t)
