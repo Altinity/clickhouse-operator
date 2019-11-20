@@ -37,13 +37,13 @@ const (
 )
 
 const (
-	configUsers         = "users"
+	configMacros        = "macros"
 	configProfiles      = "profiles"
 	configQuotas        = "quotas"
-	configSettings      = "settings"
 	configRemoteServers = "remote_servers"
+	configSettings      = "settings"
+	configUsers         = "users"
 	configZookeeper     = "zookeeper"
-	configMacros        = "macros"
 )
 
 const (
@@ -51,13 +51,21 @@ const (
 
 	// Filenames of the chopConfig files in /etc/clickhouse-server/config.d
 	// These files would be created as ConfigMaps mapping if necessary
+
+	// macros.xml
+	filenameMacrosXML = configMacros + dotXML
+	// profiles.xml
+	filenameProfilesXML = configProfiles + dotXML
+	// quotas.xml
+	filenameQuotasXML = configQuotas + dotXML
+	// remote_servers.xml
 	filenameRemoteServersXML = configRemoteServers + dotXML
-	filenameZookeeperXML     = configZookeeper + dotXML
-	filenameUsersXML         = configUsers + dotXML
-	filenameQuotasXML        = configQuotas + dotXML
-	filenameProfilesXML      = configProfiles + dotXML
-	filenameSettingsXML      = configSettings + dotXML
-	filenameMacrosXML        = configMacros + dotXML
+	// settings.xml
+	filenameSettingsXML = configSettings + dotXML
+	// users.xml
+	filenameUsersXML = configUsers + dotXML
+	// zookeeper.xml
+	filenameZookeeperXML = configZookeeper + dotXML
 )
 
 const (
