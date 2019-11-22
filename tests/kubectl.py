@@ -86,10 +86,21 @@ def kube_get_pod_volumes(chi_name, ns):
     volumeMounts = kube_get_pod_spec(chi_name, ns)["containers"][0]["volumeMounts"]
     return volumeMounts
 
+def kube_get_pod_ports(chi_name, ns):
+    port_specs = kube_get_pod_spec(chi_name, ns)["containers"][0]["ports"]
+    ports = []
+    for p in port_specs:
+        ports.append(p["containerPort"])
+    return ports
+
+def kube_check_pod_ports(chi_name, ns, ports):
+    pod_ports = kube_get_pod_ports(chi_name, ns)
+    with Then(f"Expect pod ports {pod_ports} to match {ports}"):
+        assert pod_ports == ports
 
 def kube_check_pod_image(chi_name, ns, image):
     pod_image = kube_get_pod_image(chi_name, ns)
-    with Then(f"Expect pod image to match {image}"):
+    with Then(f"Expect pod image {pod_image} to match {image}"):
         assert pod_image == image
 
 def kube_check_pod_volumes(chi_name, ns, volumes):

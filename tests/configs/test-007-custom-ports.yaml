@@ -1,0 +1,10 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-007-custom-ports"
+spec:
+  useTemplates:
+    - name: clickhouse-custom-ports
+  configuration:
+    clusters:
+      - name: single
