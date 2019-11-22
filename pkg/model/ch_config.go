@@ -228,7 +228,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 		// <shard>
 		//     <internal_replication>
 		cline(b, 12, "<shard>")
-		cline(b, 12, "    <internal_replication>true</internal_replication>")
+		cline(b, 12, "    <internal_replication>false</internal_replication>")
 
 		// <replica>
 		//		<host>XXX</host>
