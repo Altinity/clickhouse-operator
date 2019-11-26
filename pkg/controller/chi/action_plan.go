@@ -95,7 +95,7 @@ func (ap *ActionPlan) HasActionsToDo() bool {
 		return false
 	}
 
-	// Looks like Have some changes
+	// Looks like have some changes
 
 	if len(ap.diff.Added) > 0 {
 		// Something added

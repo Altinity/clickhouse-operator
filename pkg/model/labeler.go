@@ -17,6 +17,7 @@ package model
 import (
 	"fmt"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kublabels "k8s.io/apimachinery/pkg/labels"
 )
@@ -34,14 +35,15 @@ func NewLabeler(version string, chi *chi.ClickHouseInstallation) *Labeler {
 }
 
 func (l *Labeler) getLabelsChiScope() map[string]string {
-	return map[string]string{
+	return l.appendChiLabels(map[string]string{
 		LabelApp:  LabelAppValue,
 		LabelChop: l.version,
 		LabelChi:  getNamePartChiName(l.chi),
-	}
+	})
 }
 
 func (l *Labeler) getSelectorChiScope() map[string]string {
+	// Do not include CHI labels
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// Skip chop
@@ -50,15 +52,16 @@ func (l *Labeler) getSelectorChiScope() map[string]string {
 }
 
 func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]string {
-	return map[string]string{
+	return l.appendChiLabels(map[string]string{
 		LabelApp:     LabelAppValue,
 		LabelChop:    l.version,
 		LabelChi:     getNamePartChiName(cluster),
 		LabelCluster: getNamePartClusterName(cluster),
-	}
+	})
 }
 
 func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]string {
+	// Do not include CHI labels
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// Skip chop
@@ -68,16 +71,17 @@ func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]st
 }
 
 func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
-	return map[string]string{
+	return l.appendChiLabels(map[string]string{
 		LabelApp:     LabelAppValue,
 		LabelChop:    l.version,
 		LabelChi:     getNamePartChiName(shard),
 		LabelCluster: getNamePartClusterName(shard),
 		LabelShard:   getNamePartShardName(shard),
-	}
+	})
 }
 
 func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
+	// Do not include CHI labels
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// Skip chop
@@ -100,10 +104,15 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
 		labels[LabelSettingsConfigVersion] = host.Config.SettingsFingerprint
 	}
-	return labels
+	return l.appendChiLabels(labels)
+}
+
+func (l *Labeler) appendChiLabels(dst map[string]string) map[string]string {
+	return util.MergeStringMaps(dst, l.chi.Labels)
 }
 
 func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
+	// Do not include CHI labels
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// skip chop

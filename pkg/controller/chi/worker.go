@@ -166,8 +166,9 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
-	glog.V(1).Infof("updateChi(%s/%s) - start reconcile >>>", new.Namespace, new.Name)
-	glog.V(1).Infof("updateChi(%s/%s) - action plan:\n%s", new.Namespace, new.Name, actionPlan.String())
+	glog.V(1).Infof("updateChi(%s/%s) - start reconcile with action plan >>>\n%s",
+		new.Namespace, new.Name, actionPlan.String(),
+	)
 
 	// We are going to update CHI
 	// Write declared CHI with initialized .Status, so it would be possible to monitor progress
