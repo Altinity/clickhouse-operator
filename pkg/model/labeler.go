@@ -22,11 +22,13 @@ import (
 	kublabels "k8s.io/apimachinery/pkg/labels"
 )
 
+// Labeler is an entity which can label CHI artifacts
 type Labeler struct {
 	version string
 	chi     *chi.ClickHouseInstallation
 }
 
+// NewLabeler creates new labeler with context
 func NewLabeler(version string, chi *chi.ClickHouseInstallation) *Labeler {
 	return &Labeler{
 		version: version,
@@ -34,7 +36,9 @@ func NewLabeler(version string, chi *chi.ClickHouseInstallation) *Labeler {
 	}
 }
 
+// getLabelsChiScope gets labels for CHI-scoped object
 func (l *Labeler) getLabelsChiScope() map[string]string {
+	// Combine generated labels and CHI-provided labels
 	return l.appendChiLabels(map[string]string{
 		LabelApp:  LabelAppValue,
 		LabelChop: l.version,
@@ -42,8 +46,9 @@ func (l *Labeler) getLabelsChiScope() map[string]string {
 	})
 }
 
+// getSelectorChiScope gets labels to select a CHI-scoped object
 func (l *Labeler) getSelectorChiScope() map[string]string {
-	// Do not include CHI labels
+	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// Skip chop
@@ -51,7 +56,9 @@ func (l *Labeler) getSelectorChiScope() map[string]string {
 	}
 }
 
+// getLabelsClusterScope gets labels for Cluster-scoped object
 func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]string {
+	// Combine generated labels and CHI-provided labels
 	return l.appendChiLabels(map[string]string{
 		LabelApp:     LabelAppValue,
 		LabelChop:    l.version,
@@ -60,8 +67,9 @@ func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]stri
 	})
 }
 
+// getSelectorClusterScope gets labels to select a Cluster-scoped object
 func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]string {
-	// Do not include CHI labels
+	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// Skip chop
@@ -70,7 +78,9 @@ func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]st
 	}
 }
 
+// getLabelsShardScope gets labels for Shard-scoped object
 func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
+	// Combine generated labels and CHI-provided labels
 	return l.appendChiLabels(map[string]string{
 		LabelApp:     LabelAppValue,
 		LabelChop:    l.version,
@@ -80,8 +90,9 @@ func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
 	})
 }
 
+// getSelectorShardScope gets labels to select a Shard-scoped object
 func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
-	// Do not include CHI labels
+	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// Skip chop
@@ -91,7 +102,9 @@ func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 	}
 }
 
+// getLabelsHostScope gets labels for Host-scoped object
 func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
+	// Combine generated labels and CHI-provided labels
 	labels := map[string]string{
 		LabelApp:     LabelAppValue,
 		LabelChop:    l.version,
@@ -107,12 +120,14 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 	return l.appendChiLabels(labels)
 }
 
+// appendChiLabels appends CHI-provided labels to labels set
 func (l *Labeler) appendChiLabels(dst map[string]string) map[string]string {
 	return util.MergeStringMaps(dst, l.chi.Labels)
 }
 
+// getSelectorShardScope gets labels to select a Host-scoped object
 func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
-	// Do not include CHI labels
+	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelApp: LabelAppValue,
 		// skip chop
@@ -182,6 +197,7 @@ func IsChopGeneratedObject(objectMeta *meta.ObjectMeta) bool {
 	return ok
 }
 
+// GetChiNameFromObjectMeta extracts CHI name from ObjectMeta by labels
 func GetChiNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	// ObjectMeta must have LabelChi:  chi.Name label
 	name, ok := meta.Labels[LabelChi]
@@ -192,6 +208,7 @@ func GetChiNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	}
 }
 
+// GetClusterNameFromObjectMeta extracts cluster name from ObjectMeta by labels
 func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	// ObjectMeta must have LabelCluster
 	name, ok := meta.Labels[LabelCluster]
