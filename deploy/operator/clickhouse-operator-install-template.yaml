@@ -1036,7 +1036,7 @@ data:
     <yandex>
         <logger>
             <!-- Possible levels: https://github.com/pocoproject/poco/blob/develop/Foundation/include/Poco/Logger.h#L105 -->
-            <level>trace</level>
+            <level>debug</level>
             <log>/var/log/clickhouse-server/clickhouse-server.log</log>
             <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
             <size>1000M</size>
@@ -1046,6 +1046,15 @@ data:
         </logger>
     </yandex>
 
+  03-clickhouse-querylog.xml: |
+    <yandex>
+    <query_log>
+        <database>system</database>
+        <table>query_log</table>
+        <partition_by>toMonday(event_date)</partition_by>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </query_log>
+    </yandex>
 ---
 # Possible Template Parameters:
 #
@@ -1172,6 +1181,19 @@ data:
         </users>
     </yandex>
 
+  02-clickhouse-default-profile.xml: |
+    <yandex>
+      <profiles>
+        <default>
+          <log_queries>1</log_queries>
+          <connect_timeout_with_failover_ms>1000</connect_timeout_with_failover_ms>
+          <optimize_move_to_prewhere>0</optimize_move_to_prewhere>
+          <distributed_aggregation_memory_efficient>1</distributed_aggregation_memory_efficient>
+          <parallel_view_processing>1</parallel_view_processing>
+          <http_connection_timeout>5</http_connection_timeout>
+        </default>
+      </profiles>
+    </yandex>
 ---
 # Possible Template Parameters:
 #
