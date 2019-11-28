@@ -1,24 +1,23 @@
 # ClickHouse Operator
 
-The ClickHouse Operator creates, configures and manages ClickHouse clusters running on Kubernetes.
+ClickHouse Operator creates, configures and manages ClickHouse clusters running on Kubernetes.
 
 [![issues](https://img.shields.io/github/issues/altinity/clickhouse-operator.svg)](https://github.com/altinity/clickhouse-operator/issues)
 [![tags](https://img.shields.io/github/tag/altinity/clickhouse-operator.svg)](https://github.com/altinity/clickhouse-operator/tags)
 [![Go Report Card](https://goreportcard.com/badge/github.com/altinity/clickhouse-operator)](https://goreportcard.com/report/github.com/altinity/clickhouse-operator)
 
-**Warning!** 
-**ClickHouse Operator is in beta. You can use it at your own risk. There may be backwards incompatible API changes up until the first major release.**
-
 ## Features
 
 The ClickHouse Operator for Kubernetes currently provides the following:
 
-- Creates ClickHouse cluster based on Custom Resource [specification][chi_max_yaml] provided
-- Storage customization (VolumeClaim templates)
-- Pod template customization (Volume and Container templates)
-- ClickHouse configuration customization (including Zookeeper integration)
+- Creates ClickHouse clusters based on Custom Resource [specification][chi_max_yaml] provided
+- Customized storage provisioning (VolumeClaim templates)
+- Customized pod templates
+- Customized service templates for endpoints
+- ClickHouse configuration and settings (including Zookeeper integration)
+- Flexible templating
 - ClickHouse cluster scaling including automatic schema propagation
-- ClickHouse cluster version upgrades
+- ClickHouse version upgrades
 - Exporting ClickHouse metrics to Prometheus
 
 ## Requirements
