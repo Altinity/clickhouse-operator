@@ -182,17 +182,17 @@ func (ap *ActionPlan) String() string {
 
 	if len(ap.labelsDiff.Added) > 0 {
 		// Something added
-		str += "added labels"
+		str += "added labels\n"
 	}
 
 	if len(ap.labelsDiff.Removed) > 0 {
 		// Something removed
-		str += "removed labels"
+		str += "removed labels\n"
 	}
 
 	if len(ap.labelsDiff.Modified) > 0 {
 		// Something modified
-		str += "modified labels"
+		str += "modified labels\n"
 	}
 
 	return str
