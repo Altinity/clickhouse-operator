@@ -36,7 +36,7 @@ const (
 func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
 	glog.V(1).Infof("Reconcile ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 	// Check whether object with such name already exists in k8s
-	if curConfigMap, err := c.getConfigMap(&configMap.ObjectMeta, true); curConfigMap != nil {
+	if curConfigMap, err := c.getConfigMap(&configMap.ObjectMeta, false); curConfigMap != nil {
 		// Object with such name already exists, this is not an error
 		glog.V(1).Infof("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		_, err := c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
@@ -58,7 +58,7 @@ func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
 func (c *Controller) ReconcileService(service *core.Service) error {
 	glog.V(1).Infof("Reconcile Service %s/%s", service.Namespace, service.Name)
 	// Check whether object with such name already exists in k8s
-	if curService, err := c.getService(&service.ObjectMeta, true); curService != nil {
+	if curService, err := c.getService(&service.ObjectMeta, false); curService != nil {
 		// Object with such name already exists, this is not an error
 		glog.V(1).Infof("Update Service %s/%s", service.Namespace, service.Name)
 		// spec.resourceVersion is required in order to update Service
@@ -86,7 +86,7 @@ func (c *Controller) ReconcileService(service *core.Service) error {
 // reconcileStatefulSet reconciles apps.StatefulSet
 func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	// Check whether object with such name already exists in k8s
-	if curStatefulSet, err := c.getStatefulSet(&newStatefulSet.ObjectMeta, true); curStatefulSet != nil {
+	if curStatefulSet, err := c.getStatefulSet(&newStatefulSet.ObjectMeta, false); curStatefulSet != nil {
 		// StatefulSet already exists - update it
 		err := c.updateStatefulSet(curStatefulSet, newStatefulSet)
 		host.Chi.Status.UpdatedHostsCount++
