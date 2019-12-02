@@ -16,122 +16,165 @@ package chi
 
 import (
 	"fmt"
-
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kublabels "k8s.io/apimachinery/pkg/labels"
+
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
 // getConfigMap gets ConfigMap either by namespaced name or by labels
 // TODO review byNameOnly params
 func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*core.ConfigMap, error) {
-	// Check whether object with such name already exists in k8s
-	if res, err := c.configMapLister.ConfigMaps(objMeta.Namespace).Get(objMeta.Name); res != nil {
+	get := c.configMapLister.ConfigMaps(objMeta.Namespace).Get
+	list := c.configMapLister.ConfigMaps(objMeta.Namespace).List
+	var objects []*core.ConfigMap
+
+	// Check whether object with such name already exists
+	obj, err := get(objMeta.Name)
+
+	if (obj != nil) && (err == nil) {
 		// Object found by name
-		return res, nil
-	} else if apierrors.IsNotFound(err) {
-		errNotFound := err
-		if byNameOnly {
-			return nil, errNotFound
-		}
-		// Try to find by labels
-		if selector, err := chopmodel.GetSelectorFromObjectMeta(objMeta); err != nil {
-			return nil, err
-		} else if objects, err := c.configMapLister.ConfigMaps(objMeta.Namespace).List(selector); err != nil {
-			return nil, err
-		} else if len(objects) == 0 {
-			return nil, errNotFound
-		} else if len(objects) == 1 {
-			// Exactly one object found by labels
-			return objects[0], nil
-		} else {
-			// Too much object found by labels
-			return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
-		}
-	} else {
+		return obj, nil
+	}
+
+	if !apierrors.IsNotFound(err) {
 		// Error, which is not related to "Object not found"
 		return nil, err
 	}
 
-	return nil, fmt.Errorf("unexpected flow")
+	// Object not found by name. Try to find by labels
+
+	if byNameOnly {
+		return nil, fmt.Errorf("object not found by name %s/%s and no label search allowed ", objMeta.Namespace, objMeta.Name)
+	}
+
+	var selector kublabels.Selector
+	if selector, err = chopmodel.GetSelectorFromObjectMeta(objMeta); err != nil {
+		return nil, err
+	}
+
+	if objects, err = list(selector); err != nil {
+		return nil, err
+	}
+
+	if len(objects) == 0 {
+		return nil, apierrors.NewNotFound(apps.Resource("ConfigMap"), objMeta.Name)
+	}
+
+	if len(objects) == 1 {
+		// Exactly one object found by labels
+		return objects[0], nil
+	}
+
+	// Too much objects found by labels
+	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
 }
 
 // getService gets Service either by namespaced name or by labels
 // TODO review byNameOnly params
 func (c *Controller) getService(objMeta *meta.ObjectMeta, byNameOnly bool) (*core.Service, error) {
-	// Check whether object with such name already exists in k8s
-	if res, err := c.serviceLister.Services(objMeta.Namespace).Get(objMeta.Name); res != nil {
+	get := c.serviceLister.Services(objMeta.Namespace).Get
+	list := c.serviceLister.Services(objMeta.Namespace).List
+	var objects []*core.Service
+
+	// Check whether object with such name already exists
+	obj, err := get(objMeta.Name)
+
+	if (obj != nil) && (err == nil) {
 		// Object found by name
-		return res, nil
-	} else if apierrors.IsNotFound(err) {
-		errNotFound := err
-		if byNameOnly {
-			return nil, errNotFound
-		}
-		// Try to find by labels
-		if selector, err := chopmodel.GetSelectorFromObjectMeta(objMeta); err != nil {
-			return nil, err
-		} else if objects, err := c.serviceLister.Services(objMeta.Namespace).List(selector); err != nil {
-			return nil, err
-		} else if len(objects) == 0 {
-			return nil, errNotFound
-		} else if len(objects) == 1 {
-			// Exactly one object found by labels
-			return objects[0], nil
-		} else {
-			// Too much object found by labels
-			return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
-		}
-	} else {
+		return obj, nil
+	}
+
+	if !apierrors.IsNotFound(err) {
 		// Error, which is not related to "Object not found"
 		return nil, err
 	}
 
-	return nil, fmt.Errorf("unexpected flow")
+	// Object not found by name. Try to find by labels
+
+	if byNameOnly {
+		return nil, fmt.Errorf("object not found by name %s/%s and no label search allowed ", objMeta.Namespace, objMeta.Name)
+	}
+
+	var selector kublabels.Selector
+	if selector, err = chopmodel.GetSelectorFromObjectMeta(objMeta); err != nil {
+		return nil, err
+	}
+
+	if objects, err = list(selector); err != nil {
+		return nil, err
+	}
+
+	if len(objects) == 0 {
+		return nil, apierrors.NewNotFound(apps.Resource("Service"), objMeta.Name)
+	}
+
+	if len(objects) == 1 {
+		// Exactly one object found by labels
+		return objects[0], nil
+	}
+
+	// Too much objects found by labels
+	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
 }
 
 // getStatefulSet gets StatefulSet either by namespaced name or by labels
 // TODO review byNameOnly params
 func (c *Controller) getStatefulSet(objMeta *meta.ObjectMeta, byNameOnly bool) (*apps.StatefulSet, error) {
-	// Check whether object with such name already exists in k8s
-	if res, err := c.statefulSetLister.StatefulSets(objMeta.Namespace).Get(objMeta.Name); res != nil {
+	get := c.statefulSetLister.StatefulSets(objMeta.Namespace).Get
+	list := c.statefulSetLister.StatefulSets(objMeta.Namespace).List
+	var objects []*apps.StatefulSet
+
+	// Check whether object with such name already exists
+	obj, err := get(objMeta.Name)
+
+	if (obj != nil) && (err == nil) {
 		// Object found by name
-		return res, nil
-	} else if apierrors.IsNotFound(err) {
-		errNotFound := err
-		if byNameOnly {
-			return nil, errNotFound
-		}
-		// Try to find by labels
-		if selector, err := chopmodel.GetSelectorFromObjectMeta(objMeta); err != nil {
-			return nil, err
-		} else if objects, err := c.statefulSetLister.StatefulSets(objMeta.Namespace).List(selector); err != nil {
-			return nil, err
-		} else if len(objects) == 0 {
-			return nil, errNotFound
-		} else if len(objects) == 1 {
-			// Exactly one object found by labels
-			return objects[0], nil
-		} else {
-			// Too much object found by labels
-			return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
-		}
-	} else {
+		return obj, nil
+	}
+
+	if !apierrors.IsNotFound(err) {
 		// Error, which is not related to "Object not found"
 		return nil, err
 	}
 
-	return nil, fmt.Errorf("unexpected flow")
+	// Object not found by name. Try to find by labels
+
+	if byNameOnly {
+		return nil, fmt.Errorf("object not found by name %s/%s and no label search allowed ", objMeta.Namespace, objMeta.Name)
+	}
+
+	var selector kublabels.Selector
+	if selector, err = chopmodel.GetSelectorFromObjectMeta(objMeta); err != nil {
+		return nil, err
+	}
+
+	if objects, err = list(selector); err != nil {
+		return nil, err
+	}
+
+	if len(objects) == 0 {
+		return nil, apierrors.NewNotFound(apps.Resource("StatefulSet"), objMeta.Name)
+	}
+
+	if len(objects) == 1 {
+		// Exactly one object found by labels
+		return objects[0], nil
+	}
+
+	// Too much objects found by labels
+	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
 }
 
 // GetChiByObjectMeta gets CHI by namespaced name
 func (c *Controller) GetChiByObjectMeta(objectMeta *meta.ObjectMeta) (*chiv1.ClickHouseInstallation, error) {
 	chiName, err := chopmodel.GetChiNameFromObjectMeta(objectMeta)
 	if err != nil {
-		return nil, fmt.Errorf("ObjectMeta %s does not generated by CHI %v", objectMeta.Name, err)
+		return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", objectMeta.Name, err)
 	}
 
 	return c.chiLister.ClickHouseInstallations(objectMeta.Namespace).Get(chiName)

@@ -24,10 +24,17 @@ import (
 )
 
 const (
-	namePartChiMaxLen     = 60
-	namePartClusterMaxLen = 15
-	namePartShardMaxLen   = 15
-	namePartReplicaMaxLen = 15
+	// Names context length
+	namePartChiMaxLenNamesCtx     = 60
+	namePartClusterMaxLenNamesCtx = 15
+	namePartShardMaxLenNamesCtx   = 15
+	namePartReplicaMaxLenNamesCtx = 15
+
+	// Labels context length
+	namePartChiMaxLenLabelsCtx     = 63
+	namePartClusterMaxLenLabelsCtx = 63
+	namePartShardMaxLenLabelsCtx   = 63
+	namePartReplicaMaxLenLabelsCtx = 63
 )
 
 const (
@@ -107,149 +114,213 @@ func sanitize(s string) string {
 	return strings.Trim(s, "-_.")
 }
 
-func namePartChiName(name string) string {
-	return sanitize(util.StringHead(name, namePartChiMaxLen))
+const (
+	namerContextLabels = "labels"
+	namerContextNames  = "names"
+)
+
+type namerContext string
+type namer struct {
+	ctx namerContext
 }
 
-func namePartChiNameID(name string) string {
-	return util.CreateStringID(name, namePartChiMaxLen)
+func newNamer(ctx namerContext) *namer {
+	return &namer{
+		ctx: ctx,
+	}
 }
 
-func namePartClusterName(name string) string {
-	return sanitize(util.StringHead(name, namePartClusterMaxLen))
+func (n *namer) namePartChiName(name string) string {
+	var len int
+	if n.ctx == namerContextLabels {
+		len = namePartChiMaxLenLabelsCtx
+	} else {
+		len = namePartChiMaxLenNamesCtx
+	}
+	return sanitize(util.StringHead(name, len))
 }
 
-func namePartClusterNameID(name string) string {
-	return util.CreateStringID(name, namePartClusterMaxLen)
+func (n *namer) namePartChiNameID(name string) string {
+	var len int
+	if n.ctx == namerContextLabels {
+		len = namePartChiMaxLenLabelsCtx
+	} else {
+		len = namePartChiMaxLenNamesCtx
+	}
+	return util.CreateStringID(name, len)
 }
 
-func namePartShardName(name string) string {
-	return sanitize(util.StringHead(name, namePartShardMaxLen))
+func (n *namer) namePartClusterName(name string) string {
+	var len int
+	if n.ctx == namerContextLabels {
+		len = namePartClusterMaxLenLabelsCtx
+	} else {
+		len = namePartClusterMaxLenNamesCtx
+	}
+	return sanitize(util.StringHead(name, len))
 }
 
-func namePartShardNameID(name string) string {
-	return util.CreateStringID(name, namePartShardMaxLen)
+func (n *namer) namePartClusterNameID(name string) string {
+	var len int
+	if n.ctx == namerContextLabels {
+		len = namePartClusterMaxLenLabelsCtx
+	} else {
+		len = namePartClusterMaxLenNamesCtx
+	}
+	return util.CreateStringID(name, len)
 }
 
-func namePartReplicaName(name string) string {
-	return sanitize(util.StringHead(name, namePartReplicaMaxLen))
+func (n *namer) namePartShardName(name string) string {
+	var len int
+	if n.ctx == namerContextLabels {
+		len = namePartShardMaxLenLabelsCtx
+	} else {
+		len = namePartShardMaxLenNamesCtx
+	}
+	return sanitize(util.StringHead(name, len))
 }
 
-func namePartReplicaNameID(name string) string {
-	return util.CreateStringID(name, namePartReplicaMaxLen)
+func (n *namer) namePartShardNameID(name string) string {
+	var len int
+	if n.ctx == namerContextLabels {
+		len = namePartShardMaxLenLabelsCtx
+	} else {
+		len = namePartShardMaxLenNamesCtx
+	}
+	return util.CreateStringID(name, len)
 }
 
-func getNamePartChiName(obj interface{}) string {
+func (n *namer) namePartReplicaName(name string) string {
+	var len int
+	if n.ctx == namerContextLabels {
+		len = namePartReplicaMaxLenLabelsCtx
+	} else {
+		len = namePartReplicaMaxLenNamesCtx
+	}
+	return sanitize(util.StringHead(name, len))
+}
+
+func (n *namer) namePartReplicaNameID(name string) string {
+	var len int
+	if n.ctx == namerContextLabels {
+		len = namePartReplicaMaxLenLabelsCtx
+	} else {
+		len = namePartReplicaMaxLenNamesCtx
+	}
+	return util.CreateStringID(name, len)
+}
+
+func (n *namer) getNamePartChiName(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ClickHouseInstallation:
 		chi := obj.(*chop.ClickHouseInstallation)
-		return namePartChiName(chi.Name)
+		return n.namePartChiName(chi.Name)
 	case *chop.ChiCluster:
 		cluster := obj.(*chop.ChiCluster)
-		return namePartChiName(cluster.Address.ChiName)
+		return n.namePartChiName(cluster.Address.ChiName)
 	case *chop.ChiShard:
 		shard := obj.(*chop.ChiShard)
-		return namePartChiName(shard.Address.ChiName)
+		return n.namePartChiName(shard.Address.ChiName)
 	case *chop.ChiHost:
 		host := obj.(*chop.ChiHost)
-		return namePartChiName(host.Address.ChiName)
+		return n.namePartChiName(host.Address.ChiName)
 	}
 
 	return "ERROR"
 }
 
-func getNamePartClusterName(obj interface{}) string {
+func (n *namer) getNamePartClusterName(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ChiCluster:
 		cluster := obj.(*chop.ChiCluster)
-		return namePartClusterName(cluster.Address.ClusterName)
+		return n.namePartClusterName(cluster.Address.ClusterName)
 	case *chop.ChiShard:
 		shard := obj.(*chop.ChiShard)
-		return namePartClusterName(shard.Address.ClusterName)
+		return n.namePartClusterName(shard.Address.ClusterName)
 	case *chop.ChiHost:
 		host := obj.(*chop.ChiHost)
-		return namePartClusterName(host.Address.ClusterName)
+		return n.namePartClusterName(host.Address.ClusterName)
 	}
 
 	return "ERROR"
 }
 
-func getNamePartShardName(obj interface{}) string {
+func (n *namer) getNamePartShardName(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ChiShard:
 		shard := obj.(*chop.ChiShard)
-		return namePartShardName(shard.Address.ShardName)
+		return n.namePartShardName(shard.Address.ShardName)
 	case *chop.ChiHost:
 		host := obj.(*chop.ChiHost)
-		return namePartShardName(host.Address.ShardName)
+		return n.namePartShardName(host.Address.ShardName)
 	}
 
 	return "ERROR"
 }
 
-func getNamePartReplicaName(host *chop.ChiHost) string {
-	return namePartReplicaName(host.Address.ReplicaName)
+func (n *namer) getNamePartReplicaName(host *chop.ChiHost) string {
+	return n.namePartReplicaName(host.Address.ReplicaName)
 }
 
-func newNameReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
+func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
 	return strings.NewReplacer(
-		macrosChiName, namePartChiName(chi.Name),
-		macrosChiID, namePartChiNameID(chi.Name),
+		macrosChiName, newNamer(namerContextNames).namePartChiName(chi.Name),
+		macrosChiID, newNamer(namerContextNames).namePartChiNameID(chi.Name),
 	)
 }
 
-func newNameReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
+func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 	return strings.NewReplacer(
-		macrosChiName, namePartChiName(cluster.Address.ChiName),
-		macrosChiID, namePartChiNameID(cluster.Address.ChiName),
-		macrosClusterName, namePartClusterName(cluster.Address.ClusterName),
-		macrosClusterID, namePartClusterNameID(cluster.Address.ClusterName),
+		macrosChiName, newNamer(namerContextNames).namePartChiName(cluster.Address.ChiName),
+		macrosChiID, newNamer(namerContextNames).namePartChiNameID(cluster.Address.ChiName),
+		macrosClusterName, newNamer(namerContextNames).namePartClusterName(cluster.Address.ClusterName),
+		macrosClusterID, newNamer(namerContextNames).namePartClusterNameID(cluster.Address.ClusterName),
 		macrosClusterIndex, strconv.Itoa(cluster.Address.ClusterIndex),
 	)
 }
 
-func newNameReplacerShard(shard *chop.ChiShard) *strings.Replacer {
+func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 	return strings.NewReplacer(
-		macrosChiName, namePartChiName(shard.Address.ChiName),
-		macrosChiID, namePartChiNameID(shard.Address.ChiName),
-		macrosClusterName, namePartClusterName(shard.Address.ClusterName),
-		macrosClusterID, namePartClusterNameID(shard.Address.ClusterName),
+		macrosChiName, newNamer(namerContextNames).namePartChiName(shard.Address.ChiName),
+		macrosChiID, newNamer(namerContextNames).namePartChiNameID(shard.Address.ChiName),
+		macrosClusterName, newNamer(namerContextNames).namePartClusterName(shard.Address.ClusterName),
+		macrosClusterID, newNamer(namerContextNames).namePartClusterNameID(shard.Address.ClusterName),
 		macrosClusterIndex, strconv.Itoa(shard.Address.ClusterIndex),
-		macrosShardName, namePartShardName(shard.Address.ShardName),
-		macrosShardID, namePartShardNameID(shard.Address.ShardName),
+		macrosShardName, newNamer(namerContextNames).namePartShardName(shard.Address.ShardName),
+		macrosShardID, newNamer(namerContextNames).namePartShardNameID(shard.Address.ShardName),
 		macrosShardIndex, strconv.Itoa(shard.Address.ShardIndex),
 	)
 }
 
-func newNameReplacerHost(host *chop.ChiHost) *strings.Replacer {
+func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
 	return strings.NewReplacer(
-		macrosChiName, namePartChiName(host.Address.ChiName),
-		macrosChiID, namePartChiNameID(host.Address.ChiName),
-		macrosClusterName, namePartClusterName(host.Address.ClusterName),
-		macrosClusterID, namePartClusterNameID(host.Address.ClusterName),
+		macrosChiName, newNamer(namerContextNames).namePartChiName(host.Address.ChiName),
+		macrosChiID, newNamer(namerContextNames).namePartChiNameID(host.Address.ChiName),
+		macrosClusterName, newNamer(namerContextNames).namePartClusterName(host.Address.ClusterName),
+		macrosClusterID, newNamer(namerContextNames).namePartClusterNameID(host.Address.ClusterName),
 		macrosClusterIndex, strconv.Itoa(host.Address.ClusterIndex),
-		macrosShardName, namePartShardName(host.Address.ShardName),
-		macrosShardID, namePartShardNameID(host.Address.ShardName),
+		macrosShardName, newNamer(namerContextNames).namePartShardName(host.Address.ShardName),
+		macrosShardID, newNamer(namerContextNames).namePartShardNameID(host.Address.ShardName),
 		macrosShardIndex, strconv.Itoa(host.Address.ShardIndex),
-		macrosReplicaName, namePartReplicaName(host.Address.ReplicaName),
-		macrosReplicaID, namePartReplicaNameID(host.Address.ReplicaName),
+		macrosReplicaName, newNamer(namerContextNames).namePartReplicaName(host.Address.ReplicaName),
+		macrosReplicaID, newNamer(namerContextNames).namePartReplicaNameID(host.Address.ReplicaName),
 		macrosReplicaIndex, strconv.Itoa(host.Address.ReplicaIndex),
 	)
 }
 
 // CreateConfigMapPodName returns a name for a ConfigMap for ClickHouse pod
 func CreateConfigMapPodName(host *chop.ChiHost) string {
-	return newNameReplacerHost(host).Replace(configMapDeploymentNamePattern)
+	return newNameMacroReplacerHost(host).Replace(configMapDeploymentNamePattern)
 }
 
 // CreateConfigMapCommonName returns a name for a ConfigMap for replica's common chopConfig
 func CreateConfigMapCommonName(chi *chop.ClickHouseInstallation) string {
-	return newNameReplacerChi(chi).Replace(configMapCommonNamePattern)
+	return newNameMacroReplacerChi(chi).Replace(configMapCommonNamePattern)
 }
 
 // CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common chopConfig
 func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
-	return newNameReplacerChi(chi).Replace(configMapCommonUsersNamePattern)
+	return newNameMacroReplacerChi(chi).Replace(configMapCommonUsersNamePattern)
 }
 
 // CreateChiServiceName creates a name of a Installation Service resource
@@ -258,12 +329,12 @@ func CreateChiServiceName(chi *chop.ClickHouseInstallation) string {
 		// Service template available
 		if template.GenerateName != "" {
 			// Service template has explicitly specified service name template
-			return newNameReplacerChi(chi).Replace(template.GenerateName)
+			return newNameMacroReplacerChi(chi).Replace(template.GenerateName)
 		}
 	}
 
 	// Create Service name based on default Service Name template
-	return newNameReplacerChi(chi).Replace(chiServiceNamePattern)
+	return newNameMacroReplacerChi(chi).Replace(chiServiceNamePattern)
 }
 
 // CreateChiServiceName creates a name of a Installation Service resource
@@ -281,12 +352,12 @@ func CreateClusterServiceName(cluster *chop.ChiCluster) string {
 		// Service template available
 		if template.GenerateName != "" {
 			// Service template has explicitly specified service name template
-			return newNameReplacerCluster(cluster).Replace(template.GenerateName)
+			return newNameMacroReplacerCluster(cluster).Replace(template.GenerateName)
 		}
 	}
 
 	// Create Service name based on default Service Name template
-	return newNameReplacerCluster(cluster).Replace(clusterServiceNamePattern)
+	return newNameMacroReplacerCluster(cluster).Replace(clusterServiceNamePattern)
 }
 
 // CreateShardServiceName returns a name of a shard's Service
@@ -295,17 +366,17 @@ func CreateShardServiceName(shard *chop.ChiShard) string {
 		// Service template available
 		if template.GenerateName != "" {
 			// Service template has explicitly specified service name template
-			return newNameReplacerShard(shard).Replace(template.GenerateName)
+			return newNameMacroReplacerShard(shard).Replace(template.GenerateName)
 		}
 	}
 
 	// Create Service name based on default Service Name template
-	return newNameReplacerShard(shard).Replace(shardServiceNamePattern)
+	return newNameMacroReplacerShard(shard).Replace(shardServiceNamePattern)
 }
 
 // CreateStatefulSetName creates a name of a StatefulSet for ClickHouse instance
 func CreateStatefulSetName(host *chop.ChiHost) string {
-	return newNameReplacerHost(host).Replace(statefulSetNamePattern)
+	return newNameMacroReplacerHost(host).Replace(statefulSetNamePattern)
 }
 
 // CreateStatefulSetServiceName returns a name of a StatefulSet-related Service for ClickHouse instance
@@ -314,12 +385,12 @@ func CreateStatefulSetServiceName(host *chop.ChiHost) string {
 		// Service template available
 		if template.GenerateName != "" {
 			// Service template has explicitly specified service name template
-			return newNameReplacerHost(host).Replace(template.GenerateName)
+			return newNameMacroReplacerHost(host).Replace(template.GenerateName)
 		}
 	}
 
 	// Create Service name based on default Service Name template
-	return newNameReplacerHost(host).Replace(statefulSetServiceNamePattern)
+	return newNameMacroReplacerHost(host).Replace(statefulSetServiceNamePattern)
 }
 
 // CreatePodHostname returns a name of a Pod of a ClickHouse instance

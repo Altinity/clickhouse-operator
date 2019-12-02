@@ -35,17 +35,18 @@ const (
 // reconcileConfigMap reconciles core.ConfigMap
 func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
 	glog.V(1).Infof("Reconcile ConfigMap %s/%s", configMap.Namespace, configMap.Name)
-	// Check whether object with such name already exists in k8s
-	if curConfigMap, err := c.getConfigMap(&configMap.ObjectMeta, true); curConfigMap != nil {
-		// Object with such name already exists, this is not an error
+	// Check whether this object already exists in k8s
+	if curConfigMap, err := c.getConfigMap(&configMap.ObjectMeta, false); curConfigMap != nil {
+		// Object found
 		glog.V(1).Infof("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		_, err := c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
 		// Object updated
 		return err
 	} else if apierrors.IsNotFound(err) {
-		// Object with such name not found - create it
+		// Object not found - create it
 		glog.V(1).Infof("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		_, err := c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
+		// Object created
 		return err
 	} else {
 		return err
@@ -57,11 +58,11 @@ func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
 // reconcileService reconciles core.Service
 func (c *Controller) ReconcileService(service *core.Service) error {
 	glog.V(1).Infof("Reconcile Service %s/%s", service.Namespace, service.Name)
-	// Check whether object with such name already exists in k8s
-	if curService, err := c.getService(&service.ObjectMeta, true); curService != nil {
-		// Object with such name already exists, this is not an error
+	// Check whether this object already exists in k8s
+	if curService, err := c.getService(&service.ObjectMeta, false); curService != nil {
+		// Object found
 		glog.V(1).Infof("Update Service %s/%s", service.Namespace, service.Name)
-		// spec.resourceVersion is required in order to update Service
+		// spec.resourceVersion is required in order to update object
 		service.ResourceVersion = curService.ResourceVersion
 		// spec.clusterIP field is immutable, need to use already assigned value
 		// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
@@ -70,11 +71,13 @@ func (c *Controller) ReconcileService(service *core.Service) error {
 		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
 		service.Spec.ClusterIP = curService.Spec.ClusterIP
 		_, err := c.kubeClient.CoreV1().Services(service.Namespace).Update(service)
+		// Object updated
 		return err
 	} else if apierrors.IsNotFound(err) {
 		glog.V(1).Infof("Create service %s/%s", service.Namespace, service.Name)
-		// Object with such name not found - create it
+		// Object not found - create it
 		_, err := c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
+		// Object created
 		return err
 	} else {
 		return err
@@ -85,15 +88,16 @@ func (c *Controller) ReconcileService(service *core.Service) error {
 
 // reconcileStatefulSet reconciles apps.StatefulSet
 func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
-	// Check whether object with such name already exists in k8s
-	if curStatefulSet, err := c.getStatefulSet(&newStatefulSet.ObjectMeta, true); curStatefulSet != nil {
-		// StatefulSet already exists - update it
+	// Check whether this object already exists in k8s
+	if curStatefulSet, err := c.getStatefulSet(&newStatefulSet.ObjectMeta, false); curStatefulSet != nil {
+		// Object found - update it
 		err := c.updateStatefulSet(curStatefulSet, newStatefulSet)
 		host.Chi.Status.UpdatedHostsCount++
 		_ = c.updateChiObjectStatus(host.Chi, false)
+		// Object updated
 		return err
 	} else if apierrors.IsNotFound(err) {
-		// StatefulSet with such name not found - create StatefulSet
+		// Object not found - create it
 		err := c.createStatefulSet(newStatefulSet, host)
 		host.Chi.Status.AddedHostsCount++
 		_ = c.updateChiObjectStatus(host.Chi, false)
