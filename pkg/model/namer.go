@@ -263,47 +263,51 @@ func (n *namer) getNamePartReplicaName(host *chop.ChiHost) string {
 }
 
 func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
+	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
-		macrosChiName, newNamer(namerContextNames).namePartChiName(chi.Name),
-		macrosChiID, newNamer(namerContextNames).namePartChiNameID(chi.Name),
+		macrosChiName, n.namePartChiName(chi.Name),
+		macrosChiID, n.namePartChiNameID(chi.Name),
 	)
 }
 
 func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
+	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
-		macrosChiName, newNamer(namerContextNames).namePartChiName(cluster.Address.ChiName),
-		macrosChiID, newNamer(namerContextNames).namePartChiNameID(cluster.Address.ChiName),
-		macrosClusterName, newNamer(namerContextNames).namePartClusterName(cluster.Address.ClusterName),
-		macrosClusterID, newNamer(namerContextNames).namePartClusterNameID(cluster.Address.ClusterName),
+		macrosChiName, n.namePartChiName(cluster.Address.ChiName),
+		macrosChiID, n.namePartChiNameID(cluster.Address.ChiName),
+		macrosClusterName, n.namePartClusterName(cluster.Address.ClusterName),
+		macrosClusterID, n.namePartClusterNameID(cluster.Address.ClusterName),
 		macrosClusterIndex, strconv.Itoa(cluster.Address.ClusterIndex),
 	)
 }
 
 func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
+	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
-		macrosChiName, newNamer(namerContextNames).namePartChiName(shard.Address.ChiName),
-		macrosChiID, newNamer(namerContextNames).namePartChiNameID(shard.Address.ChiName),
-		macrosClusterName, newNamer(namerContextNames).namePartClusterName(shard.Address.ClusterName),
-		macrosClusterID, newNamer(namerContextNames).namePartClusterNameID(shard.Address.ClusterName),
+		macrosChiName, n.namePartChiName(shard.Address.ChiName),
+		macrosChiID, n.namePartChiNameID(shard.Address.ChiName),
+		macrosClusterName, n.namePartClusterName(shard.Address.ClusterName),
+		macrosClusterID, n.namePartClusterNameID(shard.Address.ClusterName),
 		macrosClusterIndex, strconv.Itoa(shard.Address.ClusterIndex),
-		macrosShardName, newNamer(namerContextNames).namePartShardName(shard.Address.ShardName),
-		macrosShardID, newNamer(namerContextNames).namePartShardNameID(shard.Address.ShardName),
+		macrosShardName, n.namePartShardName(shard.Address.ShardName),
+		macrosShardID, n.namePartShardNameID(shard.Address.ShardName),
 		macrosShardIndex, strconv.Itoa(shard.Address.ShardIndex),
 	)
 }
 
 func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
+	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
-		macrosChiName, newNamer(namerContextNames).namePartChiName(host.Address.ChiName),
-		macrosChiID, newNamer(namerContextNames).namePartChiNameID(host.Address.ChiName),
-		macrosClusterName, newNamer(namerContextNames).namePartClusterName(host.Address.ClusterName),
-		macrosClusterID, newNamer(namerContextNames).namePartClusterNameID(host.Address.ClusterName),
+		macrosChiName, n.namePartChiName(host.Address.ChiName),
+		macrosChiID, n.namePartChiNameID(host.Address.ChiName),
+		macrosClusterName, n.namePartClusterName(host.Address.ClusterName),
+		macrosClusterID, n.namePartClusterNameID(host.Address.ClusterName),
 		macrosClusterIndex, strconv.Itoa(host.Address.ClusterIndex),
-		macrosShardName, newNamer(namerContextNames).namePartShardName(host.Address.ShardName),
-		macrosShardID, newNamer(namerContextNames).namePartShardNameID(host.Address.ShardName),
+		macrosShardName, n.namePartShardName(host.Address.ShardName),
+		macrosShardID, n.namePartShardNameID(host.Address.ShardName),
 		macrosShardIndex, strconv.Itoa(host.Address.ShardIndex),
-		macrosReplicaName, newNamer(namerContextNames).namePartReplicaName(host.Address.ReplicaName),
-		macrosReplicaID, newNamer(namerContextNames).namePartReplicaNameID(host.Address.ReplicaName),
+		macrosReplicaName, n.namePartReplicaName(host.Address.ReplicaName),
+		macrosReplicaID, n.namePartReplicaNameID(host.Address.ReplicaName),
 		macrosReplicaIndex, strconv.Itoa(host.Address.ReplicaIndex),
 	)
 }
