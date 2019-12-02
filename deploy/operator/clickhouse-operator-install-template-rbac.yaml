@@ -1,0 +1,26 @@
+# Possible Template Parameters:
+#
+# $OPERATOR_NAMESPACE
+#
+# Setup ServiceAccount
+# ServiceAccount would be created in kubectl-specified namespace
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: clickhouse-operator
+  namespace: $OPERATOR_NAMESPACE
+---
+# Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
+# ClusterRoleBinding is namespace-less and must have unique name
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: clickhouse-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: clickhouse-operator
+    namespace: $OPERATOR_NAMESPACE
