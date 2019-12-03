@@ -14,24 +14,6 @@
 
 package model
 
-import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
-)
-
-const (
-	// Kubernetes labels
-	LabelApp      = clickhousealtinitycom.GroupName + "/app"
-	LabelAppValue = "chop"
-	LabelChop     = clickhousealtinitycom.GroupName + "/chop"
-	LabelChi      = clickhousealtinitycom.GroupName + "/chi"
-	LabelCluster  = clickhousealtinitycom.GroupName + "/cluster"
-	LabelShard    = clickhousealtinitycom.GroupName + "/shard"
-	LabelReplica  = clickhousealtinitycom.GroupName + "/replica"
-	// Supplementary service labels - used to cooperate with k8s
-	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/zookeeper-version"
-	LabelSettingsConfigVersion  = clickhousealtinitycom.GroupName + "/settings-version"
-)
-
 const (
 	xmlTagYandex = "yandex"
 )

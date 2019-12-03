@@ -63,7 +63,7 @@ func (c *Creator) CreateServiceChi() *corev1.Service {
 			template,
 			c.chi.Namespace,
 			serviceName,
-			c.labeler.getLabelsChiScope(),
+			c.labeler.getLabelsServiceChi(),
 			c.labeler.getSelectorChiScope(),
 		)
 	} else {
@@ -73,7 +73,7 @@ func (c *Creator) CreateServiceChi() *corev1.Service {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: c.chi.Namespace,
-				Labels:    c.labeler.getLabelsChiScope(),
+				Labels:    c.labeler.getLabelsServiceChi(),
 			},
 			Spec: corev1.ServiceSpec{
 				// ClusterIP: templateDefaultsServiceClusterIP,
@@ -105,7 +105,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 			template,
 			cluster.Address.Namespace,
 			serviceName,
-			c.labeler.getLabelsClusterScope(cluster),
+			c.labeler.getLabelsServiceCluster(cluster),
 			c.labeler.getSelectorClusterScope(cluster),
 		)
 	} else {
@@ -124,7 +124,7 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 			template,
 			shard.Address.Namespace,
 			serviceName,
-			c.labeler.getLabelsShardScope(shard),
+			c.labeler.getLabelsServiceShard(shard),
 			c.labeler.getSelectorShardScope(shard),
 		)
 	} else {
@@ -144,7 +144,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			template,
 			host.Address.Namespace,
 			serviceName,
-			c.labeler.getLabelsHostScope(host, false),
+			c.labeler.getLabelsServiceHost(host),
 			c.labeler.GetSelectorHostScope(host),
 		)
 	} else {
@@ -154,7 +154,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: host.Address.Namespace,
-				Labels:    c.labeler.getLabelsHostScope(host, false),
+				Labels:    c.labeler.getLabelsServiceHost(host),
 			},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
@@ -240,7 +240,7 @@ func (c *Creator) CreateConfigMapChiCommon() *corev1.ConfigMap {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonName(c.chi),
 			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsChiScope(),
+			Labels:    c.labeler.getLabelsConfigMapChiCommon(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigSectionsGenerator.commonConfigSections,
@@ -254,7 +254,7 @@ func (c *Creator) CreateConfigMapChiCommonUsers() *corev1.ConfigMap {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonUsersName(c.chi),
 			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsChiScope(),
+			Labels:    c.labeler.getLabelsConfigMapChiCommonUsers(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigSectionsGenerator.commonUsersConfigSections,
@@ -267,7 +267,7 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapPodName(host),
 			Namespace: host.Address.Namespace,
-			Labels:    c.labeler.getLabelsHostScope(host, false),
+			Labels:    c.labeler.getLabelsConfigMapHost(host),
 		},
 		Data: c.chConfigSectionsGenerator.CreateConfigsPod(host),
 	}
