@@ -57,6 +57,11 @@ MANIFEST_PRINT_DEPLOYMENT="${MANIFEST_PRINT_DEPLOYMENT:-yes}"
 # Render operator's Service
 MANIFEST_PRINT_SERVICE="${MANIFEST_PRINT_SERVICE:-yes}"
 
+SED_ARGS=""
+if [[ "${OPERATOR_NAMESPACE}" == "-" ]]; then
+    SED_ARGS="/^  namespace:/ d"
+fi
+
 ##################################
 ##
 ##     File handler
@@ -163,7 +168,9 @@ if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
     render_separator
     ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-01-section-crd.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
     cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-01-section-crd.yaml" | \
-        OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" envsubst
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+        envsubst
 fi
 
 # Render RBAC section
@@ -171,7 +178,9 @@ if [[ "${MANIFEST_PRINT_RBAC}" == "yes" ]]; then
     render_separator
     ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-02-section-rbac.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
     cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-02-section-rbac.yaml" | \
-        OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" envsubst
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+        envsubst
 fi
 
 # Render header/beginning of ConfigMap yaml specification:
@@ -189,7 +198,11 @@ function render_configmap_header() {
     ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
     # Render ConfigMap header template with vars substitution
     cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" | \
-            OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" CONFIGMAP_NAME="${CM_NAME}" envsubst
+            sed "${SED_ARGS}" | \
+            OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+            OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+            CONFIGMAP_NAME="${CM_NAME}" \
+            envsubst
 }
 
 # Render one file section in ConfigMap yaml specification:
@@ -225,9 +238,10 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
     if [[ -z "${OPERATOR_CONFIG_FILE}" ]]; then
         # No config file specified, render simple deployment, w/o ConfigMaps
 
-        render_separator
         ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+        render_separator
         cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-04-section-deployment.yaml" | \
+            sed "${SED_ARGS}" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
             METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
@@ -298,9 +312,10 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         fi
 
         # Render Deployment
-        render_separator
         ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+        render_separator
         cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" | \
+            sed "${SED_ARGS}" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
             METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
@@ -311,8 +326,11 @@ fi
 
 # Render Service section
 if [[ "${MANIFEST_PRINT_SERVICE}" == "yes" ]]; then
-    render_separator
     ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-05-section-service.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+    render_separator
     cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-05-section-service.yaml" | \
-        OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" envsubst
+        sed "${SED_ARGS}" | \
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+        envsubst
 fi
