@@ -108,8 +108,10 @@ const (
 )
 
 const (
-	podDistributionOnePerHost  = "OnePerHost"
-	podDistributionUnspecified = "Unspecified"
+	podDistributionUnspecified         = "Unspecified"
+	podDistributionOnePerHost          = "OnePerHost"
+	podDistributionShardAntiAffinity   = "ShardAntiAffinity"
+	podDistributionReplicaAntiAffinity = "ReplicaAntiAffinity"
 )
 
 const (

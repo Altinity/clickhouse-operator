@@ -256,6 +256,11 @@ func (in *ChiLayout) DeepCopy() *ChiLayout {
 func (in *ChiPodTemplate) DeepCopyInto(out *ChiPodTemplate) {
 	*out = *in
 	in.Zone.DeepCopyInto(&out.Zone)
+	if in.PodDistribution != nil {
+		in, out := &in.PodDistribution, &out.PodDistribution
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	in.Spec.DeepCopyInto(&out.Spec)
 	return
 }
