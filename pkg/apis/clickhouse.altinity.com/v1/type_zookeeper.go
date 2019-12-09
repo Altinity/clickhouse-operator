@@ -44,4 +44,17 @@ func (zoo *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeTy
 			}
 		}
 	}
+
+	if from.SessionTimeoutMs > 0 {
+		zoo.SessionTimeoutMs = from.SessionTimeoutMs
+	}
+	if from.OperationTimeoutMs > 0 {
+		zoo.OperationTimeoutMs = from.OperationTimeoutMs
+	}
+	if from.Root != "" {
+		zoo.Root = from.Root
+	}
+	if from.Identity != "" {
+		zoo.Identity = from.Identity
+	}
 }

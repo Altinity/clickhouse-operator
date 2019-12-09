@@ -287,10 +287,12 @@ type ChiTemplates struct {
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet
 type ChiPodTemplate struct {
-	Name         string             `json:"name"         yaml:"name"`
-	Zone         ChiPodTemplateZone `json:"zone"         yaml:"zone""`
-	Distribution string             `json:"distribution" yaml:"distribution"`
-	Spec         corev1.PodSpec     `json:"spec"         yaml:"spec"`
+	Name string             `json:"name"            yaml:"name"`
+	Zone ChiPodTemplateZone `json:"zone"            yaml:"zone""`
+	// DEPRECATED - to be removed soon
+	Distribution    string         `json:"distribution"    yaml:"distribution"`
+	PodDistribution []string       `json:"podDistribution" yaml:"podDistribution"`
+	Spec            corev1.PodSpec `json:"spec"            yaml:"spec"`
 }
 
 type ChiPodTemplateZone struct {
