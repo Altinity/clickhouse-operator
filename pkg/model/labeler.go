@@ -19,6 +19,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kublabels "k8s.io/apimachinery/pkg/labels"
 )
@@ -206,6 +207,92 @@ func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 		LabelReplica: l.namer.getNamePartReplicaName(host),
 		// skip StatefulSet
 		// skip Zookeeper
+	}
+}
+
+func (l *Labeler) prepareAffinity(podTemplate *chi.ChiPodTemplate, host *chi.ChiHost) {
+	if podTemplate.Spec.Affinity == nil {
+		return
+	}
+
+	// Walk over all affinity fields
+
+	if podTemplate.Spec.Affinity.NodeAffinity != nil {
+		l.processNodeSelector(podTemplate.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
+		// TODO
+		// PreferredDuringSchedulingIgnoredDuringExecution []PreferredSchedulingTerm are skipped for now
+	}
+
+	if podTemplate.Spec.Affinity.PodAffinity != nil {
+		l.processPodAffinityTerms(podTemplate.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
+		// TODO
+		// PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm are skipped for now
+	}
+
+	if podTemplate.Spec.Affinity.PodAntiAffinity != nil {
+		l.processPodAffinityTerms(podTemplate.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
+		// TODO
+		// PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm are skipped for now
+	}
+}
+
+func (l *Labeler) processNodeSelector(nodeSelector *v1.NodeSelector, host *chi.ChiHost) {
+	if nodeSelector == nil {
+		return
+	}
+	for i := range nodeSelector.NodeSelectorTerms {
+		nodeSelectorTerm := &nodeSelector.NodeSelectorTerms[i]
+		l.processNodeSelectorTerm(nodeSelectorTerm, host)
+	}
+}
+
+func (l *Labeler) processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm, host *chi.ChiHost) {
+	for j := range nodeSelectorTerm.MatchExpressions {
+		nodeSelectorRequirement := &nodeSelectorTerm.MatchExpressions[j]
+		l.processNodeSelectorRequirement(nodeSelectorRequirement, host)
+	}
+
+	for j := range nodeSelectorTerm.MatchFields {
+		nodeSelectorRequirement := &nodeSelectorTerm.MatchExpressions[j]
+		l.processNodeSelectorRequirement(nodeSelectorRequirement, host)
+	}
+}
+
+func (l *Labeler) processNodeSelectorRequirement(nodeSelectorRequirement *v1.NodeSelectorRequirement, host *chi.ChiHost) {
+	nodeSelectorRequirement.Key = newNameMacroReplacerHost(host).Replace(nodeSelectorRequirement.Key)
+	// Update values only, keys are not macros-ed
+	for key := range nodeSelectorRequirement.Values {
+		nodeSelectorRequirement.Values[key] = newNameMacroReplacerHost(host).Replace(nodeSelectorRequirement.Values[key])
+	}
+}
+
+func (l *Labeler) processPodAffinityTerms(podAffinityTerms []v1.PodAffinityTerm, host *chi.ChiHost) {
+	for i := range podAffinityTerms {
+		podAffinityTerm := &podAffinityTerms[i]
+		l.processLabelSelector(podAffinityTerm.LabelSelector, host)
+		podAffinityTerm.TopologyKey = newNameMacroReplacerHost(host).Replace(podAffinityTerm.TopologyKey)
+	}
+}
+
+func (l *Labeler) processLabelSelector(labelSelector *meta.LabelSelector, host *chi.ChiHost) {
+	if labelSelector == nil {
+		return
+	}
+
+	for k := range labelSelector.MatchLabels {
+		labelSelector.MatchLabels[k] = newNameMacroReplacerHost(host).Replace(labelSelector.MatchLabels[k])
+	}
+	for j := range labelSelector.MatchExpressions {
+		labelSelectorRequirement := &labelSelector.MatchExpressions[j]
+		l.processLabelSelectorRequirement(labelSelectorRequirement, host)
+	}
+}
+
+func (l *Labeler) processLabelSelectorRequirement(labelSelectorRequirement *meta.LabelSelectorRequirement, host *chi.ChiHost) {
+	labelSelectorRequirement.Key = newNameMacroReplacerHost(host).Replace(labelSelectorRequirement.Key)
+	// Update values only, keys are not macros-ed
+	for key := range labelSelectorRequirement.Values {
+		labelSelectorRequirement.Values[key] = newNameMacroReplacerHost(host).Replace(labelSelectorRequirement.Values[key])
 	}
 }
 

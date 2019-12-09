@@ -346,6 +346,16 @@ spec:
                           # List podDistributionXXX constants from model
                           - "Unspecified"
                           - "OnePerHost"
+                      podDistribution:
+                        type: array
+                        items:
+                          type: string
+                          enum:
+                            # List podDistributionXXX constants from model
+                            - "Unspecified"
+                            - "OnePerHost"
+                            - "ShardAntiAffinity"
+                            - "ReplicaAntiAffinity"
                       spec:
                         # TODO specify PodSpec
                         type: object
@@ -727,6 +737,16 @@ spec:
                           # List podDistributionXXX constants from model
                           - "Unspecified"
                           - "OnePerHost"
+                      podDistribution:
+                        type: array
+                        items:
+                          type: string
+                          enum:
+                            # List podDistributionXXX constants from model
+                            - "Unspecified"
+                            - "OnePerHost"
+                            - "ShardAntiAffinity"
+                            - "ReplicaAntiAffinity"
                       spec:
                         # TODO specify PodSpec
                         type: object
