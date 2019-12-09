@@ -314,6 +314,16 @@ spec:
         # OnePerHost
         distribution: "Unspecified"
 
+        # Possible values for podDistribution are:
+        # Unspecified
+        # OnePerHost
+        # ShardAntiAffinity
+        # ReplicaAntiAffinity
+        podDistribution:
+          - "OnePerHost"
+          - "ShardAntiAffinity"
+          - "ReplicaAntiAffinity"
+
         # type PodSpec struct {} from k8s.io/core/v1
         spec:
           containers:
