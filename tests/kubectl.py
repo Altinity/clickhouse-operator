@@ -20,7 +20,8 @@ def kube_get(type, name, ns="default"):
 def kube_createns(ns):
     cmd = shell(f"kubectl create ns {ns}")
     assert cmd.exitcode == 0, error()
-    time.sleep(5)
+    cmd = shell(f"kubectl get ns {ns}")
+    assert cmd.exitcode == 0, error()
 
 def kube_deletens(ns):
     shell(f"kubectl delete ns {ns}", timeout = 60)
@@ -31,6 +32,13 @@ def kube_get_count(type, ns="default", label=""):
         return len(cmd.output.splitlines())-1
     else:
         return 0
+    
+def kubectl(command, ok_to_fail = False):
+    cmd = shell(f"kubectl {command}", timeout = 60)
+    code = cmd.exitcode
+    if ok_to_fail == False:
+        assert(code) == 0, error()
+    return cmd.output
 
 def kube_count_resources(ns="default", label=""):
     sts = kube_get_count("sts", ns, label)
@@ -82,6 +90,12 @@ def kube_get_pod_image(chi_name, ns):
     pod_image = kube_get_pod_spec(chi_name, ns)["containers"][0]["image"]
     return pod_image
 
+def kube_get_pod_name(chi_name, ns):
+    chi = kube_get("chi", chi_name, ns)
+    pod = kube_get("pod", chi["status"]["pods"][0], ns)
+    pod_name = pod["metadata"]["name"]
+    return pod_name
+
 def kube_get_pod_volumes(chi_name, ns):
     volumeMounts = kube_get_pod_spec(chi_name, ns)["containers"][0]["volumeMounts"]
     return volumeMounts
@@ -119,15 +133,9 @@ def kube_check_pod_antiaffinity(chi_name, ns):
     expected = {"requiredDuringSchedulingIgnoredDuringExecution": [
                     {
                         "labelSelector": {
-                            "matchExpressions": [
-                                {
-                                    "key": "clickhouse.altinity.com/app",
-                                    "operator": "In",
-                                    "values": [
-                                        "chop"
-                                    ]
-                                }
-                            ]
+                            "matchLabels": {
+                                    "clickhouse.altinity.com/app": "chop"
+                            }
                         },
                         "topologyKey": "kubernetes.io/hostname"
                     }
