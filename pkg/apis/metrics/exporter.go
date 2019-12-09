@@ -237,4 +237,15 @@ func (e *Exporter) collectFromHost(chi *WatchedChi, hostname string, c chan<- pr
 		e.enqueueToRemoveFromWatched(chi)
 		return
 	}
+	
+	glog.Infof("Querying mutations for %s\n", hostname)
+	if mutations, err := fetcher.clickHouseQueryMutations(); err == nil {
+		glog.Infof("Extracted %d mutations for %s\n", len(mutations), hostname)
+		writer.WriteMutations(mutations)
+	} else {
+		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
+		glog.Infof("Error querying mutations for %s: %s\n", hostname, err)
+		e.enqueueToRemoveFromWatched(chi)
+		return
+	}
 }
