@@ -55,7 +55,8 @@ spec:
           key: "clickhouse"
           values:
             - "allow"
-        distribution: "OnePerHost"
+        podDistribution:
+          - "OnePerHost"
         spec:
           containers:
             - name: clickhouse-pod
