@@ -602,7 +602,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 	// Ensure "must have" sections are in place, which are
 	// 1. user/profile
 	// 2. user/quota
-	// 3. user/networks/ip
+	// 3. user/networks/ip OR user/networks/host OR user/networks/host_regexp
 	// 4. user/password OR user/password_sha256_hex
 	for username := range usernameMap {
 		if _, ok := (*users)[username+"/profile"]; !ok {
@@ -613,7 +613,10 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 			// No 'user/quota' section
 			(*users)[username+"/quota"] = n.config.ChConfigUserDefaultQuota
 		}
-		if _, ok := (*users)[username+"/networks/ip"]; !ok {
+		_, okIPs := (*users)[username+"/networks/ip"]
+		_, okHost := (*users)[username+"/networks/host"]
+		_, okHostRegexp := (*users)[username+"/networks/host_regexp"]
+		if !okIPs && !okHost && !okHostRegexp {
 			// No 'user/networks/ip' section
 			(*users)[username+"/networks/ip"] = n.config.ChConfigUserDefaultNetworksIP
 		}
