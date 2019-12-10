@@ -33,6 +33,10 @@ const (
 	LabelCluster                      = clickhousealtinitycom.GroupName + "/cluster"
 	LabelShard                        = clickhousealtinitycom.GroupName + "/shard"
 	LabelReplica                      = clickhousealtinitycom.GroupName + "/replica"
+	LabelChiCycleIndex                = clickhousealtinitycom.GroupName + "/chiCycleIndex"
+	LabelChiCycleOffset               = clickhousealtinitycom.GroupName + "/chiCycleOffset"
+	LabelClusterCycleIndex            = clickhousealtinitycom.GroupName + "/clusterCycleIndex"
+	LabelClusterCycleOffset           = clickhousealtinitycom.GroupName + "/clusterCycleOffset"
 	LabelConfigMap                    = clickhousealtinitycom.GroupName + "/ConfigMap"
 	LabelConfigMapValueChiCommon      = "ChiCommon"
 	LabelConfigMapValueChiCommonUsers = "ChiCommonUsers"
@@ -176,12 +180,16 @@ func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	labels := map[string]string{
-		LabelApp:     LabelAppValue,
-		LabelChop:    l.version,
-		LabelChi:     l.namer.getNamePartChiName(host),
-		LabelCluster: l.namer.getNamePartClusterName(host),
-		LabelShard:   l.namer.getNamePartShardName(host),
-		LabelReplica: l.namer.getNamePartReplicaName(host),
+		LabelApp:                LabelAppValue,
+		LabelChop:               l.version,
+		LabelChi:                l.namer.getNamePartChiName(host),
+		LabelCluster:            l.namer.getNamePartClusterName(host),
+		LabelShard:              l.namer.getNamePartShardName(host),
+		LabelReplica:            l.namer.getNamePartReplicaName(host),
+		LabelChiCycleIndex:      l.namer.getNamePartChiCycleIndex(host),
+		LabelChiCycleOffset:     l.namer.getNamePartChiCycleOffset(host),
+		LabelClusterCycleIndex:  l.namer.getNamePartClusterCycleIndex(host),
+		LabelClusterCycleOffset: l.namer.getNamePartClusterCycleOffset(host),
 	}
 	if applySupplementaryServiceLabels {
 		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint

@@ -63,6 +63,14 @@ const (
 	macrosReplicaID = "{replicaID}"
 	// macrosReplicaIndex is an index of the replica in the shard - integer number, converted into string
 	macrosReplicaIndex = "{replicaIndex}"
+	// macroChiCycleIndex is an index of the replica in the CHI-level cycle - integer number, converted into string
+	macroChiCycleIndex = "{chiCycleIndex}"
+	// macroChiCycleOffset is an offset of the replica in the CHI-level cycle - integer number, converted into string
+	macroChiCycleOffset = "{chiCycleOffset}"
+	// macroClusterCycleIndex is an index of the replica in the Cluster-level cycle - integer number, converted into string
+	macroClusterCycleIndex = "{clusterCycleIndex}"
+	// macroClusterCycleOffset is an offset of the replica in the Cluster-level cycle - integer number, converted into string
+	macroClusterCycleOffset = "{clusterCycleOffset}"
 )
 
 const (
@@ -262,6 +270,22 @@ func (n *namer) getNamePartReplicaName(host *chop.ChiHost) string {
 	return n.namePartReplicaName(host.Address.ReplicaName)
 }
 
+func (n *namer) getNamePartChiCycleIndex(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ChiCycleIndex)
+}
+
+func (n *namer) getNamePartChiCycleOffset(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ChiCycleOffset)
+}
+
+func (n *namer) getNamePartClusterCycleIndex(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ClusterCycleIndex)
+}
+
+func (n *namer) getNamePartClusterCycleOffset(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ClusterCycleOffset)
+}
+
 func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
 	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
@@ -309,6 +333,10 @@ func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
 		macrosReplicaName, n.namePartReplicaName(host.Address.ReplicaName),
 		macrosReplicaID, n.namePartReplicaNameID(host.Address.ReplicaName),
 		macrosReplicaIndex, strconv.Itoa(host.Address.ReplicaIndex),
+		macroChiCycleIndex, strconv.Itoa(host.Address.ChiCycleIndex), // TODO use appropriate namePart function
+		macroChiCycleOffset, strconv.Itoa(host.Address.ChiCycleOffset), // TODO use appropriate namePart function
+		macroClusterCycleIndex, strconv.Itoa(host.Address.ClusterCycleIndex), // TODO use appropriate namePart function
+		macroClusterCycleOffset, strconv.Itoa(host.Address.ClusterCycleOffset), // TODO use appropriate namePart function
 	)
 }
 

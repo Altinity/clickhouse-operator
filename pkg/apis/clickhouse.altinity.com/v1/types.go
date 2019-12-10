@@ -255,15 +255,21 @@ type ChiHost struct {
 
 // ChiHostAddress defines address of a host within ClickHouseInstallation
 type ChiHostAddress struct {
-	Namespace    string `json:"namespace"`
-	ChiName      string `json:"chiName"`
-	ClusterName  string `json:"clusterName"`
-	ClusterIndex int    `json:"clusterIndex"`
-	ShardName    string `json:"shardName,omitempty"`
-	ShardIndex   int    `json:"shardIndex"`
-	ReplicaName  string `json:"replicaName,omitempty"`
-	ReplicaIndex int    `json:"replicaIndex"`
-	HostIndex    int    `json:"hostIndex"`
+	Namespace          string `json:"namespace"`
+	ChiName            string `json:"chiName"`
+	ClusterName        string `json:"clusterName"`
+	ClusterIndex       int    `json:"clusterIndex"`
+	ShardName          string `json:"shardName,omitempty"`
+	ShardIndex         int    `json:"shardIndex"`
+	ReplicaName        string `json:"replicaName,omitempty"`
+	ReplicaIndex       int    `json:"replicaIndex"`
+	HostIndex          int    `json:"hostIndex"`
+	ChiCycleSize       int    `json:"chiCycleSize"`
+	ChiCycleIndex      int    `json:"chiCycleIndex"`
+	ChiCycleOffset     int    `json:"chiCycleOffset"`
+	ClusterCycleSize   int    `json:"clusterCycleSize"`
+	ClusterCycleIndex  int    `json:"clusterCycleIndex"`
+	ClusterCycleOffset int    `json:"clusterCycleOffset"`
 }
 
 // ChiHostConfig defines additional data related to a host
@@ -290,14 +296,19 @@ type ChiPodTemplate struct {
 	Name string             `json:"name"            yaml:"name"`
 	Zone ChiPodTemplateZone `json:"zone"            yaml:"zone""`
 	// DEPRECATED - to be removed soon
-	Distribution    string         `json:"distribution"    yaml:"distribution"`
-	PodDistribution []string       `json:"podDistribution" yaml:"podDistribution"`
-	Spec            corev1.PodSpec `json:"spec"            yaml:"spec"`
+	Distribution    string               `json:"distribution"    yaml:"distribution"`
+	PodDistribution []ChiPodDistribution `json:"podDistribution" yaml:"podDistribution"`
+	Spec            corev1.PodSpec       `json:"spec"            yaml:"spec"`
 }
 
 type ChiPodTemplateZone struct {
 	Key    string   `json:"key" yaml:"key"`
 	Values []string `json:"values" yaml:"values"`
+}
+
+type ChiPodDistribution struct {
+	Type   string `json:"type"   yaml:"type"`
+	Number int    `json:"number" yaml:"number"`
 }
 
 // ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
