@@ -11,7 +11,7 @@ spec:
   configuration:
     zookeeper: # Add Zookeeper
       nodes:
-        - host: zookeeper.zoo1ns
+        - host: zookeepers
           port: 2181
       root: "/clickhouse/test-010-zkroot"
     clusters:

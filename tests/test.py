@@ -176,8 +176,12 @@ def set_operator_version(version):
 @TestScenario
 @Name("Test zookeeper initialization")
 def test_010():
-    with Given("Zookeeper is installed"):
-        assert kube_get("service", "zookeeper", "zoo1ns"), error()
+    with Given("Install Zookeeper if missing"):
+        if kube_get_count("service", namespace, name = "zookeepers") == 0:
+            config=get_full_path("../deploy/zookeeper/quick-start-volume-emptyDir/zookeeper-1-node.yaml")
+            kube_apply(config, namespace)
+            kube_wait_object("service", "zookeepers", namespace)
+
     create_and_check("configs/test-010-zkroot.yaml", 
                      {"object_counts": [1,1,2],
                       "do_not_delete": 1})
@@ -188,7 +192,7 @@ def test_010():
     create_and_check("configs/test-010-zkroot.yaml",{})
 
 if main():
-    with Module("init"):
+    with Module("main"):
         with Given("clickhouse-operator is installed"):
             assert kube_get_count("pod", "kube-system", "-l app=clickhouse-operator")>0, error()
             with And(f"Clean namespace {namespace}"): 
@@ -204,7 +208,7 @@ if main():
         with Module("regression", flags=TE):
             tests = [test_001, 
                      test_002, 
-                     test_003, # can fail in dev 0.8.0 version 
+                     test_003,
                      test_004, 
                      test_005, 
                      test_006, 
@@ -212,7 +216,7 @@ if main():
                      test_010]
         
             all_tests = tests
-            # all_tests = [test_010]
+            all_tests = [test_010]
         
             for t in all_tests:
                 run(test=t, flags=TE)

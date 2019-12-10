@@ -26,8 +26,8 @@ def kube_createns(ns):
 def kube_deletens(ns):
     shell(f"kubectl delete ns {ns}", timeout = 60)
     
-def kube_get_count(type, ns="default", label=""):
-    cmd = shell(f"kubectl get {type} -n {ns} -o=custom-columns=kind:kind,name:.metadata.name {label}")
+def kube_get_count(type, ns="default", label="", name=""):
+    cmd = shell(f"kubectl get {type} {name} -n {ns} -o=custom-columns=kind:kind,name:.metadata.name {label}")
     if cmd.exitcode == 0:
         return len(cmd.output.splitlines())-1
     else:
@@ -61,12 +61,22 @@ def kube_delete(config, ns):
 def kube_wait_objects(chi, ns, objects):
     with Then(f"{objects[0]} statefulsets, {objects[1]} pods and {objects[2]} services should be created"):
         for i in range(1,max_retries):
-            counts = kube_count_resources(ns, f"-l clickhouse.altinity.com/chi={chi}")
+            counts = kube_count_resources(ns, label = f"-l clickhouse.altinity.com/chi={chi}")
             if counts == objects:
                 break
             with Then("Not ready. Wait for " + str(i*5) + " seconds"):
                 time.sleep(i*5)
         assert counts == objects, error()
+
+def kube_wait_object(type, name, ns, label=""):
+    with Then(f"{type} {name} should be created"):
+        for i in range(1,max_retries):
+            counts = kube_get_count(type, ns, name = name, label = label)
+            if counts > 0:
+                break
+            with Then("Not ready. Wait for " + str(i*5) + " seconds"):
+                time.sleep(i*5)
+        assert counts > 0, error()
 
 def kube_wait_chi_status(chi, ns, status):        
     with Then(f"Installation status is {status}"):
