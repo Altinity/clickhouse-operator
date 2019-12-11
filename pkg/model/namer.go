@@ -38,6 +38,9 @@ const (
 )
 
 const (
+	// macrosNamespace is a sanitized namespace name where ClickHouseInstallation runs
+	macrosNamespace = "{namespace}"
+
 	// macrosChiName is a sanitized ClickHouseInstallation name
 	macrosChiName = "{chi}"
 	// macrosChiID is a sanitized ID made of original ClickHouseInstallation name
@@ -63,14 +66,14 @@ const (
 	macrosReplicaID = "{replicaID}"
 	// macrosReplicaIndex is an index of the replica in the shard - integer number, converted into string
 	macrosReplicaIndex = "{replicaIndex}"
-	// macroChiCycleIndex is an index of the replica in the CHI-level cycle - integer number, converted into string
-	macroChiCycleIndex = "{chiCycleIndex}"
-	// macroChiCycleOffset is an offset of the replica in the CHI-level cycle - integer number, converted into string
-	macroChiCycleOffset = "{chiCycleOffset}"
-	// macroClusterCycleIndex is an index of the replica in the Cluster-level cycle - integer number, converted into string
-	macroClusterCycleIndex = "{clusterCycleIndex}"
-	// macroClusterCycleOffset is an offset of the replica in the Cluster-level cycle - integer number, converted into string
-	macroClusterCycleOffset = "{clusterCycleOffset}"
+	// macrosChiCycleIndex is an index of the replica in the CHI-level cycle - integer number, converted into string
+	macrosChiCycleIndex = "{chiCycleIndex}"
+	// macrosChiCycleOffset is an offset of the replica in the CHI-level cycle - integer number, converted into string
+	macrosChiCycleOffset = "{chiCycleOffset}"
+	// macrosClusterCycleIndex is an index of the replica in the Cluster-level cycle - integer number, converted into string
+	macrosClusterCycleIndex = "{clusterCycleIndex}"
+	// macrosClusterCycleOffset is an offset of the replica in the Cluster-level cycle - integer number, converted into string
+	macrosClusterCycleOffset = "{clusterCycleOffset}"
 )
 
 const (
@@ -136,6 +139,16 @@ func newNamer(ctx namerContext) *namer {
 	return &namer{
 		ctx: ctx,
 	}
+}
+
+func (n *namer) namePartNamespace(name string) string {
+	var len int
+	if n.ctx == namerContextLabels {
+		len = namePartChiMaxLenLabelsCtx
+	} else {
+		len = namePartChiMaxLenNamesCtx
+	}
+	return sanitize(util.StringHead(name, len))
 }
 
 func (n *namer) namePartChiName(name string) string {
@@ -218,6 +231,25 @@ func (n *namer) namePartReplicaNameID(name string) string {
 	return util.CreateStringID(name, len)
 }
 
+func (n *namer) getNamePartNamespace(obj interface{}) string {
+	switch obj.(type) {
+	case *chop.ClickHouseInstallation:
+		chi := obj.(*chop.ClickHouseInstallation)
+		return n.namePartChiName(chi.Namespace)
+	case *chop.ChiCluster:
+		cluster := obj.(*chop.ChiCluster)
+		return n.namePartChiName(cluster.Address.Namespace)
+	case *chop.ChiShard:
+		shard := obj.(*chop.ChiShard)
+		return n.namePartChiName(shard.Address.Namespace)
+	case *chop.ChiHost:
+		host := obj.(*chop.ChiHost)
+		return n.namePartChiName(host.Address.Namespace)
+	}
+
+	return "ERROR"
+}
+
 func (n *namer) getNamePartChiName(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ClickHouseInstallation:
@@ -289,6 +321,7 @@ func (n *namer) getNamePartClusterCycleOffset(host *chop.ChiHost) string {
 func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
 	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
+		macrosNamespace, n.namePartNamespace(chi.Namespace),
 		macrosChiName, n.namePartChiName(chi.Name),
 		macrosChiID, n.namePartChiNameID(chi.Name),
 	)
@@ -297,6 +330,7 @@ func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer
 func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
+		macrosNamespace, n.namePartNamespace(cluster.Address.Namespace),
 		macrosChiName, n.namePartChiName(cluster.Address.ChiName),
 		macrosChiID, n.namePartChiNameID(cluster.Address.ChiName),
 		macrosClusterName, n.namePartClusterName(cluster.Address.ClusterName),
@@ -308,6 +342,7 @@ func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
+		macrosNamespace, n.namePartNamespace(shard.Address.Namespace),
 		macrosChiName, n.namePartChiName(shard.Address.ChiName),
 		macrosChiID, n.namePartChiNameID(shard.Address.ChiName),
 		macrosClusterName, n.namePartClusterName(shard.Address.ClusterName),
@@ -322,6 +357,7 @@ func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
 	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
+		macrosNamespace, n.namePartNamespace(host.Address.Namespace),
 		macrosChiName, n.namePartChiName(host.Address.ChiName),
 		macrosChiID, n.namePartChiNameID(host.Address.ChiName),
 		macrosClusterName, n.namePartClusterName(host.Address.ClusterName),
@@ -333,10 +369,10 @@ func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
 		macrosReplicaName, n.namePartReplicaName(host.Address.ReplicaName),
 		macrosReplicaID, n.namePartReplicaNameID(host.Address.ReplicaName),
 		macrosReplicaIndex, strconv.Itoa(host.Address.ReplicaIndex),
-		macroChiCycleIndex, strconv.Itoa(host.Address.ChiCycleIndex), // TODO use appropriate namePart function
-		macroChiCycleOffset, strconv.Itoa(host.Address.ChiCycleOffset), // TODO use appropriate namePart function
-		macroClusterCycleIndex, strconv.Itoa(host.Address.ClusterCycleIndex), // TODO use appropriate namePart function
-		macroClusterCycleOffset, strconv.Itoa(host.Address.ClusterCycleOffset), // TODO use appropriate namePart function
+		macrosChiCycleIndex, strconv.Itoa(host.Address.ChiCycleIndex), // TODO use appropriate namePart function
+		macrosChiCycleOffset, strconv.Itoa(host.Address.ChiCycleOffset), // TODO use appropriate namePart function
+		macrosClusterCycleIndex, strconv.Itoa(host.Address.ClusterCycleIndex), // TODO use appropriate namePart function
+		macrosClusterCycleOffset, strconv.Itoa(host.Address.ClusterCycleOffset), // TODO use appropriate namePart function
 	)
 }
 

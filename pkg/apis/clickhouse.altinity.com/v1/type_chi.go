@@ -25,6 +25,9 @@ const (
 	PodDistributionMaxNumberPerHost          = "MaxNumberPerHost"
 	PodDistributionOneReplicaOfAShardPerHost = "OneReplicaOfAShardPerHost"
 	PodDistributionOneShardOfAReplicaPerHost = "OneShardOfAReplicaPerHost"
+	PodDistributionOneNamespacePerHost       = "OneNamespacePerHost"
+	PodDistributionOneChiPerHost             = "OneCHIPerHost"
+	PodDistributionOneClusterPerHost         = "OneClusterPerHost"
 )
 
 // StatusFill fills .Status
