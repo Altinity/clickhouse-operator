@@ -616,7 +616,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 		_, okIPs := (*users)[username+"/networks/ip"]
 		_, okHost := (*users)[username+"/networks/host"]
 		_, okHostRegexp := (*users)[username+"/networks/host_regexp"]
-		if !okIPs && !okHost && !okHostRegexp {
+		if !okIPs {
 			// No 'user/networks/ip' section
 			(*users)[username+"/networks/ip"] = n.config.ChConfigUserDefaultNetworksIP
 		}

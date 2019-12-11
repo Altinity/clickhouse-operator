@@ -70,7 +70,8 @@ onStatefulSetUpdateFailureAction: rollback
 chConfigUserDefaultProfile: default
 chConfigUserDefaultQuota: default
 chConfigUserDefaultNetworksIP:
-  - "::/0"
+  - "::/1"
+  - "127.0.0.1"
 chConfigUserDefaultPassword: "default"
 
 ################################################

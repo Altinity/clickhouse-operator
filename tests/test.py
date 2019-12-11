@@ -9,75 +9,8 @@ from testflows.connect import Shell
 
 from kubectl import *
 from clickhouse import *
-from test import kube_count_resources
+from test_examples import *
 
-namespace="test"
-
-def get_full_path(test_file):
-    return os.path.join(current_dir, f"{test_file}")
-
-def get_chi_name(path):
-    return yaml.safe_load(open(path,"r"))["metadata"]["name"]
-
-def create_and_check(test_file, checks):
-    config=get_full_path(test_file)
-    chi_name=get_chi_name(config)
-    
-    if "apply_templates" in checks:
-        for t in checks["apply_templates"]:
-            kube_apply(get_full_path(t), namespace)
-
-    kube_apply(config, namespace)
-    
-    if "object_counts" in checks:
-        kube_wait_objects(chi_name, namespace, checks["object_counts"])
-        
-    if "chi_status" in checks:
-        kube_wait_chi_status(chi_name, namespace, checks["chi_status"])
-    else:
-        kube_wait_chi_status(chi_name, namespace, "Completed")
-        
-    if "pod_image" in checks:
-        kube_check_pod_image(chi_name, namespace, checks["pod_image"])
-    
-    if "pod_volumes" in checks:
-        kube_check_pod_volumes(chi_name, namespace, checks["pod_volumes"])
-        
-    if "pod_podAntiAffinity" in checks:
-        kube_check_pod_antiaffinity(chi_name, namespace)
-        
-    if "pod_ports" in checks:
-        kube_check_pod_ports(chi_name, namespace, checks["pod_ports"])
-    
-    if "do_not_delete" not in checks:
-        kube_delete(config, namespace)
-        kube_wait_objects(chi_name, namespace, [0,0,0])
-
-
-@TestScenario
-@Name("Empty installation, creates 1 node")
-def test_examples01_1():
-    create_and_check("../docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml", {"object_counts": [1,1,2]})
-
-@TestScenario
-@Name("1 shard 2 replicas")
-def test_examples01_2():
-    create_and_check("../docs/chi-examples/01-simple-layout-02-1shard-2repl.yaml", {"object_counts": [2,2,3]})
-
-@TestScenario
-@Name("Persistent volume mapping via defaults")
-def test_examples02_1():
-    create_and_check("../docs/chi-examples/02-persistent-volume-01-default-volume.yaml", 
-                     {"object_counts": [1,1,2],
-                      "pod_volumes": {"/var/lib/clickhouse", "/var/log/clickhouse-server"}})
-
-@TestScenario
-@Name("Persistent volume mapping via podTemplate")
-def test_examples02_2():
-    create_and_check("../docs/chi-examples/02-persistent-volume-02-pod-template.yaml", 
-                     {"object_counts": [1,1,2],
-                      "pod_image": "yandex/clickhouse-server:19.3.7",
-                      "pod_volumes": {"/var/lib/clickhouse", "/var/log/clickhouse-server"}})
 @TestScenario
 @Name("1 node")
 def test_001():
@@ -87,7 +20,7 @@ def test_001():
 @Name("useTemplates for pod and volume templates")
 def test_002():
     create_and_check("configs/test-002-tpl.yaml", 
-                     {"object_counts": [1,1,2],
+                     {"pod_count": 1,
                       "apply_templates": {"configs/tpl-clickhouse-stable.yaml", "configs/tpl-log-volume.yaml"},
                       "pod_image": "yandex/clickhouse-server:19.11.8.46",
                       "pod_volumes": {"/var/log/clickhouse-server"}})
@@ -96,7 +29,7 @@ def test_002():
 @Name("useTemplates for pod and distribution templates")
 def test_003():
     create_and_check("configs/test-003-tpl.yaml", 
-                     {"object_counts": [1,1,2],
+                     {"pod_count": 1,
                       "apply_templates": {"configs/tpl-clickhouse-stable.yaml", "configs/tpl-one-per-host.yaml"},
                       "pod_image": "yandex/clickhouse-server:19.11.8.46",
                       "pod_podAntiAffinity": 1})
@@ -105,14 +38,14 @@ def test_003():
 @Name("Compatibility test if old syntax with volumeClaimTemplate is still supported")
 def test_004():
     create_and_check("configs/test-004-tpl.yaml", 
-                     {"object_counts": [1,1,2],
+                     {"pod_count": 1,
                       "pod_volumes": {"/var/lib/clickhouse"}})
 
 @TestScenario
 @Name("Test manifest created by ACM")
 def test_005():
     create_and_check("configs/test-005-acm.yaml", 
-                     {"object_counts": [1,1,2],
+                     {"pod_count": 1,
                       "pod_image": "yandex/clickhouse-server:19.11.8.46",
                       "pod_volumes": {"/var/lib/clickhouse"}})
 
@@ -120,24 +53,24 @@ def test_005():
 @Name("Test clickhouse version upgrade from one version to another using podTemplate change")
 def test_006():
     create_and_check("configs/test-006-ch-upgrade-1.yaml", 
-                     {"object_counts": [2,2,3],
+                     {"pod_count": 2,
                       "pod_image": "yandex/clickhouse-server:19.11.8.46",
                       "do_not_delete": 1})
     with Then("Use different podTemplate and confirm that pod image is updated"):  
         create_and_check("configs/test-006-ch-upgrade-2.yaml", 
-                         {"object_counts": [2,2,3],
+                         {"pod_count": 2,
                           "pod_image": "yandex/clickhouse-server:latest",
                           "do_not_delete": 1})
         with Then("Change image in podTemplate itself and confirm that pod image is updated"):
             create_and_check("configs/test-006-ch-upgrade-3.yaml", 
-                             {"object_counts": [2,2,3],
+                             {"pod_count": 2,
                               "pod_image": "yandex/clickhouse-server:19.11.8.46"})
 
 @TestScenario
 @Name("Test template with custom clickhouse ports")
 def test_007():
     create_and_check("configs/test-007-custom-ports.yaml", 
-                     {"object_counts": [1,1,2],
+                     {"pod_count": 1,
                       "apply_templates": {"configs/tpl-custom-ports.yaml"},
                       "pod_image": "yandex/clickhouse-server:19.11.8.46",
                       "pod_ports": [8124,9001,9010]})
@@ -153,52 +86,73 @@ def test_009():
         chi_full_name=get_chi_name(config)
         chi_cut_name=chi_full_name[0:15]
 
-        kube_apply(config, namespace)
-        kube_wait_objects(chi_cut_name, namespace, [1,1,2])
-        kube_wait_chi_status(chi_full_name, namespace, "Completed")
+        kube_apply(config)
+        kube_wait_objects(chi_cut_name, [1,1,2])
+        kube_wait_chi_status(chi_full_name, "Completed")
         
-        assert kube_get_count("statefulset", namespace, "-l clickhouse.altinity.com/app=chop")==1, error()
+        assert kube_get_count("statefulset", label = "-l clickhouse.altinity.com/app=chop")==1, error()
         
         with Then(f"upgrade operator to {version_to}"):
             set_operator_version(version_to)
             with And("Wait 20 seconds"):
                 time.sleep(20)
                 with Then("No new statefulsets should be created"):
-                    assert kube_get_count("statefulset", namespace, "-l clickhouse.altinity.com/app=chop")==1, error()
+                    assert kube_get_count("statefulset", label = "-l clickhouse.altinity.com/app=chop")==1, error()
 
         
         
 def set_operator_version(version):
     kubectl(f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:{version} -n kube-system")
     kubectl("rollout status deployment.v1.apps/clickhouse-operator -n kube-system")
-    # assert kube_get_count("pod", "kube-system", f"-l app=clickhouse-operator,version={version}")>0, error()
+    # assert kube_get_count("pod", ns = "kube-system", label = f"-l app=clickhouse-operator,version={version}")>0, error()
 
 @TestScenario
 @Name("Test zookeeper initialization")
 def test_010():
     with Given("Install Zookeeper if missing"):
-        if kube_get_count("service", namespace, name = "zookeepers") == 0:
+        if kube_get_count("service", name = "zookeepers") == 0:
             config=get_full_path("../deploy/zookeeper/quick-start-volume-emptyDir/zookeeper-1-node.yaml")
-            kube_apply(config, namespace)
-            kube_wait_object("service", "zookeepers", namespace)
+            kube_apply(config)
+            kube_wait_object("service", "zookeepers")
 
     create_and_check("configs/test-010-zkroot.yaml", 
-                     {"object_counts": [1,1,2],
+                     {"pod_count": 1,
                       "do_not_delete": 1})
     with And("ClickHouse should complain regarding zookeeper path"):
-        out = clickhouse_query_with_error("test-010-zkroot", namespace, "select * from system.zookeeper where path = '/'")
+        out = clickhouse_query_with_error("test-010-zkroot", "select * from system.zookeeper where path = '/'")
         assert "You should create root node /clickhouse/test-010-zkroot before start" in out, error()
     
     create_and_check("configs/test-010-zkroot.yaml",{})
 
+@TestScenario
+@Name("Test access isolation")    
+def test_011():
+    create_and_check("configs/test-011-secure-user.yaml", 
+                     {"pod_count": 2,
+                      "do_not_delete": 1})
+    create_and_check("configs/test-011-insecure-user.yaml", 
+                     {"pod_count": 1,
+                      "do_not_delete": 1})
+    with Then("Query between hosts should succeed"):
+        out = clickhouse_query_with_error("test-011-secure-user", 
+                "select 'OK' from remote('chi-test-011-secure-user-default-1-0', system.one)")
+        assert out == 'OK', error()
+    with And("Query from other host should fail"):
+        out = clickhouse_query_with_error("test-011-insecure-user", 
+                "select 'OK' from remote('chi-test-011-secure-user-default-1-0', system.one)")
+        assert out != 'OK', error()
+
+    
+kubectl.namespace="test"
+
 if main():
     with Module("main"):
         with Given("clickhouse-operator is installed"):
-            assert kube_get_count("pod", "kube-system", "-l app=clickhouse-operator")>0, error()
-            with And(f"Clean namespace {namespace}"): 
-                kube_deletens(namespace)
-                with And(f"Create namespace {namespace}"):
-                    kube_createns(namespace)
+            assert kube_get_count("pod", ns = "kube-system", label = "-l app=clickhouse-operator")>0, error()
+            with And(f"Clean namespace {kubectl.namespace}"): 
+                kube_deletens(kubectl.namespace)
+                with And(f"Create namespace {kubectl.namespace}"):
+                    kube_createns(kubectl.namespace)
     
         with Module("examples", flags=TE):
             examples=[test_examples01_1, test_examples01_2, test_examples02_1, test_examples02_2]
@@ -213,10 +167,11 @@ if main():
                      test_005, 
                      test_006, 
                      test_007, 
-                     test_010]
+                     test_010,
+                     test_011]
         
-            all_tests = tests
-            all_tests = [test_010]
+            # all_tests = tests
+            all_tests = [test_011]
         
             for t in all_tests:
                 run(test=t, flags=TE)
