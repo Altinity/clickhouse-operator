@@ -320,6 +320,9 @@ spec:
         # MaxNumberPerHost
         # OneReplicaOfAShardPerHost
         # OneShardOfAReplicaPerHost
+        # OneNamespacePerHost
+        # OneCHIPerHost
+        # OneClusterPerHost
         podDistribution:
           - type: OneReplicaOfAShardPerHost
           - type: MaxNumberPerHost
