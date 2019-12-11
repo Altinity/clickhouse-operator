@@ -105,6 +105,18 @@ func (w *PrometheusWriter) WriteSystemReplicas(data [][]string) {
 	}
 }
 
+func (w *PrometheusWriter) WriteMutations(data [][]string) {
+	for _, metric := range data {
+		writeSingleMetricToPrometheus(w.out, "table_mutations", "Number of active mutations for the table", metric[2], prometheus.GaugeValue,
+			[]string{"chi", "hostname", "database", "table"},
+			w.chi.Name, w.hostname, metric[0], metric[1])
+		writeSingleMetricToPrometheus(w.out, "table_mutations_parts_to_do", "Number of data parts that need to be mutated for the mutation to finish", metric[3], prometheus.GaugeValue,
+			[]string{"chi", "hostname", "database", "table"},
+			w.chi.Name, w.hostname, metric[0], metric[1])
+
+	}
+}
+
 func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, desc string, value string, metricType prometheus.ValueType, labels []string, labelValues ...string) {
 	floatValue, _ := strconv.ParseFloat(value, 64)
 	m, err := prometheus.NewConstMetric(
