@@ -362,6 +362,9 @@ spec:
                                 - "MaxNumberPerHost"
                                 - "OneReplicaOfAShardPerHost"
                                 - "OneShardOfAReplicaPerHost"
+                                - "OneNamespacePerHost"
+                                - "OneCHIPerHost"
+                                - "OneClusterPerHost"
                             number:
                               type: integer
                               minimum: 0
@@ -763,6 +766,9 @@ spec:
                                 - "MaxNumberPerHost"
                                 - "OneReplicaOfAShardPerHost"
                                 - "OneShardOfAReplicaPerHost"
+                                - "OneNamespacePerHost"
+                                - "OneCHIPerHost"
+                                - "OneClusterPerHost"
                             number:
                               type: integer
                               minimum: 0
