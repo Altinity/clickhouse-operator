@@ -16,6 +16,18 @@ package v1
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/version"
+	"math"
+)
+
+const (
+	PodDistributionUnspecified               = "Unspecified"
+	PodDistributionOnePerHost                = "OnePerHost"
+	PodDistributionMaxNumberPerHost          = "MaxNumberPerHost"
+	PodDistributionOneReplicaOfAShardPerHost = "OneReplicaOfAShardPerHost"
+	PodDistributionOneShardOfAReplicaPerHost = "OneShardOfAReplicaPerHost"
+	PodDistributionOneNamespacePerHost       = "OneNamespacePerHost"
+	PodDistributionOneChiPerHost             = "OneCHIPerHost"
+	PodDistributionOneClusterPerHost         = "OneClusterPerHost"
 )
 
 // StatusFill fills .Status
@@ -36,10 +48,21 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 
 	hostProcessor := func(
 		chi *ClickHouseInstallation,
+
+		chiCycleSize int,
+		chiCycleIndex int,
+		chiCycleOffset int,
+
+		clusterCycleSize int,
+		clusterCycleIndex int,
+		clusterCycleOffset int,
+
 		clusterIndex int,
 		cluster *ChiCluster,
+
 		shardIndex int,
 		shard *ChiShard,
+
 		replicaIndex int,
 		host *ChiHost,
 	) error {
@@ -64,11 +87,66 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 		host.Address.ReplicaName = host.Name
 		host.Address.ReplicaIndex = replicaIndex
 		host.Address.HostIndex = hostsCount
+		host.Address.ChiCycleSize = chiCycleSize
+		host.Address.ChiCycleIndex = chiCycleIndex
+		host.Address.ChiCycleOffset = chiCycleOffset
+		host.Address.ClusterCycleSize = clusterCycleSize
+		host.Address.ClusterCycleIndex = clusterCycleIndex
+		host.Address.ClusterCycleOffset = clusterCycleOffset
 
 		hostsCount++
 		return nil
 	}
-	chi.WalkHostsFullPath(hostProcessor)
+
+	// Let's find NPerHost pod distribution
+	maxNumberPerHost := 0
+	podTemplateProcessor := func(template *ChiPodTemplate) {
+		for i := range template.PodDistribution {
+			podDistribution := &template.PodDistribution[i]
+			if podDistribution.Type == PodDistributionMaxNumberPerHost {
+				maxNumberPerHost = podDistribution.Number
+			}
+		}
+	}
+	chi.WalkPodTemplates(podTemplateProcessor)
+
+	//          1perHost   2perHost  3perHost  4perHost  5perHost
+	// sh1r1    n1   a     n1  a     n1 a      n1  a     n1  a
+	// sh1r2    n2   a     n2  a     n2 a      n2  a     n2  a
+	// sh1r3    n3   a     n3  a     n3 a      n3  a     n3  a
+	// sh2r1    n4   a     n4  a     n4 a      n4  a     n1  b
+	// sh2r2    n5   a     n5  a     n5 a      n1  b     n2  b
+	// sh2r3    n6   a     n6  a     n1 b      n2  b     n3  b
+	// sh3r1    n7   a     n7  a     n2 b      n3  b     n1  c
+	// sh3r2    n8   a     n8  a     n3 b      n4  b     n2  c
+	// sh3r3    n9   a     n1  b     n4 b      n1  c     n3  c
+	// sh4r1    n10  a     n2  b     n5 b      n2  c     n1  d
+	// sh4r2    n11  a     n3  b     n1 c      n3  c     n2  d
+	// sh4r3    n12  a     n4  b     n2 c      n4  c     n3  d
+	// sh5r1    n13  a     n5  b     n3 c      n1  d     n1  e
+	// sh5r2    n14  a     n6  b     n4 c      n2  d     n2  e
+	// sh5r3    n15  a     n7  b     n5 c      n3  d     n3  e
+	// 1perHost = ceil(15 / 1 'cycles num') = 15 'cycle len'
+	// 2perHost = ceil(15 / 2 'cycles num') = 8  'cycle len'
+	// 3perHost = ceil(15 / 3 'cycles num') = 5  'cycle len'
+	// 4perHost = ceil(15 / 4 'cycles num') = 4  'cycle len'
+	// 5perHost = ceil(15 / 5 'cycles num') = 3  'cycle len'
+
+	// Number of requested cycles equals to max number of ClickHouses per host, but can't be less than 1
+	requestedClusterCyclesNum := maxNumberPerHost
+	if requestedClusterCyclesNum <= 0 {
+		requestedClusterCyclesNum = 1
+	}
+
+	chiCycleSize := 0 // Unlimited
+	clusterCycleSize := 0
+	if requestedClusterCyclesNum == 1 {
+		// One cycle only requested
+		clusterCycleSize = 0 // Unlimited
+	} else {
+		clusterCycleSize = int(math.Ceil(float64(chi.HostsCount()) / float64(requestedClusterCyclesNum)))
+	}
+	chi.WalkHostsFullPath(chiCycleSize, clusterCycleSize, hostProcessor)
 
 	return hostsCount
 }
@@ -77,10 +155,21 @@ func (chi *ClickHouseInstallation) FillChiPointer() {
 
 	hostProcessor := func(
 		chi *ClickHouseInstallation,
+
+		chiCycleSize int,
+		chiCycleIndex int,
+		chiCycleOffset int,
+
+		clusterCycleSize int,
+		clusterCycleIndex int,
+		clusterCycleOffset int,
+
 		clusterIndex int,
 		cluster *ChiCluster,
+
 		shardIndex int,
 		shard *ChiShard,
+
 		replicaIndex int,
 		host *ChiHost,
 	) error {
@@ -89,7 +178,7 @@ func (chi *ClickHouseInstallation) FillChiPointer() {
 		host.Chi = chi
 		return nil
 	}
-	chi.WalkHostsFullPath(hostProcessor)
+	chi.WalkHostsFullPath(0, 0, hostProcessor)
 }
 
 func (chi *ClickHouseInstallation) WalkClustersFullPath(
@@ -161,12 +250,25 @@ func (chi *ClickHouseInstallation) WalkShards(
 }
 
 func (chi *ClickHouseInstallation) WalkHostsFullPath(
+	chiCycleSize int,
+	clusterCycleSize int,
 	f func(
 		chi *ClickHouseInstallation,
+
+		chiCycleSize int,
+		chiCycleIndex int,
+		chiCycleOffset int,
+
+		clusterCycleSize int,
+		clusterCycleIndex int,
+		clusterCycleOffset int,
+
 		clusterIndex int,
 		cluster *ChiCluster,
+
 		shardIndex int,
 		shard *ChiShard,
+
 		replicaIndex int,
 		host *ChiHost,
 	) error,
@@ -174,13 +276,52 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 
 	res := make([]error, 0)
 
+	chiCycleIndex := 0
+	chiCycleOffset := 0
+
+	clusterCycleIndex := 0
+	clusterCycleOffset := 0
+
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
 		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+
+		clusterCycleIndex = 0
+		clusterCycleOffset = 0
+
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Replicas {
 				host := &shard.Replicas[replicaIndex]
-				res = append(res, f(chi, clusterIndex, cluster, shardIndex, shard, replicaIndex, host))
+				res = append(res, f(
+					chi,
+
+					chiCycleSize,
+					chiCycleIndex,
+					chiCycleOffset,
+
+					clusterCycleSize,
+					clusterCycleIndex,
+					clusterCycleOffset,
+
+					clusterIndex,
+					cluster,
+					shardIndex,
+					shard,
+					replicaIndex,
+					host,
+				))
+
+				chiCycleOffset++
+				clusterCycleOffset++
+
+				if (chiCycleSize > 0) && (chiCycleOffset >= chiCycleSize) {
+					chiCycleOffset = 0
+					chiCycleIndex++
+				}
+				if (clusterCycleSize > 0) && (clusterCycleOffset >= clusterCycleSize) {
+					clusterCycleOffset = 0
+					clusterCycleIndex++
+				}
 			}
 		}
 	}
@@ -319,18 +460,18 @@ func (chi *ClickHouseInstallation) ClustersCount() int {
 	return count
 }
 
-func (chi *ClickHouseInstallation) HostsCount() int {
+func (chi *ClickHouseInstallation) ShardsCount() int {
 	count := 0
-	chi.WalkHosts(func(host *ChiHost) error {
+	chi.WalkShards(func(shard *ChiShard) error {
 		count++
 		return nil
 	})
 	return count
 }
 
-func (chi *ClickHouseInstallation) ShardsCount() int {
+func (chi *ClickHouseInstallation) HostsCount() int {
 	count := 0
-	chi.WalkShards(func(shard *ChiShard) error {
+	chi.WalkHosts(func(host *ChiHost) error {
 		count++
 		return nil
 	})
@@ -344,6 +485,18 @@ func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate,
 	} else {
 		template, ok := chi.Spec.Templates.PodTemplatesIndex[name]
 		return template, ok
+	}
+}
+
+// WalkPodTemplates walks over all PodTemplates
+func (chi *ClickHouseInstallation) WalkPodTemplates(f func(template *ChiPodTemplate)) {
+	if chi.Spec.Templates.PodTemplatesIndex == nil {
+		return
+	}
+
+	for name := range chi.Spec.Templates.PodTemplatesIndex {
+		template, _ := chi.Spec.Templates.PodTemplatesIndex[name]
+		f(template)
 	}
 }
 

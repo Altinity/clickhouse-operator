@@ -93,7 +93,7 @@ const (
 	WHERE active = 1
 	GROUP BY database, table
 	`
-	
+
 	queryMutationsSQL = `
 	select database, table, count() as mutations, sum(parts_to_do) as parts_to_do 
 	  from system.mutations 

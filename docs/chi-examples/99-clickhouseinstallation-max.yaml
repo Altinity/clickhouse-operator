@@ -317,12 +317,13 @@ spec:
         # Possible values for podDistribution are:
         # Unspecified
         # OnePerHost
-        # ShardAntiAffinity
-        # ReplicaAntiAffinity
+        # MaxNumberPerHost
+        # OneReplicaOfAShardPerHost
+        # OneShardOfAReplicaPerHost
         podDistribution:
-          - "OnePerHost"
-          - "ShardAntiAffinity"
-          - "ReplicaAntiAffinity"
+          - type: OneReplicaOfAShardPerHost
+          - type: MaxNumberPerHost
+            number: 2
 
         # type PodSpec struct {} from k8s.io/core/v1
         spec:

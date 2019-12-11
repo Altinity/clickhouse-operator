@@ -176,24 +176,30 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 	}
 
 	// Distribution
-	if template.Distribution == podDistributionOnePerHost {
+	if template.Distribution == chiv1.PodDistributionOnePerHost {
 		// Known distribution, all is fine
 	} else {
 		// Default Pod Distribution
-		template.Distribution = podDistributionUnspecified
+		template.Distribution = chiv1.PodDistributionUnspecified
 	}
 
 	// PodDistribution
 	for i := range template.PodDistribution {
-		switch template.PodDistribution[i] {
+		podDistribution := &template.PodDistribution[i]
+		switch podDistribution.Type {
 		case
-			podDistributionOnePerHost,
-			podDistributionShardAntiAffinity,
-			podDistributionReplicaAntiAffinity:
+			chiv1.PodDistributionOnePerHost,
+			chiv1.PodDistributionOneShardOfAReplicaPerHost,
+			chiv1.PodDistributionOneReplicaOfAShardPerHost:
 			// PodDistribution is known
+		case chiv1.PodDistributionMaxNumberPerHost:
+			// PodDistribution is known
+			if podDistribution.Number < 0 {
+				podDistribution.Number = 0
+			}
 		default:
 			// PodDistribution is not known
-			template.PodDistribution[i] = podDistributionUnspecified
+			podDistribution.Type = chiv1.PodDistributionUnspecified
 		}
 	}
 
@@ -319,7 +325,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 	var antiAffinity *v1.PodAntiAffinity = nil
 
 	// Distribution
-	if template.Distribution == podDistributionOnePerHost {
+	if template.Distribution == chiv1.PodDistributionOnePerHost {
 		if antiAffinity == nil {
 			antiAffinity = &v1.PodAntiAffinity{}
 		}
@@ -328,15 +334,15 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 				LabelSelector: &v12.LabelSelector{
 					// A list of node selector requirements by node's labels.
 					MatchLabels: map[string]string{
-						LabelApp: LabelAppValue,
+						LabelAppName: labelAppValue,
 					},
 					// Switch to MatchLabels
 					//MatchExpressions: []v12.LabelSelectorRequirement{
 					//	{
-					//		Key:      LabelApp,
+					//		Key:      LabelAppName,
 					//		Operator: v12.LabelSelectorOpIn,
 					//		Values: []string{
-					//			LabelAppValue,
+					//			labelAppValue,
 					//		},
 					//	},
 					//},
@@ -348,8 +354,9 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 
 	// PodDistribution
 	for i := range template.PodDistribution {
-		switch template.PodDistribution[i] {
-		case podDistributionOnePerHost:
+		podDistribution := &template.PodDistribution[i]
+		switch podDistribution.Type {
+		case chiv1.PodDistributionOnePerHost:
 			if antiAffinity == nil {
 				antiAffinity = &v1.PodAntiAffinity{}
 			}
@@ -358,15 +365,15 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 					LabelSelector: &v12.LabelSelector{
 						// A list of node selector requirements by node's labels.
 						MatchLabels: map[string]string{
-							LabelApp: LabelAppValue,
+							LabelAppName: labelAppValue,
 						},
 						// Switch to MatchLabels
 						//MatchExpressions: []v12.LabelSelectorRequirement{
 						//	{
-						//		Key:      LabelApp,
+						//		Key:      LabelAppName,
 						//		Operator: v12.LabelSelectorOpIn,
 						//		Values: []string{
-						//			LabelAppValue,
+						//			labelAppValue,
 						//		},
 						//	},
 						//},
@@ -374,7 +381,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 					TopologyKey: "kubernetes.io/hostname",
 				},
 			)
-		case podDistributionShardAntiAffinity:
+		case chiv1.PodDistributionMaxNumberPerHost:
 			if antiAffinity == nil {
 				antiAffinity = &v1.PodAntiAffinity{}
 			}
@@ -383,15 +390,15 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 					LabelSelector: &v12.LabelSelector{
 						// A list of node selector requirements by node's labels.
 						MatchLabels: map[string]string{
-							LabelShard: macrosShardName,
+							LabelClusterCycleIndex: macrosClusterCycleIndex,
 						},
 						// Switch to MatchLabels
 						//MatchExpressions: []v12.LabelSelectorRequirement{
 						//	{
-						//		Key:      LabelApp,
+						//		Key:      LabelAppName,
 						//		Operator: v12.LabelSelectorOpIn,
 						//		Values: []string{
-						//			LabelAppValue,
+						//			labelAppValue,
 						//		},
 						//	},
 						//},
@@ -399,7 +406,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 					TopologyKey: "kubernetes.io/hostname",
 				},
 			)
-		case podDistributionReplicaAntiAffinity:
+		case chiv1.PodDistributionOneReplicaOfAShardPerHost:
 			if antiAffinity == nil {
 				antiAffinity = &v1.PodAntiAffinity{}
 			}
@@ -408,18 +415,118 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 					LabelSelector: &v12.LabelSelector{
 						// A list of node selector requirements by node's labels.
 						MatchLabels: map[string]string{
-							LabelReplica: macrosReplicaName,
+							LabelShardName: macrosShardName,
 						},
 						// Switch to MatchLabels
 						//MatchExpressions: []v12.LabelSelectorRequirement{
 						//	{
-						//		Key:      LabelApp,
+						//		Key:      LabelAppName,
 						//		Operator: v12.LabelSelectorOpIn,
 						//		Values: []string{
-						//			LabelAppValue,
+						//			labelAppValue,
 						//		},
 						//	},
 						//},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			)
+		case chiv1.PodDistributionOneShardOfAReplicaPerHost:
+			if antiAffinity == nil {
+				antiAffinity = &v1.PodAntiAffinity{}
+			}
+			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+				v1.PodAffinityTerm{
+					LabelSelector: &v12.LabelSelector{
+						// A list of node selector requirements by node's labels.
+						MatchLabels: map[string]string{
+							LabelReplicaName: macrosReplicaName,
+						},
+						// Switch to MatchLabels
+						//MatchExpressions: []v12.LabelSelectorRequirement{
+						//	{
+						//		Key:      LabelAppName,
+						//		Operator: v12.LabelSelectorOpIn,
+						//		Values: []string{
+						//			labelAppValue,
+						//		},
+						//	},
+						//},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			)
+		case chiv1.PodDistributionOneNamespacePerHost:
+			if antiAffinity == nil {
+				antiAffinity = &v1.PodAntiAffinity{}
+			}
+			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+				v1.PodAffinityTerm{
+					LabelSelector: &v12.LabelSelector{
+						// A list of node selector requirements by node's labels.
+						//MatchLabels: map[string]string{
+						//	LabelClusterCycleIndex: macrosClusterCycleIndex,
+						//},
+						// Switch to MatchLabels
+						MatchExpressions: []v12.LabelSelectorRequirement{
+							{
+								Key:      LabelNamespace,
+								Operator: v12.LabelSelectorOpNotIn,
+								Values: []string{
+									macrosNamespace,
+								},
+							},
+						},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			)
+		case chiv1.PodDistributionOneChiPerHost:
+			if antiAffinity == nil {
+				antiAffinity = &v1.PodAntiAffinity{}
+			}
+			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+				v1.PodAffinityTerm{
+					LabelSelector: &v12.LabelSelector{
+						// A list of node selector requirements by node's labels.
+						//MatchLabels: map[string]string{
+						//	LabelClusterCycleIndex: macrosClusterCycleIndex,
+						//},
+						// Switch to MatchLabels
+						MatchExpressions: []v12.LabelSelectorRequirement{
+							{
+								Key:      LabelChiName,
+								Operator: v12.LabelSelectorOpNotIn,
+								Values: []string{
+									macrosChiName,
+								},
+							},
+						},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			)
+		case chiv1.PodDistributionOneClusterPerHost:
+			if antiAffinity == nil {
+				antiAffinity = &v1.PodAntiAffinity{}
+			}
+			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+				v1.PodAffinityTerm{
+					LabelSelector: &v12.LabelSelector{
+						// A list of node selector requirements by node's labels.
+						//MatchLabels: map[string]string{
+						//	LabelClusterCycleIndex: macrosClusterCycleIndex,
+						//},
+						// Switch to MatchLabels
+						MatchExpressions: []v12.LabelSelectorRequirement{
+							{
+								Key:      LabelClusterName,
+								Operator: v12.LabelSelectorOpNotIn,
+								Values: []string{
+									macrosClusterName,
+								},
+							},
+						},
 					},
 					TopologyKey: "kubernetes.io/hostname",
 				},

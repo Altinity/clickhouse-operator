@@ -341,11 +341,34 @@ spec:
                             items:
                               type: string
                       distribution:
+                        # DEPRECATED
                         type: string
                         enum:
-                          # List podDistributionXXX constants from model
                           - "Unspecified"
                           - "OnePerHost"
+                      podDistribution:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - type
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                # List podDistributionXXX constants
+                                - "Unspecified"
+                                - "OnePerHost"
+                                - "MaxNumberPerHost"
+                                - "OneReplicaOfAShardPerHost"
+                                - "OneShardOfAReplicaPerHost"
+                                - "OneNamespacePerHost"
+                                - "OneCHIPerHost"
+                                - "OneClusterPerHost"
+                            number:
+                              type: integer
+                              minimum: 0
+                              maximum: 65535
                       spec:
                         # TODO specify PodSpec
                         type: object
@@ -722,11 +745,34 @@ spec:
                             items:
                               type: string
                       distribution:
+                        # DEPRECATED
                         type: string
                         enum:
-                          # List podDistributionXXX constants from model
                           - "Unspecified"
                           - "OnePerHost"
+                      podDistribution:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - type
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                # List podDistributionXXX constants
+                                - "Unspecified"
+                                - "OnePerHost"
+                                - "MaxNumberPerHost"
+                                - "OneReplicaOfAShardPerHost"
+                                - "OneShardOfAReplicaPerHost"
+                                - "OneNamespacePerHost"
+                                - "OneCHIPerHost"
+                                - "OneClusterPerHost"
+                            number:
+                              type: integer
+                              minimum: 0
+                              maximum: 65535
                       spec:
                         # TODO specify PodSpec
                         type: object
@@ -815,18 +861,8 @@ spec:
               type: integer
             onStatefulSetCreateFailureAction:
               type: string
-              # TODO enum?
-#              enum:
-#                # List podDistributionXXX constants from model
-#                 - "Unspecified"
-#                 - "OnePerHost"
             onStatefulSetUpdateFailureAction:
               type: string
-              # TODO enum?
-#              enum:
-#                # List podDistributionXXX constants from model
-#                 - "Unspecified"
-#                 - "OnePerHost"
             chConfigUserDefaultProfile:
               type: string
             chConfigUserDefaultQuota:

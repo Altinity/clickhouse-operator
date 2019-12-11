@@ -310,41 +310,45 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 }
 
 // setupStatefulSetPodTemplate performs PodTemplate setup of StatefulSet
-func (c *Creator) setupStatefulSetPodTemplate(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
+func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	statefulSetName := CreateStatefulSetName(host)
 
 	// Initial PodTemplateSpec value
 	// All the rest fields would be filled later
-	statefulSetObject.Spec.Template = corev1.PodTemplateSpec{
+	statefulSet.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: c.labeler.getLabelsHostScope(host, true),
 		},
 	}
 
 	// Specify pod templates - either explicitly defined or default
-	if podTemplate, ok := host.GetPodTemplate(); ok {
+	podTemplate, ok := host.GetPodTemplate()
+	if ok {
 		// Replica references known PodTemplate
-		statefulSetCopyPodTemplate(statefulSetObject, podTemplate)
-		glog.V(1).Infof("setupStatefulSetPodTemplate() for statefulSet %s - template used", statefulSetName)
+		// Make a copy of this known PodTemplate in order not to spoil the original common-used template
+		podTemplate = podTemplate.DeepCopy()
+		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
 	} else {
-		// Replica references UNKNOWN PodTemplate
-		statefulSetCopyPodTemplate(statefulSetObject, newDefaultPodTemplate(statefulSetName))
-		glog.V(1).Infof("setupStatefulSetPodTemplate() for statefulSet %s - default template", statefulSetName)
+		// Replica references UNKNOWN PodTemplate, will use default one
+		podTemplate = newDefaultPodTemplate(statefulSetName)
+		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use default generated template", statefulSetName)
 	}
+	c.labeler.prepareAffinity(podTemplate, host)
+	statefulSetAssignPodTemplate(statefulSet, podTemplate)
 
 	// Pod created by this StatefulSet has to have alias
-	statefulSetObject.Spec.Template.Spec.HostAliases = []corev1.HostAlias{
+	statefulSet.Spec.Template.Spec.HostAliases = []corev1.HostAlias{
 		{
 			IP:        "127.0.0.1",
 			Hostnames: []string{CreatePodHostname(host)},
 		},
 	}
 
-	c.setupConfigMapVolumes(statefulSetObject, host)
+	c.setupConfigMapVolumes(statefulSet, host)
 
 	// We have default LogVolumeClaimTemplate specified - need to append log container
 	if host.Templates.LogVolumeClaimTemplate != "" {
-		addContainer(&statefulSetObject.Spec.Template.Spec, corev1.Container{
+		addContainer(&statefulSet.Spec.Template.Spec, corev1.Container{
 			Name:  ClickHouseLogContainerName,
 			Image: defaultBusyBoxDockerImage,
 			Command: []string{
@@ -517,10 +521,11 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.Statefu
 	c.setupStatefulSetApplyVolumeClaimTemplates(statefulSet, host)
 }
 
-// statefulSetCopyPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
-func statefulSetCopyPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
+// statefulSetAssignPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
+func statefulSetAssignPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
+	// StatefulSet's pod template is not directly compatible with ChiPodTemplate, we need some fields only
 	dst.Spec.Template.Name = template.Name
-	dst.Spec.Template.Spec = *template.Spec.DeepCopy()
+	dst.Spec.Template.Spec = template.Spec
 }
 
 // statefulSetAppendVolumeClaimTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' ChiVolumeClaimTemplate
