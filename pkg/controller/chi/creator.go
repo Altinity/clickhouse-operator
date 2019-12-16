@@ -221,15 +221,21 @@ func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulS
 	// What to do with StatefulSet - look into chop configuration settings
 	switch c.chopConfigManager.Config().OnStatefulSetCreateFailureAction {
 	case chop.OnStatefulSetCreateFailureActionAbort:
-		// Do nothing, just report appropriate error
+		// Report appropriate error, it will break reconcile loop
 		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - abort", namespace, name)
 		return errors.New(fmt.Sprintf("Create failed on %s/%s", namespace, name))
 
 	case chop.OnStatefulSetCreateFailureActionDelete:
-		// Delete gracefully problematic failed StatefulSet
+		// Delete gracefully failed StatefulSet
 		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to DELETE FAILED StatefulSet", namespace, name)
 		_ = c.deleteHost(host)
 		return c.shouldContinueOnCreateFailed()
+
+	case chop.OnStatefulSetCreateFailureActionIgnore:
+		// Ignore error, continue reconcile loop
+		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to ignore error", namespace, name)
+		return nil
+
 	default:
 		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetCreateFailureAction=%s", c.chopConfigManager.Config().OnStatefulSetCreateFailureAction)
 		return nil
@@ -248,7 +254,7 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 	// What to do with StatefulSet - look into chop configuration settings
 	switch c.chopConfigManager.Config().OnStatefulSetUpdateFailureAction {
 	case chop.OnStatefulSetUpdateFailureActionAbort:
-		// Do nothing, just report appropriate error
+		// Report appropriate error, it will break reconcile loop
 		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort", namespace, name)
 		return errors.New(fmt.Sprintf("Update failed on %s/%s", namespace, name))
 
@@ -270,6 +276,12 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 
 			return c.shouldContinueOnUpdateFailed()
 		}
+
+	case chop.OnStatefulSetUpdateFailureActionIgnore:
+		// Ignore error, continue reconcile loop
+		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - going to ignore error", namespace, name)
+		return nil
+
 	default:
 		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s", c.chopConfigManager.Config().OnStatefulSetUpdateFailureAction)
 		return nil

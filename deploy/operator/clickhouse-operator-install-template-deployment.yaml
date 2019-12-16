@@ -60,6 +60,7 @@ data:
     # Possible options:
     # 1. abort - do nothing, just break the process and wait for admin
     # 2. delete - delete newly created problematic StatefulSet
+    # 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
     onStatefulSetCreateFailureAction: delete
     
     # What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
@@ -67,6 +68,7 @@ data:
     # 1. abort - do nothing, just break the process and wait for admin
     # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
     # Pod would be recreated by StatefulSet based on rollback-ed configuration
+    # 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
     onStatefulSetUpdateFailureAction: rollback
     
     ################################################
