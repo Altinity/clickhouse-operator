@@ -316,13 +316,14 @@ spec:
 
         # Possible values for podDistribution are:
         # Unspecified
-        # OnePerHost
-        # MaxNumberPerHost
-        # OneReplicaOfAShardPerHost
-        # OneShardOfAReplicaPerHost
-        # OneNamespacePerHost
-        # OneCHIPerHost
-        # OneClusterPerHost
+        # OnePerHost -- one ClickHouse instance per host: CH - CH - CH -- ClickHousePodAntiAffinity  
+        # OneReplicaOfAShardPerHost -- one replica of a shard number per host: shard1,replica1 - shard1,replica2 - shard1,replica3 -- ShardOtherReplicaAntiAffinity
+        # OneShardOfAReplicaPerHost -- one shard per replica per host: shard1,replica1 - shard2,replica1 - shard3, replica1 -- ReplicaOtherShardAntiAffinity
+        # OneNamespacePerHost -- ns1 - ns2 - ns3 -- OtherNamespaceAntiAffinity
+        # OneCHIPerHost -- one ClickHouseInstallation per host: CHI1 - CHI2 - CHI3 -- OtherCHIAntiAffinity
+        # OneClusterPerHost -- one CHI cluster per host: cluster1 - cluster2 - cluster3 -- OtherClusterAntiAffinity
+        # MaxNumberPerHost -- Number of ClickHouse instances of current cluster per host -- MaxNumberPerNode 
+        
         podDistribution:
           - type: OneReplicaOfAShardPerHost
           - type: MaxNumberPerHost
