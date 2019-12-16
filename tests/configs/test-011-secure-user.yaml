@@ -3,12 +3,19 @@ kind: ClickHouseInstallation
 metadata:
   name: test-011-secure-user
 spec:
+  templates:
+    podTemplates:
+    - name: clickhouse
+      spec:
+        containers:
+        - name: clickhouse-pod
+          image: yandex/clickhouse-server:19.15
+  defaults:
+    templates:
+      podTemplate: clickhouse
   configuration:
     users:
-      # default/networks/host_regexp: ^chi-test-011-secure-user-\d+-\d+ # this does not work
-      default/networks/host: # this works!
-        - chi-test-011-secure-user-default-1-0.test
-        - chi-test-011-secure-user-default-0-0.test
+      default/networks/host_regexp: \.chi-test-011-secure-user-default-\d+-\d+\.test
       default/networks/ip: "127.0.0.1"
       default/password: ""
     clusters:

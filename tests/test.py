@@ -133,13 +133,18 @@ def test_011():
     create_and_check("configs/test-011-insecure-user.yaml", 
                      {"pod_count": 1,
                       "do_not_delete": 1})
-    with Then("Query between hosts should succeed"):
-        out = clickhouse_query_with_error("test-011-secure-user", 
-                "select 'OK' from remote('chi-test-011-secure-user-default-1-0', system.one)")
+    
+    with Then("Connection to localhost should succeed"):
+        out = clickhouse_query_with_error("test-011-secure-user", "select 'OK'")
         assert out == 'OK', error()
-    with And("Query from other host should fail"):
-        out = clickhouse_query_with_error("test-011-insecure-user", 
-                "select 'OK' from remote('chi-test-011-secure-user-default-1-0', system.one)")
+
+    with Then("Query from secured to secured host should succeed"):
+        out = clickhouse_query_with_error("test-011-secure-user", "select 'OK'", 
+                                          host = "chi-test-011-secure-user-default-1-0")
+        assert out == 'OK', error()
+    with And("Query from insecured to secured host should fail"):
+        out = clickhouse_query_with_error("test-011-insecure-user","select 'OK'", 
+                                          host = "chi-test-011-secure-user-default-1-0")
         assert out != 'OK', error()
 
     
@@ -170,8 +175,8 @@ if main():
                      test_010,
                      test_011]
         
-            # all_tests = tests
-            all_tests = [test_011]
+            all_tests = tests
+            # all_tests = [test_011]
         
             for t in all_tests:
                 run(test=t, flags=TE)
