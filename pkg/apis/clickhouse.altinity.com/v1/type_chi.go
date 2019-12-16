@@ -20,14 +20,17 @@ import (
 )
 
 const (
-	PodDistributionUnspecified               = "Unspecified"
-	PodDistributionOnePerHost                = "OnePerHost"
-	PodDistributionMaxNumberPerHost          = "MaxNumberPerHost"
-	PodDistributionOneReplicaOfAShardPerHost = "OneReplicaOfAShardPerHost"
-	PodDistributionOneShardOfAReplicaPerHost = "OneShardOfAReplicaPerHost"
-	PodDistributionOneNamespacePerHost       = "OneNamespacePerHost"
-	PodDistributionOneChiPerHost             = "OneCHIPerHost"
-	PodDistributionOneClusterPerHost         = "OneClusterPerHost"
+	PodDistributionUnspecified                   = "Unspecified"
+	PodDistributionClickHousePodAntiAffinity     = "ClickHouseAntiAffinity"
+	PodDistributionShardOtherReplicaAntiAffinity = "ShardOtherReplicaAntiAffinity"
+	PodDistributionReplicaOtherShardAntiAffinity = "ReplicaOtherShardAntiAffinity"
+	PodDistributionOtherNamespaceAntiAffinity    = "OtherNamespaceAntiAffinity"
+	PodDistributionOtherCHIAntiAffinity          = "OtherCHIAntiAffinity"
+	PodDistributionOtherClusterAntiAffinity      = "OtherClusterAntiAffinity"
+	PodDistributionMaxNumberPerNode              = "MaxNumberPerNode"
+
+	// Deprecated value
+	PodDistributionOnePerHost = "OnePerHost"
 )
 
 // StatusFill fills .Status
@@ -103,7 +106,7 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 	podTemplateProcessor := func(template *ChiPodTemplate) {
 		for i := range template.PodDistribution {
 			podDistribution := &template.PodDistribution[i]
-			if podDistribution.Type == PodDistributionMaxNumberPerHost {
+			if podDistribution.Type == PodDistributionMaxNumberPerNode {
 				maxNumberPerHost = podDistribution.Number
 			}
 		}

@@ -316,17 +316,17 @@ spec:
 
         # Possible values for podDistribution are:
         # Unspecified
-        # OnePerHost -- one ClickHouse instance per host: CH - CH - CH -- ClickHousePodAntiAffinity  
-        # OneReplicaOfAShardPerHost -- one replica of a shard number per host: shard1,replica1 - shard1,replica2 - shard1,replica3 -- ShardOtherReplicaAntiAffinity
-        # OneShardOfAReplicaPerHost -- one shard per replica per host: shard1,replica1 - shard2,replica1 - shard3, replica1 -- ReplicaOtherShardAntiAffinity
-        # OneNamespacePerHost -- ns1 - ns2 - ns3 -- OtherNamespaceAntiAffinity
-        # OneCHIPerHost -- one ClickHouseInstallation per host: CHI1 - CHI2 - CHI3 -- OtherCHIAntiAffinity
-        # OneClusterPerHost -- one CHI cluster per host: cluster1 - cluster2 - cluster3 -- OtherClusterAntiAffinity
-        # MaxNumberPerHost -- Number of ClickHouse instances of current cluster per host -- MaxNumberPerNode 
+        # ClickHouseAntiAffinity -- one ClickHouse instance per node - AntiAffinity by CH instances: CH - CH - CH
+        # ShardOtherReplicaAntiAffinity -- one replica of a shard number per node - AntiAffinity by shard name: shard1,replica1 - shard1,replica2 - shard1,replica3
+        # ReplicaOtherShardAntiAffinity -- one shard of a replica per node - AntiAffinity by replica name: shard1,replica1 - shard2,replica1 - shard3, replica1
+        # OtherNamespaceAntiAffinity - one namespace per node - AntiAffinity by namespace ns1 - ns2 - ns3
+        # OtherCHIAntiAffinity - one ClickHouseInstallation per node - AntiAffinity by CHI name - CHI1 - CHI2 - CHI3
+        # OtherClusterAntiAffinity - one CHI cluster per node - AntiAffinity by cluster name - cluster1 - cluster2 - cluster3
+        # MaxNumberPerNode - Maximum number of ClickHouse instances - AntiAffinity by cycle - circular replication.
         
         podDistribution:
           - type: OneReplicaOfAShardPerHost
-          - type: MaxNumberPerHost
+          - type: MaxNumberPerNode
             number: 2
 
         # type PodSpec struct {} from k8s.io/core/v1

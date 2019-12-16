@@ -358,13 +358,13 @@ spec:
                               enum:
                                 # List podDistributionXXX constants
                                 - "Unspecified"
-                                - "OnePerHost"
-                                - "MaxNumberPerHost"
-                                - "OneReplicaOfAShardPerHost"
-                                - "OneShardOfAReplicaPerHost"
-                                - "OneNamespacePerHost"
-                                - "OneCHIPerHost"
-                                - "OneClusterPerHost"
+                                - "ClickHouseAntiAffinity"
+                                - "ShardOtherReplicaAntiAffinity"
+                                - "ReplicaOtherShardAntiAffinity"
+                                - "OtherNamespaceAntiAffinity"
+                                - "OtherCHIAntiAffinity"
+                                - "OtherClusterAntiAffinity"
+                                - "MaxNumberPerNode"
                             number:
                               type: integer
                               minimum: 0
@@ -762,13 +762,13 @@ spec:
                               enum:
                                 # List podDistributionXXX constants
                                 - "Unspecified"
-                                - "OnePerHost"
-                                - "MaxNumberPerHost"
-                                - "OneReplicaOfAShardPerHost"
-                                - "OneShardOfAReplicaPerHost"
-                                - "OneNamespacePerHost"
-                                - "OneCHIPerHost"
-                                - "OneClusterPerHost"
+                                - "ClickHouseAntiAffinity"
+                                - "ShardOtherReplicaAntiAffinity"
+                                - "ReplicaOtherShardAntiAffinity"
+                                - "OtherNamespaceAntiAffinity"
+                                - "OtherCHIAntiAffinity"
+                                - "OtherClusterAntiAffinity"
+                                - "MaxNumberPerNode"
                             number:
                               type: integer
                               minimum: 0

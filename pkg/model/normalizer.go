@@ -188,11 +188,11 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
 		case
-			chiv1.PodDistributionOnePerHost,
-			chiv1.PodDistributionOneShardOfAReplicaPerHost,
-			chiv1.PodDistributionOneReplicaOfAShardPerHost:
+			chiv1.PodDistributionClickHousePodAntiAffinity,
+			chiv1.PodDistributionReplicaOtherShardAntiAffinity,
+			chiv1.PodDistributionShardOtherReplicaAntiAffinity:
 			// PodDistribution is known
-		case chiv1.PodDistributionMaxNumberPerHost:
+		case chiv1.PodDistributionMaxNumberPerNode:
 			// PodDistribution is known
 			if podDistribution.Number < 0 {
 				podDistribution.Number = 0
@@ -338,35 +338,35 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 	for i := range template.PodDistribution {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
-		case chiv1.PodDistributionOnePerHost:
+		case chiv1.PodDistributionClickHousePodAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				map[string]string{
 					LabelAppName: labelAppValue,
 				},
 			)
-		case chiv1.PodDistributionMaxNumberPerHost:
+		case chiv1.PodDistributionMaxNumberPerNode:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				map[string]string{
 					LabelClusterCycleIndex: macrosClusterCycleIndex,
 				},
 			)
-		case chiv1.PodDistributionOneReplicaOfAShardPerHost:
+		case chiv1.PodDistributionShardOtherReplicaAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				map[string]string{
 					LabelShardName: macrosShardName,
 				},
 			)
-		case chiv1.PodDistributionOneShardOfAReplicaPerHost:
+		case chiv1.PodDistributionReplicaOtherShardAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				map[string]string{
 					LabelReplicaName: macrosReplicaName,
 				},
 			)
-		case chiv1.PodDistributionOneNamespacePerHost:
+		case chiv1.PodDistributionOtherNamespaceAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchExpressions(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				[]v12.LabelSelectorRequirement{
@@ -379,7 +379,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 					},
 				},
 			)
-		case chiv1.PodDistributionOneChiPerHost:
+		case chiv1.PodDistributionOtherCHIAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchExpressions(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				[]v12.LabelSelectorRequirement{
@@ -392,7 +392,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 					},
 				},
 			)
-		case chiv1.PodDistributionOneClusterPerHost:
+		case chiv1.PodDistributionOtherClusterAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchExpressions(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				[]v12.LabelSelectorRequirement{
