@@ -322,14 +322,14 @@ func (n *Normalizer) mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinit
 }
 
 func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodAntiAffinity {
-	var antiAffinity *v1.PodAntiAffinity = nil
+	var podAntiAffinity *v1.PodAntiAffinity = nil
 
 	// Distribution
 	if template.Distribution == chiv1.PodDistributionOnePerHost {
-		if antiAffinity == nil {
-			antiAffinity = &v1.PodAntiAffinity{}
+		if podAntiAffinity == nil {
+			podAntiAffinity = &v1.PodAntiAffinity{}
 		}
-		antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 			v1.PodAffinityTerm{
 				LabelSelector: &v12.LabelSelector{
 					// A list of node selector requirements by node's labels.
@@ -357,10 +357,10 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
 		case chiv1.PodDistributionOnePerHost:
-			if antiAffinity == nil {
-				antiAffinity = &v1.PodAntiAffinity{}
+			if podAntiAffinity == nil {
+				podAntiAffinity = &v1.PodAntiAffinity{}
 			}
-			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				v1.PodAffinityTerm{
 					LabelSelector: &v12.LabelSelector{
 						// A list of node selector requirements by node's labels.
@@ -382,10 +382,10 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 				},
 			)
 		case chiv1.PodDistributionMaxNumberPerHost:
-			if antiAffinity == nil {
-				antiAffinity = &v1.PodAntiAffinity{}
+			if podAntiAffinity == nil {
+				podAntiAffinity = &v1.PodAntiAffinity{}
 			}
-			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				v1.PodAffinityTerm{
 					LabelSelector: &v12.LabelSelector{
 						// A list of node selector requirements by node's labels.
@@ -407,10 +407,10 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 				},
 			)
 		case chiv1.PodDistributionOneReplicaOfAShardPerHost:
-			if antiAffinity == nil {
-				antiAffinity = &v1.PodAntiAffinity{}
+			if podAntiAffinity == nil {
+				podAntiAffinity = &v1.PodAntiAffinity{}
 			}
-			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				v1.PodAffinityTerm{
 					LabelSelector: &v12.LabelSelector{
 						// A list of node selector requirements by node's labels.
@@ -432,10 +432,10 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 				},
 			)
 		case chiv1.PodDistributionOneShardOfAReplicaPerHost:
-			if antiAffinity == nil {
-				antiAffinity = &v1.PodAntiAffinity{}
+			if podAntiAffinity == nil {
+				podAntiAffinity = &v1.PodAntiAffinity{}
 			}
-			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				v1.PodAffinityTerm{
 					LabelSelector: &v12.LabelSelector{
 						// A list of node selector requirements by node's labels.
@@ -457,10 +457,10 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 				},
 			)
 		case chiv1.PodDistributionOneNamespacePerHost:
-			if antiAffinity == nil {
-				antiAffinity = &v1.PodAntiAffinity{}
+			if podAntiAffinity == nil {
+				podAntiAffinity = &v1.PodAntiAffinity{}
 			}
-			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				v1.PodAffinityTerm{
 					LabelSelector: &v12.LabelSelector{
 						// A list of node selector requirements by node's labels.
@@ -482,10 +482,10 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 				},
 			)
 		case chiv1.PodDistributionOneChiPerHost:
-			if antiAffinity == nil {
-				antiAffinity = &v1.PodAntiAffinity{}
+			if podAntiAffinity == nil {
+				podAntiAffinity = &v1.PodAntiAffinity{}
 			}
-			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				v1.PodAffinityTerm{
 					LabelSelector: &v12.LabelSelector{
 						// A list of node selector requirements by node's labels.
@@ -507,10 +507,10 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 				},
 			)
 		case chiv1.PodDistributionOneClusterPerHost:
-			if antiAffinity == nil {
-				antiAffinity = &v1.PodAntiAffinity{}
+			if podAntiAffinity == nil {
+				podAntiAffinity = &v1.PodAntiAffinity{}
 			}
-			antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(antiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				v1.PodAffinityTerm{
 					LabelSelector: &v12.LabelSelector{
 						// A list of node selector requirements by node's labels.
@@ -534,7 +534,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 		}
 	}
 
-	return antiAffinity
+	return podAntiAffinity
 }
 
 func (n *Normalizer) mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.PodAntiAffinity {
