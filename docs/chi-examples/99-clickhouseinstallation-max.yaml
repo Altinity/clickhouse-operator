@@ -315,15 +315,39 @@ spec:
         distribution: "Unspecified"
 
         # Possible values for podDistribution are:
-        # Unspecified
-        # ClickHouseAntiAffinity -- one ClickHouse instance per node - AntiAffinity by CH instances: CH - CH - CH
-        # ShardOtherReplicaAntiAffinity -- one replica of a shard number per node - AntiAffinity by shard name: shard1,replica1 - shard1,replica2 - shard1,replica3
-        # ReplicaOtherShardAntiAffinity -- one shard of a replica per node - AntiAffinity by replica name: shard1,replica1 - shard2,replica1 - shard3, replica1
-        # OtherNamespaceAntiAffinity - one namespace per node - AntiAffinity by namespace ns1 - ns2 - ns3
-        # OtherCHIAntiAffinity - one ClickHouseInstallation per node - AntiAffinity by CHI name - CHI1 - CHI2 - CHI3
-        # OtherClusterAntiAffinity - one CHI cluster per node - AntiAffinity by cluster name - cluster1 - cluster2 - cluster3
-        # MaxNumberPerNode - Maximum number of ClickHouse instances - AntiAffinity by cycle - circular replication.
-        
+        # Unspecified - empty value
+        # ClickHouseAntiAffinity - AntiAffinity by ClickHouse instances.
+        #   Pod pushes away other ClickHouse pods, which allows one ClickHouse instance per node
+        #   CH - (push away) - CH - (push away) - CH
+        # ShardAntiAffinity - AntiAffinity by shard name.
+        #   Pod pushes away other pods of the same shard (replicas of this shard), which allows one replica of a shard per node.
+        #   Used for data loss avoidance - keeps all copies of the shard on different nodes.
+        #   shard1,replica1 - (push away) - shard1,replica2 - (push away) - shard1,replica3
+        # ReplicaAntiAffinity - AntiAffinity by replica name.
+        #   Pod pushes away other pods of the same replica (shards of this replica), which allows one shard of a replica per node.
+        #   Used to evenly distribute load from "full cluster scan" queries.
+        #   shard1,replica1 - (push away) - shard2,replica1 - (push away) - shard3,replica1
+        # AnotherNamespaceAntiAffinity - AntiAffinity by "another" namespace.
+        #   Pod pushes away pods from another namespace, which allows same-namespace pods per node
+        #   ns1 - (push away) - ns2 - (push away) - ns3
+        # AnotherCHIAntiAffinity - AntiAffinity by "another" ClickHouseInstallation name.
+        #   Pod pushes away pods from another ClickHouseInstallation, which allows same-ClickHouseInstallation pods per node.
+        #   CHI1 - (push away) - CHI2 - (push away) - CHI3
+        # AnotherClusterAntiAffinity - AntiAffinity by "another" cluster name.
+        #   Pod pushes away pods from another Cluster, which allows same-cluster pods per node
+        #   cluster1 - (push away) - cluster2 - (push away) - cluster3
+        # MaxNumberPerNode - AntiAffinity by cycle index.
+        #   Pod pushes away pods from the same cycle, which allows to specify maximum number of ClickHouse instances per node.
+        #   Used to setup circular replication.
+        # NamespaceAffinity - Affinity by namespace.
+        #   Pod attracts pods from the same namespace, which allows pods from same namespace per node.
+        #   ns1 + (attracts) + ns1
+        # CHIAffinity - Affinity by ClickHouseInstallation name.
+        #   Pod attracts pods from the same ClickHouseInstallation, which allows pods from the same CHI per node.
+        #   CHI1 + (attracts) + CHI1
+        # ClusterAffinity - Affinity by cluster name.
+        #   Pod attracts pods from the same cluster, which allows pods from the same Cluster per node.
+        #   cluster1 + (attracts) + cluster1
         podDistribution:
           - type: OneReplicaOfAShardPerHost
           - type: MaxNumberPerNode

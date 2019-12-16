@@ -217,16 +217,17 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 
 func (n *Normalizer) newAffinity(template *chiv1.ChiPodTemplate) *v1.Affinity {
 	nodeAffinity := n.newNodeAffinity(template)
+	podAffinity := n.newPodAffinity(template)
 	podAntiAffinity := n.newPodAntiAffinity(template)
 
-	if (nodeAffinity == nil) && (podAntiAffinity == nil) {
+	if (nodeAffinity == nil) && (podAffinity == nil) && (podAntiAffinity == nil) {
 		// Neither Affinity nor AntiAffinity specified
 		return nil
 	}
 
 	return &v1.Affinity{
 		NodeAffinity:    nodeAffinity,
-		PodAffinity:     nil,
+		PodAffinity:     podAffinity,
 		PodAntiAffinity: podAntiAffinity,
 	}
 }
@@ -239,12 +240,12 @@ func (n *Normalizer) mergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affin
 
 	if dst == nil {
 		// No receiver, allocate new one
-		dst = &v1.Affinity{
-			NodeAffinity:    n.mergeNodeAffinity(nil, src.NodeAffinity),
-			PodAffinity:     src.PodAffinity,
-			PodAntiAffinity: n.mergePodAntiAffinity(nil, src.PodAntiAffinity),
-		}
+		dst = &v1.Affinity{}
 	}
+
+	dst.NodeAffinity = n.mergeNodeAffinity(dst.NodeAffinity, src.NodeAffinity)
+	dst.PodAffinity = n.mergePodAffinity(dst.PodAffinity, src.PodAffinity)
+	dst.PodAntiAffinity = n.mergePodAntiAffinity(dst.PodAntiAffinity, src.PodAntiAffinity)
 
 	return dst
 }
@@ -311,6 +312,81 @@ func (n *Normalizer) mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinit
 	}
 
 	// Copy PreferredSchedulingTerm
+	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
+		dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			dst.PreferredDuringSchedulingIgnoredDuringExecution,
+			src.PreferredDuringSchedulingIgnoredDuringExecution[i],
+		)
+	}
+
+	return dst
+}
+
+func (n *Normalizer) newPodAffinity(template *chiv1.ChiPodTemplate) *v1.PodAffinity {
+	podAffinity := &v1.PodAffinity{}
+
+	for i := range template.PodDistribution {
+		podDistribution := &template.PodDistribution[i]
+		switch podDistribution.Type {
+		case chiv1.PodDistributionNamespaceAffinity:
+			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
+				podAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+				map[string]string{
+					LabelNamespace: macrosNamespace,
+				},
+			)
+		case chiv1.PodDistributionCHIAffinity:
+			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
+				podAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+				map[string]string{
+					LabelChiName: macrosChiName,
+				},
+			)
+		case chiv1.PodDistributionClusterAffinity:
+			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
+				podAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+				map[string]string{
+					LabelClusterName: macrosClusterName,
+				},
+			)
+		}
+	}
+
+	if len(podAffinity.RequiredDuringSchedulingIgnoredDuringExecution) > 0 {
+		// Has something to return
+		return podAffinity
+	}
+
+	return nil
+}
+
+func (n *Normalizer) mergePodAffinity(dst *v1.PodAffinity, src *v1.PodAffinity) *v1.PodAffinity {
+	if src == nil {
+		// Nothing to merge from
+		return dst
+	}
+
+	if len(src.RequiredDuringSchedulingIgnoredDuringExecution) == 0 {
+		return dst
+	}
+
+	if dst == nil {
+		// No receiver, allocate new one
+		dst = &v1.PodAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution:  []v1.PodAffinityTerm{},
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{},
+		}
+	}
+
+	// Copy PodAffinityTerm
+	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution {
+		dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			dst.RequiredDuringSchedulingIgnoredDuringExecution,
+			src.RequiredDuringSchedulingIgnoredDuringExecution[i],
+		)
+	}
+
+	// Copy WeightedPodAffinityTerm
 	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
 		dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
 			dst.PreferredDuringSchedulingIgnoredDuringExecution,
@@ -416,6 +492,43 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 	return nil
 }
 
+func (n *Normalizer) mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.PodAntiAffinity {
+	if src == nil {
+		// Nothing to merge from
+		return dst
+	}
+
+	if len(src.RequiredDuringSchedulingIgnoredDuringExecution) == 0 {
+		return dst
+	}
+
+	if dst == nil {
+		// No receiver, allocate new one
+		dst = &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution:  []v1.PodAffinityTerm{},
+			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{},
+		}
+	}
+
+	// Copy PodAffinityTerm
+	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution {
+		dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			dst.RequiredDuringSchedulingIgnoredDuringExecution,
+			src.RequiredDuringSchedulingIgnoredDuringExecution[i],
+		)
+	}
+
+	// Copy WeightedPodAffinityTerm
+	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
+		dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			dst.PreferredDuringSchedulingIgnoredDuringExecution,
+			src.PreferredDuringSchedulingIgnoredDuringExecution[i],
+		)
+	}
+
+	return dst
+}
+
 func (n *Normalizer) addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTerm, matchLabels map[string]string) []v1.PodAffinityTerm {
 	return append(terms,
 		v1.PodAffinityTerm{
@@ -463,43 +576,6 @@ func (n *Normalizer) addPodAffinityTermWithMatchExpressions(terms []v1.PodAffini
 			TopologyKey: "kubernetes.io/hostname",
 		},
 	)
-}
-
-func (n *Normalizer) mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.PodAntiAffinity {
-	if src == nil {
-		// Nothing to merge from
-		return dst
-	}
-
-	if len(src.RequiredDuringSchedulingIgnoredDuringExecution) == 0 {
-		return dst
-	}
-
-	if dst == nil {
-		// No receiver, allocate new one
-		dst = &v1.PodAntiAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution:  []v1.PodAffinityTerm{},
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{},
-		}
-	}
-
-	// Copy PodAffinityTerm
-	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution {
-		dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
-			dst.RequiredDuringSchedulingIgnoredDuringExecution,
-			src.RequiredDuringSchedulingIgnoredDuringExecution[i],
-		)
-	}
-
-	// Copy WeightedPodAffinityTerm
-	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
-		dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
-			dst.PreferredDuringSchedulingIgnoredDuringExecution,
-			src.PreferredDuringSchedulingIgnoredDuringExecution[i],
-		)
-	}
-
-	return dst
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates

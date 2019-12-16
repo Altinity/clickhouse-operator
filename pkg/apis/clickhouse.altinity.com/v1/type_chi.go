@@ -28,6 +28,9 @@ const (
 	PodDistributionOtherCHIAntiAffinity          = "OtherCHIAntiAffinity"
 	PodDistributionOtherClusterAntiAffinity      = "OtherClusterAntiAffinity"
 	PodDistributionMaxNumberPerNode              = "MaxNumberPerNode"
+	PodDistributionNamespaceAffinity             = "NamespaceAffinity"
+	PodDistributionCHIAffinity                   = "CHIAffinity"
+	PodDistributionClusterAffinity               = "ClusterAffinity"
 
 	// Deprecated value
 	PodDistributionOnePerHost = "OnePerHost"
