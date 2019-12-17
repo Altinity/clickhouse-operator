@@ -20,17 +20,17 @@ import (
 )
 
 const (
-	PodDistributionUnspecified                   = "Unspecified"
-	PodDistributionClickHousePodAntiAffinity     = "ClickHouseAntiAffinity"
-	PodDistributionShardOtherReplicaAntiAffinity = "ShardOtherReplicaAntiAffinity"
-	PodDistributionReplicaOtherShardAntiAffinity = "ReplicaOtherShardAntiAffinity"
-	PodDistributionOtherNamespaceAntiAffinity    = "OtherNamespaceAntiAffinity"
-	PodDistributionOtherCHIAntiAffinity          = "OtherCHIAntiAffinity"
-	PodDistributionOtherClusterAntiAffinity      = "OtherClusterAntiAffinity"
-	PodDistributionMaxNumberPerNode              = "MaxNumberPerNode"
-	PodDistributionNamespaceAffinity             = "NamespaceAffinity"
-	PodDistributionCHIAffinity                   = "CHIAffinity"
-	PodDistributionClusterAffinity               = "ClusterAffinity"
+	PodDistributionUnspecified                               = "Unspecified"
+	PodDistributionClickHouseAntiAffinity                    = "ClickHouseAntiAffinity"
+	PodDistributionSameShardAntiAffinity                     = "SameShardAntiAffinity"
+	PodDistributionSameReplicaAntiAffinity                   = "SameReplicaAntiAffinity"
+	PodDistributionAnotherNamespaceAntiAffinity              = "AnotherNamespaceAntiAffinity"
+	PodDistributionAnotherClickHouseInstallationAntiAffinity = "AnotherClickHouseInstallationAntiAffinity"
+	PodDistributionAnotherClusterAntiAffinity                = "AnotherClusterAntiAffinity"
+	PodDistributionMaxNumberPerNode                          = "MaxNumberPerNode"
+	PodDistributionNamespaceAffinity                         = "NamespaceAffinity"
+PodDistributionClickHouseInstallationAffinity            = "ClickHouseInstallationAffinity"
+	PodDistributionClusterAffinity                           = "ClusterAffinity"
 
 	// Deprecated value
 	PodDistributionOnePerHost = "OnePerHost"

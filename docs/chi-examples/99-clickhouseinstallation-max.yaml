@@ -319,18 +319,20 @@ spec:
         # ClickHouseAntiAffinity - AntiAffinity by ClickHouse instances.
         #   Pod pushes away other ClickHouse pods, which allows one ClickHouse instance per node
         #   CH - (push away) - CH - (push away) - CH
-        # ShardAntiAffinity - AntiAffinity by shard name.
+        # SameShardAntiAffinity - AntiAffinity by shard name.
         #   Pod pushes away other pods of the same shard (replicas of this shard), which allows one replica of a shard per node.
+        #   Other shards are allowed - it does not push alll shards away, the same only.
         #   Used for data loss avoidance - keeps all copies of the shard on different nodes.
         #   shard1,replica1 - (push away) - shard1,replica2 - (push away) - shard1,replica3
-        # ReplicaAntiAffinity - AntiAffinity by replica name.
+        # SameReplicaAntiAffinity - AntiAffinity by replica name.
         #   Pod pushes away other pods of the same replica (shards of this replica), which allows one shard of a replica per node.
+        #   Other replicas are allowed - it does not push all replicas away, the same only.
         #   Used to evenly distribute load from "full cluster scan" queries.
         #   shard1,replica1 - (push away) - shard2,replica1 - (push away) - shard3,replica1
         # AnotherNamespaceAntiAffinity - AntiAffinity by "another" namespace.
         #   Pod pushes away pods from another namespace, which allows same-namespace pods per node
         #   ns1 - (push away) - ns2 - (push away) - ns3
-        # AnotherCHIAntiAffinity - AntiAffinity by "another" ClickHouseInstallation name.
+        # AnotherClickHouseInstallationAntiAffinity - AntiAffinity by "another" ClickHouseInstallation name.
         #   Pod pushes away pods from another ClickHouseInstallation, which allows same-ClickHouseInstallation pods per node.
         #   CHI1 - (push away) - CHI2 - (push away) - CHI3
         # AnotherClusterAntiAffinity - AntiAffinity by "another" cluster name.
@@ -342,14 +344,14 @@ spec:
         # NamespaceAffinity - Affinity by namespace.
         #   Pod attracts pods from the same namespace, which allows pods from same namespace per node.
         #   ns1 + (attracts) + ns1
-        # CHIAffinity - Affinity by ClickHouseInstallation name.
+        # ClickHouseInstallationAffinity - Affinity by ClickHouseInstallation name.
         #   Pod attracts pods from the same ClickHouseInstallation, which allows pods from the same CHI per node.
         #   CHI1 + (attracts) + CHI1
         # ClusterAffinity - Affinity by cluster name.
         #   Pod attracts pods from the same cluster, which allows pods from the same Cluster per node.
         #   cluster1 + (attracts) + cluster1
         podDistribution:
-          - type: OneReplicaOfAShardPerHost
+          - type: SameShardAntiAffinity
           - type: MaxNumberPerNode
             number: 2
 
