@@ -29,7 +29,7 @@ const (
 	PodDistributionAnotherClusterAntiAffinity                = "AnotherClusterAntiAffinity"
 	PodDistributionMaxNumberPerNode                          = "MaxNumberPerNode"
 	PodDistributionNamespaceAffinity                         = "NamespaceAffinity"
-PodDistributionClickHouseInstallationAffinity            = "ClickHouseInstallationAffinity"
+	PodDistributionClickHouseInstallationAffinity            = "ClickHouseInstallationAffinity"
 	PodDistributionClusterAffinity                           = "ClusterAffinity"
 
 	// Deprecated value
