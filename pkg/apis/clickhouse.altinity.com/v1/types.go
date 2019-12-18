@@ -255,21 +255,23 @@ type ChiHost struct {
 
 // ChiHostAddress defines address of a host within ClickHouseInstallation
 type ChiHostAddress struct {
-	Namespace          string `json:"namespace"`
-	ChiName            string `json:"chiName"`
-	ClusterName        string `json:"clusterName"`
-	ClusterIndex       int    `json:"clusterIndex"`
-	ShardName          string `json:"shardName,omitempty"`
-	ShardIndex         int    `json:"shardIndex"`
-	ReplicaName        string `json:"replicaName,omitempty"`
-	ReplicaIndex       int    `json:"replicaIndex"`
-	HostIndex          int    `json:"hostIndex"`
-	ChiCycleSize       int    `json:"chiCycleSize"`
-	ChiCycleIndex      int    `json:"chiCycleIndex"`
-	ChiCycleOffset     int    `json:"chiCycleOffset"`
-	ClusterCycleSize   int    `json:"clusterCycleSize"`
-	ClusterCycleIndex  int    `json:"clusterCycleIndex"`
-	ClusterCycleOffset int    `json:"clusterCycleOffset"`
+	Namespace               string `json:"namespace"`
+	ChiName                 string `json:"chiName"`
+	ClusterName             string `json:"clusterName"`
+	ClusterIndex            int    `json:"clusterIndex"`
+	ShardName               string `json:"shardName,omitempty"`
+	ShardIndex              int    `json:"shardIndex"`
+	ReplicaName             string `json:"replicaName,omitempty"`
+	ReplicaIndex            int    `json:"replicaIndex"`
+	ChiScopeIndex           int    `json:"chiScopeIndex"`
+	ChiScopeCycleSize       int    `json:"chiScopeCycleSize"`
+	ChiScopeCycleIndex      int    `json:"chiScopeCycleIndex"`
+	ChiScopeCycleOffset     int    `json:"chiScopeCycleOffset"`
+	ClusterScopeIndex       int    `json:"clusterScopeIndex"`
+	ClusterScopeCycleSize   int    `json:"clusterScopeCycleSize"`
+	ClusterScopeCycleIndex  int    `json:"clusterScopeCycleIndex"`
+	ClusterScopeCycleOffset int    `json:"clusterScopeCycleOffset"`
+	ShardScopeIndex         int    `json:"shardScopeIndex"`
 }
 
 // ChiHostConfig defines additional data related to a host

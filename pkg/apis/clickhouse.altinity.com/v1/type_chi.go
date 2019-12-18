@@ -49,19 +49,19 @@ func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 	chi.Status.Endpoint = endpoint
 }
 
-func (chi *ClickHouseInstallation) FillAddressInfo() int {
-	hostsCount := 0
-
+func (chi *ClickHouseInstallation) FillAddressInfo() {
 	hostProcessor := func(
 		chi *ClickHouseInstallation,
 
-		chiCycleSize int,
-		chiCycleIndex int,
-		chiCycleOffset int,
+		chiScopeIndex int,
+		chiScopeCycleSize int,
+		chiScopeCycleIndex int,
+		chiScopeCycleOffset int,
 
-		clusterCycleSize int,
-		clusterCycleIndex int,
-		clusterCycleOffset int,
+		clusterScopeIndex int,
+		clusterScopeCycleSize int,
+		clusterScopeCycleIndex int,
+		clusterScopeCycleOffset int,
 
 		clusterIndex int,
 		cluster *ChiCluster,
@@ -92,15 +92,16 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 		host.Address.ShardIndex = shardIndex
 		host.Address.ReplicaName = host.Name
 		host.Address.ReplicaIndex = replicaIndex
-		host.Address.HostIndex = hostsCount
-		host.Address.ChiCycleSize = chiCycleSize
-		host.Address.ChiCycleIndex = chiCycleIndex
-		host.Address.ChiCycleOffset = chiCycleOffset
-		host.Address.ClusterCycleSize = clusterCycleSize
-		host.Address.ClusterCycleIndex = clusterCycleIndex
-		host.Address.ClusterCycleOffset = clusterCycleOffset
+		host.Address.ChiScopeIndex = chiScopeIndex
+		host.Address.ChiScopeCycleSize = chiScopeCycleSize
+		host.Address.ChiScopeCycleIndex = chiScopeCycleIndex
+		host.Address.ChiScopeCycleOffset = chiScopeCycleOffset
+		host.Address.ClusterScopeIndex = clusterScopeIndex
+		host.Address.ClusterScopeCycleSize = clusterScopeCycleSize
+		host.Address.ClusterScopeCycleIndex = clusterScopeCycleIndex
+		host.Address.ClusterScopeCycleOffset = clusterScopeCycleOffset
+		host.Address.ShardScopeIndex = replicaIndex
 
-		hostsCount++
 		return nil
 	}
 
@@ -153,8 +154,6 @@ func (chi *ClickHouseInstallation) FillAddressInfo() int {
 		clusterCycleSize = int(math.Ceil(float64(chi.HostsCount()) / float64(requestedClusterCyclesNum)))
 	}
 	chi.WalkHostsFullPath(chiCycleSize, clusterCycleSize, hostProcessor)
-
-	return hostsCount
 }
 
 func (chi *ClickHouseInstallation) FillChiPointer() {
@@ -162,13 +161,15 @@ func (chi *ClickHouseInstallation) FillChiPointer() {
 	hostProcessor := func(
 		chi *ClickHouseInstallation,
 
-		chiCycleSize int,
-		chiCycleIndex int,
-		chiCycleOffset int,
+		chiScopeIndex int,
+		chiScopeCycleSize int,
+		chiScopeCycleIndex int,
+		chiScopeCycleOffset int,
 
-		clusterCycleSize int,
-		clusterCycleIndex int,
-		clusterCycleOffset int,
+		clusterScopeIndex int,
+		clusterScopeCycleSize int,
+		clusterScopeCycleIndex int,
+		clusterScopeCycleOffset int,
 
 		clusterIndex int,
 		cluster *ChiCluster,
@@ -256,18 +257,20 @@ func (chi *ClickHouseInstallation) WalkShards(
 }
 
 func (chi *ClickHouseInstallation) WalkHostsFullPath(
-	chiCycleSize int,
-	clusterCycleSize int,
+	chiScopeCycleSize int,
+	clusterScopeCycleSize int,
 	f func(
 		chi *ClickHouseInstallation,
 
-		chiCycleSize int,
-		chiCycleIndex int,
-		chiCycleOffset int,
+		chiScopeIndex int,
+		chiScopeCycleSize int,
+		chiScopeCycleIndex int,
+		chiScopeCycleOffset int,
 
-		clusterCycleSize int,
-		clusterCycleIndex int,
-		clusterCycleOffset int,
+		clusterScopeIndex int,
+		clusterScopeCycleSize int,
+		clusterScopeCycleIndex int,
+		clusterScopeCycleOffset int,
 
 		clusterIndex int,
 		cluster *ChiCluster,
@@ -282,17 +285,20 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 
 	res := make([]error, 0)
 
-	chiCycleIndex := 0
-	chiCycleOffset := 0
+	chiScopeIndex := 0
+	chiScopeCycleIndex := 0
+	chiScopeCycleOffset := 0
 
-	clusterCycleIndex := 0
-	clusterCycleOffset := 0
+	clusterScopeIndex := 0
+	clusterScopeCycleIndex := 0
+	clusterScopeCycleOffset := 0
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
 		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
 
-		clusterCycleIndex = 0
-		clusterCycleOffset = 0
+		clusterScopeIndex = 0
+		clusterScopeCycleIndex = 0
+		clusterScopeCycleOffset = 0
 
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
@@ -301,32 +307,40 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 				res = append(res, f(
 					chi,
 
-					chiCycleSize,
-					chiCycleIndex,
-					chiCycleOffset,
+					chiScopeIndex,
+					chiScopeCycleSize,
+					chiScopeCycleIndex,
+					chiScopeCycleOffset,
 
-					clusterCycleSize,
-					clusterCycleIndex,
-					clusterCycleOffset,
+					clusterScopeIndex,
+					clusterScopeCycleSize,
+					clusterScopeCycleIndex,
+					clusterScopeCycleOffset,
 
 					clusterIndex,
 					cluster,
+
 					shardIndex,
 					shard,
+
 					replicaIndex,
 					host,
 				))
 
-				chiCycleOffset++
-				clusterCycleOffset++
-
-				if (chiCycleSize > 0) && (chiCycleOffset >= chiCycleSize) {
-					chiCycleOffset = 0
-					chiCycleIndex++
+				// Chi-scope counters
+				chiScopeIndex++
+				chiScopeCycleOffset++
+				if (chiScopeCycleSize > 0) && (chiScopeCycleOffset >= chiScopeCycleSize) {
+					chiScopeCycleOffset = 0
+					chiScopeCycleIndex++
 				}
-				if (clusterCycleSize > 0) && (clusterCycleOffset >= clusterCycleSize) {
-					clusterCycleOffset = 0
-					clusterCycleIndex++
+
+				// Cluster-scope counters
+				clusterScopeIndex++
+				clusterScopeCycleOffset++
+				if (clusterScopeCycleSize > 0) && (clusterScopeCycleOffset >= clusterScopeCycleSize) {
+					clusterScopeCycleOffset = 0
+					clusterScopeCycleIndex++
 				}
 			}
 		}

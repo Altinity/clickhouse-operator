@@ -428,7 +428,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				map[string]string{
-					LabelClusterCycleIndex: macrosClusterCycleIndex,
+					LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
 				},
 			)
 		case chiv1.PodDistributionSameShardAntiAffinity:
@@ -538,7 +538,7 @@ func (n *Normalizer) addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTer
 			LabelSelector: &v12.LabelSelector{
 				// A list of node selector requirements by node's labels.
 				//MatchLabels: map[string]string{
-				//	LabelClusterCycleIndex: macrosClusterCycleIndex,
+				//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
 				//},
 				MatchLabels: matchLabels,
 				// Switch to MatchLabels
@@ -563,7 +563,7 @@ func (n *Normalizer) addPodAffinityTermWithMatchExpressions(terms []v1.PodAffini
 			LabelSelector: &v12.LabelSelector{
 				// A list of node selector requirements by node's labels.
 				//MatchLabels: map[string]string{
-				//	LabelClusterCycleIndex: macrosClusterCycleIndex,
+				//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
 				//},
 				//MatchExpressions: []v12.LabelSelectorRequirement{
 				//	{
@@ -593,7 +593,7 @@ func (n *Normalizer) addWeightedPodAffinityTermWithMatchLabels(
 				LabelSelector: &v12.LabelSelector{
 					// A list of node selector requirements by node's labels.
 					//MatchLabels: map[string]string{
-					//	LabelClusterCycleIndex: macrosClusterCycleIndex,
+					//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
 					//},
 					MatchLabels: matchLabels,
 					// Switch to MatchLabels

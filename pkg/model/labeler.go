@@ -34,10 +34,13 @@ const (
 	LabelClusterName                  = clickhousealtinitycom.GroupName + "/cluster"
 	LabelShardName                    = clickhousealtinitycom.GroupName + "/shard"
 	LabelReplicaName                  = clickhousealtinitycom.GroupName + "/replica"
-	LabelChiCycleIndex                = clickhousealtinitycom.GroupName + "/chiCycleIndex"
-	LabelChiCycleOffset               = clickhousealtinitycom.GroupName + "/chiCycleOffset"
-	LabelClusterCycleIndex            = clickhousealtinitycom.GroupName + "/clusterCycleIndex"
-	LabelClusterCycleOffset           = clickhousealtinitycom.GroupName + "/clusterCycleOffset"
+	LabelChiScopeIndex                = clickhousealtinitycom.GroupName + "/chiScopeIndex"
+	LabelChiScopeCycleIndex           = clickhousealtinitycom.GroupName + "/chiScopeCycleIndex"
+	LabelChiScopeCycleOffset          = clickhousealtinitycom.GroupName + "/chiScopeCycleOffset"
+	LabelClusterScopeIndex            = clickhousealtinitycom.GroupName + "/clusterScopeIndex"
+	LabelClusterScopeCycleIndex       = clickhousealtinitycom.GroupName + "/clusterScopeCycleIndex"
+	LabelClusterScopeCycleOffset      = clickhousealtinitycom.GroupName + "/clusterScopeCycleOffset"
+	LabelShardScopeIndex              = clickhousealtinitycom.GroupName + "/shardScopeIndex"
 	LabelConfigMap                    = clickhousealtinitycom.GroupName + "/ConfigMap"
 	labelConfigMapValueChiCommon      = "ChiCommon"
 	labelConfigMapValueChiCommonUsers = "ChiCommonUsers"
@@ -184,17 +187,20 @@ func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	labels := map[string]string{
-		LabelNamespace:          l.namer.getNamePartNamespace(host),
-		LabelAppName:            labelAppValue,
-		LabelChop:               l.version,
-		LabelChiName:            l.namer.getNamePartChiName(host),
-		LabelClusterName:        l.namer.getNamePartClusterName(host),
-		LabelShardName:          l.namer.getNamePartShardName(host),
-		LabelReplicaName:        l.namer.getNamePartReplicaName(host),
-		LabelChiCycleIndex:      l.namer.getNamePartChiCycleIndex(host),
-		LabelChiCycleOffset:     l.namer.getNamePartChiCycleOffset(host),
-		LabelClusterCycleIndex:  l.namer.getNamePartClusterCycleIndex(host),
-		LabelClusterCycleOffset: l.namer.getNamePartClusterCycleOffset(host),
+		LabelNamespace:               l.namer.getNamePartNamespace(host),
+		LabelAppName:                 labelAppValue,
+		LabelChop:                    l.version,
+		LabelChiName:                 l.namer.getNamePartChiName(host),
+		LabelClusterName:             l.namer.getNamePartClusterName(host),
+		LabelShardName:               l.namer.getNamePartShardName(host),
+		LabelReplicaName:             l.namer.getNamePartReplicaName(host),
+		LabelChiScopeIndex:           l.namer.getNamePartChiScopeIndex(host),
+		LabelChiScopeCycleIndex:      l.namer.getNamePartChiScopeCycleIndex(host),
+		LabelChiScopeCycleOffset:     l.namer.getNamePartChiScopeCycleOffset(host),
+		LabelClusterScopeIndex:       l.namer.getNamePartClusterScopeIndex(host),
+		LabelClusterScopeCycleIndex:  l.namer.getNamePartClusterScopeCycleIndex(host),
+		LabelClusterScopeCycleOffset: l.namer.getNamePartClusterScopeCycleOffset(host),
+		LabelShardScopeIndex:         l.namer.getNamePartShardScopeIndex(host),
 	}
 	if applySupplementaryServiceLabels {
 		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
