@@ -106,18 +106,18 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 	}
 
 	// Let's find NPerHost pod distribution
-	maxNumberPerHost := 0
+	maxNumberPerNode := 0
 	podTemplateProcessor := func(template *ChiPodTemplate) {
 		for i := range template.PodDistribution {
 			podDistribution := &template.PodDistribution[i]
 			if podDistribution.Type == PodDistributionMaxNumberPerNode {
-				maxNumberPerHost = podDistribution.Number
+				maxNumberPerNode = podDistribution.Number
 			}
 		}
 	}
 	chi.WalkPodTemplates(podTemplateProcessor)
 
-	//          1perHost   2perHost  3perHost  4perHost  5perHost
+	//          1perNode   2perNode  3perNode  4perNode  5perNode
 	// sh1r1    n1   a     n1  a     n1 a      n1  a     n1  a
 	// sh1r2    n2   a     n2  a     n2 a      n2  a     n2  a
 	// sh1r3    n3   a     n3  a     n3 a      n3  a     n3  a
@@ -133,27 +133,27 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 	// sh5r1    n13  a     n5  b     n3 c      n1  d     n1  e
 	// sh5r2    n14  a     n6  b     n4 c      n2  d     n2  e
 	// sh5r3    n15  a     n7  b     n5 c      n3  d     n3  e
-	// 1perHost = ceil(15 / 1 'cycles num') = 15 'cycle len'
-	// 2perHost = ceil(15 / 2 'cycles num') = 8  'cycle len'
-	// 3perHost = ceil(15 / 3 'cycles num') = 5  'cycle len'
-	// 4perHost = ceil(15 / 4 'cycles num') = 4  'cycle len'
-	// 5perHost = ceil(15 / 5 'cycles num') = 3  'cycle len'
+	// 1perNode = ceil(15 / 1 'cycles num') = 15 'cycle len'
+	// 2perNode = ceil(15 / 2 'cycles num') = 8  'cycle len'
+	// 3perNode = ceil(15 / 3 'cycles num') = 5  'cycle len'
+	// 4perNode = ceil(15 / 4 'cycles num') = 4  'cycle len'
+	// 5perNode = ceil(15 / 5 'cycles num') = 3  'cycle len'
 
-	// Number of requested cycles equals to max number of ClickHouses per host, but can't be less than 1
-	requestedClusterCyclesNum := maxNumberPerHost
-	if requestedClusterCyclesNum <= 0 {
-		requestedClusterCyclesNum = 1
+	// Number of requested cycles equals to max number of ClickHouses per node, but can't be less than 1
+	requestedClusterScopeCyclesNum := maxNumberPerNode
+	if requestedClusterScopeCyclesNum <= 0 {
+		requestedClusterScopeCyclesNum = 1
 	}
 
-	chiCycleSize := 0 // Unlimited
-	clusterCycleSize := 0
-	if requestedClusterCyclesNum == 1 {
+	chiScopeCycleSize := 0 // Unlimited
+	clusterScopeCycleSize := 0
+	if requestedClusterScopeCyclesNum == 1 {
 		// One cycle only requested
-		clusterCycleSize = 0 // Unlimited
+		clusterScopeCycleSize = 0 // Unlimited
 	} else {
-		clusterCycleSize = int(math.Ceil(float64(chi.HostsCount()) / float64(requestedClusterCyclesNum)))
+		clusterScopeCycleSize = int(math.Ceil(float64(chi.HostsCount()) / float64(requestedClusterScopeCyclesNum)))
 	}
-	chi.WalkHostsFullPath(chiCycleSize, clusterCycleSize, hostProcessor)
+	chi.WalkHostsFullPath(chiScopeCycleSize, clusterScopeCycleSize, hostProcessor)
 }
 
 func (chi *ClickHouseInstallation) FillChiPointer() {
