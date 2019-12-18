@@ -16,6 +16,7 @@ package model
 
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -27,14 +28,14 @@ import (
 )
 
 type Normalizer struct {
-	config             *chiv1.Config
+	chop *chop.Chop
 	chi                *chiv1.ClickHouseInstallation
 	withDefaultCluster bool
 }
 
-func NewNormalizer(config *chiv1.Config) *Normalizer {
+func NewNormalizer(chop *chop.Chop) *Normalizer {
 	return &Normalizer{
-		config: config,
+		chop: chop,
 	}
 }
 
@@ -44,12 +45,12 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withD
 	n.withDefaultCluster = withDefaultCluster
 
 	// What base should be used
-	if n.config.ChiTemplate == nil {
+	if n.chop.Config().ChiTemplate == nil {
 		// No template specified - start with clear page
 		n.chi = new(chiv1.ClickHouseInstallation)
 	} else {
 		// Template specified - start with template
-		n.chi = n.config.ChiTemplate.DeepCopy()
+		n.chi = n.chop.Config().ChiTemplate.DeepCopy()
 	}
 
 	// At this moment n.chi is either empty or a system-wide template
@@ -69,7 +70,7 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withD
 	// Apply CHI-specified templates
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
-		if template := n.config.FindTemplate(useTemplate, chi.Namespace); template == nil {
+		if template := n.chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
 			glog.V(1).Infof("UNABLE to find template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			(&n.chi.Spec).MergeFrom(&template.Spec, chiv1.MergeTypeOverrideByNonEmptyValues)
@@ -753,24 +754,24 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 	for username := range usernameMap {
 		if _, ok := (*users)[username+"/profile"]; !ok {
 			// No 'user/profile' section
-			(*users)[username+"/profile"] = n.config.ChConfigUserDefaultProfile
+			(*users)[username+"/profile"] = n.chop.Config().ChConfigUserDefaultProfile
 		}
 		if _, ok := (*users)[username+"/quota"]; !ok {
 			// No 'user/quota' section
-			(*users)[username+"/quota"] = n.config.ChConfigUserDefaultQuota
+			(*users)[username+"/quota"] = n.chop.Config().ChConfigUserDefaultQuota
 		}
 		_, okIPs := (*users)[username+"/networks/ip"]
 		// _, okHost := (*users)[username+"/networks/host"]
 		// _, okHostRegexp := (*users)[username+"/networks/host_regexp"]
 		if !okIPs {
 			// No 'user/networks/ip' section
-			(*users)[username+"/networks/ip"] = n.config.ChConfigUserDefaultNetworksIP
+			(*users)[username+"/networks/ip"] = n.chop.Config().ChConfigUserDefaultNetworksIP
 		}
 		_, okPassword := (*users)[username+"/password"]
 		_, okPasswordSHA256 := (*users)[username+"/password_sha256_hex"]
 		if !okPassword && !okPasswordSHA256 {
 			// Neither 'password' nor 'password_sha256_hex' are in place
-			(*users)[username+"/password"] = n.config.ChConfigUserDefaultPassword
+			(*users)[username+"/password"] = n.chop.Config().ChConfigUserDefaultPassword
 		}
 	}
 }

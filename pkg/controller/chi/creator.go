@@ -195,7 +195,7 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 
 		// StatefulSet is either not created or generation is not yet reached
 
-		if time.Since(start) >= (time.Duration(c.chopConfigManager.Config().StatefulSetUpdateTimeout) * time.Second) {
+		if time.Since(start) >= (time.Duration(c.chop.Config().StatefulSetUpdateTimeout) * time.Second) {
 			// Timeout reached, no good result available, time to quit
 			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) - TIMEOUT reached", namespace, name)
 			return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - wait timeout", namespace, name))
@@ -204,7 +204,7 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 		// Wait some more time
 		glog.V(2).Infof("waitStatefulSetGeneration(%s/%s):%s", namespace, name)
 		select {
-		case <-time.After(time.Duration(c.chopConfigManager.Config().StatefulSetUpdatePollPeriod) * time.Second):
+		case <-time.After(time.Duration(c.chop.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}
 	}
 
@@ -219,7 +219,7 @@ func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulS
 	name := failedStatefulSet.Name
 
 	// What to do with StatefulSet - look into chop configuration settings
-	switch c.chopConfigManager.Config().OnStatefulSetCreateFailureAction {
+	switch c.chop.Config().OnStatefulSetCreateFailureAction {
 	case chop.OnStatefulSetCreateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
 		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - abort", namespace, name)
@@ -237,7 +237,7 @@ func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulS
 		return nil
 
 	default:
-		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetCreateFailureAction=%s", c.chopConfigManager.Config().OnStatefulSetCreateFailureAction)
+		glog.V(1).Infof("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", c.chop.Config().OnStatefulSetCreateFailureAction)
 		return nil
 	}
 
@@ -252,7 +252,7 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 	name := rollbackStatefulSet.Name
 
 	// What to do with StatefulSet - look into chop configuration settings
-	switch c.chopConfigManager.Config().OnStatefulSetUpdateFailureAction {
+	switch c.chop.Config().OnStatefulSetUpdateFailureAction {
 	case chop.OnStatefulSetUpdateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
 		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort", namespace, name)
@@ -283,7 +283,7 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 		return nil
 
 	default:
-		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s", c.chopConfigManager.Config().OnStatefulSetUpdateFailureAction)
+		glog.V(1).Infof("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", c.chop.Config().OnStatefulSetUpdateFailureAction)
 		return nil
 	}
 

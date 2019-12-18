@@ -56,8 +56,8 @@ type ClickHouseInstallationTemplate ClickHouseInstallation
 type ClickHouseOperatorConfiguration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              Config `json:"spec"`
-	Status            string `json:"status"`
+	Spec              OperatorConfig `json:"spec"`
+	Status            string         `json:"status"`
 }
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
@@ -404,10 +404,10 @@ const (
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
-// Do not forget to update func (config *Config) String()
+// Do not forget to update func (config *OperatorConfig) String()
 // Do not forget to update CRD spec
-type Config struct {
-	// Full path to the config file and folder where this Config originates from
+type OperatorConfig struct {
+	// Full path to the config file and folder where this OperatorConfig originates from
 	ConfigFilePath   string
 	ConfigFolderPath string
 
@@ -422,7 +422,7 @@ type Config struct {
 	ChCommonConfigsPath string `json:"chCommonConfigsPath" yaml:"chCommonConfigsPath"`
 	ChHostConfigsPath   string `json:"chHostConfigsPath"   yaml:"chHostConfigsPath"`
 	ChUsersConfigsPath  string `json:"chUsersConfigsPath"  yaml:"chUsersConfigsPath"`
-	// Config files fetched from these paths. Maps "file name->file content"
+	// OperatorConfig files fetched from these paths. Maps "file name->file content"
 	ChCommonConfigs map[string]string
 	ChHostConfigs   map[string]string
 	ChUsersConfigs  map[string]string

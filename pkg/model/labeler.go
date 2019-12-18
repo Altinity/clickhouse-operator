@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,17 +59,17 @@ const (
 
 // Labeler is an entity which can label CHI artifacts
 type Labeler struct {
-	version string
-	chi     *chi.ClickHouseInstallation
-	namer   *namer
+	chop  *chop.Chop
+	chi   *chi.ClickHouseInstallation
+	namer *namer
 }
 
 // NewLabeler creates new labeler with context
-func NewLabeler(version string, chi *chi.ClickHouseInstallation) *Labeler {
+func NewLabeler(chop *chop.Chop, chi *chi.ClickHouseInstallation) *Labeler {
 	return &Labeler{
-		version: version,
-		chi:     chi,
-		namer:   newNamer(namerContextLabels),
+		chop:  chop,
+		chi:   chi,
+		namer: newNamer(namerContextLabels),
 	}
 }
 
@@ -120,7 +121,7 @@ func (l *Labeler) getLabelsChiScope() map[string]string {
 	return l.appendChiLabels(map[string]string{
 		LabelNamespace: l.namer.getNamePartNamespace(l.chi),
 		LabelAppName:   labelAppValue,
-		LabelChop:      l.version,
+		LabelChop:      l.chop.Version,
 		LabelChiName:   l.namer.getNamePartChiName(l.chi),
 	})
 }
@@ -141,7 +142,7 @@ func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]stri
 	return l.appendChiLabels(map[string]string{
 		LabelNamespace:   l.namer.getNamePartNamespace(cluster),
 		LabelAppName:     labelAppValue,
-		LabelChop:        l.version,
+		LabelChop:        l.chop.Version,
 		LabelChiName:     l.namer.getNamePartChiName(cluster),
 		LabelClusterName: l.namer.getNamePartClusterName(cluster),
 	})
@@ -164,7 +165,7 @@ func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
 	return l.appendChiLabels(map[string]string{
 		LabelNamespace:   l.namer.getNamePartNamespace(shard),
 		LabelAppName:     labelAppValue,
-		LabelChop:        l.version,
+		LabelChop:        l.chop.Version,
 		LabelChiName:     l.namer.getNamePartChiName(shard),
 		LabelClusterName: l.namer.getNamePartClusterName(shard),
 		LabelShardName:   l.namer.getNamePartShardName(shard),
@@ -189,7 +190,7 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 	labels := map[string]string{
 		LabelNamespace:               l.namer.getNamePartNamespace(host),
 		LabelAppName:                 labelAppValue,
-		LabelChop:                    l.version,
+		LabelChop:                    l.chop.Version,
 		LabelChiName:                 l.namer.getNamePartChiName(host),
 		LabelClusterName:             l.namer.getNamePartClusterName(host),
 		LabelShardName:               l.namer.getNamePartShardName(host),

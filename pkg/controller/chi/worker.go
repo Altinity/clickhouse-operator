@@ -35,11 +35,11 @@ type worker struct {
 func (c *Controller) newWorker() *worker {
 	return &worker{
 		c:          c,
-		normalizer: chopmodels.NewNormalizer(c.chopConfigManager.Config()),
+		normalizer: chopmodels.NewNormalizer(c.chop),
 		schemer: chopmodels.NewSchemer(
-			c.chopConfigManager.Config().ChUsername,
-			c.chopConfigManager.Config().ChPassword,
-			c.chopConfigManager.Config().ChPort,
+			c.chop.Config().ChUsername,
+			c.chop.Config().ChPassword,
+			c.chop.Config().ChPort,
 		),
 		creator: nil,
 	}
@@ -240,7 +240,7 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 // reconcile reconciles ClickHouseInstallation
 func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
-	w.creator = chopmodels.NewCreator(chi, w.c.chopConfigManager.Config(), w.c.version)
+	w.creator = chopmodels.NewCreator(w.c.chop, chi)
 	return chi.WalkTillError(
 		w.reconcileChi,
 		w.reconcileCluster,

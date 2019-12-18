@@ -26,7 +26,7 @@ import (
 	"syscall"
 	"time"
 
-	chopconfig "github.com/altinity/clickhouse-operator/pkg/config"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 
@@ -168,11 +168,11 @@ func Run() {
 	kubeClient, chopClient := createClientsets(kubeConfig)
 
 	//
-	// Create operator config
+	// Create operator instance
 	//
-	chopConfigManager := chopconfig.NewConfigManager(chopClient, chopConfigFile)
-	if err := chopConfigManager.Init(); err != nil {
-		glog.Fatalf("Unable to build config file %v\n", err)
+	chop := chop.NewChop(version.Version, chopClient, chopConfigFile)
+	if err := chop.Init(); err != nil {
+		glog.Fatalf("Unable to init CHOP instance %v\n", err)
 		os.Exit(1)
 	}
 
@@ -182,20 +182,19 @@ func Run() {
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
 		kubeClient,
 		kubeInformerFactoryResyncPeriod,
-		kubeinformers.WithNamespace(chopConfigManager.Config().GetInformerNamespace()),
+		kubeinformers.WithNamespace(chop.Config().GetInformerNamespace()),
 	)
 	chopInformerFactory := chopinformers.NewSharedInformerFactoryWithOptions(
 		chopClient,
 		chopInformerFactoryResyncPeriod,
-		chopinformers.WithNamespace(chopConfigManager.Config().GetInformerNamespace()),
+		chopinformers.WithNamespace(chop.Config().GetInformerNamespace()),
 	)
 
 	//
 	// Create Controller
 	//
 	chiController := chi.NewController(
-		version.Version,
-		chopConfigManager,
+		chop,
 		chopClient,
 		kubeClient,
 		chopInformerFactory,
