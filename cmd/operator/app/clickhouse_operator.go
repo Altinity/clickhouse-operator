@@ -27,11 +27,12 @@ import (
 	"time"
 
 	chopconfig "github.com/altinity/clickhouse-operator/pkg/config"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
+
 	kubeinformers "k8s.io/client-go/informers"
 	kube "k8s.io/client-go/kubernetes"
 	kuberest "k8s.io/client-go/rest"
