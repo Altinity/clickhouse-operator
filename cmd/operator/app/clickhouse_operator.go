@@ -46,7 +46,7 @@ const (
 	defaultMetricsEndpoint                  = ":8888"
 	metricsPath                             = "/metrics"
 	defaultInformerFactoryResyncPeriod      = 60 * time.Second
-	defaultInformerFactoryResyncDebugPeriod = 600 * time.Second
+	defaultInformerFactoryResyncDebugPeriod = 60 * time.Second
 )
 
 const (
