@@ -359,12 +359,15 @@ spec:
                                 # List podDistributionXXX constants
                                 - "Unspecified"
                                 - "ClickHouseAntiAffinity"
-                                - "ShardOtherReplicaAntiAffinity"
-                                - "ReplicaOtherShardAntiAffinity"
-                                - "OtherNamespaceAntiAffinity"
-                                - "OtherCHIAntiAffinity"
-                                - "OtherClusterAntiAffinity"
+                                - "SameShardAntiAffinity"
+                                - "SameReplicaAntiAffinity"
+                                - "AnotherNamespaceAntiAffinity"
+                                - "AnotherClickHouseInstallationAntiAffinity"
+                                - "AnotherClusterAntiAffinity"
                                 - "MaxNumberPerNode"
+                                - "NamespaceAffinity"
+                                - "ClickHouseInstallationAffinity"
+                                - "ClusterAffinity"
                             number:
                               type: integer
                               minimum: 0
@@ -763,12 +766,15 @@ spec:
                                 # List podDistributionXXX constants
                                 - "Unspecified"
                                 - "ClickHouseAntiAffinity"
-                                - "ShardOtherReplicaAntiAffinity"
-                                - "ReplicaOtherShardAntiAffinity"
-                                - "OtherNamespaceAntiAffinity"
-                                - "OtherCHIAntiAffinity"
-                                - "OtherClusterAntiAffinity"
+                                - "SameShardAntiAffinity"
+                                - "SameReplicaAntiAffinity"
+                                - "AnotherNamespaceAntiAffinity"
+                                - "AnotherClickHouseInstallationAntiAffinity"
+                                - "AnotherClusterAntiAffinity"
                                 - "MaxNumberPerNode"
+                                - "NamespaceAffinity"
+                                - "ClickHouseInstallationAffinity"
+                                - "ClusterAffinity"
                             number:
                               type: integer
                               minimum: 0

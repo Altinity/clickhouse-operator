@@ -66,14 +66,20 @@ const (
 	macrosReplicaID = "{replicaID}"
 	// macrosReplicaIndex is an index of the replica in the shard - integer number, converted into string
 	macrosReplicaIndex = "{replicaIndex}"
-	// macrosChiCycleIndex is an index of the replica in the CHI-level cycle - integer number, converted into string
-	macrosChiCycleIndex = "{chiCycleIndex}"
-	// macrosChiCycleOffset is an offset of the replica in the CHI-level cycle - integer number, converted into string
-	macrosChiCycleOffset = "{chiCycleOffset}"
-	// macrosClusterCycleIndex is an index of the replica in the Cluster-level cycle - integer number, converted into string
-	macrosClusterCycleIndex = "{clusterCycleIndex}"
-	// macrosClusterCycleOffset is an offset of the replica in the Cluster-level cycle - integer number, converted into string
-	macrosClusterCycleOffset = "{clusterCycleOffset}"
+	// macrosChiScopeCycleIndex is an index of the replica in the CHI-scope cycle - integer number, converted into string
+	macrosChiScopeCycleIndex = "{chiScopeCycleIndex}"
+	// macrosChiScopeCycleOffset is an offset of the replica in the CHI-scope cycle - integer number, converted into string
+	macrosChiScopeCycleOffset = "{chiScopeCycleOffset}"
+	// macrosClusterScopeCycleIndex is an index of the replica in the Cluster-scope cycle - integer number, converted into string
+	macrosClusterScopeCycleIndex = "{clusterScopeCycleIndex}"
+	// macrosClusterScopeCycleOffset is an offset of the replica in the Cluster-scope cycle - integer number, converted into string
+	macrosClusterScopeCycleOffset = "{clusterScopeCycleOffset}"
+	// macrosChiScopeIndex is an index of the replica on the CHI-scope
+	macrosChiScopeIndex = "{chiScopeIndex}"
+	// macrosClusterScopeIndex is an index of the replica on the cluster-scope
+	macrosClusterScopeIndex = "{clusterScopeIndex}"
+	// macrosShardScopeIndex is an index of the replica on the shard-scope
+	macrosShardScopeIndex = "{shardScopeIndex}"
 )
 
 const (
@@ -302,20 +308,32 @@ func (n *namer) getNamePartReplicaName(host *chop.ChiHost) string {
 	return n.namePartReplicaName(host.Address.ReplicaName)
 }
 
-func (n *namer) getNamePartChiCycleIndex(host *chop.ChiHost) string {
-	return strconv.Itoa(host.Address.ChiCycleIndex)
+func (n *namer) getNamePartChiScopeCycleIndex(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ChiScopeCycleIndex)
 }
 
-func (n *namer) getNamePartChiCycleOffset(host *chop.ChiHost) string {
-	return strconv.Itoa(host.Address.ChiCycleOffset)
+func (n *namer) getNamePartChiScopeCycleOffset(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ChiScopeCycleOffset)
 }
 
-func (n *namer) getNamePartClusterCycleIndex(host *chop.ChiHost) string {
-	return strconv.Itoa(host.Address.ClusterCycleIndex)
+func (n *namer) getNamePartClusterScopeCycleIndex(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ClusterScopeCycleIndex)
 }
 
-func (n *namer) getNamePartClusterCycleOffset(host *chop.ChiHost) string {
-	return strconv.Itoa(host.Address.ClusterCycleOffset)
+func (n *namer) getNamePartClusterScopeCycleOffset(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ClusterScopeCycleOffset)
+}
+
+func (n *namer) getNamePartChiScopeIndex(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ChiScopeIndex)
+}
+
+func (n *namer) getNamePartClusterScopeIndex(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ClusterScopeIndex)
+}
+
+func (n *namer) getNamePartShardScopeIndex(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ShardScopeIndex)
 }
 
 func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
@@ -369,10 +387,13 @@ func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
 		macrosReplicaName, n.namePartReplicaName(host.Address.ReplicaName),
 		macrosReplicaID, n.namePartReplicaNameID(host.Address.ReplicaName),
 		macrosReplicaIndex, strconv.Itoa(host.Address.ReplicaIndex),
-		macrosChiCycleIndex, strconv.Itoa(host.Address.ChiCycleIndex), // TODO use appropriate namePart function
-		macrosChiCycleOffset, strconv.Itoa(host.Address.ChiCycleOffset), // TODO use appropriate namePart function
-		macrosClusterCycleIndex, strconv.Itoa(host.Address.ClusterCycleIndex), // TODO use appropriate namePart function
-		macrosClusterCycleOffset, strconv.Itoa(host.Address.ClusterCycleOffset), // TODO use appropriate namePart function
+		macrosChiScopeIndex, strconv.Itoa(host.Address.ChiScopeIndex), // TODO use appropriate namePart function
+		macrosChiScopeCycleIndex, strconv.Itoa(host.Address.ChiScopeCycleIndex), // TODO use appropriate namePart function
+		macrosChiScopeCycleOffset, strconv.Itoa(host.Address.ChiScopeCycleOffset), // TODO use appropriate namePart function
+		macrosClusterScopeIndex, strconv.Itoa(host.Address.ClusterScopeIndex), // TODO use appropriate namePart function
+		macrosClusterScopeCycleIndex, strconv.Itoa(host.Address.ClusterScopeCycleIndex), // TODO use appropriate namePart function
+		macrosClusterScopeCycleOffset, strconv.Itoa(host.Address.ClusterScopeCycleOffset), // TODO use appropriate namePart function
+		macrosShardScopeIndex, strconv.Itoa(host.Address.ShardScopeIndex), // TODO use appropriate namePart function
 	)
 }
 

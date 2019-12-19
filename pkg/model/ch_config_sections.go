@@ -28,10 +28,10 @@ type configSections struct {
 	// ClickHouse config generator
 	chConfigGenerator *ClickHouseConfigGenerator
 	// clickhouse-operator configuration
-	chopConfig *chi.Config
+	chopConfig *chi.OperatorConfig
 }
 
-func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig *chi.Config) *configSections {
+func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig *chi.OperatorConfig) *configSections {
 	return &configSections{
 		commonConfigSections:      make(map[string]string),
 		commonUsersConfigSections: make(map[string]string),

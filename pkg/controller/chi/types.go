@@ -15,11 +15,11 @@
 package chi
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/config"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	choplisters "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 	kube "k8s.io/client-go/kubernetes"
@@ -32,9 +32,9 @@ import (
 
 // Controller defines CRO controller
 type Controller struct {
-	version string
+	// Instance of Operator
+	chop *chop.Chop
 
-	chopConfigManager *config.Manager
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 	kubeClient kube.Interface
 	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
@@ -93,11 +93,11 @@ const (
 
 type ReconcileChi struct {
 	cmd string
-	old *chop.ClickHouseInstallation
-	new *chop.ClickHouseInstallation
+	old *chi.ClickHouseInstallation
+	new *chi.ClickHouseInstallation
 }
 
-func NewReconcileChi(cmd string, old, new *chop.ClickHouseInstallation) *ReconcileChi {
+func NewReconcileChi(cmd string, old, new *chi.ClickHouseInstallation) *ReconcileChi {
 	return &ReconcileChi{
 		cmd: cmd,
 		old: old,
@@ -107,11 +107,11 @@ func NewReconcileChi(cmd string, old, new *chop.ClickHouseInstallation) *Reconci
 
 type ReconcileChit struct {
 	cmd string
-	old *chop.ClickHouseInstallationTemplate
-	new *chop.ClickHouseInstallationTemplate
+	old *chi.ClickHouseInstallationTemplate
+	new *chi.ClickHouseInstallationTemplate
 }
 
-func NewReconcileChit(cmd string, old, new *chop.ClickHouseInstallationTemplate) *ReconcileChit {
+func NewReconcileChit(cmd string, old, new *chi.ClickHouseInstallationTemplate) *ReconcileChit {
 	return &ReconcileChit{
 		cmd: cmd,
 		old: old,
@@ -121,11 +121,11 @@ func NewReconcileChit(cmd string, old, new *chop.ClickHouseInstallationTemplate)
 
 type ReconcileChopConfig struct {
 	cmd string
-	old *chop.ClickHouseOperatorConfiguration
-	new *chop.ClickHouseOperatorConfiguration
+	old *chi.ClickHouseOperatorConfiguration
+	new *chi.ClickHouseOperatorConfiguration
 }
 
-func NewReconcileChopConfig(cmd string, old, new *chop.ClickHouseOperatorConfiguration) *ReconcileChopConfig {
+func NewReconcileChopConfig(cmd string, old, new *chi.ClickHouseOperatorConfiguration) *ReconcileChopConfig {
 	return &ReconcileChopConfig{
 		cmd: cmd,
 		old: old,

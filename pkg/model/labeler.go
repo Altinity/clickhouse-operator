@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,10 +35,13 @@ const (
 	LabelClusterName                  = clickhousealtinitycom.GroupName + "/cluster"
 	LabelShardName                    = clickhousealtinitycom.GroupName + "/shard"
 	LabelReplicaName                  = clickhousealtinitycom.GroupName + "/replica"
-	LabelChiCycleIndex                = clickhousealtinitycom.GroupName + "/chiCycleIndex"
-	LabelChiCycleOffset               = clickhousealtinitycom.GroupName + "/chiCycleOffset"
-	LabelClusterCycleIndex            = clickhousealtinitycom.GroupName + "/clusterCycleIndex"
-	LabelClusterCycleOffset           = clickhousealtinitycom.GroupName + "/clusterCycleOffset"
+	LabelChiScopeIndex                = clickhousealtinitycom.GroupName + "/chiScopeIndex"
+	LabelChiScopeCycleIndex           = clickhousealtinitycom.GroupName + "/chiScopeCycleIndex"
+	LabelChiScopeCycleOffset          = clickhousealtinitycom.GroupName + "/chiScopeCycleOffset"
+	LabelClusterScopeIndex            = clickhousealtinitycom.GroupName + "/clusterScopeIndex"
+	LabelClusterScopeCycleIndex       = clickhousealtinitycom.GroupName + "/clusterScopeCycleIndex"
+	LabelClusterScopeCycleOffset      = clickhousealtinitycom.GroupName + "/clusterScopeCycleOffset"
+	LabelShardScopeIndex              = clickhousealtinitycom.GroupName + "/shardScopeIndex"
 	LabelConfigMap                    = clickhousealtinitycom.GroupName + "/ConfigMap"
 	labelConfigMapValueChiCommon      = "ChiCommon"
 	labelConfigMapValueChiCommonUsers = "ChiCommonUsers"
@@ -55,17 +59,17 @@ const (
 
 // Labeler is an entity which can label CHI artifacts
 type Labeler struct {
-	version string
-	chi     *chi.ClickHouseInstallation
-	namer   *namer
+	chop  *chop.Chop
+	chi   *chi.ClickHouseInstallation
+	namer *namer
 }
 
 // NewLabeler creates new labeler with context
-func NewLabeler(version string, chi *chi.ClickHouseInstallation) *Labeler {
+func NewLabeler(chop *chop.Chop, chi *chi.ClickHouseInstallation) *Labeler {
 	return &Labeler{
-		version: version,
-		chi:     chi,
-		namer:   newNamer(namerContextLabels),
+		chop:  chop,
+		chi:   chi,
+		namer: newNamer(namerContextLabels),
 	}
 }
 
@@ -117,7 +121,7 @@ func (l *Labeler) getLabelsChiScope() map[string]string {
 	return l.appendChiLabels(map[string]string{
 		LabelNamespace: l.namer.getNamePartNamespace(l.chi),
 		LabelAppName:   labelAppValue,
-		LabelChop:      l.version,
+		LabelChop:      l.chop.Version,
 		LabelChiName:   l.namer.getNamePartChiName(l.chi),
 	})
 }
@@ -138,7 +142,7 @@ func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]stri
 	return l.appendChiLabels(map[string]string{
 		LabelNamespace:   l.namer.getNamePartNamespace(cluster),
 		LabelAppName:     labelAppValue,
-		LabelChop:        l.version,
+		LabelChop:        l.chop.Version,
 		LabelChiName:     l.namer.getNamePartChiName(cluster),
 		LabelClusterName: l.namer.getNamePartClusterName(cluster),
 	})
@@ -161,7 +165,7 @@ func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
 	return l.appendChiLabels(map[string]string{
 		LabelNamespace:   l.namer.getNamePartNamespace(shard),
 		LabelAppName:     labelAppValue,
-		LabelChop:        l.version,
+		LabelChop:        l.chop.Version,
 		LabelChiName:     l.namer.getNamePartChiName(shard),
 		LabelClusterName: l.namer.getNamePartClusterName(shard),
 		LabelShardName:   l.namer.getNamePartShardName(shard),
@@ -184,17 +188,20 @@ func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	labels := map[string]string{
-		LabelNamespace:          l.namer.getNamePartNamespace(host),
-		LabelAppName:            labelAppValue,
-		LabelChop:               l.version,
-		LabelChiName:            l.namer.getNamePartChiName(host),
-		LabelClusterName:        l.namer.getNamePartClusterName(host),
-		LabelShardName:          l.namer.getNamePartShardName(host),
-		LabelReplicaName:        l.namer.getNamePartReplicaName(host),
-		LabelChiCycleIndex:      l.namer.getNamePartChiCycleIndex(host),
-		LabelChiCycleOffset:     l.namer.getNamePartChiCycleOffset(host),
-		LabelClusterCycleIndex:  l.namer.getNamePartClusterCycleIndex(host),
-		LabelClusterCycleOffset: l.namer.getNamePartClusterCycleOffset(host),
+		LabelNamespace:               l.namer.getNamePartNamespace(host),
+		LabelAppName:                 labelAppValue,
+		LabelChop:                    l.chop.Version,
+		LabelChiName:                 l.namer.getNamePartChiName(host),
+		LabelClusterName:             l.namer.getNamePartClusterName(host),
+		LabelShardName:               l.namer.getNamePartShardName(host),
+		LabelReplicaName:             l.namer.getNamePartReplicaName(host),
+		LabelChiScopeIndex:           l.namer.getNamePartChiScopeIndex(host),
+		LabelChiScopeCycleIndex:      l.namer.getNamePartChiScopeCycleIndex(host),
+		LabelChiScopeCycleOffset:     l.namer.getNamePartChiScopeCycleOffset(host),
+		LabelClusterScopeIndex:       l.namer.getNamePartClusterScopeIndex(host),
+		LabelClusterScopeCycleIndex:  l.namer.getNamePartClusterScopeCycleIndex(host),
+		LabelClusterScopeCycleOffset: l.namer.getNamePartClusterScopeCycleOffset(host),
+		LabelShardScopeIndex:         l.namer.getNamePartShardScopeIndex(host),
 	}
 	if applySupplementaryServiceLabels {
 		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
@@ -232,20 +239,17 @@ func (l *Labeler) prepareAffinity(podTemplate *chi.ChiPodTemplate, host *chi.Chi
 
 	if podTemplate.Spec.Affinity.NodeAffinity != nil {
 		l.processNodeSelector(podTemplate.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
-		// TODO
-		// PreferredDuringSchedulingIgnoredDuringExecution []PreferredSchedulingTerm are skipped for now
+		l.processPreferredSchedulingTerms(podTemplate.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, host)
 	}
 
 	if podTemplate.Spec.Affinity.PodAffinity != nil {
 		l.processPodAffinityTerms(podTemplate.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
-		// TODO
-		// PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm are skipped for now
+		l.processWeightedPodAffinityTerms(podTemplate.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution, host)
 	}
 
 	if podTemplate.Spec.Affinity.PodAntiAffinity != nil {
 		l.processPodAffinityTerms(podTemplate.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
-		// TODO
-		// PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm are skipped for now
+		l.processWeightedPodAffinityTerms(podTemplate.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, host)
 	}
 }
 
@@ -259,14 +263,21 @@ func (l *Labeler) processNodeSelector(nodeSelector *v1.NodeSelector, host *chi.C
 	}
 }
 
+func (l *Labeler) processPreferredSchedulingTerms(preferredSchedulingTerms []v1.PreferredSchedulingTerm, host *chi.ChiHost) {
+	for i := range preferredSchedulingTerms {
+		nodeSelectorTerm := &preferredSchedulingTerms[i].Preference
+		l.processNodeSelectorTerm(nodeSelectorTerm, host)
+	}
+}
+
 func (l *Labeler) processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm, host *chi.ChiHost) {
-	for j := range nodeSelectorTerm.MatchExpressions {
-		nodeSelectorRequirement := &nodeSelectorTerm.MatchExpressions[j]
+	for i := range nodeSelectorTerm.MatchExpressions {
+		nodeSelectorRequirement := &nodeSelectorTerm.MatchExpressions[i]
 		l.processNodeSelectorRequirement(nodeSelectorRequirement, host)
 	}
 
-	for j := range nodeSelectorTerm.MatchFields {
-		nodeSelectorRequirement := &nodeSelectorTerm.MatchExpressions[j]
+	for i := range nodeSelectorTerm.MatchFields {
+		nodeSelectorRequirement := &nodeSelectorTerm.MatchFields[i]
 		l.processNodeSelectorRequirement(nodeSelectorRequirement, host)
 	}
 }
@@ -274,17 +285,28 @@ func (l *Labeler) processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm,
 func (l *Labeler) processNodeSelectorRequirement(nodeSelectorRequirement *v1.NodeSelectorRequirement, host *chi.ChiHost) {
 	nodeSelectorRequirement.Key = newNameMacroReplacerHost(host).Replace(nodeSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
-	for key := range nodeSelectorRequirement.Values {
-		nodeSelectorRequirement.Values[key] = newNameMacroReplacerHost(host).Replace(nodeSelectorRequirement.Values[key])
+	for i := range nodeSelectorRequirement.Values {
+		nodeSelectorRequirement.Values[i] = newNameMacroReplacerHost(host).Replace(nodeSelectorRequirement.Values[i])
 	}
 }
 
 func (l *Labeler) processPodAffinityTerms(podAffinityTerms []v1.PodAffinityTerm, host *chi.ChiHost) {
 	for i := range podAffinityTerms {
 		podAffinityTerm := &podAffinityTerms[i]
-		l.processLabelSelector(podAffinityTerm.LabelSelector, host)
-		podAffinityTerm.TopologyKey = newNameMacroReplacerHost(host).Replace(podAffinityTerm.TopologyKey)
+		l.processPodAffinityTerm(podAffinityTerm, host)
 	}
+}
+
+func (l *Labeler) processWeightedPodAffinityTerms(weightedPodAffinityTerms []v1.WeightedPodAffinityTerm, host *chi.ChiHost) {
+	for i := range weightedPodAffinityTerms {
+		podAffinityTerm := &weightedPodAffinityTerms[i].PodAffinityTerm
+		l.processPodAffinityTerm(podAffinityTerm, host)
+	}
+}
+
+func (l *Labeler) processPodAffinityTerm(podAffinityTerm *v1.PodAffinityTerm, host *chi.ChiHost) {
+	l.processLabelSelector(podAffinityTerm.LabelSelector, host)
+	podAffinityTerm.TopologyKey = newNameMacroReplacerHost(host).Replace(podAffinityTerm.TopologyKey)
 }
 
 func (l *Labeler) processLabelSelector(labelSelector *meta.LabelSelector, host *chi.ChiHost) {
@@ -304,8 +326,8 @@ func (l *Labeler) processLabelSelector(labelSelector *meta.LabelSelector, host *
 func (l *Labeler) processLabelSelectorRequirement(labelSelectorRequirement *meta.LabelSelectorRequirement, host *chi.ChiHost) {
 	labelSelectorRequirement.Key = newNameMacroReplacerHost(host).Replace(labelSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
-	for key := range labelSelectorRequirement.Values {
-		labelSelectorRequirement.Values[key] = newNameMacroReplacerHost(host).Replace(labelSelectorRequirement.Values[key])
+	for i := range labelSelectorRequirement.Values {
+		labelSelectorRequirement.Values[i] = newNameMacroReplacerHost(host).Replace(labelSelectorRequirement.Values[i])
 	}
 }
 

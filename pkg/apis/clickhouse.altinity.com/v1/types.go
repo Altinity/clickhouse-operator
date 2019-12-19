@@ -56,8 +56,8 @@ type ClickHouseInstallationTemplate ClickHouseInstallation
 type ClickHouseOperatorConfiguration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              Config `json:"spec"`
-	Status            string `json:"status"`
+	Spec              OperatorConfig `json:"spec"`
+	Status            string         `json:"status"`
 }
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
@@ -255,21 +255,23 @@ type ChiHost struct {
 
 // ChiHostAddress defines address of a host within ClickHouseInstallation
 type ChiHostAddress struct {
-	Namespace          string `json:"namespace"`
-	ChiName            string `json:"chiName"`
-	ClusterName        string `json:"clusterName"`
-	ClusterIndex       int    `json:"clusterIndex"`
-	ShardName          string `json:"shardName,omitempty"`
-	ShardIndex         int    `json:"shardIndex"`
-	ReplicaName        string `json:"replicaName,omitempty"`
-	ReplicaIndex       int    `json:"replicaIndex"`
-	HostIndex          int    `json:"hostIndex"`
-	ChiCycleSize       int    `json:"chiCycleSize"`
-	ChiCycleIndex      int    `json:"chiCycleIndex"`
-	ChiCycleOffset     int    `json:"chiCycleOffset"`
-	ClusterCycleSize   int    `json:"clusterCycleSize"`
-	ClusterCycleIndex  int    `json:"clusterCycleIndex"`
-	ClusterCycleOffset int    `json:"clusterCycleOffset"`
+	Namespace               string `json:"namespace"`
+	ChiName                 string `json:"chiName"`
+	ClusterName             string `json:"clusterName"`
+	ClusterIndex            int    `json:"clusterIndex"`
+	ShardName               string `json:"shardName,omitempty"`
+	ShardIndex              int    `json:"shardIndex"`
+	ReplicaName             string `json:"replicaName,omitempty"`
+	ReplicaIndex            int    `json:"replicaIndex"`
+	ChiScopeIndex           int    `json:"chiScopeIndex"`
+	ChiScopeCycleSize       int    `json:"chiScopeCycleSize"`
+	ChiScopeCycleIndex      int    `json:"chiScopeCycleIndex"`
+	ChiScopeCycleOffset     int    `json:"chiScopeCycleOffset"`
+	ClusterScopeIndex       int    `json:"clusterScopeIndex"`
+	ClusterScopeCycleSize   int    `json:"clusterScopeCycleSize"`
+	ClusterScopeCycleIndex  int    `json:"clusterScopeCycleIndex"`
+	ClusterScopeCycleOffset int    `json:"clusterScopeCycleOffset"`
+	ShardScopeIndex         int    `json:"shardScopeIndex"`
 }
 
 // ChiHostConfig defines additional data related to a host
@@ -402,10 +404,10 @@ const (
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
-// Do not forget to update func (config *Config) String()
+// Do not forget to update func (config *OperatorConfig) String()
 // Do not forget to update CRD spec
-type Config struct {
-	// Full path to the config file and folder where this Config originates from
+type OperatorConfig struct {
+	// Full path to the config file and folder where this OperatorConfig originates from
 	ConfigFilePath   string
 	ConfigFolderPath string
 
@@ -420,7 +422,7 @@ type Config struct {
 	ChCommonConfigsPath string `json:"chCommonConfigsPath" yaml:"chCommonConfigsPath"`
 	ChHostConfigsPath   string `json:"chHostConfigsPath"   yaml:"chHostConfigsPath"`
 	ChUsersConfigsPath  string `json:"chUsersConfigsPath"  yaml:"chUsersConfigsPath"`
-	// Config files fetched from these paths. Maps "file name->file content"
+	// OperatorConfig files fetched from these paths. Maps "file name->file content"
 	ChCommonConfigs map[string]string
 	ChHostConfigs   map[string]string
 	ChUsersConfigs  map[string]string
