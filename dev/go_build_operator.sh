@@ -11,7 +11,8 @@ source "${CUR_DIR}/go_build_config.sh"
 "${MANIFESTS_ROOT}/operator/build-clickhouse-operator-install-yaml.sh"
 
 #CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ${CUR_DIR}/clickhouse-operator ${SRC_ROOT}/cmd/clickhouse-operator
-if CGO_ENABLED=0 go build \
+if CGO_ENABLED=0 GO111MODULE=on go build \
+    -mod=vendor \
     -a \
     -ldflags "-X ${REPO}/pkg/version.Version=${VERSION} -X ${REPO}/pkg/version.GitSHA=${GIT_SHA}" \
     -o "${OPERATOR_BIN}" \

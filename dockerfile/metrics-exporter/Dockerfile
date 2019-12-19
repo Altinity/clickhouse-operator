@@ -12,9 +12,9 @@ RUN echo "WORKDIR=$GOPATH/src/github.com/altinity/clickhouse-operator"
 # Reconstruct source tree inside docker
 WORKDIR $GOPATH/src/github.com/altinity/clickhouse-operator
 ADD . .
-# ./vendor is excluded in .dockerignore, reconstruct it with 'dep' tool
-RUN go get -u github.com/golang/dep/cmd/dep
-RUN dep ensure --vendor-only
+# ./vendor is excluded in .dockerignore, reconstruct it with 'mod' tool
+RUN GO111MODULE=on go mod tidy
+RUN GO111MODULE=on go mod vendor
 
 # Build operator binary with explicitly specified output
 RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter ./dev/go_build_metrics_exporter.sh
