@@ -19,6 +19,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/golang/glog"
+	"gopkg.in/d4l3k/messagediff.v1"
 	"k8s.io/api/core/v1"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -28,7 +29,7 @@ import (
 )
 
 type Normalizer struct {
-	chop *chop.Chop
+	chop               *chop.Chop
 	chi                *chiv1.ClickHouseInstallation
 	withDefaultCluster bool
 }
@@ -71,7 +72,7 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withD
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		if template := n.chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
-			glog.V(1).Infof("UNABLE to find template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
+			glog.V(1).Infof("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			(&n.chi.Spec).MergeFrom(&template.Spec, chiv1.MergeTypeOverrideByNonEmptyValues)
 			glog.V(1).Infof("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
@@ -190,14 +191,23 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 		switch podDistribution.Type {
 		case
 			chiv1.PodDistributionClickHouseAntiAffinity,
+			chiv1.PodDistributionSameShardAntiAffinity,
 			chiv1.PodDistributionSameReplicaAntiAffinity,
-			chiv1.PodDistributionSameShardAntiAffinity:
+			chiv1.PodDistributionAnotherNamespaceAntiAffinity,
+			chiv1.PodDistributionAnotherClickHouseInstallationAntiAffinity,
+			chiv1.PodDistributionAnotherClusterAntiAffinity:
 			// PodDistribution is known
-		case chiv1.PodDistributionMaxNumberPerNode:
+		case
+			chiv1.PodDistributionMaxNumberPerNode:
 			// PodDistribution is known
 			if podDistribution.Number < 0 {
 				podDistribution.Number = 0
 			}
+		case
+			chiv1.PodDistributionNamespaceAffinity,
+			chiv1.PodDistributionClickHouseInstallationAffinity,
+			chiv1.PodDistributionClusterAffinity:
+			// PodDistribution is known
 		default:
 			// PodDistribution is not known
 			podDistribution.Type = chiv1.PodDistributionUnspecified
@@ -286,14 +296,6 @@ func (n *Normalizer) mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinit
 		return dst
 	}
 
-	// Check NodeSelectors are available
-	if src.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-		return dst
-	}
-	if len(src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms) == 0 {
-		return dst
-	}
-
 	if dst == nil {
 		// No receiver, allocate new one
 		dst = &v1.NodeAffinity{
@@ -304,20 +306,40 @@ func (n *Normalizer) mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinit
 		}
 	}
 
-	// Copy NodeSelectors
+	// Merge NodeSelectors
 	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-		dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
-			dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-			src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i],
-		)
+		s := &src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i]
+		equal := false
+		for j := range dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+			d := &dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[j]
+			if _, equal = messagediff.DeepDiff(*s, *d); equal {
+				break
+			}
+		}
+		if !equal {
+			dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
+				dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+				src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i],
+			)
+		}
 	}
 
-	// Copy PreferredSchedulingTerm
+	// Merge PreferredSchedulingTerm
 	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
-		dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
-			dst.PreferredDuringSchedulingIgnoredDuringExecution,
-			src.PreferredDuringSchedulingIgnoredDuringExecution[i],
-		)
+		s := &src.PreferredDuringSchedulingIgnoredDuringExecution[i]
+		equal := false
+		for j := range dst.PreferredDuringSchedulingIgnoredDuringExecution {
+			d := &dst.PreferredDuringSchedulingIgnoredDuringExecution[j]
+			if _, equal = messagediff.DeepDiff(*s, *d); equal {
+				break
+			}
+		}
+		if !equal {
+			dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
+				dst.PreferredDuringSchedulingIgnoredDuringExecution,
+				src.PreferredDuringSchedulingIgnoredDuringExecution[i],
+			)
+		}
 	}
 
 	return dst
@@ -370,10 +392,6 @@ func (n *Normalizer) mergePodAffinity(dst *v1.PodAffinity, src *v1.PodAffinity) 
 		return dst
 	}
 
-	if len(src.RequiredDuringSchedulingIgnoredDuringExecution) == 0 {
-		return dst
-	}
-
 	if dst == nil {
 		// No receiver, allocate new one
 		dst = &v1.PodAffinity{
@@ -382,20 +400,40 @@ func (n *Normalizer) mergePodAffinity(dst *v1.PodAffinity, src *v1.PodAffinity) 
 		}
 	}
 
-	// Copy PodAffinityTerm
+	// Merge PodAffinityTerm
 	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution {
-		dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
-			dst.RequiredDuringSchedulingIgnoredDuringExecution,
-			src.RequiredDuringSchedulingIgnoredDuringExecution[i],
-		)
+		s := &src.RequiredDuringSchedulingIgnoredDuringExecution[i]
+		equal := false
+		for j := range dst.RequiredDuringSchedulingIgnoredDuringExecution {
+			d := &dst.RequiredDuringSchedulingIgnoredDuringExecution[j]
+			if _, equal = messagediff.DeepDiff(*s, *d); equal {
+				break
+			}
+		}
+		if !equal {
+			dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
+				dst.RequiredDuringSchedulingIgnoredDuringExecution,
+				src.RequiredDuringSchedulingIgnoredDuringExecution[i],
+			)
+		}
 	}
 
-	// Copy WeightedPodAffinityTerm
+	// Merge WeightedPodAffinityTerm
 	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
-		dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
-			dst.PreferredDuringSchedulingIgnoredDuringExecution,
-			src.PreferredDuringSchedulingIgnoredDuringExecution[i],
-		)
+		s := &src.PreferredDuringSchedulingIgnoredDuringExecution[i]
+		equal := false
+		for j := range dst.PreferredDuringSchedulingIgnoredDuringExecution {
+			d := &dst.PreferredDuringSchedulingIgnoredDuringExecution[j]
+			if _, equal = messagediff.DeepDiff(*s, *d); equal {
+				break
+			}
+		}
+		if !equal {
+			dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
+				dst.PreferredDuringSchedulingIgnoredDuringExecution,
+				src.PreferredDuringSchedulingIgnoredDuringExecution[i],
+			)
+		}
 	}
 
 	return dst
@@ -502,10 +540,6 @@ func (n *Normalizer) mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAn
 		return dst
 	}
 
-	if len(src.RequiredDuringSchedulingIgnoredDuringExecution) == 0 {
-		return dst
-	}
-
 	if dst == nil {
 		// No receiver, allocate new one
 		dst = &v1.PodAntiAffinity{
@@ -514,20 +548,40 @@ func (n *Normalizer) mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAn
 		}
 	}
 
-	// Copy PodAffinityTerm
+	// Merge PodAffinityTerm
 	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution {
-		dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
-			dst.RequiredDuringSchedulingIgnoredDuringExecution,
-			src.RequiredDuringSchedulingIgnoredDuringExecution[i],
-		)
+		s := &src.RequiredDuringSchedulingIgnoredDuringExecution[i]
+		equal := false
+		for j := range dst.RequiredDuringSchedulingIgnoredDuringExecution {
+			d := &dst.RequiredDuringSchedulingIgnoredDuringExecution[j]
+			if _, equal = messagediff.DeepDiff(*s, *d); equal {
+				break
+			}
+		}
+		if !equal {
+			dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
+				dst.RequiredDuringSchedulingIgnoredDuringExecution,
+				src.RequiredDuringSchedulingIgnoredDuringExecution[i],
+			)
+		}
 	}
 
-	// Copy WeightedPodAffinityTerm
+	// Merge WeightedPodAffinityTerm
 	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
-		dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
-			dst.PreferredDuringSchedulingIgnoredDuringExecution,
-			src.PreferredDuringSchedulingIgnoredDuringExecution[i],
-		)
+		s := &src.PreferredDuringSchedulingIgnoredDuringExecution[i]
+		equal := false
+		for j := range dst.PreferredDuringSchedulingIgnoredDuringExecution {
+			d := &dst.PreferredDuringSchedulingIgnoredDuringExecution[j]
+			if _, equal = messagediff.DeepDiff(*s, *d); equal {
+				break
+			}
+		}
+		if !equal {
+			dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
+				dst.PreferredDuringSchedulingIgnoredDuringExecution,
+				src.PreferredDuringSchedulingIgnoredDuringExecution[i],
+			)
+		}
 	}
 
 	return dst
