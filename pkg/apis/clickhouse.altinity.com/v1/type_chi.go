@@ -426,7 +426,8 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 		return
 	}
 
-	// Copy ObjectMeta for now
+	// Copy metadata for now
+	chi.TypeMeta = from.TypeMeta
 	chi.ObjectMeta = from.ObjectMeta
 
 	// Do actual merge for Spec

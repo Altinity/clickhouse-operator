@@ -479,15 +479,25 @@ func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfigur
 // updateChiObject updates ClickHouseInstallation object
 func (c *Controller) updateChiObject(chi *chi.ClickHouseInstallation) error {
 	new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
+
 	if err != nil {
 		// Error update
 		glog.V(1).Infof("ERROR update CHI (%s/%s): %q", chi.Namespace, chi.Name, err)
-	} else if chi.ObjectMeta.ResourceVersion != new.ObjectMeta.ResourceVersion {
-		// Updated
-		chi.ObjectMeta.ResourceVersion = new.ObjectMeta.ResourceVersion
-		glog.V(2).Infof("CHI (%s/%s) bump resource version %d/%d", chi.Namespace, chi.Name, chi.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
+		return err
 	}
-	return err
+
+	if chi.ObjectMeta.ResourceVersion != new.ObjectMeta.ResourceVersion {
+		// Updated
+		glog.V(2).Infof("CHI (%s/%s) bump resource version %d/%d",
+			chi.Namespace, chi.Name, chi.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion,
+		)
+		chi.ObjectMeta.ResourceVersion = new.ObjectMeta.ResourceVersion
+		return nil
+	}
+
+	// ResourceVersion not changed - no update performed?
+
+	return nil
 }
 
 // updateChiObjectStatus updates ClickHouseInstallation object's Status
