@@ -309,11 +309,6 @@ spec:
         #  values:
         #    - "us-east-1a"
 
-        # Possible values for distribution are:
-        # Unspecified
-        # OnePerHost
-        distribution: "Unspecified"
-
         # Possible values for podDistribution are:
         # Unspecified - empty value
         # ClickHouseAntiAffinity - AntiAffinity by ClickHouse instances.

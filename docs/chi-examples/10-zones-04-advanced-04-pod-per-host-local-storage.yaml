@@ -46,7 +46,8 @@ spec:
           key: "clickhouse"
           values:
             - "allow"
-        distribution: "OnePerHost"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
         spec:
           volumes:
             # Specify volume as path on local filesystem as a directory which will be created, if need be
