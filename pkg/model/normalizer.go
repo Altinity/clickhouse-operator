@@ -21,11 +21,14 @@ import (
 	"github.com/golang/glog"
 	"gopkg.in/d4l3k/messagediff.v1"
 	"k8s.io/api/core/v1"
+	"crypto/sha256"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"regexp"
 	"strconv"
 	"strings"
+	"fmt"
+    "encoding/hex"
 )
 
 type Normalizer struct {
@@ -803,9 +806,13 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 	// Ensure "must have" sections are in place, which are
 	// 1. user/profile
 	// 2. user/quota
-	// 3. user/networks/ip OR user/networks/host OR user/networks/host_regexp
-	// 4. user/password OR user/password_sha256_hex
-	for username := range usernameMap {
+	// 3. user/networks/ip and user/networks/host_regexp defaults to the installation pods
+	// 4. user/password_sha256_hex
+	usernameMap["default"] = true
+	if (*users == nil) {
+		*users = make(map[string]interface{})
+	} 
+    for username := range usernameMap {
 		if _, ok := (*users)[username+"/profile"]; !ok {
 			// No 'user/profile' section
 			(*users)[username+"/profile"] = n.chop.Config().ChConfigUserDefaultProfile
@@ -814,18 +821,28 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 			// No 'user/quota' section
 			(*users)[username+"/quota"] = n.chop.Config().ChConfigUserDefaultQuota
 		}
-		_, okIPs := (*users)[username+"/networks/ip"]
-		// _, okHost := (*users)[username+"/networks/host"]
-		// _, okHostRegexp := (*users)[username+"/networks/host_regexp"]
-		if !okIPs {
+		if _, ok := (*users)[username+"/networks/ip"]; !ok {
 			// No 'user/networks/ip' section
 			(*users)[username+"/networks/ip"] = n.chop.Config().ChConfigUserDefaultNetworksIP
 		}
+		if _, ok := (*users)[username+"/networks/host_regexp"]; !ok {
+			// No 'user/networks/host_regexp' section
+			(*users)[username+"/networks/host_regexp"] = CreatePodRegexp(n.chi)
+		}
 		_, okPassword := (*users)[username+"/password"]
 		_, okPasswordSHA256 := (*users)[username+"/password_sha256_hex"]
-		if !okPassword && !okPasswordSHA256 {
-			// Neither 'password' nor 'password_sha256_hex' are in place
-			(*users)[username+"/password"] = n.chop.Config().ChConfigUserDefaultPassword
+		if !okPasswordSHA256 && username != "default" {
+			// if SHA256 is not set, initialize it from the given or default password
+			var pass string
+			if !okPassword {
+				pass = n.chop.Config().ChConfigUserDefaultPassword
+			} else {
+				pass = fmt.Sprintf("%v", (*users)[username+"/password"])
+				// Delete password completely, we will have SHA256 instead
+				delete(*users, username+"/password")
+			}
+            pass_sha256 := sha256.Sum256([]byte(pass))
+			(*users)[username+"/password_sha256_hex"] = hex.EncodeToString(pass_sha256[:])
 		}
 	}
 }

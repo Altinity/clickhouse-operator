@@ -115,6 +115,10 @@ const (
 	// ServiceName.domain.name
 	serviceFQDNPattern = "%s" + "." + namespaceDomainPattern
 
+	// podNameRegexpPattern is a template of pod name regexp. "chi-{chi}-{cluster}-\d+-\d+\.{namespace}.svc.cluster.local"
+	// TODO: should match end of string but ".svc.cluster.local$" generates very strange extra string:
+	podNameRegexpPattern = "chi-" + macrosChiName + "-[^.]+\\d+-\\d+\\." + macrosNamespace + ".svc.cluster.local$"
+
 	// podFQDNPattern consists of 3 parts:
 	// 1. nameless service of of stateful set
 	// 2. namespace name
@@ -526,6 +530,11 @@ func CreatePodFQDNsOfChi(chi *chop.ClickHouseInstallation) []string {
 		return nil
 	})
 	return fqdns
+}
+
+
+func CreatePodRegexp(chi *chop.ClickHouseInstallation) string {
+	return newNameMacroReplacerChi(chi).Replace(podNameRegexpPattern)
 }
 
 // CreatePodName create Pod name based on specified StatefulSet or Replica

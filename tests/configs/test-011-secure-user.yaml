@@ -15,9 +15,11 @@ spec:
       podTemplate: clickhouse
   configuration:
     users:
-      default/networks/host_regexp: \.chi-test-011-secure-user-default-\d+-\d+\.test
-      default/networks/ip: "127.0.0.1"
-      default/password: ""
+      # default user should be security to localhost and interhost connections
+      # operator creates host_regxp expression for that
+      # default/networks/host_regexp: \.chi-test-011-secure-user-[^.]+-\d+-\d+\.test.svc.cluster.local$
+      user1/password: topsecret
+      user1/networks/ip: "::/0"
     clusters:
     - name: default
       layout:

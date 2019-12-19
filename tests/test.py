@@ -125,35 +125,64 @@ def test_010():
     create_and_check("configs/test-010-zkroot.yaml",{})
 
 @TestScenario
-@Name("Test access isolation")    
+@Name("Test user security and network isolation")    
 def test_011():
     create_and_check("configs/test-011-secure-user.yaml", 
                      {"pod_count": 2,
+                      "apply_templates": {"configs/tpl-log-volume.yaml"},
                       "do_not_delete": 1})
+
     create_and_check("configs/test-011-insecure-user.yaml", 
                      {"pod_count": 1,
                       "do_not_delete": 1})
-    
-    with Then("Connection to localhost should succeed"):
-        out = clickhouse_query_with_error("test-011-secure-user", "select 'OK'")
-        assert out == 'OK', error()
 
-    with Then("Query from secured to secured host should succeed"):
+    with Then("Connection to localhost should succeed with default user"):
+        out = clickhouse_query_with_error("test-011-secure-user", "select 'OK'")
+        assert out == 'OK'
+
+    with Then("Connection from secured to secured host should succeed"):
         out = clickhouse_query_with_error("test-011-secure-user", "select 'OK'", 
                                           host = "chi-test-011-secure-user-default-1-0")
-        assert out == 'OK', error()
-    with And("Query from insecured to secured host should fail"):
+        assert out == 'OK'
+
+    with And("Connection from insecured to secured host should fail for default"):
         out = clickhouse_query_with_error("test-011-insecure-user","select 'OK'", 
                                           host = "chi-test-011-secure-user-default-1-0")
-        assert out != 'OK', error()
+        assert out != 'OK'
 
+    with And("Connection from insecured to secured host should fail for user with no password"):
+        out = clickhouse_query_with_error("test-011-insecure-user","select 'OK'", 
+                                          host = "chi-test-011-secure-user-default-1-0", user = "user1")
+        assert "Password required" in out
     
+    with And("Connection from insecured to secured host should work for user with password"):
+        out = clickhouse_query_with_error("test-011-insecure-user","select 'OK'", 
+                                          host = "chi-test-011-secure-user-default-1-0", user = "user1", pwd = "topsecret")
+        assert out == 'OK'
+
+    with And("Password should be encrypted"):
+        chi = kube_get("chi", "test-011-secure-user")
+        assert "user1/password" not in chi["spec"]["configuration"]["users"]
+        assert "user1/password_sha256_hex" in chi["spec"]["configuration"]["users"]
+
+    create_and_check("configs/test-011-secure-user.yaml", {})
+    create_and_check("configs/test-011-insecure-user.yaml", {})
+
+@TestScenario
+@Name("Test service templates")
+def test_012():
+    set_operator_version("dev")
+    create_and_check("configs/test-012-service-template.yaml", 
+                     {"object_counts": [1,1,2],
+                      "service": ["service-test-012","ClusterIP"],
+                      "do_not_delete": 1})
+
 kubectl.namespace="test"
 
 if main():
     with Module("main"):
         with Given("clickhouse-operator is installed"):
-            assert kube_get_count("pod", ns = "kube-system", label = "-l app=clickhouse-operator")>0, error()
+            # assert kube_get_count("pod", ns = "kube-system", label = "-l app=clickhouse-operator")>0, error()
             with And(f"Clean namespace {kubectl.namespace}"): 
                 kube_deletens(kubectl.namespace)
                 with And(f"Create namespace {kubectl.namespace}"):
@@ -173,10 +202,11 @@ if main():
                      test_006, 
                      test_007, 
                      test_010,
-                     test_011]
+                     test_011,
+                     test_012]
         
             all_tests = tests
-            # all_tests = [test_011]
+            all_tests = [test_011]
         
             for t in all_tests:
                 run(test=t, flags=TE)

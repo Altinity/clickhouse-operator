@@ -40,19 +40,22 @@ def create_and_check(test_file, checks, ns = namespace):
         kube_wait_chi_status(chi_name, checks["chi_status"], ns)
     else:
         kube_wait_chi_status(chi_name, "Completed", ns)
-        
+
     if "pod_image" in checks:
         kube_check_pod_image(chi_name, checks["pod_image"], ns)
-    
+
     if "pod_volumes" in checks:
         kube_check_pod_volumes(chi_name, checks["pod_volumes"], ns)
-        
+
     if "pod_podAntiAffinity" in checks:
         kube_check_pod_antiaffinity(chi_name, ns)
-        
+
     if "pod_ports" in checks:
         kube_check_pod_ports(chi_name, checks["pod_ports"], ns)
-    
+
+    if "service" in checks:
+        kube_check_service(checks["service"][0], checks["service"][1], ns)
+
     if "do_not_delete" not in checks:
         kube_delete(config, ns)
         kube_wait_objects(chi_name, [0,0,0], ns)
@@ -196,3 +199,10 @@ def kube_check_pod_antiaffinity(chi_name, ns):
         assert "affinity" in pod_spec
         assert "podAntiAffinity" in pod_spec["affinity"]
         assert pod_spec["affinity"]["podAntiAffinity"] == expected
+
+def kube_check_service(service_name, service_type, ns = "test"):
+    with When(f"{service_name} is available"):
+        service = kube_get("service", "service_name", ns)
+        with Then(f"Service type is {service_type}"):
+            assert service["spec"]["type"] == service_type
+    
