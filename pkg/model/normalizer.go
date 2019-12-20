@@ -827,7 +827,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 		}
 		if _, ok := (*users)[username+"/networks/host_regexp"]; !ok {
 			// No 'user/networks/host_regexp' section
-			(*users)[username+"/networks/host_regexp"] = CreatePodRegexp(n.chi)
+			(*users)[username+"/networks/host_regexp"] = CreatePodRegexp(n.chi, n.chop.Config().ChConfigNetworksHostRegexpTemplate)
 		}
 		_, okPassword := (*users)[username+"/password"]
 		_, okPasswordSHA256 := (*users)[username+"/password_sha256_hex"]

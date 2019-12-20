@@ -432,6 +432,7 @@ func (config *OperatorConfig) String() string {
 	util.Fprintf(b, "ChConfigUserDefaultQuota: %s\n", config.ChConfigUserDefaultQuota)
 	util.Fprintf(b, "%s", config.stringSlice("ChConfigUserDefaultNetworksIP", config.ChConfigUserDefaultNetworksIP))
 	util.Fprintf(b, "ChConfigUserDefaultPassword: %s\n", config.ChConfigUserDefaultPassword)
+	util.Fprintf(b, "ChConfigNetworksHostRegexpTemplate: %s\n", config.ChConfigNetworksHostRegexpTemplate)
 
 	util.Fprintf(b, "ChUsername: %s\n", config.ChUsername)
 	util.Fprintf(b, "ChPassword: %s\n", config.ChPassword)

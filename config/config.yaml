@@ -76,6 +76,9 @@ chConfigUserDefaultNetworksIP:
   - "127.0.0.1"
 chConfigUserDefaultPassword: "default"
 
+# Default host_regexp to limit network connectivity from outside
+ChConfigNetworksHostRegexpTemplate: "chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
+
 ################################################
 ##
 ## Operator's access to ClickHouse instances
