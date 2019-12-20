@@ -220,7 +220,6 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 	new.Status.Status = chop.StatusCompleted
 	_ = w.c.updateChiObjectStatus(new, false)
 
-	//c.metricsExporter.UpdateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 	w.c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 
 	glog.V(1).Infof("updateChi(%s/%s) - complete reconcile <<<", new.Namespace, new.Name)

@@ -59,8 +59,10 @@ func (e *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		e.getWatchedChi(w, r)
 	case "POST":
 		e.addWatchedChi(w, r)
+	case "DELETE":
+		e.deleteWatchedChi(w, r)
 	default:
-		fmt.Fprintf(w, "Sorry, only GET and POST methods are supported.")
+		fmt.Fprintf(w, "Sorry, only GET, POST and DELETE methods are supported.")
 	}
 }
 
@@ -76,6 +78,20 @@ func (e *Exporter) addWatchedChi(w http.ResponseWriter, r *http.Request) {
 		if !chi.empty() {
 			// All is OK, CHI seems to be valid
 			exporter.addToWatched(chi)
+			return
+		}
+	}
+
+	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
+}
+
+func (e *Exporter) deleteWatchedChi(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	chi := &WatchedChi{}
+	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
+		if !chi.empty() {
+			// All is OK, CHI seems to be valid
+			exporter.enqueueToRemoveFromWatched(chi)
 			return
 		}
 	}
