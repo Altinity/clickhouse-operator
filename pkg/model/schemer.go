@@ -122,7 +122,7 @@ func (s *Schemer) ClusterGetCreateDistributedObjects(chi *chop.ClickHouseInstall
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 		) 
-		ANY INNER JOIN (select distinct database, name, create_table_query from system.tables SETTINGS skip_unavailable_shards = 1) USING (database, name)
+		LEFT JOIN (select distinct database, name, create_table_query from system.tables SETTINGS skip_unavailable_shards = 1) USING (database, name)
 		ORDER BY order
 		`,
 		"system.tables",
