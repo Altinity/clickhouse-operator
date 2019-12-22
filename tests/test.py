@@ -177,12 +177,38 @@ def test_012():
                       "service": ["service-test-012","ClusterIP"],
                       "do_not_delete": 1})
 
+@TestScenario
+@Name("Test adding shards and creating local and distributed tables automatically")
+def test_013():
+    create_and_check("configs/test-013-add-shards-1.yaml",
+                     {"apply_templates": {"configs/tpl-clickhouse-stable.yaml"}, 
+                      "object_counts": [1,1,2], "do_not_delete": 1})
+    
+    with Then("Create local and distributed table"):
+        clickhouse_query("test-013-add-shards", 
+                         "CREATE TABLE test_local Engine = Log as select * from system.one")
+        clickhouse_query("test-013-add-shards", 
+                         "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
+
+    with Then("Add one more shard"):
+        create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2,2,3], "do_not_delete": 1})
+    with And("Table should be created on a second shard"):
+        out = clickhouse_query("test-013-add-shards", "select count() from default.test_distr",
+                               host = "chi-test-013-add-shards-default-1-0")
+        assert out == "1"
+    
+    with Then("Remove shard"):
+        create_and_check("configs/test-013-add-shards-1.yaml", {"object_counts": [1,1,2]})
+
 kubectl.namespace="test"
+version="dev"
 
 if main():
     with Module("main"):
         with Given("clickhouse-operator is installed"):
             # assert kube_get_count("pod", ns = "kube-system", label = "-l app=clickhouse-operator")>0, error()
+            with And(f"Set operator version {version}"):
+                set_operator_version(version)
             with And(f"Clean namespace {kubectl.namespace}"): 
                 kube_deletens(kubectl.namespace)
                 with And(f"Create namespace {kubectl.namespace}"):
@@ -203,10 +229,11 @@ if main():
                      test_007, 
                      test_010,
                      test_011,
-                     test_012]
+                     test_012,
+                     test_013]
         
-            all_tests = tests
-            all_tests = [test_011]
+            # all_tests = tests
+            all_tests = [test_013]
         
             for t in all_tests:
                 run(test=t, flags=TE)
