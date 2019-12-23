@@ -9,4 +9,6 @@ kind: ConfigMap
 metadata:
   name: ${CONFIGMAP_NAME}
   namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    app: clickhouse-operator
 data:

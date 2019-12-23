@@ -926,6 +926,8 @@ kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-files
   namespace: dev
+  labels:
+    app: clickhouse-operator
 data:
   config.yaml: |
     ################################################
@@ -1002,9 +1004,12 @@ data:
     chConfigUserDefaultProfile: default
     chConfigUserDefaultQuota: default
     chConfigUserDefaultNetworksIP:
-      - "::/1"
+      - "::1"
       - "127.0.0.1"
     chConfigUserDefaultPassword: "default"
+    
+    # Default host_regexp to limit network connectivity from outside
+    ChConfigNetworksHostRegexpTemplate: "chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
     
     ################################################
     ##
@@ -1034,6 +1039,8 @@ kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: dev
+  labels:
+    app: clickhouse-operator
 data:
 ---
 # Possible Template Parameters:
@@ -1047,6 +1054,8 @@ kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: dev
+  labels:
+    app: clickhouse-operator
 data:
   01-clickhouse-listen.xml: |
     <yandex>
@@ -1079,6 +1088,7 @@ data:
         <flush_interval_milliseconds>7500</flush_interval_milliseconds>
     </query_log>
     </yandex>
+
 ---
 # Possible Template Parameters:
 #
@@ -1091,6 +1101,8 @@ kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: dev
+  labels:
+    app: clickhouse-operator
 data:
   001-templates.json.example: |
     {
@@ -1158,6 +1170,7 @@ data:
         podTemplates:
           - name: default-oneperhost-pod-template
             distribution: "OnePerHost"
+
   default-storage-template.yaml.example: |
     apiVersion: "clickhouse.altinity.com/v1"
     kind: "ClickHouseInstallationTemplate"
@@ -1176,6 +1189,7 @@ data:
 
   readme: |
     Templates in this folder are packaged with an operator and available via 'useTemplate'
+
 ---
 # Possible Template Parameters:
 #
@@ -1188,6 +1202,8 @@ kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: dev
+  labels:
+    app: clickhouse-operator
 data:
   01-clickhouse-user.xml: |
     <yandex>
@@ -1223,6 +1239,7 @@ data:
         </default>
       </profiles>
     </yandex>
+
 ---
 # Possible Template Parameters:
 #
