@@ -202,7 +202,7 @@ def kube_check_pod_antiaffinity(chi_name, ns):
 
 def kube_check_service(service_name, service_type, ns = "test"):
     with When(f"{service_name} is available"):
-        service = kube_get("service", "service_name", ns)
+        service = kube_get("service", service_name, ns)
         with Then(f"Service type is {service_type}"):
             assert service["spec"]["type"] == service_type
     
