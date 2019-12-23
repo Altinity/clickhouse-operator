@@ -415,6 +415,18 @@ func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string
 	}
 }
 
+func (c *Controller) deleteWatch(namespace, name string) {
+	go c.deleteWatchAsync(namespace, name)
+}
+
+func (c *Controller) deleteWatchAsync(namespace, name string) {
+	if err := metrics.DeleteWatchREST(namespace, name); err != nil {
+		glog.V(1).Infof("FAIL delete watch (%s/%s): %q", namespace, name, err)
+	} else {
+		glog.V(2).Infof("OK delete watch (%s/%s)", namespace, name)
+	}
+}
+
 // addChit sync new CHIT - creates all its resources
 func (c *Controller) addChit(chit *chi.ClickHouseInstallationTemplate) error {
 	glog.V(1).Infof("addChit(%s/%s)", chit.Namespace, chit.Name)

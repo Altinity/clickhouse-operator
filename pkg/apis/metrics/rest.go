@@ -99,13 +99,7 @@ func (e *Exporter) deleteWatchedChi(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
 }
 
-func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
-	chi := &WatchedChi{
-		Namespace: namespace,
-		Name:      chiName,
-		Hostnames: hostnames,
-	}
-
+func MakeRESTCall(chi *WatchedChi, op string) error {
 	url := "http://127.0.0.1:8888/chi"
 
 	json, err := json.Marshal(chi)
@@ -113,7 +107,7 @@ func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(json))
+	req, err := http.NewRequest(op, url, bytes.NewBuffer(json))
 	if err != nil {
 		return err
 	}
@@ -121,6 +115,24 @@ func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
 	_, err = doRequest(req)
 
 	return err
+}
+
+func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
+	chi := &WatchedChi{
+		Namespace: namespace,
+		Name:      chiName,
+		Hostnames: hostnames,
+	}
+	return MakeRESTCall(chi, "POST")
+}
+
+func DeleteWatchREST(namespace, chiName string) error {
+	chi := &WatchedChi{
+		Namespace: namespace,
+		Name:      chiName,
+		Hostnames: []string{},
+	}
+	return MakeRESTCall(chi, "DELETE")
 }
 
 func doRequest(req *http.Request) ([]byte, error) {
