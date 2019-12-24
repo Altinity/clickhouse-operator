@@ -359,8 +359,8 @@ spec:
                                 # List podDistributionXXX constants
                                 - "Unspecified"
                                 - "ClickHouseAntiAffinity"
-                                - "SameShardAntiAffinity"
-                                - "SameReplicaAntiAffinity"
+                                - "ShardAntiAffinity"
+                                - "ReplicaAntiAffinity"
                                 - "AnotherNamespaceAntiAffinity"
                                 - "AnotherClickHouseInstallationAntiAffinity"
                                 - "AnotherClusterAntiAffinity"
@@ -766,8 +766,8 @@ spec:
                                 # List podDistributionXXX constants
                                 - "Unspecified"
                                 - "ClickHouseAntiAffinity"
-                                - "SameShardAntiAffinity"
-                                - "SameReplicaAntiAffinity"
+                                - "ShardAntiAffinity"
+                                - "ReplicaAntiAffinity"
                                 - "AnotherNamespaceAntiAffinity"
                                 - "AnotherClickHouseInstallationAntiAffinity"
                                 - "AnotherClusterAntiAffinity"

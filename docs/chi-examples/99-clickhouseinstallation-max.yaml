@@ -314,12 +314,12 @@ spec:
         # ClickHouseAntiAffinity - AntiAffinity by ClickHouse instances.
         #   Pod pushes away other ClickHouse pods, which allows one ClickHouse instance per node
         #   CH - (push away) - CH - (push away) - CH
-        # SameShardAntiAffinity - AntiAffinity by shard name.
+        # ShardAntiAffinity - AntiAffinity by shard name.
         #   Pod pushes away other pods of the same shard (replicas of this shard), which allows one replica of a shard per node.
         #   Other shards are allowed - it does not push alll shards away, the same only.
         #   Used for data loss avoidance - keeps all copies of the shard on different nodes.
         #   shard1,replica1 - (push away) - shard1,replica2 - (push away) - shard1,replica3
-        # SameReplicaAntiAffinity - AntiAffinity by replica name.
+        # ReplicaAntiAffinity - AntiAffinity by replica name.
         #   Pod pushes away other pods of the same replica (shards of this replica), which allows one shard of a replica per node.
         #   Other replicas are allowed - it does not push all replicas away, the same only.
         #   Used to evenly distribute load from "full cluster scan" queries.
@@ -345,8 +345,14 @@ spec:
         # ClusterAffinity - Affinity by cluster name.
         #   Pod attracts pods from the same cluster, which allows pods from the same Cluster per node.
         #   cluster1 + (attracts) + cluster1
+        # ShardAffinity - Affinity by shard name.
+        #   Pod attracts pods from the same shard, which allows pods from the same Shard per node.
+        #   shard1 + (attracts) + shard1
+        # ReplicaAntiAffinity - Affinity by replica name.
+        #   Pod attracts pods from the same replica, which allows pods from the same Replica per node.
+        #   replica1 + (attracts) + replica1
         podDistribution:
-          - type: SameShardAntiAffinity
+          - type: ShardAntiAffinity
           - type: MaxNumberPerNode
             number: 2
 

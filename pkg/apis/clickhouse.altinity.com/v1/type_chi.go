@@ -22,8 +22,8 @@ import (
 const (
 	PodDistributionUnspecified                               = "Unspecified"
 	PodDistributionClickHouseAntiAffinity                    = "ClickHouseAntiAffinity"
-	PodDistributionSameShardAntiAffinity                     = "SameShardAntiAffinity"
-	PodDistributionSameReplicaAntiAffinity                   = "SameReplicaAntiAffinity"
+	PodDistributionShardAntiAffinity                         = "ShardAntiAffinity"
+	PodDistributionReplicaAntiAffinity                       = "ReplicaAntiAffinity"
 	PodDistributionAnotherNamespaceAntiAffinity              = "AnotherNamespaceAntiAffinity"
 	PodDistributionAnotherClickHouseInstallationAntiAffinity = "AnotherClickHouseInstallationAntiAffinity"
 	PodDistributionAnotherClusterAntiAffinity                = "AnotherClusterAntiAffinity"

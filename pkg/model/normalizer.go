@@ -201,8 +201,8 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 		switch podDistribution.Type {
 		case
 			chiv1.PodDistributionClickHouseAntiAffinity,
-			chiv1.PodDistributionSameShardAntiAffinity,
-			chiv1.PodDistributionSameReplicaAntiAffinity,
+			chiv1.PodDistributionShardAntiAffinity,
+			chiv1.PodDistributionReplicaAntiAffinity,
 			chiv1.PodDistributionAnotherNamespaceAntiAffinity,
 			chiv1.PodDistributionAnotherClickHouseInstallationAntiAffinity,
 			chiv1.PodDistributionAnotherClusterAntiAffinity:
@@ -480,14 +480,14 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 					LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
 				},
 			)
-		case chiv1.PodDistributionSameShardAntiAffinity:
+		case chiv1.PodDistributionShardAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				map[string]string{
 					LabelShardName: macrosShardName,
 				},
 			)
-		case chiv1.PodDistributionSameReplicaAntiAffinity:
+		case chiv1.PodDistributionReplicaAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				map[string]string{
