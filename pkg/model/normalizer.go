@@ -15,20 +15,20 @@
 package model
 
 import (
+	"crypto/sha256"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/golang/glog"
 	"gopkg.in/d4l3k/messagediff.v1"
 	"k8s.io/api/core/v1"
-	"crypto/sha256"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"encoding/hex"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
-	"fmt"
-    "encoding/hex"
 )
 
 type Normalizer struct {
@@ -103,6 +103,13 @@ func (n *Normalizer) NormalizeChi(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 	n.normalizeTemplates(&n.chi.Spec.Templates)
 
 	n.normalizeStatus()
+
+	// Post-process CHI
+	n.chi.FillAddressInfo()
+	n.chi.FillChiPointer()
+	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
+		return n.calcFingerprints(host)
+	})
 
 	return n.chi, nil
 }
@@ -751,11 +758,6 @@ func (n *Normalizer) normalizeClusters() {
 	n.chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
 		return n.normalizeCluster(cluster)
 	})
-	n.chi.FillAddressInfo()
-	n.chi.FillChiPointer()
-	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
-		return n.calcFingerprints(host)
-	})
 }
 
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
@@ -809,10 +811,10 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 	// 3. user/networks/ip and user/networks/host_regexp defaults to the installation pods
 	// 4. user/password_sha256_hex
 	usernameMap["default"] = true
-	if (*users == nil) {
+	if *users == nil {
 		*users = make(map[string]interface{})
-	} 
-    for username := range usernameMap {
+	}
+	for username := range usernameMap {
 		if _, ok := (*users)[username+"/profile"]; !ok {
 			// No 'user/profile' section
 			(*users)[username+"/profile"] = n.chop.Config().ChConfigUserDefaultProfile
@@ -841,7 +843,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 				// Delete password completely, we will have SHA256 instead
 				delete(*users, username+"/password")
 			}
-            pass_sha256 := sha256.Sum256([]byte(pass))
+			pass_sha256 := sha256.Sum256([]byte(pass))
 			(*users)[username+"/password_sha256_hex"] = hex.EncodeToString(pass_sha256[:])
 		}
 	}

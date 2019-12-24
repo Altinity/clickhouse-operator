@@ -373,7 +373,7 @@ func (w *worker) deleteChi(chi *chop.ClickHouseInstallation) error {
 	err = w.c.deleteServiceChi(chi)
 
 	w.c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, "deleted")
-	
+
 	w.c.deleteWatch(chi.Namespace, chi.Name)
 
 	glog.V(1).Infof("End delete CHI %s/%s", chi.Namespace, chi.Name)

@@ -308,12 +308,20 @@ func (n *namer) getNamePartReplicaName(host *chop.ChiHost) string {
 	return n.namePartReplicaName(host.Address.ReplicaName)
 }
 
+func (n *namer) getNamePartChiScopeCycleSize(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ChiScopeCycleSize)
+}
+
 func (n *namer) getNamePartChiScopeCycleIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ChiScopeCycleIndex)
 }
 
 func (n *namer) getNamePartChiScopeCycleOffset(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ChiScopeCycleOffset)
+}
+
+func (n *namer) getNamePartClusterScopeCycleSize(host *chop.ChiHost) string {
+	return strconv.Itoa(host.Address.ClusterScopeCycleSize)
 }
 
 func (n *namer) getNamePartClusterScopeCycleIndex(host *chop.ChiHost) string {
@@ -527,7 +535,6 @@ func CreatePodFQDNsOfChi(chi *chop.ClickHouseInstallation) []string {
 	})
 	return fqdns
 }
-
 
 // template is defined in operator config:
 // ChConfigNetworksHostRegexpTemplate: chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"

@@ -117,7 +117,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			case *WatchedChi:
 				e.toRemoveFromWatched.Delete(key)
 				e.removeFromWatched(key.(*WatchedChi))
-			    glog.Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*WatchedChi).Name, key.(*WatchedChi).Namespace)
+				glog.Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*WatchedChi).Name, key.(*WatchedChi).Namespace)
 			}
 			return true
 		})

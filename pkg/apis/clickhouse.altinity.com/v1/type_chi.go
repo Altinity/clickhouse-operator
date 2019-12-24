@@ -105,7 +105,7 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 		return nil
 	}
 
-	// Let's find NPerHost pod distribution
+	// Let's find MaxNumberPerNode pod distribution
 	maxNumberPerNode := 0
 	podTemplateProcessor := func(template *ChiPodTemplate) {
 		for i := range template.PodDistribution {
