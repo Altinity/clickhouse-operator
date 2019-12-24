@@ -5,6 +5,9 @@ OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-clickhouse-operator}"
 # Namespace to install metrics-exporter into
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 
+# Github branch for operator install
+BRANCH="${BRANCH:-master}"
+
 # Operator's docker image
 OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
 # Metrics exporter's docker image
@@ -59,7 +62,7 @@ function check_file_getter_available() {
 #
 function checks_envsubst_available() {
     if ! envsubst --version > /dev/null; then
-        echo "curl is unavailable, can not continue"
+        echo "envsubst is unavailable, can not continue"
         exit 1
     fi
 }
@@ -105,11 +108,9 @@ else
 fi
 
 # Setup clickhouse-operator into specified namespace
-kubectl apply --namespace="${OPERATOR_NAMESPACE}" -f <( \
-    get_file https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-template.yaml | \
-        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
-        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
-        METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
-        METRICS_EXPORTER_NAMESPACE="${METRICS_EXPORTER_NAMESPACE}" \
-        envsubst \
-)
+get_file https://raw.githubusercontent.com/Altinity/clickhouse-operator/${BRANCH}/deploy/operator/clickhouse-operator-install-template.yaml | \
+    OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+    OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+    METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
+    METRICS_EXPORTER_NAMESPACE="${METRICS_EXPORTER_NAMESPACE}" \
+    envsubst | kubectl apply --namespace="${OPERATOR_NAMESPACE}" -f -
