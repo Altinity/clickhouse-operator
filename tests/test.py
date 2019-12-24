@@ -173,9 +173,12 @@ def test_011():
 def test_012():
     set_operator_version("dev")
     create_and_check("configs/test-012-service-template.yaml", 
-                     {"object_counts": [1,1,2],
+                     {"object_counts": [1,1,3],
                       "service": ["service-test-012","ClusterIP"],
                       "do_not_delete": 1})
+    create_and_check("configs/test-012-service-template.yaml", 
+                     {"object_counts": [1,1,3],
+                      "service": ["service-default","ClusterIP"]})
 
 @TestScenario
 @Name("Test adding shards and creating local and distributed tables automatically")
@@ -233,7 +236,7 @@ if main():
                      test_013]
         
             # all_tests = tests
-            all_tests = [test_013]
+            all_tests = [test_012]
         
             for t in all_tests:
                 run(test=t, flags=TE)

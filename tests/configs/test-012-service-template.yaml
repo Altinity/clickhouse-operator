@@ -12,6 +12,8 @@ spec:
   configuration:
     clusters:
       - name: default
+        templates:
+          clusterServiceTemplate: cluster-service-template
         layout:
           shardsCount: 1
           replicasCount: 1
@@ -27,3 +29,14 @@ spec:
               port: 9000
           type: ClusterIP
           clusterIP: None
+      - name: cluster-service-template
+        generateName: "service-{cluster}"
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: client
+              port: 9000
+          type: ClusterIP
+          clusterIP: None
+          
