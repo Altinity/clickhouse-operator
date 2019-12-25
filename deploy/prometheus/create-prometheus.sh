@@ -26,16 +26,15 @@ kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
     https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/servicemonitor.crd.yaml
 
 # Setup prometheus-operator into specified namespace. Would manage prometheus instances
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f  <( \
-    wget -qO- https://raw.githubusercontent.com/coreos/prometheus-operator/master/bundle.yaml | \
-    PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
-)
+wget -qO- https://raw.githubusercontent.com/coreos/prometheus-operator/master/bundle.yaml | \
+PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" | \
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f -
 
 # Setup RBAC
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f <( \
-    wget -qO- https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/rbac/prometheus/prometheus-cluster-role-binding.yaml | \
-    PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
-)
+wget -qO- https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/rbac/prometheus/prometheus-cluster-role-binding.yaml | \
+PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" | \
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f -
+
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
     https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/rbac/prometheus/prometheus-cluster-role.yaml
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
@@ -52,10 +51,9 @@ kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f prometheus.yaml
 if kubectl --namespace="${OPERATOR_NAMESPACE}" get service clickhouse-operator-metrics; then
     echo "clickhouse-operator-metrics endpoint found. Configuring integration with clickhouse-operator"
     # clickhouse-operator-metrics service found, can setup integration
-    kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f <( \
-        cat ./prometheus-clickhouse-operator-service-monitor.yaml | \
-        OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} sed "s/- kube-system/- ${OPERATOR_NAMESPACE}/" \
-    )
+    cat ./prometheus-clickhouse-operator-service-monitor.yaml | \
+    OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} sed "s/- kube-system/- ${OPERATOR_NAMESPACE}/" | \
+    kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f -
 else
     echo "ERROR install prometheus. Unable to find service '${OPERATOR_NAMESPACE}/clickhouse-operator-metrics'."
     echo "Please setup clickhouse-operator into ${OPERATOR_NAMESPACE} namespace and restart this script."
