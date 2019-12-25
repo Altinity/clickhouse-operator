@@ -17,3 +17,4 @@
 1. [schema_migration.md](./schema_migration.md) - how operator migrates schema during cluster resize
 1. [storage.md](./storage.md) - storage explained
 1. [zookeeper_setup.md](./zookeeper_setup.md) - how to setup zookeeper
+1. [minikube_cygwin.md](./minikube_cygwin.md) - quick start guide, how-to setup clickhouse-operator, zookeeper and simple clickhouse installation on Windwos 10 + cygwin + minikube
