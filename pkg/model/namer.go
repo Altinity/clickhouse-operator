@@ -80,6 +80,8 @@ const (
 	macrosClusterScopeIndex = "{clusterScopeIndex}"
 	// macrosShardScopeIndex is an index of the replica on the shard-scope
 	macrosShardScopeIndex = "{shardScopeIndex}"
+	// macrosClusterScopeCycleHeadPointsToPreviousCycleTail is {clusterScopeIndex} of previous Cycle Tail
+	macrosClusterScopeCycleHeadPointsToPreviousCycleTail = "{clusterScopeCycleHeadPointsToPreviousCycleTail}"
 )
 
 const (
@@ -380,6 +382,29 @@ func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 	)
 }
 
+// Cluster-scope index of previous cycle tail
+func clusterScopeIndexOfPreviousCycleTail(host *chop.ChiHost) int {
+
+	if host.Address.ClusterScopeCycleOffset == 0 {
+		// This is the cycle head - the first host of the cycle
+		// We need to point to previous host in this cluster - which would be previous cycle tail
+
+		if host.Address.ClusterScopeIndex == 0 {
+			// This is the very first host in the cluster - head of the first cycle
+			// No previous host available, so just point to the same host, mainly because label must be an empty string
+			// or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character
+			// So we can't set it to "-1"
+			return host.Address.ClusterScopeIndex
+		}
+
+		// This is head of non-first cycle, point to previous host in the cluster - which would be previous cycle tail
+		return host.Address.ClusterScopeIndex - 1
+	}
+
+	// This is not cycle head - just point to the same host
+	return host.Address.ClusterScopeIndex
+}
+
 func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
 	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
@@ -402,6 +427,7 @@ func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
 		macrosClusterScopeCycleIndex, strconv.Itoa(host.Address.ClusterScopeCycleIndex), // TODO use appropriate namePart function
 		macrosClusterScopeCycleOffset, strconv.Itoa(host.Address.ClusterScopeCycleOffset), // TODO use appropriate namePart function
 		macrosShardScopeIndex, strconv.Itoa(host.Address.ShardScopeIndex), // TODO use appropriate namePart function
+		macrosClusterScopeCycleHeadPointsToPreviousCycleTail, strconv.Itoa(clusterScopeIndexOfPreviousCycleTail(host)),
 	)
 }
 

@@ -33,6 +33,7 @@ const (
 	PodDistributionClusterAffinity                           = "ClusterAffinity"
 	PodDistributionShardAffinity                             = "ShardAffinity"
 	PodDistributionReplicaAffinity                           = "ReplicaAffinity"
+	PodDistributionPreviousTailAffinity                      = "PreviousTailAffinity"
 
 	// Deprecated value
 	PodDistributionOnePerHost = "OnePerHost"

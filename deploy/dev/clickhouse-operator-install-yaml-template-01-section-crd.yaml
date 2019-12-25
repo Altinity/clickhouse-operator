@@ -370,6 +370,7 @@ spec:
                                 - "ClusterAffinity"
                                 - "ShardAffinity"
                                 - "ReplicaAffinity"
+                                - "PreviousTailAffinity"
                             number:
                               type: integer
                               minimum: 0
@@ -779,6 +780,7 @@ spec:
                                 - "ClusterAffinity"
                                 - "ShardAffinity"
                                 - "ReplicaAffinity"
+                                - "PreviousTailAffinity"
                             number:
                               type: integer
                               minimum: 0

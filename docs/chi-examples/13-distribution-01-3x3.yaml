@@ -17,12 +17,13 @@ spec:
       - name: dist-template
         podDistribution:
           - type: ShardAntiAffinity
+          - type: ReplicaAntiAffinity
           - type: MaxNumberPerNode
             number: 3
           - type: NamespaceAffinity
           - type: ClickHouseInstallationAffinity
           - type: ClusterAffinity
-          - type: ReplicaAffinity
+          - type: PreviousTailAffinity
         spec:
           containers:
             - name: clickhouse
