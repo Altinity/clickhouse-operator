@@ -9,9 +9,8 @@ provisioner: kubernetes.io/aws-ebs
 parameters:
   type: gp2
   # FS ext4 start encrypted disk quickly
-  fsType: ext4
   # FS xfs start encrypted disk very slow - easy can be said "does not work at all for me"
-#  fsType: xfs
+  fsType: ext4
   encrypted: "true"
 reclaimPolicy: Delete
 #volumeBindingMode: Immediate
