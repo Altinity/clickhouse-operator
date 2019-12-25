@@ -351,6 +351,8 @@ spec:
         # ReplicaAffinity - Affinity by replica name.
         #   Pod attracts pods from the same replica, which allows pods from the same Replica per node.
         #   replica1 + (attracts) + replica1
+        # PreviousTailAffinity - Affinity to overlap cycles. Used to make cycle-replication
+        #   cycle head + (attracts to) + previous cycle tail
         podDistribution:
           - type: ShardAntiAffinity
           - type: MaxNumberPerNode

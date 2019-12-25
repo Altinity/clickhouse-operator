@@ -22,7 +22,9 @@ spec:
           - type: NamespaceAffinity
           - type: ClickHouseInstallationAffinity
           - type: ClusterAffinity
-          - type: ReplicaAffinity
+#          - type: ReplicaAffinity
+          - type: ReplicaAntiAffinity
+          - type: PreviousTailAffinity
         spec:
           containers:
             - name: clickhouse

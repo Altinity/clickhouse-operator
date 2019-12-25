@@ -218,7 +218,8 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 			chiv1.PodDistributionClickHouseInstallationAffinity,
 			chiv1.PodDistributionClusterAffinity,
 			chiv1.PodDistributionShardAffinity,
-			chiv1.PodDistributionReplicaAffinity:
+			chiv1.PodDistributionReplicaAffinity,
+			chiv1.PodDistributionPreviousTailAffinity:
 
 			// PodDistribution is known
 		default:
@@ -402,6 +403,14 @@ func (n *Normalizer) newPodAffinity(template *chiv1.ChiPodTemplate) *v1.PodAffin
 				1,
 				map[string]string{
 					LabelReplicaName: macrosReplicaName,
+				},
+			)
+		case chiv1.PodDistributionPreviousTailAffinity:
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
+				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+				1,
+				map[string]string{
+					LabelClusterScopeIndex: macrosClusterScopeCycleHeadPointsToPreviousCycleTail,
 				},
 			)
 		}

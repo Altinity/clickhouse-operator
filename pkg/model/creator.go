@@ -319,19 +319,7 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 		},
 	}
 
-	// Specify pod templates - either explicitly defined or default
-	podTemplate, ok := host.GetPodTemplate()
-	if ok {
-		// Replica references known PodTemplate
-		// Make a copy of this known PodTemplate in order not to spoil the original common-used template
-		podTemplate = podTemplate.DeepCopy()
-		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
-	} else {
-		// Replica references UNKNOWN PodTemplate, will use default one
-		podTemplate = newDefaultPodTemplate(statefulSetName)
-		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use default generated template", statefulSetName)
-	}
-	c.labeler.prepareAffinity(podTemplate, host)
+	podTemplate := c.getPodTemplate(statefulSet, host)
 	statefulSetAssignPodTemplate(statefulSet, podTemplate)
 
 	// Pod created by this StatefulSet has to have alias
@@ -358,6 +346,31 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 		})
 		glog.V(1).Infof("setupStatefulSetPodTemplate() add log container for statefulSet %s", statefulSetName)
 	}
+}
+
+// getPodTemplate gets Pod Template to be used to create StatefulSet
+func (c *Creator) getPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
+	statefulSetName := CreateStatefulSetName(host)
+
+	// Which pod template would be used - either explicitly defined in or a default one
+	podTemplate, ok := host.GetPodTemplate()
+	if ok {
+		// Replica references known PodTemplate
+		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
+		podTemplate = podTemplate.DeepCopy()
+		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
+	} else {
+		// Replica references UNKNOWN PodTemplate, will use default one
+		podTemplate = newDefaultPodTemplate(statefulSetName)
+		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use default generated template", statefulSetName)
+	}
+
+	// Here we have local copy of Pod Template, to be used to create StatefulSet
+	// Now we can customize this Pod Template for particular host
+
+	c.labeler.prepareAffinity(podTemplate, host)
+
+	return podTemplate
 }
 
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
