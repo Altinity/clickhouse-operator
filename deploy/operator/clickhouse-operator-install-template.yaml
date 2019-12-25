@@ -368,6 +368,8 @@ spec:
                                 - "NamespaceAffinity"
                                 - "ClickHouseInstallationAffinity"
                                 - "ClusterAffinity"
+                                - "ShardAffinity"
+                                - "ReplicaAffinity"
                             number:
                               type: integer
                               minimum: 0
@@ -775,6 +777,8 @@ spec:
                                 - "NamespaceAffinity"
                                 - "ClickHouseInstallationAffinity"
                                 - "ClusterAffinity"
+                                - "ShardAffinity"
+                                - "ReplicaAffinity"
                             number:
                               type: integer
                               minimum: 0

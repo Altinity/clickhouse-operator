@@ -31,6 +31,8 @@ const (
 	PodDistributionNamespaceAffinity                         = "NamespaceAffinity"
 	PodDistributionClickHouseInstallationAffinity            = "ClickHouseInstallationAffinity"
 	PodDistributionClusterAffinity                           = "ClusterAffinity"
+	PodDistributionShardAffinity                             = "ShardAffinity"
+	PodDistributionReplicaAffinity                           = "ReplicaAffinity"
 
 	// Deprecated value
 	PodDistributionOnePerHost = "OnePerHost"

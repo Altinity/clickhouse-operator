@@ -348,7 +348,7 @@ spec:
         # ShardAffinity - Affinity by shard name.
         #   Pod attracts pods from the same shard, which allows pods from the same Shard per node.
         #   shard1 + (attracts) + shard1
-        # ReplicaAntiAffinity - Affinity by replica name.
+        # ReplicaAffinity - Affinity by replica name.
         #   Pod attracts pods from the same replica, which allows pods from the same Replica per node.
         #   replica1 + (attracts) + replica1
         podDistribution:
