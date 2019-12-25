@@ -22,8 +22,8 @@ import (
 const (
 	PodDistributionUnspecified                               = "Unspecified"
 	PodDistributionClickHouseAntiAffinity                    = "ClickHouseAntiAffinity"
-	PodDistributionSameShardAntiAffinity                     = "SameShardAntiAffinity"
-	PodDistributionSameReplicaAntiAffinity                   = "SameReplicaAntiAffinity"
+	PodDistributionShardAntiAffinity                         = "ShardAntiAffinity"
+	PodDistributionReplicaAntiAffinity                       = "ReplicaAntiAffinity"
 	PodDistributionAnotherNamespaceAntiAffinity              = "AnotherNamespaceAntiAffinity"
 	PodDistributionAnotherClickHouseInstallationAntiAffinity = "AnotherClickHouseInstallationAntiAffinity"
 	PodDistributionAnotherClusterAntiAffinity                = "AnotherClusterAntiAffinity"
@@ -31,6 +31,8 @@ const (
 	PodDistributionNamespaceAffinity                         = "NamespaceAffinity"
 	PodDistributionClickHouseInstallationAffinity            = "ClickHouseInstallationAffinity"
 	PodDistributionClusterAffinity                           = "ClusterAffinity"
+	PodDistributionShardAffinity                             = "ShardAffinity"
+	PodDistributionReplicaAffinity                           = "ReplicaAffinity"
 
 	// Deprecated value
 	PodDistributionOnePerHost = "OnePerHost"
@@ -105,7 +107,7 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 		return nil
 	}
 
-	// Let's find NPerHost pod distribution
+	// Let's find MaxNumberPerNode pod distribution
 	maxNumberPerNode := 0
 	podTemplateProcessor := func(template *ChiPodTemplate) {
 		for i := range template.PodDistribution {

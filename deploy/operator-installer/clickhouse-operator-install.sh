@@ -43,6 +43,9 @@ function is_wget_available() {
     fi
 }
 
+#
+# Check whether any download tool (curl, wget) is available
+#
 function check_file_getter_available() {
     if curl --version > /dev/null; then
         # curl is available - use it
