@@ -17,5 +17,5 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 kubectl create namespace ${ZK_NAMESPACE}
 for FILE in ${YAML_FILES_LIST}; do
-    kubectl -n "${ZK_NAMESPACE}" apply -f "${CUR_DIR}/${FILE}"
+    cat "${CUR_DIR}/${FILE}" | kubectl -n "${ZK_NAMESPACE}" apply -f -
 done
