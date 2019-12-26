@@ -80,7 +80,7 @@ clickhouse    chi-repl-05-replicated-1-0-0           1/1     Running   0        
 clickhouse    chi-repl-05-replicated-1-1-0           1/1     Running   0          28m
 ```
 
-## Conntect to clickhouse database
+## Connect to ClickHouse database
 ### Start minikube tunnel for assign external-ip for LoadBalancer services
 ```bash
 cmd /c start "minikube tunnel" minikube tunnel $(kubectl get services --namespace=${OPERATOR_NAMESPACE} | grep LoadBalancer | cut -d " " -f 1)
