@@ -55,7 +55,7 @@ kubectl apply --namespace=${OPERATOR_NAMESPACE} -f https://raw.githubusercontent
 
 ## Wait around 30 seconds and check all installed objects
 ```bash
-kubectl get pods --all-namespaces | grep -E "clickhouse-operator|zoo"
+kubectl get pods --all-namespaces -l 'app in (clickhouse-operator,zookeeper)'
 ```
 expected output
 ```bash
@@ -70,7 +70,7 @@ kubectl logs -f --namespace ${OPERATOR_NAMESPACE}  $(kubectl get pods --namespac
 
 ## Check installed pods
 ```bash
-kubectl get pods --all-namespaces | grep -E "chi"
+kubectl get pods --all-namespaces -l clickhouse.altinity.com/app=chop
 ```
 expected output
 ```bash
