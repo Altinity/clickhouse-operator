@@ -61,8 +61,8 @@ def create_and_check(test_file, checks, ns = namespace):
         kube_wait_objects(chi_name, [0,0,0], ns)
 
 
-def kube_get(type, name, ns="test"):
-    cmd = shell(f"kubectl get {type} {name} -n {ns} -o json")
+def kube_get(type, name, label="", ns="test"):
+    cmd = shell(f"kubectl get {type} {name} -n {ns} {label} -o json")
     assert cmd.exitcode == 0, error()
     return json.loads(cmd.output.strip())
 
@@ -138,8 +138,8 @@ def kube_wait_chi_status(chi, status, ns="test"):
         assert chi_status[1] == status, error()
 
 def kube_get_pod_spec(chi_name, ns="test"):
-    chi = kube_get("chi", chi_name, ns)
-    pod = kube_get("pod", chi["status"]["pods"][0], ns)
+    chi = kube_get("chi", chi_name, ns = ns)
+    pod = kube_get("pod", chi["status"]["pods"][0], ns = ns)
     return pod["spec"]
 
 def kube_get_pod_image(chi_name, ns="test"):
@@ -147,8 +147,8 @@ def kube_get_pod_image(chi_name, ns="test"):
     return pod_image
 
 def kube_get_pod_names(chi_name, ns="test"):
-    chi = kube_get("chi", chi_name, ns)
-    return chi["status"]["pods"]
+    pod_names = kubectl(f"get pods -n {ns} -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}").splitlines();
+    return pod_names[1:]
 
 def kube_get_pod_volumes(chi_name, ns="test"):
     volumeMounts = kube_get_pod_spec(chi_name, ns)["containers"][0]["volumeMounts"]
@@ -202,7 +202,7 @@ def kube_check_pod_antiaffinity(chi_name, ns):
 
 def kube_check_service(service_name, service_type, ns = "test"):
     with When(f"{service_name} is available"):
-        service = kube_get("service", service_name, ns)
+        service = kube_get("service", service_name, ns = ns)
         with Then(f"Service type is {service_type}"):
             assert service["spec"]["type"] == service_type
     
