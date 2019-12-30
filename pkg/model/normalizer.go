@@ -102,14 +102,14 @@ func (n *Normalizer) NormalizeChi(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 	n.normalizeConfiguration(&n.chi.Spec.Configuration)
 	n.normalizeTemplates(&n.chi.Spec.Templates)
 
-	n.normalizeStatus()
-
 	// Post-process CHI
 	n.chi.FillAddressInfo()
 	n.chi.FillChiPointer()
 	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		return n.calcFingerprints(host)
 	})
+
+	n.normalizeStatus()
 
 	return n.chi, nil
 }
