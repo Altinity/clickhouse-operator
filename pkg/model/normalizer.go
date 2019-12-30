@@ -102,20 +102,23 @@ func (n *Normalizer) NormalizeChi(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 	n.normalizeConfiguration(&n.chi.Spec.Configuration)
 	n.normalizeTemplates(&n.chi.Spec.Templates)
 
-	// Post-process CHI
+	n.finalizeCHI()
+	n.statusFill()
+
+	return n.chi, nil
+}
+
+// finalizeCHI performs some finalization tasks, which should be done after CHI is normalized
+func (n *Normalizer) finalizeCHI() {
 	n.chi.FillAddressInfo()
 	n.chi.FillChiPointer()
 	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		return n.calcFingerprints(host)
 	})
-
-	n.normalizeStatus()
-
-	return n.chi, nil
 }
 
-// normalizeStatus prepares .status section
-func (n *Normalizer) normalizeStatus() {
+// statusFill prepares .status section
+func (n *Normalizer) statusFill() {
 	endpoint := CreateChiServiceFQDN(n.chi)
 	pods := make([]string, 0)
 	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
