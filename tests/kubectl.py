@@ -138,8 +138,7 @@ def kube_wait_chi_status(chi, status, ns="test"):
         assert chi_status[1] == status, error()
 
 def kube_get_pod_spec(chi_name, ns="test"):
-    chi = kube_get("chi", chi_name, ns = ns)
-    pod = kube_get("pod", chi["status"]["pods"][0], ns = ns)
+    pod = kube_get("pod", "", ns = ns, label = f"-l clickhouse.altinity.com/chi={chi_name}")["items"][0]
     return pod["spec"]
 
 def kube_get_pod_image(chi_name, ns="test"):

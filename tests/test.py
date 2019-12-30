@@ -11,38 +11,40 @@ from kubectl import *
 from clickhouse import *
 from test_examples import *
 
+
+
 @TestScenario
-@Name("1 node")
+@Name("test_001. 1 node")
 def test_001():
     create_and_check("configs/test-001.yaml", {"object_counts": [1,1,2]})
     
 @TestScenario
-@Name("useTemplates for pod and volume templates")
+@Name("test_002. useTemplates for pod and volume templates")
 def test_002():
     create_and_check("configs/test-002-tpl.yaml", 
                      {"pod_count": 1,
                       "apply_templates": {"configs/tpl-clickhouse-stable.yaml", "configs/tpl-log-volume.yaml"},
-                      "pod_image": "yandex/clickhouse-server:19.11.8.46",
+                      "pod_image": clickhouse_stable,
                       "pod_volumes": {"/var/log/clickhouse-server"}})
 
 @TestScenario
-@Name("useTemplates for pod and distribution templates")
+@Name("test_003. useTemplates for pod and distribution templates")
 def test_003():
     create_and_check("configs/test-003-tpl.yaml", 
                      {"pod_count": 1,
                       "apply_templates": {"configs/tpl-clickhouse-stable.yaml", "configs/tpl-one-per-host.yaml"},
-                      "pod_image": "yandex/clickhouse-server:19.11.8.46",
+                      "pod_image": clickhouse_stable,
                       "pod_podAntiAffinity": 1})
 
 @TestScenario
-@Name("Compatibility test if old syntax with volumeClaimTemplate is still supported")
+@Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
 def test_004():
     create_and_check("configs/test-004-tpl.yaml", 
                      {"pod_count": 1,
                       "pod_volumes": {"/var/lib/clickhouse"}})
 
 @TestScenario
-@Name("Test manifest created by ACM")
+@Name("test_005. Test manifest created by ACM")
 def test_005():
     create_and_check("configs/test-005-acm.yaml", 
                      {"pod_count": 1,
@@ -50,7 +52,7 @@ def test_005():
                       "pod_volumes": {"/var/lib/clickhouse"}})
 
 @TestScenario
-@Name("Test clickhouse version upgrade from one version to another using podTemplate change")
+@Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
 def test_006():
     create_and_check("configs/test-006-ch-upgrade-1.yaml", 
                      {"pod_count": 2,
@@ -67,7 +69,7 @@ def test_006():
                               "pod_image": "yandex/clickhouse-server:19.11.8.46"})
 
 @TestScenario
-@Name("Test template with custom clickhouse ports")
+@Name("test_007. Test template with custom clickhouse ports")
 def test_007():
     create_and_check("configs/test-007-custom-ports.yaml", 
                      {"pod_count": 1,
@@ -76,7 +78,7 @@ def test_007():
                       "pod_ports": [8124,9001,9010]})
 
 @TestScenario
-@Name("Test operator upgrade from 0.6.0 to 0.7.0 version")
+@Name("test_009. Test operator upgrade from 0.6.0 to 0.7.0 version")
 def test_009():
     version_from="0.6.0"
     version_to="dev"
@@ -107,7 +109,7 @@ def set_operator_version(version):
     # assert kube_get_count("pod", ns = "kube-system", label = f"-l app=clickhouse-operator,version={version}")>0, error()
 
 @TestScenario
-@Name("Test zookeeper initialization")
+@Name("test_010. Test zookeeper initialization")
 def test_010():
     with Given("Install Zookeeper if missing"):
         if kube_get_count("service", name = "zookeepers") == 0:
@@ -125,7 +127,7 @@ def test_010():
     create_and_check("configs/test-010-zkroot.yaml",{})
 
 @TestScenario
-@Name("Test user security and network isolation")    
+@Name("test_011. Test user security and network isolation")    
 def test_011():
     create_and_check("configs/test-011-secure-user.yaml", 
                      {"pod_count": 2,
@@ -169,7 +171,7 @@ def test_011():
     create_and_check("configs/test-011-insecure-user.yaml", {})
 
 @TestScenario
-@Name("Test service templates")
+@Name("test_012. Test service templates")
 def test_012():
     set_operator_version("dev")
     create_and_check("configs/test-012-service-template.yaml", 
@@ -181,7 +183,7 @@ def test_012():
                       "service": ["service-default","ClusterIP"]})
 
 @TestScenario
-@Name("Test adding shards and creating local and distributed tables automatically")
+@Name("test_013. Test adding shards and creating local and distributed tables automatically")
 def test_013():
     create_and_check("configs/test-013-add-shards-1.yaml",
                      {"apply_templates": {"configs/tpl-clickhouse-stable.yaml"}, 
@@ -205,6 +207,7 @@ def test_013():
 
 kubectl.namespace="test"
 version="dev"
+clickhouse_stable="yandex/clickhouse-server:19.13.7.57"
 
 if main():
     with Module("main"):
@@ -235,8 +238,8 @@ if main():
                      test_012,
                      test_013]
         
-            # all_tests = tests
-            all_tests = [test_012]
+            all_tests = tests
+            # all_tests = [test_013]
         
             for t in all_tests:
                 run(test=t, flags=TE)
