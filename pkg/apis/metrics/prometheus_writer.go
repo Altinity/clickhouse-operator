@@ -64,8 +64,9 @@ func (w *PrometheusWriter) WriteMetrics(data [][]string) {
 			metric[2],
 			metric[1],
 			metricType,
-			[]string{"chi", "hostname"},
+			[]string{"chi", "namespace", "hostname"},
 			w.chi.Name,
+			w.chi.Namespace,
 			w.hostname,
 		)
 	}
@@ -80,29 +81,53 @@ func (w *PrometheusWriter) WriteTableSizes(data [][]string) {
 			continue
 		}
 		writeSingleMetricToPrometheus(w.out, "table_partitions", "Number of partitions of the table", metric[2], prometheus.GaugeValue,
-			[]string{"chi", "hostname", "database", "table"},
+			[]string{"chi", "namespace", "hostname", "database", "table"},
 			w.chi.Name, w.hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(w.out, "table_parts", "Number of parts of the table", metric[3], prometheus.GaugeValue,
-			[]string{"chi", "hostname", "database", "table"},
-			w.chi.Name, w.hostname, metric[0], metric[1])
+			[]string{"chi", "namespace", "hostname", "database", "table"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(w.out, "table_parts_bytes", "Table size in bytes", metric[4], prometheus.GaugeValue,
-			[]string{"chi", "hostname", "database", "table"},
-			w.chi.Name, w.hostname, metric[0], metric[1])
+			[]string{"chi", "namespace", "hostname", "database", "table"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(w.out, "table_parts_bytes_uncompressed", "Table size in bytes uncompressed", metric[5], prometheus.GaugeValue,
-			[]string{"chi", "hostname", "database", "table"},
-			w.chi.Name, w.hostname, metric[0], metric[1])
+			[]string{"chi", "namespace", "hostname", "database", "table"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(w.out, "table_parts_rows", "Number of rows in the table", metric[6], prometheus.GaugeValue,
-			[]string{"chi", "hostname", "database", "table"},
-			w.chi.Name, w.hostname, metric[0], metric[1])
+			[]string{"chi", "namespace", "hostname", "database", "table"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
 	}
 }
 
 func (w *PrometheusWriter) WriteSystemReplicas(data [][]string) {
 	for _, metric := range data {
 		writeSingleMetricToPrometheus(w.out, "system_replicas_is_session_expired", "Number of expired Zookeeper sessions of the table", metric[2], prometheus.GaugeValue,
-			[]string{"chi", "hostname", "database", "table"},
-			w.chi.Name, w.hostname, metric[0], metric[1])
+			[]string{"chi", "namespace", "hostname", "database", "table"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
 	}
+}
+
+func (w *PrometheusWriter) WriteMutations(data [][]string) {
+	for _, metric := range data {
+		writeSingleMetricToPrometheus(w.out, "table_mutations", "Number of active mutations for the table", metric[2], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "database", "table"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
+		writeSingleMetricToPrometheus(w.out, "table_mutations_parts_to_do", "Number of data parts that need to be mutated for the mutation to finish", metric[3], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "database", "table"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
+
+	}
+}
+
+func (w *PrometheusWriter) WriteErrorFetch(fetch_type string) {
+	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "Number of errors fetching metrics from ClickHouse", "1", prometheus.CounterValue,
+		[]string{"chi", "namespace", "hostname", "fetch_type"},
+		w.chi.Name, w.chi.Namespace, w.hostname, fetch_type)
+}
+
+func (w *PrometheusWriter) WriteOKFetch(fetch_type string) {
+	writeSingleMetricToPrometheus(w.out, "metric_fetches", "Number of successful metric fetches from ClickHouse", "1", prometheus.CounterValue,
+		[]string{"chi", "namespace", "hostname", "fetch_type"},
+		w.chi.Name, w.chi.Namespace, w.hostname, fetch_type)
 }
 
 func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, desc string, value string, metricType prometheus.ValueType, labels []string, labelValues ...string) {

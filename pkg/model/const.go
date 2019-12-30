@@ -14,36 +14,18 @@
 
 package model
 
-import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
-)
-
-const (
-	// Kubernetes labels
-	LabelApp      = clickhousealtinitycom.GroupName + "/app"
-	LabelAppValue = "chop"
-	LabelChop     = clickhousealtinitycom.GroupName + "/chop"
-	LabelChi      = clickhousealtinitycom.GroupName + "/chi"
-	LabelCluster  = clickhousealtinitycom.GroupName + "/cluster"
-	LabelShard    = clickhousealtinitycom.GroupName + "/shard"
-	LabelReplica  = clickhousealtinitycom.GroupName + "/replica"
-	// Supplementary service labels - used to cooperate with k8s
-	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/zookeeper-version"
-	LabelSettingsConfigVersion  = clickhousealtinitycom.GroupName + "/settings-version"
-)
-
 const (
 	xmlTagYandex = "yandex"
 )
 
 const (
-	configUsers         = "users"
+	configMacros        = "macros"
 	configProfiles      = "profiles"
 	configQuotas        = "quotas"
-	configSettings      = "settings"
 	configRemoteServers = "remote_servers"
+	configSettings      = "settings"
+	configUsers         = "users"
 	configZookeeper     = "zookeeper"
-	configMacros        = "macros"
 )
 
 const (
@@ -51,13 +33,21 @@ const (
 
 	// Filenames of the chopConfig files in /etc/clickhouse-server/config.d
 	// These files would be created as ConfigMaps mapping if necessary
+
+	// macros.xml
+	filenameMacrosXML = configMacros + dotXML
+	// profiles.xml
+	filenameProfilesXML = configProfiles + dotXML
+	// quotas.xml
+	filenameQuotasXML = configQuotas + dotXML
+	// remote_servers.xml
 	filenameRemoteServersXML = configRemoteServers + dotXML
-	filenameZookeeperXML     = configZookeeper + dotXML
-	filenameUsersXML         = configUsers + dotXML
-	filenameQuotasXML        = configQuotas + dotXML
-	filenameProfilesXML      = configProfiles + dotXML
-	filenameSettingsXML      = configSettings + dotXML
-	filenameMacrosXML        = configMacros + dotXML
+	// settings.xml
+	filenameSettingsXML = configSettings + dotXML
+	// users.xml
+	filenameUsersXML = configUsers + dotXML
+	// zookeeper.xml
+	filenameZookeeperXML = configZookeeper + dotXML
 )
 
 const (
@@ -115,11 +105,6 @@ const (
 const (
 	// Default value for ClusterIP service
 	templateDefaultsServiceClusterIP = "None"
-)
-
-const (
-	podDistributionOnePerHost  = "OnePerHost"
-	podDistributionUnspecified = "Unspecified"
 )
 
 const (

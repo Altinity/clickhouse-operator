@@ -1,0 +1,27 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-011-secure-user
+spec:
+  templates:
+    podTemplates:
+    - name: clickhouse
+      spec:
+        containers:
+        - name: clickhouse-pod
+          image: yandex/clickhouse-server:19.16.10.44
+  defaults:
+    templates:
+      podTemplate: clickhouse
+  configuration:
+    users:
+      # default user should be security to localhost and interhost connections
+      # operator creates host_regxp expression for that
+      # default/networks/host_regexp: \.chi-test-011-secure-user-[^.]+-\d+-\d+\.test.svc.cluster.local$
+      user1/password: topsecret
+      user1/networks/ip: "::/0"
+    clusters:
+    - name: default
+      layout:
+        shardsCount: 2
+        replicasCount: 1

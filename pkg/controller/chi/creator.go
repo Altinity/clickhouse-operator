@@ -35,17 +35,18 @@ const (
 // reconcileConfigMap reconciles core.ConfigMap
 func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
 	glog.V(1).Infof("Reconcile ConfigMap %s/%s", configMap.Namespace, configMap.Name)
-	// Check whether object with such name already exists in k8s
-	if curConfigMap, err := c.getConfigMap(&configMap.ObjectMeta, true); curConfigMap != nil {
-		// Object with such name already exists, this is not an error
+	// Check whether this object already exists in k8s
+	if curConfigMap, err := c.getConfigMap(&configMap.ObjectMeta, false); curConfigMap != nil {
+		// Object found
 		glog.V(1).Infof("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		_, err := c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
 		// Object updated
 		return err
 	} else if apierrors.IsNotFound(err) {
-		// Object with such name not found - create it
+		// Object not found - create it
 		glog.V(1).Infof("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		_, err := c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
+		// Object created
 		return err
 	} else {
 		return err
@@ -57,11 +58,11 @@ func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
 // reconcileService reconciles core.Service
 func (c *Controller) ReconcileService(service *core.Service) error {
 	glog.V(1).Infof("Reconcile Service %s/%s", service.Namespace, service.Name)
-	// Check whether object with such name already exists in k8s
-	if curService, err := c.getService(&service.ObjectMeta, true); curService != nil {
-		// Object with such name already exists, this is not an error
+	// Check whether this object already exists in k8s
+	if curService, err := c.getService(&service.ObjectMeta, false); curService != nil {
+		// Object found
 		glog.V(1).Infof("Update Service %s/%s", service.Namespace, service.Name)
-		// spec.resourceVersion is required in order to update Service
+		// spec.resourceVersion is required in order to update object
 		service.ResourceVersion = curService.ResourceVersion
 		// spec.clusterIP field is immutable, need to use already assigned value
 		// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
@@ -70,11 +71,13 @@ func (c *Controller) ReconcileService(service *core.Service) error {
 		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
 		service.Spec.ClusterIP = curService.Spec.ClusterIP
 		_, err := c.kubeClient.CoreV1().Services(service.Namespace).Update(service)
+		// Object updated
 		return err
 	} else if apierrors.IsNotFound(err) {
 		glog.V(1).Infof("Create service %s/%s", service.Namespace, service.Name)
-		// Object with such name not found - create it
+		// Object not found - create it
 		_, err := c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
+		// Object created
 		return err
 	} else {
 		return err
@@ -85,15 +88,16 @@ func (c *Controller) ReconcileService(service *core.Service) error {
 
 // reconcileStatefulSet reconciles apps.StatefulSet
 func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
-	// Check whether object with such name already exists in k8s
-	if curStatefulSet, err := c.getStatefulSet(&newStatefulSet.ObjectMeta, true); curStatefulSet != nil {
-		// StatefulSet already exists - update it
+	// Check whether this object already exists in k8s
+	if curStatefulSet, err := c.getStatefulSet(&newStatefulSet.ObjectMeta, false); curStatefulSet != nil {
+		// Object found - update it
 		err := c.updateStatefulSet(curStatefulSet, newStatefulSet)
 		host.Chi.Status.UpdatedHostsCount++
 		_ = c.updateChiObjectStatus(host.Chi, false)
+		// Object updated
 		return err
 	} else if apierrors.IsNotFound(err) {
-		// StatefulSet with such name not found - create StatefulSet
+		// Object not found - create it
 		err := c.createStatefulSet(newStatefulSet, host)
 		host.Chi.Status.AddedHostsCount++
 		_ = c.updateChiObjectStatus(host.Chi, false)
@@ -191,7 +195,7 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 
 		// StatefulSet is either not created or generation is not yet reached
 
-		if time.Since(start) >= (time.Duration(c.chopConfigManager.Config().StatefulSetUpdateTimeout) * time.Second) {
+		if time.Since(start) >= (time.Duration(c.chop.Config().StatefulSetUpdateTimeout) * time.Second) {
 			// Timeout reached, no good result available, time to quit
 			glog.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) - TIMEOUT reached", namespace, name)
 			return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - wait timeout", namespace, name))
@@ -200,7 +204,7 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 		// Wait some more time
 		glog.V(2).Infof("waitStatefulSetGeneration(%s/%s):%s", namespace, name)
 		select {
-		case <-time.After(time.Duration(c.chopConfigManager.Config().StatefulSetUpdatePollPeriod) * time.Second):
+		case <-time.After(time.Duration(c.chop.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}
 	}
 
@@ -215,19 +219,25 @@ func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulS
 	name := failedStatefulSet.Name
 
 	// What to do with StatefulSet - look into chop configuration settings
-	switch c.chopConfigManager.Config().OnStatefulSetCreateFailureAction {
+	switch c.chop.Config().OnStatefulSetCreateFailureAction {
 	case chop.OnStatefulSetCreateFailureActionAbort:
-		// Do nothing, just report appropriate error
+		// Report appropriate error, it will break reconcile loop
 		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - abort", namespace, name)
 		return errors.New(fmt.Sprintf("Create failed on %s/%s", namespace, name))
 
 	case chop.OnStatefulSetCreateFailureActionDelete:
-		// Delete gracefully problematic failed StatefulSet
+		// Delete gracefully failed StatefulSet
 		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to DELETE FAILED StatefulSet", namespace, name)
 		_ = c.deleteHost(host)
 		return c.shouldContinueOnCreateFailed()
+
+	case chop.OnStatefulSetCreateFailureActionIgnore:
+		// Ignore error, continue reconcile loop
+		glog.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to ignore error", namespace, name)
+		return nil
+
 	default:
-		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetCreateFailureAction=%s", c.chopConfigManager.Config().OnStatefulSetCreateFailureAction)
+		glog.V(1).Infof("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", c.chop.Config().OnStatefulSetCreateFailureAction)
 		return nil
 	}
 
@@ -242,9 +252,9 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 	name := rollbackStatefulSet.Name
 
 	// What to do with StatefulSet - look into chop configuration settings
-	switch c.chopConfigManager.Config().OnStatefulSetUpdateFailureAction {
+	switch c.chop.Config().OnStatefulSetUpdateFailureAction {
 	case chop.OnStatefulSetUpdateFailureActionAbort:
-		// Do nothing, just report appropriate error
+		// Report appropriate error, it will break reconcile loop
 		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort", namespace, name)
 		return errors.New(fmt.Sprintf("Update failed on %s/%s", namespace, name))
 
@@ -266,8 +276,14 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 
 			return c.shouldContinueOnUpdateFailed()
 		}
+
+	case chop.OnStatefulSetUpdateFailureActionIgnore:
+		// Ignore error, continue reconcile loop
+		glog.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - going to ignore error", namespace, name)
+		return nil
+
 	default:
-		glog.V(1).Infof("Unknown c.chopConfig.OnStatefulSetUpdateFailureAction=%s", c.chopConfigManager.Config().OnStatefulSetUpdateFailureAction)
+		glog.V(1).Infof("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", c.chop.Config().OnStatefulSetUpdateFailureAction)
 		return nil
 	}
 

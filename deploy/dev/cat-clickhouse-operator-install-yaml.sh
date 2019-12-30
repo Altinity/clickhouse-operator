@@ -54,6 +54,14 @@ MANIFEST_PRINT_RBAC="${MANIFEST_PRINT_RBAC:-yes}"
 # Render operator's Deployment section. May be not required in case of dev localhost run
 MANIFEST_PRINT_DEPLOYMENT="${MANIFEST_PRINT_DEPLOYMENT:-yes}"
 
+# Render operator's Service
+MANIFEST_PRINT_SERVICE="${MANIFEST_PRINT_SERVICE:-yes}"
+
+SED_ARGS=""
+if [[ "${OPERATOR_NAMESPACE}" == "-" ]]; then
+    SED_ARGS="/^  namespace:/ d"
+fi
+
 ##################################
 ##
 ##     File handler
@@ -67,19 +75,20 @@ function ensure_file() {
     # Params
     local LOCAL_DIR="$1"
     local FILE="$2"
-    local REPO_DIR="$3"
+    local GITHUB_REPO_DIR="$3"
 
     local LOCAL_FILE="${LOCAL_DIR}/${FILE}"
 
     if [[ -f "${LOCAL_FILE}" ]]; then
-        # File found, all is ok
+        # Local file found, can use it as is
         :
     else
-        download_file "${LOCAL_DIR}" "${FILE}" "${REPO_DIR}"
+        # Download file into local dir from github dir
+        download_file "${LOCAL_DIR}" "${FILE}" "${GITHUB_REPO_DIR}"
     fi
 
     if [[ -f "${LOCAL_FILE}" ]]; then
-        # File found, all is ok
+        # Local file found - must have been downloaded, can use now
         :
     else
         # File not found
@@ -95,13 +104,13 @@ function download_file() {
     # Params
     local LOCAL_DIR="$1"
     local FILE="$2"
-    local REPO_DIR="$3"
+    local GITHUB_REPO_DIR="$3"
 
     local LOCAL_FILE="${LOCAL_DIR}/${FILE}"
 
-    REPO_URL="https://raw.githubusercontent.com/Altinity/clickhouse-operator"
+    GITHUB_REPO_BASE_URL="https://raw.githubusercontent.com/Altinity/clickhouse-operator"
     BRANCH="${BRANCH:-master}"
-    FILE_URL="${REPO_URL}/${BRANCH}/${REPO_DIR}/${FILE}"
+    FILE_URL="${GITHUB_REPO_BASE_URL}/${BRANCH}/${GITHUB_REPO_DIR}/${FILE}"
 
     # Check curl is in place
     if ! curl --version > /dev/null; then
@@ -126,25 +135,52 @@ function download_file() {
     fi
 }
 
+#
+# Start render section
+#
+SECTION_RENDER_NUM=0
+function section_render_start() {
+    SECTION_RENDER_NUM=$((SECTION_RENDER_NUM+1))
+}
+
+#
+# Print separator, except first time
+#
+function render_separator() {
+    section_render_start
+
+    if [[ "${SECTION_RENDER_NUM}" -gt 1 ]]; then
+        echo "---"
+    fi
+}
+
 ##################################
 ##
 ##     Render .yaml manifest
 ##
 ##################################
 
+REPO_PATH_DEPLOY_DEV_FOLDER="deploy/dev"
+REPO_PATH_OPERATOR_CONFIG_FOLDER="config"
+
 # Render CRD section
 if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-01-section-crd.yaml" "deploy/dev"
+    render_separator
+    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-01-section-crd.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
     cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-01-section-crd.yaml" | \
-        OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" envsubst
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+        envsubst
 fi
 
 # Render RBAC section
 if [[ "${MANIFEST_PRINT_RBAC}" == "yes" ]]; then
-    echo "---"
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-02-section-rbac-and-service.yaml" "deploy/dev"
-    cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-02-section-rbac-and-service.yaml" | \
-        OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" envsubst
+    render_separator
+    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-02-section-rbac.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+    cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-02-section-rbac.yaml" | \
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+        envsubst
 fi
 
 # Render header/beginning of ConfigMap yaml specification:
@@ -159,10 +195,14 @@ function render_configmap_header() {
     CM_NAME="$1"
     # Template file with ConfigMap header/beginning
 
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" "deploy/dev"
+    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
     # Render ConfigMap header template with vars substitution
     cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" | \
-            OPERATOR_IMAGE="${OPERATOR_IMAGE}" OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" CONFIGMAP_NAME="${CM_NAME}" envsubst
+            sed "${SED_ARGS}" | \
+            OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+            OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+            CONFIGMAP_NAME="${CM_NAME}" \
+            envsubst
 }
 
 # Render one file section in ConfigMap yaml specification:
@@ -185,6 +225,8 @@ function render_configmap_data_section_file() {
     #    line 1
     #    line 2
     #    etc
+    # Add some spaces to the beginning of each line - proper indent for .yaml file
+    # Build ConfigMap section
     FILE_NAME="$(basename "${FILE_PATH}")"
     echo "  ${FILE_NAME}: |"
     cat "${FILE_PATH}" | sed 's/^/    /'
@@ -194,10 +236,12 @@ function render_configmap_data_section_file() {
 # Render Deployment and ConfigMap sections
 if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
     if [[ -z "${OPERATOR_CONFIG_FILE}" ]]; then
-        # No config file specified, render simple deployment
-        echo "---"
-        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment.yaml" "deploy/dev"
+        # No config file specified, render simple deployment, w/o ConfigMaps
+
+        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+        render_separator
         cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-04-section-deployment.yaml" | \
+            sed "${SED_ARGS}" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
             METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
@@ -206,7 +250,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
     else
         # Config file specified, render all ConfigMaps and then render deployment
 
-        echo "---"
+        render_separator
         render_configmap_header "etc-clickhouse-operator-files"
         if [[ -f "${PROJECT_ROOT}/config/config.yaml" ]]; then
             # Render clickhouse-operator config file
@@ -214,12 +258,12 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         else
             # Fetch from github and apply
             # config/config.yaml
-            download_file "${CUR_DIR}" "config.yaml" "config"
+            download_file "${CUR_DIR}" "config.yaml" "${REPO_PATH_OPERATOR_CONFIG_FOLDER}"
             render_configmap_data_section_file "${CUR_DIR}/config.yaml"
         fi
 
         # Render confd.d files
-        echo "---"
+        render_separator
         render_configmap_header "etc-clickhouse-operator-confd-files"
         if [[ ! -z "${OPERATOR_CONFD_FOLDER}" ]] && [[ -d "${OPERATOR_CONFD_FOLDER}" ]] && [[ ! -z "$(ls "${OPERATOR_CONFD_FOLDER}")" ]]; then
             for FILE in "${OPERATOR_CONFD_FOLDER}"/*; do
@@ -228,7 +272,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         fi
 
         # Render configd.d files
-        echo "---"
+        render_separator
         render_configmap_header "etc-clickhouse-operator-configd-files"
         if [[ ! -z "${OPERATOR_CONFIGD_FOLDER}" ]] && [[ -d "${OPERATOR_CONFIGD_FOLDER}" ]] && [[ ! -z "$(ls "${OPERATOR_CONFIGD_FOLDER}")" ]]; then
             for FILE in "${OPERATOR_CONFIGD_FOLDER}"/*; do
@@ -238,14 +282,14 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
             # Fetch from github and apply
             # config/config.d/01-clickhouse-listen.xml
             # config/config.d/02-clickhouse-logger.xml
-            download_file "${CUR_DIR}" "01-clickhouse-listen.xml" "config/config.d"
-            download_file "${CUR_DIR}" "02-clickhouse-logger.xml" "config/config.d"
+            download_file "${CUR_DIR}" "01-clickhouse-listen.xml" "${REPO_PATH_OPERATOR_CONFIG_FOLDER}/config.d"
+            download_file "${CUR_DIR}" "02-clickhouse-logger.xml" "${REPO_PATH_OPERATOR_CONFIG_FOLDER}/config.d"
             render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-listen.xml"
             render_configmap_data_section_file "${CUR_DIR}/02-clickhouse-logger.xml"
         fi
 
         # Render templates.d files
-        echo "---"
+        render_separator
         render_configmap_header "etc-clickhouse-operator-templatesd-files"
         if [[ ! -z "${OPERATOR_TEMPLATESD_FOLDER}" ]] && [[ -d "${OPERATOR_TEMPLATESD_FOLDER}" ]] && [[ ! -z "$(ls "${OPERATOR_TEMPLATESD_FOLDER}")" ]]; then
             for FILE in "${OPERATOR_TEMPLATESD_FOLDER}"/*; do
@@ -254,7 +298,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         fi
 
         # Render users.d files
-        echo "---"
+        render_separator
         render_configmap_header "etc-clickhouse-operator-usersd-files"
         if [[ ! -z "${OPERATOR_USERSD_FOLDER}" ]] && [[ -d "${OPERATOR_USERSD_FOLDER}" ]] && [[ ! -z "$(ls "${OPERATOR_USERSD_FOLDER}")" ]]; then
             for FILE in "${OPERATOR_USERSD_FOLDER}"/*; do
@@ -263,18 +307,30 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         else
             # Fetch from github and apply
             # config/users.d/01-clickhouse-user.xml
-            download_file "${CUR_DIR}" "01-clickhouse-user.xml" "config/users.d"
+            download_file "${CUR_DIR}" "01-clickhouse-user.xml" "${REPO_PATH_OPERATOR_CONFIG_FOLDER}/users.d"
             render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-user.xml"
         fi
 
         # Render Deployment
-        echo "---"
-        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" "deploy/dev"
+        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+        render_separator
         cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" | \
+            sed "${SED_ARGS}" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
             METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
             METRICS_EXPORTER_NAMESPACE="${METRICS_EXPORTER_NAMESPACE}" \
             envsubst
     fi
+fi
+
+# Render Service section
+if [[ "${MANIFEST_PRINT_SERVICE}" == "yes" ]]; then
+    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-05-section-service.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+    render_separator
+    cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-05-section-service.yaml" | \
+        sed "${SED_ARGS}" | \
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+        envsubst
 fi

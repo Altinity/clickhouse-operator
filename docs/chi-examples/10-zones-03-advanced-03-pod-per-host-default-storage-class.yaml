@@ -31,7 +31,7 @@ spec:
   templates:
     serviceTemplates:
       - name: ch-service
-        generateName: chendpoint
+        generateName: chendpoint-{chi}
         metadata:
           labels:
             custom.label: "custom.value"
@@ -55,8 +55,25 @@ spec:
           key: "clickhouse"
           values:
             - "allow"
-        distribution: "OnePerHost"
+        podDistribution:
+          - type: "ShardAntiAffinity"
+          - type: "ClickHouseInstallationAffinity"
+          - type: "ClusterAffinity"
         spec:
+          affinity:
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchLabels:
+                        a: b
+                      matchExpressions:
+                        - key: security
+                          operator: In
+                          values:
+                            - S2
+                    topologyKey: "kubernetes.io/hostname"
           containers:
             - name: clickhouse-pod
               image: yandex/clickhouse-server:19.3.7

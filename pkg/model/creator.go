@@ -17,6 +17,7 @@ package model
 import (
 	"fmt"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -28,27 +29,24 @@ import (
 )
 
 type Creator struct {
-	appVersion                string
+	chop                      *chop.Chop
 	chi                       *chiv1.ClickHouseInstallation
-	chopConfig                *chiv1.Config
 	chConfigGenerator         *ClickHouseConfigGenerator
 	chConfigSectionsGenerator *configSections
 	labeler                   *Labeler
 }
 
 func NewCreator(
+	chop *chop.Chop,
 	chi *chiv1.ClickHouseInstallation,
-	chopConfig *chiv1.Config,
-	appVersion string,
 ) *Creator {
 	creator := &Creator{
-		appVersion:        appVersion,
+		chop:              chop,
 		chi:               chi,
-		chopConfig:        chopConfig,
 		chConfigGenerator: NewClickHouseConfigGenerator(chi),
-		labeler:           NewLabeler(appVersion, chi),
+		labeler:           NewLabeler(chop, chi),
 	}
-	creator.chConfigSectionsGenerator = NewConfigSections(creator.chConfigGenerator, creator.chopConfig)
+	creator.chConfigSectionsGenerator = NewConfigSections(creator.chConfigGenerator, creator.chop.Config())
 	return creator
 }
 
@@ -63,7 +61,7 @@ func (c *Creator) CreateServiceChi() *corev1.Service {
 			template,
 			c.chi.Namespace,
 			serviceName,
-			c.labeler.getLabelsChiScope(),
+			c.labeler.getLabelsServiceChi(),
 			c.labeler.getSelectorChiScope(),
 		)
 	} else {
@@ -73,7 +71,7 @@ func (c *Creator) CreateServiceChi() *corev1.Service {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: c.chi.Namespace,
-				Labels:    c.labeler.getLabelsChiScope(),
+				Labels:    c.labeler.getLabelsServiceChi(),
 			},
 			Spec: corev1.ServiceSpec{
 				// ClusterIP: templateDefaultsServiceClusterIP,
@@ -105,7 +103,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 			template,
 			cluster.Address.Namespace,
 			serviceName,
-			c.labeler.getLabelsClusterScope(cluster),
+			c.labeler.getLabelsServiceCluster(cluster),
 			c.labeler.getSelectorClusterScope(cluster),
 		)
 	} else {
@@ -124,7 +122,7 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 			template,
 			shard.Address.Namespace,
 			serviceName,
-			c.labeler.getLabelsShardScope(shard),
+			c.labeler.getLabelsServiceShard(shard),
 			c.labeler.getSelectorShardScope(shard),
 		)
 	} else {
@@ -144,7 +142,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			template,
 			host.Address.Namespace,
 			serviceName,
-			c.labeler.getLabelsHostScope(host, false),
+			c.labeler.getLabelsServiceHost(host),
 			c.labeler.GetSelectorHostScope(host),
 		)
 	} else {
@@ -154,7 +152,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: host.Address.Namespace,
-				Labels:    c.labeler.getLabelsHostScope(host, false),
+				Labels:    c.labeler.getLabelsServiceHost(host),
 			},
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
@@ -240,7 +238,7 @@ func (c *Creator) CreateConfigMapChiCommon() *corev1.ConfigMap {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonName(c.chi),
 			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsChiScope(),
+			Labels:    c.labeler.getLabelsConfigMapChiCommon(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigSectionsGenerator.commonConfigSections,
@@ -254,7 +252,7 @@ func (c *Creator) CreateConfigMapChiCommonUsers() *corev1.ConfigMap {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonUsersName(c.chi),
 			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsChiScope(),
+			Labels:    c.labeler.getLabelsConfigMapChiCommonUsers(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigSectionsGenerator.commonUsersConfigSections,
@@ -267,7 +265,7 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapPodName(host),
 			Namespace: host.Address.Namespace,
-			Labels:    c.labeler.getLabelsHostScope(host, false),
+			Labels:    c.labeler.getLabelsConfigMapHost(host),
 		},
 		Data: c.chConfigSectionsGenerator.CreateConfigsPod(host),
 	}
@@ -310,41 +308,33 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 }
 
 // setupStatefulSetPodTemplate performs PodTemplate setup of StatefulSet
-func (c *Creator) setupStatefulSetPodTemplate(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
+func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	statefulSetName := CreateStatefulSetName(host)
 
 	// Initial PodTemplateSpec value
 	// All the rest fields would be filled later
-	statefulSetObject.Spec.Template = corev1.PodTemplateSpec{
+	statefulSet.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: c.labeler.getLabelsHostScope(host, true),
 		},
 	}
 
-	// Specify pod templates - either explicitly defined or default
-	if podTemplate, ok := host.GetPodTemplate(); ok {
-		// Replica references known PodTemplate
-		statefulSetCopyPodTemplate(statefulSetObject, podTemplate)
-		glog.V(1).Infof("setupStatefulSetPodTemplate() for statefulSet %s - template used", statefulSetName)
-	} else {
-		// Replica references UNKNOWN PodTemplate
-		statefulSetCopyPodTemplate(statefulSetObject, newDefaultPodTemplate(statefulSetName))
-		glog.V(1).Infof("setupStatefulSetPodTemplate() for statefulSet %s - default template", statefulSetName)
-	}
+	podTemplate := c.getPodTemplate(statefulSet, host)
+	statefulSetAssignPodTemplate(statefulSet, podTemplate)
 
 	// Pod created by this StatefulSet has to have alias
-	statefulSetObject.Spec.Template.Spec.HostAliases = []corev1.HostAlias{
+	statefulSet.Spec.Template.Spec.HostAliases = []corev1.HostAlias{
 		{
 			IP:        "127.0.0.1",
 			Hostnames: []string{CreatePodHostname(host)},
 		},
 	}
 
-	c.setupConfigMapVolumes(statefulSetObject, host)
+	c.setupConfigMapVolumes(statefulSet, host)
 
 	// We have default LogVolumeClaimTemplate specified - need to append log container
 	if host.Templates.LogVolumeClaimTemplate != "" {
-		addContainer(&statefulSetObject.Spec.Template.Spec, corev1.Container{
+		addContainer(&statefulSet.Spec.Template.Spec, corev1.Container{
 			Name:  ClickHouseLogContainerName,
 			Image: defaultBusyBoxDockerImage,
 			Command: []string{
@@ -356,6 +346,31 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSetObject *apps.StatefulSe
 		})
 		glog.V(1).Infof("setupStatefulSetPodTemplate() add log container for statefulSet %s", statefulSetName)
 	}
+}
+
+// getPodTemplate gets Pod Template to be used to create StatefulSet
+func (c *Creator) getPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
+	statefulSetName := CreateStatefulSetName(host)
+
+	// Which pod template would be used - either explicitly defined in or a default one
+	podTemplate, ok := host.GetPodTemplate()
+	if ok {
+		// Replica references known PodTemplate
+		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
+		podTemplate = podTemplate.DeepCopy()
+		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
+	} else {
+		// Replica references UNKNOWN PodTemplate, will use default one
+		podTemplate = newDefaultPodTemplate(statefulSetName)
+		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use default generated template", statefulSetName)
+	}
+
+	// Here we have local copy of Pod Template, to be used to create StatefulSet
+	// Now we can customize this Pod Template for particular host
+
+	c.labeler.prepareAffinity(podTemplate, host)
+
+	return podTemplate
 }
 
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
@@ -517,10 +532,11 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.Statefu
 	c.setupStatefulSetApplyVolumeClaimTemplates(statefulSet, host)
 }
 
-// statefulSetCopyPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
-func statefulSetCopyPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
+// statefulSetAssignPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
+func statefulSetAssignPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
+	// StatefulSet's pod template is not directly compatible with ChiPodTemplate, we need some fields only
 	dst.Spec.Template.Name = template.Name
-	dst.Spec.Template.Spec = *template.Spec.DeepCopy()
+	dst.Spec.Template.Spec = template.Spec
 }
 
 // statefulSetAppendVolumeClaimTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' ChiVolumeClaimTemplate

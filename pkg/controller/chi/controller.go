@@ -17,12 +17,12 @@ package chi
 import (
 	"context"
 	"fmt"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
-	"github.com/altinity/clickhouse-operator/pkg/config"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -44,8 +44,7 @@ import (
 
 // NewController creates instance of Controller
 func NewController(
-	version string,
-	chopConfigManager *config.Manager,
+	chop *chop.Chop,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
 	chopInformerFactory chopinformers.SharedInformerFactory,
@@ -72,8 +71,7 @@ func NewController(
 
 	// Create Controller instance
 	controller := &Controller{
-		version:                 version,
-		chopConfigManager:       chopConfigManager,
+		chop:                    chop,
 		kubeClient:              kubeClient,
 		chopClient:              chopClient,
 		chiLister:               chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Lister(),
@@ -104,25 +102,25 @@ func (c *Controller) addEventHandlers(
 ) {
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			chi := obj.(*chop.ClickHouseInstallation)
-			if !c.chopConfigManager.Config().IsWatchedNamespace(chi.Namespace) {
+			chi := obj.(*chi.ClickHouseInstallation)
+			if !c.chop.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
 			c.enqueueObject(NewReconcileChi(reconcileAdd, nil, chi))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			oldChi := old.(*chop.ClickHouseInstallation)
-			newChi := new.(*chop.ClickHouseInstallation)
-			if !c.chopConfigManager.Config().IsWatchedNamespace(newChi.Namespace) {
+			oldChi := old.(*chi.ClickHouseInstallation)
+			newChi := new.(*chi.ClickHouseInstallation)
+			if !c.chop.Config().IsWatchedNamespace(newChi.Namespace) {
 				return
 			}
 			//glog.V(1).Info("chiInformer.UpdateFunc")
 			c.enqueueObject(NewReconcileChi(reconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: func(obj interface{}) {
-			chi := obj.(*chop.ClickHouseInstallation)
-			if !c.chopConfigManager.Config().IsWatchedNamespace(chi.Namespace) {
+			chi := obj.(*chi.ClickHouseInstallation)
+			if !c.chop.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
@@ -132,25 +130,25 @@ func (c *Controller) addEventHandlers(
 
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			chit := obj.(*chop.ClickHouseInstallationTemplate)
-			if !c.chopConfigManager.Config().IsWatchedNamespace(chit.Namespace) {
+			chit := obj.(*chi.ClickHouseInstallationTemplate)
+			if !c.chop.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
 			c.enqueueObject(NewReconcileChit(reconcileAdd, nil, chit))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			oldChit := old.(*chop.ClickHouseInstallationTemplate)
-			newChit := new.(*chop.ClickHouseInstallationTemplate)
-			if !c.chopConfigManager.Config().IsWatchedNamespace(newChit.Namespace) {
+			oldChit := old.(*chi.ClickHouseInstallationTemplate)
+			newChit := new.(*chi.ClickHouseInstallationTemplate)
+			if !c.chop.Config().IsWatchedNamespace(newChit.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
 			c.enqueueObject(NewReconcileChit(reconcileUpdate, oldChit, newChit))
 		},
 		DeleteFunc: func(obj interface{}) {
-			chit := obj.(*chop.ClickHouseInstallationTemplate)
-			if !c.chopConfigManager.Config().IsWatchedNamespace(chit.Namespace) {
+			chit := obj.(*chi.ClickHouseInstallationTemplate)
+			if !c.chop.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
@@ -160,25 +158,25 @@ func (c *Controller) addEventHandlers(
 
 	chopInformerFactory.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			chopConfig := obj.(*chop.ClickHouseOperatorConfiguration)
-			if !c.chopConfigManager.Config().IsWatchedNamespace(chopConfig.Namespace) {
+			chopConfig := obj.(*chi.ClickHouseOperatorConfiguration)
+			if !c.chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
 			c.enqueueObject(NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			newChopConfig := new.(*chop.ClickHouseOperatorConfiguration)
-			oldChopConfig := old.(*chop.ClickHouseOperatorConfiguration)
-			if !c.chopConfigManager.Config().IsWatchedNamespace(newChopConfig.Namespace) {
+			newChopConfig := new.(*chi.ClickHouseOperatorConfiguration)
+			oldChopConfig := old.(*chi.ClickHouseOperatorConfiguration)
+			if !c.chop.Config().IsWatchedNamespace(newChopConfig.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
 			c.enqueueObject(NewReconcileChopConfig(reconcileUpdate, oldChopConfig, newChopConfig))
 		},
 		DeleteFunc: func(obj interface{}) {
-			chopConfig := obj.(*chop.ClickHouseOperatorConfiguration)
-			if !c.chopConfigManager.Config().IsWatchedNamespace(chopConfig.Namespace) {
+			chopConfig := obj.(*chi.ClickHouseOperatorConfiguration)
+			if !c.chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
 			//glog.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
@@ -339,7 +337,7 @@ func (c *Controller) addEventHandlers(
 
 // isTrackedObject checks whether operator is interested in changes of this object
 func (c *Controller) isTrackedObject(objectMeta *meta.ObjectMeta) bool {
-	return c.chopConfigManager.Config().IsWatchedNamespace(objectMeta.Namespace) && chopmodels.IsChopGeneratedObject(objectMeta)
+	return c.chop.Config().IsWatchedNamespace(objectMeta.Namespace) && chopmodels.IsChopGeneratedObject(objectMeta)
 }
 
 // Run syncs caches, starts workers
@@ -417,15 +415,27 @@ func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string
 	}
 }
 
+func (c *Controller) deleteWatch(namespace, name string) {
+	go c.deleteWatchAsync(namespace, name)
+}
+
+func (c *Controller) deleteWatchAsync(namespace, name string) {
+	if err := metrics.DeleteWatchREST(namespace, name); err != nil {
+		glog.V(1).Infof("FAIL delete watch (%s/%s): %q", namespace, name, err)
+	} else {
+		glog.V(2).Infof("OK delete watch (%s/%s)", namespace, name)
+	}
+}
+
 // addChit sync new CHIT - creates all its resources
-func (c *Controller) addChit(chit *chop.ClickHouseInstallationTemplate) error {
+func (c *Controller) addChit(chit *chi.ClickHouseInstallationTemplate) error {
 	glog.V(1).Infof("addChit(%s/%s)", chit.Namespace, chit.Name)
-	c.chopConfigManager.Config().AddChiTemplate((*chop.ClickHouseInstallation)(chit))
+	c.chop.Config().AddChiTemplate((*chi.ClickHouseInstallation)(chit))
 	return nil
 }
 
 // updateChit sync CHIT which was already created earlier
-func (c *Controller) updateChit(old, new *chop.ClickHouseInstallationTemplate) error {
+func (c *Controller) updateChit(old, new *chi.ClickHouseInstallationTemplate) error {
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
 		glog.V(2).Infof("updateChit(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
 		// No need to react
@@ -433,20 +443,20 @@ func (c *Controller) updateChit(old, new *chop.ClickHouseInstallationTemplate) e
 	}
 
 	glog.V(2).Infof("updateChit(%s/%s):", new.Namespace, new.Name)
-	c.chopConfigManager.Config().UpdateChiTemplate((*chop.ClickHouseInstallation)(new))
+	c.chop.Config().UpdateChiTemplate((*chi.ClickHouseInstallation)(new))
 	return nil
 }
 
 // deleteChit deletes CHIT
-func (c *Controller) deleteChit(chit *chop.ClickHouseInstallationTemplate) error {
+func (c *Controller) deleteChit(chit *chi.ClickHouseInstallationTemplate) error {
 	glog.V(2).Infof("deleteChit(%s/%s):", chit.Namespace, chit.Name)
-	c.chopConfigManager.Config().DeleteChiTemplate((*chop.ClickHouseInstallation)(chit))
+	c.chop.Config().DeleteChiTemplate((*chi.ClickHouseInstallation)(chit))
 	return nil
 }
 
 // addChopConfig
-func (c *Controller) addChopConfig(chopConfig *chop.ClickHouseOperatorConfiguration) error {
-	if c.chopConfigManager.IsConfigListed(chopConfig) {
+func (c *Controller) addChopConfig(chopConfig *chi.ClickHouseOperatorConfiguration) error {
+	if c.chop.ConfigManager.IsConfigListed(chopConfig) {
 		glog.V(1).Infof("addChopConfig(%s/%s) known config", chopConfig.Namespace, chopConfig.Name)
 	} else {
 		glog.V(1).Infof("addChopConfig(%s/%s) UNKNOWN CONFIG", chopConfig.Namespace, chopConfig.Name)
@@ -457,7 +467,7 @@ func (c *Controller) addChopConfig(chopConfig *chop.ClickHouseOperatorConfigurat
 }
 
 // updateChopConfig
-func (c *Controller) updateChopConfig(old, new *chop.ClickHouseOperatorConfiguration) error {
+func (c *Controller) updateChopConfig(old, new *chi.ClickHouseOperatorConfiguration) error {
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
 		glog.V(2).Infof("updateChopConfig(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
 		// No need to react
@@ -471,7 +481,7 @@ func (c *Controller) updateChopConfig(old, new *chop.ClickHouseOperatorConfigura
 }
 
 // deleteChit deletes CHIT
-func (c *Controller) deleteChopConfig(chopConfig *chop.ClickHouseOperatorConfiguration) error {
+func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfiguration) error {
 	glog.V(2).Infof("deleteChopConfig(%s/%s):", chopConfig.Namespace, chopConfig.Name)
 	os.Exit(0)
 
@@ -479,21 +489,31 @@ func (c *Controller) deleteChopConfig(chopConfig *chop.ClickHouseOperatorConfigu
 }
 
 // updateChiObject updates ClickHouseInstallation object
-func (c *Controller) updateChiObject(chi *chop.ClickHouseInstallation) error {
+func (c *Controller) updateChiObject(chi *chi.ClickHouseInstallation) error {
 	new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
+
 	if err != nil {
 		// Error update
 		glog.V(1).Infof("ERROR update CHI (%s/%s): %q", chi.Namespace, chi.Name, err)
-	} else if chi.ObjectMeta.ResourceVersion != new.ObjectMeta.ResourceVersion {
-		// Updated
-		chi.ObjectMeta.ResourceVersion = new.ObjectMeta.ResourceVersion
-		glog.V(2).Infof("CHI (%s/%s) bump resource version %d/%d", chi.Namespace, chi.Name, chi.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
+		return err
 	}
-	return err
+
+	if chi.ObjectMeta.ResourceVersion != new.ObjectMeta.ResourceVersion {
+		// Updated
+		glog.V(2).Infof("CHI (%s/%s) bump resource version %d/%d",
+			chi.Namespace, chi.Name, chi.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion,
+		)
+		chi.ObjectMeta.ResourceVersion = new.ObjectMeta.ResourceVersion
+		return nil
+	}
+
+	// ResourceVersion not changed - no update performed?
+
+	return nil
 }
 
 // updateChiObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) updateChiObjectStatus(chi *chop.ClickHouseInstallation, tolerateAbsence bool) error {
+func (c *Controller) updateChiObjectStatus(chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
 	glog.V(1).Infof("Update CHI status (%s/%s)", chi.Namespace, chi.Name)
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(chi.Name, meta.GetOptions{})
 	if err != nil {
@@ -547,7 +567,7 @@ func (c *Controller) handleObject(obj interface{}) {
 	}
 
 	// Ensure owner is of a proper kind
-	if ownerRef.Kind != chop.ClickHouseInstallationCRDResourceKind {
+	if ownerRef.Kind != chi.ClickHouseInstallationCRDResourceKind {
 		return
 	}
 
