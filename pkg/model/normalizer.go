@@ -117,7 +117,7 @@ func (n *Normalizer) finalizeCHI() {
 	})
 }
 
-// statusFill prepares .status section
+// statusFill fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) statusFill() {
 	endpoint := CreateChiServiceFQDN(n.chi)
 	pods := make([]string, 0)
