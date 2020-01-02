@@ -993,7 +993,7 @@ func (n *Normalizer) ensureLayoutShards(layout *chiv1.ChiLayout) {
 		layout.Shards = make([]chiv1.ChiShard, layout.ShardsCount, layout.ShardsCount)
 	} else {
 		// Some (may be all) shards specified, need to append space for unspecified shards
-		// TODO may be there is better way to append N slots to slice
+		// TODO may be there is better way to append N slots to a slice
 		for len(layout.Shards) < layout.ShardsCount {
 			layout.Shards = append(layout.Shards, chiv1.ChiShard{})
 		}
@@ -1026,13 +1026,16 @@ func (n *Normalizer) normalizeShardReplicas(shard *chiv1.ChiShard) {
 	for replicaIndex := range shard.Replicas {
 		// Convenience wrapper
 		host := &shard.Replicas[replicaIndex]
-
-		// Normalize a host/replica
-		n.normalizeHostName(host, replicaIndex)
-		n.normalizeHostPort(host)
-		// Use PodTemplate from shard
-		host.InheritTemplatesFrom(shard)
+		n.normalizeHost(host, shard, replicaIndex)
 	}
+}
+
+// normalizeHost normalizes a host/replica
+func (n *Normalizer) normalizeHost(host *chiv1.ChiHost, shard *chiv1.ChiShard, replicaIndex int) {
+	n.normalizeHostName(host, replicaIndex)
+	n.normalizeHostPort(host)
+	// Use PodTemplate from parent shard
+	host.InheritTemplatesFrom(shard)
 }
 
 // normalizeHostName normalizes host's name
