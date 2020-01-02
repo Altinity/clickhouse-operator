@@ -900,30 +900,30 @@ func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 	// Use PodTemplate from .spec.defaults
 	cluster.InheritTemplatesFrom(n.chi)
 
-	// Convenience wrapper
-	layout := &cluster.Layout
-
-	n.normalizeLayoutShardsCountAndReplicasCount(layout)
+	n.normalizeLayoutShardsCountAndReplicasCount(&cluster.Layout)
 
 	// Loop over all shards and replicas inside shards and fill structure
 	// .Layout.ShardsCount is provided
-	n.ensureLayoutShards(layout)
-	for shardIndex := range layout.Shards {
+	n.ensureLayoutShards(&cluster.Layout)
+	for shardIndex := range cluster.Layout.Shards {
 		// Convenience wrapper
-		shard := &layout.Shards[shardIndex]
-
-		// Normalize a shard - walk over all fields
-		n.normalizeShardName(shard, shardIndex)
-		n.normalizeShardWeight(shard)
-		n.normalizeShardInternalReplication(shard)
-		// For each shard of this normalized cluster inherit cluster's PodTemplate
-		shard.InheritTemplatesFrom(cluster)
-		// Normalize Replicas
-		n.normalizeShardReplicasCount(shard, layout.ReplicasCount)
-		n.normalizeShardReplicas(shard)
+		shard := &cluster.Layout.Shards[shardIndex]
+		n.normalizeShard(shard, cluster, shardIndex)
 	}
 
 	return nil
+}
+
+// normalizeShard normalizes a shard - walks over all fields
+func (n *Normalizer) normalizeShard(shard *chiv1.ChiShard, cluster *chiv1.ChiCluster, shardIndex int) {
+	n.normalizeShardName(shard, shardIndex)
+	n.normalizeShardWeight(shard)
+	n.normalizeShardInternalReplication(shard)
+	// For each shard of this normalized cluster inherit cluster's PodTemplate
+	shard.InheritTemplatesFrom(cluster)
+	// Normalize Replicas
+	n.normalizeShardReplicasCount(shard, cluster.Layout.ReplicasCount)
+	n.normalizeShardReplicas(shard)
 }
 
 // normalizeLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
