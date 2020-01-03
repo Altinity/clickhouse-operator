@@ -871,11 +871,16 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 				pass = n.chop.Config().ChConfigUserDefaultPassword
 			} else {
 				pass = fmt.Sprintf("%v", (*users)[username+"/password"])
-				// Delete password completely, we will have SHA256 instead
-				delete(*users, username+"/password")
 			}
 			pass_sha256 := sha256.Sum256([]byte(pass))
 			(*users)[username+"/password_sha256_hex"] = hex.EncodeToString(pass_sha256[:])
+			okPasswordSHA256 = true
+		}
+		if okPasswordSHA256 && username == "default" { // Remove password that is empty in stock ClickHouse users.xml
+			(*users)[username+"/password"] = "_removed_"
+		}
+		if okPasswordSHA256 && okPassword {
+			delete(*users, username+"/password") // ClickHouse does not start if both password and sha256 are defined
 		}
 	}
 }
