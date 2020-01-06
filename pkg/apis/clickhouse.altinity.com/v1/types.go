@@ -243,9 +243,13 @@ type ChiShardAddress struct {
 
 // ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
 type ChiHost struct {
-	Name      string           `json:"name,omitempty"`
-	Port      int32            `json:"port,omitempty"`
-	Templates ChiTemplateNames `json:"templates,omitempty"`
+	Name string `json:"name,omitempty"`
+	// DEPRECATED - to be removed soon
+	Port                int32            `json:"port,omitempty"`
+	TcpPort             int32            `json:"tcpPort,omitempty"`
+	HttpPort            int32            `json:"httpPort,omitempty"`
+	InterserverHttpPort int32            `json:"interserverHttpPort,omitempty"`
+	Templates           ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data
 	Address ChiHostAddress          `json:"address"`

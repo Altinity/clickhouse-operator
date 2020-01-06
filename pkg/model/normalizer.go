@@ -1038,7 +1038,7 @@ func (n *Normalizer) normalizeShardReplicas(shard *chiv1.ChiShard) {
 // normalizeHost normalizes a host/replica
 func (n *Normalizer) normalizeHost(host *chiv1.ChiHost, shard *chiv1.ChiShard, replicaIndex int) {
 	n.normalizeHostName(host, replicaIndex)
-	n.normalizeHostPort(host)
+	n.normalizeHostPorts(host)
 	// Use PodTemplate from parent shard
 	host.InheritTemplatesFrom(shard)
 }
@@ -1054,10 +1054,22 @@ func (n *Normalizer) normalizeHostName(host *chiv1.ChiHost, index int) {
 	}
 }
 
-// normalizeHostPort ensures chiv1.ChiReplica.Port is reasonable
-func (n *Normalizer) normalizeHostPort(host *chiv1.ChiHost) {
+// normalizeHostPorts ensures chiv1.ChiReplica.Port is reasonable
+func (n *Normalizer) normalizeHostPorts(host *chiv1.ChiHost) {
 	if host.Port <= 0 {
-		host.Port = chDefaultClientPortNumber
+		host.Port = chDefaultTcpPortNumber
+	}
+
+	if host.TcpPort <= 0 {
+		host.TcpPort = chDefaultTcpPortNumber
+	}
+
+	if host.HttpPort <= 0 {
+		host.HttpPort = chDefaultHttpPortNumber
+	}
+
+	if host.InterserverHttpPort <= 0 {
+		host.InterserverHttpPort = chDefaultInterserverHttpPortNumber
 	}
 }
 
