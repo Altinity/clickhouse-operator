@@ -296,7 +296,15 @@ spec:
                                         # See namePartReplicaMaxLen const
                                         maxLength: 15
                                         pattern: "^[a-zA-Z0-9-]{0,15}$"
-                                      port:
+                                      tcpPort:
+                                        type: integer
+                                        minimum: 1
+                                        maximum: 65535
+                                      httpPort:
+                                        type: integer
+                                        minimum: 1
+                                        maximum: 65535
+                                      interserverHttpPort:
                                         type: integer
                                         minimum: 1
                                         maximum: 65535
@@ -706,7 +714,15 @@ spec:
                                         # See namePartReplicaMaxLen const
                                         maxLength: 15
                                         pattern: "^[a-zA-Z0-9-]{0,15}$"
-                                      port:
+                                      tcpPort:
+                                        type: integer
+                                        minimum: 1
+                                        maximum: 65535
+                                      httpPort:
+                                        type: integer
+                                        minimum: 1
+                                        maximum: 65535
+                                      interserverHttpPort:
                                         type: integer
                                         minimum: 1
                                         maximum: 65535
