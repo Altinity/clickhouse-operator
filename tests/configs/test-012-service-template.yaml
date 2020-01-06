@@ -23,9 +23,9 @@ spec:
         generateName: "service-{chi}"
         spec:
           ports:
-            - name: http-port
+            - name: http
               port: 8123
-            - name: tcp-port
+            - name: tcp
               port: 9000
           type: ClusterIP
           clusterIP: None
@@ -33,9 +33,9 @@ spec:
         generateName: "service-{cluster}"
         spec:
           ports:
-            - name: http-port
+            - name: http
               port: 8123
-            - name: tcp-port
+            - name: tcp
               port: 9000
           type: ClusterIP
           clusterIP: None

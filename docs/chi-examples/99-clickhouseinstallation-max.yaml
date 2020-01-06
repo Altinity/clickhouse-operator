@@ -228,9 +228,9 @@ spec:
         # type ServiceSpec struct from k8s.io/core/v1
         spec:
           ports:
-            - name: http-port
+            - name: http
               port: 8123
-            - name: tcp-port
+            - name: tcp
               port: 9000
           type: LoadBalancer
 
@@ -238,11 +238,11 @@ spec:
         # type ServiceSpec struct from k8s.io/core/v1
         spec:
           ports:
-            - name: http-port
+            - name: http
               port: 8123
-            - name: tcp-port
+            - name: tcp
               port: 9000
-            - name: interserver-http-port
+            - name: interserver
               port: 9009
           type: ClusterIP
           ClusterIP: None
@@ -254,11 +254,11 @@ spec:
           selector:
             app: example
           ports:
-            - name: http-port
+            - name: http
               port: 8123
-            - name: tcp-port
+            - name: tcp
               port: 9000
-            - name: interserver-http-port
+            - name: interserver
               port: 9009
           externalTrafficPolicy: Local
           type: LoadBalancer

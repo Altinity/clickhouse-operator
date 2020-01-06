@@ -15,11 +15,11 @@ spec:
             - name: clickhouse
               image: yandex/clickhouse-server:19.11.8.46
               ports:
-                - name: http-port
+                - name: http
                   containerPort: 8124
-                - name: tcp-port
+                - name: tcp
                   containerPort: 9001
-                - name: interserver-http-port
+                - name: interserver
                   containerPort: 9010
   configuration:
     settings:

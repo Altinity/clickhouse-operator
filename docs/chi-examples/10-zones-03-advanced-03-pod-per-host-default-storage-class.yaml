@@ -43,9 +43,9 @@ spec:
             service.beta.kubernetes.io/cce-load-balancer-internal-vpc: "true"
         spec:
           ports:
-            - name: http-port
+            - name: http
               port: 8123
-            - name: tcp-port
+            - name: tcp
               port: 9000
           type: LoadBalancer
     podTemplates:
@@ -78,11 +78,11 @@ spec:
             - name: clickhouse-pod
               image: yandex/clickhouse-server:19.3.7
               ports:
-                - name: http-port
+                - name: http
                   containerPort: 8123
-                - name: tcp-port
+                - name: tcp
                   containerPort: 9000
-                - name: interserver-http-port
+                - name: interserver
                   containerPort: 9009
               volumeMounts:
                 - name: storage-vc-template

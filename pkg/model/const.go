@@ -94,11 +94,11 @@ const (
 
 const (
 	// ClickHouse open ports
-	chDefaultTcpPortName               = "tcp-port"
+	chDefaultTcpPortName               = "tcp"
 	chDefaultTcpPortNumber             = 9000
-	chDefaultHttpPortName              = "http-port"
+	chDefaultHttpPortName              = "http"
 	chDefaultHttpPortNumber            = 8123
-	chDefaultInterserverHttpPortName   = "interserver-http-port"
+	chDefaultInterserverHttpPortName   = "interserver"
 	chDefaultInterserverHttpPortNumber = 9009
 )
 
