@@ -78,7 +78,7 @@ def test_007():
                       "pod_ports": [8124,9001,9010]})
 
 @TestScenario
-@Name("test_009. Test operator upgrade from 0.6.0 to 0.7.0 version")
+@Name("test_009. Test operator upgrade from 0.6.0 to later version")
 def test_009():
     version_from="0.6.0"
     version_to="dev"
@@ -129,46 +129,70 @@ def test_010():
 @TestScenario
 @Name("test_011. Test user security and network isolation")    
 def test_011():
-    create_and_check("configs/test-011-secure-user.yaml", 
+    create_and_check("configs/test-011-secured-cluster.yaml", 
                      {"pod_count": 2,
                       "apply_templates": {"configs/tpl-log-volume.yaml"},
                       "do_not_delete": 1})
 
-    create_and_check("configs/test-011-insecure-user.yaml", 
+    create_and_check("configs/test-011-insecured-cluster.yaml", 
                      {"pod_count": 1,
                       "do_not_delete": 1})
 
     with Then("Connection to localhost should succeed with default user"):
-        out = clickhouse_query_with_error("test-011-secure-user", "select 'OK'")
+        out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'")
         assert out == 'OK'
 
     with Then("Connection from secured to secured host should succeed"):
-        out = clickhouse_query_with_error("test-011-secure-user", "select 'OK'", 
-                                          host = "chi-test-011-secure-user-default-1-0")
+        out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'", 
+                                          host = "chi-test-011-secured-cluster-default-1-0")
         assert out == 'OK'
 
     with And("Connection from insecured to secured host should fail for default"):
-        out = clickhouse_query_with_error("test-011-insecure-user","select 'OK'", 
-                                          host = "chi-test-011-secure-user-default-1-0")
+        out = clickhouse_query_with_error("test-011-insecured-cluster","select 'OK'", 
+                                          host = "chi-test-011-secured-cluster-default-1-0")
         assert out != 'OK'
 
     with And("Connection from insecured to secured host should fail for user with no password"):
-        out = clickhouse_query_with_error("test-011-insecure-user","select 'OK'", 
-                                          host = "chi-test-011-secure-user-default-1-0", user = "user1")
+        out = clickhouse_query_with_error("test-011-insecured-cluster","select 'OK'", 
+                                          host = "chi-test-011-secured-cluster-default-1-0", user = "user1")
         assert "Password required" in out
     
     with And("Connection from insecured to secured host should work for user with password"):
-        out = clickhouse_query_with_error("test-011-insecure-user","select 'OK'", 
-                                          host = "chi-test-011-secure-user-default-1-0", user = "user1", pwd = "topsecret")
+        out = clickhouse_query_with_error("test-011-insecured-cluster","select 'OK'", 
+                                          host = "chi-test-011-secured-cluster-default-1-0", user = "user1", pwd = "topsecret")
         assert out == 'OK'
 
     with And("Password should be encrypted"):
-        chi = kube_get("chi", "test-011-secure-user")
+        chi = kube_get("chi", "test-011-secured-cluster")
         assert "user1/password" not in chi["spec"]["configuration"]["users"]
         assert "user1/password_sha256_hex" in chi["spec"]["configuration"]["users"]
 
-    create_and_check("configs/test-011-secure-user.yaml", {})
-    create_and_check("configs/test-011-insecure-user.yaml", {})
+    with Then("User with no password should get default automatically"):
+        out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'", user = "user2", pwd = "default")
+        assert out == 'OK'
+
+    with Then("User with both plain and sha256 password should get the latter one"):
+        out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'", user = "user3", pwd = "clickhouse_operator_password")
+        assert out == 'OK'
+        
+    with And("Password should be encrypted"):
+        chi = kube_get("chi", "test-011-secured-cluster")
+        assert "user3/password" not in chi["spec"]["configuration"]["users"]
+        assert "user3/password_sha256_hex" in chi["spec"]["configuration"]["users"]
+
+    create_and_check("configs/test-011-secured-cluster.yaml", {})
+    create_and_check("configs/test-011-insecured-cluster.yaml", {})
+    
+    create_and_check("configs/test-011-secured-default.yaml", 
+                     {"pod_count": 1,
+                      "do_not_delete": 1})
+    
+    with Then("Connection to localhost should succeed with default user"):
+        out = clickhouse_query_with_error("test-011-secured-default", "select 'OK'", pwd = "clickhouse_operator_password")
+        assert out == 'OK'
+    
+    create_and_check("configs/test-011-secured-default.yaml", {})
+
 
 @TestScenario
 @Name("test_012. Test service templates")
@@ -232,14 +256,15 @@ if main():
                      test_004, 
                      test_005, 
                      test_006, 
-                     test_007, 
+                     test_007,
+                     # test_009,  
                      test_010,
                      test_011,
                      test_012,
                      test_013]
         
             all_tests = tests
-            # all_tests = [test_013]
+            all_tests = [test_011]
         
             for t in all_tests:
                 run(test=t, flags=TE)
