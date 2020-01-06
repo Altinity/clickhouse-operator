@@ -34,9 +34,9 @@ spec:
         generateName: chendpoint
         spec:
           ports:
-            - name: http_port
+            - name: http-port
               port: 8123
-            - name: tcp_port
+            - name: tcp-port
               port: 9000
           type: LoadBalancer
     podTemplates:
@@ -59,11 +59,11 @@ spec:
             - name: clickhouse-pod
               image: yandex/clickhouse-server:19.3.7
               ports:
-                - name: http_port
+                - name: http-port
                   containerPort: 8123
-                - name: tcp_port
+                - name: tcp-port
                   containerPort: 9000
-                - name: interserver_http_port
+                - name: interserver-http-port
                   containerPort: 9009
               volumeMounts:
                 - name: local-path

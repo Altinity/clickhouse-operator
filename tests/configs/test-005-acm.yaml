@@ -11,11 +11,11 @@ spec:
         - name: clickhouse-pod
           image: yandex/clickhouse-server:19.11.8.46
           ports:
-          - name: http
+          - name: http-port
             containerPort: 8123
-          - name: client
+          - name: tcp-port
             containerPort: 9000
-          - name: interserver
+          - name: interserver-http-port
             containerPort: 9009
           resources:
             requests:

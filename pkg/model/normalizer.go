@@ -133,7 +133,7 @@ func (n *Normalizer) normalizeStop(stop *string) {
 	// Set defaults for CHI object properties
 	if !util.IsStringBool(*stop) {
 		// In case it is unknown value - just use set it to false
-		*stop = util.StringBoolFalse
+		*stop = util.StringBoolFalseLowercase
 	}
 }
 
