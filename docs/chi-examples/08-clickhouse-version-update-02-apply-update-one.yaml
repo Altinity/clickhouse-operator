@@ -11,9 +11,9 @@ spec:
         layout:
           shards:
             - replicas:
-                - port: 9000
-                - port: 9000
-                - port: 9000
+                - tcpPort: 9000
+                - tcpPort: 9000
+                - tcpPort: 9000
                   templates:
                     podTemplate: clickhouse:19.3.7
 

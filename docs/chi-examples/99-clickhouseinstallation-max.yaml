@@ -160,7 +160,9 @@ spec:
                 replicaServiceTemplate: replica-service-template
               replicas:
                 - name: replica0
-                  port: 9000
+                  tcpPort: 9000
+                  httpPort: 8123
+                  interserverHttpPort: 9009
                   templates:
                     podTemplate: clickhouse-v19.11.3.11
                     dataVolumeClaimTemplate: default-volume-claim
@@ -226,9 +228,9 @@ spec:
         # type ServiceSpec struct from k8s.io/core/v1
         spec:
           ports:
-            - name: http
+            - name: http_port
               port: 8123
-            - name: client
+            - name: tcp_port
               port: 9000
           type: LoadBalancer
 
@@ -236,11 +238,11 @@ spec:
         # type ServiceSpec struct from k8s.io/core/v1
         spec:
           ports:
-            - name: http
+            - name: http_port
               port: 8123
-            - name: client
+            - name: tcp_port
               port: 9000
-            - name: interserver
+            - name: interserver_http_port
               port: 9009
           type: ClusterIP
           ClusterIP: None
@@ -252,11 +254,11 @@ spec:
           selector:
             app: example
           ports:
-            - name: http
+            - name: http_port
               port: 8123
-            - name: client
+            - name: tcp_port
               port: 9000
-            - name: interserver
+            - name: interserver_http_port
               port: 9009
           externalTrafficPolicy: Local
           type: LoadBalancer

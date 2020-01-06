@@ -57,9 +57,9 @@ spec:
             - name: clickhouse-pod
               image: yandex/clickhouse-server:19.3.7
               ports:
-                - name: http
+                - name: http_port
                   containerPort: 8123
-                - name: client
+                - name: tcp_port
                   containerPort: 9000
-                - name: interserver
+                - name: interserver_http_port
                   containerPort: 9009
