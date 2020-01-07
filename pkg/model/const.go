@@ -20,6 +20,7 @@ const (
 
 const (
 	configMacros        = "macros"
+	configPorts         = "ports"
 	configProfiles      = "profiles"
 	configQuotas        = "quotas"
 	configRemoteServers = "remote_servers"
@@ -36,6 +37,8 @@ const (
 
 	// macros.xml
 	filenameMacrosXML = configMacros + dotXML
+	// ports.xml
+	filenamePortsXML = configPorts + dotXML
 	// profiles.xml
 	filenameProfilesXML = configProfiles + dotXML
 	// quotas.xml

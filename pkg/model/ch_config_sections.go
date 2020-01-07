@@ -70,6 +70,7 @@ func (c *configSections) CreateConfigsPod(host *chi.ChiHost) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	podConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(podConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(host))
+	util.IncludeNonEmpty(podConfigSections, filenamePortsXML, c.chConfigGenerator.GetHostPorts(host))
 	// Extra user-specified config files
 	util.MergeStringMaps(podConfigSections, c.chopConfig.ChHostConfigs)
 

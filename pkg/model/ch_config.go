@@ -293,6 +293,50 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *chiv1.ChiHost) string {
 	return b.String()
 }
 
+func noCustomPorts(host *chiv1.ChiHost) bool {
+	if host.TcpPort != chDefaultTcpPortNumber {
+		return false
+	}
+
+	if host.HttpPort != chDefaultHttpPortNumber {
+		return false
+	}
+
+	if host.InterserverHttpPort != chDefaultInterserverHttpPortNumber {
+		return false
+	}
+
+	return true
+}
+
+// GetHostPorts creates "ports.xml" content
+func (c *ClickHouseConfigGenerator) GetHostPorts(host *chiv1.ChiHost) string {
+
+	if noCustomPorts(host) {
+		return ""
+	}
+
+	b := &bytes.Buffer{}
+
+	// <yandex>
+	cline(b, 0, "<"+xmlTagYandex+">")
+
+	if host.TcpPort != chDefaultTcpPortNumber {
+		cline(b, 4, "<tcp_port>%d</tcp_port>", host.TcpPort)
+	}
+	if host.HttpPort != chDefaultHttpPortNumber {
+		cline(b, 4, "<http_port>%d</http_port>", host.HttpPort)
+	}
+	if host.InterserverHttpPort != chDefaultInterserverHttpPortNumber {
+		cline(b, 4, "<interserver_http_port>%d</interserver_http_port>", host.InterserverHttpPort)
+	}
+
+	// </yandex>
+	cline(b, 0, "</"+xmlTagYandex+">")
+
+	return b.String()
+}
+
 // generateXMLConfig creates XML using map[string]string definitions
 func (c *ClickHouseConfigGenerator) generateXMLConfig(data map[string]interface{}, prefix string) string {
 	if len(data) == 0 {
