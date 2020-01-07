@@ -267,7 +267,7 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 			Namespace: host.Address.Namespace,
 			Labels:    c.labeler.getLabelsConfigMapHost(host),
 		},
-		Data: c.chConfigSectionsGenerator.CreateConfigsPod(host),
+		Data: c.chConfigSectionsGenerator.CreateConfigsHost(host),
 	}
 }
 
