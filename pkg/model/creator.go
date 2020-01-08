@@ -325,6 +325,7 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 
 	podTemplate := c.getPodTemplate(statefulSet, host)
 	statefulSetAssignPodTemplate(statefulSet, podTemplate)
+	ensureNamedPortsSpecified(statefulSet, host)
 
 	// Pod created by this StatefulSet has to have alias
 	statefulSet.Spec.Template.Spec.HostAliases = []corev1.HostAlias{
@@ -541,6 +542,34 @@ func statefulSetAssignPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodT
 	// StatefulSet's pod template is not directly compatible with ChiPodTemplate, we need some fields only
 	dst.Spec.Template.Name = template.Name
 	dst.Spec.Template.Spec = template.Spec
+}
+
+func ensureNamedPortsSpecified(sts *apps.StatefulSet, host *chiv1.ChiHost) {
+	for i := range sts.Spec.Template.Spec.Containers {
+		container := &sts.Spec.Template.Spec.Containers[i]
+
+		// Ensure each container has all named ports specified
+		ensurePortByName(container, chDefaultTcpPortName, host.TcpPort)
+		ensurePortByName(container, chDefaultHttpPortName, host.HttpPort)
+		ensurePortByName(container, chDefaultInterserverHttpPortName, host.InterserverHttpPort)
+	}
+}
+
+func ensurePortByName(container *corev1.Container, name string, port int32) {
+	for j := range container.Ports {
+		containerPort := &container.Ports[j]
+		if containerPort.Name == name {
+			containerPort.HostPort = 0
+			containerPort.ContainerPort = port
+			return
+		}
+	}
+
+	// port with specified name not found. Need to append
+	container.Ports = append(container.Ports, corev1.ContainerPort{
+		Name:          name,
+		ContainerPort: port,
+	})
 }
 
 // statefulSetAppendVolumeClaimTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' ChiVolumeClaimTemplate
