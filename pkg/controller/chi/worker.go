@@ -289,11 +289,6 @@ func (w *worker) reconcileShard(shard *chop.ChiShard) error {
 
 // reconcileHost reconciles ClickHouse host
 func (w *worker) reconcileHost(host *chop.ChiHost) error {
-	// Add host's Service
-	service := w.creator.CreateServiceHost(host)
-	if err := w.c.ReconcileService(service); err != nil {
-		return err
-	}
 
 	// Add host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)
@@ -304,6 +299,12 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	// Add host's StatefulSet
 	statefulSet := w.creator.CreateStatefulSet(host)
 	if err := w.c.ReconcileStatefulSet(statefulSet, host); err != nil {
+		return err
+	}
+
+	// Add host's Service
+	service := w.creator.CreateServiceHost(host)
+	if err := w.c.ReconcileService(service); err != nil {
 		return err
 	}
 
