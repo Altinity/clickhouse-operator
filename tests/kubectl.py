@@ -82,8 +82,8 @@ def kube_get_count(type, name="", label="", ns="test"):
     else:
         return 0
     
-def kubectl(command, ok_to_fail = False):
-    cmd = shell(f"kubectl {command}", timeout = 60)
+def kubectl(command, ok_to_fail = False, ns = "test"):
+    cmd = shell(f"kubectl {command} -n {ns}", timeout = 60)
     code = cmd.exitcode
     if ok_to_fail == False:
         assert(code) == 0, error()
@@ -130,7 +130,7 @@ def kube_wait_object(type, name, label="", count = 1, ns="test"):
 def kube_wait_chi_status(chi, status, ns="test"):        
     with Then(f"Installation status is {status}"):
         for i in range(1,max_retries):
-            chi_status = kubectl(f"get chi {chi} -n {ns} -o=custom-columns=status:.status.status").splitlines()
+            chi_status = kubectl(f"get chi {chi} -o=custom-columns=status:.status.status", ns=ns).splitlines()
             if chi_status[1] == status:
                 break
             with Then("Not ready. Wait for " + str(i*5) + " seconds"):
@@ -146,7 +146,7 @@ def kube_get_pod_image(chi_name, ns="test"):
     return pod_image
 
 def kube_get_pod_names(chi_name, ns="test"):
-    pod_names = kubectl(f"get pods -n {ns} -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}").splitlines();
+    pod_names = kubectl(f"get pods -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}", ns=ns).splitlines();
     return pod_names[1:]
 
 def kube_get_pod_volumes(chi_name, ns="test"):
