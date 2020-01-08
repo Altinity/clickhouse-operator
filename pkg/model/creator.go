@@ -164,19 +164,19 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 						Name:       chDefaultHttpPortName,
 						Protocol:   corev1.ProtocolTCP,
 						Port:       host.HttpPort,
-						TargetPort: intstr.FromInt(int(host.HttpPort)),
+						TargetPort: intstr.FromString(chDefaultHttpPortName),
 					},
 					{
 						Name:       chDefaultTcpPortName,
 						Protocol:   corev1.ProtocolTCP,
 						Port:       host.TcpPort,
-						TargetPort: intstr.FromInt(int(host.TcpPort)),
+						TargetPort: intstr.FromString(chDefaultTcpPortName),
 					},
 					{
 						Name:       chDefaultInterserverHttpPortName,
 						Protocol:   corev1.ProtocolTCP,
 						Port:       host.InterserverHttpPort,
-						TargetPort: intstr.FromInt(int(host.InterserverHttpPort)),
+						TargetPort: intstr.FromString(chDefaultInterserverHttpPortName),
 					},
 				},
 				Selector:                 c.labeler.GetSelectorHostScope(host),
@@ -552,20 +552,21 @@ func statefulSetAssignPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodT
 	dst.Spec.Template.Spec = template.Spec
 }
 
-func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
+func getClickHouseContainer(statefulSet *apps.StatefulSet) *corev1.Container {
+	return &statefulSet.Spec.Template.Spec.Containers[0]
+}
 
-		// Ensure each container has all named ports specified
-		ensurePortByName(container, chDefaultTcpPortName, host.TcpPort)
-		ensurePortByName(container, chDefaultHttpPortName, host.HttpPort)
-		ensurePortByName(container, chDefaultInterserverHttpPortName, host.InterserverHttpPort)
-	}
+func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	chContainer := getClickHouseContainer(statefulSet)
+	// Ensure ClickHouse container has all named ports specified
+	ensurePortByName(chContainer, chDefaultTcpPortName, host.TcpPort)
+	ensurePortByName(chContainer, chDefaultHttpPortName, host.HttpPort)
+	ensurePortByName(chContainer, chDefaultInterserverHttpPortName, host.InterserverHttpPort)
 }
 
 func ensurePortByName(container *corev1.Container, name string, port int32) {
-	for j := range container.Ports {
-		containerPort := &container.Ports[j]
+	for i := range container.Ports {
+		containerPort := &container.Ports[i]
 		if containerPort.Name == name {
 			containerPort.HostPort = 0
 			containerPort.ContainerPort = port
