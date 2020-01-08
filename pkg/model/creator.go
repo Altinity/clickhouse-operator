@@ -313,21 +313,28 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 
 // setupStatefulSetPodTemplate performs PodTemplate setup of StatefulSet
 func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	statefulSetName := CreateStatefulSetName(host)
 
-	// Initial PodTemplateSpec value
-	// All the rest fields would be filled later
+	// Initial PodTemplateSpec
 	statefulSet.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: c.labeler.getLabelsHostScope(host, true),
 		},
 	}
 
+	// Process Pod Template
+
 	podTemplate := c.getPodTemplate(statefulSet, host)
 	statefulSetAssignPodTemplate(statefulSet, podTemplate)
+	c.personalizeStatefulSetPodTemplate(statefulSet, host)
+}
+
+func (c *Creator) personalizeStatefulSetPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	statefulSetName := CreateStatefulSetName(host)
+
+	// Ensure necessary named ports and respecified
 	ensureNamedPortsSpecified(statefulSet, host)
 
-	// Pod created by this StatefulSet has to have alias
+	// Ensure pod created by this StatefulSet has alias 127.0.0.1
 	statefulSet.Spec.Template.Spec.HostAliases = []corev1.HostAlias{
 		{
 			IP:        "127.0.0.1",
@@ -335,9 +342,10 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 		},
 	}
 
+	// Setup volumes based on ConfigMaps into Pod Template
 	c.setupConfigMapVolumes(statefulSet, host)
 
-	// We have default LogVolumeClaimTemplate specified - need to append log container
+	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.LogVolumeClaimTemplate != "" {
 		addContainer(&statefulSet.Spec.Template.Spec, corev1.Container{
 			Name:  ClickHouseLogContainerName,
@@ -544,9 +552,9 @@ func statefulSetAssignPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodT
 	dst.Spec.Template.Spec = template.Spec
 }
 
-func ensureNamedPortsSpecified(sts *apps.StatefulSet, host *chiv1.ChiHost) {
-	for i := range sts.Spec.Template.Spec.Containers {
-		container := &sts.Spec.Template.Spec.Containers[i]
+func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	for i := range statefulSet.Spec.Template.Spec.Containers {
+		container := &statefulSet.Spec.Template.Spec.Containers[i]
 
 		// Ensure each container has all named ports specified
 		ensurePortByName(container, chDefaultTcpPortName, host.TcpPort)
