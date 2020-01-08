@@ -841,7 +841,8 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 	// 2. user/quota
 	// 3. user/networks/ip and user/networks/host_regexp defaults to the installation pods
 	// 4. user/password_sha256_hex
-	usernameMap["default"] = true
+	
+	usernameMap["default"] = true // we need default user here in order to secure host_regexp
 	if *users == nil {
 		*users = make(map[string]interface{})
 	}
@@ -862,25 +863,31 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 			// No 'user/networks/host_regexp' section
 			(*users)[username+"/networks/host_regexp"] = CreatePodRegexp(n.chi, n.chop.Config().ChConfigNetworksHostRegexpTemplate)
 		}
-		_, okPassword := (*users)[username+"/password"]
+
+	    var pass = ""
+	    _pass, okPassword := (*users)[username+"/password"]
+		if okPassword {
+			pass = fmt.Sprintf("%v", _pass)
+		} else if username != "default" {
+			pass = n.chop.Config().ChConfigUserDefaultPassword
+		}
+
 		_, okPasswordSHA256 := (*users)[username+"/password_sha256_hex"]
-		if !okPasswordSHA256 && username != "default" {
-			// if SHA256 is not set, initialize it from the given or default password
-			var pass string
-			if !okPassword {
-				pass = n.chop.Config().ChConfigUserDefaultPassword
-			} else {
-				pass = fmt.Sprintf("%v", (*users)[username+"/password"])
-			}
+		// if SHA256 is not set, initialize it from the password
+		if pass != "" && !okPasswordSHA256 {
 			pass_sha256 := sha256.Sum256([]byte(pass))
 			(*users)[username+"/password_sha256_hex"] = hex.EncodeToString(pass_sha256[:])
 			okPasswordSHA256 = true
 		}
-		if okPasswordSHA256 && username == "default" { // Remove password that is empty in stock ClickHouse users.xml
-			(*users)[username+"/password"] = "_removed_"
-		}
-		if okPasswordSHA256 && okPassword {
-			delete(*users, username+"/password") // ClickHouse does not start if both password and sha256 are defined
+
+		if okPasswordSHA256 {
+			// ClickHouse does not start if both password and sha256 are defined
+			if username == "default" { 
+				// Set remove password flag for default user that is empty in stock ClickHouse users.xml
+				(*users)[username+"/password"] = "_removed_"
+			} else {
+				delete(*users, username+"/password")
+			}
 		}
 	}
 }

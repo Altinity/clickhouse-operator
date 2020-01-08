@@ -10,10 +10,10 @@ spec:
         containers:
         - name: clickhouse-pod
           image: yandex/clickhouse-server:19.16.10.44
-          command:
-                - "/bin/bash"
-                - "-c"
-                - "/entrypoint.sh; while true; do sleep 600; done"
+          # command:
+          #      - "/bin/bash"
+          #      - "-c"
+          #      - "/entrypoint.sh; while true; do sleep 600; done"
   defaults:
     templates:
       podTemplate: clickhouse
