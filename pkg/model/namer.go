@@ -66,18 +66,18 @@ const (
 	macrosReplicaID = "{replicaID}"
 	// macrosReplicaIndex is an index of the replica in the shard - integer number, converted into string
 	macrosReplicaIndex = "{replicaIndex}"
+	// macrosChiScopeIndex is an index of the replica on the CHI-scope
+	macrosChiScopeIndex = "{chiScopeIndex}"
 	// macrosChiScopeCycleIndex is an index of the replica in the CHI-scope cycle - integer number, converted into string
 	macrosChiScopeCycleIndex = "{chiScopeCycleIndex}"
 	// macrosChiScopeCycleOffset is an offset of the replica in the CHI-scope cycle - integer number, converted into string
 	macrosChiScopeCycleOffset = "{chiScopeCycleOffset}"
+	// macrosClusterScopeIndex is an index of the replica on the cluster-scope
+	macrosClusterScopeIndex = "{clusterScopeIndex}"
 	// macrosClusterScopeCycleIndex is an index of the replica in the Cluster-scope cycle - integer number, converted into string
 	macrosClusterScopeCycleIndex = "{clusterScopeCycleIndex}"
 	// macrosClusterScopeCycleOffset is an offset of the replica in the Cluster-scope cycle - integer number, converted into string
 	macrosClusterScopeCycleOffset = "{clusterScopeCycleOffset}"
-	// macrosChiScopeIndex is an index of the replica on the CHI-scope
-	macrosChiScopeIndex = "{chiScopeIndex}"
-	// macrosClusterScopeIndex is an index of the replica on the cluster-scope
-	macrosClusterScopeIndex = "{clusterScopeIndex}"
 	// macrosShardScopeIndex is an index of the replica on the shard-scope
 	macrosShardScopeIndex = "{shardScopeIndex}"
 	// macrosClusterScopeCycleHeadPointsToPreviousCycleTail is {clusterScopeIndex} of previous Cycle Tail
@@ -382,7 +382,7 @@ func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 	)
 }
 
-// Cluster-scope index of previous cycle tail
+// clusterScopeIndexOfPreviousCycleTail gets cluster-scope index of previous cycle tail
 func clusterScopeIndexOfPreviousCycleTail(host *chop.ChiHost) int {
 
 	if host.Address.ClusterScopeCycleOffset == 0 {
