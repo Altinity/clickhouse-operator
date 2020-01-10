@@ -211,7 +211,8 @@ type ChiClusterLayout struct {
 	ShardsCount   int    `json:"shardsCount,omitempty"`
 	ReplicasCount int    `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiShard
-	Shards []ChiShard `json:"shards,omitempty"`
+	Shards   []ChiShard   `json:"shards,omitempty"`
+	Replicas []ChiReplica `json:"replicas,omitempty"`
 }
 
 // ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
@@ -229,6 +230,17 @@ type ChiShard struct {
 	// Internal data
 	Address ChiShardAddress         `json:"address"`
 	Chi     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+}
+
+// ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
+type ChiReplica struct {
+	Name        string           `json:"name,omitempty"`
+	Templates   ChiTemplateNames `json:"templates,omitempty"`
+	ShardsCount int              `json:"shardsCount,omitempty"`
+	Shards      []ChiHost        `json:"shards,omitempty"`
+
+	// Internal data
+	Chi *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiShardAddress defines address of a shard within ClickHouseInstallation
