@@ -920,9 +920,12 @@ func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 
 	n.normalizeClusterLayoutShardsCountAndReplicasCount(&cluster.Layout)
 
-	// Loop over all shards and replicas inside shards and fill structure
-	// .Layout.ShardsCount is provided
 	n.ensureClusterLayoutShards(&cluster.Layout)
+	n.ensureClusterLayoutReplicas(&cluster.Layout)
+
+	// Need to migrate hosts from Shards and Replicas into HostsField
+
+	// Loop over all shards and replicas inside shards and fill structure
 	for shardIndex := range cluster.Layout.Shards {
 		// Convenience wrapper
 		shard := &cluster.Layout.Shards[shardIndex]
@@ -930,6 +933,94 @@ func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 	}
 
 	return nil
+}
+
+// normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
+func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *chiv1.ChiClusterLayout) {
+	// Layout.ShardsCount and
+	// Layout.ReplicasCount must represent max number of shards and replicas requested respectively
+
+	// Deal with ShardsCount
+	if layout.ShardsCount == 0 {
+		// No ShardsCount specified - need to figure out
+
+		// We need to have at least one Shard
+		layout.ShardsCount = 1
+
+		// Let's look for explicitly specified Shards in Layout.Shards
+		if len(layout.Shards) > layout.ShardsCount {
+			// We have some Shards specified explicitly
+			layout.ShardsCount = len(layout.Shards)
+		}
+
+		// Let's look for explicitly specified Shards in Layout.Replicas
+		for i := range layout.Replicas {
+			replica := &layout.Replicas[i]
+
+			if replica.ShardsCount > layout.ShardsCount {
+				// We have Shards number specified explicitly in this replica
+				layout.ShardsCount = replica.ShardsCount
+			}
+
+			if len(replica.Shards) > layout.ShardsCount {
+				// We have some Shards specified explicitly
+				layout.ShardsCount = len(replica.Shards)
+			}
+		}
+	}
+
+	// Deal with ReplicasCount
+	if layout.ReplicasCount == 0 {
+		// No ReplicasCount specified - need to figure out
+
+		// We need to have at least one Replica
+		layout.ReplicasCount = 1
+
+		// Let's look for explicitly specified Replicas in Layout.Shards
+		for i := range layout.Shards {
+			shard := &layout.Shards[i]
+
+			if shard.ReplicasCount > layout.ReplicasCount {
+				// We have Replicas number specified explicitly in this shard
+				layout.ReplicasCount = shard.ReplicasCount
+			}
+
+			if len(shard.Replicas) > layout.ReplicasCount {
+				// We have some Replicas specified explicitly
+				layout.ReplicasCount = len(shard.Replicas)
+			}
+		}
+
+		// Let's look for explicitly specified Replicas in Layout.Replicas
+		if len(layout.Replicas) > layout.ReplicasCount {
+			// We have some Replicas specified explicitly
+			layout.ReplicasCount = len(layout.Replicas)
+		}
+	}
+}
+
+// ensureClusterLayoutShards ensures slice layout.Shards is in place
+func (n *Normalizer) ensureClusterLayoutShards(layout *chiv1.ChiClusterLayout) {
+	// Disposition of shards in slice would be
+	// [explicitly specified shards 0..N, N+1..layout.ShardsCount-1 empty slots for to-be-filled shards]
+
+	// Some (may be all) shards specified, need to append space for unspecified shards
+	// TODO may be there is better way to append N slots to a slice
+	for len(layout.Shards) < layout.ShardsCount {
+		layout.Shards = append(layout.Shards, chiv1.ChiShard{})
+	}
+}
+
+// ensureClusterLayoutReplicas ensures slice layout.Replicas is in place
+func (n *Normalizer) ensureClusterLayoutReplicas(layout *chiv1.ChiClusterLayout) {
+	// Disposition of replicas in slice would be
+	// [explicitly specified replicas 0..N, N+1..layout.ReplicasCount-1 empty slots for to-be-filled replicas]
+
+	// Some (may be all) replicas specified, need to append space for unspecified replicas
+	// TODO may be there is better way to append N slots to a slice
+	for len(layout.Replicas) < layout.ReplicasCount {
+		layout.Replicas = append(layout.Replicas, chiv1.ChiReplica{})
+	}
 }
 
 // normalizeShard normalizes a shard - walks over all fields
@@ -942,33 +1033,6 @@ func (n *Normalizer) normalizeShard(shard *chiv1.ChiShard, cluster *chiv1.ChiClu
 	// Normalize Replicas
 	n.normalizeShardReplicasCount(shard, cluster.Layout.ReplicasCount)
 	n.normalizeShardReplicas(shard)
-}
-
-// normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
-func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *chiv1.ChiClusterLayout) {
-
-	// Deal with ShardsCount
-	if layout.ShardsCount == 0 {
-		// No ShardsCount specified - need to figure out
-		// Need to look for explicitly specified Shards
-		if len(layout.Shards) > 0 {
-			// We have some Shards specified explicitly - ok, this means exact ShardsCount is known
-			layout.ShardsCount = len(layout.Shards)
-		} else {
-			// Neither ShardsCount nor Shards are specified, assume 1 as default value
-			layout.ShardsCount = 1
-		}
-	}
-
-	// Deal with ReplicasCount
-	// layout.ReplicasCount is used in case Shard is not opinionated how many replicas it (shard) needs
-	if layout.ReplicasCount == 0 {
-		// No ReplicasCount specified - need to figure out
-		// In case no ReplicasCount specified use 1 as a default value
-		layout.ReplicasCount = 1
-	}
-
-	// Here layout.ReplicasCount is specified
 }
 
 // normalizeShardReplicasCount ensures shard.ReplicasCount filled properly
@@ -999,44 +1063,12 @@ func (n *Normalizer) normalizeShardName(shard *chiv1.ChiShard, index int) {
 func (n *Normalizer) normalizeShardWeight(shard *chiv1.ChiShard) {
 }
 
-// ensureClusterLayoutShards ensures slice layout.Shards is in place
-func (n *Normalizer) ensureClusterLayoutShards(layout *chiv1.ChiClusterLayout) {
-	if layout.ShardsCount <= 0 {
-		// May be need to do something like throw an exception
-		return
-	}
-
-	// Disposition of shards in slice would be
-	// [explicitly specified shards 0..N, N+1..layout.ShardsCount-1 empty slots for to-be-filled shards]
-
-	if len(layout.Shards) == 0 {
-		// No shards specified - just allocate required number
-		layout.Shards = make([]chiv1.ChiShard, layout.ShardsCount, layout.ShardsCount)
-	} else {
-		// Some (may be all) shards specified, need to append space for unspecified shards
-		// TODO may be there is better way to append N slots to a slice
-		for len(layout.Shards) < layout.ShardsCount {
-			layout.Shards = append(layout.Shards, chiv1.ChiShard{})
-		}
-	}
-}
-
 // ensureShardReplicas ensures slice shard.Replicas is in place
 func (n *Normalizer) ensureShardReplicas(shard *chiv1.ChiShard) {
-	if shard.ReplicasCount <= 0 {
-		// May be need to do something like throw an exception
-		return
-	}
-
-	if shard.ReplicasCount == 0 {
-		// No replicas specified - just allocate required number
-		shard.Replicas = make([]*chiv1.ChiHost, shard.ReplicasCount)
-	} else {
-		// Some (may be all) replicas specified, need to append space for unspecified replicas
-		// TODO may be there is better way to append N slots to slice
-		for len(shard.Replicas) < shard.ReplicasCount {
-			shard.Replicas = append(shard.Replicas, nil)
-		}
+	// Some (may be all) replicas specified, need to append space for unspecified replicas
+	// TODO may be there is better way to append N slots to slice
+	for len(shard.Replicas) < shard.ReplicasCount {
+		shard.Replicas = append(shard.Replicas, nil)
 	}
 }
 
