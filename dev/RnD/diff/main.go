@@ -104,7 +104,7 @@ func ex2() (ChiSpec, ChiSpec) {
 						Fingerprint: "",
 					},
 
-					Layout: ChiLayout{
+					Layout: ChiClusterLayout{
 						// useless
 						Type: "",
 						// useless
@@ -222,7 +222,7 @@ func ex2() (ChiSpec, ChiSpec) {
 						Fingerprint: "",
 					},
 
-					Layout: ChiLayout{
+					Layout: ChiClusterLayout{
 						// useless
 						Type: "",
 						// useless

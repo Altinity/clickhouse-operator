@@ -918,11 +918,11 @@ func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 	// Use PodTemplate from .spec.defaults
 	cluster.InheritTemplatesFrom(n.chi)
 
-	n.normalizeLayoutShardsCountAndReplicasCount(&cluster.Layout)
+	n.normalizeClusterLayoutShardsCountAndReplicasCount(&cluster.Layout)
 
 	// Loop over all shards and replicas inside shards and fill structure
 	// .Layout.ShardsCount is provided
-	n.ensureLayoutShards(&cluster.Layout)
+	n.ensureClusterLayoutShards(&cluster.Layout)
 	for shardIndex := range cluster.Layout.Shards {
 		// Convenience wrapper
 		shard := &cluster.Layout.Shards[shardIndex]
@@ -944,12 +944,15 @@ func (n *Normalizer) normalizeShard(shard *chiv1.ChiShard, cluster *chiv1.ChiClu
 	n.normalizeShardReplicas(shard)
 }
 
-// normalizeLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
-func (n *Normalizer) normalizeLayoutShardsCountAndReplicasCount(layout *chiv1.ChiLayout) {
+// normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
+func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *chiv1.ChiClusterLayout) {
+
+	// Deal with ShardsCount
 	if layout.ShardsCount == 0 {
-		// We can look for explicitly specified Shards slice
+		// No ShardsCount specified - need to figure out
+		// Need to look for explicitly specified Shards
 		if len(layout.Shards) > 0 {
-			// We have Shards specified as slice - ok, this means exact ShardsCount is known
+			// We have some Shards specified explicitly - ok, this means exact ShardsCount is known
 			layout.ShardsCount = len(layout.Shards)
 		} else {
 			// Neither ShardsCount nor Shards are specified, assume 1 as default value
@@ -957,10 +960,10 @@ func (n *Normalizer) normalizeLayoutShardsCountAndReplicasCount(layout *chiv1.Ch
 		}
 	}
 
-	// Here layout.ShardsCount is specified
-
-	// layout.ReplicasCount is used in case Shard not opinionated how many replicas it (shard) needs
+	// Deal with ReplicasCount
+	// layout.ReplicasCount is used in case Shard is not opinionated how many replicas it (shard) needs
 	if layout.ReplicasCount == 0 {
+		// No ReplicasCount specified - need to figure out
 		// In case no ReplicasCount specified use 1 as a default value
 		layout.ReplicasCount = 1
 	}
@@ -996,8 +999,8 @@ func (n *Normalizer) normalizeShardName(shard *chiv1.ChiShard, index int) {
 func (n *Normalizer) normalizeShardWeight(shard *chiv1.ChiShard) {
 }
 
-// ensureLayoutShards ensures slice layout.Shards is in place
-func (n *Normalizer) ensureLayoutShards(layout *chiv1.ChiLayout) {
+// ensureClusterLayoutShards ensures slice layout.Shards is in place
+func (n *Normalizer) ensureClusterLayoutShards(layout *chiv1.ChiClusterLayout) {
 	if layout.ShardsCount <= 0 {
 		// May be need to do something like throw an exception
 		return

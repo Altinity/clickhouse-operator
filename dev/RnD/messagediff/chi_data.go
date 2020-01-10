@@ -55,7 +55,7 @@ func exCHI1() (ChiSpec, ChiSpec) {
 						Fingerprint: "",
 					},
 
-					Layout: ChiLayout{
+					Layout: ChiClusterLayout{
 						// useless
 						Type: "",
 						// useless
@@ -173,7 +173,7 @@ func exCHI1() (ChiSpec, ChiSpec) {
 						Fingerprint: "",
 					},
 
-					Layout: ChiLayout{
+					Layout: ChiClusterLayout{
 						// useless
 						Type: "",
 						// useless

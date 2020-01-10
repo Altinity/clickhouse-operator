@@ -188,7 +188,7 @@ type ChiConfiguration struct {
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
 	Name      string           `json:"name"`
-	Layout    ChiLayout        `json:"layout"`
+	Layout    ChiClusterLayout `json:"layout"`
 	Templates ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data
@@ -204,8 +204,8 @@ type ChiClusterAddress struct {
 	ClusterIndex int    `json:"clusterIndex"`
 }
 
-// ChiLayout defines layout section of .spec.configuration.clusters
-type ChiLayout struct {
+// ChiClusterLayout defines layout section of .spec.configuration.clusters
+type ChiClusterLayout struct {
 	// DEPRECATED - to be removed soon
 	Type          string `json:"type"`
 	ShardsCount   int    `json:"shardsCount,omitempty"`
