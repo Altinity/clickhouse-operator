@@ -48,7 +48,7 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withD
 	// Should insert default cluster if no cluster specified
 	n.withDefaultCluster = withDefaultCluster
 
-	// What base should be used
+	// What base should be used to create CHI
 	if n.chop.Config().ChiTemplate == nil {
 		// No template specified - start with clear page
 		n.chi = new(chiv1.ClickHouseInstallation)
@@ -57,21 +57,23 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withD
 		n.chi = n.chop.Config().ChiTemplate.DeepCopy()
 	}
 
-	// At this moment n.chi is either empty or a system-wide template
-	// However, we need to apply all templates from useTemplates,
-	var useTemplates []chiv1.ChiUseTemplate
-	if len(chi.Spec.UseTemplates) > 0 {
-		useTemplates = make([]chiv1.ChiUseTemplate, len(chi.Spec.UseTemplates))
-		copy(useTemplates, chi.Spec.UseTemplates)
-
-		// Normalize UseTemplates
-		n.normalizeUseTemplates(&useTemplates)
-	}
+	// At this moment n.chi is either empty CHI or a system-wide template
+	// We need to apply templates
 
 	// Apply CHOP-specified templates
 	// TODO
 
 	// Apply CHI-specified templates
+
+	var useTemplates []chiv1.ChiUseTemplate
+	if len(chi.Spec.UseTemplates) > 0 {
+		useTemplates = make([]chiv1.ChiUseTemplate, len(chi.Spec.UseTemplates))
+		copy(useTemplates, chi.Spec.UseTemplates)
+
+		// UseTemplates must contain reasonable data, thus has to be normalized
+		n.normalizeUseTemplates(&useTemplates)
+	}
+
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		if template := n.chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
@@ -82,7 +84,7 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withD
 		}
 	}
 
-	// And place provided CHI on top of the whole stack
+	// After all templates applied, place provided CHI on top of the whole stack
 	n.chi.MergeFrom(chi, chiv1.MergeTypeOverrideByNonEmptyValues)
 
 	return n.NormalizeChi(nil)
@@ -771,7 +773,16 @@ func (n *Normalizer) normalizeUseTemplate(useTemplate *chiv1.ChiUseTemplate) {
 
 // normalizeClusters normalizes clusters
 func (n *Normalizer) normalizeClusters() {
+	// We need to have at least one cluster available
+	n.ensureCluster()
 
+	// Normalize all clusters in this CHI
+	n.chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
+		return n.normalizeCluster(cluster)
+	})
+}
+
+func (n *Normalizer) ensureCluster() {
 	// Introduce default cluster in case it is required
 	if len(n.chi.Spec.Configuration.Clusters) == 0 {
 		if n.withDefaultCluster {
@@ -784,11 +795,6 @@ func (n *Normalizer) normalizeClusters() {
 			n.chi.Spec.Configuration.Clusters = []chiv1.ChiCluster{}
 		}
 	}
-
-	// Normalize all clusters in this CHI
-	n.chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
-		return n.normalizeCluster(cluster)
-	})
 }
 
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
