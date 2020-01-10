@@ -147,7 +147,7 @@ func (s *Schemer) GetCreateReplicatedObjects(
 	for shardIndex := range cluster.Layout.Shards {
 		shard = &cluster.Layout.Shards[shardIndex]
 		for replicaIndex := range shard.Replicas {
-			replica := &shard.Replicas[replicaIndex]
+			replica := shard.Replicas[replicaIndex]
 			if replica == host {
 				break
 			}

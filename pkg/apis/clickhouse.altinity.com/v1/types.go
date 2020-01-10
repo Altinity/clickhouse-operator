@@ -224,8 +224,8 @@ type ChiShard struct {
 	InternalReplication string           `json:"internalReplication,omitempty"`
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 	ReplicasCount       int              `json:"replicasCount,omitempty"`
-	// TODO refactor into map[string]ChiReplica
-	Replicas []ChiHost `json:"replicas,omitempty"`
+	// TODO refactor into map[string]ChiHost
+	Replicas []*ChiHost `json:"replicas,omitempty"`
 
 	// Internal data
 	Address ChiShardAddress         `json:"address"`
@@ -237,7 +237,8 @@ type ChiReplica struct {
 	Name        string           `json:"name,omitempty"`
 	Templates   ChiTemplateNames `json:"templates,omitempty"`
 	ShardsCount int              `json:"shardsCount,omitempty"`
-	Shards      []ChiHost        `json:"shards,omitempty"`
+	// TODO refactor into map[string]ChiHost
+	Shards []*ChiHost `json:"shards,omitempty"`
 
 	// Internal data
 	Chi *ClickHouseInstallation `json:"-" testdiff:"ignore"`

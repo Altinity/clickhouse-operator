@@ -306,7 +306,7 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Replicas {
-				host := &shard.Replicas[replicaIndex]
+				host := shard.Replicas[replicaIndex]
 				res = append(res, f(
 					chi,
 
@@ -363,7 +363,7 @@ func (chi *ClickHouseInstallation) WalkHosts(
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Replicas {
-				host := &shard.Replicas[replicaIndex]
+				host := shard.Replicas[replicaIndex]
 				res = append(res, f(host))
 			}
 		}
@@ -380,7 +380,7 @@ func (chi *ClickHouseInstallation) WalkHostsTillError(
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Replicas {
-				host := &shard.Replicas[replicaIndex]
+				host := shard.Replicas[replicaIndex]
 				if err := f(host); err != nil {
 					return err
 				}
@@ -413,7 +413,7 @@ func (chi *ClickHouseInstallation) WalkTillError(
 				return err
 			}
 			for replicaIndex := range shard.Replicas {
-				host := &shard.Replicas[replicaIndex]
+				host := shard.Replicas[replicaIndex]
 				if err := fHost(host); err != nil {
 					return err
 				}

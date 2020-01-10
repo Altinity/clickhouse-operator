@@ -1030,12 +1030,12 @@ func (n *Normalizer) ensureShardReplicas(shard *chiv1.ChiShard) {
 
 	if shard.ReplicasCount == 0 {
 		// No replicas specified - just allocate required number
-		shard.Replicas = make([]chiv1.ChiHost, shard.ReplicasCount)
+		shard.Replicas = make([]*chiv1.ChiHost, shard.ReplicasCount)
 	} else {
 		// Some (may be all) replicas specified, need to append space for unspecified replicas
 		// TODO may be there is better way to append N slots to slice
 		for len(shard.Replicas) < shard.ReplicasCount {
-			shard.Replicas = append(shard.Replicas, chiv1.ChiHost{})
+			shard.Replicas = append(shard.Replicas, nil)
 		}
 	}
 }
@@ -1046,7 +1046,7 @@ func (n *Normalizer) normalizeShardReplicas(shard *chiv1.ChiShard) {
 	n.ensureShardReplicas(shard)
 	for replicaIndex := range shard.Replicas {
 		// Convenience wrapper
-		host := &shard.Replicas[replicaIndex]
+		host := shard.Replicas[replicaIndex]
 		n.normalizeHost(host, shard, replicaIndex)
 	}
 }

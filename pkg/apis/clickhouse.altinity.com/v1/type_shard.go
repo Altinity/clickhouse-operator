@@ -31,7 +31,7 @@ func (shard *ChiShard) WalkHosts(
 	res := make([]error, 0)
 
 	for replicaIndex := range shard.Replicas {
-		host := &shard.Replicas[replicaIndex]
+		host := shard.Replicas[replicaIndex]
 		res = append(res, f(host))
 	}
 

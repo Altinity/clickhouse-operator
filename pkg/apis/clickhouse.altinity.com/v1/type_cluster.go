@@ -47,7 +47,7 @@ func (cluster *ChiCluster) WalkHosts(
 	for shardIndex := range cluster.Layout.Shards {
 		shard := &cluster.Layout.Shards[shardIndex]
 		for replicaIndex := range shard.Replicas {
-			host := &shard.Replicas[replicaIndex]
+			host := shard.Replicas[replicaIndex]
 			res = append(res, f(host))
 		}
 	}
