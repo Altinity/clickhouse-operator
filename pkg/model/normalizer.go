@@ -923,16 +923,44 @@ func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 	n.ensureClusterLayoutShards(&cluster.Layout)
 	n.ensureClusterLayoutReplicas(&cluster.Layout)
 
-	// Need to migrate hosts from Shards and Replicas into HostsField
-
 	// Loop over all shards and replicas inside shards and fill structure
-	for shardIndex := range cluster.Layout.Shards {
-		// Convenience wrapper
-		shard := &cluster.Layout.Shards[shardIndex]
-		n.normalizeShard(shard, cluster, shardIndex)
-	}
+	cluster.WalkShards(func(index int, shard *chiv1.ChiShard) error {
+		n.normalizeShard(shard, cluster, index)
+		return nil
+	})
+
+	cluster.WalkReplicas(func(index int, replica *chiv1.ChiReplica) error {
+		n.normalizeReplica(replica, cluster, index)
+		return nil
+	})
+
+	n.createHostsField(cluster)
+
+	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *chiv1.ChiHost) error {
+		n.normalizeHost(host, cluster.GetShard(shard), cluster.GetReplica(replica), shard, replica)
+		return nil
+	})
 
 	return nil
+}
+
+func (n *Normalizer) createHostsField(cluster *chiv1.ChiCluster) {
+	cluster.Layout.HostsField = chiv1.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
+
+	// Need to migrate hosts from Shards and Replicas into HostsField
+
+	cluster.WalkHostsByShards(
+		func(shard, replica int, host *chiv1.ChiHost) error {
+			cluster.Layout.HostsField.Set(shard, replica, host)
+			return nil
+		},
+	)
+	cluster.WalkHostsByReplicas(
+		func(shard, replica int, host *chiv1.ChiHost) error {
+			cluster.Layout.HostsField.Set(shard, replica, host)
+			return nil
+		},
+	)
 }
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
@@ -962,9 +990,9 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *c
 				layout.ShardsCount = replica.ShardsCount
 			}
 
-			if len(replica.Shards) > layout.ShardsCount {
+			if len(replica.Hosts) > layout.ShardsCount {
 				// We have some Shards specified explicitly
-				layout.ShardsCount = len(replica.Shards)
+				layout.ShardsCount = len(replica.Hosts)
 			}
 		}
 	}
@@ -985,9 +1013,9 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *c
 				layout.ReplicasCount = shard.ReplicasCount
 			}
 
-			if len(shard.Replicas) > layout.ReplicasCount {
+			if len(shard.Hosts) > layout.ReplicasCount {
 				// We have some Replicas specified explicitly
-				layout.ReplicasCount = len(shard.Replicas)
+				layout.ReplicasCount = len(shard.Hosts)
 			}
 		}
 
@@ -1035,18 +1063,60 @@ func (n *Normalizer) normalizeShard(shard *chiv1.ChiShard, cluster *chiv1.ChiClu
 	n.normalizeShardReplicas(shard)
 }
 
+// normalizeReplica normalizes a replica - walks over all fields
+func (n *Normalizer) normalizeReplica(replica *chiv1.ChiReplica, cluster *chiv1.ChiCluster, replicaIndex int) {
+	n.normalizeReplicaName(replica, replicaIndex)
+	// For each replica of this normalized cluster inherit cluster's PodTemplate
+	replica.InheritTemplatesFrom(cluster)
+	// Normalize Shards
+	n.normalizeReplicaShardsCount(replica, cluster.Layout.ShardsCount)
+	n.normalizeReplicaShards(replica)
+}
+
 // normalizeShardReplicasCount ensures shard.ReplicasCount filled properly
 func (n *Normalizer) normalizeShardReplicasCount(shard *chiv1.ChiShard, layoutReplicasCount int) {
-	if shard.ReplicasCount == 0 {
-		// We can look for explicitly specified Replicas
-		if len(shard.Replicas) > 0 {
-			// We have Replicas specified as slice - ok, this means exact ReplicasCount is known
-			shard.ReplicasCount = len(shard.Replicas)
-		} else {
-			// MergeFrom ReplicasCount from layout
-			shard.ReplicasCount = layoutReplicasCount
-		}
+	if shard.ReplicasCount > 0 {
+		// Shard has explicitly specified number of replicas
+		return
 	}
+
+	// Here we have shard.ReplicasCount = 0, meaning that
+	// shard does not have explicitly specified number of replicas - need to fill it
+
+	// Look for explicitly specified Replicas first
+	if len(shard.Hosts) > 0 {
+		// We have Replicas specified as a slice and no other replicas count provided,
+		// this means we have explicitly specified replicas only and exact ReplicasCount is known
+		shard.ReplicasCount = len(shard.Hosts)
+		return
+	}
+
+	// No shard.ReplicasCount specified, no replicas explicitly provided, so we have to
+	// use ReplicasCount from layout
+	shard.ReplicasCount = layoutReplicasCount
+}
+
+// normalizeReplicaShardsCount ensures replica.ShardsCount filled properly
+func (n *Normalizer) normalizeReplicaShardsCount(replica *chiv1.ChiReplica, layoutShardsCount int) {
+	if replica.ShardsCount > 0 {
+		// Replica has explicitly specified number of shards
+		return
+	}
+
+	// Here we have replica.ShardsCount = 0, meaning that
+	// replica does not have explicitly specified number of shards - need to fill it
+
+	// Look for explicitly specified Shards first
+	if len(replica.Hosts) > 0 {
+		// We have Shards specified as a slice and no other shards count provided,
+		// this means we have explicitly specified shards only and exact ShardsCount is known
+		replica.ShardsCount = len(replica.Hosts)
+		return
+	}
+
+	// No replica.ShardsCount specified, no shards explicitly provided, so we have to
+	// use ShardsCount from layout
+	replica.ShardsCount = layoutShardsCount
 }
 
 // normalizeShardName normalizes shard name
@@ -1059,6 +1129,16 @@ func (n *Normalizer) normalizeShardName(shard *chiv1.ChiShard, index int) {
 	shard.Name = strconv.Itoa(index)
 }
 
+// normalizeReplicaName normalizes replica name
+func (n *Normalizer) normalizeReplicaName(replica *chiv1.ChiReplica, index int) {
+	if len(replica.Name) > 0 {
+		// Already has a name
+		return
+	}
+
+	replica.Name = strconv.Itoa(index)
+}
+
 // normalizeShardName normalizes shard weight
 func (n *Normalizer) normalizeShardWeight(shard *chiv1.ChiShard) {
 }
@@ -1067,8 +1147,17 @@ func (n *Normalizer) normalizeShardWeight(shard *chiv1.ChiShard) {
 func (n *Normalizer) ensureShardReplicas(shard *chiv1.ChiShard) {
 	// Some (may be all) replicas specified, need to append space for unspecified replicas
 	// TODO may be there is better way to append N slots to slice
-	for len(shard.Replicas) < shard.ReplicasCount {
-		shard.Replicas = append(shard.Replicas, nil)
+	for len(shard.Hosts) < shard.ReplicasCount {
+		shard.Hosts = append(shard.Hosts, &chiv1.ChiHost{})
+	}
+}
+
+// ensureReplicaShards ensures slice replica.Shards is in place
+func (n *Normalizer) ensureReplicaShards(replica *chiv1.ChiReplica) {
+	// Some (may be all) shards specified, need to append space for unspecified shards
+	// TODO may be there is better way to append N slots to slice
+	for len(replica.Hosts) < replica.ShardsCount {
+		replica.Hosts = append(replica.Hosts, &chiv1.ChiHost{})
 	}
 }
 
@@ -1076,19 +1165,26 @@ func (n *Normalizer) ensureShardReplicas(shard *chiv1.ChiShard) {
 func (n *Normalizer) normalizeShardReplicas(shard *chiv1.ChiShard) {
 	// Fill each replica
 	n.ensureShardReplicas(shard)
-	for replicaIndex := range shard.Replicas {
-		// Convenience wrapper
-		host := shard.Replicas[replicaIndex]
-		n.normalizeHost(host, shard, replicaIndex)
-	}
+}
+
+// normalizeShardReplicas normalizes all replicas of specified shard
+func (n *Normalizer) normalizeReplicaShards(replica *chiv1.ChiReplica) {
+	// Fill each replica
+	n.ensureReplicaShards(replica)
 }
 
 // normalizeHost normalizes a host/replica
-func (n *Normalizer) normalizeHost(host *chiv1.ChiHost, shard *chiv1.ChiShard, replicaIndex int) {
+func (n *Normalizer) normalizeHost(
+	host *chiv1.ChiHost,
+	shard *chiv1.ChiShard,
+	replica *chiv1.ChiReplica,
+	shardIndex int,
+	replicaIndex int,
+) {
 	n.normalizeHostName(host, replicaIndex)
 	n.normalizeHostPorts(host)
 	// Use PodTemplate from parent shard
-	host.InheritTemplatesFrom(shard)
+	host.InheritTemplatesFrom(shard, replica)
 }
 
 // normalizeHostName normalizes host's name

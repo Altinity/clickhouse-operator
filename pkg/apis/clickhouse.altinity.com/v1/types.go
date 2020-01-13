@@ -19,11 +19,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	StatusInProgress = "InProgress"
-	StatusCompleted  = "Completed"
-)
-
 type MergeType string
 
 const (
@@ -111,68 +106,6 @@ type ChiTemplateNames struct {
 	ReplicaServiceTemplate string `json:"replicaServiceTemplate,omitempty"  yaml:"replicaServiceTemplate"`
 }
 
-func (templates *ChiTemplateNames) HandleDeprecatedFields() {
-	if templates.DataVolumeClaimTemplate == "" {
-		templates.DataVolumeClaimTemplate = templates.VolumeClaimTemplate
-	}
-}
-
-func (templates *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type MergeType) {
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		if templates.PodTemplate == "" {
-			templates.PodTemplate = from.PodTemplate
-		}
-		if templates.DataVolumeClaimTemplate == "" {
-			templates.DataVolumeClaimTemplate = from.DataVolumeClaimTemplate
-		}
-		if templates.LogVolumeClaimTemplate == "" {
-			templates.LogVolumeClaimTemplate = from.LogVolumeClaimTemplate
-		}
-		if templates.VolumeClaimTemplate == "" {
-			templates.VolumeClaimTemplate = from.VolumeClaimTemplate
-		}
-		if templates.ServiceTemplate == "" {
-			templates.ServiceTemplate = from.ServiceTemplate
-		}
-		if templates.ClusterServiceTemplate == "" {
-			templates.ClusterServiceTemplate = from.ClusterServiceTemplate
-		}
-		if templates.ShardServiceTemplate == "" {
-			templates.ShardServiceTemplate = from.ShardServiceTemplate
-		}
-		if templates.ReplicaServiceTemplate == "" {
-			templates.ReplicaServiceTemplate = from.ReplicaServiceTemplate
-		}
-	case MergeTypeOverrideByNonEmptyValues:
-		// Override by non-empty values only
-		if from.PodTemplate != "" {
-			templates.PodTemplate = from.PodTemplate
-		}
-		if from.DataVolumeClaimTemplate != "" {
-			templates.DataVolumeClaimTemplate = from.DataVolumeClaimTemplate
-		}
-		if from.LogVolumeClaimTemplate != "" {
-			templates.LogVolumeClaimTemplate = from.LogVolumeClaimTemplate
-		}
-		if from.VolumeClaimTemplate != "" {
-			templates.VolumeClaimTemplate = from.VolumeClaimTemplate
-		}
-		if from.ServiceTemplate != "" {
-			templates.ServiceTemplate = from.ServiceTemplate
-		}
-		if from.ClusterServiceTemplate != "" {
-			templates.ClusterServiceTemplate = from.ClusterServiceTemplate
-		}
-		if from.ShardServiceTemplate != "" {
-			templates.ShardServiceTemplate = from.ShardServiceTemplate
-		}
-		if from.ReplicaServiceTemplate != "" {
-			templates.ReplicaServiceTemplate = from.ReplicaServiceTemplate
-		}
-	}
-}
-
 // ChiConfiguration defines configuration section of .spec
 type ChiConfiguration struct {
 	Zookeeper ChiZookeeperConfig     `json:"zookeeper,omitempty" yaml:"zookeeper"`
@@ -213,19 +146,22 @@ type ChiClusterLayout struct {
 	// TODO refactor into map[string]ChiShard
 	Shards   []ChiShard   `json:"shards,omitempty"`
 	Replicas []ChiReplica `json:"replicas,omitempty"`
+
+	HostsField *HostsField `json:"-" testdiff:"ignore"`
 }
 
 // ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
 type ChiShard struct {
 	// DEPRECATED - to be removed soon
-	DefinitionType      string           `json:"definitionType"`
+	DefinitionType string `json:"definitionType"`
+
 	Name                string           `json:"name,omitempty"`
 	Weight              int              `json:"weight,omitempty"`
 	InternalReplication string           `json:"internalReplication,omitempty"`
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 	ReplicasCount       int              `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiHost
-	Replicas []*ChiHost `json:"replicas,omitempty"`
+	Hosts []*ChiHost `json:"replicas,omitempty"`
 
 	// Internal data
 	Address ChiShardAddress         `json:"address"`
@@ -238,7 +174,7 @@ type ChiReplica struct {
 	Templates   ChiTemplateNames `json:"templates,omitempty"`
 	ShardsCount int              `json:"shardsCount,omitempty"`
 	// TODO refactor into map[string]ChiHost
-	Shards []*ChiHost `json:"shards,omitempty"`
+	Hosts []*ChiHost `json:"shards,omitempty"`
 
 	// Internal data
 	Chi *ClickHouseInstallation `json:"-" testdiff:"ignore"`
@@ -409,13 +345,6 @@ type ClickHouseOperatorConfigurationList struct {
 	Items           []ClickHouseOperatorConfiguration `json:"items"`
 }
 
-const (
-	// ClickHouseInstallationCRDResourceKind defines kind of CRD resource
-	ClickHouseInstallationCRDResourceKind         = "ClickHouseInstallation"
-	ClickHouseInstallationTemplateCRDResourceKind = "ClickHouseInstallationTemplate"
-	ClickHouseOperatorCRDResourceKind             = "ClickHouseOperator"
-)
-
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
@@ -483,26 +412,3 @@ type OperatorConfig struct {
 	ChPassword string `json:"chPassword" yaml:"chPassword"`
 	ChPort     int    `json:"chPort"     yaml:"chPort""`
 }
-
-const (
-	// What to do in case StatefulSet can't reach new Generation - abort CHI reconcile
-	OnStatefulSetCreateFailureActionAbort = "abort"
-
-	// What to do in case StatefulSet can't reach new Generation - delete newly created problematic StatefulSet
-	OnStatefulSetCreateFailureActionDelete = "delete"
-
-	// What to do in case StatefulSet can't reach new Generation - do nothing, keep StatefulSet broken and move to the next
-	OnStatefulSetCreateFailureActionIgnore = "ignore"
-)
-
-const (
-	// What to do in case StatefulSet can't reach new Generation - abort CHI reconcile
-	OnStatefulSetUpdateFailureActionAbort = "abort"
-
-	// What to do in case StatefulSet can't reach new Generation - delete Pod and rollback StatefulSet to previous Generation
-	// Pod would be recreated by StatefulSet based on rollback-ed configuration
-	OnStatefulSetUpdateFailureActionRollback = "rollback"
-
-	// What to do in case StatefulSet can't reach new Generation - do nothing, keep StatefulSet broken and move to the next
-	OnStatefulSetUpdateFailureActionIgnore = "ignore"
-)

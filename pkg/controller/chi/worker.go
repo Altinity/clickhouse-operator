@@ -417,7 +417,9 @@ func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
 	glog.V(1).Infof("Start delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
 
 	// Delete all shards
-	cluster.WalkShards(w.deleteShard)
+	cluster.WalkShards(func(index int, shard *chop.ChiShard) error {
+		return w.deleteShard(shard)
+	})
 
 	// Delete Cluster Service
 	_ = w.c.deleteServiceCluster(cluster)

@@ -14,33 +14,33 @@
 
 package v1
 
-func (shard *ChiShard) InheritTemplatesFrom(cluster *ChiCluster) {
-	(&shard.Templates).MergeFrom(&cluster.Templates, MergeTypeFillEmptyValues)
-	(&shard.Templates).HandleDeprecatedFields()
+func (replica *ChiReplica) InheritTemplatesFrom(cluster *ChiCluster) {
+	(&replica.Templates).MergeFrom(&cluster.Templates, MergeTypeFillEmptyValues)
+	(&replica.Templates).HandleDeprecatedFields()
 }
 
-func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
-	name := shard.Templates.ShardServiceTemplate
-	template, ok := shard.Chi.GetServiceTemplate(name)
+func (replica *ChiReplica) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+	name := replica.Templates.ReplicaServiceTemplate
+	template, ok := replica.Chi.GetServiceTemplate(name)
 	return template, ok
 }
 
-func (shard *ChiShard) WalkHosts(
+func (replica *ChiReplica) WalkHosts(
 	f func(host *ChiHost) error,
 ) []error {
 	res := make([]error, 0)
 
-	for replicaIndex := range shard.Hosts {
-		host := shard.Hosts[replicaIndex]
+	for shardIndex := range replica.Hosts {
+		host := replica.Hosts[shardIndex]
 		res = append(res, f(host))
 	}
 
 	return res
 }
 
-func (shard *ChiShard) HostsCount() int {
+func (replica *ChiReplica) HostsCount() int {
 	count := 0
-	shard.WalkHosts(func(host *ChiHost) error {
+	replica.WalkHosts(func(host *ChiHost) error {
 		count++
 		return nil
 	})

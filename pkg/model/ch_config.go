@@ -155,7 +155,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 		cline(b, 8, "<%s>", cluster.Name)
 
 		// Build each shard XML
-		cluster.WalkShards(func(shard *chiv1.ChiShard) error {
+		cluster.WalkShards(func(index int, shard *chiv1.ChiShard) error {
 			// <shard>
 			//		<internal_replication>VALUE(true/false)</internal_replication>
 			cline(b, 12, "<shard>")

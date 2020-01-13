@@ -156,6 +156,7 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 	} else {
 		clusterScopeCycleSize = int(math.Ceil(float64(chi.HostsCount()) / float64(requestedClusterScopeCyclesNum)))
 	}
+
 	chi.WalkHostsFullPath(chiScopeCycleSize, clusterScopeCycleSize, hostProcessor)
 }
 
@@ -305,8 +306,8 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
-			for replicaIndex := range shard.Replicas {
-				host := shard.Replicas[replicaIndex]
+			for replicaIndex := range shard.Hosts {
+				host := shard.Hosts[replicaIndex]
 				res = append(res, f(
 					chi,
 
@@ -362,8 +363,8 @@ func (chi *ClickHouseInstallation) WalkHosts(
 		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
-			for replicaIndex := range shard.Replicas {
-				host := shard.Replicas[replicaIndex]
+			for replicaIndex := range shard.Hosts {
+				host := shard.Hosts[replicaIndex]
 				res = append(res, f(host))
 			}
 		}
@@ -379,8 +380,8 @@ func (chi *ClickHouseInstallation) WalkHostsTillError(
 		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
-			for replicaIndex := range shard.Replicas {
-				host := shard.Replicas[replicaIndex]
+			for replicaIndex := range shard.Hosts {
+				host := shard.Hosts[replicaIndex]
 				if err := f(host); err != nil {
 					return err
 				}
@@ -412,8 +413,8 @@ func (chi *ClickHouseInstallation) WalkTillError(
 			if err := fShard(shard); err != nil {
 				return err
 			}
-			for replicaIndex := range shard.Replicas {
-				host := shard.Replicas[replicaIndex]
+			for replicaIndex := range shard.Hosts {
+				host := shard.Hosts[replicaIndex]
 				if err := fHost(host); err != nil {
 					return err
 				}

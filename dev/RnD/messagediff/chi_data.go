@@ -84,7 +84,7 @@ func exCHI1() (ChiSpec, ChiSpec) {
 									Fingerprint: "",
 								},
 
-								Replicas: []ChiReplica{
+								Hosts: []ChiReplica{
 									// Replica 0
 									{
 										Port: 9000,
@@ -202,7 +202,7 @@ func exCHI1() (ChiSpec, ChiSpec) {
 									Fingerprint: "",
 								},
 
-								Replicas: []ChiReplica{
+								Hosts: []ChiReplica{
 									// Replica 0
 									{
 										Port: 9000,
