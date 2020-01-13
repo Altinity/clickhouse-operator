@@ -87,7 +87,7 @@ spec:
           image: "k8s.gcr.io/kubernetes-zookeeper:1.0-3.4.10"
           resources:
             requests:
-              memory: "300Mi"
+              memory: "1Gi"
               cpu: "0.5"
           ports:
             - containerPort: 2181
@@ -96,6 +96,9 @@ spec:
               name: server
             - containerPort: 3888
               name: leader-election
+# See those links for proper startup settings:
+# https://github.com/kow3ns/kubernetes-zookeeper/blob/master/docker/scripts/start-zookeeper
+# https://clickhouse.yandex/docs/en/operations/tips/#zookeeper
           command:
             - sh
             - -c
@@ -108,13 +111,13 @@ spec:
           --election_port=3888 \
           --server_port=2888 \
           --tick_time=2000 \
-          --init_limit=10 \
-          --sync_limit=5 \
-          --heap=512M \
-          --max_client_cnxns=60 \
-          --snap_retain_count=3 \
-          --purge_interval=12 \
-          --max_session_timeout=40000 \
+          --init_limit=30000 \
+          --sync_limit=10 \
+          --heap=1G \
+          --max_client_cnxns=2000 \
+          --snap_retain_count=10 \
+          --purge_interval=1 \
+          --max_session_timeout=60000000 \
           --min_session_timeout=4000 \
           --log_level=INFO"
           readinessProbe:
