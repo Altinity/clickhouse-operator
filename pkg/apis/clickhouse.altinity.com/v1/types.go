@@ -177,7 +177,8 @@ type ChiReplica struct {
 	Hosts []*ChiHost `json:"shards,omitempty"`
 
 	// Internal data
-	Chi *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+	Address ChiReplicaAddress       `json:"address"`
+	Chi     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiShardAddress defines address of a shard within ClickHouseInstallation
@@ -188,6 +189,16 @@ type ChiShardAddress struct {
 	ClusterIndex int    `json:"clusterIndex"`
 	ShardName    string `json:"shardName,omitempty"`
 	ShardIndex   int    `json:"shardIndex"`
+}
+
+// ChiReplicaAddress defines address of a replica within ClickHouseInstallation
+type ChiReplicaAddress struct {
+	Namespace    string `json:"namespace"`
+	ChiName      string `json:"chiName"`
+	ClusterName  string `json:"clusterName"`
+	ClusterIndex int    `json:"clusterIndex"`
+	ReplicaName  string `json:"replicaName,omitempty"`
+	ReplicaIndex int    `json:"replicaIndex"`
 }
 
 // ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
@@ -216,6 +227,7 @@ type ChiHostAddress struct {
 	ShardIndex              int    `json:"shardIndex"`
 	ReplicaName             string `json:"replicaName,omitempty"`
 	ReplicaIndex            int    `json:"replicaIndex"`
+	HostName                string `json:"hostName,omitempty"`
 	ChiScopeIndex           int    `json:"chiScopeIndex"`
 	ChiScopeCycleSize       int    `json:"chiScopeCycleSize"`
 	ChiScopeCycleIndex      int    `json:"chiScopeCycleIndex"`

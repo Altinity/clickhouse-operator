@@ -73,6 +73,8 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 		shard *ChiShard,
 
 		replicaIndex int,
+		replica *ChiReplica,
+
 		host *ChiHost,
 	) error {
 		cluster.Address.Namespace = chi.Namespace
@@ -87,14 +89,22 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 		shard.Address.ShardName = shard.Name
 		shard.Address.ShardIndex = shardIndex
 
+		replica.Address.Namespace = chi.Namespace
+		replica.Address.ChiName = chi.Name
+		replica.Address.ClusterName = cluster.Name
+		replica.Address.ClusterIndex = clusterIndex
+		replica.Address.ReplicaName = replica.Name
+		replica.Address.ReplicaIndex = replicaIndex
+
 		host.Address.Namespace = chi.Namespace
 		host.Address.ChiName = chi.Name
 		host.Address.ClusterName = cluster.Name
 		host.Address.ClusterIndex = clusterIndex
 		host.Address.ShardName = shard.Name
 		host.Address.ShardIndex = shardIndex
-		host.Address.ReplicaName = host.Name
+		host.Address.ReplicaName = replica.Name
 		host.Address.ReplicaIndex = replicaIndex
+		host.Address.HostName = host.Name
 		host.Address.ChiScopeIndex = chiScopeIndex
 		host.Address.ChiScopeCycleSize = chiScopeCycleSize
 		host.Address.ChiScopeCycleIndex = chiScopeCycleIndex
@@ -182,10 +192,13 @@ func (chi *ClickHouseInstallation) FillChiPointer() {
 		shard *ChiShard,
 
 		replicaIndex int,
+		replica *ChiReplica,
+
 		host *ChiHost,
 	) error {
 		cluster.Chi = chi
 		shard.Chi = chi
+		replica.Chi = chi
 		host.Chi = chi
 		return nil
 	}
@@ -283,6 +296,8 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 		shard *ChiShard,
 
 		replicaIndex int,
+		replica *ChiReplica,
+
 		host *ChiHost,
 	) error,
 ) []error {
@@ -305,8 +320,10 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 		clusterScopeCycleOffset = 0
 
 		for shardIndex := range cluster.Layout.Shards {
-			shard := &cluster.Layout.Shards[shardIndex]
+			shard := cluster.GetShard(shardIndex)
 			for replicaIndex := range shard.Hosts {
+				replica := cluster.GetReplica(replicaIndex)
+
 				host := shard.Hosts[replicaIndex]
 				res = append(res, f(
 					chi,
@@ -328,6 +345,8 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 					shard,
 
 					replicaIndex,
+					replica,
+
 					host,
 				))
 
