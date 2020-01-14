@@ -65,6 +65,7 @@ zoo1ns        zookeeper-0                            1/1     Running   0    3m59
 
 ## Watch progress how to clickhouse-operator deploy ClickHouse installation 
 ```bash
+kubectl describe chi repl-05 -n clickhouse
 kubectl logs -f --namespace ${OPERATOR_NAMESPACE}  $(kubectl get pods --namespace=${OPERATOR_NAMESPACE} -o wide | grep -E "clickhouse-operator" | cut -d " " -f 1) -c clickhouse-operator
 ```
 
@@ -108,6 +109,13 @@ expected output
 19.6.2.11
 ```
 
+## Install Prometheus & Grafana for Monitoring
+```bash
+export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-prometheus}
+curl -sL https://raw.githubusercontent.com/Altinity/clickhouse-operator/${BRANCH}/deploy/prometheus/create-prometheus.sh | bash
+
+kubectl --namespace=prometheus port-forward service/prometheus 9090
+```
 ## Clear all installed objects
 ```bash
 minikube delete
