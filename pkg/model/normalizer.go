@@ -923,6 +923,8 @@ func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 	n.ensureClusterLayoutShards(&cluster.Layout)
 	n.ensureClusterLayoutReplicas(&cluster.Layout)
 
+	n.createHostsField(cluster)
+
 	// Loop over all shards and replicas inside shards and fill structure
 	cluster.WalkShards(func(index int, shard *chiv1.ChiShard) error {
 		n.normalizeShard(shard, cluster, index)
@@ -933,8 +935,6 @@ func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 		n.normalizeReplica(replica, cluster, index)
 		return nil
 	})
-
-	n.createHostsField(cluster)
 
 	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *chiv1.ChiHost) error {
 		n.normalizeHost(host, cluster.GetShard(shard), cluster.GetReplica(replica), shard, replica)
@@ -1060,7 +1060,7 @@ func (n *Normalizer) normalizeShard(shard *chiv1.ChiShard, cluster *chiv1.ChiClu
 	shard.InheritTemplatesFrom(cluster)
 	// Normalize Replicas
 	n.normalizeShardReplicasCount(shard, cluster.Layout.ReplicasCount)
-	n.normalizeShardReplicas(shard)
+	n.normalizeShardHosts(shard, cluster, shardIndex)
 }
 
 // normalizeReplica normalizes a replica - walks over all fields
@@ -1070,7 +1070,7 @@ func (n *Normalizer) normalizeReplica(replica *chiv1.ChiReplica, cluster *chiv1.
 	replica.InheritTemplatesFrom(cluster)
 	// Normalize Shards
 	n.normalizeReplicaShardsCount(replica, cluster.Layout.ShardsCount)
-	n.normalizeReplicaShards(replica)
+	n.normalizeReplicaHosts(replica, cluster, replicaIndex)
 }
 
 // normalizeShardReplicasCount ensures shard.ReplicasCount filled properly
@@ -1143,34 +1143,38 @@ func (n *Normalizer) normalizeReplicaName(replica *chiv1.ChiReplica, index int) 
 func (n *Normalizer) normalizeShardWeight(shard *chiv1.ChiShard) {
 }
 
-// ensureShardReplicas ensures slice shard.Replicas is in place
-func (n *Normalizer) ensureShardReplicas(shard *chiv1.ChiShard) {
-	// Some (may be all) replicas specified, need to append space for unspecified replicas
-	// TODO may be there is better way to append N slots to slice
+// normalizeShardHosts normalizes all replicas of specified shard
+func (n *Normalizer) normalizeShardHosts(shard *chiv1.ChiShard, cluster *chiv1.ChiCluster, shardIndex int) {
+	// Some (may be all) hosts are explicitly specified, we need to append hosts which are assumed - implicitly specified
 	for len(shard.Hosts) < shard.ReplicasCount {
-		shard.Hosts = append(shard.Hosts, &chiv1.ChiHost{})
+		// We still have some assumed hosts in this shard - let's add it as replicaIndex
+		replicaIndex := len(shard.Hosts)
+		// Check whether we have this host in HostsField
+		host := cluster.Layout.HostsField.Get(shardIndex, replicaIndex)
+		if host == nil {
+			// We do not have this host in HostsField yet
+			host = &chiv1.ChiHost{}
+			cluster.Layout.HostsField.Set(shardIndex, replicaIndex, host)
+		}
+		shard.Hosts = append(shard.Hosts, host)
 	}
 }
 
-// ensureReplicaShards ensures slice replica.Shards is in place
-func (n *Normalizer) ensureReplicaShards(replica *chiv1.ChiReplica) {
-	// Some (may be all) shards specified, need to append space for unspecified shards
-	// TODO may be there is better way to append N slots to slice
+// normalizeReplicaHosts normalizes all replicas of specified shard
+func (n *Normalizer) normalizeReplicaHosts(replica *chiv1.ChiReplica, cluster *chiv1.ChiCluster, replicaIndex int) {
+	// Some (may be all) hosts are explicitly specified, we need to append hosts which are assumed - implicitly specified
 	for len(replica.Hosts) < replica.ShardsCount {
-		replica.Hosts = append(replica.Hosts, &chiv1.ChiHost{})
+		// We still have some assumed hosts in this replica - let's add it as shardIndex
+		shardIndex := len(replica.Hosts)
+		// Check whether we have this host in HostsField
+		host := cluster.Layout.HostsField.Get(shardIndex, replicaIndex)
+		if host == nil {
+			// We do not have this host in HostsField yet
+			host = &chiv1.ChiHost{}
+			cluster.Layout.HostsField.Set(shardIndex, replicaIndex, host)
+		}
+		replica.Hosts = append(replica.Hosts, host)
 	}
-}
-
-// normalizeShardReplicas normalizes all replicas of specified shard
-func (n *Normalizer) normalizeShardReplicas(shard *chiv1.ChiShard) {
-	// Fill each replica
-	n.ensureShardReplicas(shard)
-}
-
-// normalizeShardReplicas normalizes all replicas of specified shard
-func (n *Normalizer) normalizeReplicaShards(replica *chiv1.ChiReplica) {
-	// Fill each replica
-	n.ensureReplicaShards(replica)
 }
 
 // normalizeHost normalizes a host/replica

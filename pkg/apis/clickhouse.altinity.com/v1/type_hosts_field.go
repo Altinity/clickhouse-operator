@@ -49,7 +49,10 @@ func (hf *HostsField) WalkHosts(
 
 	for shard := 0; shard < hf.Shards; shard++ {
 		for replica := 0; replica < hf.Replicas; replica++ {
-			res = append(res, f(shard, replica, hf.Get(shard, replica)))
+			host := hf.Get(shard, replica)
+			if host != nil {
+				res = append(res, f(shard, replica, host))
+			}
 		}
 	}
 
@@ -59,9 +62,7 @@ func (hf *HostsField) WalkHosts(
 func (hf *HostsField) HostsCount() int {
 	count := 0
 	hf.WalkHosts(func(shard, replica int, host *ChiHost) error {
-		if host != nil {
-			count++
-		}
+		count++
 		return nil
 	})
 	return count
