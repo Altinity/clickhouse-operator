@@ -84,7 +84,7 @@ spec:
       containers:
         - name: kubernetes-zookeeper
           imagePullPolicy: Always
-          image: "k8s.gcr.io/kubernetes-zookeeper:1.0-3.4.10"
+          image: "docker.io/zookeeper:3.5.6"
           resources:
             requests:
               memory: "1Gi"
@@ -100,40 +100,73 @@ spec:
 # https://github.com/kow3ns/kubernetes-zookeeper/blob/master/docker/scripts/start-zookeeper
 # https://clickhouse.yandex/docs/en/operations/tips/#zookeeper
           command:
-            - sh
+            - bash
+            - -x
             - -c
-            - "start-zookeeper \
-          --servers=3 \
-          --data_dir=/var/lib/zookeeper/data \
-          --data_log_dir=/var/lib/zookeeper/data/log \
-          --conf_dir=/opt/zookeeper/conf \
-          --client_port=2181 \
-          --election_port=3888 \
-          --server_port=2888 \
-          --tick_time=2000 \
-          --init_limit=30000 \
-          --sync_limit=10 \
-          --heap=1G \
-          --max_client_cnxns=2000 \
-          --snap_retain_count=10 \
-          --purge_interval=1 \
-          --max_session_timeout=60000000 \
-          --min_session_timeout=4000 \
-          --log_level=INFO"
+            - |
+              SERVERS=3 &&
+              HOST=`hostname -s` &&
+              DOMAIN=`hostname -d` &&
+              CLIENT_PORT=2181 &&
+              SERVER_PORT=2888 &&
+              ELECTION_PORT=3888 &&
+              {
+                echo "clientPort=${CLIENT_PORT}"
+                echo 'tickTime=2000'
+                echo 'initLimit=30000'
+                echo 'syncLimit=10'
+                echo 'maxClientCnxns=2000'
+                echo 'maxSessionTimeout=60000000'
+                echo 'dataDir=/data'
+                echo 'dataLogDir=/datalog'
+                echo 'autopurge.snapRetainCount=10'
+                echo 'autopurge.purgeInterval=1'
+                echo 'preAllocSize=131072'
+                echo 'snapCount=3000000'
+                echo 'leaderServes=yes'
+                echo 'standaloneEnabled=true'
+                echo '4lw.commands.whitelist=stat, ruok, conf, isro'
+              } > /conf/zoo.cfg &&
+              {
+                echo "zookeeper.root.logger=CONSOLE"
+                echo "zookeeper.console.threshold=INFO"
+                echo "log4j.rootLogger=\${zookeeper.root.logger}"
+                echo "log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender"
+                echo "log4j.appender.CONSOLE.Threshold=\${zookeeper.console.threshold}"
+                echo "log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout"
+                echo "log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n"
+              } > /conf/log4j.properties &&
+              echo 'JVMFLAGS="-Xms128M -Xmx1G -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled"' > /conf/java.env &&
+              if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
+                  NAME=${BASH_REMATCH[1]}
+                  ORD=${BASH_REMATCH[2]}
+              else
+                  echo "Fialed to parse name and ordinal of Pod"
+                  exit 1
+              fi &&
+              export MY_ID=$((ORD+1)) &&
+              echo $MY_ID > $ZOO_DATA_DIR/myid &&
+              if [[ $SERVERS -gt 1 ]]; then
+                for (( i=1; i<=$SERVERS; i++ )); do
+                    echo "server.$i=$NAME-$((i-1)).$DOMAIN:$SERVER_PORT:$ELECTION_PORT" >> /conf/zoo.cfg;
+                done
+              fi &&
+              chown -Rv zookeeper "$ZOO_DATA_DIR" "$ZOO_DATA_LOG_DIR" "$ZOO_LOG_DIR" "$ZOO_CONF_DIR" &&
+              zkServer.sh start-foreground
           readinessProbe:
             exec:
               command:
-                - sh
+                - bash
                 - -c
-                - "zookeeper-ready 2181"
+                - "OK=$(echo ruok | nc 127.0.0.1 2181); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
             initialDelaySeconds: 10
             timeoutSeconds: 5
           livenessProbe:
             exec:
               command:
-                - sh
+                - bash
                 - -c
-                - "zookeeper-ready 2181"
+                - "OK=$(echo ruok | nc 127.0.0.1 2181); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
             initialDelaySeconds: 10
             timeoutSeconds: 5
           volumeMounts:
