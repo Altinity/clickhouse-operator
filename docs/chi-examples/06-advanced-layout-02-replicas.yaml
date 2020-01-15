@@ -1,29 +1,20 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "advanced-01"
+  name: "adv-layout-02"
 spec:
   configuration:
     clusters:
       - name: adv
         layout:
-          shards:
-            - replicas:
-                - templates:
-                    podTemplate: clickhouse:19.1.10
-                  httpPort: 8000
-                  tcpPort: 8001
-                  interserverHttpPort: 8002
-                - templates:
-                    podTemplate: clickhouse:19.3.5
-                  httpPort: 9000
-                  tcpPort: 9001
-                  interserverHttpPort: 9002
-                - templates:
-                    podTemplate: clickhouse:19.3.7
-                  httpPort: 10000
-                  tcpPort: 10001
-                  interserverHttpPort: 10002
+          shardsCount: 2
+          replicas:
+            - templates:
+                podTemplate: clickhouse:19.1.10
+            - templates:
+                podTemplate: clickhouse:19.3.5
+            - templates:
+                podTemplate: clickhouse:19.3.7
 
   templates:
     podTemplates:
@@ -37,13 +28,6 @@ spec:
               #        image: yandex/clickhouse-server:19.3.7
               #        image: yandex/clickhouse-server:19.1.105
               image: yandex/clickhouse-server:19.1.10
-              ports:
-                - name: http
-                  containerPort: 8000
-                - name: tcp
-                  containerPort: 8001
-                - name: interserver
-                  containerPort: 8002
 
       - name: clickhouse:19.3.5
         spec:
@@ -54,13 +38,6 @@ spec:
               #        image: yandex/clickhouse-server:19.3.7
               #        image: yandex/clickhouse-server:19.1.105
               image: yandex/clickhouse-server:19.3.5
-              ports:
-                - name: http
-                  containerPort: 9000
-                - name: tcp
-                  containerPort: 9001
-                - name: interserver
-                  containerPort: 9002
 
 
       - name: clickhouse:19.3.7
@@ -72,10 +49,3 @@ spec:
               #        image: yandex/clickhouse-server:19.3.7
               #        image: yandex/clickhouse-server:19.1.105
               image: yandex/clickhouse-server:19.3.7
-              ports:
-                - name: http
-                  containerPort: 10000
-                - name: tcp
-                  containerPort: 10001
-                - name: interserver
-                  containerPort: 10002
