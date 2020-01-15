@@ -114,6 +114,7 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 		host.Address.ClusterScopeCycleIndex = clusterScopeCycleIndex
 		host.Address.ClusterScopeCycleOffset = clusterScopeCycleOffset
 		host.Address.ShardScopeIndex = replicaIndex
+		host.Address.ReplicaScopeIndex = shardIndex
 
 		return nil
 	}

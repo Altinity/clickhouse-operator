@@ -225,8 +225,10 @@ type ChiHostAddress struct {
 	ClusterIndex            int    `json:"clusterIndex"`
 	ShardName               string `json:"shardName,omitempty"`
 	ShardIndex              int    `json:"shardIndex"`
+	ShardScopeIndex         int    `json:"shardScopeIndex"`
 	ReplicaName             string `json:"replicaName,omitempty"`
 	ReplicaIndex            int    `json:"replicaIndex"`
+	ReplicaScopeIndex       int    `json:"replicaScopeIndex"`
 	HostName                string `json:"hostName,omitempty"`
 	ChiScopeIndex           int    `json:"chiScopeIndex"`
 	ChiScopeCycleSize       int    `json:"chiScopeCycleSize"`
@@ -236,7 +238,6 @@ type ChiHostAddress struct {
 	ClusterScopeCycleSize   int    `json:"clusterScopeCycleSize"`
 	ClusterScopeCycleIndex  int    `json:"clusterScopeCycleIndex"`
 	ClusterScopeCycleOffset int    `json:"clusterScopeCycleOffset"`
-	ShardScopeIndex         int    `json:"shardScopeIndex"`
 }
 
 // ChiHostConfig defines additional data related to a host
