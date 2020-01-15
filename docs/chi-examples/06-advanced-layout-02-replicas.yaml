@@ -7,7 +7,7 @@ spec:
     clusters:
       - name: adv
         layout:
-          shardsCount: 2
+          shardsCount: 4
           replicas:
             - templates:
                 podTemplate: clickhouse:19.1.10
