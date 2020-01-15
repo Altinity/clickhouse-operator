@@ -47,8 +47,8 @@ func (c *Controller) labelMyObjectsTree() {
 	//    uid: a275a8a0-83ae-11e9-b92d-0208b778ea1a
 
 	// Label operator's Pod with version label
-	podName, ok1 := c.chopConfigManager.GetRuntimeParam("OPERATOR_POD_NAME")
-	namespace, ok2 := c.chopConfigManager.GetRuntimeParam("OPERATOR_POD_NAMESPACE")
+	podName, ok1 := c.chop.ConfigManager.GetRuntimeParam("OPERATOR_POD_NAME")
+	namespace, ok2 := c.chop.ConfigManager.GetRuntimeParam("OPERATOR_POD_NAMESPACE")
 
 	if !ok1 || !ok2 {
 		glog.V(1).Infof("ERROR fetch Pod name out of %s/%s", namespace, podName)
@@ -63,7 +63,7 @@ func (c *Controller) labelMyObjectsTree() {
 	}
 
 	// Put label on the Pod
-	pod.Labels["version"] = c.version
+	pod.Labels["version"] = c.chop.Version
 	if _, err := c.kubeClient.CoreV1().Pods(namespace).Update(pod); err != nil {
 		glog.V(1).Infof("ERROR put label on Pod %s/%s %v", namespace, podName, err)
 	}
@@ -93,7 +93,7 @@ func (c *Controller) labelMyObjectsTree() {
 	}
 
 	// Put label on the ReplicaSet
-	replicaSet.Labels["version"] = c.version
+	replicaSet.Labels["version"] = c.chop.Version
 	if _, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Update(replicaSet); err != nil {
 		glog.V(1).Infof("ERROR put label on ReplicaSet %s/%s %v", namespace, replicaSetName, err)
 	}
@@ -123,7 +123,7 @@ func (c *Controller) labelMyObjectsTree() {
 	}
 
 	// Put label on the Deployment
-	deployment.Labels["version"] = c.version
+	deployment.Labels["version"] = c.chop.Version
 	if _, err := c.kubeClient.AppsV1().Deployments(namespace).Update(deployment); err != nil {
 		glog.V(1).Infof("ERROR put label on Deployment %s/%s %v", namespace, deploymentName, err)
 	}

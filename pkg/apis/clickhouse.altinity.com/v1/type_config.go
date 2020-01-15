@@ -53,7 +53,7 @@ const (
 )
 
 // MergeFrom merges
-func (config *Config) MergeFrom(from *Config, _type MergeType) {
+func (config *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) {
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if err := mergo.Merge(config, *from); err != nil {
@@ -66,8 +66,8 @@ func (config *Config) MergeFrom(from *Config, _type MergeType) {
 	}
 }
 
-// readChiTemplates build Config.ChiTemplate from template files content
-func (config *Config) readChiTemplates() {
+// readChiTemplates build OperatorConfig.ChiTemplate from template files content
+func (config *OperatorConfig) readChiTemplates() {
 	// Read CHI template files
 	config.ChiTemplateFiles = readConfigFiles(config.ChiTemplatesPath, config.isChiTemplateExt)
 
@@ -84,7 +84,7 @@ func (config *Config) readChiTemplates() {
 }
 
 // enlistChiTemplate inserts template into templates catalog
-func (config *Config) enlistChiTemplate(template *ClickHouseInstallation) {
+func (config *OperatorConfig) enlistChiTemplate(template *ClickHouseInstallation) {
 	if config.ChiTemplates == nil {
 		config.ChiTemplates = make([]*ClickHouseInstallation, 0)
 	}
@@ -93,7 +93,7 @@ func (config *Config) enlistChiTemplate(template *ClickHouseInstallation) {
 }
 
 // unlistChiTemplate removes template from templates catalog
-func (config *Config) unlistChiTemplate(template *ClickHouseInstallation) {
+func (config *OperatorConfig) unlistChiTemplate(template *ClickHouseInstallation) {
 	if config.ChiTemplates == nil {
 		return
 	}
@@ -113,7 +113,7 @@ func (config *Config) unlistChiTemplate(template *ClickHouseInstallation) {
 	// TODO compact the slice
 }
 
-func (config *Config) FindTemplate(use *ChiUseTemplate, namespace string) *ClickHouseInstallation {
+func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *ClickHouseInstallation {
 	// Try to find direct match
 	for _, _template := range config.ChiTemplates {
 		if _template == nil {
@@ -148,7 +148,7 @@ func (config *Config) FindTemplate(use *ChiUseTemplate, namespace string) *Click
 }
 
 // buildUnifiedChiTemplate builds combined CHI Template from templates catalog
-func (config *Config) buildUnifiedChiTemplate() {
+func (config *OperatorConfig) buildUnifiedChiTemplate() {
 
 	return
 	/*
@@ -189,22 +189,22 @@ func (config *Config) buildUnifiedChiTemplate() {
 	*/
 }
 
-func (config *Config) AddChiTemplate(template *ClickHouseInstallation) {
+func (config *OperatorConfig) AddChiTemplate(template *ClickHouseInstallation) {
 	config.enlistChiTemplate(template)
 	config.buildUnifiedChiTemplate()
 }
 
-func (config *Config) UpdateChiTemplate(template *ClickHouseInstallation) {
+func (config *OperatorConfig) UpdateChiTemplate(template *ClickHouseInstallation) {
 	config.enlistChiTemplate(template)
 	config.buildUnifiedChiTemplate()
 }
 
-func (config *Config) DeleteChiTemplate(template *ClickHouseInstallation) {
+func (config *OperatorConfig) DeleteChiTemplate(template *ClickHouseInstallation) {
 	config.unlistChiTemplate(template)
 	config.buildUnifiedChiTemplate()
 }
 
-func (config *Config) Postprocess() {
+func (config *OperatorConfig) Postprocess() {
 	config.normalize()
 	config.readClickHouseCustomConfigFiles()
 	config.readChiTemplates()
@@ -213,8 +213,8 @@ func (config *Config) Postprocess() {
 	config.applyDefaultWatchNamespace()
 }
 
-// normalize() makes fully-and-correctly filled Config
-func (config *Config) normalize() {
+// normalize() makes fully-and-correctly filled OperatorConfig
+func (config *OperatorConfig) normalize() {
 
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
@@ -288,7 +288,7 @@ func (config *Config) normalize() {
 }
 
 // applyEnvVarParams applies ENV VARS over config
-func (config *Config) applyEnvVarParams() {
+func (config *OperatorConfig) applyEnvVarParams() {
 	if ns := os.Getenv("WATCH_NAMESPACE"); len(ns) > 0 {
 		// We have WATCH_NAMESPACE explicitly specified
 		config.WatchNamespaces = []string{ns}
@@ -308,7 +308,7 @@ func (config *Config) applyEnvVarParams() {
 }
 
 // applyDefaultWatchNamespace applies default watch namespace in case none specified earlier
-func (config *Config) applyDefaultWatchNamespace() {
+func (config *OperatorConfig) applyDefaultWatchNamespace() {
 	// In case we have watched namespaces specified, all is fine
 	// In case we do not have watched namespaces specified, we need to decide, what namespace to watch.
 	// In this case, there are two options:
@@ -333,7 +333,7 @@ func (config *Config) applyDefaultWatchNamespace() {
 }
 
 // prepareConfigPath - prepares config path absolute/relative with default relative value
-func (config *Config) prepareConfigPath(path *string, defaultRelativePath string) {
+func (config *OperatorConfig) prepareConfigPath(path *string, defaultRelativePath string) {
 	if *path == "" {
 		// Path not specified, try to build it relative to config file
 		*path = config.relativeToConfigFolderPath(defaultRelativePath)
@@ -351,7 +351,7 @@ func (config *Config) prepareConfigPath(path *string, defaultRelativePath string
 }
 
 // relativeToConfigFolderPath returns absolute path relative to ConfigFolderPath
-func (config *Config) relativeToConfigFolderPath(relativePath string) string {
+func (config *OperatorConfig) relativeToConfigFolderPath(relativePath string) string {
 	if config.ConfigFolderPath == "" {
 		// Relative base is not set, do nothing
 		return relativePath
@@ -366,14 +366,14 @@ func (config *Config) relativeToConfigFolderPath(relativePath string) string {
 }
 
 // readClickHouseCustomConfigFiles reads all extra user-specified ClickHouse config files
-func (config *Config) readClickHouseCustomConfigFiles() {
+func (config *OperatorConfig) readClickHouseCustomConfigFiles() {
 	config.ChCommonConfigs = readConfigFiles(config.ChCommonConfigsPath, config.isChConfigExt)
 	config.ChHostConfigs = readConfigFiles(config.ChHostConfigsPath, config.isChConfigExt)
 	config.ChUsersConfigs = readConfigFiles(config.ChUsersConfigsPath, config.isChConfigExt)
 }
 
 // isChConfigExt returns true in case specified file has proper extension for a ClickHouse config file
-func (config *Config) isChConfigExt(file string) bool {
+func (config *OperatorConfig) isChConfigExt(file string) bool {
 	switch util.ExtToLower(file) {
 	case ".xml":
 		return true
@@ -382,7 +382,7 @@ func (config *Config) isChConfigExt(file string) bool {
 }
 
 // isChiTemplateExt returns true in case specified file has proper extension for a CHI template config file
-func (config *Config) isChiTemplateExt(file string) bool {
+func (config *OperatorConfig) isChiTemplateExt(file string) bool {
 	switch util.ExtToLower(file) {
 	case ".yaml":
 		return true
@@ -393,7 +393,7 @@ func (config *Config) isChiTemplateExt(file string) bool {
 }
 
 // IsWatchedNamespace returns whether specified namespace is in a list of watched
-func (config *Config) IsWatchedNamespace(namespace string) bool {
+func (config *OperatorConfig) IsWatchedNamespace(namespace string) bool {
 	// In case no namespaces specified - watch all namespaces
 	if len(config.WatchNamespaces) == 0 {
 		return true
@@ -402,8 +402,8 @@ func (config *Config) IsWatchedNamespace(namespace string) bool {
 	return util.InArray(namespace, config.WatchNamespaces)
 }
 
-// String returns string representation of a Config
-func (config *Config) String() string {
+// String returns string representation of a OperatorConfig
+func (config *OperatorConfig) String() string {
 	b := &bytes.Buffer{}
 
 	util.Fprintf(b, "ConfigFilePath: %s\n", config.ConfigFilePath)
@@ -432,6 +432,7 @@ func (config *Config) String() string {
 	util.Fprintf(b, "ChConfigUserDefaultQuota: %s\n", config.ChConfigUserDefaultQuota)
 	util.Fprintf(b, "%s", config.stringSlice("ChConfigUserDefaultNetworksIP", config.ChConfigUserDefaultNetworksIP))
 	util.Fprintf(b, "ChConfigUserDefaultPassword: %s\n", config.ChConfigUserDefaultPassword)
+	util.Fprintf(b, "ChConfigNetworksHostRegexpTemplate: %s\n", config.ChConfigNetworksHostRegexpTemplate)
 
 	util.Fprintf(b, "ChUsername: %s\n", config.ChUsername)
 	util.Fprintf(b, "ChPassword: %s\n", config.ChPassword)
@@ -440,13 +441,13 @@ func (config *Config) String() string {
 	return b.String()
 }
 
-// WriteToLog writes Config into log
-func (config *Config) WriteToLog() {
-	glog.V(1).Infof("Config:\n%s", config.String())
+// WriteToLog writes OperatorConfig into log
+func (config *OperatorConfig) WriteToLog() {
+	glog.V(1).Infof("OperatorConfig:\n%s", config.String())
 }
 
-// stringSlice returns string of named []string Config param
-func (config *Config) stringSlice(name string, sl []string) string {
+// stringSlice returns string of named []string OperatorConfig param
+func (config *OperatorConfig) stringSlice(name string, sl []string) string {
 	b := &bytes.Buffer{}
 	util.Fprintf(b, "%s (%d):\n", name, len(sl))
 	for i := range sl {
@@ -456,8 +457,8 @@ func (config *Config) stringSlice(name string, sl []string) string {
 	return b.String()
 }
 
-// stringMap returns string of named map[string]string Config param
-func (config *Config) stringMap(name string, m map[string]string) string {
+// stringMap returns string of named map[string]string OperatorConfig param
+func (config *OperatorConfig) stringMap(name string, m map[string]string) string {
 	// Write params according to sorted names
 	// So we need to
 	// 1. Extract and sort names aka keys
@@ -481,7 +482,7 @@ func (config *Config) stringMap(name string, m map[string]string) string {
 
 // GetInformerNamespace is a TODO stub
 // Namespace where informers would watch notifications from
-func (config *Config) GetInformerNamespace() string {
+func (config *OperatorConfig) GetInformerNamespace() string {
 	// Namespace where informers would watch notifications from
 	namespace := metav1.NamespaceAll
 	if len(config.WatchNamespaces) == 1 {

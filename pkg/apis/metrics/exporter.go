@@ -117,6 +117,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			case *WatchedChi:
 				e.toRemoveFromWatched.Delete(key)
 				e.removeFromWatched(key.(*WatchedChi))
+				glog.Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*WatchedChi).Name, key.(*WatchedChi).Namespace)
 			}
 			return true
 		})
@@ -180,7 +181,7 @@ func (e *Exporter) addToWatched(chi *WatchedChi) {
 	}
 
 	// CHI is not watched
-	glog.V(2).Infof("ClickHouseInstallation (%s/%s): including hostnames into Exporter", chi.Namespace, chi.Name)
+	glog.Infof("Added ClickHouseInstallation (%s/%s): including hostnames into Exporter", chi.Namespace, chi.Name)
 
 	e.chInstallations[chi.indexKey()] = chi
 }
@@ -209,10 +210,12 @@ func (e *Exporter) collectFromHost(chi *WatchedChi, hostname string, c chan<- pr
 	if metrics, err := fetcher.clickHouseQueryMetrics(); err == nil {
 		glog.Infof("Extracted %d metrics for %s\n", len(metrics), hostname)
 		writer.WriteMetrics(metrics)
+		writer.WriteOKFetch("system.metrics")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 		glog.Infof("Error querying metrics for %s: %s\n", hostname, err)
-		e.enqueueToRemoveFromWatched(chi)
+		writer.WriteErrorFetch("system.metrics")
+		//e.enqueueToRemoveFromWatched(chi)
 		return
 	}
 
@@ -220,10 +223,12 @@ func (e *Exporter) collectFromHost(chi *WatchedChi, hostname string, c chan<- pr
 	if tableSizes, err := fetcher.clickHouseQueryTableSizes(); err == nil {
 		glog.Infof("Extracted %d table sizes for %s\n", len(tableSizes), hostname)
 		writer.WriteTableSizes(tableSizes)
+		writer.WriteOKFetch("table sizes")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 		glog.Infof("Error querying table sizes for %s: %s\n", hostname, err)
-		e.enqueueToRemoveFromWatched(chi)
+		writer.WriteErrorFetch("table sizes")
+		// e.enqueueToRemoveFromWatched(chi)
 		return
 	}
 
@@ -231,10 +236,25 @@ func (e *Exporter) collectFromHost(chi *WatchedChi, hostname string, c chan<- pr
 	if systemReplicas, err := fetcher.clickHouseQuerySystemReplicas(); err == nil {
 		glog.Infof("Extracted %d system replicas for %s\n", len(systemReplicas), hostname)
 		writer.WriteSystemReplicas(systemReplicas)
+		writer.WriteOKFetch("system.replicas")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 		glog.Infof("Error querying system replicas for %s: %s\n", hostname, err)
-		e.enqueueToRemoveFromWatched(chi)
+		writer.WriteErrorFetch("system.replicas")
+		// e.enqueueToRemoveFromWatched(chi)
+		return
+	}
+
+	glog.Infof("Querying mutations for %s\n", hostname)
+	if mutations, err := fetcher.clickHouseQueryMutations(); err == nil {
+		glog.Infof("Extracted %d mutations for %s\n", len(mutations), hostname)
+		writer.WriteMutations(mutations)
+		writer.WriteOKFetch("system.mutations")
+	} else {
+		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
+		glog.Infof("Error querying mutations for %s: %s\n", hostname, err)
+		writer.WriteErrorFetch("system.mutations")
+		//e.enqueueToRemoveFromWatched(chi)
 		return
 	}
 }

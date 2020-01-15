@@ -19,16 +19,18 @@
 
 Apply `clickhouse-operator` installation manifest. The simplest way - directly from `github`.
 
-In case you are convenient to install operator into `kube-system` namespace just run:
+## **In case you are convenient to install operator into `kube-system` namespace**
+
+just run:
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install.yaml
 ``` 
 
-In case you'd like to customize namespace where to install operator, or customize any operator's or ClickHouse's configuration, feel free to use installer script.
-Please, `cd` into writable folder, because install script would download config files to build `.yaml` manifests from into current dir. 
+## **In case you'd like to customize installation parameters**,
+
+such as namespace where to install operator or operator's image, use the special installer script.
 ```bash
-cd ~
-curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-installer/clickhouse-operator-install.sh | OPERATOR_NAMESPACE=test-clickhouse-operator bash
+curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-installer/clickhouse-operator-install.sh | OPERATOR_NAMESPACE=test-clickhouse-operator sh
 ```
 Take into account explicitly specified namespace
 ```bash
@@ -37,14 +39,40 @@ OPERATOR_NAMESPACE=test-clickhouse-operator
 This namespace would be created and used to install `clickhouse-operator` into.
 Install script would download some `.yaml` and `.xml` files and install `clickhouse-operator` into specified namespace.
 
-In case no `OPERATOR_NAMESPACE` specified, as:
+If no `OPERATOR_NAMESPACE` specified, as:
 ```bash
 cd ~
 curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-installer/clickhouse-operator-install.sh | bash
 ```
 installer will create namespace `clickhouse-operator` and install **clickhouse-operator** into it.
 
-Operator installation process
+## **In case you can not run scripts from internet in your protected environment**, 
+
+you can download manually [this template file](https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-template.yaml)
+and edit it according to your choice. After that apply it with `kubectl`. Or you can use this snippet instead:
+```bash
+# Namespace to install operator into
+OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-clickhouse-operator}"
+# Namespace to install metrics-exporter into
+METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
+
+# Operator's docker image
+OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
+# Metrics exporter's docker image
+METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:latest}"
+
+# Setup clickhouse-operator into specified namespace
+kubectl apply --namespace="${OPERATOR_NAMESPACE}" -f <( \
+    curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-template.yaml | \
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+        METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
+        METRICS_EXPORTER_NAMESPACE="${METRICS_EXPORTER_NAMESPACE}" \
+        envsubst \
+)
+```
+
+## Operator installation process
 ```text
 Setup ClickHouse Operator into test-clickhouse-operator namespace
 namespace/test-clickhouse-operator created

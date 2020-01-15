@@ -135,7 +135,7 @@ func (c *Controller) statefulSetDelete(host *chop.ChiHost) error {
 func (c *Controller) persistentVolumeClaimDelete(host *chop.ChiHost) error {
 
 	namespace := host.Address.Namespace
-	labeler := chopmodel.NewLabeler(c.version, host.Chi)
+	labeler := chopmodel.NewLabeler(c.chop, host.Chi)
 	listOptions := newListOptions(labeler.GetSelectorHostScope(host))
 	if list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(listOptions); err == nil {
 		glog.V(1).Infof("OK get list of PVC for host %s/%s", namespace, host.Name)

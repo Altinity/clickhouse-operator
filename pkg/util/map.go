@@ -32,8 +32,16 @@ func MergeStringMaps(dst, src map[string]string) map[string]string {
 	if dst == nil {
 		dst = make(map[string]string)
 	}
+
+	if src == nil {
+		// Nothing to merge from
+		return dst
+	}
+
+	// Place key->value pair from src into dst
 	for key := range src {
 		dst[key] = src[key]
 	}
+
 	return dst
 }

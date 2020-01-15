@@ -35,7 +35,8 @@ spec:
         zone:
           values:
             - "us-east-1a"
-        distribution: "OnePerHost"
+        podDistribution:
+          - type: "ClickHouseAntiAffinity"
         spec:
           containers:
             - name: clickhouse-pod

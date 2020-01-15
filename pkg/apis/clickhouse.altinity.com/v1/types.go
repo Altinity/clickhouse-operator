@@ -56,8 +56,8 @@ type ClickHouseInstallationTemplate ClickHouseInstallation
 type ClickHouseOperatorConfiguration struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              Config `json:"spec"`
-	Status            string `json:"status"`
+	Spec              OperatorConfig `json:"spec"`
+	Status            string         `json:"status"`
 }
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
@@ -255,15 +255,23 @@ type ChiHost struct {
 
 // ChiHostAddress defines address of a host within ClickHouseInstallation
 type ChiHostAddress struct {
-	Namespace    string `json:"namespace"`
-	ChiName      string `json:"chiName"`
-	ClusterName  string `json:"clusterName"`
-	ClusterIndex int    `json:"clusterIndex"`
-	ShardName    string `json:"shardName,omitempty"`
-	ShardIndex   int    `json:"shardIndex"`
-	ReplicaName  string `json:"replicaName,omitempty"`
-	ReplicaIndex int    `json:"replicaIndex"`
-	HostIndex    int    `json:"hostIndex"`
+	Namespace               string `json:"namespace"`
+	ChiName                 string `json:"chiName"`
+	ClusterName             string `json:"clusterName"`
+	ClusterIndex            int    `json:"clusterIndex"`
+	ShardName               string `json:"shardName,omitempty"`
+	ShardIndex              int    `json:"shardIndex"`
+	ReplicaName             string `json:"replicaName,omitempty"`
+	ReplicaIndex            int    `json:"replicaIndex"`
+	ChiScopeIndex           int    `json:"chiScopeIndex"`
+	ChiScopeCycleSize       int    `json:"chiScopeCycleSize"`
+	ChiScopeCycleIndex      int    `json:"chiScopeCycleIndex"`
+	ChiScopeCycleOffset     int    `json:"chiScopeCycleOffset"`
+	ClusterScopeIndex       int    `json:"clusterScopeIndex"`
+	ClusterScopeCycleSize   int    `json:"clusterScopeCycleSize"`
+	ClusterScopeCycleIndex  int    `json:"clusterScopeCycleIndex"`
+	ClusterScopeCycleOffset int    `json:"clusterScopeCycleOffset"`
+	ShardScopeIndex         int    `json:"shardScopeIndex"`
 }
 
 // ChiHostConfig defines additional data related to a host
@@ -287,15 +295,22 @@ type ChiTemplates struct {
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet
 type ChiPodTemplate struct {
-	Name         string             `json:"name"         yaml:"name"`
-	Zone         ChiPodTemplateZone `json:"zone"         yaml:"zone""`
-	Distribution string             `json:"distribution" yaml:"distribution"`
-	Spec         corev1.PodSpec     `json:"spec"         yaml:"spec"`
+	Name string             `json:"name"            yaml:"name"`
+	Zone ChiPodTemplateZone `json:"zone"            yaml:"zone""`
+	// DEPRECATED - to be removed soon
+	Distribution    string               `json:"distribution"    yaml:"distribution"`
+	PodDistribution []ChiPodDistribution `json:"podDistribution" yaml:"podDistribution"`
+	Spec            corev1.PodSpec       `json:"spec"            yaml:"spec"`
 }
 
 type ChiPodTemplateZone struct {
 	Key    string   `json:"key" yaml:"key"`
 	Values []string `json:"values" yaml:"values"`
+}
+
+type ChiPodDistribution struct {
+	Type   string `json:"type"   yaml:"type"`
+	Number int    `json:"number" yaml:"number"`
 }
 
 // ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
@@ -389,10 +404,10 @@ const (
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
-// Do not forget to update func (config *Config) String()
+// Do not forget to update func (config *OperatorConfig) String()
 // Do not forget to update CRD spec
-type Config struct {
-	// Full path to the config file and folder where this Config originates from
+type OperatorConfig struct {
+	// Full path to the config file and folder where this OperatorConfig originates from
 	ConfigFilePath   string
 	ConfigFolderPath string
 
@@ -407,7 +422,7 @@ type Config struct {
 	ChCommonConfigsPath string `json:"chCommonConfigsPath" yaml:"chCommonConfigsPath"`
 	ChHostConfigsPath   string `json:"chHostConfigsPath"   yaml:"chHostConfigsPath"`
 	ChUsersConfigsPath  string `json:"chUsersConfigsPath"  yaml:"chUsersConfigsPath"`
-	// Config files fetched from these paths. Maps "file name->file content"
+	// OperatorConfig files fetched from these paths. Maps "file name->file content"
 	ChCommonConfigs map[string]string
 	ChHostConfigs   map[string]string
 	ChUsersConfigs  map[string]string
@@ -442,6 +457,7 @@ type Config struct {
 	ChConfigUserDefaultNetworksIP []string `json:"chConfigUserDefaultNetworksIP" yaml:"chConfigUserDefaultNetworksIP"`
 	ChConfigUserDefaultPassword   string   `json:"chConfigUserDefaultPassword"   yaml:"chConfigUserDefaultPassword"`
 
+	ChConfigNetworksHostRegexpTemplate string `json:"chConfigNetworksHostRegexpTemplate" yaml:"chConfigNetworksHostRegexpTemplate"`
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
 	// 2. Schema maintenance
@@ -452,18 +468,24 @@ type Config struct {
 }
 
 const (
-	// What to do in case StatefulSet can't reach new Generation - abort rolling create
+	// What to do in case StatefulSet can't reach new Generation - abort CHI reconcile
 	OnStatefulSetCreateFailureActionAbort = "abort"
 
 	// What to do in case StatefulSet can't reach new Generation - delete newly created problematic StatefulSet
 	OnStatefulSetCreateFailureActionDelete = "delete"
+
+	// What to do in case StatefulSet can't reach new Generation - do nothing, keep StatefulSet broken and move to the next
+	OnStatefulSetCreateFailureActionIgnore = "ignore"
 )
 
 const (
-	// What to do in case StatefulSet can't reach new Generation - abort rolling update
+	// What to do in case StatefulSet can't reach new Generation - abort CHI reconcile
 	OnStatefulSetUpdateFailureActionAbort = "abort"
 
 	// What to do in case StatefulSet can't reach new Generation - delete Pod and rollback StatefulSet to previous Generation
 	// Pod would be recreated by StatefulSet based on rollback-ed configuration
 	OnStatefulSetUpdateFailureActionRollback = "rollback"
+
+	// What to do in case StatefulSet can't reach new Generation - do nothing, keep StatefulSet broken and move to the next
+	OnStatefulSetUpdateFailureActionIgnore = "ignore"
 )

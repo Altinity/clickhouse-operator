@@ -93,6 +93,12 @@ const (
 	WHERE active = 1
 	GROUP BY database, table
 	`
+
+	queryMutationsSQL = `
+	select database, table, count() as mutations, sum(parts_to_do) as parts_to_do 
+	  from system.mutations 
+	 where is_done = 0 
+	 group by database, table`
 )
 
 type ClickHouseFetcher struct {
@@ -115,23 +121,7 @@ func (f *ClickHouseFetcher) newConn() *clickhouse.Conn {
 	return clickhouse.New(f.Hostname, f.Username, f.Password, f.Port)
 }
 
-func (f *ClickHouseFetcher) clickHouseQueryMetricsOld() ([][]string, error) {
-	data := make([][]string, 0)
-	conn := f.newConn()
-	rows, err := conn.Query(heredoc.Doc(queryMetricsSQL))
-	if err != nil {
-		return nil, err
-	}
-	for rows.Next() {
-		var metric, value, description, _type string
-		if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
-			data = append(data, []string{metric, value, description, _type})
-		}
-	}
-	return data, nil
-}
-
-// clickHouseQueryMetrics requests metrics data from the ClickHouse database
+// clickHouseQueryMetrics requests metrics data from ClickHouse
 func (f *ClickHouseFetcher) clickHouseQueryMetrics() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		heredoc.Doc(queryMetricsSQL),
@@ -145,23 +135,7 @@ func (f *ClickHouseFetcher) clickHouseQueryMetrics() ([][]string, error) {
 	)
 }
 
-func (f *ClickHouseFetcher) clickHouseQueryTableSizesOld() ([][]string, error) {
-	data := make([][]string, 0)
-	conn := f.newConn()
-	rows, err := conn.Query(heredoc.Doc(queryTableSizesSQL))
-	if err != nil {
-		return nil, err
-	}
-	for rows.Next() {
-		var database, table, partitions, parts, bytes, uncompressed, _rows string
-		if err := rows.Scan(&database, &table, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
-			data = append(data, []string{database, table, partitions, parts, bytes, uncompressed, _rows})
-		}
-	}
-	return data, nil
-}
-
-// clickHouseQueryTableSizes requests data sizes from the ClickHouse
+// clickHouseQueryTableSizes requests data sizes from ClickHouse
 func (f *ClickHouseFetcher) clickHouseQueryTableSizes() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		heredoc.Doc(queryTableSizesSQL),
@@ -175,23 +149,7 @@ func (f *ClickHouseFetcher) clickHouseQueryTableSizes() ([][]string, error) {
 	)
 }
 
-func (f *ClickHouseFetcher) clickHouseQuerySystemReplicasOld() ([][]string, error) {
-	data := make([][]string, 0)
-	conn := f.newConn()
-	rows, err := conn.Query(heredoc.Doc(querySystemReplicasSQL))
-	if err != nil {
-		return nil, err
-	}
-	for rows.Next() {
-		var database, table, isSessionExpired string
-		if err := rows.Scan(&database, &table, &isSessionExpired); err == nil {
-			data = append(data, []string{database, table, isSessionExpired})
-		}
-	}
-	return data, nil
-}
-
-// clickHouseQuerySystemReplicas requests replica information from the ClickHouse database
+// clickHouseQuerySystemReplicas requests replica information from ClickHouse
 func (f *ClickHouseFetcher) clickHouseQuerySystemReplicas() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		heredoc.Doc(querySystemReplicasSQL),
@@ -199,6 +157,20 @@ func (f *ClickHouseFetcher) clickHouseQuerySystemReplicas() ([][]string, error) 
 			var database, table, isSessionExpired string
 			if err := rows.Scan(&database, &table, &isSessionExpired); err == nil {
 				*data = append(*data, []string{database, table, isSessionExpired})
+			}
+			return nil
+		},
+	)
+}
+
+// clickHouseQuerySystemMutations requests mutations information from ClickHouse
+func (f *ClickHouseFetcher) clickHouseQueryMutations() ([][]string, error) {
+	return f.clickHouseQueryScanRows(
+		heredoc.Doc(queryMutationsSQL),
+		func(rows *sqlmodule.Rows, data *[][]string) error {
+			var database, table, mutations, parts_to_do string
+			if err := rows.Scan(&database, &table, &mutations, &parts_to_do); err == nil {
+				*data = append(*data, []string{database, table, mutations, parts_to_do})
 			}
 			return nil
 		},

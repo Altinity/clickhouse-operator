@@ -59,8 +59,10 @@ func (e *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		e.getWatchedChi(w, r)
 	case "POST":
 		e.addWatchedChi(w, r)
+	case "DELETE":
+		e.deleteWatchedChi(w, r)
 	default:
-		fmt.Fprintf(w, "Sorry, only GET and POST methods are supported.")
+		fmt.Fprintf(w, "Sorry, only GET, POST and DELETE methods are supported.")
 	}
 }
 
@@ -83,13 +85,21 @@ func (e *Exporter) addWatchedChi(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
 }
 
-func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
-	chi := &WatchedChi{
-		Namespace: namespace,
-		Name:      chiName,
-		Hostnames: hostnames,
+func (e *Exporter) deleteWatchedChi(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	chi := &WatchedChi{}
+	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
+		if !chi.empty() {
+			// All is OK, CHI seems to be valid
+			exporter.enqueueToRemoveFromWatched(chi)
+			return
+		}
 	}
 
+	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
+}
+
+func MakeRESTCall(chi *WatchedChi, op string) error {
 	url := "http://127.0.0.1:8888/chi"
 
 	json, err := json.Marshal(chi)
@@ -97,7 +107,7 @@ func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(json))
+	req, err := http.NewRequest(op, url, bytes.NewBuffer(json))
 	if err != nil {
 		return err
 	}
@@ -105,6 +115,24 @@ func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
 	_, err = doRequest(req)
 
 	return err
+}
+
+func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
+	chi := &WatchedChi{
+		Namespace: namespace,
+		Name:      chiName,
+		Hostnames: hostnames,
+	}
+	return MakeRESTCall(chi, "POST")
+}
+
+func DeleteWatchREST(namespace, chiName string) error {
+	chi := &WatchedChi{
+		Namespace: namespace,
+		Name:      chiName,
+		Hostnames: []string{},
+	}
+	return MakeRESTCall(chi, "DELETE")
 }
 
 func doRequest(req *http.Request) ([]byte, error) {

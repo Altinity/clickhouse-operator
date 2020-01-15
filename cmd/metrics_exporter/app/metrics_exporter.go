@@ -18,13 +18,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
-	chopconfig "github.com/altinity/clickhouse-operator/pkg/config"
-	"github.com/altinity/clickhouse-operator/pkg/version"
-	"github.com/golang/glog"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/golang/glog"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 // Prometheus exporter defaults
@@ -77,20 +79,26 @@ func Run() {
 	}()
 
 	//
-	// Create operator config
+	// Create operator instance
 	//
-	chopConfigManager := chopconfig.NewConfigManager(nil, chopConfigFile)
-	if err := chopConfigManager.Init(); err != nil {
-		glog.Fatalf("Unable to build config file %v\n", err)
+	chop := chop.NewChop(version.Version, nil, chopConfigFile)
+	if err := chop.Init(); err != nil {
+		glog.Fatalf("Unable to init CHOP instance %v\n", err)
 		os.Exit(1)
 	}
 
 	glog.V(1).Info("Starting metrics exporter\n")
 
 	metrics.StartMetricsREST(
-		chopConfigManager.Config().ChUsername, chopConfigManager.Config().ChPassword, chopConfigManager.Config().ChPort,
-		metricsEP, metricsPath,
-		chiListEP, chiListPath,
+		chop.Config().ChUsername,
+		chop.Config().ChPassword,
+		chop.Config().ChPort,
+
+		metricsEP,
+		metricsPath,
+
+		chiListEP,
+		chiListPath,
 	)
 
 	<-ctx.Done()

@@ -6,9 +6,14 @@
                 <ip>0.0.0.0/0</ip>
                 <ip>::/0</ip>
             </networks>
-            <password>clickhouse_operator_password</password>
-            <profile>default</profile>
+            <password_sha256_hex>716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448</password_sha256_hex>
+            <profile>clickhouse_operator</profile>
             <quota>default</quota>
         </clickhouse_operator>
     </users>
+    <profiles>
+        <clickhouse_operator>
+            <log_queries>0</log_queries>
+        </clickhouse_operator>
+    </profiles>
 </yandex>

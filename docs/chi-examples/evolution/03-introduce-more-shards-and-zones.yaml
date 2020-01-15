@@ -23,7 +23,8 @@ spec:
           key: "clickhouse"
           values:
             - "allow"
-        distribution: "OnePerHost"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
         spec:
           containers:
             - name: clickhouse

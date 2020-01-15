@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package chop
 
 import (
 	"github.com/golang/glog"
@@ -28,20 +28,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type Manager struct {
+type ConfigManager struct {
 	chopClient     *chopclientset.Clientset
 	chopConfigList *chiv1.ClickHouseOperatorConfigurationList
 
 	initConfigFilePath string
 
 	// fileConfig is a file-based config
-	fileConfig *chiv1.Config
+	fileConfig *chiv1.OperatorConfig
 
 	// crConfigs is a slice of Custom Resource based configs
-	crConfigs []*chiv1.Config
+	crConfigs []*chiv1.OperatorConfig
 
 	// config is the final, unified config
-	config *chiv1.Config
+	config *chiv1.OperatorConfig
 
 	runtimeParams map[string]string
 }
@@ -50,15 +50,15 @@ type Manager struct {
 func NewConfigManager(
 	chopClient *chopclientset.Clientset,
 	initConfigFilePath string,
-) *Manager {
-	return &Manager{
+) *ConfigManager {
+	return &ConfigManager{
 		chopClient:         chopClient,
 		initConfigFilePath: initConfigFilePath,
 	}
 }
 
 // Init reads config from all sources
-func (cm *Manager) Init() error {
+func (cm *ConfigManager) Init() error {
 	var err error
 
 	// Get ENV vars
@@ -87,20 +87,20 @@ func (cm *Manager) Init() error {
 	// Finalize config by post-processing
 	cm.config.Postprocess()
 
-	// Config is ready
+	// OperatorConfig is ready
 	glog.V(1).Info("Final CHOP config")
 	cm.config.WriteToLog()
 
 	return nil
 }
 
-// Config is an access wrapper
-func (cm *Manager) Config() *chiv1.Config {
+// OperatorConfig is an access wrapper
+func (cm *ConfigManager) Config() *chiv1.OperatorConfig {
 	return cm.config
 }
 
 // getCRBasedConfigs reads all ClickHouseOperatorConfiguration objects in specified namespace
-func (cm *Manager) getCRBasedConfigs(namespace string) {
+func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 	if cm.chopClient == nil {
 		return
 	}
@@ -129,7 +129,7 @@ func (cm *Manager) getCRBasedConfigs(namespace string) {
 			chOperatorConfiguration := &cm.chopConfigList.Items[i]
 			if chOperatorConfiguration.Name == name {
 
-				// Save location info into Config itself
+				// Save location info into OperatorConfig itself
 				chOperatorConfiguration.Spec.ConfigFolderPath = namespace
 				chOperatorConfiguration.Spec.ConfigFilePath = name
 
@@ -141,7 +141,7 @@ func (cm *Manager) getCRBasedConfigs(namespace string) {
 }
 
 // logCRBasedConfigs writes all ClickHouseOperatorConfiguration objects into log
-func (cm *Manager) logCRBasedConfigs() {
+func (cm *ConfigManager) logCRBasedConfigs() {
 	for _, chOperatorConfiguration := range cm.crConfigs {
 		glog.V(1).Infof("chop config %s/%s :", chOperatorConfiguration.ConfigFolderPath, chOperatorConfiguration.ConfigFilePath)
 		chOperatorConfiguration.WriteToLog()
@@ -149,7 +149,7 @@ func (cm *Manager) logCRBasedConfigs() {
 }
 
 // buildUnifiedConfig prepares one config from all accumulated parts
-func (cm *Manager) buildUnifiedConfig() {
+func (cm *ConfigManager) buildUnifiedConfig() {
 	// Start with file config as a base
 	cm.config = cm.fileConfig
 	cm.fileConfig = nil
@@ -161,7 +161,7 @@ func (cm *Manager) buildUnifiedConfig() {
 }
 
 // IsConfigListed checks whether specified ClickHouseOperatorConfiguration is listed in list of ClickHouseOperatorConfiguration(s)
-func (cm *Manager) IsConfigListed(config *chiv1.ClickHouseOperatorConfiguration) bool {
+func (cm *ConfigManager) IsConfigListed(config *chiv1.ClickHouseOperatorConfiguration) bool {
 	for i := range cm.chopConfigList.Items {
 		chOperatorConfiguration := &cm.chopConfigList.Items[i]
 
@@ -176,8 +176,8 @@ func (cm *Manager) IsConfigListed(config *chiv1.ClickHouseOperatorConfiguration)
 	return false
 }
 
-// GetConfig creates Config object based on current environment
-func (cm *Manager) getFileBasedConfig(configFilePath string) (*chiv1.Config, error) {
+// getFileBasedConfig creates OperatorConfig object based on file specified
+func (cm *ConfigManager) getFileBasedConfig(configFilePath string) (*chiv1.OperatorConfig, error) {
 	// In case we have config file specified - that's it
 	if len(configFilePath) > 0 {
 		// Config file explicitly specified as CLI flag
@@ -220,22 +220,22 @@ func (cm *Manager) getFileBasedConfig(configFilePath string) (*chiv1.Config, err
 	return cm.buildDefaultConfig()
 }
 
-// buildConfigFromFile returns Config struct built out of specified file path
-func (cm *Manager) buildConfigFromFile(configFilePath string) (*chiv1.Config, error) {
+// buildConfigFromFile returns OperatorConfig struct built out of specified file path
+func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.OperatorConfig, error) {
 	// Read config file content
 	yamlText, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
 		return nil, err
 	}
 
-	// Parse config file content into Config struct
-	config := new(chiv1.Config)
+	// Parse config file content into OperatorConfig struct
+	config := new(chiv1.OperatorConfig)
 	err = yaml.Unmarshal(yamlText, config)
 	if err != nil {
 		return nil, err
 	}
 
-	// Fill Config's paths
+	// Fill OperatorConfig's paths
 	config.ConfigFilePath, err = filepath.Abs(configFilePath)
 	config.ConfigFolderPath = filepath.Dir(config.ConfigFilePath)
 
@@ -243,15 +243,15 @@ func (cm *Manager) buildConfigFromFile(configFilePath string) (*chiv1.Config, er
 
 }
 
-// buildDefaultConfig returns default Config
-func (cm *Manager) buildDefaultConfig() (*chiv1.Config, error) {
-	config := new(chiv1.Config)
+// buildDefaultConfig returns default OperatorConfig
+func (cm *ConfigManager) buildDefaultConfig() (*chiv1.OperatorConfig, error) {
+	config := new(chiv1.OperatorConfig)
 
 	return config, nil
 }
 
 // getEnvVarParamNames return list of ENV VARS parameter names
-func (cm *Manager) getEnvVarParamNames() []string {
+func (cm *ConfigManager) getEnvVarParamNames() []string {
 	// This list of ENV VARS is specified in operator .yaml manifest, section "kind: Deployment"
 	return []string{
 		// spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -282,7 +282,7 @@ func (cm *Manager) getEnvVarParamNames() []string {
 }
 
 // getEnvVarParams returns map[string]string of ENV VARS with some runtime parameters
-func (cm *Manager) getEnvVarParams() map[string]string {
+func (cm *ConfigManager) getEnvVarParams() map[string]string {
 	params := make(map[string]string)
 	// Extract parameters from ENV VARS
 	for _, varName := range cm.getEnvVarParamNames() {
@@ -293,7 +293,7 @@ func (cm *Manager) getEnvVarParams() map[string]string {
 }
 
 // logEnvVarParams writes runtime parameters into log
-func (cm *Manager) logEnvVarParams() {
+func (cm *ConfigManager) logEnvVarParams() {
 	// Log params according to sorted names
 	// So we need to
 	// 1. Extract and sort names aka keys
@@ -314,7 +314,7 @@ func (cm *Manager) logEnvVarParams() {
 }
 
 // GetRuntimeParam gets specified runtime param
-func (cm *Manager) GetRuntimeParam(name string) (string, bool) {
+func (cm *ConfigManager) GetRuntimeParam(name string) (string, bool) {
 	_map := cm.getEnvVarParams()
 	value, ok := _map[name]
 	return value, ok

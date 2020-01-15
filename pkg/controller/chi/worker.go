@@ -35,11 +35,11 @@ type worker struct {
 func (c *Controller) newWorker() *worker {
 	return &worker{
 		c:          c,
-		normalizer: chopmodels.NewNormalizer(c.chopConfigManager.Config()),
+		normalizer: chopmodels.NewNormalizer(c.chop),
 		schemer: chopmodels.NewSchemer(
-			c.chopConfigManager.Config().ChUsername,
-			c.chopConfigManager.Config().ChPassword,
-			c.chopConfigManager.Config().ChPort,
+			c.chop.Config().ChUsername,
+			c.chop.Config().ChPassword,
+			c.chop.Config().ChPort,
 		),
 		creator: nil,
 	}
@@ -125,6 +125,16 @@ func (w *worker) addChi(new *chop.ClickHouseInstallation) error {
 	return w.updateChi(nil, new)
 }
 
+func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseInstallation {
+	if chi == nil {
+		chi, _ = w.normalizer.CreateTemplatedChi(&chop.ClickHouseInstallation{}, false)
+	} else {
+		chi, _ = w.normalizer.CreateTemplatedChi(chi, true)
+	}
+
+	return chi
+}
+
 // updateChi sync CHI which was already created earlier
 func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
@@ -134,50 +144,31 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
-	if old == nil {
-		old, _ = w.normalizer.CreateTemplatedChi(&chop.ClickHouseInstallation{}, false)
-	} else {
-		old, _ = w.normalizer.CreateTemplatedChi(old, true)
-	}
-
-	if new == nil {
-		new, _ = w.normalizer.CreateTemplatedChi(&chop.ClickHouseInstallation{}, false)
-	} else {
-		new, _ = w.normalizer.CreateTemplatedChi(new, true)
-	}
-
-	/*
-		cur, _ := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(new.Name, meta.GetOptions{})
-		if cur != nil {
-			glog.V(1).Infof("updateChi(%s/%s): generations arrived %d cur %d", new.Namespace, new.Name, new.ObjectMeta.Generation, cur.ObjectMeta.Generation)
-			if cur.ObjectMeta.Generation > new.ObjectMeta.Generation {
-				glog.V(1).Infof("updateChi(%s/%s): generation already ahead. Arrived %d cur %d. No change required", new.Namespace, new.Name, new.ObjectMeta.Generation, cur.ObjectMeta.Generation)
-				return nil
-			}
-		}
-	*/
-	glog.V(2).Infof("updateChi(%s/%s)", new.Namespace, new.Name)
+	old = w.normalize(old)
+	new = w.normalize(new)
 
 	actionPlan := NewActionPlan(old, new)
 
 	if !actionPlan.HasActionsToDo() {
 		// Nothing to do - no changes found - no need to react
-		glog.V(2).Infof("updateChi(%s/%s): no changes found", new.Namespace, new.Name)
+		glog.V(2).Infof("updateChi(%s/%s) - no changes found", new.Namespace, new.Name)
 		return nil
 	}
 
-	glog.V(1).Infof("updateChi(%s/%s) - start reconcile >>>", new.Namespace, new.Name)
-	glog.V(1).Infof("updateChi(%s/%s) - action plan:\n%s", new.Namespace, new.Name, actionPlan.String())
+	glog.V(1).Infof("updateChi(%s/%s) - start reconcile with action plan >>>\n%s",
+		new.Namespace, new.Name, actionPlan.String(),
+	)
 
-	// We are going to update CHI
-	// Write declared CHI with initialized .Status, so it would be possible to monitor progress
-	// Write normalized/expanded version
+	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	new.Status.Status = chop.StatusInProgress
 	new.Status.UpdatedHostsCount = 0
 	new.Status.AddedHostsCount = 0
 	new.Status.DeletedHostsCount = 0
 	new.Status.DeleteHostsCount = actionPlan.GetRemovedHostsNum()
-	_ = w.c.updateChiObject(new)
+	if err := w.c.updateChiObject(new); err != nil {
+		glog.V(1).Infof("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
+		return nil
+	}
 
 	if err := w.reconcile(new); err != nil {
 		log := fmt.Sprintf("FAILED update: %v", err)
@@ -229,7 +220,6 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 	new.Status.Status = chop.StatusCompleted
 	_ = w.c.updateChiObjectStatus(new, false)
 
-	//c.metricsExporter.UpdateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 	w.c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 
 	glog.V(1).Infof("updateChi(%s/%s) - complete reconcile <<<", new.Namespace, new.Name)
@@ -239,7 +229,7 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 // reconcile reconciles ClickHouseInstallation
 func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
-	w.creator = chopmodels.NewCreator(chi, w.c.chopConfigManager.Config(), w.c.version)
+	w.creator = chopmodels.NewCreator(w.c.chop, chi)
 	return chi.WalkTillError(
 		w.reconcileChi,
 		w.reconcileCluster,
@@ -383,6 +373,8 @@ func (w *worker) deleteChi(chi *chop.ClickHouseInstallation) error {
 	err = w.c.deleteServiceChi(chi)
 
 	w.c.eventChi(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, "deleted")
+
+	w.c.deleteWatch(chi.Namespace, chi.Name)
 
 	glog.V(1).Infof("End delete CHI %s/%s", chi.Namespace, chi.Name)
 

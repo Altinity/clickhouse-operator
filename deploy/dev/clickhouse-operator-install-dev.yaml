@@ -5,7 +5,6 @@
 #
 # Setup CustomResourceDefinition(s)
 # CustomResourceDefinition is namespace-less and must have unique name
----
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
@@ -342,11 +341,40 @@ spec:
                             items:
                               type: string
                       distribution:
+                        # DEPRECATED
                         type: string
                         enum:
-                          # List podDistributionXXX constants from model
                           - "Unspecified"
                           - "OnePerHost"
+                      podDistribution:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - type
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                # List podDistributionXXX constants
+                                - "Unspecified"
+                                - "ClickHouseAntiAffinity"
+                                - "ShardAntiAffinity"
+                                - "ReplicaAntiAffinity"
+                                - "AnotherNamespaceAntiAffinity"
+                                - "AnotherClickHouseInstallationAntiAffinity"
+                                - "AnotherClusterAntiAffinity"
+                                - "MaxNumberPerNode"
+                                - "NamespaceAffinity"
+                                - "ClickHouseInstallationAffinity"
+                                - "ClusterAffinity"
+                                - "ShardAffinity"
+                                - "ReplicaAffinity"
+                                - "PreviousTailAffinity"
+                            number:
+                              type: integer
+                              minimum: 0
+                              maximum: 65535
                       spec:
                         # TODO specify PodSpec
                         type: object
@@ -723,11 +751,40 @@ spec:
                             items:
                               type: string
                       distribution:
+                        # DEPRECATED
                         type: string
                         enum:
-                          # List podDistributionXXX constants from model
                           - "Unspecified"
                           - "OnePerHost"
+                      podDistribution:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - type
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                # List podDistributionXXX constants
+                                - "Unspecified"
+                                - "ClickHouseAntiAffinity"
+                                - "ShardAntiAffinity"
+                                - "ReplicaAntiAffinity"
+                                - "AnotherNamespaceAntiAffinity"
+                                - "AnotherClickHouseInstallationAntiAffinity"
+                                - "AnotherClusterAntiAffinity"
+                                - "MaxNumberPerNode"
+                                - "NamespaceAffinity"
+                                - "ClickHouseInstallationAffinity"
+                                - "ClusterAffinity"
+                                - "ShardAffinity"
+                                - "ReplicaAffinity"
+                                - "PreviousTailAffinity"
+                            number:
+                              type: integer
+                              minimum: 0
+                              maximum: 65535
                       spec:
                         # TODO specify PodSpec
                         type: object
@@ -816,18 +873,8 @@ spec:
               type: integer
             onStatefulSetCreateFailureAction:
               type: string
-              # TODO enum?
-#              enum:
-#                # List podDistributionXXX constants from model
-#                 - "Unspecified"
-#                 - "OnePerHost"
             onStatefulSetUpdateFailureAction:
               type: string
-              # TODO enum?
-#              enum:
-#                # List podDistributionXXX constants from model
-#                 - "Unspecified"
-#                 - "OnePerHost"
             chConfigUserDefaultProfile:
               type: string
             chConfigUserDefaultQuota:
@@ -850,7 +897,6 @@ spec:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:latest
 #
 # Setup ServiceAccount
 # ServiceAccount would be created in kubectl-specified namespace
@@ -875,25 +921,6 @@ subjects:
     name: clickhouse-operator
     namespace: dev
 ---
-# Setup ClusterIP Service to provide monitoring metrics for Prometheus
-# Service would be created in kubectl-specified namespace
-# In order to get access outside of k8s it should be exposed as:
-# kubectl --namespace prometheus port-forward service/prometheus 9090
-# and point browser to localhost:9090
-kind: Service
-apiVersion: v1
-metadata:
-  name: clickhouse-operator-metrics
-  namespace: dev
-  labels:
-    app: clickhouse-operator
-spec:
-  ports:
-    - port: 8888
-      name: clickhouse-operator-metrics
-  selector:
-    app: clickhouse-operator
----
 # Possible Template Parameters:
 #
 # dev
@@ -905,6 +932,8 @@ kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-files
   namespace: dev
+  labels:
+    app: clickhouse-operator
 data:
   config.yaml: |
     ################################################
@@ -956,6 +985,7 @@ data:
     # Possible options:
     # 1. abort - do nothing, just break the process and wait for admin
     # 2. delete - delete newly created problematic StatefulSet
+    # 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
     onStatefulSetCreateFailureAction: delete
     
     # What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
@@ -963,6 +993,7 @@ data:
     # 1. abort - do nothing, just break the process and wait for admin
     # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
     # Pod would be recreated by StatefulSet based on rollback-ed configuration
+    # 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
     onStatefulSetUpdateFailureAction: rollback
     
     ################################################
@@ -979,8 +1010,12 @@ data:
     chConfigUserDefaultProfile: default
     chConfigUserDefaultQuota: default
     chConfigUserDefaultNetworksIP:
-      - "::/0"
+      - "::1"
+      - "127.0.0.1"
     chConfigUserDefaultPassword: "default"
+    
+    # Default host_regexp to limit network connectivity from outside
+    ChConfigNetworksHostRegexpTemplate: "chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
     
     ################################################
     ##
@@ -1010,6 +1045,8 @@ kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: dev
+  labels:
+    app: clickhouse-operator
 data:
 ---
 # Possible Template Parameters:
@@ -1023,6 +1060,8 @@ kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: dev
+  labels:
+    app: clickhouse-operator
 data:
   01-clickhouse-listen.xml: |
     <yandex>
@@ -1055,7 +1094,6 @@ data:
         <flush_interval_milliseconds>7500</flush_interval_milliseconds>
     </query_log>
     </yandex>
-
 ---
 # Possible Template Parameters:
 #
@@ -1068,6 +1106,8 @@ kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: dev
+  labels:
+    app: clickhouse-operator
 data:
   001-templates.json.example: |
     {
@@ -1135,7 +1175,6 @@ data:
         podTemplates:
           - name: default-oneperhost-pod-template
             distribution: "OnePerHost"
-
   default-storage-template.yaml.example: |
     apiVersion: "clickhouse.altinity.com/v1"
     kind: "ClickHouseInstallationTemplate"
@@ -1154,7 +1193,6 @@ data:
 
   readme: |
     Templates in this folder are packaged with an operator and available via 'useTemplate'
-
 ---
 # Possible Template Parameters:
 #
@@ -1167,6 +1205,8 @@ kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: dev
+  labels:
+    app: clickhouse-operator
 data:
   01-clickhouse-user.xml: |
     <yandex>
@@ -1177,11 +1217,16 @@ data:
                     <ip>0.0.0.0/0</ip>
                     <ip>::/0</ip>
                 </networks>
-                <password>clickhouse_operator_password</password>
-                <profile>default</profile>
+                <password_sha256_hex>716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448</password_sha256_hex>
+                <profile>clickhouse_operator</profile>
                 <quota>default</quota>
             </clickhouse_operator>
         </users>
+        <profiles>
+            <clickhouse_operator>
+                <log_queries>0</log_queries>
+            </clickhouse_operator>
+        </profiles>
     </yandex>
 
   02-clickhouse-default-profile.xml: |
@@ -1197,7 +1242,6 @@ data:
         </default>
       </profiles>
     </yandex>
-
 ---
 # Possible Template Parameters:
 #
@@ -1321,3 +1365,26 @@ spec:
               mountPath: /etc/clickhouse-operator/templates.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/users.d
+---
+# Possible Template Parameters:
+#
+# dev
+#
+# Setup ClusterIP Service to provide monitoring metrics for Prometheus
+# Service would be created in kubectl-specified namespace
+# In order to get access outside of k8s it should be exposed as:
+# kubectl --namespace prometheus port-forward service/prometheus 9090
+# and point browser to localhost:9090
+kind: Service
+apiVersion: v1
+metadata:
+  name: clickhouse-operator-metrics
+  namespace: dev
+  labels:
+    app: clickhouse-operator
+spec:
+  ports:
+    - port: 8888
+      name: clickhouse-operator-metrics
+  selector:
+    app: clickhouse-operator
