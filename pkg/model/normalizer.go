@@ -1205,19 +1205,19 @@ func (n *Normalizer) normalizeHostName(host *chiv1.ChiHost, index int) {
 // normalizeHostPorts ensures chiv1.ChiReplica.Port is reasonable
 func (n *Normalizer) normalizeHostPorts(host *chiv1.ChiHost) {
 	if host.Port <= 0 {
-		host.Port = chDefaultTcpPortNumber
+		host.Port = chDefaultTCPPortNumber
 	}
 
-	if host.TcpPort <= 0 {
-		host.TcpPort = chDefaultTcpPortNumber
+	if host.TCPPort <= 0 {
+		host.TCPPort = chDefaultTCPPortNumber
 	}
 
-	if host.HttpPort <= 0 {
-		host.HttpPort = chDefaultHttpPortNumber
+	if host.HTTPPort <= 0 {
+		host.HTTPPort = chDefaultHTTPPortNumber
 	}
 
-	if host.InterserverHttpPort <= 0 {
-		host.InterserverHttpPort = chDefaultInterserverHttpPortNumber
+	if host.InterserverHTTPPort <= 0 {
+		host.InterserverHTTPPort = chDefaultInterserverHTTPPortNumber
 	}
 }
 

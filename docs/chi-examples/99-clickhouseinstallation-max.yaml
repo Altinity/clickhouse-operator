@@ -162,7 +162,7 @@ spec:
                 - name: replica0
                   tcpPort: 9000
                   httpPort: 8123
-                  interserverHttpPort: 9009
+                  interserverHTTPPort: 9009
                   templates:
                     podTemplate: clickhouse-v19.11.3.11
                     dataVolumeClaimTemplate: default-volume-claim

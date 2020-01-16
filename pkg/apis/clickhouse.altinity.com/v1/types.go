@@ -206,9 +206,9 @@ type ChiHost struct {
 	Name string `json:"name,omitempty"`
 	// DEPRECATED - to be removed soon
 	Port                int32            `json:"port,omitempty"`
-	TcpPort             int32            `json:"tcpPort,omitempty"`
-	HttpPort            int32            `json:"httpPort,omitempty"`
-	InterserverHttpPort int32            `json:"interserverHttpPort,omitempty"`
+	TCPPort             int32            `json:"tcpPort,omitempty"`
+	HTTPPort            int32            `json:"httpPort,omitempty"`
+	InterserverHTTPPort int32            `json:"interserverHTTPPort,omitempty"`
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data

@@ -173,7 +173,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 				// </replica>
 				cline(b, 16, "<replica>")
 				cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-				cline(b, 16, "    <port>%d</port>", host.InterserverHttpPort)
+				cline(b, 16, "    <port>%d</port>", host.InterserverHTTPPort)
 				cline(b, 16, "</replica>")
 
 				return nil
@@ -208,7 +208,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 		// </replica>
 		cline(b, 16, "<replica>")
 		cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-		cline(b, 16, "    <port>%d</port>", host.InterserverHttpPort)
+		cline(b, 16, "    <port>%d</port>", host.InterserverHTTPPort)
 		cline(b, 16, "</replica>")
 
 		return nil
@@ -236,7 +236,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 		// </replica>
 		cline(b, 16, "<replica>")
 		cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-		cline(b, 16, "    <port>%d</port>", host.InterserverHttpPort)
+		cline(b, 16, "    <port>%d</port>", host.InterserverHTTPPort)
 		cline(b, 16, "</replica>")
 
 		// </shard>
@@ -294,15 +294,15 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *chiv1.ChiHost) string {
 }
 
 func noCustomPorts(host *chiv1.ChiHost) bool {
-	if host.TcpPort != chDefaultTcpPortNumber {
+	if host.TCPPort != chDefaultTCPPortNumber {
 		return false
 	}
 
-	if host.HttpPort != chDefaultHttpPortNumber {
+	if host.HTTPPort != chDefaultHTTPPortNumber {
 		return false
 	}
 
-	if host.InterserverHttpPort != chDefaultInterserverHttpPortNumber {
+	if host.InterserverHTTPPort != chDefaultInterserverHTTPPortNumber {
 		return false
 	}
 
@@ -321,14 +321,14 @@ func (c *ClickHouseConfigGenerator) GetHostPorts(host *chiv1.ChiHost) string {
 	// <yandex>
 	cline(b, 0, "<"+xmlTagYandex+">")
 
-	if host.TcpPort != chDefaultTcpPortNumber {
-		cline(b, 4, "<tcp_port>%d</tcp_port>", host.TcpPort)
+	if host.TCPPort != chDefaultTCPPortNumber {
+		cline(b, 4, "<tcp_port>%d</tcp_port>", host.TCPPort)
 	}
-	if host.HttpPort != chDefaultHttpPortNumber {
-		cline(b, 4, "<http_port>%d</http_port>", host.HttpPort)
+	if host.HTTPPort != chDefaultHTTPPortNumber {
+		cline(b, 4, "<http_port>%d</http_port>", host.HTTPPort)
 	}
-	if host.InterserverHttpPort != chDefaultInterserverHttpPortNumber {
-		cline(b, 4, "<interserver_http_port>%d</interserver_http_port>", host.InterserverHttpPort)
+	if host.InterserverHTTPPort != chDefaultInterserverHTTPPortNumber {
+		cline(b, 4, "<interserver_http_port>%d</interserver_http_port>", host.InterserverHTTPPort)
 	}
 
 	// </yandex>

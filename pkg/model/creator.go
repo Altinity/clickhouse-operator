@@ -77,16 +77,16 @@ func (c *Creator) CreateServiceChi() *corev1.Service {
 				// ClusterIP: templateDefaultsServiceClusterIP,
 				Ports: []corev1.ServicePort{
 					{
-						Name:       chDefaultHttpPortName,
+						Name:       chDefaultHTTPPortName,
 						Protocol:   corev1.ProtocolTCP,
-						Port:       chDefaultHttpPortNumber,
-						TargetPort: intstr.FromString(chDefaultHttpPortName),
+						Port:       chDefaultHTTPPortNumber,
+						TargetPort: intstr.FromString(chDefaultHTTPPortName),
 					},
 					{
-						Name:       chDefaultTcpPortName,
+						Name:       chDefaultTCPPortName,
 						Protocol:   corev1.ProtocolTCP,
-						Port:       chDefaultTcpPortNumber,
-						TargetPort: intstr.FromString(chDefaultTcpPortName),
+						Port:       chDefaultTCPPortNumber,
+						TargetPort: intstr.FromString(chDefaultTCPPortName),
 					},
 				},
 				Selector: c.labeler.getSelectorChiScope(),
@@ -161,22 +161,22 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			Spec: corev1.ServiceSpec{
 				Ports: []corev1.ServicePort{
 					{
-						Name:       chDefaultHttpPortName,
+						Name:       chDefaultHTTPPortName,
 						Protocol:   corev1.ProtocolTCP,
-						Port:       host.HttpPort,
-						TargetPort: intstr.FromString(chDefaultHttpPortName),
+						Port:       host.HTTPPort,
+						TargetPort: intstr.FromString(chDefaultHTTPPortName),
 					},
 					{
-						Name:       chDefaultTcpPortName,
+						Name:       chDefaultTCPPortName,
 						Protocol:   corev1.ProtocolTCP,
-						Port:       host.TcpPort,
-						TargetPort: intstr.FromString(chDefaultTcpPortName),
+						Port:       host.TCPPort,
+						TargetPort: intstr.FromString(chDefaultTCPPortName),
 					},
 					{
-						Name:       chDefaultInterserverHttpPortName,
+						Name:       chDefaultInterserverHTTPPortName,
 						Protocol:   corev1.ProtocolTCP,
-						Port:       host.InterserverHttpPort,
-						TargetPort: intstr.FromString(chDefaultInterserverHttpPortName),
+						Port:       host.InterserverHTTPPort,
+						TargetPort: intstr.FromString(chDefaultInterserverHTTPPortName),
 					},
 				},
 				Selector:                 c.labeler.GetSelectorHostScope(host),
@@ -559,9 +559,9 @@ func getClickHouseContainer(statefulSet *apps.StatefulSet) *corev1.Container {
 func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	chContainer := getClickHouseContainer(statefulSet)
 	// Ensure ClickHouse container has all named ports specified
-	ensurePortByName(chContainer, chDefaultTcpPortName, host.TcpPort)
-	ensurePortByName(chContainer, chDefaultHttpPortName, host.HttpPort)
-	ensurePortByName(chContainer, chDefaultInterserverHttpPortName, host.InterserverHttpPort)
+	ensurePortByName(chContainer, chDefaultTCPPortName, host.TCPPort)
+	ensurePortByName(chContainer, chDefaultHTTPPortName, host.HTTPPort)
+	ensurePortByName(chContainer, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
 }
 
 func ensurePortByName(container *corev1.Container, name string, port int32) {
@@ -623,23 +623,23 @@ func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 		Image: defaultClickHouseDockerImage,
 		Ports: []corev1.ContainerPort{
 			{
-				Name:          chDefaultHttpPortName,
-				ContainerPort: chDefaultHttpPortNumber,
+				Name:          chDefaultHTTPPortName,
+				ContainerPort: chDefaultHTTPPortNumber,
 			},
 			{
-				Name:          chDefaultTcpPortName,
-				ContainerPort: chDefaultTcpPortNumber,
+				Name:          chDefaultTCPPortName,
+				ContainerPort: chDefaultTCPPortNumber,
 			},
 			{
-				Name:          chDefaultInterserverHttpPortName,
-				ContainerPort: chDefaultInterserverHttpPortNumber,
+				Name:          chDefaultInterserverHTTPPortName,
+				ContainerPort: chDefaultInterserverHTTPPortNumber,
 			},
 		},
 		ReadinessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/ping",
-					Port: intstr.Parse(chDefaultHttpPortName),
+					Port: intstr.Parse(chDefaultHTTPPortName),
 				},
 			},
 			InitialDelaySeconds: 10,
