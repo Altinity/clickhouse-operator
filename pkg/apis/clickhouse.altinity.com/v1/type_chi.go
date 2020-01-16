@@ -503,6 +503,16 @@ func (chi *ClickHouseInstallation) HostsCount() int {
 	return count
 }
 
+// GetHostTemplate gets ChiHostTemplate by name
+func (chi *ClickHouseInstallation) GetHostTemplate(name string) (*ChiHostTemplate, bool) {
+	if chi.Spec.Templates.HostTemplatesIndex == nil {
+		return nil, false
+	} else {
+		template, ok := chi.Spec.Templates.HostTemplatesIndex[name]
+		return template, ok
+	}
+}
+
 // GetPodTemplate gets ChiPodTemplate by name
 func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate, bool) {
 	if chi.Spec.Templates.PodTemplatesIndex == nil {

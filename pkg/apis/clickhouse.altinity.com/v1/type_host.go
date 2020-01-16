@@ -22,6 +22,12 @@ func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica) 
 	(&host.Templates).HandleDeprecatedFields()
 }
 
+func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
+	name := host.Templates.HostTemplate
+	template, ok := host.CHI.GetHostTemplate(name)
+	return template, ok
+}
+
 func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
 	name := host.Templates.PodTemplate
 	template, ok := host.CHI.GetPodTemplate(name)
