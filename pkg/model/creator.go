@@ -325,10 +325,10 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 
 	podTemplate := c.getPodTemplate(host)
 	statefulSetAssignPodTemplate(statefulSet, podTemplate)
-	c.personalizeStatefulSetPodTemplate(statefulSet, host)
+	c.personalizeStatefulSetTemplate(statefulSet, host)
 }
 
-func (c *Creator) personalizeStatefulSetPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	statefulSetName := CreateStatefulSetName(host)
 
 	// Ensure necessary named ports and respecified

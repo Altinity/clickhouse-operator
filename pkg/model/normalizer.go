@@ -1219,20 +1219,20 @@ func (n *Normalizer) normalizeHost(
 	shardIndex int,
 	replicaIndex int,
 ) {
-	n.normalizeHostName(host, replicaIndex)
+	n.normalizeHostName(host, shardIndex, replicaIndex)
 	n.normalizeHostPorts(host)
 	// Use PodTemplate from parent shard
 	host.InheritTemplatesFrom(shard, replica)
 }
 
 // normalizeHostName normalizes host's name
-func (n *Normalizer) normalizeHostName(host *chiv1.ChiHost, index int) {
+func (n *Normalizer) normalizeHostName(host *chiv1.ChiHost, shardIndex, replicaIndex int) {
 	if len(host.Name) > 0 {
 		// Already has a name, do not change it
 		return
 	} else {
 		// No name specified - name this host
-		host.Name = strconv.Itoa(index)
+		host.Name = fmt.Sprintf("%d-%d", shardIndex, replicaIndex)
 	}
 }
 
