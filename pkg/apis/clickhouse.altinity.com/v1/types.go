@@ -126,13 +126,13 @@ type ChiCluster struct {
 
 	// Internal data
 	Address ChiClusterAddress       `json:"address"`
-	Chi     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiClusterAddress defines address of a cluster within ClickHouseInstallation
 type ChiClusterAddress struct {
 	Namespace    string `json:"namespace"`
-	ChiName      string `json:"chiName"`
+	CHIName      string `json:"chiName"`
 	ClusterName  string `json:"clusterName"`
 	ClusterIndex int    `json:"clusterIndex"`
 }
@@ -165,7 +165,7 @@ type ChiShard struct {
 
 	// Internal data
 	Address ChiShardAddress         `json:"address"`
-	Chi     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
@@ -178,13 +178,13 @@ type ChiReplica struct {
 
 	// Internal data
 	Address ChiReplicaAddress       `json:"address"`
-	Chi     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiShardAddress defines address of a shard within ClickHouseInstallation
 type ChiShardAddress struct {
 	Namespace    string `json:"namespace"`
-	ChiName      string `json:"chiName"`
+	CHIName      string `json:"chiName"`
 	ClusterName  string `json:"clusterName"`
 	ClusterIndex int    `json:"clusterIndex"`
 	ShardName    string `json:"shardName,omitempty"`
@@ -194,7 +194,7 @@ type ChiShardAddress struct {
 // ChiReplicaAddress defines address of a replica within ClickHouseInstallation
 type ChiReplicaAddress struct {
 	Namespace    string `json:"namespace"`
-	ChiName      string `json:"chiName"`
+	CHIName      string `json:"chiName"`
 	ClusterName  string `json:"clusterName"`
 	ClusterIndex int    `json:"clusterIndex"`
 	ReplicaName  string `json:"replicaName,omitempty"`
@@ -214,13 +214,13 @@ type ChiHost struct {
 	// Internal data
 	Address ChiHostAddress          `json:"address"`
 	Config  ChiHostConfig           `json:"config"`
-	Chi     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiHostAddress defines address of a host within ClickHouseInstallation
 type ChiHostAddress struct {
 	Namespace               string `json:"namespace"`
-	ChiName                 string `json:"chiName"`
+	CHIName                 string `json:"chiName"`
 	ClusterName             string `json:"clusterName"`
 	ClusterIndex            int    `json:"clusterIndex"`
 	ShardName               string `json:"shardName,omitempty"`
@@ -230,10 +230,10 @@ type ChiHostAddress struct {
 	ReplicaIndex            int    `json:"replicaIndex"`
 	ReplicaScopeIndex       int    `json:"replicaScopeIndex"`
 	HostName                string `json:"hostName,omitempty"`
-	ChiScopeIndex           int    `json:"chiScopeIndex"`
-	ChiScopeCycleSize       int    `json:"chiScopeCycleSize"`
-	ChiScopeCycleIndex      int    `json:"chiScopeCycleIndex"`
-	ChiScopeCycleOffset     int    `json:"chiScopeCycleOffset"`
+	CHIScopeIndex           int    `json:"chiScopeIndex"`
+	CHIScopeCycleSize       int    `json:"chiScopeCycleSize"`
+	CHIScopeCycleIndex      int    `json:"chiScopeCycleIndex"`
+	CHIScopeCycleOffset     int    `json:"chiScopeCycleOffset"`
 	ClusterScopeIndex       int    `json:"clusterScopeIndex"`
 	ClusterScopeCycleSize   int    `json:"clusterScopeCycleSize"`
 	ClusterScopeCycleIndex  int    `json:"clusterScopeCycleIndex"`
@@ -246,7 +246,7 @@ type ChiHostConfig struct {
 	SettingsFingerprint  string `json:"settingsfingerprint"`
 }
 
-// ChiTemplates defines templates section of .spec
+// CHITemplates defines templates section of .spec
 type ChiTemplates struct {
 	// Templates
 	PodTemplates         []ChiPodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates"`
@@ -387,13 +387,13 @@ type OperatorConfig struct {
 	ChUsersConfigs  map[string]string
 
 	// Path where to look for ClickHouseInstallation templates .yaml files
-	ChiTemplatesPath string `json:"chiTemplatesPath" yaml:"chiTemplatesPath"`
-	// Chi template files fetched from this path. Maps "file name->file content"
-	ChiTemplateFiles map[string]string
-	// Chi template objects unmarshalled from ChiTemplateFiles. Maps "metadata.name->object"
-	ChiTemplates []*ClickHouseInstallation
+	CHITemplatesPath string `json:"chiTemplatesPath" yaml:"chiTemplatesPath"`
+	// CHI template files fetched from this path. Maps "file name->file content"
+	CHITemplateFiles map[string]string
+	// CHI template objects unmarshalled from CHITemplateFiles. Maps "metadata.name->object"
+	CHITemplates []*ClickHouseInstallation
 	// ClickHouseInstallation template
-	ChiTemplate *ClickHouseInstallation
+	CHITemplate *ClickHouseInstallation
 
 	// Create/Update StatefulSet behavior - for how long to wait for StatefulSet to reach new Generation
 	StatefulSetUpdateTimeout uint64 `json:"statefulSetUpdateTimeout" yaml:"statefulSetUpdateTimeout"`

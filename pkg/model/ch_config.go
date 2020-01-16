@@ -265,7 +265,7 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *chiv1.ChiHost) string {
 	cline(b, 0, "    <macros>")
 
 	// <installation>CHI-name-macros-value</installation>
-	cline(b, 8, "<installation>%s</installation>", host.Address.ChiName)
+	cline(b, 8, "<installation>%s</installation>", host.Address.CHIName)
 
 	// <CLUSTER_NAME>cluster-name-macros-value</CLUSTER_NAME>
 	// cline(b, 8, "<%s>%[2]s</%[1]s>", replica.Address.ClusterName, c.getMacrosCluster(replica.Address.ClusterName))
@@ -274,7 +274,7 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *chiv1.ChiHost) string {
 
 	// All Shards One Replica Cluster
 	// <CLUSTER_NAME-shard>0-based shard index within all-shards-one-replica-cluster</CLUSTER_NAME-shard>
-	cline(b, 8, "<%s-shard>%d</%[1]s-shard>", allShardsOneReplicaClusterName, host.Address.ChiScopeIndex)
+	cline(b, 8, "<%s-shard>%d</%[1]s-shard>", allShardsOneReplicaClusterName, host.Address.CHIScopeIndex)
 
 	// <cluster> and <shard> macros are applicable to main cluster only. All aux clusters do not have ambiguous macros
 	// <cluster></cluster> macro

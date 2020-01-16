@@ -78,26 +78,26 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 		host *ChiHost,
 	) error {
 		cluster.Address.Namespace = chi.Namespace
-		cluster.Address.ChiName = chi.Name
+		cluster.Address.CHIName = chi.Name
 		cluster.Address.ClusterName = cluster.Name
 		cluster.Address.ClusterIndex = clusterIndex
 
 		shard.Address.Namespace = chi.Namespace
-		shard.Address.ChiName = chi.Name
+		shard.Address.CHIName = chi.Name
 		shard.Address.ClusterName = cluster.Name
 		shard.Address.ClusterIndex = clusterIndex
 		shard.Address.ShardName = shard.Name
 		shard.Address.ShardIndex = shardIndex
 
 		replica.Address.Namespace = chi.Namespace
-		replica.Address.ChiName = chi.Name
+		replica.Address.CHIName = chi.Name
 		replica.Address.ClusterName = cluster.Name
 		replica.Address.ClusterIndex = clusterIndex
 		replica.Address.ReplicaName = replica.Name
 		replica.Address.ReplicaIndex = replicaIndex
 
 		host.Address.Namespace = chi.Namespace
-		host.Address.ChiName = chi.Name
+		host.Address.CHIName = chi.Name
 		host.Address.ClusterName = cluster.Name
 		host.Address.ClusterIndex = clusterIndex
 		host.Address.ShardName = shard.Name
@@ -105,10 +105,10 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 		host.Address.ReplicaName = replica.Name
 		host.Address.ReplicaIndex = replicaIndex
 		host.Address.HostName = host.Name
-		host.Address.ChiScopeIndex = chiScopeIndex
-		host.Address.ChiScopeCycleSize = chiScopeCycleSize
-		host.Address.ChiScopeCycleIndex = chiScopeCycleIndex
-		host.Address.ChiScopeCycleOffset = chiScopeCycleOffset
+		host.Address.CHIScopeIndex = chiScopeIndex
+		host.Address.CHIScopeCycleSize = chiScopeCycleSize
+		host.Address.CHIScopeCycleIndex = chiScopeCycleIndex
+		host.Address.CHIScopeCycleOffset = chiScopeCycleOffset
 		host.Address.ClusterScopeIndex = clusterScopeIndex
 		host.Address.ClusterScopeCycleSize = clusterScopeCycleSize
 		host.Address.ClusterScopeCycleIndex = clusterScopeCycleIndex
@@ -197,10 +197,10 @@ func (chi *ClickHouseInstallation) FillChiPointer() {
 
 		host *ChiHost,
 	) error {
-		cluster.Chi = chi
-		shard.Chi = chi
-		replica.Chi = chi
-		host.Chi = chi
+		cluster.CHI = chi
+		shard.CHI = chi
+		replica.CHI = chi
+		host.CHI = chi
 		return nil
 	}
 	chi.WalkHostsFullPath(0, 0, hostProcessor)
@@ -351,7 +351,7 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 					host,
 				))
 
-				// Chi-scope counters
+				// CHI-scope counters
 				chiScopeIndex++
 				chiScopeCycleOffset++
 				if (chiScopeCycleSize > 0) && (chiScopeCycleOffset >= chiScopeCycleSize) {

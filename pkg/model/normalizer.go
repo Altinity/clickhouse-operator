@@ -49,12 +49,12 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withD
 	n.withDefaultCluster = withDefaultCluster
 
 	// What base should be used to create CHI
-	if n.chop.Config().ChiTemplate == nil {
+	if n.chop.Config().CHITemplate == nil {
 		// No template specified - start with clear page
 		n.chi = new(chiv1.ClickHouseInstallation)
 	} else {
 		// Template specified - start with template
-		n.chi = n.chop.Config().ChiTemplate.DeepCopy()
+		n.chi = n.chop.Config().CHITemplate.DeepCopy()
 	}
 
 	// At this moment n.chi is either empty CHI or a system-wide template

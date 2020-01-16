@@ -21,7 +21,7 @@ func (replica *ChiReplica) InheritTemplatesFrom(cluster *ChiCluster) {
 
 func (replica *ChiReplica) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	name := replica.Templates.ReplicaServiceTemplate
-	template, ok := replica.Chi.GetServiceTemplate(name)
+	template, ok := replica.CHI.GetServiceTemplate(name)
 	return template, ok
 }
 

@@ -30,8 +30,8 @@ func (in *ChiCluster) DeepCopyInto(out *ChiCluster) {
 	in.Layout.DeepCopyInto(&out.Layout)
 	out.Templates = in.Templates
 	out.Address = in.Address
-	if in.Chi != nil {
-		in, out := &in.Chi, &out.Chi
+	if in.CHI != nil {
+		in, out := &in.CHI, &out.CHI
 		*out = new(ClickHouseInstallation)
 		(*in).DeepCopyInto(*out)
 	}
@@ -214,8 +214,8 @@ func (in *ChiHost) DeepCopyInto(out *ChiHost) {
 	out.Templates = in.Templates
 	out.Address = in.Address
 	out.Config = in.Config
-	if in.Chi != nil {
-		in, out := &in.Chi, &out.Chi
+	if in.CHI != nil {
+		in, out := &in.CHI, &out.CHI
 		*out = new(ClickHouseInstallation)
 		(*in).DeepCopyInto(*out)
 	}
@@ -340,8 +340,8 @@ func (in *ChiReplica) DeepCopyInto(out *ChiReplica) {
 		}
 	}
 	out.Address = in.Address
-	if in.Chi != nil {
-		in, out := &in.Chi, &out.Chi
+	if in.CHI != nil {
+		in, out := &in.CHI, &out.CHI
 		*out = new(ClickHouseInstallation)
 		(*in).DeepCopyInto(*out)
 	}
@@ -408,8 +408,8 @@ func (in *ChiShard) DeepCopyInto(out *ChiShard) {
 		}
 	}
 	out.Address = in.Address
-	if in.Chi != nil {
-		in, out := &in.Chi, &out.Chi
+	if in.CHI != nil {
+		in, out := &in.CHI, &out.CHI
 		*out = new(ClickHouseInstallation)
 		(*in).DeepCopyInto(*out)
 	}
@@ -899,15 +899,15 @@ func (in *OperatorConfig) DeepCopyInto(out *OperatorConfig) {
 			(*out)[key] = val
 		}
 	}
-	if in.ChiTemplateFiles != nil {
-		in, out := &in.ChiTemplateFiles, &out.ChiTemplateFiles
+	if in.CHITemplateFiles != nil {
+		in, out := &in.CHITemplateFiles, &out.CHITemplateFiles
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}
 	}
-	if in.ChiTemplates != nil {
-		in, out := &in.ChiTemplates, &out.ChiTemplates
+	if in.CHITemplates != nil {
+		in, out := &in.CHITemplates, &out.CHITemplates
 		*out = make([]*ClickHouseInstallation, len(*in))
 		for i := range *in {
 			if (*in)[i] != nil {
@@ -917,8 +917,8 @@ func (in *OperatorConfig) DeepCopyInto(out *OperatorConfig) {
 			}
 		}
 	}
-	if in.ChiTemplate != nil {
-		in, out := &in.ChiTemplate, &out.ChiTemplate
+	if in.CHITemplate != nil {
+		in, out := &in.CHITemplate, &out.CHITemplate
 		*out = new(ClickHouseInstallation)
 		(*in).DeepCopyInto(*out)
 	}

@@ -21,7 +21,7 @@ func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
 
 func (cluster *ChiCluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	name := cluster.Templates.ClusterServiceTemplate
-	template, ok := cluster.Chi.GetServiceTemplate(name)
+	template, ok := cluster.CHI.GetServiceTemplate(name)
 	return template, ok
 }
 

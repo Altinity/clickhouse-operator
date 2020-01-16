@@ -24,18 +24,18 @@ func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica) 
 
 func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
 	name := host.Templates.PodTemplate
-	template, ok := host.Chi.GetPodTemplate(name)
+	template, ok := host.CHI.GetPodTemplate(name)
 	return template, ok
 }
 
 func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	name := host.Templates.ReplicaServiceTemplate
-	template, ok := host.Chi.GetServiceTemplate(name)
+	template, ok := host.CHI.GetServiceTemplate(name)
 	return template, ok
 }
 
 func (host *ChiHost) GetReplicasNum() int32 {
-	if util.IsStringBoolTrue(host.Chi.Spec.Stop) {
+	if util.IsStringBoolTrue(host.CHI.Spec.Stop) {
 		return 0
 	} else {
 		return 1
