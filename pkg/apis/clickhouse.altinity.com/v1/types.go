@@ -95,6 +95,7 @@ type ChiDefaults struct {
 
 // ChiTemplateNames defines references to .spec.templates to be used on current level of cluster
 type ChiTemplateNames struct {
+	HostTemplate            string `json:"hostTemplate,omitempty"            yaml:"hostTemplate"`
 	PodTemplate             string `json:"podTemplate,omitempty"             yaml:"podTemplate"`
 	DataVolumeClaimTemplate string `json:"dataVolumeClaimTemplate,omitempty" yaml:"dataVolumeClaimTemplate"`
 	LogVolumeClaimTemplate  string `json:"logVolumeClaimTemplate,omitempty"  yaml:"logVolumeClaimTemplate"`
@@ -217,6 +218,17 @@ type ChiHost struct {
 	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
+// ChiHostTemplate defines full Host Template
+type ChiHostTemplate struct {
+	Name             string                `json:"name"            yaml:"name"`
+	PortDistribution []ChiPortDistribution `json:"portDistribution" yaml:"portDistribution"`
+	Spec             ChiHost               `json:"spec"            yaml:"spec"`
+}
+
+type ChiPortDistribution struct {
+	Type string `json:"type"   yaml:"type"`
+}
+
 // ChiHostAddress defines address of a host within ClickHouseInstallation
 type ChiHostAddress struct {
 	Namespace               string `json:"namespace"`
@@ -249,11 +261,13 @@ type ChiHostConfig struct {
 // CHITemplates defines templates section of .spec
 type ChiTemplates struct {
 	// Templates
+	HostTemplates        []ChiHostTemplate        `json:"hostTemplates,omitempty"        yaml:"hostTemplates"`
 	PodTemplates         []ChiPodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates"`
 	VolumeClaimTemplates []ChiVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates"`
 	ServiceTemplates     []ChiServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates"`
 
 	// Index maps template name to template itself
+	HostTemplatesIndex        map[string]*ChiHostTemplate        `testdiff:"ignore"`
 	PodTemplatesIndex         map[string]*ChiPodTemplate         `testdiff:"ignore"`
 	VolumeClaimTemplatesIndex map[string]*ChiVolumeClaimTemplate `testdiff:"ignore"`
 	ServiceTemplatesIndex     map[string]*ChiServiceTemplate     `testdiff:"ignore"`

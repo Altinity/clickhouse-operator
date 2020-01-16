@@ -54,3 +54,27 @@ const (
 	// What to do in case StatefulSet can't reach new Generation - do nothing, keep StatefulSet broken and move to the next
 	OnStatefulSetUpdateFailureActionIgnore = "ignore"
 )
+
+const (
+	PodDistributionUnspecified                               = "Unspecified"
+	PodDistributionClickHouseAntiAffinity                    = "ClickHouseAntiAffinity"
+	PodDistributionShardAntiAffinity                         = "ShardAntiAffinity"
+	PodDistributionReplicaAntiAffinity                       = "ReplicaAntiAffinity"
+	PodDistributionAnotherNamespaceAntiAffinity              = "AnotherNamespaceAntiAffinity"
+	PodDistributionAnotherClickHouseInstallationAntiAffinity = "AnotherClickHouseInstallationAntiAffinity"
+	PodDistributionAnotherClusterAntiAffinity                = "AnotherClusterAntiAffinity"
+	PodDistributionMaxNumberPerNode                          = "MaxNumberPerNode"
+	PodDistributionNamespaceAffinity                         = "NamespaceAffinity"
+	PodDistributionClickHouseInstallationAffinity            = "ClickHouseInstallationAffinity"
+	PodDistributionClusterAffinity                           = "ClusterAffinity"
+	PodDistributionShardAffinity                             = "ShardAffinity"
+	PodDistributionReplicaAffinity                           = "ReplicaAffinity"
+	PodDistributionPreviousTailAffinity                      = "PreviousTailAffinity"
+
+	// Deprecated value
+	PodDistributionOnePerHost = "OnePerHost"
+)
+
+const (
+	PortDistributionUnspecified = "Unspecified"
+)

@@ -19,26 +19,6 @@ import (
 	"math"
 )
 
-const (
-	PodDistributionUnspecified                               = "Unspecified"
-	PodDistributionClickHouseAntiAffinity                    = "ClickHouseAntiAffinity"
-	PodDistributionShardAntiAffinity                         = "ShardAntiAffinity"
-	PodDistributionReplicaAntiAffinity                       = "ReplicaAntiAffinity"
-	PodDistributionAnotherNamespaceAntiAffinity              = "AnotherNamespaceAntiAffinity"
-	PodDistributionAnotherClickHouseInstallationAntiAffinity = "AnotherClickHouseInstallationAntiAffinity"
-	PodDistributionAnotherClusterAntiAffinity                = "AnotherClusterAntiAffinity"
-	PodDistributionMaxNumberPerNode                          = "MaxNumberPerNode"
-	PodDistributionNamespaceAffinity                         = "NamespaceAffinity"
-	PodDistributionClickHouseInstallationAffinity            = "ClickHouseInstallationAffinity"
-	PodDistributionClusterAffinity                           = "ClusterAffinity"
-	PodDistributionShardAffinity                             = "ShardAffinity"
-	PodDistributionReplicaAffinity                           = "ReplicaAffinity"
-	PodDistributionPreviousTailAffinity                      = "PreviousTailAffinity"
-
-	// Deprecated value
-	PodDistributionOnePerHost = "OnePerHost"
-)
-
 // StatusFill fills .Status
 func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 	chi.Status.Version = version.Version

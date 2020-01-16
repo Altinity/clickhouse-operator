@@ -23,6 +23,9 @@ func (templateNames *ChiTemplateNames) HandleDeprecatedFields() {
 func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type MergeType) {
 	switch _type {
 	case MergeTypeFillEmptyValues:
+		if templateNames.HostTemplate == "" {
+			templateNames.HostTemplate = from.HostTemplate
+		}
 		if templateNames.PodTemplate == "" {
 			templateNames.PodTemplate = from.PodTemplate
 		}
@@ -49,6 +52,9 @@ func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type M
 		}
 	case MergeTypeOverrideByNonEmptyValues:
 		// Override by non-empty values only
+		if from.HostTemplate != "" {
+			templateNames.HostTemplate = from.HostTemplate
+		}
 		if from.PodTemplate != "" {
 			templateNames.PodTemplate = from.PodTemplate
 		}

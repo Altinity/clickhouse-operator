@@ -160,6 +160,11 @@ func (n *Normalizer) normalizeConfiguration(conf *chiv1.ChiConfiguration) {
 
 // normalizeTemplates normalizes .spec.templates
 func (n *Normalizer) normalizeTemplates(templates *chiv1.ChiTemplates) {
+	for i := range templates.HostTemplates {
+		hostTemplate := &templates.HostTemplates[i]
+		n.normalizeHostTemplate(hostTemplate)
+	}
+
 	for i := range templates.PodTemplates {
 		podTemplate := &templates.PodTemplates[i]
 		n.normalizePodTemplate(podTemplate)
@@ -174,6 +179,34 @@ func (n *Normalizer) normalizeTemplates(templates *chiv1.ChiTemplates) {
 		serviceTemplate := &templates.ServiceTemplates[i]
 		n.normalizeServiceTemplate(serviceTemplate)
 	}
+}
+
+// normalizeHostTemplate normalizes .spec.templates.hostTemplates
+func (n *Normalizer) normalizeHostTemplate(template *chiv1.ChiHostTemplate) {
+	// Name
+
+	// HostDistribution
+	for i := range template.PortDistribution {
+		portDistribution := &template.PortDistribution[i]
+		switch portDistribution.Type {
+		case
+			chiv1.PortDistributionUnspecified:
+			// distribution is known
+		default:
+			// distribution is not known
+			portDistribution.Type = chiv1.PortDistributionUnspecified
+		}
+	}
+
+	// Spec
+
+	// Introduce HostTemplate into Index
+	// Ensure map is in place
+	if n.chi.Spec.Templates.HostTemplatesIndex == nil {
+		n.chi.Spec.Templates.HostTemplatesIndex = make(map[string]*chiv1.ChiHostTemplate)
+	}
+
+	n.chi.Spec.Templates.HostTemplatesIndex[template.Name] = template
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
@@ -205,6 +238,7 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
 		case
+			chiv1.PodDistributionUnspecified,
 			chiv1.PodDistributionClickHouseAntiAffinity,
 			chiv1.PodDistributionShardAntiAffinity,
 			chiv1.PodDistributionReplicaAntiAffinity,
