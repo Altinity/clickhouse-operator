@@ -323,7 +323,7 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 
 	// Process Pod Template
 
-	podTemplate := c.getPodTemplate(statefulSet, host)
+	podTemplate := c.getPodTemplate(host)
 	statefulSetAssignPodTemplate(statefulSet, podTemplate)
 	c.personalizeStatefulSetPodTemplate(statefulSet, host)
 }
@@ -362,7 +362,7 @@ func (c *Creator) personalizeStatefulSetPodTemplate(statefulSet *apps.StatefulSe
 }
 
 // getPodTemplate gets Pod Template to be used to create StatefulSet
-func (c *Creator) getPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
+func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 	statefulSetName := CreateStatefulSetName(host)
 
 	// Which pod template would be used - either explicitly defined in or a default one
