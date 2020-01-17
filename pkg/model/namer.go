@@ -604,7 +604,7 @@ func CreatePodFQDNsOfChi(chi *chop.ClickHouseInstallation) []string {
 }
 
 // template is defined in operator config:
-// ChConfigNetworksHostRegexpTemplate: chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
+// CHConfigNetworksHostRegexpTemplate: chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
 func CreatePodRegexp(chi *chop.ClickHouseInstallation, template string) string {
 	return newNameMacroReplacerChi(chi).Replace(template)
 }

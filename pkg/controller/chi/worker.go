@@ -37,9 +37,9 @@ func (c *Controller) newWorker() *worker {
 		c:          c,
 		normalizer: chopmodels.NewNormalizer(c.chop),
 		schemer: chopmodels.NewSchemer(
-			c.chop.Config().ChUsername,
-			c.chop.Config().ChPassword,
-			c.chop.Config().ChPort,
+			c.chop.Config().CHUsername,
+			c.chop.Config().CHPassword,
+			c.chop.Config().CHPort,
 		),
 		creator: nil,
 	}

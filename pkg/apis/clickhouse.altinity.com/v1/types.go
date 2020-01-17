@@ -392,13 +392,13 @@ type OperatorConfig struct {
 	// conf.d
 	// users.d
 	// respectively
-	ChCommonConfigsPath string `json:"chCommonConfigsPath" yaml:"chCommonConfigsPath"`
-	ChHostConfigsPath   string `json:"chHostConfigsPath"   yaml:"chHostConfigsPath"`
-	ChUsersConfigsPath  string `json:"chUsersConfigsPath"  yaml:"chUsersConfigsPath"`
+	CHCommonConfigsPath string `json:"chCommonConfigsPath" yaml:"chCommonConfigsPath"`
+	CHHostConfigsPath   string `json:"chHostConfigsPath"   yaml:"chHostConfigsPath"`
+	CHUsersConfigsPath  string `json:"chUsersConfigsPath"  yaml:"chUsersConfigsPath"`
 	// OperatorConfig files fetched from these paths. Maps "file name->file content"
-	ChCommonConfigs map[string]string
-	ChHostConfigs   map[string]string
-	ChUsersConfigs  map[string]string
+	CHCommonConfigs map[string]string
+	CHHostConfigs   map[string]string
+	CHUsersConfigs  map[string]string
 
 	// Path where to look for ClickHouseInstallation templates .yaml files
 	CHITemplatesPath string `json:"chiTemplatesPath" yaml:"chiTemplatesPath"`
@@ -425,17 +425,17 @@ type OperatorConfig struct {
 	// 2. user/quota - string
 	// 3. user/networks/ip - multiple strings
 	// 4. user/password - string
-	ChConfigUserDefaultProfile    string   `json:"chConfigUserDefaultProfile"    yaml:"chConfigUserDefaultProfile"`
-	ChConfigUserDefaultQuota      string   `json:"chConfigUserDefaultQuota"      yaml:"chConfigUserDefaultQuota"`
-	ChConfigUserDefaultNetworksIP []string `json:"chConfigUserDefaultNetworksIP" yaml:"chConfigUserDefaultNetworksIP"`
-	ChConfigUserDefaultPassword   string   `json:"chConfigUserDefaultPassword"   yaml:"chConfigUserDefaultPassword"`
+	CHConfigUserDefaultProfile    string   `json:"chConfigUserDefaultProfile"    yaml:"chConfigUserDefaultProfile"`
+	CHConfigUserDefaultQuota      string   `json:"chConfigUserDefaultQuota"      yaml:"chConfigUserDefaultQuota"`
+	CHConfigUserDefaultNetworksIP []string `json:"chConfigUserDefaultNetworksIP" yaml:"chConfigUserDefaultNetworksIP"`
+	CHConfigUserDefaultPassword   string   `json:"chConfigUserDefaultPassword"   yaml:"chConfigUserDefaultPassword"`
 
-	ChConfigNetworksHostRegexpTemplate string `json:"chConfigNetworksHostRegexpTemplate" yaml:"chConfigNetworksHostRegexpTemplate"`
+	CHConfigNetworksHostRegexpTemplate string `json:"chConfigNetworksHostRegexpTemplate" yaml:"chConfigNetworksHostRegexpTemplate"`
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
-	ChUsername string `json:"chUsername" yaml:"chUsername"`
-	ChPassword string `json:"chPassword" yaml:"chPassword"`
-	ChPort     int    `json:"chPort"     yaml:"chPort""`
+	CHUsername string `json:"chUsername" yaml:"chUsername"`
+	CHPassword string `json:"chPassword" yaml:"chPassword"`
+	CHPort     int    `json:"chPort"     yaml:"chPort""`
 }

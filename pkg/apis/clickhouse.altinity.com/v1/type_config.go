@@ -218,9 +218,9 @@ func (config *OperatorConfig) normalize() {
 
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
-	config.prepareConfigPath(&config.ChCommonConfigsPath, "config.d")
-	config.prepareConfigPath(&config.ChHostConfigsPath, "conf.d")
-	config.prepareConfigPath(&config.ChUsersConfigsPath, "users.d")
+	config.prepareConfigPath(&config.CHCommonConfigsPath, "config.d")
+	config.prepareConfigPath(&config.CHHostConfigsPath, "conf.d")
+	config.prepareConfigPath(&config.CHUsersConfigsPath, "users.d")
 
 	// Process ClickHouseInstallation templates section
 	config.prepareConfigPath(&config.CHITemplatesPath, "templates.d")
@@ -259,31 +259,31 @@ func (config *OperatorConfig) normalize() {
 	// 2. user/quota
 	// 3. user/networks/ip
 	// 4. user/password
-	if config.ChConfigUserDefaultProfile == "" {
-		config.ChConfigUserDefaultProfile = defaultChConfigUserDefaultProfile
+	if config.CHConfigUserDefaultProfile == "" {
+		config.CHConfigUserDefaultProfile = defaultChConfigUserDefaultProfile
 	}
-	if config.ChConfigUserDefaultQuota == "" {
-		config.ChConfigUserDefaultQuota = defaultChConfigUserDefaultQuota
+	if config.CHConfigUserDefaultQuota == "" {
+		config.CHConfigUserDefaultQuota = defaultChConfigUserDefaultQuota
 	}
-	if len(config.ChConfigUserDefaultNetworksIP) == 0 {
-		config.ChConfigUserDefaultNetworksIP = []string{defaultChConfigUserDefaultNetworksIP}
+	if len(config.CHConfigUserDefaultNetworksIP) == 0 {
+		config.CHConfigUserDefaultNetworksIP = []string{defaultChConfigUserDefaultNetworksIP}
 	}
-	if config.ChConfigUserDefaultPassword == "" {
-		config.ChConfigUserDefaultPassword = defaultChConfigUserDefaultPassword
+	if config.CHConfigUserDefaultPassword == "" {
+		config.CHConfigUserDefaultPassword = defaultChConfigUserDefaultPassword
 	}
 
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
-	if config.ChUsername == "" {
-		config.ChUsername = defaultChUsername
+	if config.CHUsername == "" {
+		config.CHUsername = defaultChUsername
 	}
-	if config.ChPassword == "" {
-		config.ChPassword = defaultChPassword
+	if config.CHPassword == "" {
+		config.CHPassword = defaultChPassword
 	}
-	if config.ChPort == 0 {
-		config.ChPort = defaultChPort
+	if config.CHPort == 0 {
+		config.CHPort = defaultChPort
 	}
 }
 
@@ -367,9 +367,9 @@ func (config *OperatorConfig) relativeToConfigFolderPath(relativePath string) st
 
 // readClickHouseCustomConfigFiles reads all extra user-specified ClickHouse config files
 func (config *OperatorConfig) readClickHouseCustomConfigFiles() {
-	config.ChCommonConfigs = readConfigFiles(config.ChCommonConfigsPath, config.isChConfigExt)
-	config.ChHostConfigs = readConfigFiles(config.ChHostConfigsPath, config.isChConfigExt)
-	config.ChUsersConfigs = readConfigFiles(config.ChUsersConfigsPath, config.isChConfigExt)
+	config.CHCommonConfigs = readConfigFiles(config.CHCommonConfigsPath, config.isChConfigExt)
+	config.CHHostConfigs = readConfigFiles(config.CHHostConfigsPath, config.isChConfigExt)
+	config.CHUsersConfigs = readConfigFiles(config.CHUsersConfigsPath, config.isChConfigExt)
 }
 
 // isChConfigExt returns true in case specified file has proper extension for a ClickHouse config file
@@ -411,13 +411,13 @@ func (config *OperatorConfig) String() string {
 
 	util.Fprintf(b, "%s", config.stringSlice("WatchNamespaces", config.WatchNamespaces))
 
-	util.Fprintf(b, "ChCommonConfigsPath: %s\n", config.ChCommonConfigsPath)
-	util.Fprintf(b, "ChHostConfigsPath: %s\n", config.ChHostConfigsPath)
-	util.Fprintf(b, "ChUsersConfigsPath: %s\n", config.ChUsersConfigsPath)
+	util.Fprintf(b, "CHCommonConfigsPath: %s\n", config.CHCommonConfigsPath)
+	util.Fprintf(b, "CHHostConfigsPath: %s\n", config.CHHostConfigsPath)
+	util.Fprintf(b, "CHUsersConfigsPath: %s\n", config.CHUsersConfigsPath)
 
-	util.Fprintf(b, "%s", config.stringMap("ChCommonConfigs", config.ChCommonConfigs))
-	util.Fprintf(b, "%s", config.stringMap("ChHostConfigs", config.ChHostConfigs))
-	util.Fprintf(b, "%s", config.stringMap("ChUsersConfigs", config.ChUsersConfigs))
+	util.Fprintf(b, "%s", config.stringMap("CHCommonConfigs", config.CHCommonConfigs))
+	util.Fprintf(b, "%s", config.stringMap("CHHostConfigs", config.CHHostConfigs))
+	util.Fprintf(b, "%s", config.stringMap("CHUsersConfigs", config.CHUsersConfigs))
 
 	util.Fprintf(b, "CHITemplatesPath: %s\n", config.CHITemplatesPath)
 	util.Fprintf(b, "%s", config.stringMap("CHITemplateFiles", config.CHITemplateFiles))
@@ -428,15 +428,15 @@ func (config *OperatorConfig) String() string {
 	util.Fprintf(b, "OnStatefulSetCreateFailureAction: %s\n", config.OnStatefulSetCreateFailureAction)
 	util.Fprintf(b, "OnStatefulSetUpdateFailureAction: %s\n", config.OnStatefulSetUpdateFailureAction)
 
-	util.Fprintf(b, "ChConfigUserDefaultProfile: %s\n", config.ChConfigUserDefaultProfile)
-	util.Fprintf(b, "ChConfigUserDefaultQuota: %s\n", config.ChConfigUserDefaultQuota)
-	util.Fprintf(b, "%s", config.stringSlice("ChConfigUserDefaultNetworksIP", config.ChConfigUserDefaultNetworksIP))
-	util.Fprintf(b, "ChConfigUserDefaultPassword: %s\n", config.ChConfigUserDefaultPassword)
-	util.Fprintf(b, "ChConfigNetworksHostRegexpTemplate: %s\n", config.ChConfigNetworksHostRegexpTemplate)
+	util.Fprintf(b, "CHConfigUserDefaultProfile: %s\n", config.CHConfigUserDefaultProfile)
+	util.Fprintf(b, "CHConfigUserDefaultQuota: %s\n", config.CHConfigUserDefaultQuota)
+	util.Fprintf(b, "%s", config.stringSlice("CHConfigUserDefaultNetworksIP", config.CHConfigUserDefaultNetworksIP))
+	util.Fprintf(b, "CHConfigUserDefaultPassword: %s\n", config.CHConfigUserDefaultPassword)
+	util.Fprintf(b, "CHConfigNetworksHostRegexpTemplate: %s\n", config.CHConfigNetworksHostRegexpTemplate)
 
-	util.Fprintf(b, "ChUsername: %s\n", config.ChUsername)
-	util.Fprintf(b, "ChPassword: %s\n", config.ChPassword)
-	util.Fprintf(b, "ChPort: %d\n", config.ChPort)
+	util.Fprintf(b, "CHUsername: %s\n", config.CHUsername)
+	util.Fprintf(b, "CHPassword: %s\n", config.CHPassword)
+	util.Fprintf(b, "CHPort: %d\n", config.CHPort)
 
 	return b.String()
 }

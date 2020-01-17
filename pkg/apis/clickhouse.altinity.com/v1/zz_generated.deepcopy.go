@@ -938,22 +938,22 @@ func (in *OperatorConfig) DeepCopyInto(out *OperatorConfig) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.ChCommonConfigs != nil {
-		in, out := &in.ChCommonConfigs, &out.ChCommonConfigs
+	if in.CHCommonConfigs != nil {
+		in, out := &in.CHCommonConfigs, &out.CHCommonConfigs
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}
 	}
-	if in.ChHostConfigs != nil {
-		in, out := &in.ChHostConfigs, &out.ChHostConfigs
+	if in.CHHostConfigs != nil {
+		in, out := &in.CHHostConfigs, &out.CHHostConfigs
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
 		}
 	}
-	if in.ChUsersConfigs != nil {
-		in, out := &in.ChUsersConfigs, &out.ChUsersConfigs
+	if in.CHUsersConfigs != nil {
+		in, out := &in.CHUsersConfigs, &out.CHUsersConfigs
 		*out = make(map[string]string, len(*in))
 		for key, val := range *in {
 			(*out)[key] = val
@@ -982,8 +982,8 @@ func (in *OperatorConfig) DeepCopyInto(out *OperatorConfig) {
 		*out = new(ClickHouseInstallation)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.ChConfigUserDefaultNetworksIP != nil {
-		in, out := &in.ChConfigUserDefaultNetworksIP, &out.ChConfigUserDefaultNetworksIP
+	if in.CHConfigUserDefaultNetworksIP != nil {
+		in, out := &in.CHConfigUserDefaultNetworksIP, &out.CHConfigUserDefaultNetworksIP
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

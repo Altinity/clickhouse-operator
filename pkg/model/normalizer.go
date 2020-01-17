@@ -889,19 +889,19 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 	for username := range usernameMap {
 		if _, ok := (*users)[username+"/profile"]; !ok {
 			// No 'user/profile' section
-			(*users)[username+"/profile"] = n.chop.Config().ChConfigUserDefaultProfile
+			(*users)[username+"/profile"] = n.chop.Config().CHConfigUserDefaultProfile
 		}
 		if _, ok := (*users)[username+"/quota"]; !ok {
 			// No 'user/quota' section
-			(*users)[username+"/quota"] = n.chop.Config().ChConfigUserDefaultQuota
+			(*users)[username+"/quota"] = n.chop.Config().CHConfigUserDefaultQuota
 		}
 		if _, ok := (*users)[username+"/networks/ip"]; !ok {
 			// No 'user/networks/ip' section
-			(*users)[username+"/networks/ip"] = n.chop.Config().ChConfigUserDefaultNetworksIP
+			(*users)[username+"/networks/ip"] = n.chop.Config().CHConfigUserDefaultNetworksIP
 		}
 		if _, ok := (*users)[username+"/networks/host_regexp"]; !ok {
 			// No 'user/networks/host_regexp' section
-			(*users)[username+"/networks/host_regexp"] = CreatePodRegexp(n.chi, n.chop.Config().ChConfigNetworksHostRegexpTemplate)
+			(*users)[username+"/networks/host_regexp"] = CreatePodRegexp(n.chi, n.chop.Config().CHConfigNetworksHostRegexpTemplate)
 		}
 
 		var pass = ""
@@ -909,7 +909,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 		if okPassword {
 			pass = fmt.Sprintf("%v", _pass)
 		} else if username != "default" {
-			pass = n.chop.Config().ChConfigUserDefaultPassword
+			pass = n.chop.Config().CHConfigUserDefaultPassword
 		}
 
 		_, okPasswordSHA256 := (*users)[username+"/password_sha256_hex"]
