@@ -115,8 +115,86 @@ func (n *Normalizer) finalizeCHI() {
 	n.chi.FillAddressInfo()
 	n.chi.FillChiPointer()
 	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
+		hostTemplate := n.getHostTemplate(host)
+		hostApplyHostTemplate(host, hostTemplate)
+		return nil
+	})
+	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		return n.calcFingerprints(host)
 	})
+}
+
+// getHostTemplate gets Host Template to be used to normalize Host
+func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate {
+	statefulSetName := CreateStatefulSetName(host)
+
+	// Which host template would be used - either explicitly defined in or a default one
+	hostTemplate, ok := host.GetHostTemplate()
+	if ok {
+		// Host references known HostTemplate
+		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use custom template %s", statefulSetName, hostTemplate.Name)
+	} else {
+		// Host references UNKNOWN HostTemplate, will use default one
+		hostTemplate = newDefaultHostTemplate(statefulSetName)
+		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use default generated template", statefulSetName)
+	}
+
+	return hostTemplate
+}
+
+func hostApplyHostTemplate(host *chiv1.ChiHost, template *chiv1.ChiHostTemplate) {
+	if host.Name == "" {
+		host.Name = template.Spec.Name
+	}
+
+	for _, portDistribution := range template.PortDistribution {
+		switch portDistribution.Type {
+		case chiv1.PortDistributionUnspecified:
+			if host.TCPPort == chPortNumberMustBeAssignedLater {
+				host.TCPPort = template.Spec.TCPPort
+			}
+			if host.HTTPPort == chPortNumberMustBeAssignedLater {
+				host.HTTPPort = template.Spec.HTTPPort
+			}
+			if host.InterserverHTTPPort == chPortNumberMustBeAssignedLater {
+				host.InterserverHTTPPort = template.Spec.InterserverHTTPPort
+			}
+		case chiv1.PortDistributionClusterScopeIndex:
+			if host.TCPPort == chPortNumberMustBeAssignedLater {
+				base := chDefaultTCPPortNumber
+				if template.Spec.TCPPort != chPortNumberMustBeAssignedLater {
+					base = template.Spec.TCPPort
+				}
+				host.TCPPort = base + int32(host.Address.ClusterScopeIndex)
+			}
+			if host.HTTPPort == chPortNumberMustBeAssignedLater {
+				base := chDefaultHTTPPortNumber
+				if template.Spec.HTTPPort != chPortNumberMustBeAssignedLater {
+					base = template.Spec.HTTPPort
+				}
+				host.HTTPPort = base + int32(host.Address.ClusterScopeIndex)
+			}
+			if host.InterserverHTTPPort == chPortNumberMustBeAssignedLater {
+				base := chDefaultInterserverHTTPPortNumber
+				if template.Spec.InterserverHTTPPort != chPortNumberMustBeAssignedLater {
+					base = template.Spec.InterserverHTTPPort
+				}
+				host.InterserverHTTPPort = base + int32(host.Address.ClusterScopeIndex)
+			}
+		}
+	}
+
+	if host.TCPPort == chPortNumberMustBeAssignedLater {
+		host.TCPPort = chDefaultTCPPortNumber
+	}
+	if host.HTTPPort == chPortNumberMustBeAssignedLater {
+		host.HTTPPort = chDefaultHTTPPortNumber
+	}
+	if host.InterserverHTTPPort == chPortNumberMustBeAssignedLater {
+		host.InterserverHTTPPort = chDefaultInterserverHTTPPortNumber
+	}
+
+	host.InheritTemplatesFrom(nil, nil, template)
 }
 
 // statusFill fills .status section of a CHI with values based on current CHI
@@ -199,6 +277,7 @@ func (n *Normalizer) normalizeHostTemplate(template *chiv1.ChiHostTemplate) {
 	}
 
 	// Spec
+	n.normalizeHostTemplateSpec(&template.Spec)
 
 	// Introduce HostTemplate into Index
 	// Ensure map is in place
@@ -1222,7 +1301,12 @@ func (n *Normalizer) normalizeHost(
 	n.normalizeHostName(host, shardIndex, replicaIndex)
 	n.normalizeHostPorts(host)
 	// Use PodTemplate from parent shard
-	host.InheritTemplatesFrom(shard, replica)
+	host.InheritTemplatesFrom(shard, replica, nil)
+}
+
+// normalizeHostTemplateSpec is the same as normalizeHost but for a template
+func (n *Normalizer) normalizeHostTemplateSpec(host *chiv1.ChiHost) {
+	n.normalizeHostPorts(host)
 }
 
 // normalizeHostName normalizes host's name
@@ -1238,20 +1322,20 @@ func (n *Normalizer) normalizeHostName(host *chiv1.ChiHost, shardIndex, replicaI
 
 // normalizeHostPorts ensures chiv1.ChiReplica.Port is reasonable
 func (n *Normalizer) normalizeHostPorts(host *chiv1.ChiHost) {
-	if host.Port <= 0 {
-		host.Port = chDefaultTCPPortNumber
+	if (host.Port <= 0) || (host.Port >= 65535) {
+		host.Port = chPortNumberMustBeAssignedLater
 	}
 
-	if host.TCPPort <= 0 {
-		host.TCPPort = chDefaultTCPPortNumber
+	if (host.TCPPort <= 0) || (host.TCPPort >= 65535) {
+		host.TCPPort = chPortNumberMustBeAssignedLater
 	}
 
-	if host.HTTPPort <= 0 {
-		host.HTTPPort = chDefaultHTTPPortNumber
+	if (host.HTTPPort <= 0) || (host.HTTPPort >= 65535) {
+		host.HTTPPort = chPortNumberMustBeAssignedLater
 	}
 
-	if host.InterserverHTTPPort <= 0 {
-		host.InterserverHTTPPort = chDefaultInterserverHTTPPortNumber
+	if (host.InterserverHTTPPort <= 0) || (host.InterserverHTTPPort >= 65535) {
+		host.InterserverHTTPPort = chPortNumberMustBeAssignedLater
 	}
 }
 

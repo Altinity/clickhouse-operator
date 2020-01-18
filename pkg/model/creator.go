@@ -322,9 +322,9 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 	}
 
 	// Process Pod Template
-
 	podTemplate := c.getPodTemplate(host)
-	statefulSetAssignPodTemplate(statefulSet, podTemplate)
+	statefulSetApplyPodTemplate(statefulSet, podTemplate)
+
 	c.personalizeStatefulSetTemplate(statefulSet, host)
 }
 
@@ -368,12 +368,12 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 	// Which pod template would be used - either explicitly defined in or a default one
 	podTemplate, ok := host.GetPodTemplate()
 	if ok {
-		// Replica references known PodTemplate
+		// Host references known PodTemplate
 		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
 		podTemplate = podTemplate.DeepCopy()
 		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
 	} else {
-		// Replica references UNKNOWN PodTemplate, will use default one
+		// Host references UNKNOWN PodTemplate, will use default one
 		podTemplate = newDefaultPodTemplate(statefulSetName)
 		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use default generated template", statefulSetName)
 	}
@@ -545,8 +545,8 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.Statefu
 	c.setupStatefulSetApplyVolumeClaimTemplates(statefulSet, host)
 }
 
-// statefulSetAssignPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
-func statefulSetAssignPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
+// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
+func statefulSetApplyPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
 	// StatefulSet's pod template is not directly compatible with ChiPodTemplate, we need some fields only
 	dst.Spec.Template.Name = template.Name
 	dst.Spec.Template.Spec = template.Spec
@@ -606,6 +606,25 @@ func statefulSetAppendVolumeClaimTemplate(statefulSet *apps.StatefulSet, volumeC
 		},
 		Spec: *volumeClaimTemplate.Spec.DeepCopy(),
 	})
+}
+
+// newDefaultHostTemplate returns default Host Template to be used with StatefulSet
+func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
+	hostTemplate := &chiv1.ChiHostTemplate{
+		Name: name,
+		PortDistribution: []chiv1.ChiPortDistribution{
+			{Type: chiv1.PortDistributionUnspecified},
+		},
+		Spec: chiv1.ChiHost{
+			Name:                "",
+			TCPPort:             chDefaultTCPPortNumber,
+			HTTPPort:            chDefaultHTTPPortNumber,
+			InterserverHTTPPort: chDefaultInterserverHTTPPortNumber,
+			Templates:           chiv1.ChiTemplateNames{},
+		},
+	}
+
+	return hostTemplate
 }
 
 // newDefaultPodTemplate returns default Pod Template to be used with StatefulSet

@@ -76,5 +76,6 @@ const (
 )
 
 const (
-	PortDistributionUnspecified = "Unspecified"
+	PortDistributionUnspecified       = "Unspecified"
+	PortDistributionClusterScopeIndex = "ClusterScopeIndex"
 )
