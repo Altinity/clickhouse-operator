@@ -37,13 +37,6 @@ spec:
               #        image: yandex/clickhouse-server:19.3.7
               #        image: yandex/clickhouse-server:19.1.105
               image: yandex/clickhouse-server:19.1.10
-              ports:
-                - name: http
-                  containerPort: 8000
-                - name: tcp
-                  containerPort: 8001
-                - name: interserver
-                  containerPort: 8002
 
       - name: clickhouse:19.3.5
         spec:
@@ -54,13 +47,6 @@ spec:
               #        image: yandex/clickhouse-server:19.3.7
               #        image: yandex/clickhouse-server:19.1.105
               image: yandex/clickhouse-server:19.3.5
-              ports:
-                - name: http
-                  containerPort: 9000
-                - name: tcp
-                  containerPort: 9001
-                - name: interserver
-                  containerPort: 9002
 
 
       - name: clickhouse:19.3.7
@@ -72,10 +58,3 @@ spec:
               #        image: yandex/clickhouse-server:19.3.7
               #        image: yandex/clickhouse-server:19.1.105
               image: yandex/clickhouse-server:19.3.7
-              ports:
-                - name: http
-                  containerPort: 10000
-                - name: tcp
-                  containerPort: 10001
-                - name: interserver
-                  containerPort: 10002
