@@ -263,7 +263,15 @@ func (n *Normalizer) normalizeTemplates(templates *chiv1.ChiTemplates) {
 func (n *Normalizer) normalizeHostTemplate(template *chiv1.ChiHostTemplate) {
 	// Name
 
-	// HostDistribution
+	// PortDistribution
+
+	if template.PortDistribution == nil {
+		// In case no PortDistribution provided - setup default one
+		template.PortDistribution = []chiv1.ChiPortDistribution{
+			{Type: chiv1.PortDistributionUnspecified},
+		}
+	}
+	// Normalize PortDistribution
 	for i := range template.PortDistribution {
 		portDistribution := &template.PortDistribution[i]
 		switch portDistribution.Type {
