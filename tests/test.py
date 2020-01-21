@@ -12,7 +12,6 @@ from clickhouse import *
 from test_examples import *
 
 
-
 @TestScenario
 @Name("test_001. 1 node")
 def test_001():
@@ -108,14 +107,18 @@ def set_operator_version(version):
     kubectl("rollout status deployment.v1.apps/clickhouse-operator", ns = "kube-system")
     # assert kube_get_count("pod", ns = "kube-system", label = f"-l app=clickhouse-operator,version={version}")>0, error()
 
-@TestScenario
-@Name("test_010. Test zookeeper initialization")
-def test_010():
+def check_zookeeper():
     with Given("Install Zookeeper if missing"):
         if kube_get_count("service", name = "zookeepers") == 0:
             config=get_full_path("../deploy/zookeeper/quick-start-volume-emptyDir/zookeeper-1-node.yaml")
             kube_apply(config)
-            kube_wait_object("service", "zookeepers")
+            kube_wait_object("service", "zookeepers")    
+
+
+@TestScenario
+@Name("test_010. Test zookeeper initialization")
+def test_010():
+    check_zookeeper()
 
     create_and_check("configs/test-010-zkroot.yaml", 
                      {"pod_count": 1,
@@ -244,9 +247,42 @@ def test_013():
     with Then("Remove shard"):
         create_and_check("configs/test-013-add-shards-1.yaml", {"object_counts": [1,1,2]})
 
+@TestScenario
+@Name("test_014. Test that replication works")
+def test_014():
+    check_zookeeper()
+ 
+    create_table = """
+    create table t (a Int8) 
+    Engine = ReplicatedMergeTree('/clickhouse/{installation}/{cluster}/tables/{shard}/{database}/{table}', '{replica}')
+    partition by tuple() order by a""".replace('\r', '').replace('\n', '')
+
+    create_and_check("configs/test-014-replication.yaml", 
+                    {"apply_templates": {"configs/tpl-clickhouse-stable.yaml"}, 
+                     "pod_count": 2,
+                     "do_not_delete": 1})
+
+    clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-0")
+    clickhouse_query("test-014-replication", "insert into t values(1)", host = "chi-test-014-replication-default-0-0")
+    clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-1")
+    out = clickhouse_query("test-014-replication", "select a from t", host = "chi-test-014-replication-default-0-1")
+    assert out == "1"
+
+    with When("Add one more replica"):
+        create_and_check("configs/test-014-replication-2.yaml", 
+                         {"pod_count": 3,
+                          "do_not_delete": 1})
+        # that also works:
+        # kubectl patch chi test-014-replication -n test --type=json -p '[{"op":"add", "path": "/spec/configuration/clusters/0/layout/shards/0/replicasCount", "value": 3}]'
+        with Then("Replicated table should be automatically created"):
+            out = clickhouse_query("test-014-replication", "select a from t", host = "chi-test-014-replication-default-0-2")
+            assert out == "1"
+
+    create_and_check("configs/test-014-replication.yaml", {})
+
 kubectl.namespace="test"
 version="latest"
-clickhouse_stable="yandex/clickhouse-server:19.13.7.57"
+clickhouse_stable="yandex/clickhouse-server:19.16.10.44"
 
 if main():
     with Module("main"):
@@ -276,10 +312,11 @@ if main():
                      test_010,
                      test_011,
                      test_012,
-                     test_013]
+                     test_013,
+                     test_014]
         
             all_tests = tests
-            all_tests = [test_011]
+            all_tests = [test_014]
         
             for t in all_tests:
                 run(test=t, flags=TE)

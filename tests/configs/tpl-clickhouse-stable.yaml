@@ -13,4 +13,4 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:19.13.7.57
+              image: yandex/clickhouse-server:19.16.10.44
