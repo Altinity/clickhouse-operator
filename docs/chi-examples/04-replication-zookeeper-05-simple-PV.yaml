@@ -11,6 +11,8 @@ spec:
       podTemplate: clickhouse:19.6
  
   configuration:
+    users:
+      default/networks/ip: "::/0"
     zookeeper:
       nodes:
       - host: zookeeper.zoo1ns

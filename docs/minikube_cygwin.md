@@ -102,7 +102,7 @@ Status:
 
 ###  and run following command
 ```bash
-curl "http://$(kubectl get svc --namespace=${OPERATOR_NAMESPACE} | grep LoadBalancer | awk '{print $4}'):8123/?query=SELECT+Version()"
+curl "http://$(kubectl get svc --namespace=${OPERATOR_NAMESPACE} | grep LoadBalancer | awk '{print $4}'):8123/?query=SELECT+version()"
 ```
 expected output
 ```
