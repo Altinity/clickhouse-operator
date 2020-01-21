@@ -2,12 +2,15 @@
 
 echo "External value for \$PROMETHEUS_NAMESPACE=$PROMETHEUS_NAMESPACE"
 echo "External value for \$OPERATOR_NAMESPACE=$OPERATOR_NAMESPACE"
+echo "External value for \$BRANCH=$BRANCH"
 
 PROMETHEUS_NAMESPACE="${PROMETHEUS_NAMESPACE:-prometheus}"
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
+BRANCH="${BRANCH:-master}"
 
 echo "Setup Prometheus into '${PROMETHEUS_NAMESPACE}' namespace"
 echo "Expecting operator in '${OPERATOR_NAMESPACE}' namespace"
+echo "Get clickhouse monitor service description from '${BRANCH}' branch"
 sleep 10
 
 # Let's setup all prometheus-related stuff into dedicated namespace called "prometheus"
@@ -15,15 +18,15 @@ kubectl create namespace "${PROMETHEUS_NAMESPACE}"
 
 # Create prometheus-operator's CRDs
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/alertmanager.crd.yaml
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_alertmanagers.yaml
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/podmonitor.crd.yaml
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/prometheus.crd.yaml
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_prometheuses.yaml
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/prometheusrule.crd.yaml
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/servicemonitor.crd.yaml
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
 
 # Setup prometheus-operator into specified namespace. Would manage prometheus instances
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f  <( \
@@ -42,7 +45,7 @@ kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
     https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/rbac/prometheus/prometheus-service-account.yaml
 
 # Setup Prometheus instance via prometheus-operator into dedicated namespace
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f prometheus.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/${BRANCH}/deploy/prometheus/prometheus.yaml
 
 # Setup "Prometheus - clickhouse-operator" integration.
 # Specify endpoint, where Prometheus can gather data from clickhouse-operator
@@ -53,7 +56,7 @@ if kubectl --namespace="${OPERATOR_NAMESPACE}" get service clickhouse-operator-m
     echo "clickhouse-operator-metrics endpoint found. Configuring integration with clickhouse-operator"
     # clickhouse-operator-metrics service found, can setup integration
     kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f <( \
-        cat ./prometheus-clickhouse-operator-service-monitor.yaml | \
+        wget -qO- https://raw.githubusercontent.com/Altinity/clickhouse-operator/${BRANCH}/deploy/prometheus/prometheus-clickhouse-operator-service-monitor.yaml | \
         OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} sed "s/- kube-system/- ${OPERATOR_NAMESPACE}/" \
     )
 else
