@@ -18,7 +18,8 @@ spec:
   templates:
     hostTemplates:
       - name: port-distribution
-        portDistribution: ClusterScopeIndex
+        portDistribution:
+          - type: ClusterScopeIndex
         spec:
           tcpPort: 10000
           httpPort: 11000
