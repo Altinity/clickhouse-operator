@@ -132,11 +132,11 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 	hostTemplate, ok := host.GetHostTemplate()
 	if ok {
 		// Host references known HostTemplate
-		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use custom template %s", statefulSetName, hostTemplate.Name)
+		glog.V(1).Infof("getHostTemplate() statefulSet %s use custom host template %s", statefulSetName, hostTemplate.Name)
 	} else {
 		// Host references UNKNOWN HostTemplate, will use default one
 		hostTemplate = newDefaultHostTemplate(statefulSetName)
-		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use default generated template", statefulSetName)
+		glog.V(1).Infof("getHostTemplate() statefulSet %s use default generated host template", statefulSetName)
 	}
 
 	return hostTemplate
@@ -276,7 +276,8 @@ func (n *Normalizer) normalizeHostTemplate(template *chiv1.ChiHostTemplate) {
 		portDistribution := &template.PortDistribution[i]
 		switch portDistribution.Type {
 		case
-			chiv1.PortDistributionUnspecified:
+			chiv1.PortDistributionUnspecified,
+			chiv1.PortDistributionClusterScopeIndex:
 			// distribution is known
 		default:
 			// distribution is not known
