@@ -15,15 +15,15 @@ kubectl create namespace "${PROMETHEUS_NAMESPACE}"
 
 # Create prometheus-operator's CRDs
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/alertmanager.crd.yaml
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_alertmanagers.yaml
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/podmonitor.crd.yaml
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/prometheus.crd.yaml
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_prometheuses.yaml
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/prometheusrule.crd.yaml
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/servicemonitor.crd.yaml
+    https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
 
 # Setup prometheus-operator into specified namespace. Would manage prometheus instances
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply -f  <( \
