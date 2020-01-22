@@ -70,10 +70,10 @@ spec:
       description: Client access endpoint
       priority: 1 # show in wide view
       JSONPath: .status.endpoint
-# TODO return to this feature later
-# Pruning unknown fields. FEATURE STATE: Kubernetes v1.15
-# Probably full specification may be needed
-#  preserveUnknownFields: false
+  # TODO return to this feature later
+  # Pruning unknown fields. FEATURE STATE: Kubernetes v1.15
+  # Probably full specification may be needed
+  #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
       properties:
@@ -153,6 +153,8 @@ spec:
                 templates:
                   type: object
                   properties:
+                    hostTemplate:
+                      type: string
                     podTemplate:
                       type: string
                     dataVolumeClaimTemplate:
@@ -226,6 +228,8 @@ spec:
                       templates:
                         type: object
                         properties:
+                          hostTemplate:
+                            type: string
                           podTemplate:
                             type: string
                           dataVolumeClaimTemplate:
@@ -295,6 +299,8 @@ spec:
                                 templates:
                                   type: object
                                   properties:
+                                    hostTemplate:
+                                      type: string
                                     podTemplate:
                                       type: string
                                     dataVolumeClaimTemplate:
@@ -312,6 +318,7 @@ spec:
                                 replicas:
                                   type: array
                                   items:
+                                    # Host
                                     type: object
                                     properties:
                                       name:
@@ -335,6 +342,84 @@ spec:
                                       templates:
                                         type: object
                                         properties:
+                                          hostTemplate:
+                                            type: string
+                                          podTemplate:
+                                            type: string
+                                          dataVolumeClaimTemplate:
+                                            type: string
+                                          logVolumeClaimTemplate:
+                                            type: string
+                                          serviceTemplate:
+                                            type: string
+                                          clusterServiceTemplate:
+                                            type: string
+                                          shardServiceTemplate:
+                                            type: string
+                                          replicaServiceTemplate:
+                                            type: string
+                          replicas:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+                                  minLength: 1
+                                  # See namePartShardMaxLen const
+                                  maxLength: 15
+                                  pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                shardsCount:
+                                  type: integer
+                                  minimum: 1
+                                templates:
+                                  type: object
+                                  properties:
+                                    hostTeampate:
+                                      type: string
+                                    podTemplate:
+                                      type: string
+                                    dataVolumeClaimTemplate:
+                                      type: string
+                                    logVolumeClaimTemplate:
+                                      type: string
+                                    serviceTemplate:
+                                      type: string
+                                    clusterServiceTemplate:
+                                      type: string
+                                    shardServiceTemplate:
+                                      type: string
+                                    replicaServiceTemplate:
+                                      type: string
+                                shards:
+                                  type: array
+                                  items:
+                                    # Host
+                                    type: object
+                                    properties:
+                                      name:
+                                        type: string
+                                        minLength: 1
+                                        # See namePartReplicaMaxLen const
+                                        maxLength: 15
+                                        pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                      tcpPort:
+                                        type: integer
+                                        minimum: 1
+                                        maximum: 65535
+                                      httpPort:
+                                        type: integer
+                                        minimum: 1
+                                        maximum: 65535
+                                      interserverHttpPort:
+                                        type: integer
+                                        minimum: 1
+                                        maximum: 65535
+                                      templates:
+                                        type: object
+                                        properties:
+                                          hostTemplate:
+                                            type: string
                                           podTemplate:
                                             type: string
                                           dataVolumeClaimTemplate:
@@ -352,6 +437,70 @@ spec:
             templates:
               type: object
               properties:
+                hostTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                      portDistribution:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - type
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                # List PortDistributionXXX constants
+                                - "Unspecified"
+                                - "ClusterScopeIndex"
+                      spec:
+                        # Host
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                            minLength: 1
+                            # See namePartReplicaMaxLen const
+                            maxLength: 15
+                            pattern: "^[a-zA-Z0-9-]{0,15}$"
+                          tcpPort:
+                            type: integer
+                            minimum: 1
+                            maximum: 65535
+                          httpPort:
+                            type: integer
+                            minimum: 1
+                            maximum: 65535
+                          interserverHttpPort:
+                            type: integer
+                            minimum: 1
+                            maximum: 65535
+                          templates:
+                            type: object
+                            properties:
+                              hostTemplate:
+                                type: string
+                              podTemplate:
+                                type: string
+                              dataVolumeClaimTemplate:
+                                type: string
+                              logVolumeClaimTemplate:
+                                type: string
+                              serviceTemplate:
+                                type: string
+                              clusterServiceTemplate:
+                                type: string
+                              shardServiceTemplate:
+                                type: string
+                              replicaServiceTemplate:
+                                type: string
+
                 podTemplates:
                   type: array
                   items:
@@ -595,6 +744,8 @@ spec:
                 templates:
                   type: object
                   properties:
+                    hostTemplate:
+                      type: string
                     podTemplate:
                       type: string
                     dataVolumeClaimTemplate:
@@ -668,6 +819,8 @@ spec:
                       templates:
                         type: object
                         properties:
+                          hostTemplate:
+                            type: string
                           podTemplate:
                             type: string
                           dataVolumeClaimTemplate:
@@ -737,6 +890,8 @@ spec:
                                 templates:
                                   type: object
                                   properties:
+                                    hostTemplate:
+                                      type: string
                                     podTemplate:
                                       type: string
                                     dataVolumeClaimTemplate:
@@ -754,6 +909,7 @@ spec:
                                 replicas:
                                   type: array
                                   items:
+                                    # Host
                                     type: object
                                     properties:
                                       name:
@@ -777,6 +933,84 @@ spec:
                                       templates:
                                         type: object
                                         properties:
+                                          hostTemplate:
+                                            type: string
+                                          podTemplate:
+                                            type: string
+                                          dataVolumeClaimTemplate:
+                                            type: string
+                                          logVolumeClaimTemplate:
+                                            type: string
+                                          serviceTemplate:
+                                            type: string
+                                          clusterServiceTemplate:
+                                            type: string
+                                          shardServiceTemplate:
+                                            type: string
+                                          replicaServiceTemplate:
+                                            type: string
+                          replicas:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name:
+                                  type: string
+                                  minLength: 1
+                                  # See namePartShardMaxLen const
+                                  maxLength: 15
+                                  pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                shardsCount:
+                                  type: integer
+                                  minimum: 1
+                                templates:
+                                  type: object
+                                  properties:
+                                    hostTeampate:
+                                      type: string
+                                    podTemplate:
+                                      type: string
+                                    dataVolumeClaimTemplate:
+                                      type: string
+                                    logVolumeClaimTemplate:
+                                      type: string
+                                    serviceTemplate:
+                                      type: string
+                                    clusterServiceTemplate:
+                                      type: string
+                                    shardServiceTemplate:
+                                      type: string
+                                    replicaServiceTemplate:
+                                      type: string
+                                shards:
+                                  type: array
+                                  items:
+                                    # Host
+                                    type: object
+                                    properties:
+                                      name:
+                                        type: string
+                                        minLength: 1
+                                        # See namePartReplicaMaxLen const
+                                        maxLength: 15
+                                        pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                      tcpPort:
+                                        type: integer
+                                        minimum: 1
+                                        maximum: 65535
+                                      httpPort:
+                                        type: integer
+                                        minimum: 1
+                                        maximum: 65535
+                                      interserverHttpPort:
+                                        type: integer
+                                        minimum: 1
+                                        maximum: 65535
+                                      templates:
+                                        type: object
+                                        properties:
+                                          hostTemplate:
+                                            type: string
                                           podTemplate:
                                             type: string
                                           dataVolumeClaimTemplate:
@@ -794,6 +1028,70 @@ spec:
             templates:
               type: object
               properties:
+                hostTemplates:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - name
+                    properties:
+                      name:
+                        type: string
+                      portDistribution:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            - type
+                          properties:
+                            type:
+                              type: string
+                              enum:
+                                # List PortDistributionXXX constants
+                                - "Unspecified"
+                                - "ClusterScopeIndex"
+                      spec:
+                        # Host
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                            minLength: 1
+                            # See namePartReplicaMaxLen const
+                            maxLength: 15
+                            pattern: "^[a-zA-Z0-9-]{0,15}$"
+                          tcpPort:
+                            type: integer
+                            minimum: 1
+                            maximum: 65535
+                          httpPort:
+                            type: integer
+                            minimum: 1
+                            maximum: 65535
+                          interserverHttpPort:
+                            type: integer
+                            minimum: 1
+                            maximum: 65535
+                          templates:
+                            type: object
+                            properties:
+                              hostTemplate:
+                                type: string
+                              podTemplate:
+                                type: string
+                              dataVolumeClaimTemplate:
+                                type: string
+                              logVolumeClaimTemplate:
+                                type: string
+                              serviceTemplate:
+                                type: string
+                              clusterServiceTemplate:
+                                type: string
+                              shardServiceTemplate:
+                                type: string
+                              replicaServiceTemplate:
+                                type: string
+
                 podTemplates:
                   type: array
                   items:
