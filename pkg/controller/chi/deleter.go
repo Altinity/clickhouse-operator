@@ -49,8 +49,8 @@ func (c *Controller) deleteHost(host *chop.ChiHost) error {
 	_ = c.deleteServiceHost(host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
-	host.Chi.Status.DeletedHostsCount++
-	_ = c.updateChiObjectStatus(host.Chi, true)
+	host.CHI.Status.DeletedHostsCount++
+	_ = c.updateChiObjectStatus(host.CHI, true)
 
 	glog.V(1).Infof("End delete host %s/%s", host.Address.ClusterName, host.Name)
 
@@ -135,7 +135,7 @@ func (c *Controller) statefulSetDelete(host *chop.ChiHost) error {
 func (c *Controller) persistentVolumeClaimDelete(host *chop.ChiHost) error {
 
 	namespace := host.Address.Namespace
-	labeler := chopmodel.NewLabeler(c.chop, host.Chi)
+	labeler := chopmodel.NewLabeler(c.chop, host.CHI)
 	listOptions := newListOptions(labeler.GetSelectorHostScope(host))
 	if list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(listOptions); err == nil {
 		glog.V(1).Infof("OK get list of PVC for host %s/%s", namespace, host.Name)

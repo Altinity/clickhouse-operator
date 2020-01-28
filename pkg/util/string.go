@@ -30,16 +30,24 @@ func RandomString() string {
 }
 
 const (
-	StringBool0        = "0"
-	StringBool1        = "1"
-	StringBoolFalse    = "false"
-	StringBoolTrue     = "true"
-	StringBoolNo       = "no"
-	StringBoolYes      = "yes"
-	StringBoolOff      = "off"
-	StringBoolOn       = "on"
-	StringBoolDisabled = "disabled"
-	StringBoolEnabled  = "enabled"
+	StringBool0                    = "0"
+	StringBool1                    = "1"
+	StringBoolFalseFirstCapital    = "False"
+	StringBoolFalseLowercase       = "false"
+	StringBoolTrueFirstCapital     = "True"
+	StringBoolTrueLowercase        = "true"
+	StringBoolNoFirstCapital       = "No"
+	StringBoolNoLowercase          = "no"
+	StringBoolYesFirstCapital      = "Yes"
+	StringBoolYesLowercase         = "yes"
+	StringBoolOffFirstCapital      = "Off"
+	StringBoolOffLowercase         = "off"
+	StringBoolOnFirstCapital       = "On"
+	StringBoolOnLowercase          = "on"
+	StringBoolDisabledFirstCapital = "Disabled"
+	StringBoolDisabledLowercase    = "disabled"
+	StringBoolEnabledFirstCapital  = "Enabled"
+	StringBoolEnabledLowercase     = "enabled"
 )
 
 // IsStringBool checks whether str is a string as bool value
@@ -49,17 +57,17 @@ func IsStringBool(str string) bool {
 		StringBool0,
 		StringBool1,
 
-		StringBoolFalse,
-		StringBoolTrue,
+		StringBoolFalseLowercase,
+		StringBoolTrueLowercase,
 
-		StringBoolNo,
-		StringBoolYes,
+		StringBoolNoLowercase,
+		StringBoolYesLowercase,
 
-		StringBoolOff,
-		StringBoolOn,
+		StringBoolOffLowercase,
+		StringBoolOnLowercase,
 
-		StringBoolDisabled,
-		StringBoolEnabled:
+		StringBoolDisabledLowercase,
+		StringBoolEnabledLowercase:
 		return true
 
 	default:
@@ -72,10 +80,10 @@ func IsStringBoolFalse(str string) bool {
 	switch strings.ToLower(str) {
 	case
 		StringBool0,
-		StringBoolFalse,
-		StringBoolNo,
-		StringBoolOff,
-		StringBoolDisabled:
+		StringBoolFalseLowercase,
+		StringBoolNoLowercase,
+		StringBoolOffLowercase,
+		StringBoolDisabledLowercase:
 		return true
 
 	default:
@@ -88,10 +96,10 @@ func IsStringBoolTrue(str string) bool {
 	switch strings.ToLower(str) {
 	case
 		StringBool1,
-		StringBoolTrue,
-		StringBoolYes,
-		StringBoolOn,
-		StringBoolEnabled:
+		StringBoolTrueLowercase,
+		StringBoolYesLowercase,
+		StringBoolOnLowercase,
+		StringBoolEnabledLowercase:
 		return true
 
 	default:
@@ -101,45 +109,45 @@ func IsStringBoolTrue(str string) bool {
 
 // CastStringBoolTo01 casts string-bool into string "0/1"
 func CastStringBoolTo01(str string, defaultValue bool) string {
-	// True and False values
-	t := StringBool1
-	f := StringBool0
+	// True and False string values
+	_true := StringBool1
+	_false := StringBool0
 
 	if IsStringBoolTrue(str) {
-		return t
+		return _true
 	}
 	if IsStringBoolFalse(str) {
-		return f
+		return _false
 	}
 
 	// String value unrecognized, return default value
 
 	if defaultValue {
-		return t
+		return _true
 	} else {
-		return f
+		return _false
 	}
 }
 
 // CastStringBoolToTrueFalse casts string-bool into string "true/false"
 func CastStringBoolToTrueFalse(str string, defaultValue bool) string {
 	// True and False values
-	t := StringBoolTrue
-	f := StringBoolFalse
+	_true := StringBoolTrueLowercase
+	_false := StringBoolFalseLowercase
 
 	if IsStringBoolTrue(str) {
-		return t
+		return _true
 	}
 	if IsStringBoolFalse(str) {
-		return f
+		return _false
 	}
 
 	// String value unrecognized, return default value
 
 	if defaultValue {
-		return t
+		return _true
 	} else {
-		return f
+		return _false
 	}
 }
 

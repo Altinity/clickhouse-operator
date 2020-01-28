@@ -39,7 +39,7 @@ spec:
 #
           replicas:
           - index: 2
-            port: 9000
+            tcpPort: 9000
             deployment:
               scenario: Default
 #             zone:

@@ -2,14 +2,25 @@
 
 # Build all-sections-included clickhouse-operator installation .yaml manifest with namespace and image parameters
 
-# Full list of available vars is available in ${MANIFEST_ROOT}/dev/cat-clickhouse-operator-install-yaml.sh file
-OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
-OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
-METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:latest}"
-
 # Paths
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+PROJECT_ROOT="$(realpath "${CUR_DIR}/../..")"
 MANIFEST_ROOT="$(realpath ${CUR_DIR}/..)"
+
+#
+# Setup SOME variables
+# Full list of available vars is available in ${MANIFEST_ROOT}/dev/cat-clickhouse-operator-install-yaml.sh file
+#
+
+# Namespace to install operator
+OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
+METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
+
+# Operator's docker image
+RELEASE_VERSION=$(cat ${PROJECT_ROOT}/release)
+OPERATOR_VERSION="${OPERATOR_VERSION:-$RELEASE_VERSION}"
+OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:$OPERATOR_VERSION}"
+METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:$OPERATOR_VERSION}"
 
 # Run generator
 

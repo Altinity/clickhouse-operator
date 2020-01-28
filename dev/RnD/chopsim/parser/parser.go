@@ -16,7 +16,7 @@ const (
 
 const (
 	shardDefinitionTypeReplicasCount = "ReplicasCount"
-	shardDefinitionTypeReplicas      = "Replicas"
+	shardDefinitionTypeReplicas      = "Hosts"
 )
 
 const (

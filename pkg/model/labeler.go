@@ -34,7 +34,9 @@ const (
 	LabelChiName                      = clickhousealtinitycom.GroupName + "/chi"
 	LabelClusterName                  = clickhousealtinitycom.GroupName + "/cluster"
 	LabelShardName                    = clickhousealtinitycom.GroupName + "/shard"
+	LabelShardScopeIndex              = clickhousealtinitycom.GroupName + "/shardScopeIndex"
 	LabelReplicaName                  = clickhousealtinitycom.GroupName + "/replica"
+	LabelReplicaScopeIndex            = clickhousealtinitycom.GroupName + "/replicaScopeIndex"
 	LabelChiScopeIndex                = clickhousealtinitycom.GroupName + "/chiScopeIndex"
 	LabelChiScopeCycleSize            = clickhousealtinitycom.GroupName + "/chiScopeCycleSize"
 	LabelChiScopeCycleIndex           = clickhousealtinitycom.GroupName + "/chiScopeCycleIndex"
@@ -43,7 +45,6 @@ const (
 	LabelClusterScopeCycleSize        = clickhousealtinitycom.GroupName + "/clusterScopeCycleSize"
 	LabelClusterScopeCycleIndex       = clickhousealtinitycom.GroupName + "/clusterScopeCycleIndex"
 	LabelClusterScopeCycleOffset      = clickhousealtinitycom.GroupName + "/clusterScopeCycleOffset"
-	LabelShardScopeIndex              = clickhousealtinitycom.GroupName + "/shardScopeIndex"
 	LabelConfigMap                    = clickhousealtinitycom.GroupName + "/ConfigMap"
 	labelConfigMapValueChiCommon      = "ChiCommon"
 	labelConfigMapValueChiCommonUsers = "ChiCommonUsers"
@@ -196,7 +197,9 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 		LabelChiName:                 l.namer.getNamePartChiName(host),
 		LabelClusterName:             l.namer.getNamePartClusterName(host),
 		LabelShardName:               l.namer.getNamePartShardName(host),
+		LabelShardScopeIndex:         l.namer.getNamePartShardScopeIndex(host),
 		LabelReplicaName:             l.namer.getNamePartReplicaName(host),
+		LabelReplicaScopeIndex:       l.namer.getNamePartReplicaScopeIndex(host),
 		LabelChiScopeIndex:           l.namer.getNamePartChiScopeIndex(host),
 		LabelChiScopeCycleSize:       l.namer.getNamePartChiScopeCycleSize(host),
 		LabelChiScopeCycleIndex:      l.namer.getNamePartChiScopeCycleIndex(host),
@@ -205,7 +208,6 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 		LabelClusterScopeCycleSize:   l.namer.getNamePartClusterScopeCycleSize(host),
 		LabelClusterScopeCycleIndex:  l.namer.getNamePartClusterScopeCycleIndex(host),
 		LabelClusterScopeCycleOffset: l.namer.getNamePartClusterScopeCycleOffset(host),
-		LabelShardScopeIndex:         l.namer.getNamePartShardScopeIndex(host),
 	}
 	if applySupplementaryServiceLabels {
 		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint

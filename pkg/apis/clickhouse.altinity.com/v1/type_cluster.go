@@ -21,18 +21,39 @@ func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
 
 func (cluster *ChiCluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	name := cluster.Templates.ClusterServiceTemplate
-	template, ok := cluster.Chi.GetServiceTemplate(name)
+	template, ok := cluster.CHI.GetServiceTemplate(name)
 	return template, ok
 }
 
+func (cluster *ChiCluster) GetShard(shard int) *ChiShard {
+	return &cluster.Layout.Shards[shard]
+}
+
+func (cluster *ChiCluster) GetReplica(replica int) *ChiReplica {
+	return &cluster.Layout.Replicas[replica]
+}
+
 func (cluster *ChiCluster) WalkShards(
-	f func(shard *ChiShard) error,
+	f func(index int, shard *ChiShard) error,
 ) []error {
 	res := make([]error, 0)
 
 	for shardIndex := range cluster.Layout.Shards {
 		shard := &cluster.Layout.Shards[shardIndex]
-		res = append(res, f(shard))
+		res = append(res, f(shardIndex, shard))
+	}
+
+	return res
+}
+
+func (cluster *ChiCluster) WalkReplicas(
+	f func(index int, replica *ChiReplica) error,
+) []error {
+	res := make([]error, 0)
+
+	for replicaIndex := range cluster.Layout.Replicas {
+		replica := &cluster.Layout.Replicas[replicaIndex]
+		res = append(res, f(replicaIndex, replica))
 	}
 
 	return res
@@ -46,9 +67,43 @@ func (cluster *ChiCluster) WalkHosts(
 
 	for shardIndex := range cluster.Layout.Shards {
 		shard := &cluster.Layout.Shards[shardIndex]
-		for replicaIndex := range shard.Replicas {
-			host := &shard.Replicas[replicaIndex]
+		for replicaIndex := range shard.Hosts {
+			host := shard.Hosts[replicaIndex]
 			res = append(res, f(host))
+		}
+	}
+
+	return res
+}
+
+func (cluster *ChiCluster) WalkHostsByShards(
+	f func(shard, replica int, host *ChiHost) error,
+) []error {
+
+	res := make([]error, 0)
+
+	for shardIndex := range cluster.Layout.Shards {
+		shard := &cluster.Layout.Shards[shardIndex]
+		for replicaIndex := range shard.Hosts {
+			host := shard.Hosts[replicaIndex]
+			res = append(res, f(shardIndex, replicaIndex, host))
+		}
+	}
+
+	return res
+}
+
+func (cluster *ChiCluster) WalkHostsByReplicas(
+	f func(shard, replica int, host *ChiHost) error,
+) []error {
+
+	res := make([]error, 0)
+
+	for replicaIndex := range cluster.Layout.Replicas {
+		replica := &cluster.Layout.Replicas[replicaIndex]
+		for shardIndex := range replica.Hosts {
+			host := replica.Hosts[shardIndex]
+			res = append(res, f(shardIndex, replicaIndex, host))
 		}
 	}
 

@@ -20,7 +20,7 @@ import (
 
 func HostCanDeletePVC(host *chiv1.ChiHost, pvcName string) bool {
 	policy := chiv1.PVCReclaimPolicyRetain
-	host.Chi.WalkVolumeClaimTemplates(func(template *chiv1.ChiVolumeClaimTemplate) {
+	host.CHI.WalkVolumeClaimTemplates(func(template *chiv1.ChiVolumeClaimTemplate) {
 		if pvcName == CreatePVCName(template, host) {
 			policy = template.PVCReclaimPolicy
 		}

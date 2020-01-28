@@ -90,9 +90,9 @@ func Run() {
 	glog.V(1).Info("Starting metrics exporter\n")
 
 	metrics.StartMetricsREST(
-		chop.Config().ChUsername,
-		chop.Config().ChPassword,
-		chop.Config().ChPort,
+		chop.Config().CHUsername,
+		chop.Config().CHPassword,
+		chop.Config().CHPort,
 
 		metricsEP,
 		metricsPath,

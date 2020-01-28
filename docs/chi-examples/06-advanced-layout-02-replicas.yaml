@@ -1,0 +1,51 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "adv-layout-02"
+spec:
+  configuration:
+    clusters:
+      - name: adv
+        layout:
+          shardsCount: 4
+          replicas:
+            - templates:
+                podTemplate: clickhouse:19.1.10
+            - templates:
+                podTemplate: clickhouse:19.3.5
+            - templates:
+                podTemplate: clickhouse:19.3.7
+
+  templates:
+    podTemplates:
+
+      - name: clickhouse:19.1.10
+        spec:
+          containers:
+            - name: clickhouse-pod
+              #        image: yandex/clickhouse-server:19.1.10
+              #        image: yandex/clickhouse-server:19.3.5
+              #        image: yandex/clickhouse-server:19.3.7
+              #        image: yandex/clickhouse-server:19.1.105
+              image: yandex/clickhouse-server:19.1.10
+
+      - name: clickhouse:19.3.5
+        spec:
+          containers:
+            - name: clickhouse-pod
+              #        image: yandex/clickhouse-server:19.1.10
+              #        image: yandex/clickhouse-server:19.3.5
+              #        image: yandex/clickhouse-server:19.3.7
+              #        image: yandex/clickhouse-server:19.1.105
+              image: yandex/clickhouse-server:19.3.5
+
+
+      - name: clickhouse:19.3.7
+        spec:
+          containers:
+            - name: clickhouse-pod
+              #        image: yandex/clickhouse-server:19.1.10
+              #        image: yandex/clickhouse-server:19.3.5
+              #        image: yandex/clickhouse-server:19.3.7
+              #        image: yandex/clickhouse-server:19.1.105
+              image: yandex/clickhouse-server:19.3.7

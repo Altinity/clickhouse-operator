@@ -1,15 +1,5 @@
 #!/bin/bash
 
-# Namespace to install operator into
-OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-clickhouse-operator}"
-# Namespace to install metrics-exporter into
-METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
-
-# Operator's docker image
-OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
-# Metrics exporter's docker image
-METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:latest}"
-
 #
 # Check whether kubectl is available
 #
@@ -84,6 +74,22 @@ function get_file() {
         exit 1
     fi
 }
+
+#
+# Setup SOME variables
+# Full list of available vars is available in ${MANIFEST_ROOT}/dev/cat-clickhouse-operator-install-yaml.sh file
+#
+
+# Namespace to install operator
+OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
+METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
+
+# Operator's docker image
+RELEASE_VERSION=$(get_file https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/release)
+OPERATOR_VERSION="${OPERATOR_VERSION:-$RELEASE_VERSION}"
+OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:$OPERATOR_VERSION}"
+METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:$OPERATOR_VERSION}"
+
 
 ##
 ## Main

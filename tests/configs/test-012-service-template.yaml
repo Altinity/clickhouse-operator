@@ -25,7 +25,7 @@ spec:
           ports:
             - name: http
               port: 8123
-            - name: client
+            - name: tcp
               port: 9000
           type: ClusterIP
           clusterIP: None
@@ -35,7 +35,7 @@ spec:
           ports:
             - name: http
               port: 8123
-            - name: client
+            - name: tcp
               port: 9000
           type: ClusterIP
           clusterIP: None

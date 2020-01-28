@@ -17,9 +17,10 @@ OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 
 # Operator's docker image
-OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
-METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:latest}"
-
+RELEASE_VERSION=$(cat ${PROJECT_ROOT}/release)
+OPERATOR_VERSION="${OPERATOR_VERSION:-$RELEASE_VERSION}"
+OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:$OPERATOR_VERSION}"
+METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:$OPERATOR_VERSION}"
 
 # Local path to operator's config file to be injected into .yaml
 OPERATOR_CONFIG_FILE="${PROJECT_ROOT}/config/config.yaml"

@@ -51,7 +51,7 @@ func (c *configSections) CreateConfigsCommon() {
 	util.IncludeNonEmpty(c.commonConfigSections, filenameSettingsXML, c.chConfigGenerator.GetSettings())
 	util.MergeStringMaps(c.commonConfigSections, c.chConfigGenerator.GetFiles())
 	// Extra user-specified config files
-	util.MergeStringMaps(c.commonConfigSections, c.chopConfig.ChCommonConfigs)
+	util.MergeStringMaps(c.commonConfigSections, c.chopConfig.CHCommonConfigs)
 }
 
 func (c *configSections) CreateConfigsUsers() {
@@ -63,15 +63,16 @@ func (c *configSections) CreateConfigsUsers() {
 	util.IncludeNonEmpty(c.commonUsersConfigSections, filenameQuotasXML, c.chConfigGenerator.GetQuotas())
 	util.IncludeNonEmpty(c.commonUsersConfigSections, filenameProfilesXML, c.chConfigGenerator.GetProfiles())
 	// Extra user-specified config files
-	util.MergeStringMaps(c.commonUsersConfigSections, c.chopConfig.ChUsersConfigs)
+	util.MergeStringMaps(c.commonUsersConfigSections, c.chopConfig.CHUsersConfigs)
 }
 
-func (c *configSections) CreateConfigsPod(host *chi.ChiHost) map[string]string {
+func (c *configSections) CreateConfigsHost(host *chi.ChiHost) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
-	podConfigSections := make(map[string]string)
-	util.IncludeNonEmpty(podConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(host))
+	hostConfigSections := make(map[string]string)
+	util.IncludeNonEmpty(hostConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(host))
+	util.IncludeNonEmpty(hostConfigSections, filenamePortsXML, c.chConfigGenerator.GetHostPorts(host))
 	// Extra user-specified config files
-	util.MergeStringMaps(podConfigSections, c.chopConfig.ChHostConfigs)
+	util.MergeStringMaps(hostConfigSections, c.chopConfig.CHHostConfigs)
 
-	return podConfigSections
+	return hostConfigSections
 }

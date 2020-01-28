@@ -29,13 +29,6 @@ spec:
           containers:
             - name: clickhouse
               image: yandex/clickhouse-server:19.4.3.11
-              ports:
-                - name: http
-                  containerPort: 8123
-                - name: client
-                  containerPort: 9000
-                - name: interserver
-                  containerPort: 9009
               volumeMounts:
                 - name: storage-vc-template
                   mountPath: /var/lib/clickhouse
