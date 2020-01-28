@@ -1,7 +1,7 @@
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:latest
+# altinity/clickhouse-operator:0.8.0
 #
 # Setup CustomResourceDefinition(s)
 # CustomResourceDefinition is namespace-less and must have unique name
@@ -924,7 +924,7 @@ subjects:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:latest
+# altinity/clickhouse-operator:0.8.0
 # etc-clickhouse-operator-files
 #
 apiVersion: v1
@@ -1037,7 +1037,7 @@ data:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:latest
+# altinity/clickhouse-operator:0.8.0
 # etc-clickhouse-operator-confd-files
 #
 apiVersion: v1
@@ -1052,7 +1052,7 @@ data:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:latest
+# altinity/clickhouse-operator:0.8.0
 # etc-clickhouse-operator-configd-files
 #
 apiVersion: v1
@@ -1094,11 +1094,12 @@ data:
         <flush_interval_milliseconds>7500</flush_interval_milliseconds>
     </query_log>
     </yandex>
+
 ---
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:latest
+# altinity/clickhouse-operator:0.8.0
 # etc-clickhouse-operator-templatesd-files
 #
 apiVersion: v1
@@ -1175,6 +1176,7 @@ data:
         podTemplates:
           - name: default-oneperhost-pod-template
             distribution: "OnePerHost"
+
   default-storage-template.yaml.example: |
     apiVersion: "clickhouse.altinity.com/v1"
     kind: "ClickHouseInstallationTemplate"
@@ -1193,11 +1195,12 @@ data:
 
   readme: |
     Templates in this folder are packaged with an operator and available via 'useTemplate'
+
 ---
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:latest
+# altinity/clickhouse-operator:0.8.0
 # etc-clickhouse-operator-usersd-files
 #
 apiVersion: v1
@@ -1242,12 +1245,13 @@ data:
         </default>
       </profiles>
     </yandex>
+
 ---
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:latest
-# altinity/metrics-exporter:latest
+# altinity/clickhouse-operator:0.8.0
+# altinity/metrics-exporter:0.8.0
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -1287,7 +1291,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:latest
+          image: altinity/clickhouse-operator:0.8.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -1352,7 +1356,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:latest
+          image: altinity/metrics-exporter:0.8.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
