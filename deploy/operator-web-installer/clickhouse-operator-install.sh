@@ -85,7 +85,7 @@ OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 
 # Operator's docker image
-RELEASE_VERSION=`get_file https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/release`
+RELEASE_VERSION=$(get_file https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/release)
 OPERATOR_VERSION="${OPERATOR_VERSION:-$RELEASE_VERSION}"
 OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:$OPERATOR_VERSION}"
 METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:$OPERATOR_VERSION}"
