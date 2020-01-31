@@ -43,14 +43,11 @@ spec:
         podDistribution:
           - type: ShardAntiAffinity
           - type: ReplicaAntiAffinity
-          - type: MaxNumberPerNode
-            number: 3
           - type: NamespaceAffinity
           - type: ClickHouseInstallationAffinity
-          - type: ClusterAffinity
           - type: PreviousTailAffinity
         spec:
           hostNetwork: true
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:18.16.1
+              image: yandex/clickhouse-server:19.16
