@@ -1,7 +1,7 @@
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:latest
+# altinity/clickhouse-operator:0.8.0
 #
 # Setup CustomResourceDefinition(s)
 # CustomResourceDefinition is namespace-less and must have unique name
