@@ -121,7 +121,7 @@ This is the trivial [1 shard 1 replica](./chi-examples/01-simple-layout-01-1shar
 **WARNING**: Do not use it for anything other than 'Hello, world!', it does not have persistent storage!
  
 ```bash
-kubectl apply -n test-clickhouse-operator -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/examples/01-simple-layout-01-1shard-1repl.yaml
+kubectl apply -n test-clickhouse-operator -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml
 ```
 ```text
 clickhouseinstallation.clickhouse.altinity.com/simple-01 created
