@@ -347,8 +347,20 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 			chiv1.PodDistributionShardAffinity,
 			chiv1.PodDistributionReplicaAffinity,
 			chiv1.PodDistributionPreviousTailAffinity:
-
 			// PodDistribution is known
+
+		case chiv1.PodDistributionCircularReplication:
+			// PodDistribution is known
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionShardAntiAffinity})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionReplicaAntiAffinity})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionMaxNumberPerNode, Number: n.chi.Spec.Configuration.Clusters[0].Layout.ReplicasCount})
+
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionPreviousTailAffinity})
+
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionNamespaceAffinity})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionClickHouseInstallationAffinity})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionClusterAffinity})
+
 		default:
 			// PodDistribution is not known
 			podDistribution.Type = chiv1.PodDistributionUnspecified
