@@ -28,14 +28,7 @@ spec:
     podTemplates:
       - name: pod-distribution
         podDistribution:
-          - type: ShardAntiAffinity
-          - type: ReplicaAntiAffinity
-          - type: MaxNumberPerNode
-            number: 3
-          - type: NamespaceAffinity
-          - type: ClickHouseInstallationAffinity
-          - type: ClusterAffinity
-          - type: PreviousTailAffinity
+          - type: CircularReplication
         spec:
           hostNetwork: true
           containers:
