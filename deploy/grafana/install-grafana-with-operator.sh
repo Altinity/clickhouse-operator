@@ -40,11 +40,11 @@ kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
     envsubst \
 )
 
-#echo "Waiting to start"
-#sleep 60
-#
-#kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
-#    cat grafana-dashboard-cr-template.yaml | \
-#    GRAFANA_DASHBOARD_NAME="$GRAFANA_DASHBOARD_NAME" \
-#    envsubst \
-#)
+echo "Waiting to start"
+sleep 60
+
+kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
+    cat grafana-dashboard-cr-template.yaml | \
+    GRAFANA_DASHBOARD_NAME="$GRAFANA_DASHBOARD_NAME" \
+    envsubst \
+)
