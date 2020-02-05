@@ -166,9 +166,26 @@ REPO_PATH_OPERATOR_CONFIG_FOLDER="config"
 
 # Render CRD section
 if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-01-section-crd-01-chi.yaml"
     render_separator
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-01-section-crd.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
-    cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-01-section-crd.yaml" | \
+    ensure_file "${CUR_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+    cat "${CUR_DIR}/${SECTION_FILE_NAME}" | \
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+        envsubst
+
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-01-section-crd-02-chit.yaml"
+    render_separator
+    ensure_file "${CUR_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+    cat "${CUR_DIR}/${SECTION_FILE_NAME}" | \
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+        envsubst
+
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-01-section-crd-03-chopconf.yaml"
+    render_separator
+    ensure_file "${CUR_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+    cat "${CUR_DIR}/${SECTION_FILE_NAME}" | \
         OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
         OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
         envsubst
