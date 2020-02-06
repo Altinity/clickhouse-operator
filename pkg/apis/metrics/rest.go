@@ -38,6 +38,7 @@ func StartMetricsREST(
 ) *Exporter {
 	// Initializing Prometheus Metrics Exporter
 	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsAddress, metricsPath)
+
 	exporter = NewExporter(chAccess)
 	prometheus.MustRegister(exporter)
 
@@ -52,6 +53,7 @@ func StartMetricsREST(
 	return exporter
 }
 
+// ServeHTTP is an interface method to serve HTTP requests
 func (e *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/chi" {
 		http.Error(w, "404 not found.", http.StatusNotFound)
@@ -70,17 +72,19 @@ func (e *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// getWatchedCHI serves HTTP request to get list of watched CHIs
 func (e *Exporter) getWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(exporter.chInstallations.Slice())
+	_ = json.NewEncoder(w).Encode(exporter.chInstallations.Slice())
 }
 
+// addWatchedCHI serves HTTPS request to add CHI to the list of watched CHIs
 func (e *Exporter) addWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	chi := &WatchedChi{}
+	chi := &WatchedCHI{}
 	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
-		if !chi.empty() {
-			// All is OK, CHI seems to be valid
+		if chi.isValid() {
+			// CHI is good to be added to the list of watched CHIs
 			exporter.addToWatched(chi)
 			return
 		}
@@ -89,9 +93,10 @@ func (e *Exporter) addWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
 }
 
+// deleteWatchedCHI serves HTTP request to delete CHI from the list of watched CHIs
 func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	chi := &WatchedChi{}
+	chi := &WatchedCHI{}
 	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
 		if !chi.empty() {
 			// All is OK, CHI seems to be valid
@@ -103,7 +108,7 @@ func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
 }
 
-func MakeRESTCall(chi *WatchedChi, op string) error {
+func MakeRESTCall(chi *WatchedCHI, op string) error {
 	url := "http://127.0.0.1:8888/chi"
 
 	json, err := json.Marshal(chi)
@@ -122,7 +127,7 @@ func MakeRESTCall(chi *WatchedChi, op string) error {
 }
 
 func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
-	chi := &WatchedChi{
+	chi := &WatchedCHI{
 		Namespace: namespace,
 		Name:      chiName,
 		Hostnames: hostnames,
@@ -131,7 +136,7 @@ func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
 }
 
 func DeleteWatchREST(namespace, chiName string) error {
-	chi := &WatchedChi{
+	chi := &WatchedCHI{
 		Namespace: namespace,
 		Name:      chiName,
 		Hostnames: []string{},
