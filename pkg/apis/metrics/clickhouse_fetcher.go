@@ -23,82 +23,87 @@ import (
 
 const (
 	querySystemReplicasSQL = `
-	SELECT
-		database,
-		table,
-		toString(is_session_expired) AS is_session_expired
-	FROM system.replicas
+		SELECT
+			database,
+			table,
+			toString(is_session_expired) AS is_session_expired
+		FROM system.replicas
 	`
 
 	queryMetricsSQL = `
-    SELECT
-        concat('metric.', metric) AS metric,
-        toString(value)           AS value, 
-        ''                        AS description, 
-        'gauge'                   AS type
-    FROM system.asynchronous_metrics
-    UNION ALL 
-    SELECT 
-        concat('metric.', metric) AS metric, 
-        toString(value)           AS value, 
-        description               AS description,       
-        'gauge'                   AS type   
-    FROM system.metrics
-    UNION ALL 
-    SELECT
-        concat('event.', event)   AS metric,
-        toString(value)           AS value,
-        description               AS description,
-        'counter'                 AS type
-    FROM system.events
-    UNION ALL
-    SELECT 
-        'metric.DiskDataBytes'                      AS metric,
-        toString(sum(bytes_on_disk))                AS value,
-        'Total data size for all ClickHouse tables' AS description,
-	    'gauge'                                     AS type
-    FROM system.parts
-    UNION ALL
-    SELECT 
-        'metric.MemoryPrimaryKeyBytesAllocated'              AS metric,
-        toString(sum(primary_key_bytes_in_memory_allocated)) AS value,
-        'Memory size allocated for primary keys'             AS description,
-        'gauge'                                              AS type
-    FROM system.parts
-    UNION ALL
-    SELECT 
-        'metric.MemoryDictionaryBytesAllocated'  AS metric,
-        toString(sum(bytes_allocated))           AS value,
-        'Memory size allocated for dictionaries' AS description,
-        'gauge'                                  AS type
-    FROM system.dictionaries
-    UNION ALL
-    SELECT 
-        'metric.DiskFreeBytes'                     AS metric,
-        toString(filesystemFree())                 AS value,
-        'Free disk space available at file system' AS description,
-        'gauge'                                    AS type
-	`
+    	SELECT
+        	concat('metric.', metric) AS metric,
+        	toString(value)           AS value, 
+        	''                        AS description, 
+        	'gauge'                   AS type
+    	FROM system.asynchronous_metrics
+    	UNION ALL 
+    	SELECT 
+	        concat('metric.', metric) AS metric, 
+	        toString(value)           AS value, 
+    	    description               AS description,       
+	        'gauge'                   AS type   
+	    FROM system.metrics
+	    UNION ALL 
+	    SELECT
+	        concat('event.', event)   AS metric,
+	        toString(value)           AS value,
+	        description               AS description,
+	        'counter'                 AS type
+	    FROM system.events
+	    UNION ALL
+	    SELECT 
+	        'metric.DiskDataBytes'                      AS metric,
+	        toString(sum(bytes_on_disk))                AS value,
+	        'Total data size for all ClickHouse tables' AS description,
+		    'gauge'                                     AS type
+	    FROM system.parts
+	    UNION ALL
+	    SELECT 
+	        'metric.MemoryPrimaryKeyBytesAllocated'              AS metric,
+	        toString(sum(primary_key_bytes_in_memory_allocated)) AS value,
+	        'Memory size allocated for primary keys'             AS description,
+	        'gauge'                                              AS type
+	    FROM system.parts
+	    UNION ALL
+	    SELECT 
+	        'metric.MemoryDictionaryBytesAllocated'  AS metric,
+	        toString(sum(bytes_allocated))           AS value,
+	        'Memory size allocated for dictionaries' AS description,
+	        'gauge'                                  AS type
+	    FROM system.dictionaries
+	    UNION ALL
+	    SELECT 
+	        'metric.DiskFreeBytes'                     AS metric,
+    	    toString(filesystemFree())                 AS value,
+	        'Free disk space available at file system' AS description,
+	        'gauge'                                    AS type
+		`
 
 	queryTableSizesSQL = `
-	SELECT
-		database,
-		table, 
-		toString(uniq(partition))              AS partitions, 
-		toString(count())                      AS parts, 
-		toString(sum(bytes))                   AS bytes, 
-		toString(sum(data_uncompressed_bytes)) AS uncompressed_bytes, 
-		toString(sum(rows))                    AS rows 
-	FROM system.parts
-	WHERE active = 1
-	GROUP BY database, table
-	`
+		SELECT
+			database,
+			table, 
+			toString(uniq(partition))              AS partitions, 
+			toString(count())                      AS parts, 
+			toString(sum(bytes))                   AS bytes, 
+			toString(sum(data_uncompressed_bytes)) AS uncompressed_bytes, 
+			toString(sum(rows))                    AS rows 
+		FROM system.parts
+		WHERE active = 1
+		GROUP BY database, table
+		`
 
 	queryMutationsSQL = `
-	select database, table, count() as mutations, sum(parts_to_do) as parts_to_do 
-	  from system.mutations 
-	 where is_done = 0 
-	 group by database, table`
+		SELECT
+			database,
+			table,
+			count()          AS mutations,
+			sum(parts_to_do) AS parts_to_do 
+		FROM system.mutations 
+		WHERE is_done = 0 
+		GROUP BY database, table
+		`
 )
 
 type ClickHouseFetcher struct {
