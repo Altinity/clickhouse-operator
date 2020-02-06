@@ -60,22 +60,22 @@ func (e *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET":
-		e.getWatchedChi(w, r)
+		e.getWatchedCHI(w, r)
 	case "POST":
-		e.addWatchedChi(w, r)
+		e.addWatchedCHI(w, r)
 	case "DELETE":
-		e.deleteWatchedChi(w, r)
+		e.deleteWatchedCHI(w, r)
 	default:
 		fmt.Fprintf(w, "Sorry, only GET, POST and DELETE methods are supported.")
 	}
 }
 
-func (e *Exporter) getWatchedChi(w http.ResponseWriter, r *http.Request) {
+func (e *Exporter) getWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(exporter.chInstallations.Slice())
 }
 
-func (e *Exporter) addWatchedChi(w http.ResponseWriter, r *http.Request) {
+func (e *Exporter) addWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	chi := &WatchedChi{}
 	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
@@ -89,7 +89,7 @@ func (e *Exporter) addWatchedChi(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
 }
 
-func (e *Exporter) deleteWatchedChi(w http.ResponseWriter, r *http.Request) {
+func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	chi := &WatchedChi{}
 	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
