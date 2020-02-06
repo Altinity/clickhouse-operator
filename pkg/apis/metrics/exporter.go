@@ -121,8 +121,8 @@ func (e *Exporter) removeFromWatched(chi *WatchedCHI) {
 	}
 }
 
-// addToWatched updates Exporter.chInstallation map with values from chInstances slice
-func (e *Exporter) addToWatched(chi *WatchedCHI) {
+// updateWatched updates Exporter.chInstallation map with values from chInstances slice
+func (e *Exporter) updateWatched(chi *WatchedCHI) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
@@ -153,7 +153,7 @@ func (e *Exporter) UpdateWatch(namespace, chiName string, hostnames []string) {
 		Name:      chiName,
 		Hostnames: hostnames,
 	}
-	e.addToWatched(chi)
+	e.updateWatched(chi)
 }
 
 // collectFromHost collect metrics from one host and write inito chan
@@ -220,13 +220,13 @@ func (e *Exporter) getWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(e.getWatchedCHIs())
 }
 
-// addWatchedCHI serves HTTPS request to add CHI to the list of watched CHIs
-func (e *Exporter) addWatchedCHI(w http.ResponseWriter, r *http.Request) {
+// updateWatchedCHI serves HTTPS request to add CHI to the list of watched CHIs
+func (e *Exporter) updateWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	chi := &WatchedCHI{}
 	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
 		if chi.isValid() {
-			e.addToWatched(chi)
+			e.updateWatched(chi)
 			return
 		}
 	}

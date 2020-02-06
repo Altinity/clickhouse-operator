@@ -61,28 +61,10 @@ func (e *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		e.getWatchedCHI(w, r)
 	case "POST":
-		e.addWatchedCHI(w, r)
+		e.updateWatchedCHI(w, r)
 	case "DELETE":
 		e.deleteWatchedCHI(w, r)
 	default:
 		_, _ = fmt.Fprintf(w, "Sorry, only GET, POST and DELETE methods are supported.")
 	}
-}
-
-func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
-	chi := &WatchedCHI{
-		Namespace: namespace,
-		Name:      chiName,
-		Hostnames: hostnames,
-	}
-	return makeRESTCall(chi, "POST")
-}
-
-func DeleteWatchREST(namespace, chiName string) error {
-	chi := &WatchedCHI{
-		Namespace: namespace,
-		Name:      chiName,
-		Hostnames: []string{},
-	}
-	return makeRESTCall(chi, "DELETE")
 }
