@@ -15,10 +15,7 @@
 package metrics
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/golang/glog"
@@ -68,62 +65,8 @@ func (e *Exporter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "DELETE":
 		e.deleteWatchedCHI(w, r)
 	default:
-		fmt.Fprintf(w, "Sorry, only GET, POST and DELETE methods are supported.")
+		_, _ = fmt.Fprintf(w, "Sorry, only GET, POST and DELETE methods are supported.")
 	}
-}
-
-// getWatchedCHI serves HTTP request to get list of watched CHIs
-func (e *Exporter) getWatchedCHI(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(exporter.chInstallations.Slice())
-}
-
-// addWatchedCHI serves HTTPS request to add CHI to the list of watched CHIs
-func (e *Exporter) addWatchedCHI(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	chi := &WatchedCHI{}
-	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
-		if chi.isValid() {
-			// CHI is good to be added to the list of watched CHIs
-			exporter.addToWatched(chi)
-			return
-		}
-	}
-
-	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
-}
-
-// deleteWatchedCHI serves HTTP request to delete CHI from the list of watched CHIs
-func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	chi := &WatchedCHI{}
-	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
-		if !chi.empty() {
-			// All is OK, CHI seems to be valid
-			exporter.enqueueToRemoveFromWatched(chi)
-			return
-		}
-	}
-
-	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
-}
-
-func MakeRESTCall(chi *WatchedCHI, op string) error {
-	url := "http://127.0.0.1:8888/chi"
-
-	json, err := json.Marshal(chi)
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest(op, url, bytes.NewBuffer(json))
-	if err != nil {
-		return err
-	}
-	//req.SetBasicAuth(s.Username, s.Password)
-	_, err = doRequest(req)
-
-	return err
 }
 
 func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
@@ -132,7 +75,7 @@ func UpdateWatchREST(namespace, chiName string, hostnames []string) error {
 		Name:      chiName,
 		Hostnames: hostnames,
 	}
-	return MakeRESTCall(chi, "POST")
+	return makeRESTCall(chi, "POST")
 }
 
 func DeleteWatchREST(namespace, chiName string) error {
@@ -141,25 +84,5 @@ func DeleteWatchREST(namespace, chiName string) error {
 		Name:      chiName,
 		Hostnames: []string{},
 	}
-	return MakeRESTCall(chi, "DELETE")
-}
-
-func doRequest(req *http.Request) ([]byte, error) {
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("NON 200 status code: %s", body)
-	}
-
-	return body, nil
+	return makeRESTCall(chi, "DELETE")
 }

@@ -15,6 +15,8 @@
 package metrics
 
 import (
+	"encoding/json"
+	"net/http"
 	"sync"
 
 	"github.com/golang/glog"
@@ -49,6 +51,10 @@ func NewExporter(chAccess *CHAccessInfo) *Exporter {
 		chInstallations: make(map[string]*WatchedCHI),
 		chAccessInfo:    chAccess,
 	}
+}
+
+func (e *Exporter) getWatchedCHIs() []*WatchedCHI {
+	return e.chInstallations.Slice()
 }
 
 // Collect implements prometheus.Collector Collect method
@@ -206,4 +212,38 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		//e.enqueueToRemoveFromWatched(chi)
 		return
 	}
+}
+
+// getWatchedCHI serves HTTP request to get list of watched CHIs
+func (e *Exporter) getWatchedCHI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(e.getWatchedCHIs())
+}
+
+// addWatchedCHI serves HTTPS request to add CHI to the list of watched CHIs
+func (e *Exporter) addWatchedCHI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	chi := &WatchedCHI{}
+	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
+		if chi.isValid() {
+			e.addToWatched(chi)
+			return
+		}
+	}
+
+	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
+}
+
+// deleteWatchedCHI serves HTTP request to delete CHI from the list of watched CHIs
+func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	chi := &WatchedCHI{}
+	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
+		if chi.isValid() {
+			e.enqueueToRemoveFromWatched(chi)
+			return
+		}
+	}
+
+	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
 }
