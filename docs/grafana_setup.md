@@ -89,4 +89,4 @@ More Grafana [docs](http://docs.grafana.org/)
 [grafana_manifest_yaml_secret]:  ../deploy/grafana/grafana.yaml#L56
 [create_grafana_script]: ../deploy/grafana/create-grafana.sh 
 [prometheus_setup_doc]: ./prometheus_setup.md 
-[altinity_recommended_dashboard]: ../grafana-dashboard/Altinity%20ClickHouse%20Operator%20dashboard-1556619206528.json 
+[altinity_recommended_dashboard]: ../grafana-dashboard/Altinity_ClickHouse_Operator_dashboard.json 
