@@ -44,7 +44,7 @@ import (
 
 // NewController creates instance of Controller
 func NewController(
-	chop *chop.Chop,
+	chop *chop.CHOp,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
 	chopInformerFactory chopinformers.SharedInformerFactory,

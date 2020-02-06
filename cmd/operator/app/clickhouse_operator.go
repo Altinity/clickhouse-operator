@@ -170,7 +170,7 @@ func Run() {
 	//
 	// Create operator instance
 	//
-	chop := chop.NewChop(version.Version, chopClient, chopConfigFile)
+	chop := chop.NewCHOp(version.Version, chopClient, chopConfigFile)
 	if err := chop.Init(); err != nil {
 		glog.Fatalf("Unable to init CHOP instance %v\n", err)
 		os.Exit(1)

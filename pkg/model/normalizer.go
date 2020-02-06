@@ -32,12 +32,12 @@ import (
 )
 
 type Normalizer struct {
-	chop               *chop.Chop
+	chop               *chop.CHOp
 	chi                *chiv1.ClickHouseInstallation
 	withDefaultCluster bool
 }
 
-func NewNormalizer(chop *chop.Chop) *Normalizer {
+func NewNormalizer(chop *chop.CHOp) *Normalizer {
 	return &Normalizer{
 		chop: chop,
 	}

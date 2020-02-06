@@ -12,34 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chop
+package metrics
 
-import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-)
-
-type CHOp struct {
-	Version       string
-	ConfigManager *ConfigManager
+type CHAccessInfo struct {
+	Username string
+	Password string
+	Port     int
 }
 
-func NewCHOp(
-	version string,
-	chopClient *chopclientset.Clientset,
-	initConfigFilePath string,
-
-) *CHOp {
-	return &CHOp{
-		Version:       version,
-		ConfigManager: NewConfigManager(chopClient, initConfigFilePath),
+func NewCHAccessInfo(username, password string, port int) *CHAccessInfo {
+	return &CHAccessInfo{
+		Username: username,
+		Password: password,
+		Port:     port,
 	}
-}
-
-func (c *CHOp) Init() error {
-	return c.ConfigManager.Init()
-}
-
-func (c *CHOp) Config() *v1.OperatorConfig {
-	return c.ConfigManager.Config()
 }

@@ -29,7 +29,7 @@ import (
 )
 
 type Creator struct {
-	chop                      *chop.Chop
+	chop                      *chop.CHOp
 	chi                       *chiv1.ClickHouseInstallation
 	chConfigGenerator         *ClickHouseConfigGenerator
 	chConfigSectionsGenerator *configSections
@@ -37,7 +37,7 @@ type Creator struct {
 }
 
 func NewCreator(
-	chop *chop.Chop,
+	chop *chop.CHOp,
 	chi *chiv1.ClickHouseInstallation,
 ) *Creator {
 	creator := &Creator{

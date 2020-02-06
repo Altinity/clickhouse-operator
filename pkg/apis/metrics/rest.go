@@ -28,13 +28,17 @@ import (
 
 // StartMetricsREST start Prometheus metrics exporter in background
 func StartMetricsREST(
-	username, password string, port int,
-	metricsAddress, metricsPath string,
-	chiListAddress, chiListPath string,
+	chAccess *CHAccessInfo,
+
+	metricsAddress string,
+	metricsPath string,
+
+	chiListAddress string,
+	chiListPath string,
 ) *Exporter {
 	// Initializing Prometheus Metrics Exporter
 	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsAddress, metricsPath)
-	exporter = NewExporter(username, password, port)
+	exporter = NewExporter(chAccess)
 	prometheus.MustRegister(exporter)
 
 	http.Handle(metricsPath, promhttp.Handler())

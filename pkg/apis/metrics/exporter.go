@@ -25,7 +25,7 @@ import (
 type Exporter struct {
 	// chInstallations maps CHI name to list of hostnames (of string type) of this installation
 	chInstallations chInstallationsIndex
-	chAccessInfo    chAccessInfo
+	chAccessInfo    *CHAccessInfo
 
 	mutex               sync.RWMutex
 	toRemoveFromWatched sync.Map
@@ -74,12 +74,6 @@ func (chi *WatchedChi) equal(chi2 *WatchedChi) bool {
 
 var exporter *Exporter
 
-type chAccessInfo struct {
-	Username string
-	Password string
-	Port     int
-}
-
 type chInstallationsIndex map[string]*WatchedChi
 
 func (i chInstallationsIndex) Slice() []*WatchedChi {
@@ -91,14 +85,10 @@ func (i chInstallationsIndex) Slice() []*WatchedChi {
 }
 
 // NewExporter returns a new instance of Exporter type
-func NewExporter(username, password string, port int) *Exporter {
+func NewExporter(chAccess *CHAccessInfo) *Exporter {
 	return &Exporter{
 		chInstallations: make(map[string]*WatchedChi),
-		chAccessInfo: chAccessInfo{
-			Username: username,
-			Password: password,
-			Port:     port,
-		},
+		chAccessInfo:    chAccess,
 	}
 }
 
