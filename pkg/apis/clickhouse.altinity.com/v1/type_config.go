@@ -241,16 +241,12 @@ func (config *OperatorConfig) normalize() {
 	// Default action on Create/Update failure - to keep system in previous state
 
 	// Default Create Failure action - delete
-	if strings.ToLower(config.OnStatefulSetCreateFailureAction) == OnStatefulSetCreateFailureActionAbort {
-		config.OnStatefulSetCreateFailureAction = OnStatefulSetCreateFailureActionAbort
-	} else {
+	if config.OnStatefulSetCreateFailureAction == "" {
 		config.OnStatefulSetCreateFailureAction = OnStatefulSetCreateFailureActionDelete
 	}
 
 	// Default Updated Failure action - revert
-	if strings.ToLower(config.OnStatefulSetUpdateFailureAction) == OnStatefulSetUpdateFailureActionAbort {
-		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionAbort
-	} else {
+	if config.OnStatefulSetUpdateFailureAction == "" {
 		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionRollback
 	}
 
