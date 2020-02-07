@@ -34,6 +34,7 @@ func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 
 func (chi *ClickHouseInstallation) FillAddressInfo() {
 	// What is the max number of Pods allowed per Node
+	// TODO need to support multi-cluster
 	maxNumberOfPodsPerNode := 0
 	chi.WalkPodTemplates(func(template *ChiPodTemplate) {
 		for i := range template.PodDistribution {
@@ -149,8 +150,7 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 }
 
 func (chi *ClickHouseInstallation) FillChiPointer() {
-
-	hostProcessor := func(
+	chi.WalkHostsFullPath(0, 0, func(
 		chi *ClickHouseInstallation,
 
 		chiScopeIndex int,
@@ -179,8 +179,7 @@ func (chi *ClickHouseInstallation) FillChiPointer() {
 		replica.CHI = chi
 		host.CHI = chi
 		return nil
-	}
-	chi.WalkHostsFullPath(0, 0, hostProcessor)
+	})
 }
 
 func (chi *ClickHouseInstallation) WalkClustersFullPath(
