@@ -112,3 +112,5 @@ More Grafana [docs](http://docs.grafana.org/)
 [create_grafana_script]: ../deploy/grafana/create-grafana.sh 
 [prometheus_setup_doc]: ./prometheus_setup.md 
 [altinity_recommended_dashboard]: ../grafana-dashboard/Altinity_ClickHouse_Operator_dashboard.json 
+[install_grafana_operator_script]: ../deploy/grafana/install-grafana-operator.sh
+[install_grafana_dashboard_script]: ../deploy/grafana/install-grafana-with-operator.sh
