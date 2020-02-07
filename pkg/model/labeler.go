@@ -62,13 +62,13 @@ const (
 
 // Labeler is an entity which can label CHI artifacts
 type Labeler struct {
-	chop  *chop.Chop
+	chop  *chop.CHOp
 	chi   *chi.ClickHouseInstallation
 	namer *namer
 }
 
 // NewLabeler creates new labeler with context
-func NewLabeler(chop *chop.Chop, chi *chi.ClickHouseInstallation) *Labeler {
+func NewLabeler(chop *chop.CHOp, chi *chi.ClickHouseInstallation) *Labeler {
 	return &Labeler{
 		chop:  chop,
 		chi:   chi,

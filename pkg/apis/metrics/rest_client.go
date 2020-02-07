@@ -12,34 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chop
+package metrics
 
-import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-)
-
-type CHOp struct {
-	Version       string
-	ConfigManager *ConfigManager
-}
-
-func NewCHOp(
-	version string,
-	chopClient *chopclientset.Clientset,
-	initConfigFilePath string,
-
-) *CHOp {
-	return &CHOp{
-		Version:       version,
-		ConfigManager: NewConfigManager(chopClient, initConfigFilePath),
+func ReportToMetricsExporterWatchedCHI(namespace, chiName string, hostnames []string) error {
+	chi := &WatchedCHI{
+		Namespace: namespace,
+		Name:      chiName,
+		Hostnames: hostnames,
 	}
+	return makeRESTCall(chi, "POST")
 }
 
-func (c *CHOp) Init() error {
-	return c.ConfigManager.Init()
-}
-
-func (c *CHOp) Config() *v1.OperatorConfig {
-	return c.ConfigManager.Config()
+func InformMetricsExporterToDeleteWatchedCHI(namespace, chiName string) error {
+	chi := &WatchedCHI{
+		Namespace: namespace,
+		Name:      chiName,
+		Hostnames: []string{},
+	}
+	return makeRESTCall(chi, "DELETE")
 }

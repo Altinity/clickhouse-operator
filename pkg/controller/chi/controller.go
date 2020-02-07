@@ -44,7 +44,7 @@ import (
 
 // NewController creates instance of Controller
 func NewController(
-	chop *chop.Chop,
+	chop *chop.CHOp,
 	chopClient chopclientset.Interface,
 	kubeClient kube.Interface,
 	chopInformerFactory chopinformers.SharedInformerFactory,
@@ -408,7 +408,7 @@ func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
 }
 
 func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string) {
-	if err := metrics.UpdateWatchREST(namespace, name, hostnames); err != nil {
+	if err := metrics.ReportToMetricsExporterWatchedCHI(namespace, name, hostnames); err != nil {
 		glog.V(1).Infof("FAIL update watch (%s/%s): %q", namespace, name, err)
 	} else {
 		glog.V(2).Infof("OK update watch (%s/%s)", namespace, name)
@@ -420,7 +420,7 @@ func (c *Controller) deleteWatch(namespace, name string) {
 }
 
 func (c *Controller) deleteWatchAsync(namespace, name string) {
-	if err := metrics.DeleteWatchREST(namespace, name); err != nil {
+	if err := metrics.InformMetricsExporterToDeleteWatchedCHI(namespace, name); err != nil {
 		glog.V(1).Infof("FAIL delete watch (%s/%s): %q", namespace, name, err)
 	} else {
 		glog.V(2).Infof("OK delete watch (%s/%s)", namespace, name)

@@ -552,6 +552,7 @@ spec:
                                 - "ShardAffinity"
                                 - "ReplicaAffinity"
                                 - "PreviousTailAffinity"
+                                - "CircularReplication"
                             number:
                               type: integer
                               minimum: 0
@@ -1143,6 +1144,7 @@ spec:
                                 - "ShardAffinity"
                                 - "ReplicaAffinity"
                                 - "PreviousTailAffinity"
+                                - "CircularReplication"
                             number:
                               type: integer
                               minimum: 0

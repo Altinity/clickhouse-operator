@@ -32,12 +32,12 @@ import (
 )
 
 type Normalizer struct {
-	chop               *chop.Chop
+	chop               *chop.CHOp
 	chi                *chiv1.ClickHouseInstallation
 	withDefaultCluster bool
 }
 
-func NewNormalizer(chop *chop.Chop) *Normalizer {
+func NewNormalizer(chop *chop.CHOp) *Normalizer {
 	return &Normalizer{
 		chop: chop,
 	}
@@ -135,7 +135,22 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 		glog.V(1).Infof("getHostTemplate() statefulSet %s use custom host template %s", statefulSetName, hostTemplate.Name)
 	} else {
 		// Host references UNKNOWN HostTemplate, will use default one
-		hostTemplate = newDefaultHostTemplate(statefulSetName)
+		// However, with default template there is a nuance - hostNetwork requires different default host template
+
+		// Check hostNetwork case at first
+		podTemplate, ok := host.GetPodTemplate()
+		if ok {
+			if podTemplate.Spec.HostNetwork {
+				// HostNetwork
+				hostTemplate = newDefaultHostTemplateForHostNetwork(statefulSetName)
+			}
+		}
+
+		// In case hostTemplate still is not assigned - use default one
+		if hostTemplate == nil {
+			hostTemplate = newDefaultHostTemplate(statefulSetName)
+		}
+
 		glog.V(1).Infof("getHostTemplate() statefulSet %s use default generated host template", statefulSetName)
 	}
 
@@ -347,8 +362,22 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 			chiv1.PodDistributionShardAffinity,
 			chiv1.PodDistributionReplicaAffinity,
 			chiv1.PodDistributionPreviousTailAffinity:
-
 			// PodDistribution is known
+
+		case chiv1.PodDistributionCircularReplication:
+			// PodDistribution is known
+			cluster := &n.chi.Spec.Configuration.Clusters[0]
+
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionShardAntiAffinity})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionReplicaAntiAffinity})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionMaxNumberPerNode, Number: cluster.Layout.ReplicasCount})
+
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionPreviousTailAffinity})
+
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionNamespaceAffinity})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionClickHouseInstallationAffinity})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionClusterAffinity})
+
 		default:
 			// PodDistribution is not known
 			podDistribution.Type = chiv1.PodDistributionUnspecified

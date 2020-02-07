@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "hostnet1"
+  name: "hostnet2"
 spec:
   defaults:
     templates:
@@ -10,7 +10,7 @@ spec:
 
   configuration:
     clusters:
-      - name: "hnet1"
+      - name: "hnet2"
         layout:
           shardsCount: 3
           replicasCount: 3
@@ -28,14 +28,7 @@ spec:
     podTemplates:
       - name: pod-distribution
         podDistribution:
-          - type: ShardAntiAffinity
-          - type: ReplicaAntiAffinity
-          - type: MaxNumberPerNode
-            number: 3
-          - type: NamespaceAffinity
-          - type: ClickHouseInstallationAffinity
-          - type: ClusterAffinity
-          - type: PreviousTailAffinity
+          - type: CircularReplication
         spec:
           hostNetwork: true
           containers:
