@@ -40,4 +40,4 @@ spec:
           hostNetwork: true
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:18.16.1
+              image: yandex/clickhouse-server:19.16
