@@ -366,6 +366,7 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 
 		case chiv1.PodDistributionCircularReplication:
 			// PodDistribution is known
+			// TODO need to support multi-cluster
 			cluster := &n.chi.Spec.Configuration.Clusters[0]
 
 			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionShardAntiAffinity})
