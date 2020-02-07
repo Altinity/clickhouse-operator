@@ -9,7 +9,29 @@ We may have two starting points:
 1. Need to install Grafana at first and integrate it with Prometheus afterwards
 1. Grafana installation is available and we just need to gather data from Prometheus
 
-## Install Grafana
+## Automatic installation Grafana related staff with grafana-operator
+Run [install-grafana-operator.sh][install_grafana_operator_script] for setup CNCF recommended Grafana Operator CRDs, roles, service and deployments from https://github.com/integr8ly/grafana-operator
+```bash
+bash install-grafana-operator.sh
+```
+
+Run [install-grafana-with-operator.sh][install_grafana_dashboard_script] for setup Grafana deployment, service, recomended Dashboard and Prometheus datasource (see [how to install prometheus][prometheus_setup_doc]) 
+```bash
+bash install-grafana-with-operator.sh
+```
+Run port forward for access to Grafana instance as `localhost`:
+```bash
+kubectl --namespace=grafana port-forward service/grafana 3000
+```
+and navigate browser to `http://localhost:3000` Grafana should appear.
+Login credentials:
+ - username: **admin**
+ - password: **admin**
+
+check `http://localhost:3000/datasources` contains `Prometheus` datasource
+check `http://localhost:3000/dashboards` contains [Altinity Clickhouse Operator Dashboard][altinity_recommended_dashboard]
+
+## Install Grafana instance via pure kubernetes manifests
 In case we do not have Grafana available, we can setup it directly into k8s and integrate with Prometheus afterwards. 
 We already have [manifests available][grafana_manifest_folder]. 
 We can either run [create-grafana.sh][create_grafana_script] or setup the whole process by hands, in case we need to edit configuration.
@@ -47,7 +69,7 @@ Login credentials are specified in [grafana.yaml][grafana_manifest_yaml] as reso
 
 Grafana is installed by now.
 
-## Setup Grafana & Prometheus integration
+## Manual Setup Grafana & Prometheus integration
 In Grafana, navigate to **Data Sources** page with menu or directly as 
 ```
 http://localhost:3000/datasources
@@ -72,7 +94,7 @@ Data source configuration parameters:
 
 By now, Prometheus data should be available for Grafana and we can choose nice dashboard to plot data on. Altinity supply recommended [Grafana dashoard][altinity_recommended_dashboard] as additional deliverables. 
 
-## Install Grafana Dashboard
+## Manual installation Grafana Dashboard 
 
 In order to install dashboard:
  1. Navigate to `main menu -> Dashboards -> Import` and pick `Upload .json file`. 
@@ -90,3 +112,5 @@ More Grafana [docs](http://docs.grafana.org/)
 [create_grafana_script]: ../deploy/grafana/create-grafana.sh 
 [prometheus_setup_doc]: ./prometheus_setup.md 
 [altinity_recommended_dashboard]: ../grafana-dashboard/Altinity_ClickHouse_Operator_dashboard.json 
+[install_grafana_operator_script]: ../deploy/grafana/install-grafana-operator.sh
+[install_grafana_dashboard_script]: ../deploy/grafana/install-grafana-with-operator.sh
