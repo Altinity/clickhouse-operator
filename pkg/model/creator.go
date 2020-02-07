@@ -371,11 +371,11 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 		// Host references known PodTemplate
 		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
 		podTemplate = podTemplate.DeepCopy()
-		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
+		glog.V(1).Infof("getPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
 	} else {
 		// Host references UNKNOWN PodTemplate, will use default one
 		podTemplate = newDefaultPodTemplate(statefulSetName)
-		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use default generated template", statefulSetName)
+		glog.V(1).Infof("getPodTemplate() statefulSet %s use default generated template", statefulSetName)
 	}
 
 	// Here we have local copy of Pod Template, to be used to create StatefulSet
@@ -610,7 +610,7 @@ func statefulSetAppendVolumeClaimTemplate(statefulSet *apps.StatefulSet, volumeC
 
 // newDefaultHostTemplate returns default Host Template to be used with StatefulSet
 func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
-	hostTemplate := &chiv1.ChiHostTemplate{
+	return &chiv1.ChiHostTemplate{
 		Name: name,
 		PortDistribution: []chiv1.ChiPortDistribution{
 			{Type: chiv1.PortDistributionUnspecified},
@@ -623,8 +623,22 @@ func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 			Templates:           chiv1.ChiTemplateNames{},
 		},
 	}
+}
 
-	return hostTemplate
+func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
+	return &chiv1.ChiHostTemplate{
+		Name: name,
+		PortDistribution: []chiv1.ChiPortDistribution{
+			{Type: chiv1.PortDistributionClusterScopeIndex},
+		},
+		Spec: chiv1.ChiHost{
+			Name:                "",
+			TCPPort:             chDefaultTCPPortNumber,
+			HTTPPort:            chDefaultHTTPPortNumber,
+			InterserverHTTPPort: chDefaultInterserverHTTPPortNumber,
+			Templates:           chiv1.ChiTemplateNames{},
+		},
+	}
 }
 
 // newDefaultPodTemplate returns default Pod Template to be used with StatefulSet

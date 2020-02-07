@@ -33,7 +33,7 @@ func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 }
 
 func (chi *ClickHouseInstallation) FillAddressInfo() {
-	// Let's find MaxNumberPerNode pod distribution
+	// What is the max number of Pods allowed per Node
 	maxNumberOfPodsPerNode := 0
 	chi.WalkPodTemplates(func(template *ChiPodTemplate) {
 		for i := range template.PodDistribution {

@@ -135,7 +135,22 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 		glog.V(1).Infof("getHostTemplate() statefulSet %s use custom host template %s", statefulSetName, hostTemplate.Name)
 	} else {
 		// Host references UNKNOWN HostTemplate, will use default one
-		hostTemplate = newDefaultHostTemplate(statefulSetName)
+		// However, with default template there is a nuance - hostNetwork requires different default host template
+
+		// Check hostNetwork case at first
+		podTemplate, ok := host.GetPodTemplate()
+		if ok {
+			if podTemplate.Spec.HostNetwork {
+				// HostNetwork
+				hostTemplate = newDefaultHostTemplateForHostNetwork(statefulSetName)
+			}
+		}
+
+		// In case hostTemplate still is not assigned - use default one
+		if hostTemplate == nil {
+			hostTemplate = newDefaultHostTemplate(statefulSetName)
+		}
+
 		glog.V(1).Infof("getHostTemplate() statefulSet %s use default generated host template", statefulSetName)
 	}
 
