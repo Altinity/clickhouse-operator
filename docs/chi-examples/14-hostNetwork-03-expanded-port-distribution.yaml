@@ -38,6 +38,7 @@ spec:
           - type: PreviousTailAffinity
         spec:
           hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
           containers:
             - name: clickhouse
               image: yandex/clickhouse-server:18.16.1

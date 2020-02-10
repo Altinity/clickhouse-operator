@@ -47,6 +47,7 @@ spec:
           - type: CircularReplication
         spec:
           hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
           containers:
             - name: clickhouse
               image: yandex/clickhouse-server:19.16
