@@ -171,7 +171,6 @@ data:
         <flush_interval_milliseconds>7500</flush_interval_milliseconds>
     </query_log>
     </yandex>
-
 ---
 # Possible Template Parameters:
 #
@@ -253,7 +252,6 @@ data:
         podTemplates:
           - name: default-oneperhost-pod-template
             distribution: "OnePerHost"
-
   default-storage-template.yaml.example: |
     apiVersion: "clickhouse.altinity.com/v1"
     kind: "ClickHouseInstallationTemplate"
@@ -272,7 +270,6 @@ data:
 
   readme: |
     Templates in this folder are packaged with an operator and available via 'useTemplate'
-
 ---
 # Possible Template Parameters:
 #
@@ -322,7 +319,6 @@ data:
         </default>
       </profiles>
     </yandex>
-
 ---
 # Possible Template Parameters:
 #
