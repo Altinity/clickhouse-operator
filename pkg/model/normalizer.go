@@ -388,6 +388,13 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 	// Spec
 	template.Spec.Affinity = n.mergeAffinity(template.Spec.Affinity, n.newAffinity(template))
 
+	// In case we have hostNetwork specified, we need to have ClusterFirstWithHostNet DNS policy, because of
+	// https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
+	// which tells:  For Pods running with hostNetwork, you should explicitly set its DNS policy “ClusterFirstWithHostNet”.
+	if template.Spec.HostNetwork {
+		template.Spec.DNSPolicy = v1.DNSClusterFirstWithHostNet
+	}
+
 	// Introduce PodTemplate into Index
 	// Ensure map is in place
 	if n.chi.Spec.Templates.PodTemplatesIndex == nil {
