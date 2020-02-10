@@ -173,7 +173,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 				// </replica>
 				cline(b, 16, "<replica>")
 				cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-				cline(b, 16, "    <port>%d</port>", host.InterserverHTTPPort)
+				cline(b, 16, "    <port>%d</port>", host.TCPPort)
 				cline(b, 16, "</replica>")
 
 				return nil
@@ -208,7 +208,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 		// </replica>
 		cline(b, 16, "<replica>")
 		cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-		cline(b, 16, "    <port>%d</port>", host.InterserverHTTPPort)
+		cline(b, 16, "    <port>%d</port>", host.TCPPort)
 		cline(b, 16, "</replica>")
 
 		return nil
@@ -236,7 +236,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 		// </replica>
 		cline(b, 16, "<replica>")
 		cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-		cline(b, 16, "    <port>%d</port>", host.InterserverHTTPPort)
+		cline(b, 16, "    <port>%d</port>", host.TCPPort)
 		cline(b, 16, "</replica>")
 
 		// </shard>
