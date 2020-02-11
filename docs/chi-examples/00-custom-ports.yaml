@@ -1,0 +1,28 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: clickhouse-custom-ports
+spec:
+  defaults:
+    templates:
+      podTemplate: default    
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:19.11.8.46
+              ports:
+                - name: http
+                  containerPort: 8124
+                - name: tcp
+                  containerPort: 9001
+                - name: interserver
+                  containerPort: 9010
+  configuration:
+    settings:
+      http_port: 8124
+      tcp_port: 9001
+      interserver_http_port: 9010
+
