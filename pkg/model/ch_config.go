@@ -66,7 +66,7 @@ func (c *ClickHouseConfigGenerator) GetSettings() string {
 
 // GetFiles creates data for custom common config files specified by user in .spec.configuration.files section
 func (c *ClickHouseConfigGenerator) GetFiles() map[string]string {
-	return c.chi.Spec.Configuration.Files
+	return c.chi.Spec.Configuration.Files.GetStringMap()
 }
 
 // GetZookeeper creates data for "zookeeper.xml"

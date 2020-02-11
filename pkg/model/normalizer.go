@@ -26,7 +26,6 @@ import (
 
 	"encoding/hex"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -150,8 +149,6 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 		if hostTemplate == nil {
 			hostTemplate = newDefaultHostTemplate(statefulSetName)
 		}
-
-		glog.V(1).Infof("getHostTemplate() statefulSet %s use default generated host template", statefulSetName)
 	}
 
 	return hostTemplate
@@ -199,14 +196,31 @@ func hostApplyHostTemplate(host *chiv1.ChiHost, template *chiv1.ChiHostTemplate)
 		}
 	}
 
+	settings := host.GetSettings()
+	settingsTCPPort := settings.GetTCPPort()
+	settingsHTTPPort := settings.GetHTTPPort()
+	settingsInterserverHTTPPort := settings.GetInterserverHTTPPort()
+
 	if host.TCPPort == chPortNumberMustBeAssignedLater {
-		host.TCPPort = chDefaultTCPPortNumber
+		if settingsTCPPort == chPortNumberMustBeAssignedLater {
+			host.TCPPort = chDefaultTCPPortNumber
+		} else {
+			host.TCPPort = settingsTCPPort
+		}
 	}
 	if host.HTTPPort == chPortNumberMustBeAssignedLater {
-		host.HTTPPort = chDefaultHTTPPortNumber
+		if settingsHTTPPort == chPortNumberMustBeAssignedLater {
+			host.HTTPPort = chDefaultHTTPPortNumber
+		} else {
+			host.HTTPPort = settingsHTTPPort
+		}
 	}
 	if host.InterserverHTTPPort == chPortNumberMustBeAssignedLater {
-		host.InterserverHTTPPort = chDefaultInterserverHTTPPortNumber
+		if settingsInterserverHTTPPort == chPortNumberMustBeAssignedLater {
+			host.InterserverHTTPPort = chDefaultInterserverHTTPPortNumber
+		} else {
+			host.InterserverHTTPPort = settingsInterserverHTTPPort
+		}
 	}
 
 	host.InheritTemplatesFrom(nil, nil, template)
@@ -242,10 +256,12 @@ func (n *Normalizer) normalizeDefaults(defaults *chiv1.ChiDefaults) {
 // normalizeConfiguration normalizes .spec.configuration
 func (n *Normalizer) normalizeConfiguration(conf *chiv1.ChiConfiguration) {
 	n.normalizeConfigurationZookeeper(&conf.Zookeeper)
+
 	n.normalizeConfigurationUsers(&conf.Users)
 	n.normalizeConfigurationProfiles(&conf.Profiles)
 	n.normalizeConfigurationQuotas(&conf.Quotas)
 	n.normalizeConfigurationSettings(&conf.Settings)
+	n.normalizeConfigurationFiles(&conf.Files)
 
 	// ChiConfiguration.Clusters
 	n.normalizeClusters()
@@ -982,8 +998,18 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *chiv1.ChiZookeeperConfi
 }
 
 // normalizeConfigurationUsers normalizes .spec.configuration.users
-func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) {
-	normalizePaths(users)
+func (n *Normalizer) normalizeConfigurationUsers(users *chiv1.Settings) {
+
+	if users == nil {
+		// Do not know what to do in this case
+		return
+	}
+
+	if *users == nil {
+		*users = chiv1.NewSettings()
+	}
+
+	(*users).NormalizePaths()
 
 	// Extract username from path
 	usernameMap := make(map[string]bool)
@@ -1008,9 +1034,6 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 	// 4. user/password_sha256_hex
 
 	usernameMap["default"] = true // we need default user here in order to secure host_regexp
-	if *users == nil {
-		*users = make(map[string]interface{})
-	}
 	for username := range usernameMap {
 		if _, ok := (*users)[username+"/profile"]; !ok {
 			// No 'user/profile' section
@@ -1058,18 +1081,60 @@ func (n *Normalizer) normalizeConfigurationUsers(users *map[string]interface{}) 
 }
 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
-func (n *Normalizer) normalizeConfigurationProfiles(profiles *map[string]interface{}) {
-	normalizePaths(profiles)
+func (n *Normalizer) normalizeConfigurationProfiles(profiles *chiv1.Settings) {
+
+	if profiles == nil {
+		// Do not know what to do in this case
+		return
+	}
+
+	if *profiles == nil {
+		*profiles = chiv1.NewSettings()
+	}
+	(*profiles).NormalizePaths()
 }
 
 // normalizeConfigurationQuotas normalizes .spec.configuration.quotas
-func (n *Normalizer) normalizeConfigurationQuotas(quotas *map[string]interface{}) {
-	normalizePaths(quotas)
+func (n *Normalizer) normalizeConfigurationQuotas(quotas *chiv1.Settings) {
+
+	if quotas == nil {
+		// Do not know what to do in this case
+		return
+	}
+
+	if *quotas == nil {
+		*quotas = chiv1.NewSettings()
+	}
+
+	(*quotas).NormalizePaths()
 }
 
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
-func (n *Normalizer) normalizeConfigurationSettings(settings *map[string]interface{}) {
-	normalizePaths(settings)
+func (n *Normalizer) normalizeConfigurationSettings(settings *chiv1.Settings) {
+
+	if settings == nil {
+		// Do not know what to do in this case
+		return
+	}
+
+	if *settings == nil {
+		*settings = chiv1.NewSettings()
+	}
+
+	(*settings).NormalizePaths()
+}
+
+// normalizeConfigurationFiles normalizes .spec.configuration.files
+func (n *Normalizer) normalizeConfigurationFiles(files *chiv1.Settings) {
+
+	if files == nil {
+		// Do not know what to do in this case
+		return
+	}
+
+	if *files == nil {
+		*files = chiv1.NewSettings()
+	}
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
@@ -1401,40 +1466,4 @@ func (n *Normalizer) normalizeDefaultsReplicasUseFQDN(d *chiv1.ChiDefaults) {
 // normalizeDefaultsTemplates ensures chiv1.ChiDefaults.Templates section has proper values
 func (n *Normalizer) normalizeDefaultsTemplates(d *chiv1.ChiDefaults) {
 	d.Templates.HandleDeprecatedFields()
-}
-
-// normalizePath normalizes path in .spec.configuration.{users, profiles, quotas, settings} section
-// Normalized path looks like 'a/b/c'
-func normalizePath(path string) string {
-	// Normalize multi-'/' values (like '//') to single-'/'
-	re := regexp.MustCompile("//+")
-	path = re.ReplaceAllString(path, "/")
-
-	// Cut all leading and trailing '/', so the result would be 'a/b/c'
-	return strings.Trim(path, "/")
-}
-
-// normalizePaths normalizes paths in whole conf section, like .spec.configuration.users
-func normalizePaths(conf *map[string]interface{}) {
-	pathsToNormalize := make([]string, 0, 0)
-
-	// Find entries with paths to normalize
-	for key := range *conf {
-		path := normalizePath(key)
-		if len(path) != len(key) {
-			// Normalization worked. These paths have to be normalized
-			pathsToNormalize = append(pathsToNormalize, key)
-		}
-	}
-
-	// Add entries with normalized paths
-	for _, key := range pathsToNormalize {
-		path := normalizePath(key)
-		(*conf)[path] = (*conf)[key]
-	}
-
-	// Delete entries with un-normalized paths
-	for _, key := range pathsToNormalize {
-		delete(*conf, key)
-	}
 }
