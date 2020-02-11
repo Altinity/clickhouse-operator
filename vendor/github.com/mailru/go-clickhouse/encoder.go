@@ -5,14 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
 	"time"
-)
-
-const (
-	dateFormat     = "2006-01-02"
-	timeFormat     = "2006-01-02 15:04:05"
-	timeZoneBorder = "\\'"
 )
 
 var (
@@ -20,22 +13,38 @@ var (
 )
 
 type encoder interface {
-	Encode(value driver.Value) string
-}
-
-type decoder interface {
-	Decode(t string, value []byte) (driver.Value, error)
+	Encode(value driver.Value) ([]byte, error)
 }
 
 type textEncoder struct {
 }
 
-type textDecoder struct {
-	location      *time.Location
-	useDBLocation bool
+// Encode encodes driver value into string
+// Note: there is 2 convention:
+// type string will be quoted
+// type []byte will be encoded as is (raw string)
+func (e *textEncoder) Encode(value driver.Value) ([]byte, error) {
+	switch v := value.(type) {
+	case array:
+		return e.encodeArray(reflect.ValueOf(v.v))
+	case []byte:
+		return v, nil
+	}
+
+	vv := reflect.ValueOf(value)
+	switch vv.Kind() {
+	case reflect.Interface, reflect.Ptr:
+		if vv.IsNil() {
+			return []byte("NULL"), nil
+		}
+		return e.Encode(vv.Elem().Interface())
+	case reflect.Slice, reflect.Array:
+		return e.encodeArray(vv)
+	}
+	return []byte(e.encode(value)), nil
 }
 
-func (e *textEncoder) Encode(value driver.Value) string {
+func (e *textEncoder) encode(value driver.Value) string {
 	if value == nil {
 		return "NULL"
 	}
@@ -71,132 +80,30 @@ func (e *textEncoder) Encode(value driver.Value) string {
 		return strconv.FormatFloat(v, 'f', -1, 64)
 	case string:
 		return quote(escape(v))
-	case []byte:
-		return string(v)
 	case time.Time:
 		return formatTime(v)
 	}
 
-	vv := reflect.ValueOf(value)
-	switch vv.Kind() {
-	case reflect.Interface, reflect.Ptr:
-		return e.Encode(vv.Elem().Interface())
-	case reflect.Slice, reflect.Array:
-		res := "["
-		for i := 0; i < vv.Len(); i++ {
-			if i > 0 {
-				res += ","
-			}
-			res += e.Encode(vv.Index(i).Interface())
-		}
-		res += "]"
-		return res
-	}
 	return fmt.Sprint(value)
 }
 
-func (d *textDecoder) Decode(t string, value []byte) (driver.Value, error) {
-	v := string(value)
-	switch t {
-	case "Date":
-		uv := unquote(v)
-		if uv == "0000-00-00" {
-			return time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), nil
-		}
-		return time.ParseInLocation(dateFormat, uv, d.location)
-	case "DateTime":
-		uv := unquote(v)
-		if uv == "0000-00-00 00:00:00" {
-			return time.Date(0, 0, 0, 0, 0, 0, 0, time.UTC), nil
-		}
-		return time.ParseInLocation(timeFormat, uv, d.location)
-	case "UInt8":
-		vv, err := strconv.ParseUint(v, 10, 8)
-		return uint8(vv), err
-	case "UInt16":
-		vv, err := strconv.ParseUint(v, 10, 16)
-		return uint16(vv), err
-	case "UInt32":
-		vv, err := strconv.ParseUint(v, 10, 32)
-		return uint32(vv), err
-	case "UInt64":
-		return strconv.ParseUint(v, 10, 64)
-	case "Int8":
-		vv, err := strconv.ParseInt(v, 10, 8)
-		return int8(vv), err
-	case "Int16":
-		vv, err := strconv.ParseInt(v, 10, 16)
-		return int16(vv), err
-	case "Int32":
-		vv, err := strconv.ParseInt(v, 10, 32)
-		return int32(vv), err
-	case "Int64":
-		return strconv.ParseInt(v, 10, 64)
-	case "Float32":
-		vv, err := strconv.ParseFloat(v, 64)
-		return float32(vv), err
-	case "Float64":
-		return strconv.ParseFloat(v, 64)
-	case "String":
-		return unescape(unquote(v)), nil
+// EncodeArray encodes a go slice or array as Clickhouse Array
+func (e *textEncoder) encodeArray(value reflect.Value) ([]byte, error) {
+	if value.Kind() != reflect.Slice && value.Kind() != reflect.Array {
+		return nil, fmt.Errorf("expected array or slice, got %s", value.Kind())
 	}
 
-	// got zoned datetime
-	if strings.HasPrefix(t, "DateTime") {
-		var (
-			loc *time.Location
-			err error
-		)
-
-		if d.useDBLocation {
-			left := strings.Index(t, timeZoneBorder)
-			if left == -1 {
-				return nil, fmt.Errorf("time zone not found")
-			}
-			right := strings.LastIndex(t, timeZoneBorder)
-			timeZoneName := t[left+len(timeZoneBorder) : right]
-
-			loc, err = time.LoadLocation(timeZoneName)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			loc = d.location
+	res := make([]byte, 0)
+	res = append(res, '[')
+	for i := 0; i < value.Len(); i++ {
+		if i > 0 {
+			res = append(res, ',')
 		}
-
-		var t time.Time
-		if t, err = time.ParseInLocation(timeFormat, unquote(v), loc); err != nil {
-			return t, err
+		tmp, err := e.Encode(value.Index(i).Interface())
+		if err != nil {
+			return nil, err
 		}
-		return t.In(d.location), nil
+		res = append(res, tmp...)
 	}
-
-	if strings.HasPrefix(t, "FixedString") {
-		return unescape(unquote(v)), nil
-	}
-	if strings.HasPrefix(t, "Array") {
-		if len(v) > 0 && v[0] == '[' && v[len(v)-1] == ']' {
-			var items []string
-			// check that array is not empty ([])
-			if len(v) > 2 {
-				items = strings.Split(v[1:len(v)-1], ",")
-			}
-
-			subType := t[6 : len(t)-1]
-			r := reflect.MakeSlice(reflect.SliceOf(columnType(subType)), len(items), len(items))
-			for i, item := range items {
-				vv, err := d.Decode(subType, []byte(item))
-				if err != nil {
-					return nil, err
-				}
-				r.Index(i).Set(reflect.ValueOf(vv))
-			}
-			return r.Interface(), nil
-		}
-		return nil, ErrMalformed
-	}
-	if strings.HasPrefix(t, "Enum") {
-		return unquote(v), nil
-	}
-	return value, nil
+	return append(res, ']'), nil
 }

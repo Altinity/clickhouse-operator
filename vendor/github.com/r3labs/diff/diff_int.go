@@ -24,7 +24,11 @@ func (d *Differ) diffInt(path []string, a, b reflect.Value) error {
 	}
 
 	if a.Int() != b.Int() {
-		d.cl.add(UPDATE, path, a.Interface(), b.Interface())
+		if a.CanInterface() {
+			d.cl.add(UPDATE, path, a.Interface(), b.Interface())
+		} else {
+			d.cl.add(UPDATE, path, a.Int(), b.Int())
+		}
 	}
 
 	return nil
