@@ -28,16 +28,39 @@ http://user:password@host:8123/clicks?read_timeout=10&write_timeout=20
 
 * UInt8, UInt16, UInt32, UInt64, Int8, Int16, Int32, Int64
 * Float32, Float64
+* Decimal(P, S), Decimal32(S), Decimal64(S), Decimal128(S)
 * String
 * FixedString(N)
 * Date
 * DateTime
 * Enum
+* LowCardinality(T)
 * [Array(T) (one-dimensional)](https://clickhouse.yandex/reference_en.html#Array(T))
+* [Nested(Name1 Type1, Name2 Type2, ...)](https://clickhouse.yandex/docs/en/data_types/nested_data_structures/nested/)
 
-Note:
+Notes:
 database/sql does not allow to use big uint64 values.
 It is recommended use type `UInt64` which is provided by driver for such kind of values.
+type `[]byte` are used as raw string (without quoting)
+for passing value of type `[]uint8` to driver as array - please use the wrapper `clickhouse.Array`
+for passing decimal value please use the wrappers `clickhouse.Decimal*`
+
+## Supported request params
+
+Clickhouse supports setting
+[query_id](https://clickhouse.yandex/docs/en/interfaces/http/) and
+[quota_key](https://clickhouse.yandex/docs/en/operations/quotas/) for each
+query. The database driver provides ability to set these parameters as well.
+
+There are constants `QueryID` and `QuotaKey` for correct setting these params.
+
+`quota_key` could be set as empty string, but `query_id` - does not. Keep in
+mind, that setting same `query_id` could produce exception or replace already
+running query depending on current Clickhouse settings. See
+[replace_running_query](https://clickhouse.yandex/docs/en/operations/settings/settings/#replace-running-query)
+for details.
+
+See `Example` section for use cases.
 
 ## Install
 ```
@@ -49,6 +72,7 @@ go get -u github.com/mailru/go-clickhouse
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"time"
@@ -84,7 +108,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	stmt, err := tx.Prepare("INSERT INTO example (country_code, os_id, browser_id, categories, action_day, action_time) VALUES (?, ?, ?, ?, ?, ?)")
+	stmt, err := tx.Prepare(`
+		INSERT INTO example (
+			country_code,
+			os_id,
+			browser_id,
+			categories,
+			action_day,
+			action_time
+		) VALUES (
+			?, ?, ?, ?, ?, ?
+		)`)
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -106,7 +141,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	rows, err := connect.Query("SELECT country_code, os_id, browser_id, categories, action_day, action_time FROM example")
+	rows, err := connect.Query(`
+		SELECT
+			country_code,
+			os_id,
+			browser_id,
+			categories,
+			action_day,
+			action_time
+		FROM
+			example`)
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -118,10 +163,57 @@ func main() {
 			categories            []int16
 			actionDay, actionTime time.Time
 		)
-		if err := rows.Scan(&country, &os, &browser, &categories, &actionDay, &actionTime); err != nil {
+		if err := rows.Scan(
+			&country,
+			&os,
+			&browser,
+			&categories,
+			&actionDay,
+			&actionTime,
+		); err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("country: %s, os: %d, browser: %d, categories: %v, action_day: %s, action_time: %s", country, os, browser, categories, actionDay, actionTime)
+		log.Printf("country: %s, os: %d, browser: %d, categories: %v, action_day: %s, action_time: %s",
+			country, os, browser, categories, actionDay, actionTime,
+		)
+	}
+
+	ctx := context.Background()
+	rows, err := connect.QueryContext(context.WithValue(ctx, clickhouse.QueryID, "dummy-query-id"), `
+		SELECT
+			country_code,
+			os_id,
+			browser_id,
+			categories,
+			action_day,
+			action_time
+		FROM
+			example`)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for rows.Next() {
+		var (
+			country               string
+			os, browser           uint8
+			categories            []int16
+			actionDay, actionTime time.Time
+		)
+		if err := rows.Scan(
+			&country,
+			&os,
+			&browser,
+			&categories,
+			&actionDay,
+			&actionTime,
+		); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("country: %s, os: %d, browser: %d, categories: %v, action_day: %s, action_time: %s",
+			country, os, browser, categories, actionDay, actionTime,
+		)
 	}
 }
 ```
@@ -159,7 +251,23 @@ func main() {
 	}
 
 	for _, item := range items {
-		log.Printf("country: %s, os: %d, browser: %d, categories: %v, action_time: %s", item.CountryCode, item.OsID, item.BrowserID, item.Categories, item.ActionTime)
+		log.Printf("country: %s, os: %d, browser: %d, categories: %v, action_time: %s",
+			item.CountryCode, item.OsID, item.BrowserID, item.Categories, item.ActionTime,
+		)
 	}
 }
 ```
+
+## Go versions
+Officially support last 3 golang releases
+
+
+## Development
+You can check the effect of changes on Travis CI or run tests locally:
+
+``` bash
+make init # dep ensure and install
+make test
+```
+
+_Remember that `make init` will add a few binaries used for testing (like `golint` and it's dependencies) into your GOPATH_

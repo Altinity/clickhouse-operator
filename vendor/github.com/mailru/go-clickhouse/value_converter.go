@@ -39,8 +39,7 @@ func (c converter) ConvertValue(v interface{}) (driver.Value, error) {
 			bytes := []byte(s)
 			return bytes, nil
 		}
-		// default behaviour to convert uint64 to int64
-		return int64(u64), nil
+		return u64, nil
 	}
 
 	return driver.DefaultParameterConverter.ConvertValue(v)

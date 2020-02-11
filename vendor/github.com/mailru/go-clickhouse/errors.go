@@ -9,11 +9,13 @@ import (
 
 // Various errors the driver might return. Can change between driver versions.
 var (
-	ErrPlaceholderCount = errors.New("clickhouse: wrong placeholder count")
-	ErrNameParams       = errors.New("clickhouse: driver does not support the use of Named Parameters")
-	ErrMalformed        = errors.New("clickhouse: response is malformed")
-	ErrNoLastInsertID   = errors.New("no LastInsertId available")
-	ErrNoRowsAffected   = errors.New("no RowsAffected available")
+	ErrPlaceholderCount  = errors.New("clickhouse: wrong placeholder count")
+	ErrNameParams        = errors.New("clickhouse: driver does not support the use of Named Parameters")
+	ErrMalformed         = errors.New("clickhouse: response is malformed")
+	ErrTransportNil      = errors.New("clickhouse: transport must be set")
+	ErrIncorrectResponse = errors.New("clickhouse: response must contain 'Ok.'")
+	ErrNoLastInsertID    = errors.New("no LastInsertId available")
+	ErrNoRowsAffected    = errors.New("no RowsAffected available")
 )
 
 var errorRe = regexp.MustCompile(`(?s)Code: (\d+),.+DB::Exception: (.+),.*`)

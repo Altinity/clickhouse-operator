@@ -1,2 +1,5 @@
 .idea/
 _vendor/
+vendor/
+coverage.out
+Gopkg.lock

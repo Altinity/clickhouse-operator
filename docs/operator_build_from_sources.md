@@ -3,14 +3,14 @@
 ## Requirements 
 
 1. `go-lang` compiler
-2. `dep` Package Manager
+2. `mod` Package Manager
 3. Get the sources from our repository using `go` git wrapper `go get github.com/Altinity/clickhouse-operator`
 
 ## Binary Build Procedure
 
 1. Switch working dir to `src/github.com/Altinity/clickhouse-operator`
-2. Make sure all packages are linked properly by using `dep` package manager: `dep ensure --vendor-only` (you can also install `dep` with `go` like so: `go get -u github.com/golang/dep/cmd/dep`)
-3. Build the sources `go build -o ./clickhouse-operator ./cmd/clickhouse-operator`. This will create `clickhouse-operator` binary which could be only used inside kubernetes environment.
+2. Make sure all packages are linked properly by using `mod` package manager: `go mod tidy`
+3. Build the sources `go build -o ./clickhouse-operator cmd/operator/main.go`. This will create `clickhouse-operator` binary which could be only used inside kubernetes environment.
 
 ## Docker Image Build and Usage Procedure
 

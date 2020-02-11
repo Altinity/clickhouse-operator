@@ -6,6 +6,7 @@ package diff
 
 import (
 	"reflect"
+	"time"
 )
 
 func (d *Differ) diffTime(path []string, a, b reflect.Value) error {
@@ -23,7 +24,11 @@ func (d *Differ) diffTime(path []string, a, b reflect.Value) error {
 		return ErrTypeMismatch
 	}
 
-	if a.Interface() != b.Interface() {
+	// Marshal and unmarshal time type will lose accuracy. Using unix nano to compare time type.
+	au := a.Interface().(time.Time).UnixNano()
+	bu := b.Interface().(time.Time).UnixNano()
+
+	if au != bu {
 		d.cl.add(UPDATE, path, a.Interface(), b.Interface())
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -14,18 +15,31 @@ import (
 	"time"
 )
 
+type key int
+
+const (
+	// QueryID uses for setting query_id request param for request to Clickhouse
+	QueryID key = iota
+	// QuotaKey uses for setting quota_key request param for request to Clickhouse
+	QuotaKey
+
+	quotaKeyParamName = "quota_key"
+	queryIDParamName  = "query_id"
+)
+
 // conn implements an interface sql.Conn
 type conn struct {
-	url           *url.URL
-	user          *url.Userinfo
-	location      *time.Location
-	useDBLocation bool
-	transport     *http.Transport
-	cancel        context.CancelFunc
-	txCtx         context.Context
-	stmts         []*stmt
-	logger        *log.Logger
-	closed        int32
+	url                *url.URL
+	user               *url.Userinfo
+	location           *time.Location
+	useDBLocation      bool
+	useGzipCompression bool
+	transport          *http.Transport
+	cancel             context.CancelFunc
+	txCtx              context.Context
+	stmts              []*stmt
+	logger             *log.Logger
+	closed             int32
 }
 
 func newConn(cfg *Config) *conn {
@@ -34,9 +48,10 @@ func newConn(cfg *Config) *conn {
 		logger = log.New(os.Stderr, "clickhouse: ", log.LstdFlags)
 	}
 	c := &conn{
-		url:           cfg.url(map[string]string{"default_format": "TabSeparatedWithNamesAndTypes"}, false),
-		location:      cfg.Location,
-		useDBLocation: cfg.UseDBLocation,
+		url:                cfg.url(map[string]string{"default_format": "TabSeparatedWithNamesAndTypes"}, false),
+		location:           cfg.Location,
+		useDBLocation:      cfg.UseDBLocation,
+		useGzipCompression: cfg.GzipCompression,
 		transport: &http.Transport{
 			DialContext: (&net.Dialer{
 				Timeout:   cfg.Timeout,
@@ -46,6 +61,7 @@ func newConn(cfg *Config) *conn {
 			MaxIdleConns:          1,
 			IdleConnTimeout:       cfg.IdleTimeout,
 			ResponseHeaderTimeout: cfg.ReadTimeout,
+			TLSClientConfig:       getTLSConfigClone(cfg.TLSConfig),
 		},
 		logger: logger,
 	}
@@ -160,7 +176,7 @@ func (c *conn) query(ctx context.Context, query string, args []driver.Value) (dr
 	if atomic.LoadInt32(&c.closed) != 0 {
 		return nil, driver.ErrBadConn
 	}
-	req, err := c.buildRequest(query, args, true)
+	req, err := c.buildRequest(ctx, query, args, true)
 	if err != nil {
 		return nil, err
 	}
@@ -168,50 +184,54 @@ func (c *conn) query(ctx context.Context, query string, args []driver.Value) (dr
 	if err != nil {
 		return nil, err
 	}
-	return newTextRows(body, c.location, c.useDBLocation)
+
+	return newTextRows(c, body, c.location, c.useDBLocation)
 }
 
 func (c *conn) exec(ctx context.Context, query string, args []driver.Value) (driver.Result, error) {
 	if atomic.LoadInt32(&c.closed) != 0 {
 		return nil, driver.ErrBadConn
 	}
-	req, err := c.buildRequest(query, args, false)
+	req, err := c.buildRequest(ctx, query, args, false)
 	if err != nil {
 		return nil, err
 	}
-	_, err = c.doRequest(ctx, req)
+	body, err := c.doRequest(ctx, req)
+	if body != nil {
+		body.Close()
+	}
 	return emptyResult, err
 }
 
-func (c *conn) doRequest(ctx context.Context, req *http.Request) ([]byte, error) {
+func (c *conn) doRequest(ctx context.Context, req *http.Request) (io.ReadCloser, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	transport := c.transport
 	c.cancel = cancel
 
-	defer func() {
-		c.cancel = nil
-	}()
-
 	if transport == nil {
+		c.cancel = nil
 		return nil, driver.ErrBadConn
 	}
 
 	req = req.WithContext(ctx)
 	resp, err := transport.RoundTrip(req)
 	if err != nil {
+		c.cancel = nil
 		return nil, err
 	}
 	if resp.StatusCode != 200 {
 		msg, err := readResponse(resp)
-		if err != nil {
-			return nil, err
+		c.cancel = nil
+		if err == nil {
+			err = newError(string(msg))
 		}
-		return nil, newError(string(msg))
+		return nil, err
 	}
-	return readResponse(resp)
+
+	return resp.Body, nil
 }
 
-func (c *conn) buildRequest(query string, params []driver.Value, readonly bool) (*http.Request, error) {
+func (c *conn) buildRequest(ctx context.Context, query string, params []driver.Value, readonly bool) (*http.Request, error) {
 	var (
 		method string
 		err    error
@@ -232,6 +252,20 @@ func (c *conn) buildRequest(query string, params []driver.Value, readonly bool) 
 	if err == nil && c.user != nil {
 		p, _ := c.user.Password()
 		req.SetBasicAuth(c.user.Username(), p)
+	}
+	if ctx != nil {
+		quotaKey, quotaOk := ctx.Value(QuotaKey).(string)
+		queryID, queryOk := ctx.Value(QueryID).(string)
+		if quotaOk || queryOk {
+			reqQuery := req.URL.Query()
+			if quotaOk {
+				reqQuery.Add(quotaKeyParamName, quotaKey)
+			}
+			if queryOk && len(queryID) > 0 {
+				reqQuery.Add(queryIDParamName, queryID)
+			}
+			req.URL.RawQuery = reqQuery.Encode()
+		}
 	}
 	return req, err
 }

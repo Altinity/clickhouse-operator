@@ -54,21 +54,25 @@ func interpolateParams2(query string, params []driver.Value, index []int) (strin
 	if len(params) == 0 {
 		return query, nil
 	}
-	paramsStr := make([]string, len(params))
-	n := len(query) - len(index)
+
+	var (
+		queryRaw      = []byte(query)
+		paramsEncoded = make([][]byte, len(params))
+		n             = len(queryRaw) - len(index) // do not count number of placeholders
+	)
 	for i, v := range params {
-		paramsStr[i] = textEncode.Encode(v)
-		n += len(paramsStr[i])
+		paramsEncoded[i], _ = textEncode.Encode(v)
+		n += len(paramsEncoded[i])
 	}
 	buf := make([]byte, n)
 	i := 0
 	k := 0
 	for j, idx := range index {
-		copy(buf[k:], []byte(query[i:idx]))
+		copy(buf[k:], queryRaw[i:idx])
 		k += idx - i
-		copy(buf[k:], []byte(paramsStr[j]))
+		copy(buf[k:], paramsEncoded[j])
 		i = idx + 1
-		k += len(paramsStr[j])
+		k += len(paramsEncoded[j])
 	}
 	copy(buf[k:], query[i:])
 	return string(buf), nil
