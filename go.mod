@@ -1,10 +1,9 @@
-module github.com/Altinity/clickhouse-operator
+module github.com/altinity/clickhouse-operator
 
 go 1.13
 
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
-	github.com/altinity/clickhouse-operator v0.0.0-20200207115600-b2588bf218fa
 	github.com/d4l3k/messagediff v1.2.1 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
