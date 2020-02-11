@@ -35,7 +35,7 @@ func (settings Settings) fetchPort(name string) int32 {
 			if err == nil {
 				return int32(intValue)
 			}
-			
+
 		case int, int8, int16, int32, uint, uint8, uint32:
 			return port.(int32)
 
