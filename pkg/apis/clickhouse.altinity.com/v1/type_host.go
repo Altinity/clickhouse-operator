@@ -54,3 +54,7 @@ func (host *ChiHost) GetReplicasNum() int32 {
 		return 1
 	}
 }
+
+func (host *ChiHost) GetSettings() Settings {
+	return host.CHI.Spec.Configuration.Settings
+}

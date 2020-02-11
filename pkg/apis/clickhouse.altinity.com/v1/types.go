@@ -109,12 +109,12 @@ type ChiTemplateNames struct {
 
 // ChiConfiguration defines configuration section of .spec
 type ChiConfiguration struct {
-	Zookeeper ChiZookeeperConfig     `json:"zookeeper,omitempty" yaml:"zookeeper"`
-	Users     map[string]interface{} `json:"users,omitempty"     yaml:"users"`
-	Profiles  map[string]interface{} `json:"profiles,omitempty"  yaml:"profiles"`
-	Quotas    map[string]interface{} `json:"quotas,omitempty"    yaml:"quotas"`
-	Settings  map[string]interface{} `json:"settings,omitempty"  yaml:"settings"`
-	Files     map[string]string      `json:"files,omitempty"     yaml:"files"`
+	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper"`
+	Users     Settings           `json:"users,omitempty"     yaml:"users"`
+	Profiles  Settings           `json:"profiles,omitempty"  yaml:"profiles"`
+	Quotas    Settings           `json:"quotas,omitempty"    yaml:"quotas"`
+	Settings  Settings           `json:"settings,omitempty"  yaml:"settings"`
+	Files     Settings           `json:"files,omitempty"     yaml:"files"`
 	// TODO refactor into map[string]ChiCluster
 	Clusters []ChiCluster `json:"clusters,omitempty"`
 }
