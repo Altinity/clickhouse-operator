@@ -4,7 +4,7 @@
 
 # Externally configurable build-dependent options
 TAG="${TAG:-sunsingerus/metrics-exporter:dev}"
-DOCKERHUB_LOGIN="${DOCKERHUB_LOGIN:-sunsingerus}"
+DOCKERHUB_LOGIN="${DOCKERHUB_LOGIN}"
 DOCKERHUB_PUBLISH="${DOCKERHUB_PUBLISH:-yes}"
 MINIKUBE="${MINIKUBE:-no}"
 
@@ -28,6 +28,9 @@ docker build -t "${TAG}" -f "${DOCKERFILE}" "${SRC_ROOT}"
 
 # Publish image
 if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
-    docker login -u "${DOCKERHUB_LOGIN}"
+    if [[ ! -z "${DOCKERHUB_LOGIN}" ]]; then
+        echo "Dockerhub login specified: '${DOCKERHUB_LOGIN}', perform login"
+        docker login -u "${DOCKERHUB_LOGIN}"
+    fi
     docker push "${TAG}"
 fi
