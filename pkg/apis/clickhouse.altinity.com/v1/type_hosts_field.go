@@ -15,20 +15,20 @@
 package v1
 
 type HostsField struct {
-	Shards   int
-	Replicas int
+	ShardsCount   int
+	ReplicasCount int
 	Field    [][]*ChiHost
 }
 
 func NewHostsField(shards, replicas int) *HostsField {
-	hf := &HostsField{}
+	hf := new(HostsField)
 
-	hf.Shards = shards
-	hf.Replicas = replicas
+	hf.ShardsCount = shards
+	hf.ReplicasCount = replicas
 
-	hf.Field = make([][]*ChiHost, hf.Shards)
-	for shard := 0; shard < hf.Shards; shard++ {
-		hf.Field[shard] = make([]*ChiHost, hf.Replicas)
+	hf.Field = make([][]*ChiHost, hf.ShardsCount)
+	for shard := 0; shard < hf.ShardsCount; shard++ {
+		hf.Field[shard] = make([]*ChiHost, hf.ReplicasCount)
 	}
 
 	return hf
@@ -42,16 +42,24 @@ func (hf *HostsField) Get(shard, replica int) *ChiHost {
 	return hf.Field[shard][replica]
 }
 
+// GetCreate gets and creates if necessary
+func (hf *HostsField) GetCreate(shard, replica int) *ChiHost {
+	if hf.Field[shard][replica] == nil {
+		hf.Field[shard][replica] = new(ChiHost)
+	}
+	return hf.Field[shard][replica]
+}
+
+
 func (hf *HostsField) WalkHosts(
 	f func(shard, replica int, host *ChiHost) error,
 ) []error {
 	res := make([]error, 0)
 
-	for shard := 0; shard < hf.Shards; shard++ {
-		for replica := 0; replica < hf.Replicas; replica++ {
-			host := hf.Get(shard, replica)
-			if host != nil {
-				res = append(res, f(shard, replica, host))
+	for shardIndex := range hf.Field {
+		for replicaIndex := range hf.Field[shardIndex] {
+			if host := hf.Get(shardIndex, replicaIndex); host != nil {
+				res = append(res, f(shardIndex, replicaIndex, host))
 			}
 		}
 	}
