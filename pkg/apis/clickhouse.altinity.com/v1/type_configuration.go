@@ -20,55 +20,13 @@ func (configuration *ChiConfiguration) MergeFrom(from *ChiConfiguration, _type M
 	}
 
 	(&configuration.Zookeeper).MergeFrom(&from.Zookeeper, _type)
-	mapStringInterfaceMergeFrom(&configuration.Users, &from.Users)
-	mapStringInterfaceMergeFrom(&configuration.Profiles, &from.Profiles)
-	mapStringInterfaceMergeFrom(&configuration.Quotas, &from.Quotas)
-	mapStringInterfaceMergeFrom(&configuration.Settings, &from.Settings)
-	mapStringStringMergeFrom(&configuration.Files, &from.Files)
+	(&configuration.Users).MergeFrom(from.Users)
+	(&configuration.Profiles).MergeFrom(from.Profiles)
+	(&configuration.Quotas).MergeFrom(from.Quotas)
+	(&configuration.Settings).MergeFrom(from.Settings)
+	(&configuration.Files).MergeFrom(from.Files)
 
 	// TODO merge clusters
 	// Copy Clusters for now
 	configuration.Clusters = from.Clusters
-}
-
-// mapStringInterfaceMergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`
-func mapStringInterfaceMergeFrom(dst, src *map[string]interface{}) {
-	if (src == nil) || (*src == nil) {
-		return
-	}
-
-	if *dst == nil {
-		*dst = make(map[string]interface{})
-	}
-
-	for key, value := range *src {
-		if _, ok := (*dst)[key]; ok {
-			// Such key already exists in dst
-			continue
-		}
-
-		// No such a key in dst
-		(*dst)[key] = value
-	}
-}
-
-// mapStringStringMergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`
-func mapStringStringMergeFrom(dst, src *map[string]string) {
-	if (src == nil) || (*src == nil) {
-		return
-	}
-
-	if *dst == nil {
-		*dst = make(map[string]string)
-	}
-
-	for key, value := range *src {
-		if _, ok := (*dst)[key]; ok {
-			// Such key already exists in dst
-			continue
-		}
-
-		// No such a key in dst
-		(*dst)[key] = value
-	}
 }
