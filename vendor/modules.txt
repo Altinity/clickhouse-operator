@@ -1,27 +1,5 @@
 # github.com/MakeNowJust/heredoc v1.0.0
 github.com/MakeNowJust/heredoc
-# github.com/altinity/clickhouse-operator v0.0.0-20200207115600-b2588bf218fa
-github.com/altinity/clickhouse-operator/cmd/metrics_exporter/app
-github.com/altinity/clickhouse-operator/cmd/operator/app
-github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com
-github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1
-github.com/altinity/clickhouse-operator/pkg/apis/metrics
-github.com/altinity/clickhouse-operator/pkg/chop
-github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned
-github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme
-github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/typed/clickhouse.altinity.com/v1
-github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/typed/clickhouse.altinity.com/v1/fake
-github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions
-github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/clickhouse.altinity.com
-github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/clickhouse.altinity.com/v1
-github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions/internalinterfaces
-github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1
-github.com/altinity/clickhouse-operator/pkg/controller/chi
-github.com/altinity/clickhouse-operator/pkg/model
-github.com/altinity/clickhouse-operator/pkg/model/builder/xml
-github.com/altinity/clickhouse-operator/pkg/model/clickhouse
-github.com/altinity/clickhouse-operator/pkg/util
-github.com/altinity/clickhouse-operator/pkg/version
 # github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
 # github.com/cespare/xxhash/v2 v2.1.0
