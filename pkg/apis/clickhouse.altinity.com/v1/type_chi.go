@@ -19,8 +19,8 @@ import (
 	"math"
 )
 
-// StatusFill fills .Status
-func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
+// fillStatus fills .Status
+func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods []string) {
 	chi.Status.Version = version.Version
 	chi.Status.ClustersCount = chi.ClustersCount()
 	chi.Status.ShardsCount = chi.ShardsCount()
@@ -149,7 +149,7 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 	})
 }
 
-func (chi *ClickHouseInstallation) FillChiPointer() {
+func (chi *ClickHouseInstallation) FillCHIPointer() {
 	chi.WalkHostsFullPath(0, 0, func(
 		chi *ClickHouseInstallation,
 
@@ -298,10 +298,9 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 
 		for shardIndex := range cluster.Layout.Shards {
 			shard := cluster.GetShard(shardIndex)
-			for replicaIndex := range shard.Hosts {
+			for replicaIndex, host := range shard.Hosts {
 				replica := cluster.GetReplica(replicaIndex)
 
-				host := shard.Hosts[replicaIndex]
 				res = append(res, f(
 					chi,
 

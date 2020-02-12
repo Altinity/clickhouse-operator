@@ -104,7 +104,7 @@ func (n *Normalizer) NormalizeChi(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 	n.normalizeTemplates(&n.chi.Spec.Templates)
 
 	n.finalizeCHI()
-	n.statusFill()
+	n.fillStatus()
 
 	return n.chi, nil
 }
@@ -112,7 +112,7 @@ func (n *Normalizer) NormalizeChi(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 // finalizeCHI performs some finalization tasks, which should be done after CHI is normalized
 func (n *Normalizer) finalizeCHI() {
 	n.chi.FillAddressInfo()
-	n.chi.FillChiPointer()
+	n.chi.FillCHIPointer()
 	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		hostTemplate := n.getHostTemplate(host)
 		hostApplyHostTemplate(host, hostTemplate)
@@ -131,7 +131,7 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 	hostTemplate, ok := host.GetHostTemplate()
 	if ok {
 		// Host references known HostTemplate
-		glog.V(1).Infof("getHostTemplate() statefulSet %s use custom host template %s", statefulSetName, hostTemplate.Name)
+		glog.V(2).Infof("getHostTemplate() statefulSet %s use custom host template %s", statefulSetName, hostTemplate.Name)
 	} else {
 		// Host references UNKNOWN HostTemplate, will use default one
 		// However, with default template there is a nuance - hostNetwork requires different default host template
@@ -149,6 +149,8 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 		if hostTemplate == nil {
 			hostTemplate = newDefaultHostTemplate(statefulSetName)
 		}
+
+		glog.V(2).Infof("getHostTemplate() statefulSet %s use default host template", statefulSetName)
 	}
 
 	return hostTemplate
@@ -226,15 +228,15 @@ func hostApplyHostTemplate(host *chiv1.ChiHost, template *chiv1.ChiHostTemplate)
 	host.InheritTemplatesFrom(nil, nil, template)
 }
 
-// statusFill fills .status section of a CHI with values based on current CHI
-func (n *Normalizer) statusFill() {
+// fillStatus fills .status section of a CHI with values based on current CHI
+func (n *Normalizer) fillStatus() {
 	endpoint := CreateChiServiceFQDN(n.chi)
 	pods := make([]string, 0)
 	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		pods = append(pods, CreatePodName(host))
 		return nil
 	})
-	n.chi.StatusFill(endpoint, pods)
+	n.chi.FillStatus(endpoint, pods)
 }
 
 // normalizeStop normalizes .spec.stop
@@ -1172,19 +1174,17 @@ func (n *Normalizer) createHostsField(cluster *chiv1.ChiCluster) {
 	cluster.Layout.HostsField = chiv1.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
 
 	// Need to migrate hosts from Shards and Replicas into HostsField
+	hostMergeFunc := func(shard, replica int, host *chiv1.ChiHost) error {
+		if curHost := cluster.Layout.HostsField.Get(shard, replica); curHost == nil {
+			cluster.Layout.HostsField.Set(shard, replica, host)
+		} else {
+			curHost.MergeFrom(host)
+		}
+		return nil
+	}
 
-	cluster.WalkHostsByShards(
-		func(shard, replica int, host *chiv1.ChiHost) error {
-			cluster.Layout.HostsField.Set(shard, replica, host)
-			return nil
-		},
-	)
-	cluster.WalkHostsByReplicas(
-		func(shard, replica int, host *chiv1.ChiHost) error {
-			cluster.Layout.HostsField.Set(shard, replica, host)
-			return nil
-		},
-	)
+	cluster.WalkHostsByShards(hostMergeFunc)
+	cluster.WalkHostsByReplicas(hostMergeFunc)
 }
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
@@ -1369,34 +1369,26 @@ func (n *Normalizer) normalizeShardWeight(shard *chiv1.ChiShard) {
 
 // normalizeShardHosts normalizes all replicas of specified shard
 func (n *Normalizer) normalizeShardHosts(shard *chiv1.ChiShard, cluster *chiv1.ChiCluster, shardIndex int) {
-	// Some (may be all) hosts are explicitly specified, we need to append hosts which are assumed - implicitly specified
+	// Use hosts from HostsField
+	shard.Hosts = nil
 	for len(shard.Hosts) < shard.ReplicasCount {
 		// We still have some assumed hosts in this shard - let's add it as replicaIndex
 		replicaIndex := len(shard.Hosts)
 		// Check whether we have this host in HostsField
-		host := cluster.Layout.HostsField.Get(shardIndex, replicaIndex)
-		if host == nil {
-			// We do not have this host in HostsField yet
-			host = &chiv1.ChiHost{}
-			cluster.Layout.HostsField.Set(shardIndex, replicaIndex, host)
-		}
+		host := cluster.Layout.HostsField.GetOrCreate(shardIndex, replicaIndex)
 		shard.Hosts = append(shard.Hosts, host)
 	}
 }
 
 // normalizeReplicaHosts normalizes all replicas of specified shard
 func (n *Normalizer) normalizeReplicaHosts(replica *chiv1.ChiReplica, cluster *chiv1.ChiCluster, replicaIndex int) {
-	// Some (may be all) hosts are explicitly specified, we need to append hosts which are assumed - implicitly specified
+	// Use hosts from HostsField
+	replica.Hosts = nil
 	for len(replica.Hosts) < replica.ShardsCount {
 		// We still have some assumed hosts in this replica - let's add it as shardIndex
 		shardIndex := len(replica.Hosts)
 		// Check whether we have this host in HostsField
-		host := cluster.Layout.HostsField.Get(shardIndex, replicaIndex)
-		if host == nil {
-			// We do not have this host in HostsField yet
-			host = &chiv1.ChiHost{}
-			cluster.Layout.HostsField.Set(shardIndex, replicaIndex, host)
-		}
+		host := cluster.Layout.HostsField.GetOrCreate(shardIndex, replicaIndex)
 		replica.Hosts = append(replica.Hosts, host)
 	}
 }

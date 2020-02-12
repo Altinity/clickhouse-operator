@@ -152,6 +152,7 @@ type ChiClusterLayout struct {
 }
 
 // ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
+// TODO unify with ChiReplica based on HostsSet
 type ChiShard struct {
 	// DEPRECATED - to be removed soon
 	DefinitionType string `json:"definitionType"`
@@ -170,6 +171,7 @@ type ChiShard struct {
 }
 
 // ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
+// TODO unify with ChiShard based on HostsSet
 type ChiReplica struct {
 	Name        string           `json:"name,omitempty"`
 	Templates   ChiTemplateNames `json:"templates,omitempty"`
