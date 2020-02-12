@@ -42,8 +42,8 @@ func (hf *HostsField) Get(shard, replica int) *ChiHost {
 	return hf.Field[shard][replica]
 }
 
-// GetCreate gets and creates if necessary
-func (hf *HostsField) GetCreate(shard, replica int) *ChiHost {
+// GetOrCreate gets and creates if necessary
+func (hf *HostsField) GetOrCreate(shard, replica int) *ChiHost {
 	if hf.Field[shard][replica] == nil {
 		hf.Field[shard][replica] = new(ChiHost)
 	}

@@ -131,7 +131,7 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 	hostTemplate, ok := host.GetHostTemplate()
 	if ok {
 		// Host references known HostTemplate
-		glog.V(1).Infof("getHostTemplate() statefulSet %s use custom host template %s", statefulSetName, hostTemplate.Name)
+		glog.V(2).Infof("getHostTemplate() statefulSet %s use custom host template %s", statefulSetName, hostTemplate.Name)
 	} else {
 		// Host references UNKNOWN HostTemplate, will use default one
 		// However, with default template there is a nuance - hostNetwork requires different default host template
@@ -149,6 +149,8 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 		if hostTemplate == nil {
 			hostTemplate = newDefaultHostTemplate(statefulSetName)
 		}
+
+		glog.V(2).Infof("getHostTemplate() statefulSet %s use default host template", statefulSetName)
 	}
 
 	return hostTemplate
@@ -1172,19 +1174,17 @@ func (n *Normalizer) createHostsField(cluster *chiv1.ChiCluster) {
 	cluster.Layout.HostsField = chiv1.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
 
 	// Need to migrate hosts from Shards and Replicas into HostsField
+	hostMergeFunc := func(shard, replica int, host *chiv1.ChiHost) error {
+		if curHost := cluster.Layout.HostsField.Get(shard, replica); curHost == nil {
+			cluster.Layout.HostsField.Set(shard, replica, host)
+		} else {
+			curHost.MergeFrom(host)
+		}
+		return nil
+	}
 
-	cluster.WalkHostsByShards(
-		func(shard, replica int, host *chiv1.ChiHost) error {
-			cluster.Layout.HostsField.Set(shard, replica, host)
-			return nil
-		},
-	)
-	cluster.WalkHostsByReplicas(
-		func(shard, replica int, host *chiv1.ChiHost) error {
-			cluster.Layout.HostsField.Set(shard, replica, host)
-			return nil
-		},
-	)
+	cluster.WalkHostsByShards(hostMergeFunc)
+	cluster.WalkHostsByReplicas(hostMergeFunc)
 }
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
@@ -1375,7 +1375,7 @@ func (n *Normalizer) normalizeShardHosts(shard *chiv1.ChiShard, cluster *chiv1.C
 		// We still have some assumed hosts in this shard - let's add it as replicaIndex
 		replicaIndex := len(shard.Hosts)
 		// Check whether we have this host in HostsField
-		host := cluster.Layout.HostsField.GetCreate(shardIndex, replicaIndex)
+		host := cluster.Layout.HostsField.GetOrCreate(shardIndex, replicaIndex)
 		shard.Hosts = append(shard.Hosts, host)
 	}
 }
@@ -1388,7 +1388,7 @@ func (n *Normalizer) normalizeReplicaHosts(replica *chiv1.ChiReplica, cluster *c
 		// We still have some assumed hosts in this replica - let's add it as shardIndex
 		shardIndex := len(replica.Hosts)
 		// Check whether we have this host in HostsField
-		host := cluster.Layout.HostsField.GetCreate(shardIndex, replicaIndex)
+		host := cluster.Layout.HostsField.GetOrCreate(shardIndex, replicaIndex)
 		replica.Hosts = append(replica.Hosts, host)
 	}
 }

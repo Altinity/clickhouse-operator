@@ -29,6 +29,27 @@ func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, 
 	(&host.Templates).HandleDeprecatedFields()
 }
 
+func (host *ChiHost) MergeFrom(from *ChiHost) {
+	if (host == nil) || (from == nil) {
+		return
+	}
+
+	if host.Port == 0 {
+		host.Port = from.Port
+	}
+	if host.TCPPort == 0 {
+		host.TCPPort = from.TCPPort
+	}
+	if host.HTTPPort == 0 {
+		host.HTTPPort = from.HTTPPort
+	}
+	if host.InterserverHTTPPort == 0 {
+		host.InterserverHTTPPort = from.InterserverHTTPPort
+	}
+	(&host.Templates).MergeFrom(&from.Templates, MergeTypeFillEmptyValues)
+	(&host.Templates).HandleDeprecatedFields()
+}
+
 func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
 	name := host.Templates.HostTemplate
 	template, ok := host.CHI.GetHostTemplate(name)
