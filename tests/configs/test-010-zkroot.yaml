@@ -5,6 +5,8 @@ metadata:
   name: test-010-zkroot
 
 spec:
+  useTemplates:
+    - name: clickhouse-stable
   defaults:
     templates: 
       logVolumeClaimTemplate: default

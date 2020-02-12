@@ -127,15 +127,21 @@ def kube_wait_object(type, name, label="", count = 1, ns="test"):
                 time.sleep(i*5)
         assert counts >= count, error()
 
-def kube_wait_chi_status(chi, status, ns="test"):        
-    with Then(f"Installation status is {status}"):
+def kube_wait_chi_status(chi, status, ns="test"):
+    kube_wait_field("chi", chi, ".status.status", status, ns)
+
+def kube_wait_pod_status(pod, status, ns="test"):
+    kube_wait_field("pod", pod, ".status.phase", status, ns)
+
+def kube_wait_field(object, name, field, value, ns="test"):        
+    with Then(f"{object} {name} {field} should be {value}"):
         for i in range(1,max_retries):
-            chi_status = kubectl(f"get chi {chi} -o=custom-columns=status:.status.status", ns=ns).splitlines()
-            if chi_status[1] == status:
+            obj_status = kubectl(f"get {object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
+            if obj_status[1] == value:
                 break
             with Then("Not ready. Wait for " + str(i*5) + " seconds"):
                 time.sleep(i*5)
-        assert chi_status[1] == status, error()
+        assert obj_status[1] == value, error()
 
 def kube_get_pod_spec(chi_name, ns="test"):
     pod = kube_get("pod", "", ns = ns, label = f"-l clickhouse.altinity.com/chi={chi_name}")["items"][0]
