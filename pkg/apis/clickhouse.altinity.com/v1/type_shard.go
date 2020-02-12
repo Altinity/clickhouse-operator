@@ -21,7 +21,7 @@ func (shard *ChiShard) InheritTemplatesFrom(cluster *ChiCluster) {
 
 func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	name := shard.Templates.ShardServiceTemplate
-	template, ok := shard.Chi.GetServiceTemplate(name)
+	template, ok := shard.CHI.GetServiceTemplate(name)
 	return template, ok
 }
 
@@ -30,8 +30,8 @@ func (shard *ChiShard) WalkHosts(
 ) []error {
 	res := make([]error, 0)
 
-	for replicaIndex := range shard.Replicas {
-		host := &shard.Replicas[replicaIndex]
+	for replicaIndex := range shard.Hosts {
+		host := shard.Hosts[replicaIndex]
 		res = append(res, f(host))
 	}
 

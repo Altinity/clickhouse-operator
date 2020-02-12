@@ -24,7 +24,11 @@ func (d *Differ) diffFloat(path []string, a, b reflect.Value) error {
 	}
 
 	if a.Float() != b.Float() {
-		d.cl.add(UPDATE, path, a.Interface(), b.Interface())
+		if a.CanInterface() {
+			d.cl.add(UPDATE, path, a.Interface(), b.Interface())
+		} else {
+			d.cl.add(UPDATE, path, a.Float(), b.Float())
+		}
 	}
 
 	return nil

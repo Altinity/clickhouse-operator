@@ -81,18 +81,20 @@ func Run() {
 	//
 	// Create operator instance
 	//
-	chop := chop.NewChop(version.Version, nil, chopConfigFile)
+	chop := chop.NewCHOp(version.Version, nil, chopConfigFile)
 	if err := chop.Init(); err != nil {
-		glog.Fatalf("Unable to init CHOP instance %v\n", err)
+		glog.Fatalf("Unable to init CHOp instance %v\n", err)
 		os.Exit(1)
 	}
 
 	glog.V(1).Info("Starting metrics exporter\n")
 
 	metrics.StartMetricsREST(
-		chop.Config().ChUsername,
-		chop.Config().ChPassword,
-		chop.Config().ChPort,
+		metrics.NewCHAccessInfo(
+			chop.Config().CHUsername,
+			chop.Config().CHPassword,
+			chop.Config().CHPort,
+		),
 
 		metricsEP,
 		metricsPath,

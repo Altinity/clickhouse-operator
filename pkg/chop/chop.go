@@ -19,27 +19,27 @@ import (
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 )
 
-type Chop struct {
+type CHOp struct {
 	Version       string
 	ConfigManager *ConfigManager
 }
 
-func NewChop(
+func NewCHOp(
 	version string,
 	chopClient *chopclientset.Clientset,
 	initConfigFilePath string,
 
-) *Chop {
-	return &Chop{
+) *CHOp {
+	return &CHOp{
 		Version:       version,
 		ConfigManager: NewConfigManager(chopClient, initConfigFilePath),
 	}
 }
 
-func (c *Chop) Init() error {
+func (c *CHOp) Init() error {
 	return c.ConfigManager.Init()
 }
 
-func (c *Chop) Config() *v1.OperatorConfig {
+func (c *CHOp) Config() *v1.OperatorConfig {
 	return c.ConfigManager.Config()
 }

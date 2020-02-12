@@ -1,0 +1,53 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "hostnet4"
+spec:
+  defaults:
+    templates:
+      podTemplate: pod-distribution
+
+  configuration:
+    users:
+      default/networks/ip:
+        - "::/0"
+    clusters:
+      - name: "hnet4"
+        layout:
+          shardsCount: 3
+          replicas:
+            - templates:
+                hostTemplate: replica-0
+            - templates:
+                hostTemplate: replica-1
+            - templates:
+                hostTemplate: replica-2
+
+  templates:
+    hostTemplates:
+      - name: replica-0
+        spec:
+          tcpPort: 9000
+          httpPort: 8123
+          interserverHTTPPort: 9009
+      - name: replica-1
+        spec:
+          tcpPort: 9001
+          httpPort: 8124
+          interserverHTTPPort: 9010
+      - name: replica-2
+        spec:
+          tcpPort: 9002
+          httpPort: 8125
+          interserverHTTPPort: 9011
+
+    podTemplates:
+      - name: pod-distribution
+        podDistribution:
+          - type: CircularReplication
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:19.16

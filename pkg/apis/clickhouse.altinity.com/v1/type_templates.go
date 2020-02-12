@@ -24,6 +24,40 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) {
 		return
 	}
 
+	if len(from.HostTemplates) > 0 {
+		// We have templates to copy from
+		// Append HostTemplates from `from` to receiver
+		if templates.HostTemplates == nil {
+			templates.HostTemplates = make([]ChiHostTemplate, 0)
+		}
+		// Loop over all 'from' templates and copy it in case no such template in receiver
+		for fromIndex := range from.HostTemplates {
+			fromTemplate := &from.HostTemplates[fromIndex]
+
+			// Try to find entry with the same name among local templates in receiver
+			sameNameFound := false
+			for toIndex := range templates.HostTemplates {
+				toTemplate := &templates.HostTemplates[toIndex]
+				if toTemplate.Name == fromTemplate.Name {
+					// Receiver already have such a template
+					sameNameFound = true
+					// Override `to` template with `from` template
+					//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
+					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
+						glog.V(1).Infof("ERROR merge template(%s): %v", toTemplate.Name, err)
+					}
+					break
+				}
+			}
+
+			if !sameNameFound {
+				// Receiver does not have template with such a name
+				// Append template from `from`
+				templates.HostTemplates = append(templates.HostTemplates, *fromTemplate.DeepCopy())
+			}
+		}
+	}
+
 	if len(from.PodTemplates) > 0 {
 		// We have templates to copy from
 		// Append PodTemplates from `from` to receiver

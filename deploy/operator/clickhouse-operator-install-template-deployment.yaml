@@ -53,17 +53,17 @@ data:
     ################################################
     
     # How many seconds to wait for created/updated StatefulSet to be Ready
-    statefulSetUpdateTimeout: 600
+    statefulSetUpdateTimeout: 300
     
     # How many seconds to wait between checks for created/updated StatefulSet status
-    statefulSetUpdatePollPeriod: 10
+    statefulSetUpdatePollPeriod: 5
     
     # What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
     # Possible options:
     # 1. abort - do nothing, just break the process and wait for admin
     # 2. delete - delete newly created problematic StatefulSet
     # 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
-    onStatefulSetCreateFailureAction: delete
+    onStatefulSetCreateFailureAction: ignore
     
     # What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
     # Possible options:
@@ -171,7 +171,6 @@ data:
         <flush_interval_milliseconds>7500</flush_interval_milliseconds>
     </query_log>
     </yandex>
-
 ---
 # Possible Template Parameters:
 #
@@ -253,7 +252,6 @@ data:
         podTemplates:
           - name: default-oneperhost-pod-template
             distribution: "OnePerHost"
-
   default-storage-template.yaml.example: |
     apiVersion: "clickhouse.altinity.com/v1"
     kind: "ClickHouseInstallationTemplate"
@@ -272,7 +270,6 @@ data:
 
   readme: |
     Templates in this folder are packaged with an operator and available via 'useTemplate'
-
 ---
 # Possible Template Parameters:
 #
@@ -322,7 +319,6 @@ data:
         </default>
       </profiles>
     </yandex>
-
 ---
 # Possible Template Parameters:
 #

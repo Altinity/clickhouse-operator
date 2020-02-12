@@ -15,6 +15,8 @@
 package metrics
 
 import (
+	"encoding/json"
+	"net/http"
 	"sync"
 
 	"github.com/golang/glog"
@@ -25,65 +27,18 @@ import (
 type Exporter struct {
 	// chInstallations maps CHI name to list of hostnames (of string type) of this installation
 	chInstallations chInstallationsIndex
-	chAccessInfo    chAccessInfo
+	chAccessInfo    *CHAccessInfo
 
 	mutex               sync.RWMutex
 	toRemoveFromWatched sync.Map
 }
 
-type WatchedChi struct {
-	Namespace string   `json:"namespace"`
-	Name      string   `json:"name"`
-	Hostnames []string `json:"hostnames"`
-}
-
-func (chi *WatchedChi) indexKey() string {
-	return chi.Namespace + ":" + chi.Name
-}
-
-func (chi *WatchedChi) empty() bool {
-	return (len(chi.Namespace) == 0) && (len(chi.Name) == 0) && (len(chi.Hostnames) == 0)
-}
-
-func (chi *WatchedChi) equal(chi2 *WatchedChi) bool {
-	// Must have the same namespace
-	if chi.Namespace != chi2.Namespace {
-		return false
-	}
-
-	// Must have the same name
-	if chi.Name != chi2.Name {
-		return false
-	}
-
-	// Must have the same number of items
-	if len(chi.Hostnames) != len(chi2.Hostnames) {
-		return false
-	}
-
-	// Must have the same items
-	for i := range chi.Hostnames {
-		if chi.Hostnames[i] != chi2.Hostnames[i] {
-			return false
-		}
-	}
-
-	// All checks passed
-	return true
-}
-
 var exporter *Exporter
 
-type chAccessInfo struct {
-	Username string
-	Password string
-	Port     int
-}
+type chInstallationsIndex map[string]*WatchedCHI
 
-type chInstallationsIndex map[string]*WatchedChi
-
-func (i chInstallationsIndex) Slice() []*WatchedChi {
-	res := make([]*WatchedChi, 0)
+func (i chInstallationsIndex) Slice() []*WatchedCHI {
+	res := make([]*WatchedCHI, 0)
 	for _, chi := range i {
 		res = append(res, chi)
 	}
@@ -91,15 +46,15 @@ func (i chInstallationsIndex) Slice() []*WatchedChi {
 }
 
 // NewExporter returns a new instance of Exporter type
-func NewExporter(username, password string, port int) *Exporter {
+func NewExporter(chAccess *CHAccessInfo) *Exporter {
 	return &Exporter{
-		chInstallations: make(map[string]*WatchedChi),
-		chAccessInfo: chAccessInfo{
-			Username: username,
-			Password: password,
-			Port:     port,
-		},
+		chInstallations: make(map[string]*WatchedCHI),
+		chAccessInfo:    chAccess,
 	}
+}
+
+func (e *Exporter) getWatchedCHIs() []*WatchedCHI {
+	return e.chInstallations.Slice()
 }
 
 // Collect implements prometheus.Collector Collect method
@@ -114,10 +69,10 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		e.mutex.Unlock()
 		e.toRemoveFromWatched.Range(func(key, value interface{}) bool {
 			switch key.(type) {
-			case *WatchedChi:
+			case *WatchedCHI:
 				e.toRemoveFromWatched.Delete(key)
-				e.removeFromWatched(key.(*WatchedChi))
-				glog.Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*WatchedChi).Name, key.(*WatchedChi).Namespace)
+				e.removeFromWatched(key.(*WatchedCHI))
+				glog.Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*WatchedCHI).Name, key.(*WatchedCHI).Namespace)
 			}
 			return true
 		})
@@ -125,9 +80,9 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	glog.Info("Starting Collect")
 	var wg = sync.WaitGroup{}
-	e.WalkWatchedChi(func(chi *WatchedChi, hostname string) {
+	e.WalkWatchedChi(func(chi *WatchedCHI, hostname string) {
 		wg.Add(1)
-		go func(chi *WatchedChi, hostname string, c chan<- prometheus.Metric) {
+		go func(chi *WatchedCHI, hostname string, c chan<- prometheus.Metric) {
 			defer wg.Done()
 			e.collectFromHost(chi, hostname, c)
 		}(chi, hostname, ch)
@@ -136,11 +91,11 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	glog.Info("Finished Collect")
 }
 
-func (e *Exporter) enqueueToRemoveFromWatched(chi *WatchedChi) {
+func (e *Exporter) enqueueToRemoveFromWatched(chi *WatchedCHI) {
 	e.toRemoveFromWatched.Store(chi, struct{}{})
 }
 
-func (e *Exporter) WalkWatchedChi(f func(chi *WatchedChi, hostname string)) {
+func (e *Exporter) WalkWatchedChi(f func(chi *WatchedCHI, hostname string)) {
 	// Loop over ClickHouseInstallations
 	for _, chi := range e.chInstallations {
 		// Loop over all hostnames of this installation
@@ -156,7 +111,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // removeFromWatched deletes record from Exporter.chInstallation map identified by chiName key
-func (e *Exporter) removeFromWatched(chi *WatchedChi) {
+func (e *Exporter) removeFromWatched(chi *WatchedCHI) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 	_, ok := e.chInstallations[chi.indexKey()]
@@ -166,8 +121,8 @@ func (e *Exporter) removeFromWatched(chi *WatchedChi) {
 	}
 }
 
-// addToWatched updates Exporter.chInstallation map with values from chInstances slice
-func (e *Exporter) addToWatched(chi *WatchedChi) {
+// updateWatched updates Exporter.chInstallation map with values from chInstances slice
+func (e *Exporter) updateWatched(chi *WatchedCHI) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
@@ -193,16 +148,16 @@ func (e *Exporter) newFetcher(hostname string) *ClickHouseFetcher {
 
 // Ensure hostnames of the Pods from CHI object included into chopmetrics.Exporter state
 func (e *Exporter) UpdateWatch(namespace, chiName string, hostnames []string) {
-	chi := &WatchedChi{
+	chi := &WatchedCHI{
 		Namespace: namespace,
 		Name:      chiName,
 		Hostnames: hostnames,
 	}
-	e.addToWatched(chi)
+	e.updateWatched(chi)
 }
 
 // collectFromHost collect metrics from one host and write inito chan
-func (e *Exporter) collectFromHost(chi *WatchedChi, hostname string, c chan<- prometheus.Metric) {
+func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- prometheus.Metric) {
 	fetcher := e.newFetcher(hostname)
 	writer := NewPrometheusWriter(c, chi, hostname)
 
@@ -257,4 +212,38 @@ func (e *Exporter) collectFromHost(chi *WatchedChi, hostname string, c chan<- pr
 		//e.enqueueToRemoveFromWatched(chi)
 		return
 	}
+}
+
+// getWatchedCHI serves HTTP request to get list of watched CHIs
+func (e *Exporter) getWatchedCHI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(e.getWatchedCHIs())
+}
+
+// updateWatchedCHI serves HTTPS request to add CHI to the list of watched CHIs
+func (e *Exporter) updateWatchedCHI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	chi := &WatchedCHI{}
+	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
+		if chi.isValid() {
+			e.updateWatched(chi)
+			return
+		}
+	}
+
+	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
+}
+
+// deleteWatchedCHI serves HTTP request to delete CHI from the list of watched CHIs
+func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	chi := &WatchedCHI{}
+	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
+		if chi.isValid() {
+			e.enqueueToRemoveFromWatched(chi)
+			return
+		}
+	}
+
+	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
 }

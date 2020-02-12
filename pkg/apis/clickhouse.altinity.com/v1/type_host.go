@@ -16,27 +16,66 @@ package v1
 
 import "github.com/altinity/clickhouse-operator/pkg/util"
 
-func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard) {
-	(&host.Templates).MergeFrom(&shard.Templates, MergeTypeFillEmptyValues)
+func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *ChiHostTemplate) {
+	if shard != nil {
+		(&host.Templates).MergeFrom(&shard.Templates, MergeTypeFillEmptyValues)
+	}
+	if replica != nil {
+		(&host.Templates).MergeFrom(&replica.Templates, MergeTypeFillEmptyValues)
+	}
+	if template != nil {
+		(&host.Templates).MergeFrom(&template.Spec.Templates, MergeTypeFillEmptyValues)
+	}
 	(&host.Templates).HandleDeprecatedFields()
+}
+
+func (host *ChiHost) MergeFrom(from *ChiHost) {
+	if (host == nil) || (from == nil) {
+		return
+	}
+
+	if host.Port == 0 {
+		host.Port = from.Port
+	}
+	if host.TCPPort == 0 {
+		host.TCPPort = from.TCPPort
+	}
+	if host.HTTPPort == 0 {
+		host.HTTPPort = from.HTTPPort
+	}
+	if host.InterserverHTTPPort == 0 {
+		host.InterserverHTTPPort = from.InterserverHTTPPort
+	}
+	(&host.Templates).MergeFrom(&from.Templates, MergeTypeFillEmptyValues)
+	(&host.Templates).HandleDeprecatedFields()
+}
+
+func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
+	name := host.Templates.HostTemplate
+	template, ok := host.CHI.GetHostTemplate(name)
+	return template, ok
 }
 
 func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
 	name := host.Templates.PodTemplate
-	template, ok := host.Chi.GetPodTemplate(name)
+	template, ok := host.CHI.GetPodTemplate(name)
 	return template, ok
 }
 
 func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	name := host.Templates.ReplicaServiceTemplate
-	template, ok := host.Chi.GetServiceTemplate(name)
+	template, ok := host.CHI.GetServiceTemplate(name)
 	return template, ok
 }
 
 func (host *ChiHost) GetReplicasNum() int32 {
-	if util.IsStringBoolTrue(host.Chi.Spec.Stop) {
+	if util.IsStringBoolTrue(host.CHI.Spec.Stop) {
 		return 0
 	} else {
 		return 1
 	}
+}
+
+func (host *ChiHost) GetSettings() Settings {
+	return host.CHI.Spec.Configuration.Settings
 }

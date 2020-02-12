@@ -1,0 +1,63 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "adv-layout-03"
+spec:
+  configuration:
+    clusters:
+      - name: c3-2
+        layout:
+          shards:
+            - replicas:
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t1
+            - replicas:
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t1
+            - replicas:
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t2
+
+      - name: c2-3
+        layout:
+          shards:
+            - replicas:
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t1
+            - replicas:
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t1
+                - templates:
+                    podTemplate: t1
+
+  templates:
+    podTemplates:
+      - name: clickhouse:19.3.7
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.3.7
+
+      - name: clickhouse:19.3.5
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.3.5
+
+      - name: clickhouse:19.1.10
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.1.10

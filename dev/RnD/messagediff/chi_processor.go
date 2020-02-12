@@ -22,7 +22,7 @@ func processor(diff *messagediff.Diff) {
 				idx := int(pathNode.(messagediff.SliceIndex))
 				fmt.Printf("idx: pathNode[%d]=%v\n", i, idx)
 				switch structField {
-				case "Replicas":
+				case "Hosts":
 					replicaIndex = idx
 				case "Shards":
 					shardIndex = idx
@@ -55,7 +55,7 @@ func ReplicaModify() {
 }
 
 func ShardAdd(shard ChiShard) {
-	fmt.Printf("ShardAdd() %v %v %v", shard.Weight, shard.InternalReplication, shard.Replicas)
+	fmt.Printf("ShardAdd() %v %v %v", shard.Weight, shard.InternalReplication, shard.Hosts)
 	Reconfigure()
 }
 

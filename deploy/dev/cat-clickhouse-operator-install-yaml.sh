@@ -17,9 +17,10 @@ OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 
 # Operator's docker image
-OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
-METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:latest}"
-
+RELEASE_VERSION=$(cat ${PROJECT_ROOT}/release)
+OPERATOR_VERSION="${OPERATOR_VERSION:-$RELEASE_VERSION}"
+OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:$OPERATOR_VERSION}"
+METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:$OPERATOR_VERSION}"
 
 # Local path to operator's config file to be injected into .yaml
 OPERATOR_CONFIG_FILE="${PROJECT_ROOT}/config/config.yaml"
@@ -165,9 +166,26 @@ REPO_PATH_OPERATOR_CONFIG_FOLDER="config"
 
 # Render CRD section
 if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-01-section-crd-01-chi.yaml"
+    ensure_file "${CUR_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
     render_separator
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-01-section-crd.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
-    cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-01-section-crd.yaml" | \
+    cat "${CUR_DIR}/${SECTION_FILE_NAME}" | \
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+        envsubst
+
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-01-section-crd-02-chit.yaml"
+    ensure_file "${CUR_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+    render_separator
+    cat "${CUR_DIR}/${SECTION_FILE_NAME}" | \
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+        OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+        envsubst
+
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-01-section-crd-03-chopconf.yaml"
+    ensure_file "${CUR_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+    render_separator
+    cat "${CUR_DIR}/${SECTION_FILE_NAME}" | \
         OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
         OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
         envsubst
@@ -175,9 +193,10 @@ fi
 
 # Render RBAC section
 if [[ "${MANIFEST_PRINT_RBAC}" == "yes" ]]; then
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac.yaml"
+    ensure_file "${CUR_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
     render_separator
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-02-section-rbac.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
-    cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-02-section-rbac.yaml" | \
+    cat "${CUR_DIR}/${SECTION_FILE_NAME}" | \
         OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
         OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
         envsubst
@@ -195,9 +214,10 @@ function render_configmap_header() {
     CM_NAME="$1"
     # Template file with ConfigMap header/beginning
 
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml"
+    ensure_file "${CUR_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
     # Render ConfigMap header template with vars substitution
-    cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml" | \
+    cat "${CUR_DIR}/${SECTION_FILE_NAME}" | \
             sed "${SED_ARGS}" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
@@ -238,9 +258,10 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
     if [[ -z "${OPERATOR_CONFIG_FILE}" ]]; then
         # No config file specified, render simple deployment, w/o ConfigMaps
 
-        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+        SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment.yaml"
+        ensure_file "${CUR_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
         render_separator
-        cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-04-section-deployment.yaml" | \
+        cat "${CUR_DIR}/${SECTION_FILE_NAME}" | \
             sed "${SED_ARGS}" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
@@ -312,9 +333,10 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         fi
 
         # Render Deployment
-        ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+        SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml"
+        ensure_file "${CUR_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
         render_separator
-        cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml" | \
+        cat "${CUR_DIR}/${SECTION_FILE_NAME}" | \
             sed "${SED_ARGS}" | \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
@@ -326,9 +348,10 @@ fi
 
 # Render Service section
 if [[ "${MANIFEST_PRINT_SERVICE}" == "yes" ]]; then
-    ensure_file "${CUR_DIR}" "clickhouse-operator-install-yaml-template-05-section-service.yaml" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-05-section-service.yaml"
+    ensure_file "${CUR_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_DEPLOY_DEV_FOLDER}"
     render_separator
-    cat "${CUR_DIR}/clickhouse-operator-install-yaml-template-05-section-service.yaml" | \
+    cat "${CUR_DIR}/${SECTION_FILE_NAME}" | \
         sed "${SED_ARGS}" | \
         OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
         OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \

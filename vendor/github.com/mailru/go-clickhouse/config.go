@@ -10,19 +10,21 @@ import (
 
 // Config is a configuration parsed from a DSN string
 type Config struct {
-	User          string
-	Password      string
-	Scheme        string
-	Host          string
-	Database      string
-	Timeout       time.Duration
-	IdleTimeout   time.Duration
-	ReadTimeout   time.Duration
-	WriteTimeout  time.Duration
-	Location      *time.Location
-	Debug         bool
-	UseDBLocation bool
-	Params        map[string]string
+	User            string
+	Password        string
+	Scheme          string
+	Host            string
+	Database        string
+	Timeout         time.Duration
+	IdleTimeout     time.Duration
+	ReadTimeout     time.Duration
+	WriteTimeout    time.Duration
+	Location        *time.Location
+	Debug           bool
+	UseDBLocation   bool
+	GzipCompression bool
+	Params          map[string]string
+	TLSConfig       string
 }
 
 // NewConfig creates a new config with default values
@@ -32,6 +34,7 @@ func NewConfig() *Config {
 		Host:        "localhost:8123",
 		IdleTimeout: time.Hour,
 		Location:    time.UTC,
+		Params:      make(map[string]string),
 	}
 }
 
@@ -54,6 +57,9 @@ func (cfg *Config) FormatDSN() string {
 	}
 	if cfg.Location != time.UTC && cfg.Location != nil {
 		query.Set("location", cfg.Location.String())
+	}
+	if cfg.GzipCompression {
+		query.Set("enable_http_compression", "1")
 	}
 	if cfg.Debug {
 		query.Set("debug", "1")
@@ -105,8 +111,7 @@ func ParseDSN(dsn string) (*Config, error) {
 	}
 	cfg := NewConfig()
 
-	cfg.Scheme = u.Scheme
-	cfg.Host = u.Host
+	cfg.Scheme, cfg.Host = u.Scheme, u.Host
 	if len(u.Path) > 1 {
 		// skip '/'
 		cfg.Database = u.Path[1:]
@@ -147,11 +152,12 @@ func parseDSNParams(cfg *Config, params map[string][]string) (err error) {
 			cfg.Debug, err = strconv.ParseBool(v[0])
 		case "default_format", "query", "database":
 			err = fmt.Errorf("unknown option '%s'", k)
+		case "enable_http_compression":
+			cfg.GzipCompression, err = strconv.ParseBool(v[0])
+			cfg.Params[k] = v[0]
+		case "tls_config":
+			cfg.TLSConfig = v[0]
 		default:
-			// lazy init
-			if cfg.Params == nil {
-				cfg.Params = make(map[string]string)
-			}
 			cfg.Params[k] = v[0]
 		}
 		if err != nil {

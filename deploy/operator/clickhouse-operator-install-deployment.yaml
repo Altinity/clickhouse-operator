@@ -1,7 +1,7 @@
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.8.0
+# altinity/clickhouse-operator:0.9.0
 # etc-clickhouse-operator-files
 #
 apiVersion: v1
@@ -52,17 +52,17 @@ data:
     ################################################
     
     # How many seconds to wait for created/updated StatefulSet to be Ready
-    statefulSetUpdateTimeout: 600
+    statefulSetUpdateTimeout: 300
     
     # How many seconds to wait between checks for created/updated StatefulSet status
-    statefulSetUpdatePollPeriod: 10
+    statefulSetUpdatePollPeriod: 5
     
     # What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
     # Possible options:
     # 1. abort - do nothing, just break the process and wait for admin
     # 2. delete - delete newly created problematic StatefulSet
     # 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
-    onStatefulSetCreateFailureAction: delete
+    onStatefulSetCreateFailureAction: ignore
     
     # What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
     # Possible options:
@@ -113,7 +113,7 @@ data:
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.8.0
+# altinity/clickhouse-operator:0.9.0
 # etc-clickhouse-operator-confd-files
 #
 apiVersion: v1
@@ -127,7 +127,7 @@ data:
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.8.0
+# altinity/clickhouse-operator:0.9.0
 # etc-clickhouse-operator-configd-files
 #
 apiVersion: v1
@@ -168,12 +168,11 @@ data:
         <flush_interval_milliseconds>7500</flush_interval_milliseconds>
     </query_log>
     </yandex>
-
 ---
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.8.0
+# altinity/clickhouse-operator:0.9.0
 # etc-clickhouse-operator-templatesd-files
 #
 apiVersion: v1
@@ -249,7 +248,6 @@ data:
         podTemplates:
           - name: default-oneperhost-pod-template
             distribution: "OnePerHost"
-
   default-storage-template.yaml.example: |
     apiVersion: "clickhouse.altinity.com/v1"
     kind: "ClickHouseInstallationTemplate"
@@ -268,12 +266,11 @@ data:
 
   readme: |
     Templates in this folder are packaged with an operator and available via 'useTemplate'
-
 ---
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.8.0
+# altinity/clickhouse-operator:0.9.0
 # etc-clickhouse-operator-usersd-files
 #
 apiVersion: v1
@@ -317,13 +314,12 @@ data:
         </default>
       </profiles>
     </yandex>
-
 ---
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.8.0
-# altinity/metrics-exporter:0.8.0
+# altinity/clickhouse-operator:0.9.0
+# altinity/metrics-exporter:0.9.0
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -362,7 +358,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.8.0
+          image: altinity/clickhouse-operator:0.9.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -427,7 +423,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.8.0
+          image: altinity/metrics-exporter:0.9.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder

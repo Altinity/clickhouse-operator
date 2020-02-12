@@ -146,8 +146,8 @@ func (s *Schemer) GetCreateReplicatedObjects(
 	var shard *chop.ChiShard = nil
 	for shardIndex := range cluster.Layout.Shards {
 		shard = &cluster.Layout.Shards[shardIndex]
-		for replicaIndex := range shard.Replicas {
-			replica := &shard.Replicas[replicaIndex]
+		for replicaIndex := range shard.Hosts {
+			replica := shard.Hosts[replicaIndex]
 			if replica == host {
 				break
 			}

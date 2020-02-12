@@ -28,7 +28,7 @@ docker build -t "${TAG}" -f "${DOCKERFILE}" "${SRC_ROOT}"
 
 # Publish image
 if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
-    if [ ! -z "${DOCKERHUB_LOGIN}" ]; then
+    if [[ ! -z "${DOCKERHUB_LOGIN}" ]]; then
         echo "Dockerhub login specified: '${DOCKERHUB_LOGIN}', perform login"
         docker login -u "${DOCKERHUB_LOGIN}"
     fi

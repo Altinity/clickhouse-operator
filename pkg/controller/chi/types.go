@@ -33,7 +33,7 @@ import (
 // Controller defines CRO controller
 type Controller struct {
 	// Instance of Operator
-	chop *chop.Chop
+	chop *chop.CHOp
 
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 	kubeClient kube.Interface

@@ -66,7 +66,7 @@ func (c *ClickHouseConfigGenerator) GetSettings() string {
 
 // GetFiles creates data for custom common config files specified by user in .spec.configuration.files section
 func (c *ClickHouseConfigGenerator) GetFiles() map[string]string {
-	return c.chi.Spec.Configuration.Files
+	return c.chi.Spec.Configuration.Files.GetStringMap()
 }
 
 // GetZookeeper creates data for "zookeeper.xml"
@@ -155,7 +155,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 		cline(b, 8, "<%s>", cluster.Name)
 
 		// Build each shard XML
-		cluster.WalkShards(func(shard *chiv1.ChiShard) error {
+		cluster.WalkShards(func(index int, shard *chiv1.ChiShard) error {
 			// <shard>
 			//		<internal_replication>VALUE(true/false)</internal_replication>
 			cline(b, 12, "<shard>")
@@ -173,7 +173,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 				// </replica>
 				cline(b, 16, "<replica>")
 				cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-				cline(b, 16, "    <port>%d</port>", host.Port)
+				cline(b, 16, "    <port>%d</port>", host.TCPPort)
 				cline(b, 16, "</replica>")
 
 				return nil
@@ -208,7 +208,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 		// </replica>
 		cline(b, 16, "<replica>")
 		cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-		cline(b, 16, "    <port>%d</port>", host.Port)
+		cline(b, 16, "    <port>%d</port>", host.TCPPort)
 		cline(b, 16, "</replica>")
 
 		return nil
@@ -236,7 +236,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 		// </replica>
 		cline(b, 16, "<replica>")
 		cline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-		cline(b, 16, "    <port>%d</port>", host.Port)
+		cline(b, 16, "    <port>%d</port>", host.TCPPort)
 		cline(b, 16, "</replica>")
 
 		// </shard>
@@ -265,7 +265,7 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *chiv1.ChiHost) string {
 	cline(b, 0, "    <macros>")
 
 	// <installation>CHI-name-macros-value</installation>
-	cline(b, 8, "<installation>%s</installation>", host.Address.ChiName)
+	cline(b, 8, "<installation>%s</installation>", host.Address.CHIName)
 
 	// <CLUSTER_NAME>cluster-name-macros-value</CLUSTER_NAME>
 	// cline(b, 8, "<%s>%[2]s</%[1]s>", replica.Address.ClusterName, c.getMacrosCluster(replica.Address.ClusterName))
@@ -274,7 +274,7 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *chiv1.ChiHost) string {
 
 	// All Shards One Replica Cluster
 	// <CLUSTER_NAME-shard>0-based shard index within all-shards-one-replica-cluster</CLUSTER_NAME-shard>
-	cline(b, 8, "<%s-shard>%d</%[1]s-shard>", allShardsOneReplicaClusterName, host.Address.ChiScopeIndex)
+	cline(b, 8, "<%s-shard>%d</%[1]s-shard>", allShardsOneReplicaClusterName, host.Address.CHIScopeIndex)
 
 	// <cluster> and <shard> macros are applicable to main cluster only. All aux clusters do not have ambiguous macros
 	// <cluster></cluster> macro
@@ -288,6 +288,50 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *chiv1.ChiHost) string {
 	// 		</macros>
 	// </yandex>
 	cline(b, 0, "    </macros>")
+	cline(b, 0, "</"+xmlTagYandex+">")
+
+	return b.String()
+}
+
+func noCustomPorts(host *chiv1.ChiHost) bool {
+	if host.TCPPort != chDefaultTCPPortNumber {
+		return false
+	}
+
+	if host.HTTPPort != chDefaultHTTPPortNumber {
+		return false
+	}
+
+	if host.InterserverHTTPPort != chDefaultInterserverHTTPPortNumber {
+		return false
+	}
+
+	return true
+}
+
+// GetHostPorts creates "ports.xml" content
+func (c *ClickHouseConfigGenerator) GetHostPorts(host *chiv1.ChiHost) string {
+
+	if noCustomPorts(host) {
+		return ""
+	}
+
+	b := &bytes.Buffer{}
+
+	// <yandex>
+	cline(b, 0, "<"+xmlTagYandex+">")
+
+	if host.TCPPort != chDefaultTCPPortNumber {
+		cline(b, 4, "<tcp_port>%d</tcp_port>", host.TCPPort)
+	}
+	if host.HTTPPort != chDefaultHTTPPortNumber {
+		cline(b, 4, "<http_port>%d</http_port>", host.HTTPPort)
+	}
+	if host.InterserverHTTPPort != chDefaultInterserverHTTPPortNumber {
+		cline(b, 4, "<interserver_http_port>%d</interserver_http_port>", host.InterserverHTTPPort)
+	}
+
+	// </yandex>
 	cline(b, 0, "</"+xmlTagYandex+">")
 
 	return b.String()

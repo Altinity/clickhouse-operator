@@ -112,8 +112,8 @@ def check_zookeeper():
         if kube_get_count("service", name = "zookeepers") == 0:
             config=get_full_path("../deploy/zookeeper/quick-start-volume-emptyDir/zookeeper-1-node.yaml")
             kube_apply(config)
-            kube_wait_object("service", "zookeepers")    
-
+            kube_wait_object("pod", "zookeeper-0")
+            kube_wait_pod_status("zookeeper-0", "Running")
 
 @TestScenario
 @Name("test_010. Test zookeeper initialization")
@@ -121,7 +121,8 @@ def test_010():
     check_zookeeper()
 
     create_and_check("configs/test-010-zkroot.yaml", 
-                     {"pod_count": 1,
+                     {"apply_templates": {"configs/tpl-clickhouse-stable.yaml"},
+                      "pod_count": 1,
                       "do_not_delete": 1})
     with And("ClickHouse should complain regarding zookeeper path"):
         out = clickhouse_query_with_error("test-010-zkroot", "select * from system.zookeeper where path = '/'")
@@ -215,7 +216,6 @@ def test_011():
 @TestScenario
 @Name("test_012. Test service templates")
 def test_012():
-    set_operator_version("dev")
     create_and_check("configs/test-012-service-template.yaml", 
                      {"object_counts": [1,1,3],
                       "service": ["service-test-012","ClusterIP"],
@@ -280,8 +280,27 @@ def test_014():
 
     create_and_check("configs/test-014-replication.yaml", {})
 
+@TestScenario
+@Name("test_015. Test circular replication with hostNetwork")
+def test_015():
+    create_and_check("configs/test-015-host-network.yaml", 
+                     {"pod_count": 2,
+                      "do_not_delete": 1})
+    
+    with Then("Query from one server to another one should work"):
+        clickhouse_query("test-015-host-network", host = "chi-test-015-host-network-default-0-0", port = "10000", 
+                            query = "select * from remote('chi-test-015-host-network-default-0-1', system.one)")
+    
+    with Then("Distributed query should work"):
+        out = clickhouse_query("test-015-host-network", host = "chi-test-015-host-network-default-0-0", port = "10000", 
+                               query = "select count() from cluster('all-sharded', system.one) settings receive_timeout=10")
+        assert out == "2"
+    
+    create_and_check("configs/test-015-host-network.yaml", {})
+
+
 kubectl.namespace="test"
-version="latest"
+version="0.9.0"
 clickhouse_stable="yandex/clickhouse-server:19.16.10.44"
 
 if main():
@@ -295,10 +314,10 @@ if main():
                 with And(f"Create namespace {kubectl.namespace}"):
                     kube_createns(kubectl.namespace)
     
-        with Module("examples", flags=TE):
-            examples=[test_examples01_1, test_examples01_2, test_examples02_1, test_examples02_2]
-            for t in examples:
-                run(test=t, flags=TE)
+    #    with Module("examples", flags=TE):
+    #        examples=[test_examples01_1, test_examples01_2, test_examples02_1, test_examples02_2]
+    #        for t in examples:
+    #            run(test=t, flags=TE)
         
         with Module("regression", flags=TE):
             tests = [test_001, 
@@ -313,10 +332,11 @@ if main():
                      test_011,
                      test_012,
                      test_013,
-                     test_014]
+                     test_014,
+                     test_015]
         
             all_tests = tests
-            all_tests = [test_014]
+            # all_tests = [test_010]
         
             for t in all_tests:
                 run(test=t, flags=TE)

@@ -104,7 +104,7 @@ func ex2() (ChiSpec, ChiSpec) {
 						Fingerprint: "",
 					},
 
-					Layout: ChiLayout{
+					Layout: ChiClusterLayout{
 						// useless
 						Type: "",
 						// useless
@@ -133,7 +133,7 @@ func ex2() (ChiSpec, ChiSpec) {
 									Fingerprint: "",
 								},
 
-								Replicas: []ChiReplica{
+								Hosts: []ChiReplica{
 									// Replica 0
 									{
 										Port: 9000,
@@ -222,7 +222,7 @@ func ex2() (ChiSpec, ChiSpec) {
 						Fingerprint: "",
 					},
 
-					Layout: ChiLayout{
+					Layout: ChiClusterLayout{
 						// useless
 						Type: "",
 						// useless
@@ -251,7 +251,7 @@ func ex2() (ChiSpec, ChiSpec) {
 									Fingerprint: "",
 								},
 
-								Replicas: []ChiReplica{
+								Hosts: []ChiReplica{
 									// Replica 0
 									{
 										Port: 9000,

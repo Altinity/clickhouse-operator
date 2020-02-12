@@ -1,0 +1,60 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "adv-layout-01"
+spec:
+  configuration:
+    clusters:
+      - name: adv
+        layout:
+          shards:
+            - replicas:
+                - templates:
+                    podTemplate: clickhouse:19.1.10
+                  httpPort: 8000
+                  tcpPort: 8001
+                  interserverHTTPPort: 8002
+                - templates:
+                    podTemplate: clickhouse:19.3.5
+                  httpPort: 9000
+                  tcpPort: 9001
+                  interserverHTTPPort: 9002
+                - templates:
+                    podTemplate: clickhouse:19.3.7
+                  httpPort: 10000
+                  tcpPort: 10001
+                  interserverHTTPPort: 10002
+
+  templates:
+    podTemplates:
+
+      - name: clickhouse:19.1.10
+        spec:
+          containers:
+            - name: clickhouse-pod
+              #        image: yandex/clickhouse-server:19.1.10
+              #        image: yandex/clickhouse-server:19.3.5
+              #        image: yandex/clickhouse-server:19.3.7
+              #        image: yandex/clickhouse-server:19.1.105
+              image: yandex/clickhouse-server:19.1.10
+
+      - name: clickhouse:19.3.5
+        spec:
+          containers:
+            - name: clickhouse-pod
+              #        image: yandex/clickhouse-server:19.1.10
+              #        image: yandex/clickhouse-server:19.3.5
+              #        image: yandex/clickhouse-server:19.3.7
+              #        image: yandex/clickhouse-server:19.1.105
+              image: yandex/clickhouse-server:19.3.5
+
+
+      - name: clickhouse:19.3.7
+        spec:
+          containers:
+            - name: clickhouse-pod
+              #        image: yandex/clickhouse-server:19.1.10
+              #        image: yandex/clickhouse-server:19.3.5
+              #        image: yandex/clickhouse-server:19.3.7
+              #        image: yandex/clickhouse-server:19.1.105
+              image: yandex/clickhouse-server:19.3.7

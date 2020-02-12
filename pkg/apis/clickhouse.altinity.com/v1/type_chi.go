@@ -19,28 +19,8 @@ import (
 	"math"
 )
 
-const (
-	PodDistributionUnspecified                               = "Unspecified"
-	PodDistributionClickHouseAntiAffinity                    = "ClickHouseAntiAffinity"
-	PodDistributionShardAntiAffinity                         = "ShardAntiAffinity"
-	PodDistributionReplicaAntiAffinity                       = "ReplicaAntiAffinity"
-	PodDistributionAnotherNamespaceAntiAffinity              = "AnotherNamespaceAntiAffinity"
-	PodDistributionAnotherClickHouseInstallationAntiAffinity = "AnotherClickHouseInstallationAntiAffinity"
-	PodDistributionAnotherClusterAntiAffinity                = "AnotherClusterAntiAffinity"
-	PodDistributionMaxNumberPerNode                          = "MaxNumberPerNode"
-	PodDistributionNamespaceAffinity                         = "NamespaceAffinity"
-	PodDistributionClickHouseInstallationAffinity            = "ClickHouseInstallationAffinity"
-	PodDistributionClusterAffinity                           = "ClusterAffinity"
-	PodDistributionShardAffinity                             = "ShardAffinity"
-	PodDistributionReplicaAffinity                           = "ReplicaAffinity"
-	PodDistributionPreviousTailAffinity                      = "PreviousTailAffinity"
-
-	// Deprecated value
-	PodDistributionOnePerHost = "OnePerHost"
-)
-
-// StatusFill fills .Status
-func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
+// fillStatus fills .Status
+func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods []string) {
 	chi.Status.Version = version.Version
 	chi.Status.ClustersCount = chi.ClustersCount()
 	chi.Status.ShardsCount = chi.ShardsCount()
@@ -53,72 +33,17 @@ func (chi *ClickHouseInstallation) StatusFill(endpoint string, pods []string) {
 }
 
 func (chi *ClickHouseInstallation) FillAddressInfo() {
-	hostProcessor := func(
-		chi *ClickHouseInstallation,
-
-		chiScopeIndex int,
-		chiScopeCycleSize int,
-		chiScopeCycleIndex int,
-		chiScopeCycleOffset int,
-
-		clusterScopeIndex int,
-		clusterScopeCycleSize int,
-		clusterScopeCycleIndex int,
-		clusterScopeCycleOffset int,
-
-		clusterIndex int,
-		cluster *ChiCluster,
-
-		shardIndex int,
-		shard *ChiShard,
-
-		replicaIndex int,
-		host *ChiHost,
-	) error {
-		cluster.Address.Namespace = chi.Namespace
-		cluster.Address.ChiName = chi.Name
-		cluster.Address.ClusterName = cluster.Name
-		cluster.Address.ClusterIndex = clusterIndex
-
-		shard.Address.Namespace = chi.Namespace
-		shard.Address.ChiName = chi.Name
-		shard.Address.ClusterName = cluster.Name
-		shard.Address.ClusterIndex = clusterIndex
-		shard.Address.ShardName = shard.Name
-		shard.Address.ShardIndex = shardIndex
-
-		host.Address.Namespace = chi.Namespace
-		host.Address.ChiName = chi.Name
-		host.Address.ClusterName = cluster.Name
-		host.Address.ClusterIndex = clusterIndex
-		host.Address.ShardName = shard.Name
-		host.Address.ShardIndex = shardIndex
-		host.Address.ReplicaName = host.Name
-		host.Address.ReplicaIndex = replicaIndex
-		host.Address.ChiScopeIndex = chiScopeIndex
-		host.Address.ChiScopeCycleSize = chiScopeCycleSize
-		host.Address.ChiScopeCycleIndex = chiScopeCycleIndex
-		host.Address.ChiScopeCycleOffset = chiScopeCycleOffset
-		host.Address.ClusterScopeIndex = clusterScopeIndex
-		host.Address.ClusterScopeCycleSize = clusterScopeCycleSize
-		host.Address.ClusterScopeCycleIndex = clusterScopeCycleIndex
-		host.Address.ClusterScopeCycleOffset = clusterScopeCycleOffset
-		host.Address.ShardScopeIndex = replicaIndex
-
-		return nil
-	}
-
-	// Let's find MaxNumberPerNode pod distribution
-	maxNumberPerNode := 0
-	podTemplateProcessor := func(template *ChiPodTemplate) {
+	// What is the max number of Pods allowed per Node
+	// TODO need to support multi-cluster
+	maxNumberOfPodsPerNode := 0
+	chi.WalkPodTemplates(func(template *ChiPodTemplate) {
 		for i := range template.PodDistribution {
 			podDistribution := &template.PodDistribution[i]
 			if podDistribution.Type == PodDistributionMaxNumberPerNode {
-				maxNumberPerNode = podDistribution.Number
+				maxNumberOfPodsPerNode = podDistribution.Number
 			}
 		}
-	}
-	chi.WalkPodTemplates(podTemplateProcessor)
+	})
 
 	//          1perNode   2perNode  3perNode  4perNode  5perNode
 	// sh1r1    n1   a     n1  a     n1 a      n1  a     n1  a
@@ -143,7 +68,7 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 	// 5perNode = ceil(15 / 5 'cycles num') = 3  'cycle len'
 
 	// Number of requested cycles equals to max number of ClickHouses per node, but can't be less than 1
-	requestedClusterScopeCyclesNum := maxNumberPerNode
+	requestedClusterScopeCyclesNum := maxNumberOfPodsPerNode
 	if requestedClusterScopeCyclesNum <= 0 {
 		requestedClusterScopeCyclesNum = 1
 	}
@@ -156,12 +81,8 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 	} else {
 		clusterScopeCycleSize = int(math.Ceil(float64(chi.HostsCount()) / float64(requestedClusterScopeCyclesNum)))
 	}
-	chi.WalkHostsFullPath(chiScopeCycleSize, clusterScopeCycleSize, hostProcessor)
-}
 
-func (chi *ClickHouseInstallation) FillChiPointer() {
-
-	hostProcessor := func(
+	chi.WalkHostsFullPath(chiScopeCycleSize, clusterScopeCycleSize, func(
 		chi *ClickHouseInstallation,
 
 		chiScopeIndex int,
@@ -181,14 +102,84 @@ func (chi *ClickHouseInstallation) FillChiPointer() {
 		shard *ChiShard,
 
 		replicaIndex int,
+		replica *ChiReplica,
+
 		host *ChiHost,
 	) error {
-		cluster.Chi = chi
-		shard.Chi = chi
-		host.Chi = chi
+		cluster.Address.Namespace = chi.Namespace
+		cluster.Address.CHIName = chi.Name
+		cluster.Address.ClusterName = cluster.Name
+		cluster.Address.ClusterIndex = clusterIndex
+
+		shard.Address.Namespace = chi.Namespace
+		shard.Address.CHIName = chi.Name
+		shard.Address.ClusterName = cluster.Name
+		shard.Address.ClusterIndex = clusterIndex
+		shard.Address.ShardName = shard.Name
+		shard.Address.ShardIndex = shardIndex
+
+		replica.Address.Namespace = chi.Namespace
+		replica.Address.CHIName = chi.Name
+		replica.Address.ClusterName = cluster.Name
+		replica.Address.ClusterIndex = clusterIndex
+		replica.Address.ReplicaName = replica.Name
+		replica.Address.ReplicaIndex = replicaIndex
+
+		host.Address.Namespace = chi.Namespace
+		host.Address.CHIName = chi.Name
+		host.Address.ClusterName = cluster.Name
+		host.Address.ClusterIndex = clusterIndex
+		host.Address.ShardName = shard.Name
+		host.Address.ShardIndex = shardIndex
+		host.Address.ReplicaName = replica.Name
+		host.Address.ReplicaIndex = replicaIndex
+		host.Address.HostName = host.Name
+		host.Address.CHIScopeIndex = chiScopeIndex
+		host.Address.CHIScopeCycleSize = chiScopeCycleSize
+		host.Address.CHIScopeCycleIndex = chiScopeCycleIndex
+		host.Address.CHIScopeCycleOffset = chiScopeCycleOffset
+		host.Address.ClusterScopeIndex = clusterScopeIndex
+		host.Address.ClusterScopeCycleSize = clusterScopeCycleSize
+		host.Address.ClusterScopeCycleIndex = clusterScopeCycleIndex
+		host.Address.ClusterScopeCycleOffset = clusterScopeCycleOffset
+		host.Address.ShardScopeIndex = replicaIndex
+		host.Address.ReplicaScopeIndex = shardIndex
+
 		return nil
-	}
-	chi.WalkHostsFullPath(0, 0, hostProcessor)
+	})
+}
+
+func (chi *ClickHouseInstallation) FillCHIPointer() {
+	chi.WalkHostsFullPath(0, 0, func(
+		chi *ClickHouseInstallation,
+
+		chiScopeIndex int,
+		chiScopeCycleSize int,
+		chiScopeCycleIndex int,
+		chiScopeCycleOffset int,
+
+		clusterScopeIndex int,
+		clusterScopeCycleSize int,
+		clusterScopeCycleIndex int,
+		clusterScopeCycleOffset int,
+
+		clusterIndex int,
+		cluster *ChiCluster,
+
+		shardIndex int,
+		shard *ChiShard,
+
+		replicaIndex int,
+		replica *ChiReplica,
+
+		host *ChiHost,
+	) error {
+		cluster.CHI = chi
+		shard.CHI = chi
+		replica.CHI = chi
+		host.CHI = chi
+		return nil
+	})
 }
 
 func (chi *ClickHouseInstallation) WalkClustersFullPath(
@@ -282,6 +273,8 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 		shard *ChiShard,
 
 		replicaIndex int,
+		replica *ChiReplica,
+
 		host *ChiHost,
 	) error,
 ) []error {
@@ -304,9 +297,10 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 		clusterScopeCycleOffset = 0
 
 		for shardIndex := range cluster.Layout.Shards {
-			shard := &cluster.Layout.Shards[shardIndex]
-			for replicaIndex := range shard.Replicas {
-				host := &shard.Replicas[replicaIndex]
+			shard := cluster.GetShard(shardIndex)
+			for replicaIndex, host := range shard.Hosts {
+				replica := cluster.GetReplica(replicaIndex)
+
 				res = append(res, f(
 					chi,
 
@@ -327,10 +321,12 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 					shard,
 
 					replicaIndex,
+					replica,
+
 					host,
 				))
 
-				// Chi-scope counters
+				// CHI-scope counters
 				chiScopeIndex++
 				chiScopeCycleOffset++
 				if (chiScopeCycleSize > 0) && (chiScopeCycleOffset >= chiScopeCycleSize) {
@@ -362,8 +358,8 @@ func (chi *ClickHouseInstallation) WalkHosts(
 		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
-			for replicaIndex := range shard.Replicas {
-				host := &shard.Replicas[replicaIndex]
+			for replicaIndex := range shard.Hosts {
+				host := shard.Hosts[replicaIndex]
 				res = append(res, f(host))
 			}
 		}
@@ -379,8 +375,8 @@ func (chi *ClickHouseInstallation) WalkHostsTillError(
 		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
-			for replicaIndex := range shard.Replicas {
-				host := &shard.Replicas[replicaIndex]
+			for replicaIndex := range shard.Hosts {
+				host := shard.Hosts[replicaIndex]
 				if err := f(host); err != nil {
 					return err
 				}
@@ -412,8 +408,8 @@ func (chi *ClickHouseInstallation) WalkTillError(
 			if err := fShard(shard); err != nil {
 				return err
 			}
-			for replicaIndex := range shard.Replicas {
-				host := &shard.Replicas[replicaIndex]
+			for replicaIndex := range shard.Hosts {
+				host := shard.Hosts[replicaIndex]
 				if err := fHost(host); err != nil {
 					return err
 				}
@@ -500,6 +496,16 @@ func (chi *ClickHouseInstallation) HostsCount() int {
 		return nil
 	})
 	return count
+}
+
+// GetHostTemplate gets ChiHostTemplate by name
+func (chi *ClickHouseInstallation) GetHostTemplate(name string) (*ChiHostTemplate, bool) {
+	if chi.Spec.Templates.HostTemplatesIndex == nil {
+		return nil, false
+	} else {
+		template, ok := chi.Spec.Templates.HostTemplatesIndex[name]
+		return template, ok
+	}
 }
 
 // GetPodTemplate gets ChiPodTemplate by name

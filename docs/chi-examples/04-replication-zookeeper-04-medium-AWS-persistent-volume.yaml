@@ -25,14 +25,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:18.16.1
-              ports:
-                - name: http
-                  containerPort: 8123
-                - name: client
-                  containerPort: 9000
-                - name: interserver
-                  containerPort: 9009
+              image: yandex/clickhouse-server:19.16
               volumeMounts:
                 - name: clickhouse-storage-template
                   mountPath: /var/lib/clickhouse

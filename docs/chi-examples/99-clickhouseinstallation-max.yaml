@@ -160,7 +160,9 @@ spec:
                 replicaServiceTemplate: replica-service-template
               replicas:
                 - name: replica0
-                  port: 9000
+                  tcpPort: 9000
+                  httpPort: 8123
+                  interserverHTTPPort: 9009
                   templates:
                     podTemplate: clickhouse-v19.11.3.11
                     dataVolumeClaimTemplate: default-volume-claim
@@ -206,6 +208,15 @@ spec:
         # 9. {replica} - replica name
         # 10. {replicaID} - short hashed replica name (BEWARE, this is an experimental feature)
         # 11. {replicaIndex} - 0-based index of the replica in the shard (BEWARE, this is an experimental feature)
+        # 12. {chiScopeIndex} - 0-based index of the host in the chi (BEWARE, this is an experimental feature)
+        # 13. {chiScopeCycleIndex} - 0-based index of the host's cycle in the chi-scope (BEWARE, this is an experimental feature)
+        # 14. {chiScopeCycleOffset} - 0-based offset of the host in the chi-scope cycle (BEWARE, this is an experimental feature)
+        # 15. {clusterScopeIndex} - 0-based index of the host in the cluster (BEWARE, this is an experimental feature)
+        # 16. {clusterScopeCycleIndex} - 0-based index of the host's cycle in the cluster-scope (BEWARE, this is an experimental feature)
+        # 17. {clusterScopeCycleOffset} - 0-based offset of the host in the cluster-scope cycle (BEWARE, this is an experimental feature)
+        # 18. {shardScopeIndex} - 0-based index of the host in the shard (BEWARE, this is an experimental feature)
+        # 19. {replicaScopeIndex} - 0-based index of the host in the replica (BEWARE, this is an experimental feature)
+        # 20. {clusterScopeCycleHeadPointsToPreviousCycleTail} - 0-based cluster-scope index of previous cycle tail
         generateName: "service-{chi}"
         # type ObjectMeta struct from k8s.io/meta/v1
         metadata:
@@ -228,7 +239,7 @@ spec:
           ports:
             - name: http
               port: 8123
-            - name: client
+            - name: tcp
               port: 9000
           type: LoadBalancer
 
@@ -238,7 +249,7 @@ spec:
           ports:
             - name: http
               port: 8123
-            - name: client
+            - name: tcp
               port: 9000
             - name: interserver
               port: 9009
@@ -254,7 +265,7 @@ spec:
           ports:
             - name: http
               port: 8123
-            - name: client
+            - name: tcp
               port: 9000
             - name: interserver
               port: 9009
@@ -362,7 +373,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:18.16.1
+              image: yandex/clickhouse-server:19.16
               volumeMounts:
                 - name: default-volume-claim
                   mountPath: /var/lib/clickhouse

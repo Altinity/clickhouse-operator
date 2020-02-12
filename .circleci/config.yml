@@ -1,6 +1,6 @@
 version: 2
 jobs:
-  build_release:
+  build_master:
     machine:
       enabled: true
     steps:
@@ -11,26 +11,18 @@ jobs:
             docker build -f dockerfile/operator/Dockerfile -t clickhouse-operator:latest .
             docker build -f dockerfile/metrics-exporter/Dockerfile -t metrics-exporter:latest .
       - run:
-          name: Setting version
-          command: |
-            echo 'export CHO_RELEASE=$(cat release)' >> $BASH_ENV
-      - run:
           name: Pushing Docker image
           command: |
             echo "Pushing version $CHO_RELEASE"
 
             docker tag clickhouse-operator:latest $COMPANY_REPO/clickhouse-operator:latest
-            docker tag clickhouse-operator:latest $COMPANY_REPO/clickhouse-operator:$CHO_RELEASE
             docker tag metrics-exporter:latest $COMPANY_REPO/metrics-exporter:latest
-            docker tag metrics-exporter:latest $COMPANY_REPO/metrics-exporter:$CHO_RELEASE
 
             docker login -u $DOCKER_USER -p $DOCKER_PASS
 
             docker push $COMPANY_REPO/clickhouse-operator:latest
-            docker push $COMPANY_REPO/clickhouse-operator:$CHO_RELEASE
             docker push $COMPANY_REPO/metrics-exporter:latest
-            docker push $COMPANY_REPO/metrics-exporter:$CHO_RELEASE
-  build_dev:
+  build_branch:
     machine:
       enabled: true
     steps:
@@ -41,27 +33,29 @@ jobs:
             docker build -f dockerfile/operator/Dockerfile -t clickhouse-operator:dev .
             docker build -f dockerfile/metrics-exporter/Dockerfile -t metrics-exporter:dev .
       - run:
+          name: Setting version
+          command: |
+            echo 'export CHO_RELEASE=$(cat release)' >> $BASH_ENV
+      - run:
           name: Pushing Docker image
           command: |
-            docker tag clickhouse-operator:dev $COMPANY_REPO/clickhouse-operator:dev
-            docker tag metrics-exporter:dev $COMPANY_REPO/metrics-exporter:dev
+            docker tag clickhouse-operator:dev $COMPANY_REPO/clickhouse-operator:$CHO_RELEASE
+            docker tag metrics-exporter:dev $COMPANY_REPO/metrics-exporter:$CHO_RELEASE
 
             docker login -u $DOCKER_USER -p $DOCKER_PASS
 
-            docker push $COMPANY_REPO/clickhouse-operator:dev
-            docker push $COMPANY_REPO/metrics-exporter:dev
+            docker push $COMPANY_REPO/clickhouse-operator:$CHO_RELEASE
+            docker push $COMPANY_REPO/metrics-exporter:$CHO_RELEASE
 workflows:
   version: 2
   build_and_deploy:
     jobs:
-      - build_release:
+      - build_master:
           filters:
             branches:
               only: master
-      - build_dev:
+      - build_branch:
           filters:
             branches:
-              ignore:
-                - master
-                - /.*dev.*/
+              only: /[0-9]+\.[0-9]+\.[0-9]+/
   

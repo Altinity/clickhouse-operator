@@ -20,6 +20,7 @@ const (
 
 const (
 	configMacros        = "macros"
+	configPorts         = "ports"
 	configProfiles      = "profiles"
 	configQuotas        = "quotas"
 	configRemoteServers = "remote_servers"
@@ -36,6 +37,8 @@ const (
 
 	// macros.xml
 	filenameMacrosXML = configMacros + dotXML
+	// ports.xml
+	filenamePortsXML = configPorts + dotXML
 	// profiles.xml
 	filenameProfilesXML = configProfiles + dotXML
 	// quotas.xml
@@ -93,13 +96,15 @@ const (
 )
 
 const (
+	chPortNumberMustBeAssignedLater = 0
+
 	// ClickHouse open ports
-	chDefaultHTTPPortName          = "http"
-	chDefaultHTTPPortNumber        = 8123
-	chDefaultClientPortName        = "client"
-	chDefaultClientPortNumber      = 9000
-	chDefaultInterServerPortName   = "interserver"
-	chDefaultInterServerPortNumber = 9009
+	chDefaultTCPPortName               = "tcp"
+	chDefaultTCPPortNumber             = int32(9000)
+	chDefaultHTTPPortName              = "http"
+	chDefaultHTTPPortNumber            = int32(8123)
+	chDefaultInterserverHTTPPortName   = "interserver"
+	chDefaultInterserverHTTPPortNumber = int32(9009)
 )
 
 const (

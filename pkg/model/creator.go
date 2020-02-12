@@ -29,7 +29,7 @@ import (
 )
 
 type Creator struct {
-	chop                      *chop.Chop
+	chop                      *chop.CHOp
 	chi                       *chiv1.ClickHouseInstallation
 	chConfigGenerator         *ClickHouseConfigGenerator
 	chConfigSectionsGenerator *configSections
@@ -37,7 +37,7 @@ type Creator struct {
 }
 
 func NewCreator(
-	chop *chop.Chop,
+	chop *chop.CHOp,
 	chi *chiv1.ClickHouseInstallation,
 ) *Creator {
 	creator := &Creator{
@@ -77,12 +77,16 @@ func (c *Creator) CreateServiceChi() *corev1.Service {
 				// ClusterIP: templateDefaultsServiceClusterIP,
 				Ports: []corev1.ServicePort{
 					{
-						Name: chDefaultHTTPPortName,
-						Port: chDefaultHTTPPortNumber,
+						Name:       chDefaultHTTPPortName,
+						Protocol:   corev1.ProtocolTCP,
+						Port:       chDefaultHTTPPortNumber,
+						TargetPort: intstr.FromString(chDefaultHTTPPortName),
 					},
 					{
-						Name: chDefaultClientPortName,
-						Port: chDefaultClientPortNumber,
+						Name:       chDefaultTCPPortName,
+						Protocol:   corev1.ProtocolTCP,
+						Port:       chDefaultTCPPortNumber,
+						TargetPort: intstr.FromString(chDefaultTCPPortName),
 					},
 				},
 				Selector: c.labeler.getSelectorChiScope(),
@@ -159,20 +163,20 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 					{
 						Name:       chDefaultHTTPPortName,
 						Protocol:   corev1.ProtocolTCP,
-						Port:       chDefaultHTTPPortNumber,
-						TargetPort: intstr.FromInt(chDefaultHTTPPortNumber),
+						Port:       host.HTTPPort,
+						TargetPort: intstr.FromString(chDefaultHTTPPortName),
 					},
 					{
-						Name:       chDefaultClientPortName,
+						Name:       chDefaultTCPPortName,
 						Protocol:   corev1.ProtocolTCP,
-						Port:       chDefaultClientPortNumber,
-						TargetPort: intstr.FromInt(chDefaultClientPortNumber),
+						Port:       host.TCPPort,
+						TargetPort: intstr.FromString(chDefaultTCPPortName),
 					},
 					{
-						Name:       chDefaultInterServerPortName,
+						Name:       chDefaultInterserverHTTPPortName,
 						Protocol:   corev1.ProtocolTCP,
-						Port:       chDefaultInterServerPortNumber,
-						TargetPort: intstr.FromInt(chDefaultInterServerPortNumber),
+						Port:       host.InterserverHTTPPort,
+						TargetPort: intstr.FromString(chDefaultInterserverHTTPPortName),
 					},
 				},
 				Selector:                 c.labeler.GetSelectorHostScope(host),
@@ -267,7 +271,7 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 			Namespace: host.Address.Namespace,
 			Labels:    c.labeler.getLabelsConfigMapHost(host),
 		},
-		Data: c.chConfigSectionsGenerator.CreateConfigsPod(host),
+		Data: c.chConfigSectionsGenerator.CreateConfigsHost(host),
 	}
 }
 
@@ -309,20 +313,28 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 
 // setupStatefulSetPodTemplate performs PodTemplate setup of StatefulSet
 func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	statefulSetName := CreateStatefulSetName(host)
 
-	// Initial PodTemplateSpec value
-	// All the rest fields would be filled later
+	// Initial PodTemplateSpec
 	statefulSet.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: c.labeler.getLabelsHostScope(host, true),
 		},
 	}
 
-	podTemplate := c.getPodTemplate(statefulSet, host)
-	statefulSetAssignPodTemplate(statefulSet, podTemplate)
+	// Process Pod Template
+	podTemplate := c.getPodTemplate(host)
+	statefulSetApplyPodTemplate(statefulSet, podTemplate)
 
-	// Pod created by this StatefulSet has to have alias
+	c.personalizeStatefulSetTemplate(statefulSet, host)
+}
+
+func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	statefulSetName := CreateStatefulSetName(host)
+
+	// Ensure necessary named ports and respecified
+	ensureNamedPortsSpecified(statefulSet, host)
+
+	// Ensure pod created by this StatefulSet has alias 127.0.0.1
 	statefulSet.Spec.Template.Spec.HostAliases = []corev1.HostAlias{
 		{
 			IP:        "127.0.0.1",
@@ -330,9 +342,10 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 		},
 	}
 
+	// Setup volumes based on ConfigMaps into Pod Template
 	c.setupConfigMapVolumes(statefulSet, host)
 
-	// We have default LogVolumeClaimTemplate specified - need to append log container
+	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.LogVolumeClaimTemplate != "" {
 		addContainer(&statefulSet.Spec.Template.Spec, corev1.Container{
 			Name:  ClickHouseLogContainerName,
@@ -349,20 +362,20 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 }
 
 // getPodTemplate gets Pod Template to be used to create StatefulSet
-func (c *Creator) getPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
+func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 	statefulSetName := CreateStatefulSetName(host)
 
 	// Which pod template would be used - either explicitly defined in or a default one
 	podTemplate, ok := host.GetPodTemplate()
 	if ok {
-		// Replica references known PodTemplate
+		// Host references known PodTemplate
 		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
 		podTemplate = podTemplate.DeepCopy()
-		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
+		glog.V(1).Infof("getPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
 	} else {
-		// Replica references UNKNOWN PodTemplate, will use default one
+		// Host references UNKNOWN PodTemplate, will use default one
 		podTemplate = newDefaultPodTemplate(statefulSetName)
-		glog.V(1).Infof("setupStatefulSetPodTemplate() statefulSet %s use default generated template", statefulSetName)
+		glog.V(1).Infof("getPodTemplate() statefulSet %s use default generated template", statefulSetName)
 	}
 
 	// Here we have local copy of Pod Template, to be used to create StatefulSet
@@ -532,11 +545,40 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.Statefu
 	c.setupStatefulSetApplyVolumeClaimTemplates(statefulSet, host)
 }
 
-// statefulSetAssignPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
-func statefulSetAssignPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
+// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
+func statefulSetApplyPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
 	// StatefulSet's pod template is not directly compatible with ChiPodTemplate, we need some fields only
 	dst.Spec.Template.Name = template.Name
 	dst.Spec.Template.Spec = template.Spec
+}
+
+func getClickHouseContainer(statefulSet *apps.StatefulSet) *corev1.Container {
+	return &statefulSet.Spec.Template.Spec.Containers[0]
+}
+
+func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	chContainer := getClickHouseContainer(statefulSet)
+	// Ensure ClickHouse container has all named ports specified
+	ensurePortByName(chContainer, chDefaultTCPPortName, host.TCPPort)
+	ensurePortByName(chContainer, chDefaultHTTPPortName, host.HTTPPort)
+	ensurePortByName(chContainer, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
+}
+
+func ensurePortByName(container *corev1.Container, name string, port int32) {
+	for i := range container.Ports {
+		containerPort := &container.Ports[i]
+		if containerPort.Name == name {
+			containerPort.HostPort = 0
+			containerPort.ContainerPort = port
+			return
+		}
+	}
+
+	// port with specified name not found. Need to append
+	container.Ports = append(container.Ports, corev1.ContainerPort{
+		Name:          name,
+		ContainerPort: port,
+	})
 }
 
 // statefulSetAppendVolumeClaimTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' ChiVolumeClaimTemplate
@@ -566,6 +608,39 @@ func statefulSetAppendVolumeClaimTemplate(statefulSet *apps.StatefulSet, volumeC
 	})
 }
 
+// newDefaultHostTemplate returns default Host Template to be used with StatefulSet
+func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
+	return &chiv1.ChiHostTemplate{
+		Name: name,
+		PortDistribution: []chiv1.ChiPortDistribution{
+			{Type: chiv1.PortDistributionUnspecified},
+		},
+		Spec: chiv1.ChiHost{
+			Name:                "",
+			TCPPort:             chPortNumberMustBeAssignedLater,
+			HTTPPort:            chPortNumberMustBeAssignedLater,
+			InterserverHTTPPort: chPortNumberMustBeAssignedLater,
+			Templates:           chiv1.ChiTemplateNames{},
+		},
+	}
+}
+
+func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
+	return &chiv1.ChiHostTemplate{
+		Name: name,
+		PortDistribution: []chiv1.ChiPortDistribution{
+			{Type: chiv1.PortDistributionClusterScopeIndex},
+		},
+		Spec: chiv1.ChiHost{
+			Name:                "",
+			TCPPort:             chPortNumberMustBeAssignedLater,
+			HTTPPort:            chPortNumberMustBeAssignedLater,
+			InterserverHTTPPort: chPortNumberMustBeAssignedLater,
+			Templates:           chiv1.ChiTemplateNames{},
+		},
+	}
+}
+
 // newDefaultPodTemplate returns default Pod Template to be used with StatefulSet
 func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 	podTemplate := &chiv1.ChiPodTemplate{
@@ -585,12 +660,12 @@ func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 				ContainerPort: chDefaultHTTPPortNumber,
 			},
 			{
-				Name:          chDefaultClientPortName,
-				ContainerPort: chDefaultClientPortNumber,
+				Name:          chDefaultTCPPortName,
+				ContainerPort: chDefaultTCPPortNumber,
 			},
 			{
-				Name:          chDefaultInterServerPortName,
-				ContainerPort: chDefaultInterServerPortNumber,
+				Name:          chDefaultInterserverHTTPPortName,
+				ContainerPort: chDefaultInterserverHTTPPortNumber,
 			},
 		},
 		ReadinessProbe: &corev1.Probe{

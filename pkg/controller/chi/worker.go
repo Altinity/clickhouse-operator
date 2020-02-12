@@ -37,9 +37,9 @@ func (c *Controller) newWorker() *worker {
 		c:          c,
 		normalizer: chopmodels.NewNormalizer(c.chop),
 		schemer: chopmodels.NewSchemer(
-			c.chop.Config().ChUsername,
-			c.chop.Config().ChPassword,
-			c.chop.Config().ChPort,
+			c.chop.Config().CHUsername,
+			c.chop.Config().CHPassword,
+			c.chop.Config().CHPort,
 		),
 		creator: nil,
 	}
@@ -289,11 +289,6 @@ func (w *worker) reconcileShard(shard *chop.ChiShard) error {
 
 // reconcileHost reconciles ClickHouse host
 func (w *worker) reconcileHost(host *chop.ChiHost) error {
-	// Add host's Service
-	service := w.creator.CreateServiceHost(host)
-	if err := w.c.ReconcileService(service); err != nil {
-		return err
-	}
 
 	// Add host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)
@@ -304,6 +299,12 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	// Add host's StatefulSet
 	statefulSet := w.creator.CreateStatefulSet(host)
 	if err := w.c.ReconcileStatefulSet(statefulSet, host); err != nil {
+		return err
+	}
+
+	// Add host's Service
+	service := w.creator.CreateServiceHost(host)
+	if err := w.c.ReconcileService(service); err != nil {
 		return err
 	}
 
@@ -416,7 +417,9 @@ func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
 	glog.V(1).Infof("Start delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
 
 	// Delete all shards
-	cluster.WalkShards(w.deleteShard)
+	cluster.WalkShards(func(index int, shard *chop.ChiShard) error {
+		return w.deleteShard(shard)
+	})
 
 	// Delete Cluster Service
 	_ = w.c.deleteServiceCluster(cluster)

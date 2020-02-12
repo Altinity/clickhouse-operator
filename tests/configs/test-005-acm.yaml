@@ -13,7 +13,7 @@ spec:
           ports:
           - name: http
             containerPort: 8123
-          - name: client
+          - name: tcp
             containerPort: 9000
           - name: interserver
             containerPort: 9009

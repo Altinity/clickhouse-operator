@@ -13,21 +13,23 @@ spec:
     templates:
       # Templates are specified as default for all clusters
       podTemplate: pod-template-resource-limit
+      hostTemplate: host-template-custom-ports
 
   templates:
+
+    hostTemplates:
+      - name: host-template-custom-ports
+        spec:
+          tcpPort: 7000
+          httpPort: 7001
+          interserverHTTPPort: 7002
+
     podTemplates:
       - name: pod-template-resource-limit
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:18.16.1
-              ports:
-                - name: http
-                  containerPort: 8123
-                - name: client
-                  containerPort: 9000
-                - name: interserver
-                  containerPort: 9009
+              image: yandex/clickhouse-server:19.16
               volumeMounts:
                 - name: clickhouse-data-storage
                   mountPath: /var/lib/clickhouse

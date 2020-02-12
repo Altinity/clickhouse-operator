@@ -53,10 +53,3 @@ spec:
                 # Specify reference to volume on local filesystem
                 - name: local-path
                   mountPath: /var/lib/clickhouse
-              ports:
-                - name: http
-                  containerPort: 8123
-                - name: client
-                  containerPort: 9000
-                - name: interserver
-                  containerPort: 9009

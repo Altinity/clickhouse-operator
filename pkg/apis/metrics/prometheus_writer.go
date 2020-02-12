@@ -29,13 +29,13 @@ const (
 
 type PrometheusWriter struct {
 	out      chan<- prometheus.Metric
-	chi      *WatchedChi
+	chi      *WatchedCHI
 	hostname string
 }
 
 func NewPrometheusWriter(
 	out chan<- prometheus.Metric,
-	chi *WatchedChi,
+	chi *WatchedCHI,
 	hostname string,
 ) *PrometheusWriter {
 	return &PrometheusWriter{

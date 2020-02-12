@@ -1,0 +1,44 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "hostnet3"
+spec:
+  defaults:
+    templates:
+      hostTemplate: port-distribution
+      podTemplate: pod-distribution
+
+  configuration:
+    clusters:
+      - name: "hnet3"
+        layout:
+          shardsCount: 3
+          replicasCount: 3
+
+  templates:
+    hostTemplates:
+      - name: port-distribution
+        portDistribution:
+          - type: ClusterScopeIndex
+        spec:
+          tcpPort: 10000
+          httpPort: 11000
+          interserverHTTPPort: 12000
+
+    podTemplates:
+      - name: pod-distribution
+        podDistribution:
+          - type: ShardAntiAffinity
+          - type: ReplicaAntiAffinity
+          - type: MaxNumberPerNode
+            number: 3
+          - type: NamespaceAffinity
+          - type: ClickHouseInstallationAffinity
+          - type: ClusterAffinity
+          - type: PreviousTailAffinity
+        spec:
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:19.16
