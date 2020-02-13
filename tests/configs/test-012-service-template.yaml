@@ -9,13 +9,14 @@ spec:
   defaults:
     templates:
       serviceTemplate: service-template
+      replicaServiceTemplate: replica-service-template
   configuration:
     clusters:
       - name: default
         templates:
           clusterServiceTemplate: cluster-service-template
         layout:
-          shardsCount: 1
+          shardsCount: 2
           replicasCount: 1
   templates:
     serviceTemplates:
@@ -39,4 +40,13 @@ spec:
               port: 9000
           type: ClusterIP
           clusterIP: None
-          
+      - name: replica-service-template
+        generateName: "service-{chi}-{shard}-{replica}"
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: tcp
+              port: 9000
+          type: ClusterIP
+          clusterIP: None

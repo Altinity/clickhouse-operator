@@ -217,12 +217,17 @@ def test_011():
 @Name("test_012. Test service templates")
 def test_012():
     create_and_check("configs/test-012-service-template.yaml", 
-                     {"object_counts": [1,1,3],
+                     {"object_counts": [2,2,4],
                       "service": ["service-test-012","ClusterIP"],
                       "do_not_delete": 1})
-    create_and_check("configs/test-012-service-template.yaml", 
-                     {"object_counts": [1,1,3],
-                      "service": ["service-default","ClusterIP"]})
+    with Then("There should be a service for shard 0"):
+        kube_check_service("service-test-012-0-0","ClusterIP")
+    with And("There should be a service for shard 1"):
+        kube_check_service("service-test-012-1-0","ClusterIP")
+    with And("There should be a service for default cluster"):
+        kube_check_service("service-default","ClusterIP")
+
+    create_and_check("configs/test-012-service-template.yaml", {})
 
 @TestScenario
 @Name("test_013. Test adding shards and creating local and distributed tables automatically")
@@ -336,7 +341,7 @@ if main():
                      test_015]
         
             all_tests = tests
-            # all_tests = [test_010]
+            # all_tests = [test_012]
         
             for t in all_tests:
                 run(test=t, flags=TE)
