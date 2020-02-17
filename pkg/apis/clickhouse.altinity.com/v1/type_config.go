@@ -319,7 +319,7 @@ func (config *OperatorConfig) applyDefaultWatchNamespace() {
 
 	// No namespaces specified
 
-	namespace := os.Getenv("OPERATOR_POD_NAMESPACE")
+	namespace := os.Getenv(OPERATOR_POD_NAMESPACE)
 	if namespace == "kube-system" {
 		// Do nothing, we already have len(config.WatchNamespaces) == 0
 	} else {

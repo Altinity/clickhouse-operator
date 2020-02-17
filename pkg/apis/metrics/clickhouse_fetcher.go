@@ -16,6 +16,7 @@ package metrics
 
 import (
 	sqlmodule "database/sql"
+
 	"github.com/MakeNowJust/heredoc"
 
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
@@ -126,10 +127,10 @@ func (f *ClickHouseFetcher) newConn() *clickhouse.Conn {
 	return clickhouse.New(f.Hostname, f.Username, f.Password, f.Port)
 }
 
-// clickHouseQueryMetrics requests metrics data from ClickHouse
-func (f *ClickHouseFetcher) clickHouseQueryMetrics() ([][]string, error) {
+// getClickHouseQueryMetrics requests metrics data from ClickHouse
+func (f *ClickHouseFetcher) getClickHouseQueryMetrics() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
-		heredoc.Doc(queryMetricsSQL),
+		queryMetricsSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
 			var metric, value, description, _type string
 			if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
@@ -140,10 +141,10 @@ func (f *ClickHouseFetcher) clickHouseQueryMetrics() ([][]string, error) {
 	)
 }
 
-// clickHouseQueryTableSizes requests data sizes from ClickHouse
-func (f *ClickHouseFetcher) clickHouseQueryTableSizes() ([][]string, error) {
+// getClickHouseQueryTableSizes requests data sizes from ClickHouse
+func (f *ClickHouseFetcher) getClickHouseQueryTableSizes() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
-		heredoc.Doc(queryTableSizesSQL),
+		queryTableSizesSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
 			var database, table, partitions, parts, bytes, uncompressed, _rows string
 			if err := rows.Scan(&database, &table, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
@@ -154,10 +155,10 @@ func (f *ClickHouseFetcher) clickHouseQueryTableSizes() ([][]string, error) {
 	)
 }
 
-// clickHouseQuerySystemReplicas requests replica information from ClickHouse
-func (f *ClickHouseFetcher) clickHouseQuerySystemReplicas() ([][]string, error) {
+// getClickHouseQuerySystemReplicas requests replica information from ClickHouse
+func (f *ClickHouseFetcher) getClickHouseQuerySystemReplicas() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
-		heredoc.Doc(querySystemReplicasSQL),
+		querySystemReplicasSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
 			var database, table, isSessionExpired string
 			if err := rows.Scan(&database, &table, &isSessionExpired); err == nil {
@@ -169,9 +170,9 @@ func (f *ClickHouseFetcher) clickHouseQuerySystemReplicas() ([][]string, error) 
 }
 
 // clickHouseQuerySystemMutations requests mutations information from ClickHouse
-func (f *ClickHouseFetcher) clickHouseQueryMutations() ([][]string, error) {
+func (f *ClickHouseFetcher) getClickHouseQueryMutations() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
-		heredoc.Doc(queryMutationsSQL),
+		queryMutationsSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
 			var database, table, mutations, parts_to_do string
 			if err := rows.Scan(&database, &table, &mutations, &parts_to_do); err == nil {
@@ -183,15 +184,20 @@ func (f *ClickHouseFetcher) clickHouseQueryMutations() ([][]string, error) {
 }
 
 // clickHouseQueryScanRows scan all rows by external scan function
-func (f *ClickHouseFetcher) clickHouseQueryScanRows(sql string, scan func(rows *sqlmodule.Rows, data *[][]string) error) ([][]string, error) {
-	data := make([][]string, 0)
-	conn := f.newConn()
-	if rows, err := conn.Query(heredoc.Doc(sql)); err != nil {
+func (f *ClickHouseFetcher) clickHouseQueryScanRows(
+	sql string,
+	scan func(
+		rows *sqlmodule.Rows,
+		data *[][]string,
+	) error,
+) ([][]string, error) {
+	if rows, err := f.newConn().Query(heredoc.Doc(sql)); err != nil {
 		return nil, err
 	} else {
+		data := make([][]string, 0)
 		for rows.Next() {
 			_ = scan(rows, &data)
 		}
+		return data, nil
 	}
-	return data, nil
 }

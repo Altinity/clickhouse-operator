@@ -16,6 +16,7 @@ package metrics
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"sync"
 
@@ -156,13 +157,13 @@ func (e *Exporter) UpdateWatch(namespace, chiName string, hostnames []string) {
 	e.updateWatched(chi)
 }
 
-// collectFromHost collect metrics from one host and write inito chan
+// collectFromHost collects metrics from one host and writes them into chan
 func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- prometheus.Metric) {
 	fetcher := e.newFetcher(hostname)
 	writer := NewPrometheusWriter(c, chi, hostname)
 
 	glog.Infof("Querying metrics for %s\n", hostname)
-	if metrics, err := fetcher.clickHouseQueryMetrics(); err == nil {
+	if metrics, err := fetcher.getClickHouseQueryMetrics(); err == nil {
 		glog.Infof("Extracted %d metrics for %s\n", len(metrics), hostname)
 		writer.WriteMetrics(metrics)
 		writer.WriteOKFetch("system.metrics")
@@ -175,7 +176,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 	}
 
 	glog.Infof("Querying table sizes for %s\n", hostname)
-	if tableSizes, err := fetcher.clickHouseQueryTableSizes(); err == nil {
+	if tableSizes, err := fetcher.getClickHouseQueryTableSizes(); err == nil {
 		glog.Infof("Extracted %d table sizes for %s\n", len(tableSizes), hostname)
 		writer.WriteTableSizes(tableSizes)
 		writer.WriteOKFetch("table sizes")
@@ -188,7 +189,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 	}
 
 	glog.Infof("Querying system replicas for %s\n", hostname)
-	if systemReplicas, err := fetcher.clickHouseQuerySystemReplicas(); err == nil {
+	if systemReplicas, err := fetcher.getClickHouseQuerySystemReplicas(); err == nil {
 		glog.Infof("Extracted %d system replicas for %s\n", len(systemReplicas), hostname)
 		writer.WriteSystemReplicas(systemReplicas)
 		writer.WriteOKFetch("system.replicas")
@@ -201,7 +202,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 	}
 
 	glog.Infof("Querying mutations for %s\n", hostname)
-	if mutations, err := fetcher.clickHouseQueryMutations(); err == nil {
+	if mutations, err := fetcher.getClickHouseQueryMutations(); err == nil {
 		glog.Infof("Extracted %d mutations for %s\n", len(mutations), hostname)
 		writer.WriteMutations(mutations)
 		writer.WriteOKFetch("system.mutations")
@@ -220,30 +221,34 @@ func (e *Exporter) getWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(e.getWatchedCHIs())
 }
 
-// updateWatchedCHI serves HTTPS request to add CHI to the list of watched CHIs
-func (e *Exporter) updateWatchedCHI(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+// fetchCHI decodes chi from request
+func (e *Exporter) fetchCHI(r *http.Request) (*WatchedCHI, error) {
 	chi := &WatchedCHI{}
 	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
 		if chi.isValid() {
-			e.updateWatched(chi)
-			return
+			return chi, nil
 		}
 	}
 
-	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
+	return nil, fmt.Errorf("unable to parse CHI from request")
+}
+
+// updateWatchedCHI serves HTTPS request to add CHI to the list of watched CHIs
+func (e *Exporter) updateWatchedCHI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if chi, err := e.fetchCHI(r); err == nil {
+		e.updateWatched(chi)
+	} else {
+		http.Error(w, err.Error(), http.StatusNotAcceptable)
+	}
 }
 
 // deleteWatchedCHI serves HTTP request to delete CHI from the list of watched CHIs
 func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	chi := &WatchedCHI{}
-	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
-		if chi.isValid() {
-			e.enqueueToRemoveFromWatched(chi)
-			return
-		}
+	if chi, err := e.fetchCHI(r); err == nil {
+		e.enqueueToRemoveFromWatched(chi)
+	} else {
+		http.Error(w, err.Error(), http.StatusNotAcceptable)
 	}
-
-	http.Error(w, "Unable to parse CHI.", http.StatusNotAcceptable)
 }

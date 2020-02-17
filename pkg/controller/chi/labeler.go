@@ -15,6 +15,8 @@
 package chi
 
 import (
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -47,8 +49,8 @@ func (c *Controller) labelMyObjectsTree() {
 	//    uid: a275a8a0-83ae-11e9-b92d-0208b778ea1a
 
 	// Label operator's Pod with version label
-	podName, ok1 := c.chop.ConfigManager.GetRuntimeParam("OPERATOR_POD_NAME")
-	namespace, ok2 := c.chop.ConfigManager.GetRuntimeParam("OPERATOR_POD_NAMESPACE")
+	podName, ok1 := c.chop.ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAME)
+	namespace, ok2 := c.chop.ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
 
 	if !ok1 || !ok2 {
 		glog.V(1).Infof("ERROR fetch Pod name out of %s/%s", namespace, podName)

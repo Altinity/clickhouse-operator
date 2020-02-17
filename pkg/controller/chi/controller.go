@@ -408,7 +408,7 @@ func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
 }
 
 func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string) {
-	if err := metrics.ReportToMetricsExporterWatchedCHI(namespace, name, hostnames); err != nil {
+	if err := metrics.InformMetricsExporterAboutWatchedCHI(namespace, name, hostnames); err != nil {
 		glog.V(1).Infof("FAIL update watch (%s/%s): %q", namespace, name, err)
 	} else {
 		glog.V(2).Infof("OK update watch (%s/%s)", namespace, name)

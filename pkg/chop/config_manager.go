@@ -254,30 +254,19 @@ func (cm *ConfigManager) buildDefaultConfig() (*chiv1.OperatorConfig, error) {
 func (cm *ConfigManager) getEnvVarParamNames() []string {
 	// This list of ENV VARS is specified in operator .yaml manifest, section "kind: Deployment"
 	return []string{
-		// spec.nodeName: ip-172-20-52-62.ec2.internal
-		"OPERATOR_POD_NODE_NAME",
-		// metadata.name: clickhouse-operator-6f87589dbb-ftcsf
-		"OPERATOR_POD_NAME",
-		// metadata.namespace: kube-system
-		"OPERATOR_POD_NAMESPACE",
-		// status.podIP: 100.96.3.2
-		"OPERATOR_POD_IP",
-		// spec.serviceAccount: clickhouse-operator
-		// spec.serviceAccountName: clickhouse-operator
-		"OPERATOR_POD_SERVICE_ACCOUNT",
+		chiv1.OPERATOR_POD_NODE_NAME,
+		chiv1.OPERATOR_POD_NAME,
+		chiv1.OPERATOR_POD_NAMESPACE,
+		chiv1.OPERATOR_POD_IP,
+		chiv1.OPERATOR_POD_SERVICE_ACCOUNT,
 
-		// .containers.resources.requests.cpu
-		"OPERATOR_CONTAINER_CPU_REQUEST",
-		// .containers.resources.limits.cpu
-		"OPERATOR_CONTAINER_CPU_LIMIT",
-		// .containers.resources.requests.memory
-		"OPERATOR_CONTAINER_MEM_REQUEST",
-		// .containers.resources.limits.memory
-		"OPERATOR_CONTAINER_MEM_LIMIT",
+		chiv1.OPERATOR_CONTAINER_CPU_REQUEST,
+		chiv1.OPERATOR_CONTAINER_CPU_LIMIT,
+		chiv1.OPERATOR_CONTAINER_MEM_REQUEST,
+		chiv1.OPERATOR_CONTAINER_MEM_LIMIT,
 
-		// What namespaces to watch
-		"WATCH_NAMESPACE",
-		"WATCH_NAMESPACES",
+		chiv1.WATCH_NAMESPACE,
+		chiv1.WATCH_NAMESPACES,
 	}
 }
 

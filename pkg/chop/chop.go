@@ -28,7 +28,6 @@ func NewCHOp(
 	version string,
 	chopClient *chopclientset.Clientset,
 	initConfigFilePath string,
-
 ) *CHOp {
 	return &CHOp{
 		Version:       version,
