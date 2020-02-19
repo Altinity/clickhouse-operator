@@ -86,7 +86,7 @@ func Run() {
 		os.Exit(1)
 	}()
 
-	glog.V(1).Info("Starting metrics exporter. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
+	glog.V(1).Infof("Starting metrics exporter. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
 
 	// Initialize k8s API clients
 	_, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
@@ -94,7 +94,7 @@ func Run() {
 	// Create operator instance
 	chop := chop.GetCHOp(chopClient, chopConfigFile)
 
-	_ = metrics.StartMetricsREST(
+	exporter := metrics.StartMetricsREST(
 		metrics.NewCHAccessInfo(
 			chop.Config().CHUsername,
 			chop.Config().CHPassword,
@@ -107,6 +107,8 @@ func Run() {
 		chiListEP,
 		chiListPath,
 	)
+
+	exporter.Watch(chop, chopClient)
 
 	<-ctx.Done()
 }

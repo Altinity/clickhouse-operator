@@ -17,11 +17,15 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"sync"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
+
+	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 )
 
 // Exporter implements prometheus.Collector interface
@@ -250,5 +254,31 @@ func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
 		e.enqueueToRemoveFromWatched(chi)
 	} else {
 		http.Error(w, err.Error(), http.StatusNotAcceptable)
+	}
+}
+
+func (e *Exporter) Watch(chop *chop.CHOp, chopClient *chopclientset.Clientset) {
+	// Read config all Custom Resources
+	watchedNamespace := chop.Config().GetInformerNamespace()
+	list, err := chopClient.ClickhouseV1().ClickHouseInstallations(watchedNamespace).List(v1.ListOptions{})
+	if err != nil {
+		glog.V(1).Infof("Error read ClickHouseInstallations %v", err)
+		return
+	}
+
+	if list == nil {
+		return
+	}
+
+	// Get sorted names of ClickHouseOperatorConfiguration object
+	for i := range list.Items {
+		chi := &list.Items[i]
+		glog.Infof("Adding explicitly found CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.FQDNs))
+		watchedCHI := &WatchedCHI{
+			Namespace: chi.Namespace,
+			Name:      chi.Name,
+			Hostnames: chi.Status.FQDNs,
+		}
+		e.updateWatched(watchedCHI)
 	}
 }

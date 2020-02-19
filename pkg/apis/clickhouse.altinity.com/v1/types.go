@@ -83,6 +83,7 @@ type ChiStatus struct {
 	DeletedHostsCount int      `json:"deleted"`
 	DeleteHostsCount  int      `json:"delete"`
 	Pods              []string `json:"pods"`
+	FQDNs             []string `json:"fqdns"`
 	Endpoint          string   `json:"endpoint"`
 }
 
