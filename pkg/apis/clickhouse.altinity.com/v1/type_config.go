@@ -289,6 +289,7 @@ func (config *OperatorConfig) applyEnvVarParams() {
 		// We have WATCH_NAMESPACE explicitly specified
 		config.WatchNamespaces = []string{ns}
 	}
+
 	if nss := os.Getenv(WATCH_NAMESPACES); len(nss) > 0 {
 		// We have WATCH_NAMESPACES explicitly specified
 		namespaces := strings.FieldsFunc(nss, func(r rune) bool {
@@ -388,16 +389,6 @@ func (config *OperatorConfig) isCHITemplateExt(file string) bool {
 	return false
 }
 
-// IsWatchedNamespace returns whether specified namespace is in a list of watched
-func (config *OperatorConfig) IsWatchedNamespace(namespace string) bool {
-	// In case no namespaces specified - watch all namespaces
-	if len(config.WatchNamespaces) == 0 {
-		return true
-	}
-
-	return util.InArray(namespace, config.WatchNamespaces)
-}
-
 // String returns string representation of a OperatorConfig
 func (config *OperatorConfig) String() string {
 	b := &bytes.Buffer{}
@@ -476,6 +467,18 @@ func (config *OperatorConfig) stringMap(name string, m map[string]string) string
 	return b.String()
 }
 
+// TODO unify with GetInformerNamespace
+// IsWatchedNamespace returns whether specified namespace is in a list of watched
+func (config *OperatorConfig) IsWatchedNamespace(namespace string) bool {
+	// In case no namespaces specified - watch all namespaces
+	if len(config.WatchNamespaces) == 0 {
+		return true
+	}
+
+	return util.InArray(namespace, config.WatchNamespaces)
+}
+
+// TODO unify with IsWatchedNamespace
 // GetInformerNamespace is a TODO stub
 // Namespace where informers would watch notifications from
 func (config *OperatorConfig) GetInformerNamespace() string {
