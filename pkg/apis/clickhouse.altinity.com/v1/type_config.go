@@ -66,43 +66,43 @@ func (config *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) {
 	}
 }
 
-// readChiTemplates build OperatorConfig.CHITemplate from template files content
-func (config *OperatorConfig) readChiTemplates() {
+// readCHITemplates build OperatorConfig.CHITemplate from template files content
+func (config *OperatorConfig) readCHITemplates() {
 	// Read CHI template files
-	config.CHITemplateFiles = readConfigFiles(config.CHITemplatesPath, config.isChiTemplateExt)
+	config.CHITemplateFiles = readConfigFiles(config.CHITemplatesPath, config.isCHITemplateExt)
 
 	// Produce map of CHI templates out of CHI template files
 	for filename := range config.CHITemplateFiles {
 		template := new(ClickHouseInstallation)
 		if err := yaml.Unmarshal([]byte(config.CHITemplateFiles[filename]), template); err != nil {
 			// Unable to unmarshal - skip incorrect template
-			glog.V(1).Infof("FAIL readChiTemplates() unable to unmarshal file %s Error: %q", filename, err)
+			glog.V(1).Infof("FAIL readCHITemplates() unable to unmarshal file %s Error: %q", filename, err)
 			continue
 		}
-		config.enlistChiTemplate(template)
+		config.enlistCHITemplate(template)
 	}
 }
 
-// enlistChiTemplate inserts template into templates catalog
-func (config *OperatorConfig) enlistChiTemplate(template *ClickHouseInstallation) {
+// enlistCHITemplate inserts template into templates catalog
+func (config *OperatorConfig) enlistCHITemplate(template *ClickHouseInstallation) {
 	if config.CHITemplates == nil {
 		config.CHITemplates = make([]*ClickHouseInstallation, 0)
 	}
 	config.CHITemplates = append(config.CHITemplates, template)
-	glog.V(1).Infof("enlistChiTemplate(%s/%s)", template.Namespace, template.Name)
+	glog.V(1).Infof("enlistCHITemplate(%s/%s)", template.Namespace, template.Name)
 }
 
-// unlistChiTemplate removes template from templates catalog
-func (config *OperatorConfig) unlistChiTemplate(template *ClickHouseInstallation) {
+// unlistCHITemplate removes template from templates catalog
+func (config *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation) {
 	if config.CHITemplates == nil {
 		return
 	}
 
-	glog.V(1).Infof("unlistChiTemplate(%s/%s)", template.Namespace, template.Name)
+	glog.V(1).Infof("unlistCHITemplate(%s/%s)", template.Namespace, template.Name)
 	// Nullify found template entry
 	for _, _template := range config.CHITemplates {
 		if (_template.Name == template.Name) && (_template.Namespace == template.Namespace) {
-			glog.V(1).Infof("unlistChiTemplate(%s/%s) - found, unlisting", template.Namespace, template.Name)
+			glog.V(1).Infof("unlistCHITemplate(%s/%s) - found, unlisting", template.Namespace, template.Name)
 			// TODO normalize
 			//config.CHITemplates[i] = nil
 			_template.Name = ""
@@ -147,8 +147,8 @@ func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string
 	return nil
 }
 
-// buildUnifiedChiTemplate builds combined CHI Template from templates catalog
-func (config *OperatorConfig) buildUnifiedChiTemplate() {
+// buildUnifiedCHITemplate builds combined CHI Template from templates catalog
+func (config *OperatorConfig) buildUnifiedCHITemplate() {
 
 	return
 	/*
@@ -189,26 +189,26 @@ func (config *OperatorConfig) buildUnifiedChiTemplate() {
 	*/
 }
 
-func (config *OperatorConfig) AddChiTemplate(template *ClickHouseInstallation) {
-	config.enlistChiTemplate(template)
-	config.buildUnifiedChiTemplate()
+func (config *OperatorConfig) AddCHITemplate(template *ClickHouseInstallation) {
+	config.enlistCHITemplate(template)
+	config.buildUnifiedCHITemplate()
 }
 
-func (config *OperatorConfig) UpdateChiTemplate(template *ClickHouseInstallation) {
-	config.enlistChiTemplate(template)
-	config.buildUnifiedChiTemplate()
+func (config *OperatorConfig) UpdateCHITemplate(template *ClickHouseInstallation) {
+	config.enlistCHITemplate(template)
+	config.buildUnifiedCHITemplate()
 }
 
-func (config *OperatorConfig) DeleteChiTemplate(template *ClickHouseInstallation) {
-	config.unlistChiTemplate(template)
-	config.buildUnifiedChiTemplate()
+func (config *OperatorConfig) DeleteCHITemplate(template *ClickHouseInstallation) {
+	config.unlistCHITemplate(template)
+	config.buildUnifiedCHITemplate()
 }
 
 func (config *OperatorConfig) Postprocess() {
 	config.normalize()
 	config.readClickHouseCustomConfigFiles()
-	config.readChiTemplates()
-	config.buildUnifiedChiTemplate()
+	config.readCHITemplates()
+	config.buildUnifiedCHITemplate()
 	config.applyEnvVarParams()
 	config.applyDefaultWatchNamespace()
 }
@@ -363,13 +363,13 @@ func (config *OperatorConfig) relativeToConfigFolderPath(relativePath string) st
 
 // readClickHouseCustomConfigFiles reads all extra user-specified ClickHouse config files
 func (config *OperatorConfig) readClickHouseCustomConfigFiles() {
-	config.CHCommonConfigs = readConfigFiles(config.CHCommonConfigsPath, config.isChConfigExt)
-	config.CHHostConfigs = readConfigFiles(config.CHHostConfigsPath, config.isChConfigExt)
-	config.CHUsersConfigs = readConfigFiles(config.CHUsersConfigsPath, config.isChConfigExt)
+	config.CHCommonConfigs = readConfigFiles(config.CHCommonConfigsPath, config.isCHConfigExt)
+	config.CHHostConfigs = readConfigFiles(config.CHHostConfigsPath, config.isCHConfigExt)
+	config.CHUsersConfigs = readConfigFiles(config.CHUsersConfigsPath, config.isCHConfigExt)
 }
 
-// isChConfigExt returns true in case specified file has proper extension for a ClickHouse config file
-func (config *OperatorConfig) isChConfigExt(file string) bool {
+// isCHConfigExt returns true in case specified file has proper extension for a ClickHouse config file
+func (config *OperatorConfig) isCHConfigExt(file string) bool {
 	switch util.ExtToLower(file) {
 	case ".xml":
 		return true
@@ -377,8 +377,8 @@ func (config *OperatorConfig) isChConfigExt(file string) bool {
 	return false
 }
 
-// isChiTemplateExt returns true in case specified file has proper extension for a CHI template config file
-func (config *OperatorConfig) isChiTemplateExt(file string) bool {
+// isCHITemplateExt returns true in case specified file has proper extension for a CHI template config file
+func (config *OperatorConfig) isCHITemplateExt(file string) bool {
 	switch util.ExtToLower(file) {
 	case ".yaml":
 		return true
@@ -496,7 +496,7 @@ func (config *OperatorConfig) GetInformerNamespace() string {
 
 // readConfigFiles reads config files from specified path into "file name->file content" map
 // path - folder where to look for files
-// isChConfigExt - accepts path to file return bool whether this file has config extension
+// isCHConfigExt - accepts path to file return bool whether this file has config extension
 func readConfigFiles(path string, isConfigExt func(string) bool) map[string]string {
 	return util.ReadFilesIntoMap(path, isConfigExt)
 }
