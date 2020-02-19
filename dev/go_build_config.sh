@@ -18,3 +18,5 @@ OPERATOR_BIN="${OPERATOR_BIN:-${SRC_ROOT}/dev/bin/clickhouse-operator}"
 # Metrics exporter binary name can be specified externally
 # Default - put 'metrics-exporter' into cur dir
 METRICS_EXPORTER_BIN="${METRICS_EXPORTER_BIN:-${SRC_ROOT}/dev/bin/metrics-exporter}"
+
+MODULES_DIR=vendor
