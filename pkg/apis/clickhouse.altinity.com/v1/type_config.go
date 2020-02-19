@@ -285,11 +285,11 @@ func (config *OperatorConfig) normalize() {
 
 // applyEnvVarParams applies ENV VARS over config
 func (config *OperatorConfig) applyEnvVarParams() {
-	if ns := os.Getenv("WATCH_NAMESPACE"); len(ns) > 0 {
+	if ns := os.Getenv(WATCH_NAMESPACE); len(ns) > 0 {
 		// We have WATCH_NAMESPACE explicitly specified
 		config.WatchNamespaces = []string{ns}
 	}
-	if nss := os.Getenv("WATCH_NAMESPACES"); len(nss) > 0 {
+	if nss := os.Getenv(WATCH_NAMESPACES); len(nss) > 0 {
 		// We have WATCH_NAMESPACES explicitly specified
 		namespaces := strings.FieldsFunc(nss, func(r rune) bool {
 			return r == ':' || r == ','

@@ -43,4 +43,6 @@ const (
 	// What namespaces to watch
 	WATCH_NAMESPACE  = "WATCH_NAMESPACE"
 	WATCH_NAMESPACES = "WATCH_NAMESPACES"
+
+	CHOP_CONFIG = "CHOP_CONFIG"
 )
