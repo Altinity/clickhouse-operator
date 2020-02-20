@@ -34,6 +34,5 @@ replace (
 	k8s.io/api => k8s.io/api v0.0.0-20190226173710-145d52631d00
 	k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20190221084156-01f179d85dbc
 	k8s.io/client-go => k8s.io/client-go v0.0.0-20190226174127-78295b709ec6
-	k8s.io/code-generator => k8s.io/code-generator v0.0.0-20181128191024-b1289fc74931
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20190308184658-b90029ef6cd8
 )

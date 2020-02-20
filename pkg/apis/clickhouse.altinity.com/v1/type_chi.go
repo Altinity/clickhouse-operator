@@ -20,7 +20,7 @@ import (
 )
 
 // fillStatus fills .Status
-func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods []string) {
+func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string) {
 	chi.Status.Version = version.Version
 	chi.Status.ClustersCount = chi.ClustersCount()
 	chi.Status.ShardsCount = chi.ShardsCount()
@@ -29,6 +29,7 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods []string) {
 	chi.Status.DeleteHostsCount = 0
 	chi.Status.DeletedHostsCount = 0
 	chi.Status.Pods = pods
+	chi.Status.FQDNs = fqdns
 	chi.Status.Endpoint = endpoint
 }
 

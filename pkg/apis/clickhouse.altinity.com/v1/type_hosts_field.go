@@ -17,7 +17,7 @@ package v1
 type HostsField struct {
 	ShardsCount   int
 	ReplicasCount int
-	Field    [][]*ChiHost
+	Field         [][]*ChiHost
 }
 
 func NewHostsField(shards, replicas int) *HostsField {
@@ -49,7 +49,6 @@ func (hf *HostsField) GetOrCreate(shard, replica int) *ChiHost {
 	}
 	return hf.Field[shard][replica]
 }
-
 
 func (hf *HostsField) WalkHosts(
 	f func(shard, replica int, host *ChiHost) error,

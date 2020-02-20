@@ -14,7 +14,7 @@
 
 package metrics
 
-func ReportToMetricsExporterWatchedCHI(namespace, chiName string, hostnames []string) error {
+func InformMetricsExporterAboutWatchedCHI(namespace, chiName string, hostnames []string) error {
 	chi := &WatchedCHI{
 		Namespace: namespace,
 		Name:      chiName,

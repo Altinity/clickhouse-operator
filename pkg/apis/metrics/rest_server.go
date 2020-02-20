@@ -33,7 +33,6 @@ func StartMetricsREST(
 	chiListAddress string,
 	chiListPath string,
 ) *Exporter {
-	// Initializing Prometheus Metrics Exporter
 	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsAddress, metricsPath)
 
 	exporter = NewExporter(chAccess)

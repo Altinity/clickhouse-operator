@@ -232,11 +232,13 @@ func hostApplyHostTemplate(host *chiv1.ChiHost, template *chiv1.ChiHostTemplate)
 func (n *Normalizer) fillStatus() {
 	endpoint := CreateChiServiceFQDN(n.chi)
 	pods := make([]string, 0)
+	fqdns := make([]string, 0)
 	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		pods = append(pods, CreatePodName(host))
+		fqdns = append(fqdns, CreatePodFQDN(host))
 		return nil
 	})
-	n.chi.FillStatus(endpoint, pods)
+	n.chi.FillStatus(endpoint, pods, fqdns)
 }
 
 // normalizeStop normalizes .spec.stop

@@ -46,6 +46,12 @@ var (
 	// chopConfigFile defines path to clickhouse-operator config file to be used
 	chopConfigFile string
 
+	// kubeConfigFile defines path to kube config file to be used
+	kubeConfigFile string
+
+	// masterURL defines URL of kubernetes master to be used
+	masterURL string
+
 	// metricsEP defines metrics end-point IP address
 	metricsEP string
 
@@ -55,6 +61,8 @@ var (
 func init() {
 	flag.BoolVar(&versionRequest, "version", false, "Display clickhouse-operator version and exit")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
+	flag.StringVar(&kubeConfigFile, "kubeconfig", "", "Path to custom kubernetes config file. Makes sense if runs outside of the cluster only.")
+	flag.StringVar(&masterURL, "master", "", "The address of custom Kubernetes API server. Makes sense if runs outside of the cluster and not being specified in kube config file only.")
 	flag.StringVar(&metricsEP, "metrics-endpoint", defaultMetricsEndpoint, "The Prometheus exporter endpoint.")
 	flag.StringVar(&chiListEP, "chi-list-endpoint", defaultChiListEP, "The CHI list endpoint.")
 	flag.Parse()
@@ -78,18 +86,15 @@ func Run() {
 		os.Exit(1)
 	}()
 
-	//
+	glog.V(1).Infof("Starting metrics exporter. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
+
+	// Initialize k8s API clients
+	_, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
+
 	// Create operator instance
-	//
-	chop := chop.NewCHOp(version.Version, nil, chopConfigFile)
-	if err := chop.Init(); err != nil {
-		glog.Fatalf("Unable to init CHOp instance %v\n", err)
-		os.Exit(1)
-	}
+	chop := chop.GetCHOp(chopClient, chopConfigFile)
 
-	glog.V(1).Info("Starting metrics exporter\n")
-
-	metrics.StartMetricsREST(
+	exporter := metrics.StartMetricsREST(
 		metrics.NewCHAccessInfo(
 			chop.Config().CHUsername,
 			chop.Config().CHPassword,
@@ -102,6 +107,8 @@ func Run() {
 		chiListEP,
 		chiListPath,
 	)
+
+	exporter.Watch(chop, chopClient)
 
 	<-ctx.Done()
 }
