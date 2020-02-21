@@ -16,14 +16,14 @@ def test_examples01_2():
 @TestScenario
 @Name("Persistent volume mapping via defaults")
 def test_examples02_1():
-    create_and_check("../docs/chi-examples/02-persistent-volume-01-default-volume.yaml", 
+    create_and_check("../docs/chi-examples/03-persistent-volume-01-default-volume.yaml",
                      {"pod_count": 1,
                       "pod_volumes": {"/var/lib/clickhouse", "/var/log/clickhouse-server"}})
 
 @TestScenario
 @Name("Persistent volume mapping via podTemplate")
 def test_examples02_2():
-    create_and_check("../docs/chi-examples/02-persistent-volume-02-pod-template.yaml", 
+    create_and_check("../docs/chi-examples/03-persistent-volume-02-pod-template.yaml",
                      {"pod_count": 1,
                       "pod_image": "yandex/clickhouse-server:19.3.7",
                       "pod_volumes": {"/var/lib/clickhouse", "/var/log/clickhouse-server"}})
