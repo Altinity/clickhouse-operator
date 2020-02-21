@@ -16,6 +16,7 @@ package chi
 
 import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model"
 
 	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,7 +66,7 @@ func (c *Controller) labelMyObjectsTree() {
 	}
 
 	// Put label on the Pod
-	pod.Labels["version"] = c.chop.Version
+	c.addLabels(&pod.ObjectMeta)
 	if _, err := c.kubeClient.CoreV1().Pods(namespace).Update(pod); err != nil {
 		glog.V(1).Infof("ERROR put label on Pod %s/%s %v", namespace, podName, err)
 	}
@@ -95,7 +96,7 @@ func (c *Controller) labelMyObjectsTree() {
 	}
 
 	// Put label on the ReplicaSet
-	replicaSet.Labels["version"] = c.chop.Version
+	c.addLabels(&replicaSet.ObjectMeta)
 	if _, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Update(replicaSet); err != nil {
 		glog.V(1).Infof("ERROR put label on ReplicaSet %s/%s %v", namespace, replicaSetName, err)
 	}
@@ -125,8 +126,13 @@ func (c *Controller) labelMyObjectsTree() {
 	}
 
 	// Put label on the Deployment
-	deployment.Labels["version"] = c.chop.Version
+	c.addLabels(&deployment.ObjectMeta)
 	if _, err := c.kubeClient.AppsV1().Deployments(namespace).Update(deployment); err != nil {
 		glog.V(1).Infof("ERROR put label on Deployment %s/%s %v", namespace, deploymentName, err)
 	}
+}
+
+func (c *Controller) addLabels(meta *v1.ObjectMeta) {
+	meta.Labels[model.LabelAppName] =   model.LabelAppValue
+	meta.Labels[model.LabelChop] =      c.chop.Version
 }
