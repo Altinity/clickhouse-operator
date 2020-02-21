@@ -27,14 +27,14 @@ import (
 
 const (
 	// Kubernetes labels
-	LabelAppName         = clickhousealtinitycom.GroupName + "/app"
-	LabelAppValue        = "chop"
-	LabelChop            = clickhousealtinitycom.GroupName + "/chop"
-	LabelNamespace       = clickhousealtinitycom.GroupName + "/namespace"
-	LabelChiName         = clickhousealtinitycom.GroupName + "/chi"
-	LabelClusterName     = clickhousealtinitycom.GroupName + "/cluster"
-	LabelShardName       = clickhousealtinitycom.GroupName + "/shard"
-	LabelShardScopeIndex = clickhousealtinitycom.GroupName + "/shardScopeIndex"
+	LabelAppName                      = clickhousealtinitycom.GroupName + "/app"
+	LabelAppValue                     = "chop"
+	LabelChop                         = clickhousealtinitycom.GroupName + "/chop"
+	LabelNamespace                    = clickhousealtinitycom.GroupName + "/namespace"
+	LabelChiName                      = clickhousealtinitycom.GroupName + "/chi"
+	LabelClusterName                  = clickhousealtinitycom.GroupName + "/cluster"
+	LabelShardName                    = clickhousealtinitycom.GroupName + "/shard"
+	LabelShardScopeIndex              = clickhousealtinitycom.GroupName + "/shardScopeIndex"
 	LabelReplicaName                  = clickhousealtinitycom.GroupName + "/replica"
 	LabelReplicaScopeIndex            = clickhousealtinitycom.GroupName + "/replicaScopeIndex"
 	LabelChiScopeIndex                = clickhousealtinitycom.GroupName + "/chiScopeIndex"
@@ -191,16 +191,16 @@ func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	labels := map[string]string{
-		LabelNamespace:         l.namer.getNamePartNamespace(host),
-		LabelAppName:           LabelAppValue,
-		LabelChop:              l.chop.Version,
-		LabelChiName:           l.namer.getNamePartChiName(host),
-		LabelClusterName:       l.namer.getNamePartClusterName(host),
-		LabelShardName:         l.namer.getNamePartShardName(host),
-		LabelShardScopeIndex:   l.namer.getNamePartShardScopeIndex(host),
-		LabelReplicaName:       l.namer.getNamePartReplicaName(host),
-		LabelReplicaScopeIndex: l.namer.getNamePartReplicaScopeIndex(host),
-		LabelChiScopeIndex:     l.namer.getNamePartChiScopeIndex(host),
+		LabelNamespace:               l.namer.getNamePartNamespace(host),
+		LabelAppName:                 LabelAppValue,
+		LabelChop:                    l.chop.Version,
+		LabelChiName:                 l.namer.getNamePartChiName(host),
+		LabelClusterName:             l.namer.getNamePartClusterName(host),
+		LabelShardName:               l.namer.getNamePartShardName(host),
+		LabelShardScopeIndex:         l.namer.getNamePartShardScopeIndex(host),
+		LabelReplicaName:             l.namer.getNamePartReplicaName(host),
+		LabelReplicaScopeIndex:       l.namer.getNamePartReplicaScopeIndex(host),
+		LabelChiScopeIndex:           l.namer.getNamePartChiScopeIndex(host),
 		LabelChiScopeCycleSize:       l.namer.getNamePartChiScopeCycleSize(host),
 		LabelChiScopeCycleIndex:      l.namer.getNamePartChiScopeCycleIndex(host),
 		LabelChiScopeCycleOffset:     l.namer.getNamePartChiScopeCycleOffset(host),
