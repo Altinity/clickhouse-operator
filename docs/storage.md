@@ -1,8 +1,8 @@
 # Storage
 
 Examples are available in [examples](./chi-examples) folder:
-1. [Simple Default Persistent Volume](./chi-examples/02-persistent-volume-01-default-volume.yaml)
-1. [Pod Template with Persistent Volume](./chi-examples/02-persistent-volume-02-pod-template.yaml)
+1. [Simple Default Persistent Volume](./chi-examples/03-persistent-volume-01-default-volume.yaml)
+1. [Pod Template with Persistent Volume](./chi-examples/03-persistent-volume-02-pod-template.yaml)
 1. AWS-based cluster with data replication and Persistent Volumes [minimal](./chi-examples/04-replication-zookeeper-03-minimal-AWS-persistent-volume.yaml) 
 and [medium](./chi-examples/04-replication-zookeeper-04-medium-AWS-persistent-volume.yaml) Zookeeper installations
 

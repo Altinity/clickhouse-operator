@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "adv-layout-02"
+  name: "adv-layout-repl"
 spec:
   configuration:
     clusters:
@@ -11,10 +11,19 @@ spec:
           replicas:
             - templates:
                 podTemplate: clickhouse:19.1.10
+              httpPort: 8000
+              tcpPort: 8001
+              interserverHTTPPort: 8002
             - templates:
                 podTemplate: clickhouse:19.3.5
+              httpPort: 9000
+              tcpPort: 9001
+              interserverHTTPPort: 9002
             - templates:
                 podTemplate: clickhouse:19.3.7
+              httpPort: 10000
+              tcpPort: 10001
+              interserverHTTPPort: 10002
 
   templates:
     podTemplates:

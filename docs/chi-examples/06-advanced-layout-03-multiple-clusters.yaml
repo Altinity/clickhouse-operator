@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "adv-layout-03"
+  name: "adv-layout-mul"
 spec:
   configuration:
     clusters:
