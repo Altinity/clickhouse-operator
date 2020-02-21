@@ -669,7 +669,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 			map[string]string{
-				LabelAppName: labelAppValue,
+				LabelAppName: LabelAppValue,
 			},
 		)
 	}
@@ -682,7 +682,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				map[string]string{
-					LabelAppName: labelAppValue,
+					LabelAppName: LabelAppValue,
 				},
 			)
 		case chiv1.PodDistributionMaxNumberPerNode:
@@ -824,7 +824,7 @@ func (n *Normalizer) addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTer
 				//		Key:      LabelAppName,
 				//		Operator: v12.LabelSelectorOpIn,
 				//		Values: []string{
-				//			labelAppValue,
+				//			LabelAppValue,
 				//		},
 				//	},
 				//},
@@ -847,7 +847,7 @@ func (n *Normalizer) addPodAffinityTermWithMatchExpressions(terms []v1.PodAffini
 				//		Key:      LabelAppName,
 				//		Operator: v12.LabelSelectorOpIn,
 				//		Values: []string{
-				//			labelAppValue,
+				//			LabelAppValue,
 				//		},
 				//	},
 				//},
@@ -879,7 +879,7 @@ func (n *Normalizer) addWeightedPodAffinityTermWithMatchLabels(
 					//		Key:      LabelAppName,
 					//		Operator: v12.LabelSelectorOpIn,
 					//		Values: []string{
-					//			labelAppValue,
+					//			LabelAppValue,
 					//		},
 					//	},
 					//},

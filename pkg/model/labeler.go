@@ -27,14 +27,14 @@ import (
 
 const (
 	// Kubernetes labels
-	LabelAppName                      = clickhousealtinitycom.GroupName + "/app"
-	labelAppValue                     = "chop"
-	LabelChop                         = clickhousealtinitycom.GroupName + "/chop"
-	LabelNamespace                    = clickhousealtinitycom.GroupName + "/namespace"
-	LabelChiName                      = clickhousealtinitycom.GroupName + "/chi"
-	LabelClusterName                  = clickhousealtinitycom.GroupName + "/cluster"
-	LabelShardName                    = clickhousealtinitycom.GroupName + "/shard"
-	LabelShardScopeIndex              = clickhousealtinitycom.GroupName + "/shardScopeIndex"
+	LabelAppName         = clickhousealtinitycom.GroupName + "/app"
+	LabelAppValue        = "chop"
+	LabelChop            = clickhousealtinitycom.GroupName + "/chop"
+	LabelNamespace       = clickhousealtinitycom.GroupName + "/namespace"
+	LabelChiName         = clickhousealtinitycom.GroupName + "/chi"
+	LabelClusterName     = clickhousealtinitycom.GroupName + "/cluster"
+	LabelShardName       = clickhousealtinitycom.GroupName + "/shard"
+	LabelShardScopeIndex = clickhousealtinitycom.GroupName + "/shardScopeIndex"
 	LabelReplicaName                  = clickhousealtinitycom.GroupName + "/replica"
 	LabelReplicaScopeIndex            = clickhousealtinitycom.GroupName + "/replicaScopeIndex"
 	LabelChiScopeIndex                = clickhousealtinitycom.GroupName + "/chiScopeIndex"
@@ -123,7 +123,7 @@ func (l *Labeler) getLabelsChiScope() map[string]string {
 	// Combine generated labels and CHI-provided labels
 	return l.appendChiLabels(map[string]string{
 		LabelNamespace: l.namer.getNamePartNamespace(l.chi),
-		LabelAppName:   labelAppValue,
+		LabelAppName:   LabelAppValue,
 		LabelChop:      l.chop.Version,
 		LabelChiName:   l.namer.getNamePartChiName(l.chi),
 	})
@@ -133,7 +133,7 @@ func (l *Labeler) getLabelsChiScope() map[string]string {
 func (l *Labeler) getSelectorChiScope() map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelAppName: labelAppValue,
+		LabelAppName: LabelAppValue,
 		// Skip chop
 		LabelChiName: l.namer.getNamePartChiName(l.chi),
 	}
@@ -144,7 +144,7 @@ func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]stri
 	// Combine generated labels and CHI-provided labels
 	return l.appendChiLabels(map[string]string{
 		LabelNamespace:   l.namer.getNamePartNamespace(cluster),
-		LabelAppName:     labelAppValue,
+		LabelAppName:     LabelAppValue,
 		LabelChop:        l.chop.Version,
 		LabelChiName:     l.namer.getNamePartChiName(cluster),
 		LabelClusterName: l.namer.getNamePartClusterName(cluster),
@@ -155,7 +155,7 @@ func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]stri
 func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelAppName: labelAppValue,
+		LabelAppName: LabelAppValue,
 		// Skip chop
 		LabelChiName:     l.namer.getNamePartChiName(cluster),
 		LabelClusterName: l.namer.getNamePartClusterName(cluster),
@@ -167,7 +167,7 @@ func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	return l.appendChiLabels(map[string]string{
 		LabelNamespace:   l.namer.getNamePartNamespace(shard),
-		LabelAppName:     labelAppValue,
+		LabelAppName:     LabelAppValue,
 		LabelChop:        l.chop.Version,
 		LabelChiName:     l.namer.getNamePartChiName(shard),
 		LabelClusterName: l.namer.getNamePartClusterName(shard),
@@ -179,7 +179,7 @@ func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
 func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelAppName: labelAppValue,
+		LabelAppName: LabelAppValue,
 		// Skip chop
 		LabelChiName:     l.namer.getNamePartChiName(shard),
 		LabelClusterName: l.namer.getNamePartClusterName(shard),
@@ -191,16 +191,16 @@ func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	labels := map[string]string{
-		LabelNamespace:               l.namer.getNamePartNamespace(host),
-		LabelAppName:                 labelAppValue,
-		LabelChop:                    l.chop.Version,
-		LabelChiName:                 l.namer.getNamePartChiName(host),
-		LabelClusterName:             l.namer.getNamePartClusterName(host),
-		LabelShardName:               l.namer.getNamePartShardName(host),
-		LabelShardScopeIndex:         l.namer.getNamePartShardScopeIndex(host),
-		LabelReplicaName:             l.namer.getNamePartReplicaName(host),
-		LabelReplicaScopeIndex:       l.namer.getNamePartReplicaScopeIndex(host),
-		LabelChiScopeIndex:           l.namer.getNamePartChiScopeIndex(host),
+		LabelNamespace:         l.namer.getNamePartNamespace(host),
+		LabelAppName:           LabelAppValue,
+		LabelChop:              l.chop.Version,
+		LabelChiName:           l.namer.getNamePartChiName(host),
+		LabelClusterName:       l.namer.getNamePartClusterName(host),
+		LabelShardName:         l.namer.getNamePartShardName(host),
+		LabelShardScopeIndex:   l.namer.getNamePartShardScopeIndex(host),
+		LabelReplicaName:       l.namer.getNamePartReplicaName(host),
+		LabelReplicaScopeIndex: l.namer.getNamePartReplicaScopeIndex(host),
+		LabelChiScopeIndex:     l.namer.getNamePartChiScopeIndex(host),
 		LabelChiScopeCycleSize:       l.namer.getNamePartChiScopeCycleSize(host),
 		LabelChiScopeCycleIndex:      l.namer.getNamePartChiScopeCycleIndex(host),
 		LabelChiScopeCycleOffset:     l.namer.getNamePartChiScopeCycleOffset(host),
@@ -225,7 +225,7 @@ func (l *Labeler) appendChiLabels(dst map[string]string) map[string]string {
 func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelAppName: labelAppValue,
+		LabelAppName: LabelAppValue,
 		// skip chop
 		LabelChiName:     l.namer.getNamePartChiName(host),
 		LabelClusterName: l.namer.getNamePartClusterName(host),
