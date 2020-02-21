@@ -479,8 +479,13 @@ func (config *OperatorConfig) IsWatchedNamespace(namespace string) bool {
 }
 
 // TODO unify with IsWatchedNamespace
+// TODO unify approaches to multiple namespaces support
 // GetInformerNamespace is a TODO stub
 // Namespace where informers would watch notifications from
+// The thing is that InformerFactory can accept only one parameter as watched namespace,
+// be it explicitly specified namespace or empty line for "all namespaces".
+// That's what conflicts with CHOp's approach to 'specify list of namespaces to watch in', having
+// slice of namespaces (CHOp's approach) incompatible with "one namespace name" approach
 func (config *OperatorConfig) GetInformerNamespace() string {
 	// Namespace where informers would watch notifications from
 	namespace := metav1.NamespaceAll

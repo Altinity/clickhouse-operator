@@ -257,20 +257,20 @@ func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (e *Exporter) Watch(chop *chop.CHOp, chopClient *chopclientset.Clientset) {
-	// Read config all Custom Resources
+// DiscoveryWatchedCHIs discovers all ClickHouseInstallation objects available for monitoring and adds them to watched list
+func (e *Exporter) DiscoveryWatchedCHIs(chop *chop.CHOp, chopClient *chopclientset.Clientset) {
+	// Get all CHI objects from watched namespace(s)
 	watchedNamespace := chop.Config().GetInformerNamespace()
 	list, err := chopClient.ClickhouseV1().ClickHouseInstallations(watchedNamespace).List(v1.ListOptions{})
 	if err != nil {
 		glog.V(1).Infof("Error read ClickHouseInstallations %v", err)
 		return
 	}
-
 	if list == nil {
 		return
 	}
 
-	// Get sorted names of ClickHouseOperatorConfiguration object
+	// Walk over the list of ClickHouseInstallation objects and add them as watched
 	for i := range list.Items {
 		chi := &list.Items[i]
 		glog.Infof("Adding explicitly found CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.FQDNs))
