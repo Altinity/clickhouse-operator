@@ -11,7 +11,6 @@ source "${CUR_DIR}/go_build_config.sh"
 "${MANIFESTS_ROOT}/operator/build-clickhouse-operator-install-yaml.sh"
 
 # Prepare modules
-MODULES_DIR=vendor
 GO111MODULE=on go mod tidy
 GO111MODULE=on go mod "${MODULES_DIR}"
 

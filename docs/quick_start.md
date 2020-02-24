@@ -184,7 +184,7 @@ Connected to ClickHouse server version 19.4.3 revision 54416.
 ## Simple Persistent Volume Example
 
 In case of having Dynamic Volume Provisioning available - ex.: running on AWS - we are able to use PersistentVolumeClaims
-Manifest is [available in examples](./chi-examples/02-persistent-volume-01-default-volume.yaml)
+Manifest is [available in examples](./chi-examples/03-persistent-volume-01-default-volume.yaml)
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
@@ -227,7 +227,7 @@ Let's install more complex example with:
 1. Pod template
 1. VolumeClaim template
 
-Manifest is [available in examples](./chi-examples/02-persistent-volume-02-pod-template.yaml)
+Manifest is [available in examples](./chi-examples/03-persistent-volume-02-pod-template.yaml)
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"

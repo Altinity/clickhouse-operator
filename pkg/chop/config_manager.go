@@ -32,21 +32,25 @@ type ConfigManager struct {
 	chopClient     *chopclientset.Clientset
 	chopConfigList *chiv1.ClickHouseOperatorConfigurationList
 
+	// initConfigFilePath is path to the configuration file, which will be used as initial/seed
+	// to build final config, which will be used/consumed by users
 	initConfigFilePath string
 
-	// fileConfig is a file-based config
+	// fileConfig is a prepared file-based config
 	fileConfig *chiv1.OperatorConfig
 
-	// crConfigs is a slice of Custom Resource based configs
+	// crConfigs is a slice of prepared Custom Resource based configs
 	crConfigs []*chiv1.OperatorConfig
 
-	// config is the final, unified config
+	// config is the final config,
+	// built as merge of all available configs and it is ready to use/be consumed by users
 	config *chiv1.OperatorConfig
 
+	// runtimeParams is set/map of runtime params, influencing configuration
 	runtimeParams map[string]string
 }
 
-// NewConfigManager creates new Manager
+// NewConfigManager creates new ConfigManager
 func NewConfigManager(
 	chopClient *chopclientset.Clientset,
 	initConfigFilePath string,
@@ -73,13 +77,14 @@ func (cm *ConfigManager) Init() error {
 	glog.V(1).Info("File-based ClickHouseOperatorConfigurations")
 	cm.fileConfig.WriteToLog()
 
-	// Read config all Custom Resources
+	// Get configs from all config Custom Resources
 	watchedNamespace := cm.fileConfig.GetInformerNamespace()
 	cm.getCRBasedConfigs(watchedNamespace)
 	cm.logCRBasedConfigs()
 
-	// Prepare one unified config
+	// Prepare one unified config from all available config pieces
 	cm.buildUnifiedConfig()
+
 	// From now on we have one unified CHOP config
 	glog.V(1).Info("Unified (but not post-processed yet) CHOP config")
 	cm.config.WriteToLog()
@@ -101,10 +106,12 @@ func (cm *ConfigManager) Config() *chiv1.OperatorConfig {
 
 // getCRBasedConfigs reads all ClickHouseOperatorConfiguration objects in specified namespace
 func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
+	// We need to have chop kube client available in order to fetch ClickHouseOperatorConfiguration objects
 	if cm.chopClient == nil {
 		return
 	}
 
+	// Get list of ClickHouseOperatorConfiguration objects
 	var err error
 	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(metav1.ListOptions{}); err != nil {
 		glog.V(1).Infof("Error read ClickHouseOperatorConfigurations %v", err)
@@ -115,7 +122,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 		return
 	}
 
-	// Get sorted names of ClickHouseOperatorConfiguration object
+	// Get sorted names of ClickHouseOperatorConfiguration objects from the list of objects
 	var names []string
 	for i := range cm.chopConfigList.Items {
 		chOperatorConfiguration := &cm.chopConfigList.Items[i]
@@ -126,9 +133,9 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 	// Build sorted slice of configs
 	for _, name := range names {
 		for i := range cm.chopConfigList.Items {
+			// Convenience wrapper
 			chOperatorConfiguration := &cm.chopConfigList.Items[i]
 			if chOperatorConfiguration.Name == name {
-
 				// Save location info into OperatorConfig itself
 				chOperatorConfiguration.Spec.ConfigFolderPath = namespace
 				chOperatorConfiguration.Spec.ConfigFilePath = name
@@ -189,9 +196,9 @@ func (cm *ConfigManager) getFileBasedConfig(configFilePath string) (*chiv1.Opera
 	}
 
 	// No file specified - look for ENV var config file path specification
-	if len(os.Getenv("CHOP_CONFIG")) > 0 {
+	if len(os.Getenv(chiv1.CHOP_CONFIG)) > 0 {
 		// Config file explicitly specified as ENV var
-		if conf, err := cm.buildConfigFromFile(os.Getenv("CHOP_CONFIG")); err == nil {
+		if conf, err := cm.buildConfigFromFile(os.Getenv(chiv1.CHOP_CONFIG)); err == nil {
 			return conf, nil
 		} else {
 			return nil, err
@@ -254,30 +261,19 @@ func (cm *ConfigManager) buildDefaultConfig() (*chiv1.OperatorConfig, error) {
 func (cm *ConfigManager) getEnvVarParamNames() []string {
 	// This list of ENV VARS is specified in operator .yaml manifest, section "kind: Deployment"
 	return []string{
-		// spec.nodeName: ip-172-20-52-62.ec2.internal
-		"OPERATOR_POD_NODE_NAME",
-		// metadata.name: clickhouse-operator-6f87589dbb-ftcsf
-		"OPERATOR_POD_NAME",
-		// metadata.namespace: kube-system
-		"OPERATOR_POD_NAMESPACE",
-		// status.podIP: 100.96.3.2
-		"OPERATOR_POD_IP",
-		// spec.serviceAccount: clickhouse-operator
-		// spec.serviceAccountName: clickhouse-operator
-		"OPERATOR_POD_SERVICE_ACCOUNT",
+		chiv1.OPERATOR_POD_NODE_NAME,
+		chiv1.OPERATOR_POD_NAME,
+		chiv1.OPERATOR_POD_NAMESPACE,
+		chiv1.OPERATOR_POD_IP,
+		chiv1.OPERATOR_POD_SERVICE_ACCOUNT,
 
-		// .containers.resources.requests.cpu
-		"OPERATOR_CONTAINER_CPU_REQUEST",
-		// .containers.resources.limits.cpu
-		"OPERATOR_CONTAINER_CPU_LIMIT",
-		// .containers.resources.requests.memory
-		"OPERATOR_CONTAINER_MEM_REQUEST",
-		// .containers.resources.limits.memory
-		"OPERATOR_CONTAINER_MEM_LIMIT",
+		chiv1.OPERATOR_CONTAINER_CPU_REQUEST,
+		chiv1.OPERATOR_CONTAINER_CPU_LIMIT,
+		chiv1.OPERATOR_CONTAINER_MEM_REQUEST,
+		chiv1.OPERATOR_CONTAINER_MEM_LIMIT,
 
-		// What namespaces to watch
-		"WATCH_NAMESPACE",
-		"WATCH_NAMESPACES",
+		chiv1.WATCH_NAMESPACE,
+		chiv1.WATCH_NAMESPACES,
 	}
 }
 

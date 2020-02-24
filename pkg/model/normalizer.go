@@ -232,11 +232,13 @@ func hostApplyHostTemplate(host *chiv1.ChiHost, template *chiv1.ChiHostTemplate)
 func (n *Normalizer) fillStatus() {
 	endpoint := CreateChiServiceFQDN(n.chi)
 	pods := make([]string, 0)
+	fqdns := make([]string, 0)
 	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		pods = append(pods, CreatePodName(host))
+		fqdns = append(fqdns, CreatePodFQDN(host))
 		return nil
 	})
-	n.chi.FillStatus(endpoint, pods)
+	n.chi.FillStatus(endpoint, pods, fqdns)
 }
 
 // normalizeStop normalizes .spec.stop
@@ -667,7 +669,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 			map[string]string{
-				LabelAppName: labelAppValue,
+				LabelAppName: LabelAppValue,
 			},
 		)
 	}
@@ -680,7 +682,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				map[string]string{
-					LabelAppName: labelAppValue,
+					LabelAppName: LabelAppValue,
 				},
 			)
 		case chiv1.PodDistributionMaxNumberPerNode:
@@ -822,7 +824,7 @@ func (n *Normalizer) addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTer
 				//		Key:      LabelAppName,
 				//		Operator: v12.LabelSelectorOpIn,
 				//		Values: []string{
-				//			labelAppValue,
+				//			LabelAppValue,
 				//		},
 				//	},
 				//},
@@ -845,7 +847,7 @@ func (n *Normalizer) addPodAffinityTermWithMatchExpressions(terms []v1.PodAffini
 				//		Key:      LabelAppName,
 				//		Operator: v12.LabelSelectorOpIn,
 				//		Values: []string{
-				//			labelAppValue,
+				//			LabelAppValue,
 				//		},
 				//	},
 				//},
@@ -877,7 +879,7 @@ func (n *Normalizer) addWeightedPodAffinityTermWithMatchLabels(
 					//		Key:      LabelAppName,
 					//		Operator: v12.LabelSelectorOpIn,
 					//		Values: []string{
-					//			labelAppValue,
+					//			LabelAppValue,
 					//		},
 					//	},
 					//},

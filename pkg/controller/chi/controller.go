@@ -408,7 +408,7 @@ func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
 }
 
 func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string) {
-	if err := metrics.ReportToMetricsExporterWatchedCHI(namespace, name, hostnames); err != nil {
+	if err := metrics.InformMetricsExporterAboutWatchedCHI(namespace, name, hostnames); err != nil {
 		glog.V(1).Infof("FAIL update watch (%s/%s): %q", namespace, name, err)
 	} else {
 		glog.V(2).Infof("OK update watch (%s/%s)", namespace, name)
@@ -430,7 +430,7 @@ func (c *Controller) deleteWatchAsync(namespace, name string) {
 // addChit sync new CHIT - creates all its resources
 func (c *Controller) addChit(chit *chi.ClickHouseInstallationTemplate) error {
 	glog.V(1).Infof("addChit(%s/%s)", chit.Namespace, chit.Name)
-	c.chop.Config().AddChiTemplate((*chi.ClickHouseInstallation)(chit))
+	c.chop.Config().AddCHITemplate((*chi.ClickHouseInstallation)(chit))
 	return nil
 }
 
@@ -443,14 +443,14 @@ func (c *Controller) updateChit(old, new *chi.ClickHouseInstallationTemplate) er
 	}
 
 	glog.V(2).Infof("updateChit(%s/%s):", new.Namespace, new.Name)
-	c.chop.Config().UpdateChiTemplate((*chi.ClickHouseInstallation)(new))
+	c.chop.Config().UpdateCHITemplate((*chi.ClickHouseInstallation)(new))
 	return nil
 }
 
 // deleteChit deletes CHIT
 func (c *Controller) deleteChit(chit *chi.ClickHouseInstallationTemplate) error {
 	glog.V(2).Infof("deleteChit(%s/%s):", chit.Namespace, chit.Name)
-	c.chop.Config().DeleteChiTemplate((*chi.ClickHouseInstallation)(chit))
+	c.chop.Config().DeleteCHITemplate((*chi.ClickHouseInstallation)(chit))
 	return nil
 }
 

@@ -516,6 +516,11 @@ func (in *ChiStatus) DeepCopyInto(out *ChiStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.FQDNs != nil {
+		in, out := &in.FQDNs, &out.FQDNs
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

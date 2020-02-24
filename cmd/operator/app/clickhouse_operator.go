@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"os/user"
-	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -30,15 +28,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 
-	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 
-	kubeinformers "k8s.io/client-go/informers"
-	kube "k8s.io/client-go/kubernetes"
-	kuberest "k8s.io/client-go/rest"
-	kubeclientcmd "k8s.io/client-go/tools/clientcmd"
-
 	"github.com/golang/glog"
+	kubeinformers "k8s.io/client-go/informers"
 )
 
 // Prometheus exporter defaults
@@ -89,58 +82,10 @@ func init() {
 	flag.BoolVar(&versionRequest, "version", false, "Display clickhouse-operator version and exit")
 	flag.BoolVar(&debugRequest, "debug", false, "Debug run")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
-	flag.StringVar(&kubeConfigFile, "kubeconfig", "", "Path to kubernetes config file. Only required if called outside of the cluster.")
-	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Only required if called outside of the cluster and not being specified in kube config file.")
+	flag.StringVar(&kubeConfigFile, "kubeconfig", "", "Path to custom kubernetes config file. Makes sense if runs outside of the cluster only.")
+	flag.StringVar(&masterURL, "master", "", "The address of custom Kubernetes API server. Makes sense if runs outside of the cluster and not being specified in kube config file only.")
 	flag.StringVar(&metricsEP, "metrics-endpoint", defaultMetricsEndpoint, "The Prometheus exporter endpoint.")
 	flag.Parse()
-}
-
-// getKubeConfig creates kuberest.Config object based on current environment
-func getKubeConfig(kubeConfigFile, masterURL string) (*kuberest.Config, error) {
-	if len(kubeConfigFile) > 0 {
-		// kube config file specified as CLI flag
-		return kubeclientcmd.BuildConfigFromFlags(masterURL, kubeConfigFile)
-	}
-
-	if len(os.Getenv("KUBECONFIG")) > 0 {
-		// kube config file specified as ENV var
-		return kubeclientcmd.BuildConfigFromFlags(masterURL, os.Getenv("KUBECONFIG"))
-	}
-
-	if conf, err := kuberest.InClusterConfig(); err == nil {
-		// in-cluster configuration found
-		return conf, nil
-	}
-
-	usr, err := user.Current()
-	if err != nil {
-		return nil, fmt.Errorf("user not found")
-	}
-
-	// OS user found. Parse ~/.kube/config file
-	conf, err := kubeclientcmd.BuildConfigFromFlags("", filepath.Join(usr.HomeDir, ".kube", "config"))
-	if err != nil {
-		return nil, fmt.Errorf("~/.kube/config not found")
-	}
-
-	// ~/.kube/config found
-	return conf, nil
-}
-
-// createClientsets creates Clientset objects
-func createClientsets(config *kuberest.Config) (*kube.Clientset, *chopclientset.Clientset) {
-
-	kubeClientset, err := kube.NewForConfig(config)
-	if err != nil {
-		glog.Fatalf("Unable to initialize kubernetes API clientset: %s", err.Error())
-	}
-
-	chopClientset, err := chopclientset.NewForConfig(config)
-	if err != nil {
-		glog.Fatalf("Unable to initialize clickhouse-operator API clientset: %s", err.Error())
-	}
-
-	return kubeClientset, chopClientset
 }
 
 // Run is an entry point of the application
@@ -157,28 +102,13 @@ func Run() {
 
 	glog.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
 
-	//
 	// Initialize k8s API clients
-	//
-	kubeConfig, err := getKubeConfig(kubeConfigFile, masterURL)
-	if err != nil {
-		glog.Fatalf("Unable to build kubeconf: %s", err.Error())
-		os.Exit(1)
-	}
-	kubeClient, chopClient := createClientsets(kubeConfig)
+	kubeClient, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
 
-	//
 	// Create operator instance
-	//
-	chop := chop.NewCHOp(version.Version, chopClient, chopConfigFile)
-	if err := chop.Init(); err != nil {
-		glog.Fatalf("Unable to init CHOP instance %v\n", err)
-		os.Exit(1)
-	}
+	chop := chop.GetCHOp(chopClient, chopConfigFile)
 
-	//
 	// Create Informers
-	//
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
 		kubeClient,
 		kubeInformerFactoryResyncPeriod,
@@ -190,9 +120,7 @@ func Run() {
 		chopinformers.WithNamespace(chop.Config().GetInformerNamespace()),
 	)
 
-	//
 	// Create Controller
-	//
 	chiController := chi.NewController(
 		chop,
 		chopClient,

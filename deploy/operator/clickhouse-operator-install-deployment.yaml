@@ -1,7 +1,7 @@
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.9.0
+# altinity/clickhouse-operator:0.9.1
 # etc-clickhouse-operator-files
 #
 apiVersion: v1
@@ -20,8 +20,9 @@ data:
     
     # List of namespaces where clickhouse-operator watches for events.
     # Concurrently running operators should watch on different namespaces
-    # watchNamespaces:
+    #watchNamespaces:
     #  - dev
+    #  - test
     #  - info
     #  - onemore
     
@@ -103,7 +104,7 @@ data:
     # 1. Metrics requests
     # 2. Schema maintenance
     # 3. DROP DNS CACHE
-    # User with such credentials credentials can be specified in additional ClickHouse .xml config files,
+    # User with such credentials can be specified in additional ClickHouse .xml config files,
     # located in `chUsersConfigsPath` folder
     chUsername: clickhouse_operator
     chPassword: clickhouse_operator_password
@@ -113,7 +114,7 @@ data:
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.9.0
+# altinity/clickhouse-operator:0.9.1
 # etc-clickhouse-operator-confd-files
 #
 apiVersion: v1
@@ -127,7 +128,7 @@ data:
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.9.0
+# altinity/clickhouse-operator:0.9.1
 # etc-clickhouse-operator-configd-files
 #
 apiVersion: v1
@@ -172,7 +173,7 @@ data:
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.9.0
+# altinity/clickhouse-operator:0.9.1
 # etc-clickhouse-operator-templatesd-files
 #
 apiVersion: v1
@@ -270,7 +271,7 @@ data:
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.9.0
+# altinity/clickhouse-operator:0.9.1
 # etc-clickhouse-operator-usersd-files
 #
 apiVersion: v1
@@ -318,8 +319,8 @@ data:
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.9.0
-# altinity/metrics-exporter:0.9.0
+# altinity/clickhouse-operator:0.9.1
+# altinity/metrics-exporter:0.9.1
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -358,7 +359,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.9.0
+          image: altinity/clickhouse-operator:0.9.1
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -423,7 +424,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.9.0
+          image: altinity/metrics-exporter:0.9.1
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder

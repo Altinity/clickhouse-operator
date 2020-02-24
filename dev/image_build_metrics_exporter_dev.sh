@@ -8,7 +8,7 @@ source "${CUR_DIR}/go_build_config.sh"
 
 # Externally configurable build-dependent options
 TAG="${TAG:-sunsingerus/metrics-exporter:dev}"
-DOCKERHUB_LOGIN="${DOCKERHUB_LOGIN:-sunsingerus}"
+DOCKERHUB_LOGIN="${DOCKERHUB_LOGIN}"
 DOCKERHUB_PUBLISH="${DOCKERHUB_PUBLISH:-yes}"
 MINIKUBE="${MINIKUBE:-no}"
 
