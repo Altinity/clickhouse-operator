@@ -303,9 +303,22 @@ def test_015():
     
     create_and_check("configs/test-015-host-network.yaml", {})
 
+@TestScenario
+@Name("test_016. Test files and dictionaries setup")
+def test_016():
+    create_and_check("configs/test-016-dict.yaml", 
+                     {"apply_templates": {"configs/tpl-clickhouse-stable.yaml"}, 
+                      "pod_count": 1,
+                      "do_not_delete": 1})
+    
+    with Then("dictGet() should work"):
+        out = clickhouse_query("test-016-dict", query = "select dictGet('one', 'one', toUInt64(0))")
+        assert out == "0"
+    
+    create_and_check("configs/test-016-dict.yaml", {})
 
 kubectl.namespace="test"
-version="0.9.0"
+version="0.9.1"
 clickhouse_stable="yandex/clickhouse-server:19.16.10.44"
 
 if main():
@@ -338,10 +351,11 @@ if main():
                      test_012,
                      test_013,
                      test_014,
-                     test_015]
+                     test_015,
+                     test_016]
         
             all_tests = tests
-            # all_tests = [test_012]
+            # all_tests = [test_016]
         
             for t in all_tests:
                 run(test=t, flags=TE)
