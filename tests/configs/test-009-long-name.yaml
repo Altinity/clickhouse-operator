@@ -5,6 +5,8 @@ metadata:
   labels:
     test: test
 spec:
+  useTemplates:
+    - name: clickhouse-version
   configuration:
     clusters:
     - name: simple
@@ -23,9 +25,3 @@ spec:
           resources:
             requests:
               storage: 100Mi
-    podTemplates:
-      - name: default
-        spec:
-          containers:
-            - name: clickhouse
-              image: yandex/clickhouse-server:19.11.8.46

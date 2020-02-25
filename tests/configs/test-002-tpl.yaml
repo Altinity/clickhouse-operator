@@ -4,7 +4,7 @@ metadata:
   name: "test-002-tpl"
 spec:
   useTemplates:
-    - name: clickhouse-stable
+    - name: clickhouse-version
     - name: clickhouse-log-volume-mount
   configuration:
     clusters:

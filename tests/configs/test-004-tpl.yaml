@@ -3,6 +3,8 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "clickhouse-old-volume-mount"
 spec:
+  useTemplates:
+    - name: clickhouse-version
   configuration:
     clusters:
       - name: single

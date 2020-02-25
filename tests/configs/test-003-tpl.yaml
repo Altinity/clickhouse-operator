@@ -4,7 +4,7 @@ metadata:
   name: "test-003-tpl"
 spec:
   useTemplates:
-    - name: clickhouse-stable
+    - name: clickhouse-version
     - name: one-per-host-distribution
   configuration:
     clusters:
