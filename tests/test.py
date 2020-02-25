@@ -1,13 +1,25 @@
-from clickhouse import *
-from kubectl import *
-from test_examples import *
-from testflows.asserts import error
+import json
+import yaml
+import os
+import time
+
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
+from testflows.asserts import error
+from testflows.connect import Shell
+
+from kubectl import *
+from clickhouse import *
+from test_examples import *
 
 
 test_namespace = "test"
 version = "0.9.1"
 clickhouse_stable = "yandex/clickhouse-server:19.16.10.44"
+clickhouse_template="templates/tpl-clickhouse-stable.yaml"
+# clickhouse_template="templates/tpl-clickhouse-19.6.2.11.yaml"
+clickhouse_template="templates/tpl-clickhouse-20.1.4.14.yaml"
+
+clickhouse_version=yaml.safe_load(open(get_full_path(clickhouse_template),"r"))["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
 
 @TestScenario
 @Name("test_001. 1 node")
@@ -19,8 +31,8 @@ def test_001():
 def test_002():
     create_and_check("configs/test-002-tpl.yaml", 
                      {"pod_count": 1,
-                      "apply_templates": {"configs/tpl-clickhouse-stable.yaml", "configs/tpl-log-volume.yaml"},
-                      "pod_image": clickhouse_stable,
+                      "apply_templates": {clickhouse_template, "templates/tpl-log-volume.yaml"},
+                      "pod_image": clickhouse_version,
                       "pod_volumes": {"/var/log/clickhouse-server"}})
 
 @TestScenario
@@ -28,8 +40,8 @@ def test_002():
 def test_003():
     create_and_check("configs/test-003-tpl.yaml", 
                      {"pod_count": 1,
-                      "apply_templates": {"configs/tpl-clickhouse-stable.yaml", "configs/tpl-one-per-host.yaml"},
-                      "pod_image": clickhouse_stable,
+                      "apply_templates": {clickhouse_template, "templates/tpl-one-per-host.yaml"},
+                      "pod_image": clickhouse_version,
                       "pod_podAntiAffinity": 1})
 
 @TestScenario
@@ -69,7 +81,7 @@ def test_006():
 def test_007():
     create_and_check("configs/test-007-custom-ports.yaml", 
                      {"pod_count": 1,
-                      "apply_templates": {"configs/tpl-custom-ports.yaml"},
+                      "apply_templates": {"templates/tpl-custom-ports.yaml"},
                       "pod_image": "yandex/clickhouse-server:19.11.8.46",
                       "pod_ports": [8124,9001,9010]})
 
@@ -118,7 +130,7 @@ def test_010():
     check_zookeeper()
 
     create_and_check("configs/test-010-zkroot.yaml", 
-                     {"apply_templates": {"configs/tpl-clickhouse-stable.yaml"},
+                     {"apply_templates": {clickhouse_template},
                       "pod_count": 1,
                       "do_not_delete": 1})
     with And("ClickHouse should complain regarding zookeeper path"):
@@ -134,7 +146,7 @@ def test_011():
     with Given("test-011-secured-cluster.yaml and test-011-insecured-cluster.yaml"):
         create_and_check("configs/test-011-secured-cluster.yaml", 
                          {"pod_count": 2,
-                          "apply_templates": {"configs/tpl-log-volume.yaml"},
+                          "apply_templates": {"templates/tpl-log-volume.yaml"},
                           "do_not_delete": 1})
 
         create_and_check("configs/test-011-insecured-cluster.yaml", 
@@ -230,7 +242,7 @@ def test_012():
 @Name("test_013. Test adding shards and creating local and distributed tables automatically")
 def test_013():
     create_and_check("configs/test-013-add-shards-1.yaml",
-                     {"apply_templates": {"configs/tpl-clickhouse-stable.yaml"},
+                     {"apply_templates": {clickhouse_template},
                       "object_counts": [1, 1, 2], "do_not_delete": 1})
     
     with Then("Create local and distributed table"):
@@ -260,15 +272,18 @@ def test_014():
     partition by tuple() order by a""".replace('\r', '').replace('\n', '')
 
     create_and_check("configs/test-014-replication.yaml", 
-                    {"apply_templates": {"configs/tpl-clickhouse-stable.yaml"}, 
+                    {"apply_templates": {clickhouse_template},
                      "pod_count": 2,
                      "do_not_delete": 1})
 
-    clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-0")
-    clickhouse_query("test-014-replication", "insert into t values(1)", host = "chi-test-014-replication-default-0-0")
-    clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-1")
-    out = clickhouse_query("test-014-replication", "select a from t", host = "chi-test-014-replication-default-0-1")
-    assert out == "1"
+    with Given("Table is created on a first replica and data is inserted"):
+        clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-0")
+        clickhouse_query("test-014-replication", "insert into t values(1)", host = "chi-test-014-replication-default-0-0")
+        with When("Table is created on the second replica"):
+            clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-1")
+            with Then("Data should be replicated"):
+                out = clickhouse_query("test-014-replication", "select a from t", host = "chi-test-014-replication-default-0-1")
+                assert out == "1"
 
     with When("Add one more replica"):
         create_and_check("configs/test-014-replication-2.yaml", 
@@ -280,7 +295,7 @@ def test_014():
             out = clickhouse_query("test-014-replication", "select a from t", host = "chi-test-014-replication-default-0-2")
             assert out == "1"
 
-    create_and_check("configs/test-014-replication.yaml", {})
+    create_and_check("configs/test-014-replication-2.yaml", {})
 
 @TestScenario
 @Name("test_015. Test circular replication with hostNetwork")
@@ -300,9 +315,28 @@ def test_015():
     
     create_and_check("configs/test-015-host-network.yaml", {})
 
+@TestScenario
+@Name("test_016. Test files and dictionaries setup")
+def test_016():
+    create_and_check("configs/test-016-dict.yaml",
+                     {"apply_templates": {clickhouse_template},
+                      "pod_count": 1,
+                      "do_not_delete": 1})
+
+    with Then("dictGet() should work"):
+        out = clickhouse_query("test-016-dict", query = "select dictGet('one', 'one', toUInt64(0))")
+        assert out == "0"
+
+    create_and_check("configs/test-016-dict.yaml", {})
+
+# End of test scenarios
 
 if main():
     with Module("main"):
+        with Given(f"ClickHouse template {clickhouse_template}"):
+            with Then(f"ClickHouse version {clickhouse_version}"):
+                1 == 1
+
         with Given("clickhouse-operator is installed"):
             assert kube_get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") > 0, error()
             with And(f"Set operator version {version}"):
@@ -326,9 +360,11 @@ if main():
                  test_012,
                  test_013,
                  test_014,
-                 test_015]
+                 test_015,
+                 test_016]
 
         all_tests = tests
+        # all_tests = [test_009]
 
         for t in all_tests:
             run(test=t, flags=TE)

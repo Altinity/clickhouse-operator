@@ -6,6 +6,8 @@ metadata:
   name: test-012
 
 spec:
+  useTemplates:
+    - name: clickhouse-version
   defaults:
     templates:
       serviceTemplate: service-template

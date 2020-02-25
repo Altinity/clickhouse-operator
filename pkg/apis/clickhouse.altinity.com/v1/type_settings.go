@@ -84,11 +84,10 @@ func (settings *Settings) MergeFrom(src Settings) {
 }
 
 func (settings Settings) GetStringMap() map[string]string {
-	var m map[string]string
+	m := make(map[string]string)
 
 	for key := range settings {
-		stringValue, ok := settings[key].(string)
-		if ok {
+		if stringValue, ok := settings[key].(string); ok {
 			m[key] = stringValue
 		}
 	}

@@ -1,14 +1,14 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "dist3x3"
+  name: "dist_exp"
 spec:
   defaults:
     templates:
       podTemplate: dist-template
   configuration:
     clusters:
-      - name: "dist3x3"
+      - name: "dist_exp"
         layout:
           shardsCount: 3
           replicasCount: 3
@@ -25,7 +25,6 @@ spec:
           - type: ClusterAffinity
           - type: PreviousTailAffinity
         spec:
-          #hostNetwork: true
           containers:
             - name: clickhouse
               image: yandex/clickhouse-server:19.16

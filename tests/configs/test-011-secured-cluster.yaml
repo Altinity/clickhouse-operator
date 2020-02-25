@@ -3,20 +3,8 @@ kind: ClickHouseInstallation
 metadata:
   name: test-011-secured-cluster
 spec:
-  templates:
-    podTemplates:
-    - name: clickhouse
-      spec:
-        containers:
-        - name: clickhouse-pod
-          image: yandex/clickhouse-server:19.16.10.44
-          # command:
-          #      - "/bin/bash"
-          #      - "-c"
-          #      - "/entrypoint.sh; while true; do sleep 600; done"
-  defaults:
-    templates:
-      podTemplate: clickhouse
+  useTemplates:
+    - name: clickhouse-version
   configuration:
     users:
       # default user should be security to localhost and interhost connections

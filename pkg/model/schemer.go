@@ -171,7 +171,7 @@ func (s *Schemer) GetCreateReplicatedObjects(
 			name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
 		FROM system.tables
-		WHERE engine_full LIKE 'Replicated%%'
+		WHERE engine_full LIKE 'Replicated%'
 		SETTINGS skip_unavailable_shards = 1
 		`,
 		"system.tables",
