@@ -6,7 +6,7 @@ metadata:
 
 spec:
   useTemplates:
-    - name: clickhouse-stable
+    - name: clickhouse-version
   defaults:
     templates: 
       logVolumeClaimTemplate: default

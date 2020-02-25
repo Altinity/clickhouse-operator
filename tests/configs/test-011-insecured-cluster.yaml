@@ -3,6 +3,8 @@ kind: ClickHouseInstallation
 metadata:
   name: test-011-insecured-cluster
 spec:
+  useTemplates:
+    - name: clickhouse-version
   configuration:
     clusters:
     - name: default
