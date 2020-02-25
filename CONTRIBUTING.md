@@ -20,9 +20,10 @@ In case you'd like to introduce several features, make several PRs, please.
 
 Every PR has to be signed. The sign-off is a text line at the end of the commit's text description.
 Your signature certifies that you wrote the patch or otherwise have the right to contribute it to `clickhouse-operator`.
-Developer Certificate of Origin is available at [developercertificate.org](https://developercertificate.org/)):
 
-```Developer Certificate of Origin
+Developer Certificate of Origin is available at [developercertificate.org](https://developercertificate.org/):
+
+```text
 Version 1.1
 
 Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
