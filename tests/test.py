@@ -267,11 +267,14 @@ def test_014():
                      "pod_count": 2,
                      "do_not_delete": 1})
 
-    clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-0")
-    clickhouse_query("test-014-replication", "insert into t values(1)", host = "chi-test-014-replication-default-0-0")
-    clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-1")
-    out = clickhouse_query("test-014-replication", "select a from t", host = "chi-test-014-replication-default-0-1")
-    assert out == "1"
+    with Given("Table is created on a first replica and data is inserted"):
+        clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-0")
+        clickhouse_query("test-014-replication", "insert into t values(1)", host = "chi-test-014-replication-default-0-0")
+        with When("Table is created on the second replica"):
+            clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-1")
+            with Then("Data should be replicated"):
+                out = clickhouse_query("test-014-replication", "select a from t", host = "chi-test-014-replication-default-0-1")
+                assert out == "1"
 
     with When("Add one more replica"):
         create_and_check("configs/test-014-replication-2.yaml", 
@@ -366,7 +369,7 @@ if main():
                      test_016]
         
             all_tests = tests
-            # all_tests = [test_016]
+            # all_tests = [test_014]
         
             for t in all_tests:
                 run(test=t, flags=TE)

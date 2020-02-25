@@ -13,9 +13,11 @@ spec:
   configuration:
     zookeeper: # Add Zookeeper
       nodes:
-        - host: zookeepers
+        - host: zookeeper
           port: 2181
       root: "/clickhouse/test-010-zkroot"
+      session_timeout_ms: 30000
+      operation_timeout_ms: 10000
     clusters:
       - name: default
         layout:
