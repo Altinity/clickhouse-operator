@@ -11,7 +11,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 max_retries=10
 
 shell = Shell()
-namespace="test"
+namespace = "test"
 
 
 def get_full_path(test_file):
@@ -73,17 +73,21 @@ def kube_createns(ns):
     assert cmd.exitcode == 0, error()
 
 def kube_deletens(ns):
-    shell(f"kubectl delete ns {ns}", timeout = 60)
+    shell(f"kubectl delete ns {ns}", timeout=60)
     
 def kube_get_count(type, name="", label="", ns="test"):
-    cmd = shell(f"kubectl get {type} {name} -n {ns} -o=custom-columns=kind:kind,name:.metadata.name {label}")
+    if ns is None:
+        ns = '--all-namespaces'
+    elif '-n' not in ns and '--namespace' not in ns:
+        ns = f"-n {ns}"
+    cmd = shell(f"kubectl get {type} {name} {ns} -o=custom-columns=kind:kind,name:.metadata.name {label}")
     if cmd.exitcode == 0:
         return len(cmd.output.splitlines())-1
     else:
         return 0
-    
-def kubectl(command, ok_to_fail = False, ns = "test"):
-    cmd = shell(f"kubectl {command} -n {ns}", timeout = 60)
+
+def kubectl(command, ok_to_fail=False, ns="test"):
+    cmd = shell(f"kubectl -n {ns} {command}", timeout=60)
     code = cmd.exitcode
     if ok_to_fail == False:
         assert(code) == 0, error()
@@ -133,7 +137,7 @@ def kube_wait_chi_status(chi, status, ns="test"):
 def kube_wait_pod_status(pod, status, ns="test"):
     kube_wait_field("pod", pod, ".status.phase", status, ns)
 
-def kube_wait_field(object, name, field, value, ns="test"):        
+def kube_wait_field(object, name, field, value, ns="test"):
     with Then(f"{object} {name} {field} should be {value}"):
         for i in range(1,max_retries):
             obj_status = kubectl(f"get {object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
@@ -210,4 +214,3 @@ def kube_check_service(service_name, service_type, ns = "test"):
         service = kube_get("service", service_name, ns = ns)
         with Then(f"Service type is {service_type}"):
             assert service["spec"]["type"] == service_type
-    

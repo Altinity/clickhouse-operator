@@ -16,7 +16,11 @@
 
 # Skip log folder
 log
+*.log
+__pycache__
 
 # Skip dev runtime-produced
 dev/bin
 dev/log
+
+.vagrant

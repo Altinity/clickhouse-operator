@@ -27,3 +27,10 @@ def test_examples02_2():
                      {"pod_count": 1,
                       "pod_image": "yandex/clickhouse-server:19.3.7",
                       "pod_volumes": {"/var/lib/clickhouse", "/var/log/clickhouse-server"}})
+
+
+if main():
+    with Module("examples", flags=TE):
+        examples = [test_examples01_1, test_examples01_2, test_examples02_1, test_examples02_2]
+        for t in examples:
+            run(test=t, flags=TE)
