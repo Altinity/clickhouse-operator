@@ -90,11 +90,12 @@ func New(hostname, username, password string, port int) *Conn {
 
 // makeUsernamePassword makes "username:password" pair for connection
 func (c *Conn) makeUsernamePassword() string {
+	// We may have neither username nor password
 	if c.username == "" && c.password == "" {
 		return ""
 	}
 
-	// password may be omitted
+	// Password may be omitted
 	if c.password == "" {
 		return c.username + "@"
 	}
