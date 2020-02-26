@@ -18,8 +18,14 @@ import (
 	sqlmodule "database/sql"
 
 	"github.com/MakeNowJust/heredoc"
-
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	"time"
+	"context"
+)
+
+
+const (
+	defaultTimeout  = 10 * time.Second
 )
 
 const (
@@ -191,7 +197,11 @@ func (f *ClickHouseFetcher) clickHouseQueryScanRows(
 		data *[][]string,
 	) error,
 ) ([][]string, error) {
-	if rows, err := f.newConn().Query(heredoc.Doc(sql)); err != nil {
+	// Query should be deadlined
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
+	defer cancel()
+
+	if rows, err := f.newConn().QueryContext(ctx, heredoc.Doc(sql)); err != nil {
 		return nil, err
 	} else {
 		data := make([][]string, 0)
