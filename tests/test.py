@@ -387,10 +387,11 @@ if main():
                      test_013,
                      test_014,
                      test_015,
+                     test_016,
                      test_017]
         
             all_tests = tests
-            # all_tests = [test_017]
+            # all_tests = [test_016, test_017]
         
             for t in all_tests:
                 run(test=t, flags=TE)
