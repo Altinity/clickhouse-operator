@@ -49,8 +49,8 @@ func NewSchemer(username, password string, port int) *Schemer {
 	}
 }
 
-func (s *Schemer) newConn(hostname string) *clickhouse.Conn {
-	return clickhouse.New(hostname, s.Username, s.Password, s.Port)
+func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
+	return clickhouse.GetPooledDBConnection(clickhouse.NewCHConnectionParams(hostname, s.Username, s.Password, s.Port))
 }
 
 func (s *Schemer) getObjectListFromClickHouse(serviceUrl string, sql string) ([]string, []string, error) {
@@ -59,7 +59,7 @@ func (s *Schemer) getObjectListFromClickHouse(serviceUrl string, sql string) ([]
 	sqlStatements := make([]string, 0)
 
 	glog.V(1).Info(serviceUrl)
-	conn := s.newConn(serviceUrl)
+	conn := s.getCHConnection(serviceUrl)
 	var rows *sqlmodule.Rows = nil
 	var err error
 	rows, err = conn.Query(sql)
@@ -271,7 +271,7 @@ func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 	var err error = nil
 	// For each host in the list run all SQL queries
 	for _, host := range hosts {
-		conn := s.newConn(host)
+		conn := s.getCHConnection(host)
 		for _, sql := range sqls {
 			if len(sql) == 0 {
 				// Skip malformed SQL query, move to the next SQL query

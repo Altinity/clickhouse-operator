@@ -1,0 +1,69 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package clickhouse
+
+import (
+	"fmt"
+	"strconv"
+	"time"
+
+	_ "github.com/mailru/go-clickhouse"
+)
+
+const (
+	// http://user:password@host:8123/
+	chDsnUrlPattern = "http://%s%s:%s/"
+	defaultTimeout  = 10 * time.Second
+)
+
+type CHConnectionParams struct {
+	hostname string
+	username string
+	password string
+	port     int
+
+	timeout time.Duration
+}
+
+func NewCHConnectionParams(hostname, username, password string, port int) *CHConnectionParams {
+	return &CHConnectionParams{
+		hostname: hostname,
+		username: username,
+		password: password,
+		port:     port,
+		timeout:  defaultTimeout,
+	}
+}
+
+// makeUsernamePassword makes "username:password" pair for connection
+func (c *CHConnectionParams) makeUsernamePassword() string {
+	// We may have neither username nor password
+	if c.username == "" && c.password == "" {
+		return ""
+	}
+
+	// Password may be omitted
+	if c.password == "" {
+		return c.username + "@"
+	}
+
+	// Expecting both username and password to be in place
+	return c.username + ":" + c.password + "@"
+}
+
+// makeDSN makes ClickHouse DSN
+func (c *CHConnectionParams) makeDSN() string {
+	return fmt.Sprintf(chDsnUrlPattern, c.makeUsernamePassword(), c.hostname, strconv.Itoa(c.port))
+}

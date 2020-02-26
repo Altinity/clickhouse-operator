@@ -17,15 +17,14 @@ package metrics
 import (
 	sqlmodule "database/sql"
 
+	"context"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"time"
-	"context"
 )
 
-
 const (
-	defaultTimeout  = 10 * time.Second
+	defaultTimeout = 10 * time.Second
 )
 
 const (
@@ -114,23 +113,17 @@ const (
 )
 
 type ClickHouseFetcher struct {
-	Hostname string
-	Username string
-	Password string
-	Port     int
+	chConnectionParams *clickhouse.CHConnectionParams
 }
 
 func NewClickHouseFetcher(hostname, username, password string, port int) *ClickHouseFetcher {
 	return &ClickHouseFetcher{
-		Hostname: hostname,
-		Username: username,
-		Password: password,
-		Port:     port,
+		chConnectionParams: clickhouse.NewCHConnectionParams(hostname, username, password, port),
 	}
 }
 
-func (f *ClickHouseFetcher) newConn() *clickhouse.Conn {
-	return clickhouse.New(f.Hostname, f.Username, f.Password, f.Port)
+func (f *ClickHouseFetcher) getCHConnection() *clickhouse.CHConnection {
+	return clickhouse.GetPooledDBConnection(f.chConnectionParams)
 }
 
 // getClickHouseQueryMetrics requests metrics data from ClickHouse
@@ -201,7 +194,7 @@ func (f *ClickHouseFetcher) clickHouseQueryScanRows(
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
 	defer cancel()
 
-	if rows, err := f.newConn().QueryContext(ctx, heredoc.Doc(sql)); err != nil {
+	if rows, err := f.getCHConnection().QueryContext(ctx, heredoc.Doc(sql)); err != nil {
 		return nil, err
 	} else {
 		data := make([][]string, 0)
