@@ -17,8 +17,15 @@ namespace="test"
 def get_full_path(test_file):
     return os.path.join(current_dir, f"{test_file}")
 
+def get_ch_version(test_file):
+    return yaml.safe_load(open(get_full_path(test_file),"r"))["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
+
 def get_chi_name(path):
     return yaml.safe_load(open(path,"r"))["metadata"]["name"]
+
+def kube_delete_chi(chi, ns = namespace):
+    shell(f"kubectl delete chi {chi} -n {ns}", timeout = 60)
+    kube_wait_objects(chi, [0,0,0], ns)
 
 def create_and_check(test_file, checks, ns = namespace):
     config=get_full_path(test_file)
@@ -57,9 +64,7 @@ def create_and_check(test_file, checks, ns = namespace):
         kube_check_service(checks["service"][0], checks["service"][1], ns)
 
     if "do_not_delete" not in checks:
-        kube_delete(config, ns)
-        kube_wait_objects(chi_name, [0,0,0], ns)
-
+        kube_delete_chi(chi_name, ns)
 
 def kube_get(type, name, label="", ns="test"):
     cmd = shell(f"kubectl get {type} {name} -n {ns} {label} -o json")
