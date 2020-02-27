@@ -25,28 +25,41 @@ var (
 )
 
 func GetPooledDBConnection(params *CHConnectionParams) *CHConnection {
-	if connection, existed := dbConnectionPool.Load(params); existed {
+	key := makePoolKey(params)
+
+	if connection, existed := dbConnectionPool.Load(key); existed {
 		glog.V(1).Infof("Found pooled connection: %s", params.makeDSN())
 		return connection.(*CHConnection)
 	}
+
+	// Pooled connection not found, need to add it to the pool
 
 	dbConnectionPoolEntryInitMutex.Lock()
 	defer dbConnectionPoolEntryInitMutex.Unlock()
 
-	// Double check
-	if connection, existed := dbConnectionPool.Load(params); existed {
+	// Double check for race condition
+	if connection, existed := dbConnectionPool.Load(key); existed {
 		glog.V(1).Infof("Found pooled connection: %s", params.makeDSN())
 		return connection.(*CHConnection)
 	}
 
-	glog.V(1).Infof("Add connection to pool: %s", params.makeDSN())
-	connection := NewConnection(params)
-	dbConnectionPool.Store(params, connection)
+	glog.V(1).Infof("Add connection to the pool: %s", params.makeDSN())
+	dbConnectionPool.Store(key, NewConnection(params))
 
-	return connection
+	// Fetch from the pool
+	if connection, existed := dbConnectionPool.Load(key); existed {
+		glog.V(1).Infof("Found pooled connection: %s", params.makeDSN())
+		return connection.(*CHConnection)
+	}
+
+	return nil
 }
 
 // TODO we need to be able to remove entries from the pool
 func DropHost(host string) {
 
+}
+
+func makePoolKey(params *CHConnectionParams) string {
+	return params.makeDSN()
 }

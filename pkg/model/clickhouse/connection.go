@@ -29,11 +29,10 @@ type CHConnection struct {
 }
 
 func NewConnection(params *CHConnectionParams) *CHConnection {
-	c := &CHConnection{
+	// DO not perform connection immediately, do it in lazy manner
+	return &CHConnection{
 		params: params,
 	}
-	c.connect()
-	return c
 }
 
 func (c *CHConnection) connect() {
