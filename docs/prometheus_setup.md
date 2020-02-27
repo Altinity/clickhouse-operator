@@ -1,6 +1,6 @@
 # Task: Setup Prometheus monitoring
 
-We are going to setup **Prometheus & ClickHouse-operator** integration in k8s environment.
+We are going to setup **Prometheus <-> ClickHouse-operator** integration in k8s environment.
 This document assumes k8s cluster already setup and `kubectl` has access to it.
 
 We may have two starting points:
