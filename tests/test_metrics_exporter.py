@@ -5,8 +5,7 @@ from testflows.asserts import error
 import re
 import json
 import kubectl
-
-version = '0.9.1'
+import settings
 
 def set_metrics_exporter_version(version, ns="kube-system"):
     kubectl.kubectl(f"set image deployment.v1.apps/clickhouse-operator metrics-exporter=altinity/metrics-exporter:{version}", ns=ns)
@@ -18,14 +17,14 @@ def set_metrics_exporter_version(version, ns="kube-system"):
 def test_metrics_exporter_setup():
     with Given("clickhouse-operator is installed"):
         assert kubectl.kube_get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") > 0, error()
-        with And(f"Set metrics-exporter version {version}"):
-            set_metrics_exporter_version(version)
+        with And(f"Set metrics-exporter version {settings.version}"):
+            set_metrics_exporter_version(settings.version)
 
 
 @TestScenario
 @Name("Check metrics server state after reboot")
 def test_metrics_exporter_reboot():
-    def check_monitoring_chi(operator_namespace, operator_pod, expect_result, max_retries=5):
+    def check_monitoring_chi(operator_namespace, operator_pod, expect_result, max_retries=10):
         with And(f"metrics-exporter /chi enpoint result should return {expect_result}"):
             for i in range(1, max_retries):
                 out = kubectl.kubectl(
@@ -40,7 +39,10 @@ def test_metrics_exporter_reboot():
             assert out == expect_result, error()
 
     with Given("clickhouse-operator is installed"):
+        kubectl.kube_wait_field("pods", "-l app=clickhouse-operator", ".status.containerStatuses[*].ready", "true,true",
+                                ns="kube-system")
         assert kubectl.kube_get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") > 0, error()
+
         out = kubectl.kubectl("get pods -l app=clickhouse-operator", ns='kube-system').splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
         operator_namespace = "kube-system"
@@ -57,8 +59,8 @@ def test_metrics_exporter_reboot():
             check_monitoring_chi(operator_namespace, operator_pod, expected_chi)
             with When("reboot metrics exporter"):
                 kubectl.kubectl(f"exec -n {operator_namespace} {operator_pod} -c metrics-exporter reboot")
-                time.sleep(5)
-                kubectl.kube_wait_field("pods", "-l app=clickhouse-operator", ".status.containerStatuses[*].started", "true,true", ns="kube-system")
+                time.sleep(15)
+                kubectl.kube_wait_field("pods", "-l app=clickhouse-operator", ".status.containerStatuses[*].ready", "true,true", ns="kube-system")
                 with Then("check metrics exporter still contains chi objects"):
                     check_monitoring_chi(operator_namespace, operator_pod, expected_chi)
                     kubectl.kube_delete(config)

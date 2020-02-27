@@ -1,19 +1,10 @@
-import time
-
-from clickhouse import *
-from kubectl import *
+from  clickhouse import * 
+from kubectl import * 
+import settings 
 
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
 from testflows.asserts import error
 
-test_namespace = "test"
-version = "0.9.2"
-clickhouse_stable = "yandex/clickhouse-server:19.16.10.44"
-# clickhouse_template = "templates/tpl-clickhouse-stable.yaml"
-# clickhouse_template = "templates/tpl-clickhouse-19.6.2.11.yaml"
-clickhouse_template = "templates/tpl-clickhouse-20.1.4.14.yaml"
-
-clickhouse_version = get_ch_version(clickhouse_template)
 
 @TestScenario
 @Name("test_001. 1 node")
@@ -25,8 +16,8 @@ def test_001():
 def test_002():
     create_and_check("configs/test-002-tpl.yaml", 
                      {"pod_count": 1,
-                      "apply_templates": {clickhouse_template, "templates/tpl-log-volume.yaml"},
-                      "pod_image": clickhouse_version,
+                      "apply_templates": {settings.clickhouse_template, "templates/tpl-log-volume.yaml"},
+                      "pod_image": settings.clickhouse_version,
                       "pod_volumes": {"/var/log/clickhouse-server"}})
 
 @TestScenario
@@ -34,8 +25,8 @@ def test_002():
 def test_003():
     create_and_check("configs/test-003-tpl.yaml", 
                      {"pod_count": 1,
-                      "apply_templates": {clickhouse_template, "templates/tpl-one-per-host.yaml"},
-                      "pod_image": clickhouse_version,
+                      "apply_templates": {settings.clickhouse_template, "templates/tpl-one-per-host.yaml"},
+                      "pod_image": settings.clickhouse_version,
                       "pod_podAntiAffinity": 1})
 
 @TestScenario
@@ -83,10 +74,10 @@ def test_007():
 @Name("test_009. Test operator upgrade from 0.6.0 to later version")
 def test_009():
     version_from = "0.6.0"
-    version_to = version
+    version_to = settings.version
     with Given(f"clickhouse-operator {version_from}"):
-        kube_deletens(test_namespace)
-        kube_createns(test_namespace)
+        kube_deletens(settings.test_namespace)
+        kube_createns(settings.test_namespace)
         set_operator_version(version_from)
         config = get_full_path("configs/test-009-long-name.yaml")
         chi_full_name = get_chi_name(config)
@@ -110,10 +101,7 @@ def set_operator_version(version, ns="kube-system", timeout=60):
     kubectl(f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:{version}", ns=ns)
     kubectl(f"set image deployment.v1.apps/clickhouse-operator metrics-exporter=altinity/metrics-exporter:{version}", ns=ns)
     kubectl("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
-    if version <= '0.9.0':
-        assert kube_get_count("pod", ns="kube-system", label=f"-l app=clickhouse-operator,version={version}") > 0, error()
-    else:
-        assert kube_get_count("pod", ns="kube-system", label=f"-l app=clickhouse-operator,clickhouse.altinity.com/chop={version}") > 0, error()
+    assert kube_get_count("pod", ns="kube-system", label=f"-l app=clickhouse-operator") > 0, error()
 
 def check_zookeeper():
     with Given("Install Zookeeper if missing"):
@@ -129,7 +117,7 @@ def test_010():
     check_zookeeper()
 
     create_and_check("configs/test-010-zkroot.yaml", 
-                     {"apply_templates": {clickhouse_template},
+                     {"apply_templates": {settings.clickhouse_template},
                       "pod_count": 1,
                       "do_not_delete": 1})
     with And("ClickHouse should complain regarding zookeeper path"):
@@ -248,7 +236,7 @@ def test_012():
 @Name("test_013. Test adding shards and creating local and distributed tables automatically")
 def test_013():
     create_and_check("configs/test-013-add-shards-1.yaml",
-                     {"apply_templates": {clickhouse_template},
+                     {"apply_templates": {settings.clickhouse_template},
                       "object_counts": [1, 1, 2], "do_not_delete": 1})
     
     with Then("Create local and distributed table"):
@@ -278,7 +266,7 @@ def test_014():
     partition by tuple() order by a""".replace('\r', '').replace('\n', '')
 
     create_and_check("configs/test-014-replication.yaml", 
-                    {"apply_templates": {clickhouse_template},
+                    {"apply_templates": {settings.clickhouse_template},
                      "pod_count": 2,
                      "do_not_delete": 1})
 
@@ -327,7 +315,7 @@ def test_015():
 @Name("test_016. Test files and dictionaries setup")
 def test_016():
     create_and_check("configs/test-016-dict.yaml",
-                     {"apply_templates": {clickhouse_template},
+                     {"apply_templates": {settings.clickhouse_template},
                       "pod_count": 1,
                       "do_not_delete": 1})
 
@@ -361,8 +349,8 @@ def test_017():
 
 if main():
     with Module("main", flags=TE):
-        with Given(f"ClickHouse template {clickhouse_template}"):
-            with And(f"ClickHouse version {clickhouse_version}"):
+        with Given(f"ClickHouse template {settings.clickhouse_template}"):
+            with And(f"ClickHouse version {settings.clickhouse_version}"):
                 1 == 1
 
         with Given("clickhouse-operator is installed"):
@@ -370,13 +358,13 @@ if main():
                 installer = get_full_path('../deploy/operator-web-installer/clickhouse-operator-install.sh')
                 installer = shell(f"bash -x {installer}")
                 assert installer.exitcode == 0, error()
-            with And(f"Set operator version {version}"):
-                set_operator_version(version)
+            with And(f"Set operator version {settings.version}"):
+                set_operator_version(settings.version)
 
-        with Given(f"Clean namespace {test_namespace}"):
-            kube_deletens(test_namespace)
-            with And(f"Create namespace {test_namespace}"):
-                kube_createns(test_namespace)
+        with Given(f"Clean namespace {settings.test_namespace}"):
+            kube_deletens(settings.test_namespace)
+            with And(f"Create namespace {settings.test_namespace}"):
+                kube_createns(settings.test_namespace)
 
         with Module("regression", flags=TE):
             all_tests = [
@@ -399,13 +387,13 @@ if main():
             ]
         
             run_test = all_tests
-            # run_test = [
-            #     test_010,
-            #     test_011,
-            #     test_014,
-            #     test_015,
-            #     test_017,
-            # ]
+            run_test = [
+                # test_010,
+                # test_011,
+                test_014,
+                # test_015,
+                # test_017,
+            ]
 
             for t in run_test:
                 run(test=t, flags=TE)
