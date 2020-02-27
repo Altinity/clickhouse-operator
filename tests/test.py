@@ -256,7 +256,7 @@ def test_013():
                          "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
 
     with Then("Add one more shard"):
-        create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2,2,3], "do_not_delete": 1})
+        create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2, 2, 3], "do_not_delete": 1})
     with And("Table should be created on a second shard"):
         out = clickhouse_query("test-013-add-shards", "select count() from default.test_distr",
                                host="chi-test-013-add-shards-default-1-0")
@@ -281,12 +281,13 @@ def test_014():
                      "do_not_delete": 1})
 
     with Given("Table is created on a first replica and data is inserted"):
-        clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-0")
-        clickhouse_query("test-014-replication", "insert into t values(1)", host = "chi-test-014-replication-default-0-0")
+        clickhouse_query("test-014-replication", create_table, host="chi-test-014-replication-default-0-0")
+        clickhouse_query("test-014-replication", "insert into t values(1)", host="chi-test-014-replication-default-0-0")
         with When("Table is created on the second replica"):
-            clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-1")
+            clickhouse_query("test-014-replication", create_table, host="chi-test-014-replication-default-0-1")
             with Then("Data should be replicated"):
-                out = clickhouse_query("test-014-replication", "select a from t", host = "chi-test-014-replication-default-0-1")
+                out = clickhouse_query("test-014-replication", "select a from t",
+                                       host="chi-test-014-replication-default-0-1")
                 assert out == "1"
 
     with When("Add one more replica"):
@@ -296,7 +297,8 @@ def test_014():
         # that also works:
         # kubectl patch chi test-014-replication -n test --type=json -p '[{"op":"add", "path": "/spec/configuration/clusters/0/layout/shards/0/replicasCount", "value": 3}]'
         with Then("Replicated table should be automatically created"):
-            out = clickhouse_query("test-014-replication", "select a from t", host = "chi-test-014-replication-default-0-2")
+            out = clickhouse_query("test-014-replication", "select a from t",
+                                   host="chi-test-014-replication-default-0-2")
             assert out == "1"
 
     kube_delete_chi("test-014-replication")
@@ -326,11 +328,11 @@ def test_016():
                      {"apply_templates": {clickhouse_template},
                       "pod_count": 1,
                       "do_not_delete": 1})
-    
+
     with Then("dictGet() should work"):
         out = clickhouse_query("test-016-dict", query = "select dictGet('one', 'one', toUInt64(0))")
         assert out == "0"
-    
+
     kube_delete_chi("test-016-dict")
 
 @TestScenario
@@ -340,18 +342,18 @@ def test_017():
     chi = "test-017-multi-version"
 
     test_query = "select 1 /* comment */ settings log_queries=1"
-    for shard in [0,1,2,3,4,5]:
+    for shard in range(6):
         host = f"chi-{chi}-default-{shard}-0"
-        clickhouse_query(chi, host = host, query = test_query)
-        out = clickhouse_query(chi, host = host, query = "select query from system.query_log order by event_time desc limit 1")
-        ver = clickhouse_query(chi, host = host, query = "select version()")
+        clickhouse_query(chi, host=host, query=test_query)
+        out = clickhouse_query(chi, host=host,
+                               query="select query from system.query_log order by event_time desc limit 1")
+        ver = clickhouse_query(chi, host=host, query="select version()")
 
         print(f"version: {ver}")
         print(f"queried: {test_query}")
         print(f"logged: {out}")
 
     kube_delete_chi(chi)
-
 
 # End of test scenarios
 
