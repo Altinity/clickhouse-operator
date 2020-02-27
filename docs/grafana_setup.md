@@ -1,6 +1,6 @@
 # Task: Setup Grafana monitoring
 
-We are going to setup **Grafana & Prometheus** integration in k8s environment.
+We are going to setup **Grafana <-> Prometheus** integration in k8s environment.
 This document assumes k8s cluster already setup and `kubectl` has access to it.
 This document assumes Prometheus is already setup and gathers data from `clickhouse-operator`. 
 More details on how to setup **Prometheus & ClickHouse-operator** integration are in [Setup Prometheus monitoring doc][prometheus_setup_doc] 

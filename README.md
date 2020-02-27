@@ -45,6 +45,7 @@ The ClickHouse Operator for Kubernetes currently provides the following:
  * [Update Operator version][update_operator]
 
 **Monitoring**
+ * [Setup Monitoring][monitoring_setup]
  * [Prometheus & clickhouse-operator integration][prometheus_setup]
  * [Grafana & Prometheus integration][grafana_setup]
 
@@ -71,6 +72,7 @@ See [LICENSE](./LICENSE) for more details.
 [replication_setup]: ./docs/replication_setup.md
 [crd_explained]: ./docs/custom_resource_explained.md
 [zookeeper_setup]: ./docs/zookeeper_setup.md
+[monitoring_setup]: ./docs/monitoring_setup.md
 [prometheus_setup]: ./docs/prometheus_setup.md
 [grafana_setup]: ./docs/grafana_setup.md
 [storage_configuration]: ./docs/storage.md
