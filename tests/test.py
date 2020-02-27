@@ -1,3 +1,5 @@
+import time
+
 from clickhouse import *
 from kubectl import *
 
@@ -5,13 +7,13 @@ from testflows.core import TestScenario, Name, When, Then, Given, And, main, run
 from testflows.asserts import error
 
 test_namespace = "test"
-version = "0.9.1"
+version = "0.9.2"
 clickhouse_stable = "yandex/clickhouse-server:19.16.10.44"
-clickhouse_template = "templates/tpl-clickhouse-stable.yaml"
+# clickhouse_template = "templates/tpl-clickhouse-stable.yaml"
 # clickhouse_template = "templates/tpl-clickhouse-19.6.2.11.yaml"
-# clickhouse_template = "templates/tpl-clickhouse-20.1.4.14.yaml"
+clickhouse_template = "templates/tpl-clickhouse-20.1.4.14.yaml"
 
-clickhouse_version=yaml.safe_load(open(get_full_path(clickhouse_template),"r"))["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
+clickhouse_version = get_ch_version(clickhouse_template)
 
 @TestScenario
 @Name("test_001. 1 node")
@@ -81,7 +83,7 @@ def test_007():
 @Name("test_009. Test operator upgrade from 0.6.0 to later version")
 def test_009():
     version_from = "0.6.0"
-    version_to = "master"
+    version_to = version
     with Given(f"clickhouse-operator {version_from}"):
         kube_deletens(test_namespace)
         kube_createns(test_namespace)
@@ -133,8 +135,8 @@ def test_010():
     with And("ClickHouse should complain regarding zookeeper path"):
         out = clickhouse_query_with_error("test-010-zkroot", "select * from system.zookeeper where path = '/'")
         assert "You should create root node /clickhouse/test-010-zkroot before start" in out, error()
-
-    create_and_check("configs/test-010-zkroot.yaml", {})
+    
+    kube_delete_chi("test-010-zkroot.yaml")
 
 @TestScenario
 @Name("test_011. Test user security and network isolation")    
@@ -197,8 +199,8 @@ def test_011():
             assert "user3/password" not in chi["spec"]["configuration"]["users"]
             assert "user3/password_sha256_hex" in chi["spec"]["configuration"]["users"]
 
-        create_and_check("configs/test-011-secured-cluster.yaml", {})
-        create_and_check("configs/test-011-insecured-cluster.yaml", {})
+        kube_delete_chi("test-011-secured-cluster.yaml")
+        kube_delete_chi("test-011-insecured-cluster.yaml")
     
     with Given("test-011-secured-default.yaml"):
         create_and_check("configs/test-011-secured-default.yaml", 
@@ -221,7 +223,7 @@ def test_011():
                 assert "default/password" in chi["spec"]["configuration"]["users"]
                 assert chi["spec"]["configuration"]["users"]["default/password"] == "_removed_"
     
-        create_and_check("configs/test-011-secured-default.yaml", {})
+        kube_delete_chi("test-011-secured-default")
 
 
 @TestScenario
@@ -238,7 +240,7 @@ def test_012():
     with And("There should be a service for default cluster"):
         kube_check_service("service-default","ClusterIP")
 
-    create_and_check("configs/test-012-service-template.yaml", {})
+    kube_delete_chi("test-012-service-template")
 
 @TestScenario
 @Name("test_013. Test adding shards and creating local and distributed tables automatically")
@@ -297,7 +299,7 @@ def test_014():
             out = clickhouse_query("test-014-replication", "select a from t", host = "chi-test-014-replication-default-0-2")
             assert out == "1"
 
-    create_and_check("configs/test-014-replication-2.yaml", {})
+    kube_delete_chi("test-014-replication")
 
 @TestScenario
 @Name("test_015. Test circular replication with hostNetwork")
@@ -315,7 +317,7 @@ def test_015():
                                query="select count() from cluster('all-sharded', system.one) settings receive_timeout=10")
         assert out == "2"
     
-    create_and_check("configs/test-015-host-network.yaml", {})
+    kube_delete_chi("test-015-host-network")
 
 @TestScenario
 @Name("test_016. Test files and dictionaries setup")
@@ -324,19 +326,39 @@ def test_016():
                      {"apply_templates": {clickhouse_template},
                       "pod_count": 1,
                       "do_not_delete": 1})
-
+    
     with Then("dictGet() should work"):
         out = clickhouse_query("test-016-dict", query = "select dictGet('one', 'one', toUInt64(0))")
         assert out == "0"
+    
+    kube_delete_chi("test-016-dict")
 
-    create_and_check("configs/test-016-dict.yaml", {})
+@TestScenario
+@Name("test-017-multi-version. Test certain functions across multiple versions")
+def test_017():
+    create_and_check("configs/test-017-multi-version.yaml", {"pod_count": 6, "do_not_delete": 1})
+    chi = "test-017-multi-version"
+
+    test_query = "select 1 /* comment */ settings log_queries=1"
+    for shard in [0,1,2,3,4,5]:
+        host = f"chi-{chi}-default-{shard}-0"
+        clickhouse_query(chi, host = host, query = test_query)
+        out = clickhouse_query(chi, host = host, query = "select query from system.query_log order by event_time desc limit 1")
+        ver = clickhouse_query(chi, host = host, query = "select version()")
+
+        print(f"version: {ver}")
+        print(f"queried: {test_query}")
+        print(f"logged: {out}")
+
+    kube_delete_chi(chi)
+
 
 # End of test scenarios
 
 if main():
     with Module("main", flags=TE):
         with Given(f"ClickHouse template {clickhouse_template}"):
-            with Then(f"ClickHouse version {clickhouse_version}"):
+            with And(f"ClickHouse version {clickhouse_version}"):
                 1 == 1
 
         with Given("clickhouse-operator is installed"):
@@ -346,10 +368,11 @@ if main():
                 assert installer.exitcode == 0, error()
             with And(f"Set operator version {version}"):
                 set_operator_version(version)
-            with And(f"Clean namespace {test_namespace}"):
-                kube_deletens(test_namespace)
-                with And(f"Create namespace {test_namespace}"):
-                    kube_createns(test_namespace)
+
+        with Given(f"Clean namespace {test_namespace}"):
+            kube_deletens(test_namespace)
+            with And(f"Create namespace {test_namespace}"):
+                kube_createns(test_namespace)
 
         with Module("regression", flags=TE):
             tests = [test_001,
@@ -366,8 +389,9 @@ if main():
                      test_013,
                      test_014,
                      test_015,
-                     test_016]
-
+                     test_016,
+                     test_017]
+        
             all_tests = tests
             all_tests = [test_011]
 
