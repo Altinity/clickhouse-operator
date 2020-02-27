@@ -7,6 +7,7 @@
 1. [grafana_setup.md](./grafana_setup.md) - how to setup Grafana
 1. [introduction.md](./introduction.md) - general introduction
 1. [k8s_cluster_access.md](./k8s_cluster_access.md) - how to setup cluster access
+1. [monitoring_setup.md](./monitoring_setup.md) - how to setup monitoring
 1. [operator_build_from_sources.md](./operator_build_from_sources.md) - how to build operator from sources
 1. [operator_configuration.md](./operator_configuration.md) - operator configuration in details
 1. [operator_installation_details.md](./operator_installation_details.md) - how to install operator in details

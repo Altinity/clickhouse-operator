@@ -1,6 +1,16 @@
 #!/bin/bash
 
+echo "External value for \$GRAFANA_NAMESPACE=$GRAFANA_NAMESPACE"
+
 GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-grafana}"
+
+echo "OPTIONS"
+echo "Setup Grafana into '${GRAFANA_NAMESPACE}' namespace"
+echo ""
+echo "!!! IMPORTANT !!!"
+echo "If you do not agree with specified options, press ctrl-c now"
+sleep 30
+echo "Apply options now..."
 
 function clean_dir() {
     DIR="$1"
