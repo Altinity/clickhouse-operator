@@ -29,16 +29,15 @@ type CHConnection struct {
 }
 
 func NewConnection(params *CHConnectionParams) *CHConnection {
-	c := &CHConnection{
+	// DO not perform connection immediately, do it in lazy manner
+	return &CHConnection{
 		params: params,
 	}
-	c.connect()
-	return c
 }
 
 func (c *CHConnection) connect() {
-
-	dsn := c.params.makeDSN()
+	dsn := c.makeDSN()
+	glog.V(1).Infof("Establishing connection: %s", dsn)
 	dbConnection, err := sqlmodule.Open("clickhouse", dsn)
 	if err != nil {
 		glog.V(1).Infof("FAILED Open(%s) %v", dsn, err)
@@ -60,6 +59,7 @@ func (c *CHConnection) connect() {
 
 func (c *CHConnection) ensureConnected() bool {
 	if c.conn != nil {
+		glog.V(1).Infof("Already connected: %s", c.makeDSN())
 		return true
 	}
 
@@ -68,7 +68,8 @@ func (c *CHConnection) ensureConnected() bool {
 	return c.conn != nil
 }
 
-func (c *CHConnection) stringParams() string {
+// makeDSN is a wrapper over param's
+func (c *CHConnection) makeDSN() string {
 	return c.params.makeDSN()
 }
 
@@ -86,14 +87,14 @@ func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*sqlmodule
 	}
 
 	if !c.ensureConnected() {
-		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.stringParams(), sql)
+		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.makeDSN(), sql)
 		glog.V(1).Info(s)
 		return nil, fmt.Errorf(s)
 	}
 
 	rows, err := c.conn.QueryContext(ctx, sql)
 	if err != nil {
-		s := fmt.Sprintf("FAILED Query(%s) %v for SQL: %s", c.stringParams(), err, sql)
+		s := fmt.Sprintf("FAILED Query(%s) %v for SQL: %s", c.makeDSN(), err, sql)
 		glog.V(1).Info(s)
 		return nil, err
 	}
@@ -117,7 +118,7 @@ func (c *CHConnection) ExecContext(ctx context.Context, sql string) error {
 	}
 
 	if !c.ensureConnected() {
-		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.stringParams(), sql)
+		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.makeDSN(), sql)
 		glog.V(1).Info(s)
 		return fmt.Errorf(s)
 	}
@@ -125,7 +126,7 @@ func (c *CHConnection) ExecContext(ctx context.Context, sql string) error {
 	_, err := c.conn.ExecContext(ctx, sql)
 
 	if err != nil {
-		glog.V(1).Infof("FAILED Exec(%s) %v for SQL: %s", c.stringParams(), err, sql)
+		glog.V(1).Infof("FAILED Exec(%s) %v for SQL: %s", c.makeDSN(), err, sql)
 		return err
 	}
 
