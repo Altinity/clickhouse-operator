@@ -66,6 +66,7 @@ func (s *Schemer) getObjectListFromClickHouse(serviceUrl string, sql string) ([]
 	if err != nil {
 		return nil, nil, err
 	}
+	defer rows.Close()
 
 	// Some data fetched
 	for rows.Next() {
