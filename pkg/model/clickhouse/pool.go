@@ -15,6 +15,7 @@
 package clickhouse
 
 import (
+	"github.com/golang/glog"
 	"sync"
 )
 
@@ -25,6 +26,7 @@ var (
 
 func GetPooledDBConnection(params *CHConnectionParams) *CHConnection {
 	if connection, existed := dbConnectionPool.Load(params); existed {
+		glog.V(1).Infof("Found pooled connection: %s", params.makeDSN())
 		return connection.(*CHConnection)
 	}
 
@@ -33,11 +35,12 @@ func GetPooledDBConnection(params *CHConnectionParams) *CHConnection {
 
 	// Double check
 	if connection, existed := dbConnectionPool.Load(params); existed {
+		glog.V(1).Infof("Found pooled connection: %s", params.makeDSN())
 		return connection.(*CHConnection)
 	}
 
+	glog.V(1).Infof("Add connection to pool: %s", params.makeDSN())
 	connection := NewConnection(params)
-
 	dbConnectionPool.Store(params, connection)
 
 	return connection
