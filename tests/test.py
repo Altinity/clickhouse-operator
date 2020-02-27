@@ -387,13 +387,14 @@ if main():
             ]
         
             run_test = all_tests
-            run_test = [
-                # test_010,
-                # test_011,
-                test_014,
-                # test_015,
-                # test_017,
-            ]
+            # placeholder for selective test running
+            # run_test = [
+            #     # test_010,
+            #     # test_011,
+            #     # test_014,
+            #     # test_015,
+            #     # test_017,
+            # ]
 
             for t in run_test:
                 run(test=t, flags=TE)
