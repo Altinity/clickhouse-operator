@@ -106,11 +106,11 @@ By now Altinity recommended dashboard should be available for use.
 
 More Grafana [docs](http://docs.grafana.org/)
 
-[grafana_manifest_folder]: ../deploy/grafana-manually
-[grafana_manifest_yaml]: ../deploy/grafana-manually/grafana.yaml
-[grafana_manifest_yaml_secret]:  ../deploy/grafana-manually/grafana.yaml#L56
-[create_grafana_script]: ../deploy/grafana-manually/create-grafana.sh 
+[grafana_manifest_folder]: ../deploy/grafana/grafana-manually
+[grafana_manifest_yaml]: ../deploy/grafana/grafana-manually/grafana.yaml
+[grafana_manifest_yaml_secret]:  ../deploy/grafana/grafana-manually/grafana.yaml#L56
+[create_grafana_script]: ../deploy/grafana/grafana-manually/create-grafana.sh 
 [prometheus_setup_doc]: ./prometheus_setup.md 
 [altinity_recommended_dashboard]: ../grafana-dashboard/Altinity_ClickHouse_Operator_dashboard.json 
-[install_grafana_operator_script]: ../deploy/grafana-with-grafana-operator/install-grafana-operator.sh
-[install_grafana_dashboard_script]: ../deploy/grafana-with-grafana-operator/install-grafana-with-operator.sh
+[install_grafana_operator_script]: ../deploy/grafana/grafana-with-grafana-operator/install-grafana-operator.sh
+[install_grafana_dashboard_script]: ../deploy/grafana/grafana-with-grafana-operator/install-grafana-with-operator.sh
