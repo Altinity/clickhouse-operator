@@ -162,6 +162,8 @@ def test_011():
                             ".subsets[*].addresses[*].hostname", "chi-test-011-secured-cluster-default-1-0-0")
             kube_wait_field("ep", "chi-test-011-secured-cluster-default-0-0",
                             ".subsets[*].addresses[*].hostname", "chi-test-011-secured-cluster-default-0-0-0")
+            with And("hmm, service created but DNS still not updated? wait 10 sec"):
+                time.sleep(10)
             out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'",
                                               host="chi-test-011-secured-cluster-default-1-0")
             assert out == 'OK'
@@ -377,26 +379,34 @@ if main():
                 kube_createns(test_namespace)
 
         with Module("regression", flags=TE):
-            tests = [test_001,
-                     test_002,
-                     test_003,
-                     test_004,
-                     test_005,
-                     test_006,
-                     test_007,
-                     # test_009,
-                     test_010,
-                     test_011,
-                     test_012,
-                     test_013,
-                     test_014,
-                     test_015,
-                     test_016,
-                     test_017]
+            all_tests = [
+                test_001,
+                test_002,
+                test_003,
+                test_004,
+                test_005,
+                test_006,
+                test_007,
+                # test_009,
+                test_010,
+                test_011,
+                test_012,
+                test_013,
+                test_014,
+                test_015,
+                test_016,
+                test_017,
+            ]
         
-            all_tests = tests
-            all_tests = [test_011]
+            run_test = all_tests
+            # run_test = [
+            #     test_010,
+            #     test_011,
+            #     test_014,
+            #     test_015,
+            #     test_017,
+            # ]
 
-            for t in all_tests:
+            for t in run_test:
                 run(test=t, flags=TE)
 

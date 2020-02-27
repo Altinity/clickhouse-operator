@@ -22,20 +22,26 @@ Vagrant.configure(2) do |config|
     set -xeuo pipefail
 
     apt-get update
-    apt-get install -y apt-transport-https ca-certificates software-properties-common curl
+    apt-get install --no-install-recommends -y apt-transport-https ca-certificates software-properties-common curl
+    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat
+
+    # yq
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys CC86BB64
+    add-apt-repository ppa:rmescandon/yq
+    apt-get install --no-install-recommends -y yq
+
     # clickhouse
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E0C56BD4
     add-apt-repository "deb http://repo.yandex.ru/clickhouse/deb/stable/ main/"
+    apt-get install --no-install-recommends -y clickhouse-client
+
     # docker
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8D81803C0EBFCD88
     add-apt-repository "deb https://download.docker.com/linux/ubuntu bionic edge"
-
-
     apt-get install --no-install-recommends -y docker-ce
-    apt-get install --no-install-recommends -y clickhouse-client
-    apt-get install --no-install-recommends -y python3-pip
-    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq
 
+    # docker compose
+    apt-get install --no-install-recommends -y python3-pip
     python3 -m pip install -U pip
     rm -rf /usr/bin/pip3
     pip3 install -U setuptools
@@ -69,7 +75,9 @@ Vagrant.configure(2) do |config|
     cd /vagrant/
 
     if ! kubectl get deployment clickhouse-operator -n "${OPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
-        bash -x ./deploy/operator-web-installer/clickhouse-operator-install.sh
+        cd /vagrant/deploy/operator/
+        bash -x ./clickhouse-operator-install.sh
+        cd /vagrant
     fi
 
     export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-prometheus}
@@ -94,6 +102,10 @@ Vagrant.configure(2) do |config|
     # open http://localhost:3000/ and check prometheus datasource exists and grafana dashboard exists
     # kubectl --namespace="${OPERATOR_NAMESPACE}" port-forward service/clickhouse-operator-metrics 8888
     # open http://localhost:3000/chi and check exists
+
+    for image in $(cat ./tests/configs/test-017-multi-version.yaml | yq r - "spec.templates.podTemplates[*].spec.containers[*].image"); do
+        docker pull ${image}
+    done
 
     python3 /vagrant/tests/test.py
     python3 /vagrant/tests/test_examples.py
