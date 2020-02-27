@@ -59,7 +59,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1580975846784,
+  "iteration": 1582838827157,
   "links": [],
   "panels": [
     {
@@ -2023,9 +2023,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "go_memstats_alloc_bytes_total{service=\"clickhouse-operator-metrics\",}",
+          "expr": "rate(go_memstats_alloc_bytes_total{service=\"clickhouse-operator-metrics\",}[1m])",
           "hide": false,
-          "legendFormat": "GO Allocated Memory",
+          "legendFormat": "GO malloc bytes / sec",
           "refId": "A"
         },
         {
@@ -2059,7 +2059,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -2187,5 +2187,5 @@
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
   "uid": "HBIYxc8Wk",
-  "version": 4
+  "version": 5
 }
