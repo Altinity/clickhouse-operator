@@ -194,13 +194,14 @@ func (f *ClickHouseFetcher) clickHouseQueryScanRows(
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
 	defer cancel()
 
-	if rows, err := f.getCHConnection().QueryContext(ctx, heredoc.Doc(sql)); err != nil {
+	rows, err := f.getCHConnection().QueryContext(ctx, heredoc.Doc(sql))
+	if err != nil {
 		return nil, err
-	} else {
-		data := make([][]string, 0)
-		for rows.Next() {
-			_ = scan(rows, &data)
-		}
-		return data, nil
 	}
+	defer rows.Close()
+	data := make([][]string, 0)
+	for rows.Next() {
+		_ = scan(rows, &data)
+	}
+	return data, nil
 }
