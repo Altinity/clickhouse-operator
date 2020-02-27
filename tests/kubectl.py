@@ -86,8 +86,8 @@ def kube_get_count(type, name="", label="", ns="test"):
     else:
         return 0
 
-def kubectl(command, ok_to_fail=False, ns="test"):
-    cmd = shell(f"kubectl -n {ns} {command}", timeout=60)
+def kubectl(command, ok_to_fail=False, ns="test", timeout=60):
+    cmd = shell(f"kubectl -n {ns} {command}", timeout=timeout)
     code = cmd.exitcode
     if ok_to_fail == False:
         assert(code) == 0, error()

@@ -25,13 +25,18 @@ def test_metrics_exporter_setup():
 @TestScenario
 @Name("Check metrics server state after reboot")
 def test_metrics_exporter_reboot():
-    def check_monitoring_chi(operator_namespace, operator_pod, expect_result):
+    def check_monitoring_chi(operator_namespace, operator_pod, expect_result, max_retries=5):
         with And(f"metrics-exporter /chi enpoint result should return {expect_result}"):
-            out = kubectl.kubectl(
-                f"exec {operator_pod} -c metrics-exporter wget -- -O- -q http://127.0.0.1:8888/chi",
-                ns=operator_namespace
-            )
-            out = json.loads(out)
+            for i in range(1, max_retries):
+                out = kubectl.kubectl(
+                    f"exec {operator_pod} -c metrics-exporter wget -- -O- -q http://127.0.0.1:8888/chi",
+                    ns=operator_namespace
+                )
+                out = json.loads(out)
+                if out == expect_result:
+                    break
+                with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
+                    time.sleep(i * 5)
             assert out == expect_result, error()
 
     with Given("clickhouse-operator is installed"):
@@ -57,7 +62,6 @@ def test_metrics_exporter_reboot():
                 with Then("check metrics exporter still contains chi objects"):
                     check_monitoring_chi(operator_namespace, operator_pod, expected_chi)
                     kubectl.kube_delete(config)
-                    time.sleep(5)
                     check_monitoring_chi(operator_namespace, operator_pod, [])
 
 

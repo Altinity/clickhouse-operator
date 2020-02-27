@@ -1,23 +1,15 @@
-import json
-import yaml
-import os
-import time
+from clickhouse import *
+from kubectl import *
 
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
 from testflows.asserts import error
-from testflows.connect import Shell
-
-from kubectl import *
-from clickhouse import *
-from test_examples import *
-
 
 test_namespace = "test"
 version = "0.9.1"
 clickhouse_stable = "yandex/clickhouse-server:19.16.10.44"
-clickhouse_template="templates/tpl-clickhouse-stable.yaml"
-# clickhouse_template="templates/tpl-clickhouse-19.6.2.11.yaml"
-clickhouse_template="templates/tpl-clickhouse-20.1.4.14.yaml"
+clickhouse_template = "templates/tpl-clickhouse-stable.yaml"
+# clickhouse_template = "templates/tpl-clickhouse-19.6.2.11.yaml"
+# clickhouse_template = "templates/tpl-clickhouse-20.1.4.14.yaml"
 
 clickhouse_version=yaml.safe_load(open(get_full_path(clickhouse_template),"r"))["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
 
@@ -92,6 +84,7 @@ def test_009():
     version_to = "master"
     with Given(f"clickhouse-operator {version_from}"):
         kube_deletens(test_namespace)
+        kube_createns(test_namespace)
         set_operator_version(version_from)
         config = get_full_path("configs/test-009-long-name.yaml")
         chi_full_name = get_chi_name(config)
@@ -104,17 +97,21 @@ def test_009():
         assert kube_get_count("statefulset", label="-l clickhouse.altinity.com/app=chop") == 1, error()
 
         with Then(f"upgrade operator to {version_to}"):
-            set_operator_version(version_to)
+            set_operator_version(version_to, timeout=120)
             with And("Wait 20 seconds"):
                 time.sleep(20)
                 with Then("No new statefulsets should be created"):
                     assert kube_get_count("statefulset", label="-l clickhouse.altinity.com/app=chop") == 1, error()
 
 
-def set_operator_version(version, ns="kube-system"):
+def set_operator_version(version, ns="kube-system", timeout=60):
     kubectl(f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:{version}", ns=ns)
-    kubectl("rollout status deployment.v1.apps/clickhouse-operator", ns=ns)
-    # assert kube_get_count("pod", ns = "kube-system", label = f"-l app=clickhouse-operator,version={version}")>0, error()
+    kubectl(f"set image deployment.v1.apps/clickhouse-operator metrics-exporter=altinity/metrics-exporter:{version}", ns=ns)
+    kubectl("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
+    if version <= '0.9.0':
+        assert kube_get_count("pod", ns="kube-system", label=f"-l app=clickhouse-operator,version={version}") > 0, error()
+    else:
+        assert kube_get_count("pod", ns="kube-system", label=f"-l app=clickhouse-operator,clickhouse.altinity.com/chop={version}") > 0, error()
 
 def check_zookeeper():
     with Given("Install Zookeeper if missing"):
@@ -146,30 +143,35 @@ def test_011():
     with Given("test-011-secured-cluster.yaml and test-011-insecured-cluster.yaml"):
         create_and_check("configs/test-011-secured-cluster.yaml", 
                          {"pod_count": 2,
+                          "service": ["chi-test-011-secured-cluster-default-1-0", "ClusterIP"],
                           "apply_templates": {"templates/tpl-log-volume.yaml"},
                           "do_not_delete": 1})
 
-        create_and_check("configs/test-011-insecured-cluster.yaml", 
-                        {"pod_count": 1,
-                         "do_not_delete": 1})
+        create_and_check("configs/test-011-insecured-cluster.yaml",
+                         {"pod_count": 1,
+                          "do_not_delete": 1})
 
         with Then("Connection to localhost should succeed with default user"):
             out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'")
             assert out == 'OK'
 
         with And("Connection from secured to secured host should succeed"):
-            out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'", 
-                                              host = "chi-test-011-secured-cluster-default-1-0")
+            kube_wait_field("ep", "chi-test-011-secured-cluster-default-1-0",
+                            ".subsets[*].addresses[*].hostname", "chi-test-011-secured-cluster-default-1-0-0")
+            kube_wait_field("ep", "chi-test-011-secured-cluster-default-0-0",
+                            ".subsets[*].addresses[*].hostname", "chi-test-011-secured-cluster-default-0-0-0")
+            out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'",
+                                              host="chi-test-011-secured-cluster-default-1-0")
             assert out == 'OK'
 
         with And("Connection from insecured to secured host should fail for default"):
-            out = clickhouse_query_with_error("test-011-insecured-cluster","select 'OK'", 
-                                              host = "chi-test-011-secured-cluster-default-1-0")
+            out = clickhouse_query_with_error("test-011-insecured-cluster", "select 'OK'",
+                                              host="chi-test-011-secured-cluster-default-1-0")
             assert out != 'OK'
 
         with And("Connection from insecured to secured host should fail for user with no password"):
-            out = clickhouse_query_with_error("test-011-insecured-cluster","select 'OK'", 
-                                              host = "chi-test-011-secured-cluster-default-1-0", user = "user1")
+            out = clickhouse_query_with_error("test-011-insecured-cluster", "select 'OK'",
+                                              host="chi-test-011-secured-cluster-default-1-0", user="user1")
             assert "Password required" in out
     
         with And("Connection from insecured to secured host should work for user with password"):
@@ -255,7 +257,7 @@ def test_013():
         create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2,2,3], "do_not_delete": 1})
     with And("Table should be created on a second shard"):
         out = clickhouse_query("test-013-add-shards", "select count() from default.test_distr",
-                               host = "chi-test-013-add-shards-default-1-0")
+                               host="chi-test-013-add-shards-default-1-0")
         assert out == "1"
     
     with Then("Remove shard"):
@@ -332,13 +334,16 @@ def test_016():
 # End of test scenarios
 
 if main():
-    with Module("main"):
+    with Module("main", flags=TE):
         with Given(f"ClickHouse template {clickhouse_template}"):
             with Then(f"ClickHouse version {clickhouse_version}"):
                 1 == 1
 
         with Given("clickhouse-operator is installed"):
-            assert kube_get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") > 0, error()
+            if kube_get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") == 0:
+                installer = get_full_path('../deploy/operator-web-installer/clickhouse-operator-install.sh')
+                installer = shell(f"bash -x {installer}")
+                assert installer.exitcode == 0, error()
             with And(f"Set operator version {version}"):
                 set_operator_version(version)
             with And(f"Clean namespace {test_namespace}"):
@@ -346,26 +351,26 @@ if main():
                 with And(f"Create namespace {test_namespace}"):
                     kube_createns(test_namespace)
 
-    with Module("regression", flags=TE):
-        tests = [test_001,
-                 test_002,
-                 test_003,
-                 test_004,
-                 test_005,
-                 test_006,
-                 test_007,
-                 test_009,
-                 test_010,
-                 test_011,
-                 test_012,
-                 test_013,
-                 test_014,
-                 test_015,
-                 test_016]
+        with Module("regression", flags=TE):
+            tests = [test_001,
+                     test_002,
+                     test_003,
+                     test_004,
+                     test_005,
+                     test_006,
+                     test_007,
+                     # test_009,
+                     test_010,
+                     test_011,
+                     test_012,
+                     test_013,
+                     test_014,
+                     test_015,
+                     test_016]
 
-        all_tests = tests
-        # all_tests = [test_009]
+            all_tests = tests
+            all_tests = [test_011]
 
-        for t in all_tests:
-            run(test=t, flags=TE)
+            for t in all_tests:
+                run(test=t, flags=TE)
 
