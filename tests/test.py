@@ -128,7 +128,7 @@ def test_010():
         out = clickhouse_query_with_error("test-010-zkroot", "select * from system.zookeeper where path = '/'")
         assert "You should create root node /clickhouse/test-010-zkroot before start" in out, error()
     
-    kube_delete_chi("test-010-zkroot.yaml")
+    kube_delete_chi("test-010-zkroot")
 
 @TestScenario
 @Name("test_011. Test user security and network isolation")    
@@ -186,8 +186,8 @@ def test_011():
             assert "user3/password" not in chi["spec"]["configuration"]["users"]
             assert "user3/password_sha256_hex" in chi["spec"]["configuration"]["users"]
 
-        kube_delete_chi("test-011-secured-cluster.yaml")
-        kube_delete_chi("test-011-insecured-cluster.yaml")
+        kube_delete_chi("test-011-secured-cluster")
+        kube_delete_chi("test-011-insecured-cluster")
     
     with Given("test-011-secured-default.yaml"):
         create_and_check("configs/test-011-secured-default.yaml", 
@@ -227,7 +227,7 @@ def test_012():
     with And("There should be a service for default cluster"):
         kube_check_service("service-default","ClusterIP")
 
-    kube_delete_chi("test-012-service-template")
+    kube_delete_chi("test-012")
 
 @TestScenario
 @Name("test_013. Test adding shards and creating local and distributed tables automatically")
@@ -344,7 +344,7 @@ def test_017():
 
 kubectl.namespace="test"
 # operator_version="latest"
-operator_version="0.9.1"
+operator_version="0.9.2"
 
 clickhouse_template="templates/tpl-clickhouse-stable.yaml"
 # clickhouse_template="templates/tpl-clickhouse-20.1.4.14.yaml"
@@ -391,7 +391,7 @@ if main():
                      test_017]
         
             all_tests = tests
-            # all_tests = [test_016, test_017]
+            # all_tests = [test_017]
         
             for t in all_tests:
                 run(test=t, flags=TE)
