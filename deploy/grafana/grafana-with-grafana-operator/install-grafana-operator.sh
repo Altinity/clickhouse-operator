@@ -17,6 +17,7 @@ function clean_dir() {
 
     echo "##############################"
     echo "Clean dir $DIR"
+    rm -rfv $DIR
 }
 
 ##############################

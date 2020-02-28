@@ -1,29 +1,23 @@
-import json
-import yaml
-import os
-import time
+from  clickhouse import * 
+from kubectl import * 
+import settings 
 
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
 from testflows.asserts import error
-from testflows.connect import Shell
-
-from kubectl import *
-from clickhouse import *
-from test_examples import *
 
 
 @TestScenario
 @Name("test_001. 1 node")
 def test_001():
-    create_and_check("configs/test-001.yaml", {"object_counts": [1,1,2]})
+    create_and_check("configs/test-001.yaml", {"object_counts": [1, 1, 2]})
     
 @TestScenario
 @Name("test_002. useTemplates for pod and volume templates")
 def test_002():
     create_and_check("configs/test-002-tpl.yaml", 
                      {"pod_count": 1,
-                      "apply_templates": {clickhouse_template, "templates/tpl-log-volume.yaml"},
-                      "pod_image": clickhouse_version,
+                      "apply_templates": {settings.clickhouse_template, "templates/tpl-log-volume.yaml"},
+                      "pod_image": settings.clickhouse_version,
                       "pod_volumes": {"/var/log/clickhouse-server"}})
 
 @TestScenario
@@ -31,8 +25,8 @@ def test_002():
 def test_003():
     create_and_check("configs/test-003-tpl.yaml", 
                      {"pod_count": 1,
-                      "apply_templates": {clickhouse_template, "templates/tpl-one-per-host.yaml"},
-                      "pod_image": clickhouse_version,
+                      "apply_templates": {settings.clickhouse_template, "templates/tpl-one-per-host.yaml"},
+                      "pod_image": settings.clickhouse_version,
                       "pod_podAntiAffinity": 1})
 
 @TestScenario
@@ -79,38 +73,40 @@ def test_007():
 @TestScenario
 @Name("test_009. Test operator upgrade from 0.6.0 to later version")
 def test_009():
-    version_from="0.6.0"
-    version_to="dev"
+    version_from = "0.6.0"
+    version_to = settings.version
     with Given(f"clickhouse-operator {version_from}"):
+        kube_deletens(settings.test_namespace)
+        kube_createns(settings.test_namespace)
         set_operator_version(version_from)
-        config=get_full_path("configs/test-009-long-name.yaml")
-        chi_full_name=get_chi_name(config)
-        chi_cut_name=chi_full_name[0:15]
+        config = get_full_path("configs/test-009-long-name.yaml")
+        chi_full_name = get_chi_name(config)
+        chi_cut_name = chi_full_name[0:15]
 
         kube_apply(config)
-        kube_wait_objects(chi_cut_name, [1,1,2])
+        kube_wait_objects(chi_cut_name, [1, 1, 2])
         kube_wait_chi_status(chi_full_name, "Completed")
-        
-        assert kube_get_count("statefulset", label = "-l clickhouse.altinity.com/app=chop")==1, error()
-        
+
+        assert kube_get_count("statefulset", label="-l clickhouse.altinity.com/app=chop") == 1, error()
+
         with Then(f"upgrade operator to {version_to}"):
-            set_operator_version(version_to)
+            set_operator_version(version_to, timeout=120)
             with And("Wait 20 seconds"):
                 time.sleep(20)
                 with Then("No new statefulsets should be created"):
-                    assert kube_get_count("statefulset", label = "-l clickhouse.altinity.com/app=chop")==1, error()
+                    assert kube_get_count("statefulset", label="-l clickhouse.altinity.com/app=chop") == 1, error()
 
-        
-        
-def set_operator_version(version):
-    kubectl(f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:{version}", ns = "kube-system")
-    kubectl("rollout status deployment.v1.apps/clickhouse-operator", ns = "kube-system")
-    # assert kube_get_count("pod", ns = "kube-system", label = f"-l app=clickhouse-operator,version={version}")>0, error()
+
+def set_operator_version(version, ns="kube-system", timeout=60):
+    kubectl(f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:{version}", ns=ns)
+    kubectl(f"set image deployment.v1.apps/clickhouse-operator metrics-exporter=altinity/metrics-exporter:{version}", ns=ns)
+    kubectl("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
+    assert kube_get_count("pod", ns=ns, label=f"-l app=clickhouse-operator") > 0, error()
 
 def check_zookeeper():
     with Given("Install Zookeeper if missing"):
-        if kube_get_count("service", name = "zookeepers") == 0:
-            config=get_full_path("../deploy/zookeeper/quick-start-volume-emptyDir/zookeeper-1-node.yaml")
+        if kube_get_count("service", name="zookeepers") == 0:
+            config = get_full_path("../deploy/zookeeper/quick-start-volume-emptyDir/zookeeper-1-node.yaml")
             kube_apply(config)
             kube_wait_object("pod", "zookeeper-0")
             kube_wait_pod_status("zookeeper-0", "Running")
@@ -121,7 +117,7 @@ def test_010():
     check_zookeeper()
 
     create_and_check("configs/test-010-zkroot.yaml", 
-                     {"apply_templates": {clickhouse_template},
+                     {"apply_templates": {settings.clickhouse_template},
                       "pod_count": 1,
                       "do_not_delete": 1})
     with And("ClickHouse should complain regarding zookeeper path"):
@@ -137,30 +133,37 @@ def test_011():
     with Given("test-011-secured-cluster.yaml and test-011-insecured-cluster.yaml"):
         create_and_check("configs/test-011-secured-cluster.yaml", 
                          {"pod_count": 2,
+                          "service": ["chi-test-011-secured-cluster-default-1-0", "ClusterIP"],
                           "apply_templates": {"templates/tpl-log-volume.yaml"},
                           "do_not_delete": 1})
 
-        create_and_check("configs/test-011-insecured-cluster.yaml", 
-                        {"pod_count": 1,
-                         "do_not_delete": 1})
+        create_and_check("configs/test-011-insecured-cluster.yaml",
+                         {"pod_count": 1,
+                          "do_not_delete": 1})
 
         with Then("Connection to localhost should succeed with default user"):
             out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'")
             assert out == 'OK'
 
         with And("Connection from secured to secured host should succeed"):
-            out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'", 
-                                              host = "chi-test-011-secured-cluster-default-1-0")
+            kube_wait_field("ep", "chi-test-011-secured-cluster-default-1-0",
+                            ".subsets[*].addresses[*].hostname", "chi-test-011-secured-cluster-default-1-0-0")
+            kube_wait_field("ep", "chi-test-011-secured-cluster-default-0-0",
+                            ".subsets[*].addresses[*].hostname", "chi-test-011-secured-cluster-default-0-0-0")
+            with And("hmm, service created but DNS still not updated? wait 10 sec"):
+                time.sleep(10)
+            out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'",
+                                              host="chi-test-011-secured-cluster-default-1-0")
             assert out == 'OK'
 
         with And("Connection from insecured to secured host should fail for default"):
-            out = clickhouse_query_with_error("test-011-insecured-cluster","select 'OK'", 
-                                              host = "chi-test-011-secured-cluster-default-1-0")
+            out = clickhouse_query_with_error("test-011-insecured-cluster", "select 'OK'",
+                                              host="chi-test-011-secured-cluster-default-1-0")
             assert out != 'OK'
 
         with And("Connection from insecured to secured host should fail for user with no password"):
-            out = clickhouse_query_with_error("test-011-insecured-cluster","select 'OK'", 
-                                              host = "chi-test-011-secured-cluster-default-1-0", user = "user1")
+            out = clickhouse_query_with_error("test-011-insecured-cluster", "select 'OK'",
+                                              host="chi-test-011-secured-cluster-default-1-0", user="user1")
             assert "Password required" in out
     
         with And("Connection from insecured to secured host should work for user with password"):
@@ -233,8 +236,8 @@ def test_012():
 @Name("test_013. Test adding shards and creating local and distributed tables automatically")
 def test_013():
     create_and_check("configs/test-013-add-shards-1.yaml",
-                     {"apply_templates": {clickhouse_template}, 
-                      "object_counts": [1,1,2], "do_not_delete": 1})
+                     {"apply_templates": {settings.clickhouse_template},
+                      "object_counts": [1, 1, 2], "do_not_delete": 1})
     
     with Then("Create local and distributed table"):
         clickhouse_query("test-013-add-shards", 
@@ -243,10 +246,10 @@ def test_013():
                          "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
 
     with Then("Add one more shard"):
-        create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2,2,3], "do_not_delete": 1})
+        create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2, 2, 3], "do_not_delete": 1})
     with And("Table should be created on a second shard"):
         out = clickhouse_query("test-013-add-shards", "select count() from default.test_distr",
-                               host = "chi-test-013-add-shards-default-1-0")
+                               host="chi-test-013-add-shards-default-1-0")
         assert out == "1"
     
     with Then("Remove shard"):
@@ -263,17 +266,18 @@ def test_014():
     partition by tuple() order by a""".replace('\r', '').replace('\n', '')
 
     create_and_check("configs/test-014-replication.yaml", 
-                    {"apply_templates": {clickhouse_template}, 
+                    {"apply_templates": {settings.clickhouse_template},
                      "pod_count": 2,
                      "do_not_delete": 1})
 
     with Given("Table is created on a first replica and data is inserted"):
-        clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-0")
-        clickhouse_query("test-014-replication", "insert into t values(1)", host = "chi-test-014-replication-default-0-0")
+        clickhouse_query("test-014-replication", create_table, host="chi-test-014-replication-default-0-0")
+        clickhouse_query("test-014-replication", "insert into t values(1)", host="chi-test-014-replication-default-0-0")
         with When("Table is created on the second replica"):
-            clickhouse_query("test-014-replication", create_table, host = "chi-test-014-replication-default-0-1")
+            clickhouse_query("test-014-replication", create_table, host="chi-test-014-replication-default-0-1")
             with Then("Data should be replicated"):
-                out = clickhouse_query("test-014-replication", "select a from t", host = "chi-test-014-replication-default-0-1")
+                out = clickhouse_query("test-014-replication", "select a from t",
+                                       host="chi-test-014-replication-default-0-1")
                 assert out == "1"
 
     with When("Add one more replica"):
@@ -283,7 +287,8 @@ def test_014():
         # that also works:
         # kubectl patch chi test-014-replication -n test --type=json -p '[{"op":"add", "path": "/spec/configuration/clusters/0/layout/shards/0/replicasCount", "value": 3}]'
         with Then("Replicated table should be automatically created"):
-            out = clickhouse_query("test-014-replication", "select a from t", host = "chi-test-014-replication-default-0-2")
+            out = clickhouse_query("test-014-replication", "select a from t",
+                                   host="chi-test-014-replication-default-0-2")
             assert out == "1"
 
     kube_delete_chi("test-014-replication")
@@ -296,12 +301,12 @@ def test_015():
                       "do_not_delete": 1})
     
     with Then("Query from one server to another one should work"):
-        clickhouse_query("test-015-host-network", host = "chi-test-015-host-network-default-0-0", port = "10000", 
-                            query = "select * from remote('chi-test-015-host-network-default-0-1', system.one)")
+        clickhouse_query("test-015-host-network", host="chi-test-015-host-network-default-0-0", port="10000",
+                         query="select * from remote('chi-test-015-host-network-default-0-1', system.one)")
     
     with Then("Distributed query should work"):
-        out = clickhouse_query("test-015-host-network", host = "chi-test-015-host-network-default-0-0", port = "10000", 
-                               query = "select count() from cluster('all-sharded', system.one) settings receive_timeout=10")
+        out = clickhouse_query("test-015-host-network", host="chi-test-015-host-network-default-0-0", port="10000",
+                               query="select count() from cluster('all-sharded', system.one) settings receive_timeout=10")
         assert out == "2"
     
     kube_delete_chi("test-015-host-network")
@@ -309,15 +314,15 @@ def test_015():
 @TestScenario
 @Name("test_016. Test files and dictionaries setup")
 def test_016():
-    create_and_check("configs/test-016-dict.yaml", 
-                     {"apply_templates": {clickhouse_template}, 
+    create_and_check("configs/test-016-dict.yaml",
+                     {"apply_templates": {settings.clickhouse_template},
                       "pod_count": 1,
                       "do_not_delete": 1})
-    
+
     with Then("dictGet() should work"):
         out = clickhouse_query("test-016-dict", query = "select dictGet('one', 'one', toUInt64(0))")
         assert out == "0"
-    
+
     kube_delete_chi("test-016-dict")
 
 @TestScenario
@@ -325,13 +330,14 @@ def test_016():
 def test_017():
     create_and_check("configs/test-017-multi-version.yaml", {"pod_count": 6, "do_not_delete": 1})
     chi = "test-017-multi-version"
-            
+
     test_query = "select 1 /* comment */ settings log_queries=1"
-    for shard in [0,1,2,3,4,5]:
+    for shard in range(6):
         host = f"chi-{chi}-default-{shard}-0"
-        clickhouse_query(chi, host = host, query = test_query)
-        out = clickhouse_query(chi, host = host, query = "select query from system.query_log order by event_time desc limit 1")
-        ver = clickhouse_query(chi, host = host, query = "select version()")
+        clickhouse_query(chi, host=host, query=test_query)
+        out = clickhouse_query(chi, host=host,
+                               query="select query from system.query_log order by event_time desc limit 1")
+        ver = clickhouse_query(chi, host=host, query="select version()")
 
         print(f"version: {ver}")
         print(f"queried: {test_query}")
@@ -339,60 +345,61 @@ def test_017():
 
     kube_delete_chi(chi)
 
-
 # End of test scenarios
 
-kubectl.namespace="test"
-# operator_version="latest"
-operator_version="0.9.2"
-
-clickhouse_template="templates/tpl-clickhouse-stable.yaml"
-# clickhouse_template="templates/tpl-clickhouse-20.1.4.14.yaml"
-
-clickhouse_version=get_ch_version(clickhouse_template)
-
 if main():
-    with Module("main"):
-        with Given(f"ClickHouse template {clickhouse_template}"):
-            with And(f"ClickHouse version {clickhouse_version}"):
+    with Module("main", flags=TE):
+        with Given(f"ClickHouse template {settings.clickhouse_template}"):
+            with And(f"ClickHouse version {settings.clickhouse_version}"):
                 1 == 1
 
         with Given("clickhouse-operator is installed"):
-            # assert kube_get_count("pod", ns = "kube-system", label = "-l app=clickhouse-operator")>0, error()
-            with And(f"Set operator version {operator_version}"):
-                set_operator_version(operator_version)
-        
-        with Given(f"Clean namespace {kubectl.namespace}"): 
-            kube_deletens(kubectl.namespace)
-            with And(f"Create namespace {kubectl.namespace}"):
-                kube_createns(kubectl.namespace)
+            if kube_get_count("pod", ns='kube-system', label="-l app=clickhouse-operator") == 0:
+                config = get_full_path('../deploy/operator/clickhouse-operator-install-template.yaml')
+                kube_apply(f"<(cat {config} | "
+                           f"OPERATOR_IMAGE=\"altinity/clickhouse-operator:{settings.version}\" "
+                           f"OPERATOR_NAMESPACE=\"kube-system\" "
+                           f"METRICS_EXPORTER_IMAGE=\"altinity/metrics-exporter:{settings.version}\" "
+                           f"METRICS_EXPORTER_NAMESPACE=\"kube-system\" "
+                           f"envsubst)", ns="kube-system")
+            with And(f"Set operator version {settings.version}"):
+                set_operator_version(settings.version)
 
-    #    with Module("examples", flags=TE):
-    #        examples=[test_examples01_1, test_examples01_2, test_examples02_1, test_examples02_2]
-    #        for t in examples:
-    #            run(test=t, flags=TE)
-        
+        with Given(f"Clean namespace {settings.test_namespace}"):
+            kube_deletens(settings.test_namespace)
+            with And(f"Create namespace {settings.test_namespace}"):
+                kube_createns(settings.test_namespace)
+
         with Module("regression", flags=TE):
-            tests = [test_001, 
-                     test_002, 
-                     test_003,
-                     test_004, 
-                     test_005, 
-                     test_006, 
-                     test_007,
-                     # test_009,  
-                     test_010,
-                     test_011,
-                     test_012,
-                     test_013,
-                     test_014,
-                     test_015,
-                     test_016,
-                     test_017]
+            all_tests = [
+                test_001,
+                test_002,
+                test_003,
+                test_004,
+                test_005,
+                test_006,
+                test_007,
+                # test_009,
+                test_010,
+                test_011,
+                test_012,
+                test_013,
+                test_014,
+                test_015,
+                test_016,
+                test_017,
+            ]
         
-            all_tests = tests
-            # all_tests = [test_017]
-        
-            for t in all_tests:
+            run_test = all_tests
+            # placeholder for selective test running
+            # run_test = [
+            #     # test_010,
+            #     # test_011,
+            #     # test_014,
+            #     # test_015,
+            #     # test_017,
+            # ]
+
+            for t in run_test:
                 run(test=t, flags=TE)
 
