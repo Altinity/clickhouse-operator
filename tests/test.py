@@ -101,7 +101,7 @@ def set_operator_version(version, ns="kube-system", timeout=60):
     kubectl(f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:{version}", ns=ns)
     kubectl(f"set image deployment.v1.apps/clickhouse-operator metrics-exporter=altinity/metrics-exporter:{version}", ns=ns)
     kubectl("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
-    assert kube_get_count("pod", ns="kube-system", label=f"-l app=clickhouse-operator") > 0, error()
+    assert kube_get_count("pod", ns=ns, label=f"-l app=clickhouse-operator") > 0, error()
 
 def check_zookeeper():
     with Given("Install Zookeeper if missing"):
@@ -354,10 +354,14 @@ if main():
                 1 == 1
 
         with Given("clickhouse-operator is installed"):
-            if kube_get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") == 0:
-                installer = get_full_path('../deploy/operator-web-installer/clickhouse-operator-install.sh')
-                installer = shell(f"bash -x {installer}")
-                assert installer.exitcode == 0, error()
+            if kube_get_count("pod", ns='kube-system', label="-l app=clickhouse-operator") == 0:
+                config = get_full_path('../deploy/operator/clickhouse-operator-install-template.yaml')
+                kube_apply(f"<(cat {config} | "
+                           f"OPERATOR_IMAGE=\"altinity/clickhouse-operator:{settings.version}\" "
+                           f"OPERATOR_NAMESPACE=\"kube-system\" "
+                           f"METRICS_EXPORTER_IMAGE=\"altinity/metrics-exporter:{settings.version}\" "
+                           f"METRICS_EXPORTER_NAMESPACE=\"kube-system\" "
+                           f"envsubst)", ns="kube-system")
             with And(f"Set operator version {settings.version}"):
                 set_operator_version(settings.version)
 

@@ -99,20 +99,20 @@ def kubectl(command, ok_to_fail=False, ns="test", timeout=60):
     return cmd.output
 
 def kube_count_resources(label="", ns="test"):
-    sts = kube_get_count("sts", ns = ns, label = label)
-    pod = kube_get_count("pod", ns = ns, label = label)
-    service = kube_get_count("service", ns = ns, label = label)
+    sts = kube_get_count("sts", ns=ns, label=label)
+    pod = kube_get_count("pod", ns=ns, label=label)
+    service = kube_get_count("service", ns=ns, label=label)
     return [sts, pod, service]
 
 def kube_apply(config, ns="test"):
     with When(f"{config} is applied"):
-        cmd = shell(f"kubectl apply -f {config} -n {ns}")
+        cmd = shell(f"kubectl apply -n {ns} -f {config}")
     with Then("exitcode should be 0"):
         assert cmd.exitcode == 0, error()
 
 def kube_delete(config, ns="test"):
     with When(f"{config} is deleted"):
-        cmd = shell(f"kubectl delete -f {config} -n {ns}")
+        cmd = shell(f"kubectl delete -n {ns} -f {config}")
     with Then("exitcode should be 0"):
         assert cmd.exitcode == 0, error()
 
