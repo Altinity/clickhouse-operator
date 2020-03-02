@@ -264,7 +264,7 @@ refers directly to:
 
 ## AWS encrypted volumes
 
-As we have discussed in [AWS-specific](AWS-specific) section, AWS provides **gp2** volumes as default media.
+As we have discussed in [AWS-specific](#AWS-specific) section, AWS provides **gp2** volumes as default media.
 Let's create **encrypted** volume based on the same **gp2** volume.
 Specify special `StorageClass`
 ```yaml
