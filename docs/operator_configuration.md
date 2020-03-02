@@ -163,5 +163,5 @@ spec:
 ...
 ```
 
-[clickhouse-operator-install.yaml]: ./deploy/operator/clickhouse-operator-install.yaml
+[clickhouse-operator-install.yaml]: ../deploy/operator/clickhouse-operator-install.yaml
 [70-chop-config.yaml]: ./chi-examples/70-chop-config.yaml
