@@ -104,7 +104,7 @@ In order to install dashboard:
  
 By now Altinity recommended dashboard should be available for use.  
 
-More Grafana [docs](http://docs.grafana.org/)
+More [Grafana docs][grafana-docs]
 
 [grafana_manifest_folder]: ../deploy/grafana/grafana-manually
 [grafana_manifest_yaml]: ../deploy/grafana/grafana-manually/grafana.yaml
@@ -114,3 +114,4 @@ More Grafana [docs](http://docs.grafana.org/)
 [altinity_recommended_dashboard]: ../grafana-dashboard/Altinity_ClickHouse_Operator_dashboard.json 
 [install_grafana_operator_script]: ../deploy/grafana/grafana-with-grafana-operator/install-grafana-operator.sh
 [install_grafana_dashboard_script]: ../deploy/grafana/grafana-with-grafana-operator/install-grafana-with-operator.sh
+[grafana-docs]: http://docs.grafana.org/
