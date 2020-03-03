@@ -41,7 +41,7 @@ function check_file_getter_available() {
         # wget is available - use it
         :
     else
-        echo "neither curl nor wget is unavailable, can not continue"
+        echo "neither curl nor wget is available, can not continue"
         exit 1
     fi
 }
@@ -50,9 +50,9 @@ function check_file_getter_available() {
 #
 # Check whether envsubst is available
 #
-function checks_envsubst_available() {
+function check_envsubst_available() {
     if ! envsubst --version > /dev/null; then
-        echo "curl is unavailable, can not continue"
+        echo "envsubst is unavailable, can not continue"
         exit 1
     fi
 }
@@ -70,7 +70,7 @@ function get_file() {
         # wget is available - use it
         wget -qO- "${URL}"
     else
-        echo "neither curl nor wget is unavailable, can not continue"
+        echo "neither curl nor wget is available, can not continue"
         exit 1
     fi
 }
@@ -96,7 +96,7 @@ METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:$OPE
 ##
 
 check_file_getter_available
-checks_envsubst_available
+check_envsubst_available
 
 echo "Setup ClickHouse Operator into '${OPERATOR_NAMESPACE}' namespace"
 
