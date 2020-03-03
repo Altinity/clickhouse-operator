@@ -671,34 +671,37 @@ func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 		},
 	}
 
-	addContainer(&podTemplate.Spec, corev1.Container{
-		Name:  ClickHouseContainerName,
-		Image: defaultClickHouseDockerImage,
-		Ports: []corev1.ContainerPort{
-			{
-				Name:          chDefaultHTTPPortName,
-				ContainerPort: chDefaultHTTPPortNumber,
-			},
-			{
-				Name:          chDefaultTCPPortName,
-				ContainerPort: chDefaultTCPPortNumber,
-			},
-			{
-				Name:          chDefaultInterserverHTTPPortName,
-				ContainerPort: chDefaultInterserverHTTPPortNumber,
-			},
-		},
-		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/ping",
-					Port: intstr.Parse(chDefaultHTTPPortName),
+	addContainer(
+		&podTemplate.Spec,
+		corev1.Container{
+			Name:  ClickHouseContainerName,
+			Image: defaultClickHouseDockerImage,
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          chDefaultHTTPPortName,
+					ContainerPort: chDefaultHTTPPortNumber,
+				},
+				{
+					Name:          chDefaultTCPPortName,
+					ContainerPort: chDefaultTCPPortNumber,
+				},
+				{
+					Name:          chDefaultInterserverHTTPPortName,
+					ContainerPort: chDefaultInterserverHTTPPortNumber,
 				},
 			},
-			InitialDelaySeconds: 10,
-			PeriodSeconds:       10,
+			ReadinessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/ping",
+						Port: intstr.Parse(chDefaultHTTPPortName),
+					},
+				},
+				InitialDelaySeconds: 10,
+				PeriodSeconds:       10,
+			},
 		},
-	})
+	)
 
 	return podTemplate
 }
