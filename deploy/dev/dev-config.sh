@@ -3,20 +3,22 @@
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-dev}"
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 
-#INSTALL_FROM_ALTINITY_RELEASE_DOCKERHUB="${INSTALL_FROM_ALTINITY_RELEASE_DOCKERHUB:-yes}"
-INSTALL_FROM_ALTINITY_RELEASE_DOCKERHUB="${INSTALL_FROM_ALTINITY_RELEASE_DOCKERHUB:-no}"
+# yes, no
+DEPLOY_OPERATOR="${DEPLOY_OPERATOR:-yes}"
+# release, dev, custom
+DEPLOY_OPERATOR_SOURCE="${DEPLOY_OPERATOR_SOURCE:-custom}"
 
-#INSTALL_FROM_DEPLOYMENT_MANIFEST="${INSTALL_FROM_DEPLOYMENT_MANIFEST:-yes}"
-INSTALL_FROM_DEPLOYMENT_MANIFEST="${INSTALL_FROM_DEPLOYMENT_MANIFEST:-no}"
 
-# In case both INSTALL_* options are "no" we are going to run operator manually, not from dockerhub
-
-if [[ "${INSTALL_FROM_ALTINITY_RELEASE_DOCKERHUB}" == "yes" ]]; then
+if [[ "${DEPLOY_OPERATOR_SOURCE}" == "release" ]]; then
     OPERATOR_IMAGE="altinity/clickhouse-operator:latest"
     METRICS_EXPORTER_IMAGE="altinity/metrics-exporter:latest"
-fi
-
-if [[ "${INSTALL_FROM_DEPLOYMENT_MANIFEST}" == "yes" ]]; then
+    DEPLOY_OPERATOR="yes"
+elif [[ "${DEPLOY_OPERATOR_SOURCE}" == "dev" ]]; then
     OPERATOR_IMAGE="sunsingerus/clickhouse-operator:dev"
     METRICS_EXPORTER_IMAGE="sunsingerus/metrics-exporter:dev"
+    DEPLOY_OPERATOR="yes"
+fi
+
+if [[ "${OPERATOR_VERSION}" != "" ]]; then
+    DEPLOY_OPERATOR="yes"
 fi
