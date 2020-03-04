@@ -11,8 +11,8 @@ set -o pipefail
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
-CODE_GENERATOR_IN_MODULES="${SRC_ROOT}/${MODULES_DIR}/k8s.io/code-generator"
-CODE_GENERATOR_IN_GOPATH="${GOPATH}/src/k8s.io/code-generator"
+CODE_GENERATOR_DIR_IN_MODULES="${SRC_ROOT}/${MODULES_DIR}/k8s.io/code-generator"
+CODE_GENERATOR_DIR_IN_GOPATH="${GOPATH}/src/k8s.io/code-generator"
 
 CODE_GENERATOR_DIR=$( \
     realpath "${CODE_GENERATOR_DIR:-$( \
@@ -28,9 +28,9 @@ echo ""
 echo ""
 echo ""
 
-if [[ "${CODE_GENERATOR_DIR}" == "${CODE_GENERATOR_IN_MODULES}" ]]; then
+if [[ "${CODE_GENERATOR_DIR}" == "${CODE_GENERATOR_DIR_IN_MODULES}" ]]; then
     echo "Run code generator from modules"
-elif [[ "${CODE_GENERATOR_DIR}" == "${CODE_GENERATOR_IN_GOPATH}" ]]; then
+elif [[ "${CODE_GENERATOR_DIR}" == "${CODE_GENERATOR_DIR_IN_GOPATH}" ]]; then
     echo "Run code generator from GOPATH"
 else
     echo "Use custom specified CODE_GENERATOR_DIR=${CODE_GENERATOR_DIR}"
