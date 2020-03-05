@@ -94,3 +94,16 @@ spec:
   chPassword: clickhouse_operator_password
   chPort: 8123
 
+  ################################################
+  ##
+  ## Log parameters
+  ##
+  ################################################
+
+  logtostderr: ""
+  alsologtostderr: "true"
+  v: "2"
+  stderrthreshold: ""
+  vmodule: ""
+  log_backtrace_at: ""
+ 
