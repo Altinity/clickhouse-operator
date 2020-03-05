@@ -30,7 +30,9 @@ import (
 
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
+
 	kubeinformers "k8s.io/client-go/informers"
 )
 
@@ -100,13 +102,17 @@ func Run() {
 		chopInformerFactoryResyncPeriod = defaultInformerFactoryResyncDebugPeriod
 	}
 
-	glog.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
+	log.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
 
 	// Initialize k8s API clients
 	kubeClient, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
 
 	// Create operator instance
 	chop := chop.GetCHOp(chopClient, chopConfigFile)
+	chop.SetupLog()
+	chop.Config().WriteToLog()
+
+	log.V(1).Infof("Log options parsed\n")
 
 	// Create Informers
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
@@ -149,7 +155,7 @@ func Run() {
 	//
 	// Start Controller
 	//
-	glog.V(1).Info("Starting CHI controller\n")
+	log.V(1).Info("Starting CHI controller\n")
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {

@@ -22,7 +22,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
@@ -86,13 +87,15 @@ func Run() {
 		os.Exit(1)
 	}()
 
-	glog.V(1).Infof("Starting metrics exporter. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
+	log.V(1).Infof("Starting metrics exporter. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
 
 	// Initialize k8s API clients
 	_, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
 
 	// Create operator instance
 	chop := chop.GetCHOp(chopClient, chopConfigFile)
+	chop.SetupLog()
+	chop.Config().WriteToLog()
 
 	exporter := metrics.StartMetricsREST(
 		metrics.NewCHAccessInfo(
