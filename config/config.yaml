@@ -103,7 +103,7 @@ chPort: 8123
 ################################################
 
 logtostderr: "true"
-alsologtostderr: ""
+alsologtostderr: "false"
 v: "1"
 stderrthreshold: ""
 vmodule: ""

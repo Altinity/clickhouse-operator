@@ -118,7 +118,7 @@ data:
     ################################################
     
     logtostderr: "true"
-    alsologtostderr: ""
+    alsologtostderr: "false"
     v: "1"
     stderrthreshold: ""
     vmodule: ""
