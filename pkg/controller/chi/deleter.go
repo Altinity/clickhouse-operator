@@ -17,7 +17,7 @@ package chi
 import (
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -41,7 +41,7 @@ func (c *Controller) deleteHost(host *chop.ChiHost) error {
 	// 4. ConfigMap
 	// 5. Service
 	// Need to delete all these item
-	glog.V(1).Infof("Controller delete host %s/%s", host.Address.ClusterName, host.Name)
+	log.V(1).Infof("Controller delete host %s/%s", host.Address.ClusterName, host.Name)
 
 	_ = c.statefulSetDelete(host)
 	_ = c.persistentVolumeClaimDelete(host)
@@ -52,7 +52,7 @@ func (c *Controller) deleteHost(host *chop.ChiHost) error {
 	host.CHI.Status.DeletedHostsCount++
 	_ = c.updateChiObjectStatus(host.CHI, true)
 
-	glog.V(1).Infof("End delete host %s/%s", host.Address.ClusterName, host.Name)
+	log.V(1).Infof("End delete host %s/%s", host.Address.ClusterName, host.Name)
 
 	return nil
 }
@@ -74,16 +74,16 @@ func (c *Controller) deleteConfigMapsChi(chi *chop.ClickHouseInstallation) error
 	// Delete ConfigMap
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommon, newDeleteOptions())
 	if err == nil {
-		glog.V(1).Infof("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommon)
+		log.V(1).Infof("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommon)
 	} else {
-		glog.V(1).Infof("FAIL delete ConfigMap %s/%s %v", chi.Namespace, configMapCommon, err)
+		log.V(1).Infof("FAIL delete ConfigMap %s/%s %v", chi.Namespace, configMapCommon, err)
 	}
 
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommonUsersName, newDeleteOptions())
 	if err == nil {
-		glog.V(1).Infof("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommonUsersName)
+		log.V(1).Infof("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommonUsersName)
 	} else {
-		glog.V(1).Infof("FAIL delete ConfigMap %s/%s %v", chi.Namespace, configMapCommonUsersName, err)
+		log.V(1).Infof("FAIL delete ConfigMap %s/%s %v", chi.Namespace, configMapCommonUsersName, err)
 	}
 
 	return err
@@ -92,7 +92,7 @@ func (c *Controller) deleteConfigMapsChi(chi *chop.ClickHouseInstallation) error
 // statefulSetDeletePod delete a pod of a StatefulSet. This requests StatefulSet to relaunch deleted pod
 func (c *Controller) statefulSetDeletePod(statefulSet *apps.StatefulSet) error {
 	name := chopmodel.CreatePodName(statefulSet)
-	glog.V(1).Infof("Delete Pod %s/%s", statefulSet.Namespace, name)
+	log.V(1).Infof("Delete Pod %s/%s", statefulSet.Namespace, name)
 	return c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(name, newDeleteOptions())
 }
 
@@ -107,11 +107,11 @@ func (c *Controller) statefulSetDelete(host *chop.ChiHost) error {
 	name := chopmodel.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
 
-	glog.V(1).Infof("statefulSetDelete(%s/%s)", namespace, name)
+	log.V(1).Infof("statefulSetDelete(%s/%s)", namespace, name)
 
 	statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name)
 	if err != nil {
-		glog.V(1).Infof("error get StatefulSet %s/%s", namespace, name)
+		log.V(1).Infof("error get StatefulSet %s/%s", namespace, name)
 		return nil
 	}
 
@@ -123,9 +123,9 @@ func (c *Controller) statefulSetDelete(host *chop.ChiHost) error {
 
 	// And now delete empty StatefulSet
 	if err := c.kubeClient.AppsV1().StatefulSets(namespace).Delete(name, newDeleteOptions()); err == nil {
-		glog.V(1).Infof("StatefulSet %s/%s deleted", namespace, name)
+		log.V(1).Infof("StatefulSet %s/%s deleted", namespace, name)
 	} else {
-		glog.V(1).Infof("StatefulSet %s/%s FAILED TO DELETE %v", namespace, name, err)
+		log.V(1).Infof("StatefulSet %s/%s FAILED TO DELETE %v", namespace, name, err)
 	}
 
 	return nil
@@ -138,23 +138,23 @@ func (c *Controller) persistentVolumeClaimDelete(host *chop.ChiHost) error {
 	labeler := chopmodel.NewLabeler(c.chop, host.CHI)
 	listOptions := newListOptions(labeler.GetSelectorHostScope(host))
 	if list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(listOptions); err == nil {
-		glog.V(1).Infof("OK get list of PVC for host %s/%s", namespace, host.Name)
+		log.V(1).Infof("OK get list of PVC for host %s/%s", namespace, host.Name)
 		for i := range list.Items {
 			pvc := &list.Items[i]
 
 			if chopmodel.HostCanDeletePVC(host, pvc.Name) {
 				if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, newDeleteOptions()); err == nil {
-					glog.V(1).Infof("OK delete PVC %s/%s", namespace, pvc.Name)
+					log.V(1).Infof("OK delete PVC %s/%s", namespace, pvc.Name)
 				} else {
-					glog.V(1).Infof("FAIL delete PVC %s/%s %v", namespace, pvc.Name, err)
+					log.V(1).Infof("FAIL delete PVC %s/%s %v", namespace, pvc.Name, err)
 				}
 			} else {
-				glog.V(1).Infof("PVC should not be deleted, leave them intact")
+				log.V(1).Infof("PVC should not be deleted, leave them intact")
 			}
 
 		}
 	} else {
-		glog.V(1).Infof("FAIL get list of PVC for host %s/%s %v", namespace, host.Name, err)
+		log.V(1).Infof("FAIL get list of PVC for host %s/%s %v", namespace, host.Name, err)
 	}
 
 	return nil
@@ -165,12 +165,12 @@ func (c *Controller) configMapDelete(host *chop.ChiHost) error {
 	name := chopmodel.CreateConfigMapPodName(host)
 	namespace := host.Address.Namespace
 
-	glog.V(1).Infof("configMapDelete(%s/%s)", namespace, name)
+	log.V(1).Infof("configMapDelete(%s/%s)", namespace, name)
 
 	if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(name, newDeleteOptions()); err == nil {
-		glog.V(1).Infof("ConfigMap %s/%s deleted", namespace, name)
+		log.V(1).Infof("ConfigMap %s/%s deleted", namespace, name)
 	} else {
-		glog.V(1).Infof("ConfigMap %s/%s delete FAILED %v", namespace, name, err)
+		log.V(1).Infof("ConfigMap %s/%s delete FAILED %v", namespace, name, err)
 	}
 
 	return nil
@@ -180,7 +180,7 @@ func (c *Controller) configMapDelete(host *chop.ChiHost) error {
 func (c *Controller) deleteServiceHost(host *chop.ChiHost) error {
 	serviceName := chopmodel.CreateStatefulSetServiceName(host)
 	namespace := host.Address.Namespace
-	glog.V(1).Infof("deleteServiceReplica(%s/%s)", namespace, serviceName)
+	log.V(1).Infof("deleteServiceReplica(%s/%s)", namespace, serviceName)
 	return c.deleteServiceIfExists(namespace, serviceName)
 }
 
@@ -188,7 +188,7 @@ func (c *Controller) deleteServiceHost(host *chop.ChiHost) error {
 func (c *Controller) deleteServiceShard(shard *chop.ChiShard) error {
 	serviceName := chopmodel.CreateShardServiceName(shard)
 	namespace := shard.Address.Namespace
-	glog.V(1).Infof("deleteServiceShard(%s/%s)", namespace, serviceName)
+	log.V(1).Infof("deleteServiceShard(%s/%s)", namespace, serviceName)
 	return c.deleteServiceIfExists(namespace, serviceName)
 }
 
@@ -196,7 +196,7 @@ func (c *Controller) deleteServiceShard(shard *chop.ChiShard) error {
 func (c *Controller) deleteServiceCluster(cluster *chop.ChiCluster) error {
 	serviceName := chopmodel.CreateClusterServiceName(cluster)
 	namespace := cluster.Address.Namespace
-	glog.V(1).Infof("deleteServiceCluster(%s/%s)", namespace, serviceName)
+	log.V(1).Infof("deleteServiceCluster(%s/%s)", namespace, serviceName)
 	return c.deleteServiceIfExists(namespace, serviceName)
 }
 
@@ -204,7 +204,7 @@ func (c *Controller) deleteServiceCluster(cluster *chop.ChiCluster) error {
 func (c *Controller) deleteServiceChi(chi *chop.ClickHouseInstallation) error {
 	serviceName := chopmodel.CreateChiServiceName(chi)
 	namespace := chi.Namespace
-	glog.V(1).Infof("deleteServiceChi(%s/%s)", namespace, serviceName)
+	log.V(1).Infof("deleteServiceChi(%s/%s)", namespace, serviceName)
 	return c.deleteServiceIfExists(namespace, serviceName)
 }
 
@@ -223,9 +223,9 @@ func (c *Controller) deleteServiceIfExists(namespace, name string) error {
 	// Delete service
 	err = c.kubeClient.CoreV1().Services(namespace).Delete(name, newDeleteOptions())
 	if err == nil {
-		glog.V(1).Infof("OK delete Service %s/%s", namespace, name)
+		log.V(1).Infof("OK delete Service %s/%s", namespace, name)
 	} else {
-		glog.V(1).Infof("FAIL delete Service %s/%s %v", namespace, name, err)
+		log.V(1).Infof("FAIL delete Service %s/%s %v", namespace, name, err)
 	}
 
 	return err

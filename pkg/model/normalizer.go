@@ -19,7 +19,7 @@ import (
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
 	"gopkg.in/d4l3k/messagediff.v1"
 	"k8s.io/api/core/v1"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,10 +76,10 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withD
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		if template := n.chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
-			glog.V(1).Infof("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
+			log.V(1).Infof("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			(&n.chi.Spec).MergeFrom(&template.Spec, chiv1.MergeTypeOverrideByNonEmptyValues)
-			glog.V(1).Infof("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
+			log.V(1).Infof("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
 		}
 	}
 
@@ -131,7 +131,7 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 	hostTemplate, ok := host.GetHostTemplate()
 	if ok {
 		// Host references known HostTemplate
-		glog.V(2).Infof("getHostTemplate() statefulSet %s use custom host template %s", statefulSetName, hostTemplate.Name)
+		log.V(2).Infof("getHostTemplate() statefulSet %s use custom host template %s", statefulSetName, hostTemplate.Name)
 	} else {
 		// Host references UNKNOWN HostTemplate, will use default one
 		// However, with default template there is a nuance - hostNetwork requires different default host template
@@ -150,7 +150,7 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 			hostTemplate = newDefaultHostTemplate(statefulSetName)
 		}
 
-		glog.V(2).Infof("getHostTemplate() statefulSet %s use default host template", statefulSetName)
+		log.V(2).Infof("getHostTemplate() statefulSet %s use default host template", statefulSetName)
 	}
 
 	return hostTemplate

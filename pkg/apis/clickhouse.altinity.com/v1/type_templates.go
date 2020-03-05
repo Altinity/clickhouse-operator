@@ -15,7 +15,7 @@
 package v1
 
 import (
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
 	"github.com/imdario/mergo"
 )
 
@@ -44,7 +44,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) {
 					// Override `to` template with `from` template
 					//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
 					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-						glog.V(1).Infof("ERROR merge template(%s): %v", toTemplate.Name, err)
+						log.V(1).Infof("ERROR merge template(%s): %v", toTemplate.Name, err)
 					}
 					break
 				}
@@ -78,7 +78,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) {
 					// Override `to` template with `from` template
 					//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
 					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-						glog.V(1).Infof("ERROR merge template(%s): %v", toTemplate.Name, err)
+						log.V(1).Infof("ERROR merge template(%s): %v", toTemplate.Name, err)
 					}
 					break
 				}
@@ -112,7 +112,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) {
 					// Override `to` template with `from` template
 					//templates.VolumeClaimTemplates[toIndex] = *fromTemplate.DeepCopy()
 					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-						glog.V(1).Infof("ERROR merge template(%s): %v", toTemplate.Name, err)
+						log.V(1).Infof("ERROR merge template(%s): %v", toTemplate.Name, err)
 					}
 					break
 				}
@@ -146,7 +146,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) {
 					// Override `to` template with `from` template
 					//templates.ServiceTemplates[toIndex] = *fromTemplate.DeepCopy()
 					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-						glog.V(1).Infof("ERROR merge template(%s): %v", toTemplate.Name, err)
+						log.V(1).Infof("ERROR merge template(%s): %v", toTemplate.Name, err)
 					}
 					break
 				}

@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -33,7 +33,7 @@ func StartMetricsREST(
 	chiListAddress string,
 	chiListPath string,
 ) *Exporter {
-	glog.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsAddress, metricsPath)
+	log.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsAddress, metricsPath)
 
 	exporter = NewExporter(chAccess)
 	prometheus.MustRegister(exporter)
