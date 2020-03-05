@@ -15,6 +15,9 @@ echo "METRICS_EXPORTER_NAMESPACE=${METRICS_EXPORTER_NAMESPACE}"
 echo "METRICS_EXPORTER_IMAGE=${METRICS_EXPORTER_IMAGE}"
 echo "DEPLOY_OPERATOR=${DEPLOY_OPERATOR}"
 
+#
+# Deploy prerequisites - CRDs, RBACs, etc
+#
 kubectl -n "${OPERATOR_NAMESPACE}" apply -f <( \
     OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
     OPERATOR_VERSION="${OPERATOR_VERSION}" \
@@ -25,6 +28,9 @@ kubectl -n "${OPERATOR_NAMESPACE}" apply -f <( \
     "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" \
     )
 
+#
+# Deploy operator's deployment
+#
 if [[ "${DEPLOY_OPERATOR}" == "yes" ]]; then
     # Install operator from Docker Registry (dockerhub or whatever)
     kubectl -n "${OPERATOR_NAMESPACE}" apply -f <( \

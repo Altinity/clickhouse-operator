@@ -23,7 +23,7 @@ OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:$OPERATOR_VERSION
 METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:$OPERATOR_VERSION}"
 
 # Local path to operator's config file to be injected into .yaml
-OPERATOR_CONFIG_FILE="${PROJECT_ROOT}/config/config.yaml"
+OPERATOR_CONFIG_FILE="${OPERATOR_CONFIG_FILE:-${PROJECT_ROOT}/config/config.yaml}"
 
 # Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
 # as content of /etc/clickhouse-server/conf.d folder
