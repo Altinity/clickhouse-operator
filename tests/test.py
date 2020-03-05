@@ -71,30 +71,29 @@ def test_007():
                       "pod_ports": [8124,9001,9010]})
 
 @TestScenario
-@Name("test_009. Test operator upgrade from 0.6.0 to later version")
+@Name("test_009. Test operator upgrade")
 def test_009():
-    version_from = "0.6.0"
+    version_from = "0.7.0"
     version_to = settings.version
     with Given(f"clickhouse-operator {version_from}"):
-        kube_deletens(settings.test_namespace)
-        kube_createns(settings.test_namespace)
         set_operator_version(version_from)
-        config = get_full_path("configs/test-009-long-name.yaml")
-        chi_full_name = get_chi_name(config)
-        chi_cut_name = chi_full_name[0:15]
+        config = get_full_path("configs/test-009-operator-upgrade.yaml")
+        chi = get_chi_name(config)
 
-        kube_apply(config)
-        kube_wait_objects(chi_cut_name, [1, 1, 2])
-        kube_wait_chi_status(chi_full_name, "Completed")
+        create_and_check("configs/test-009-operator-upgrade.yaml", {"pod_count": 1, "do_not_delete": 1})
 
         assert kube_get_count("statefulset", label="-l clickhouse.altinity.com/app=chop") == 1, error()
 
-        with Then(f"upgrade operator to {version_to}"):
+        with When(f"upgrade operator to {version_to}"):
             set_operator_version(version_to, timeout=120)
             with And("Wait 20 seconds"):
                 time.sleep(20)
-                with Then("No new statefulsets should be created"):
+                with Then("Status should be Completed"):
+                    assert kube_get_chi_status(chi) == "Completed"
+                with And("No new statefulsets should be created"):
                     assert kube_get_count("statefulset", label="-l clickhouse.altinity.com/app=chop") == 1, error()
+
+        kube_delete_chi(chi)
 
 
 def set_operator_version(version, ns="kube-system", timeout=60):
@@ -134,7 +133,7 @@ def test_011():
         create_and_check("configs/test-011-secured-cluster.yaml", 
                          {"pod_count": 2,
                           "service": ["chi-test-011-secured-cluster-default-1-0", "ClusterIP"],
-                          "apply_templates": {"templates/tpl-log-volume.yaml"},
+                          "apply_templates": {settings.clickhouse_template, "templates/tpl-log-volume.yaml"},
                           "do_not_delete": 1})
 
         create_and_check("configs/test-011-insecured-cluster.yaml",
@@ -192,7 +191,7 @@ def test_011():
         kube_delete_chi("test-011-secured-cluster")
         kube_delete_chi("test-011-insecured-cluster")
     
-    with Given("test-011-secured-default.yaml"):
+    with Given("test-011-secured-default.yaml with password_sha256_hex for default user"):
         create_and_check("configs/test-011-secured-default.yaml", 
                          {"pod_count": 1,
                           "do_not_delete": 1})
@@ -212,6 +211,12 @@ def test_011():
                 chi = kube_get("chi", "test-011-secured-default")
                 assert "default/password" in chi["spec"]["configuration"]["users"]
                 assert chi["spec"]["configuration"]["users"]["default/password"] == "_removed_"
+
+        with When("Default user is assigned the different profile"):
+            create_and_check("configs/test-011-secured-default-3.yaml", {"do_not_delete": 1})
+            with Then("Connection to localhost should succeed with default user"):
+                out = clickhouse_query_with_error("test-011-secured-default", "select 'OK'")
+                assert out == 'OK'
     
         kube_delete_chi("test-011-secured-default")
 
@@ -344,12 +349,37 @@ def test_017():
         print(f"logged: {out}")
 
     kube_delete_chi(chi)
+    
+@TestScenario
+@Name("test-018-configmap. Test that configuration is properly updated")
+def test_018():
+    create_and_check("configs/test-018-configmap.yaml", {"pod_count": 1, "do_not_delete": 1})
+    
+    with Then("user1/networks/ip should be in config"):
+        chi = kube_get("chi", "test-018-configmap")
+        assert "user1/networks/ip" in chi["spec"]["configuration"]["users"]
+    
+    create_and_check("configs/test-018-configmap-2.yaml", {"pod_count": 1, "do_not_delete": 1})
+    with Then("user2/networks should be in config"):
+        chi = kube_get("chi", "test-018-configmap")
+        assert "user2/networks/ip" in chi["spec"]["configuration"]["users"]
+        with And("user1/networks/ip should NOT be in config"):
+            assert "user1/networks/ip" not in chi["spec"]["configuration"]["users"]
+    
+    kube_delete_chi("test-018-configmap")
+
 
 # End of test scenarios
 
 if main():
     with Module("main", flags=TE):
+        with Given(f"Clean namespace {settings.test_namespace}"):
+            kube_deletens(settings.test_namespace)
+            with And(f"Create namespace {settings.test_namespace}"):
+                kube_createns(settings.test_namespace)
+                
         with Given(f"ClickHouse template {settings.clickhouse_template}"):
+            kube_apply(get_full_path(settings.clickhouse_template), settings.test_namespace)
             with And(f"ClickHouse version {settings.clickhouse_version}"):
                 1 == 1
 
@@ -365,11 +395,6 @@ if main():
             with And(f"Set operator version {settings.version}"):
                 set_operator_version(settings.version)
 
-        with Given(f"Clean namespace {settings.test_namespace}"):
-            kube_deletens(settings.test_namespace)
-            with And(f"Create namespace {settings.test_namespace}"):
-                kube_createns(settings.test_namespace)
-
         with Module("regression", flags=TE):
             all_tests = [
                 test_001,
@@ -379,7 +404,7 @@ if main():
                 test_005,
                 test_006,
                 test_007,
-                # test_009,
+                test_009,
                 test_010,
                 test_011,
                 test_012,
@@ -387,18 +412,13 @@ if main():
                 test_014,
                 test_015,
                 test_016,
-                test_017,
+                test_018,
             ]
         
             run_test = all_tests
+            
             # placeholder for selective test running
-            # run_test = [
-            #     # test_010,
-            #     # test_011,
-            #     # test_014,
-            #     # test_015,
-            #     # test_017,
-            # ]
+            # run_test = [test_009]
 
             for t in run_test:
                 run(test=t, flags=TE)

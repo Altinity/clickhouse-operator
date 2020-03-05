@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "long-chi-name-test-0-6-0"
+  name: "test-009-operator-upgrade"
   labels:
     test: test
 spec:

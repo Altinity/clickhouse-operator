@@ -139,6 +139,9 @@ def kube_wait_object(type, name, label="", count = 1, ns="test"):
 def kube_wait_chi_status(chi, status, ns="test"):
     kube_wait_field("chi", chi, ".status.status", status, ns)
 
+def kube_get_chi_status(chi, ns="test"):
+    kube_get_field("chi", chi, ".status.status", ns)
+
 def kube_wait_pod_status(pod, status, ns="test"):
     kube_wait_field("pod", pod, ".status.phase", status, ns)
 
@@ -151,6 +154,10 @@ def kube_wait_field(object, name, field, value, ns="test"):
             with Then("Not ready. Wait for " + str(i*5) + " seconds"):
                 time.sleep(i*5)
         assert obj_status[1] == value, error()
+
+def kube_get_field(object, name, field, ns="test"):
+    out = kubectl(f"get {object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
+    return out[1]
 
 def kube_get_pod_spec(chi_name, ns="test"):
     pod = kube_get("pod", "", ns = ns, label = f"-l clickhouse.altinity.com/chi={chi_name}")["items"][0]
