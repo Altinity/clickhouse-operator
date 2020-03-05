@@ -15,8 +15,12 @@
 package chop
 
 import (
+	"flag"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 )
 
 type CHOp struct {
@@ -41,4 +45,33 @@ func (c *CHOp) Init() error {
 
 func (c *CHOp) Config() *v1.OperatorConfig {
 	return c.ConfigManager.Config()
+}
+
+func (c *CHOp) SetupLog() {
+	updated := false
+	if c.Config().Logtostderr != "" {
+		_ = flag.Set("logtostderr", c.Config().Logtostderr)
+		updated = true
+		log.V(1).Infof("Log option %s=%s\n", "logtostderr", c.Config().Logtostderr)
+	}
+	if c.Config().Alsologtostderr != "" {
+		_ = flag.Set("alsologtostderr", c.Config().Alsologtostderr)
+		updated = true
+		log.V(1).Infof("Log option %s=%s\n", "alsologtostderr", c.Config().Alsologtostderr)
+	}
+	if c.Config().Stderrthreshold != "" {
+		_ = flag.Set("stderrthreshold", c.Config().Stderrthreshold)
+		updated = true
+		log.V(1).Infof("Log option %s=%s\n", "stderrthreshold", c.Config().Stderrthreshold)
+	}
+	if c.Config().V != "" {
+		_ = flag.Set("v", c.Config().V)
+		updated = true
+		log.V(1).Infof("Log option %s=%s\n", "v", c.Config().V)
+	}
+
+	if updated {
+		flag.Parse()
+		log.V(1).Infof("Additional log options parsed\n")
+	}
 }

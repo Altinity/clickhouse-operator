@@ -19,6 +19,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model"
 
 	log "github.com/golang/glog"
+	// log "k8s.io/klog"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

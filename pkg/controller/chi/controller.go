@@ -40,6 +40,7 @@ import (
 	"os"
 
 	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 )
 
 // NewController creates instance of Controller

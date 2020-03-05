@@ -16,6 +16,8 @@ package chop
 
 import (
 	log "github.com/golang/glog"
+	// log "k8s.io/klog"
+
 	"github.com/kubernetes-sigs/yaml"
 	"io/ioutil"
 	"os"

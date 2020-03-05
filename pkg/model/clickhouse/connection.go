@@ -19,6 +19,8 @@ import (
 	sqlmodule "database/sql"
 	"fmt"
 	log "github.com/golang/glog"
+	// log "k8s.io/klog"
+
 	_ "github.com/mailru/go-clickhouse"
 	"time"
 )

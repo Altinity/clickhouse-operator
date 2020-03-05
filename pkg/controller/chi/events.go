@@ -17,6 +17,8 @@ package chi
 import (
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	log "github.com/golang/glog"
+	// log "k8s.io/klog"
+
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 

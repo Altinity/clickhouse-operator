@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 
 	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/version"

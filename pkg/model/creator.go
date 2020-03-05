@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 )
 
 type Creator struct {
