@@ -16,9 +16,10 @@ package chi
 
 import (
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"time"
 )
 
@@ -98,6 +99,6 @@ func (c *Controller) eventChi(
 	_, err := c.kubeClient.CoreV1().Events(chi.Namespace).Create(event)
 
 	if err != nil {
-		glog.V(1).Infof("Create Event failed: %v", err)
+		log.V(1).Infof("Create Event failed: %v", err)
 	}
 }

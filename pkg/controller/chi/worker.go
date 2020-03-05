@@ -16,13 +16,12 @@ package chi
 
 import (
 	"fmt"
+	log "github.com/golang/glog"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
-	"github.com/golang/glog"
 )
 
 type worker struct {
@@ -100,10 +99,10 @@ func (w *worker) processItem(item interface{}) error {
 	case *DropDns:
 		drop, _ := item.(*DropDns)
 		if chi, err := w.createChiFromObjectMeta(drop.initiator); err == nil {
-			glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", drop.initiator.Namespace, drop.initiator.Name, chi.Name)
+			log.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", drop.initiator.Namespace, drop.initiator.Name, chi.Name)
 			_ = w.schemer.ChiDropDnsCache(chi)
 		} else {
-			glog.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", drop.initiator.Namespace, drop.initiator.Name, drop.initiator.Labels)
+			log.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", drop.initiator.Namespace, drop.initiator.Name, drop.initiator.Labels)
 		}
 		return nil
 	}
@@ -119,7 +118,7 @@ func (w *worker) addChi(new *chop.ClickHouseInstallation) error {
 	// CHI is a new one - need to create normalized CHI
 	// Operator receives CHI struct partially filled by data from .yaml file provided by user
 	// We need to create full normalized specification
-	glog.V(1).Infof("addChi(%s/%s)", new.Namespace, new.Name)
+	log.V(1).Infof("addChi(%s/%s)", new.Namespace, new.Name)
 	w.c.eventChi(new, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted, fmt.Sprintf("ClickHouseInstallation (%s): start add process", new.Name))
 
 	return w.updateChi(nil, new)
@@ -139,7 +138,7 @@ func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseIns
 func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 	if (old != nil) && (new != nil) && (old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion) {
-		glog.V(2).Infof("updateChi(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
+		log.V(2).Infof("updateChi(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
 		// No need to react
 		return nil
 	}
@@ -151,11 +150,11 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 	if !actionPlan.HasActionsToDo() {
 		// Nothing to do - no changes found - no need to react
-		glog.V(2).Infof("updateChi(%s/%s) - no changes found", new.Namespace, new.Name)
+		log.V(2).Infof("updateChi(%s/%s) - no changes found", new.Namespace, new.Name)
 		return nil
 	}
 
-	glog.V(1).Infof("updateChi(%s/%s) - start reconcile with action plan >>>\n%s",
+	log.V(1).Infof("updateChi(%s/%s) - start reconcile with action plan >>>\n%s",
 		new.Namespace, new.Name, actionPlan.String(),
 	)
 
@@ -166,35 +165,35 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 	new.Status.DeletedHostsCount = 0
 	new.Status.DeleteHostsCount = actionPlan.GetRemovedHostsNum()
 	if err := w.c.updateChiObject(new); err != nil {
-		glog.V(1).Infof("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
+		log.V(1).Infof("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
 		return nil
 	}
 
 	if err := w.reconcile(new); err != nil {
-		log := fmt.Sprintf("FAILED update: %v", err)
-		glog.V(1).Info(log)
-		w.c.eventChi(new, eventTypeError, eventActionUpdate, eventReasonUpdateFailed, log)
+		str := fmt.Sprintf("FAILED update: %v", err)
+		log.V(1).Info(str)
+		w.c.eventChi(new, eventTypeError, eventActionUpdate, eventReasonUpdateFailed, str)
 		return nil
 	}
 
 	// Post-process added items
 	actionPlan.WalkAdded(
 		func(cluster *chop.ChiCluster) {
-			log := fmt.Sprintf("Added cluster %s", cluster.Name)
-			glog.V(1).Info(log)
-			w.c.eventChi(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
+			str := fmt.Sprintf("Added cluster %s", cluster.Name)
+			log.V(1).Info(str)
+			w.c.eventChi(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, str)
 		},
 		func(shard *chop.ChiShard) {
-			log := fmt.Sprintf("Added shard %d to cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName)
-			glog.V(1).Info(log)
-			w.c.eventChi(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
+			str := fmt.Sprintf("Added shard %d to cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName)
+			log.V(1).Info(str)
+			w.c.eventChi(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, str)
 
 			_ = w.createTablesOnShard(new, shard)
 		},
 		func(host *chop.ChiHost) {
-			log := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-			glog.V(1).Info(log)
-			w.c.eventChi(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, log)
+			str := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			log.V(1).Info(str)
+			w.c.eventChi(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, str)
 
 			_ = w.createTablesOnHost(new, host)
 		},
@@ -222,7 +221,7 @@ func (w *worker) updateChi(old, new *chop.ClickHouseInstallation) error {
 
 	w.c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 
-	glog.V(1).Infof("updateChi(%s/%s) - complete reconcile <<<", new.Namespace, new.Name)
+	log.V(1).Infof("updateChi(%s/%s) - complete reconcile <<<", new.Namespace, new.Name)
 
 	return nil
 }
@@ -317,11 +316,11 @@ func (w *worker) createTablesOnHost(chi *chop.ClickHouseInstallation, host *chop
 	cluster := &chi.Spec.Configuration.Clusters[host.Address.ClusterIndex]
 
 	names, createSQLs, _ := w.schemer.GetCreateReplicatedObjects(chi, cluster, host)
-	glog.V(1).Infof("Creating replicated objects: %v", names)
+	log.V(1).Infof("Creating replicated objects: %v", names)
 	_ = w.schemer.HostApplySQLs(host, createSQLs, true)
 
 	names, createSQLs, _ = w.schemer.ClusterGetCreateDistributedObjects(chi, cluster)
-	glog.V(1).Infof("Creating distributed objects: %v", names)
+	log.V(1).Infof("Creating distributed objects: %v", names)
 	_ = w.schemer.HostApplySQLs(host, createSQLs, true)
 
 	return nil
@@ -333,7 +332,7 @@ func (w *worker) createTablesOnShard(chi *chop.ClickHouseInstallation, shard *ch
 	cluster := &chi.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
 
 	names, createSQLs, _ := w.schemer.ClusterGetCreateDistributedObjects(chi, cluster)
-	glog.V(1).Infof("Creating distributed objects: %v", names)
+	log.V(1).Infof("Creating distributed objects: %v", names)
 	_ = w.schemer.ShardApplySQLs(shard, createSQLs, true)
 
 	return nil
@@ -344,7 +343,7 @@ func (w *worker) createTablesOnShard(chi *chop.ClickHouseInstallation, shard *ch
 func (w *worker) deleteTablesOnHost(host *chop.ChiHost) error {
 	// Delete tables on replica
 	tableNames, dropTableSQLs, _ := w.schemer.HostGetDropTables(host)
-	glog.V(1).Infof("Drop tables: %v as %v", tableNames, dropTableSQLs)
+	log.V(1).Infof("Drop tables: %v as %v", tableNames, dropTableSQLs)
 	_ = w.schemer.HostApplySQLs(host, dropTableSQLs, false)
 
 	return nil
@@ -354,11 +353,11 @@ func (w *worker) deleteTablesOnHost(host *chop.ChiHost) error {
 func (w *worker) deleteChi(chi *chop.ClickHouseInstallation) error {
 	var err error
 
-	glog.V(1).Infof("Start delete CHI %s/%s", chi.Namespace, chi.Name)
+	log.V(1).Infof("Start delete CHI %s/%s", chi.Namespace, chi.Name)
 
 	chi, err = w.normalizer.CreateTemplatedChi(chi, true)
 	if err != nil {
-		glog.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
+		log.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
 		return err
 	}
 
@@ -377,7 +376,7 @@ func (w *worker) deleteChi(chi *chop.ClickHouseInstallation) error {
 
 	w.c.deleteWatch(chi.Namespace, chi.Name)
 
-	glog.V(1).Infof("End delete CHI %s/%s", chi.Namespace, chi.Name)
+	log.V(1).Infof("End delete CHI %s/%s", chi.Namespace, chi.Name)
 
 	return nil
 }
@@ -391,7 +390,7 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 	// 4. ConfigMap
 	// 5. Service
 	// Need to delete all these item
-	glog.V(1).Infof("Worker delete host %s/%s", host.Address.ClusterName, host.Name)
+	log.V(1).Infof("Worker delete host %s/%s", host.Address.ClusterName, host.Name)
 
 	_ = w.deleteTablesOnHost(host)
 
@@ -400,21 +399,21 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 
 // deleteShard deletes all kubernetes resources related to shard *chop.ChiShard
 func (w *worker) deleteShard(shard *chop.ChiShard) error {
-	glog.V(1).Infof("Start delete shard %s/%s", shard.Address.Namespace, shard.Name)
+	log.V(1).Infof("Start delete shard %s/%s", shard.Address.Namespace, shard.Name)
 
 	// Delete all replicas
 	shard.WalkHosts(w.deleteHost)
 
 	// Delete Shard Service
 	_ = w.c.deleteServiceShard(shard)
-	glog.V(1).Infof("End delete shard %s/%s", shard.Address.Namespace, shard.Name)
+	log.V(1).Infof("End delete shard %s/%s", shard.Address.Namespace, shard.Name)
 
 	return nil
 }
 
 // deleteCluster deletes all kubernetes resources related to cluster *chop.ChiCluster
 func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
-	glog.V(1).Infof("Start delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
+	log.V(1).Infof("Start delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
 
 	// Delete all shards
 	cluster.WalkShards(func(index int, shard *chop.ChiShard) error {
@@ -423,7 +422,7 @@ func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
 
 	// Delete Cluster Service
 	_ = w.c.deleteServiceCluster(cluster)
-	glog.V(1).Infof("End delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
+	log.V(1).Infof("End delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
 
 	return nil
 }

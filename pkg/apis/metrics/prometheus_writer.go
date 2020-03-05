@@ -18,7 +18,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -139,14 +139,14 @@ func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, de
 		labelValues...,
 	)
 	if err != nil {
-		glog.Infof("Error creating metric %s: %s", name, err)
+		log.Infof("Error creating metric %s: %s", name, err)
 		return
 	}
 	select {
 	case out <- m:
 
 	default:
-		glog.Infof("Error sending metric to the channel %s", name)
+		log.Infof("Error sending metric to the channel %s", name)
 	}
 }
 

@@ -15,7 +15,7 @@
 package chop
 
 import (
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
 	"github.com/kubernetes-sigs/yaml"
 	"io/ioutil"
 	"os"
@@ -74,7 +74,7 @@ func (cm *ConfigManager) Init() error {
 	if err != nil {
 		return err
 	}
-	glog.V(1).Info("File-based ClickHouseOperatorConfigurations")
+	log.V(1).Info("File-based ClickHouseOperatorConfigurations")
 	cm.fileConfig.WriteToLog()
 
 	// Get configs from all config Custom Resources
@@ -86,14 +86,14 @@ func (cm *ConfigManager) Init() error {
 	cm.buildUnifiedConfig()
 
 	// From now on we have one unified CHOP config
-	glog.V(1).Info("Unified (but not post-processed yet) CHOP config")
+	log.V(1).Info("Unified (but not post-processed yet) CHOP config")
 	cm.config.WriteToLog()
 
 	// Finalize config by post-processing
 	cm.config.Postprocess()
 
 	// OperatorConfig is ready
-	glog.V(1).Info("Final CHOP config")
+	log.V(1).Info("Final CHOP config")
 	cm.config.WriteToLog()
 
 	return nil
@@ -114,7 +114,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 	// Get list of ClickHouseOperatorConfiguration objects
 	var err error
 	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(metav1.ListOptions{}); err != nil {
-		glog.V(1).Infof("Error read ClickHouseOperatorConfigurations %v", err)
+		log.V(1).Infof("Error read ClickHouseOperatorConfigurations %v", err)
 		return
 	}
 
@@ -150,7 +150,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 // logCRBasedConfigs writes all ClickHouseOperatorConfiguration objects into log
 func (cm *ConfigManager) logCRBasedConfigs() {
 	for _, chOperatorConfiguration := range cm.crConfigs {
-		glog.V(1).Infof("chop config %s/%s :", chOperatorConfiguration.ConfigFolderPath, chOperatorConfiguration.ConfigFilePath)
+		log.V(1).Infof("chop config %s/%s :", chOperatorConfiguration.ConfigFolderPath, chOperatorConfiguration.ConfigFilePath)
 		chOperatorConfiguration.WriteToLog()
 	}
 }
@@ -303,9 +303,9 @@ func (cm *ConfigManager) logEnvVarParams() {
 	sort.Strings(keys)
 
 	// Walk over sorted names aka keys
-	glog.V(1).Infof("Parameters num: %d\n", len(cm.runtimeParams))
+	log.V(1).Infof("Parameters num: %d\n", len(cm.runtimeParams))
 	for _, k := range keys {
-		glog.V(1).Infof("%s=%s\n", k, cm.runtimeParams[k])
+		log.V(1).Infof("%s=%s\n", k, cm.runtimeParams[k])
 	}
 }
 

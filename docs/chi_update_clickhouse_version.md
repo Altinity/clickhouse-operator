@@ -21,7 +21,7 @@ deployment.apps/clickhouse-operator   1/1     1            1           17s
 NAME                                            DESIRED   CURRENT   READY   AGE
 replicaset.apps/clickhouse-operator-5cbc47484   1         1         1       17s
 ```
-Now let's install ClickHouse from provided examples. Manifest file with initial position is [08-clickhouse-version-update-01-initial-position.yaml](./chi-examples/08-clickhouse-version-update-01-initial-position.yaml):
+Now let's install ClickHouse from provided examples. Manifest file with initial position is [08-clickhouse-version-update-01-initial-position.yaml][08-clickhouse-version-update-01-initial-position.yaml]:
 ```bash
 kubectl -n dev apply -f 08-clickhouse-version-update-01-initial-position.yaml
 ```
@@ -51,7 +51,7 @@ configmap/chi-06791a-deploy-confd-28a0-0-0   1      9s
 configmap/chi-06791a-deploy-confd-28a0-0-1   1      9s
 configmap/chi-06791a-deploy-confd-28a0-0-2   1      9s
 ```
-We expect all Pods to run ClickHouse version `19.1.10` as specified in [initial manifest](./chi-examples/08-clickhouse-version-update-01-initial-position.yaml).
+We expect all Pods to run ClickHouse version `19.1.10` as specified in [initial manifest][initial-manifest].
 
 Let's explore all Pods in order to check available ClickHouse version.
 Navigate directly inside each Pod
@@ -95,7 +95,7 @@ We can do by explicitly specifying `templates` with different ClickHouse version
                   templates:
                     podTemplate: clickhouse:19.3.7
 ```
-Manifest file with one ClickHouse instance update is [08-clickhouse-version-update-02-apply-update-one.yaml](./chi-examples/08-clickhouse-version-update-02-apply-update-one.yaml):
+Manifest file with one ClickHouse instance update is [08-clickhouse-version-update-02-apply-update-one.yaml][08-clickhouse-version-update-02-apply-update-one.yaml]:
 ```bash
 kubectl -n dev apply -f 08-clickhouse-version-update-02-apply-update-one.yaml
 ``` 
@@ -132,7 +132,7 @@ All seems to be good. Let's update the whole cluster now.
 ## Update the whole cluster
 
 Let's run update - apply `.yaml`.
-Manifest file with all ClickHouse instance updated is [08-clickhouse-version-update-03-apply-update-all.yaml](./chi-examples/08-clickhouse-version-update-03-apply-update-all.yaml):
+Manifest file with all ClickHouse instance updated is [08-clickhouse-version-update-03-apply-update-all.yaml][08-clickhouse-version-update-03-apply-update-all.yaml]:
 ```bash
 kubectl -n dev apply -f 08-clickhouse-version-update-03-apply-update-all.yaml
 ```
@@ -164,3 +164,8 @@ Connecting to localhost:9000 as user default.
 Connected to ClickHouse server version 19.3.7 revision 54415.
 ```
 All looks fine.
+
+[08-clickhouse-version-update-01-initial-position.yaml]: ./chi-examples/08-clickhouse-version-update-01-initial-position.yaml
+[08-clickhouse-version-update-02-apply-update-one.yaml]: ./chi-examples/08-clickhouse-version-update-02-apply-update-one.yaml
+[08-clickhouse-version-update-03-apply-update-all.yaml]: ./chi-examples/08-clickhouse-version-update-03-apply-update-all.yaml
+[initial-manifest]: ./chi-examples/08-clickhouse-version-update-01-initial-position.yaml

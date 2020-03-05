@@ -1,6 +1,6 @@
 # Install ClickHouse Operator
 
-Verify [clickhouse-operator-install.yaml](../deploy/operator/clickhouse-operator-install.yaml) file availability.
+Verify [clickhouse-operator-install.yaml][clickhouse-operator-install.yaml] file availability.
 In is located in `deploy/operator` folder inside `clickhouse-operator` sources.
 
 ## Install
@@ -46,14 +46,14 @@ Let's walk over all resources created along with ClickHouse operator, which are:
 ```text
 customresourcedefinition.apiextensions.k8s.io/clickhouseinstallations.clickhouse.altinity.com created
 ```
-New [Custom Resource Definition](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions) named **ClickHouseInstallation** is created.
+New [Custom Resource Definition][customresourcedefinitions] named **ClickHouseInstallation** is created.
 k8s API is extended with new kind `ClickHouseInstallation` and we'll be able to manage k8s resource of `kind: ClickHouseInstallation`
 
 ### Service Account
 ```text
 serviceaccount/clickhouse-operator created
 ```
-New [Service Account](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/) named **clickhouse-operator** is created.
+New [Service Account][configure-service-account] named **clickhouse-operator** is created.
 A service account provides an identity used to contact the `apiserver` by the processes that run in a Pod. 
 Processes in containers inside pods can contact the `apiserver`, and when they do, they are authenticated as a particular `Service Account` - `clickhouse-operator` in this case.
 
@@ -61,7 +61,7 @@ Processes in containers inside pods can contact the `apiserver`, and when they d
 ```text
 clusterrolebinding.rbac.authorization.k8s.io/clickhouse-operator created
 ```
-New [CluserRoleBinding](https://kubernetes.io/docs/reference/access-authn-authz/rbac/#rolebinding-and-clusterrolebinding) named **clickhouse-operator** is created.
+New [CluserRoleBinding][rolebinding-and-clusterrolebinding] named **clickhouse-operator** is created.
 A role binding grants the permissions defined in a role to a set of users. 
 It holds a reference to the role being granted to the list of subjects (users, groups, or service accounts).
 In this case Role
@@ -85,7 +85,7 @@ Permissions are granted cluster-wide with a `ClusterRoleBinding`.
 ```text
 deployment.apps/clickhouse-operator configured
 ```
-New [Deployment](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/) named **clickhouse-operator** is created. 
+New [Deployment][deployment] named **clickhouse-operator** is created. 
 ClickHouse operator app would be run by this deployment in `kube-system` namespace.
 
 ## Verify Resources
@@ -138,3 +138,9 @@ clickhouse-operator    1/1     1            1           31m
 ...
 
 ```
+
+[clickhouse-operator-install.yaml]: ../deploy/operator/clickhouse-operator-install.yaml
+[customresourcedefinitions]: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions
+[configure-service-account]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
+[rolebinding-and-clusterrolebinding]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#rolebinding-and-clusterrolebinding
+[deployment]: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
