@@ -42,4 +42,5 @@ COPY --from=builder-operator /tmp/clickhouse-operator .
 #   --config=/path/to/config
 #   --kube-config=/path/to/kubeconf
 ENTRYPOINT ["/clickhouse-operator"]
-CMD ["-alsologtostderr=true", "-v=1"]
+CMD ["-logtostderr=true", "-v=1"]
+#CMD ["-alsologtostderr=true", "-v=1"]

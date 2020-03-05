@@ -42,4 +42,5 @@ COPY --from=builder-metrics-exporter /tmp/metrics-exporter .
 #   --config=/path/to/config
 #   --kube-config=/path/to/kubeconf
 ENTRYPOINT ["/metrics-exporter"]
-CMD ["-alsologtostderr=true", "-v=1"]
+CMD ["-logtostderr=true", "-v=1"]
+#CMD ["-alsologtostderr=true", "-v=1"]

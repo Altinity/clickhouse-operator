@@ -23,6 +23,8 @@ import (
 	"sync"
 
 	log "github.com/golang/glog"
+	// log "k8s.io/klog"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"

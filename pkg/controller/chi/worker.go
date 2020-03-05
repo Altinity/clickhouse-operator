@@ -17,6 +17,7 @@ package chi
 import (
 	"fmt"
 	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"

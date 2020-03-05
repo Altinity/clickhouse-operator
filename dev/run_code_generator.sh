@@ -17,7 +17,7 @@ CODE_GENERATOR_DIR_IN_GOPATH="${GOPATH}/src/k8s.io/code-generator"
 CODE_GENERATOR_DIR=$( \
     realpath "${CODE_GENERATOR_DIR:-$( \
         cd "${SRC_ROOT}"; \
-        ls -d -1 "${CODE_GENERATOR_IN_MODULES}" 2>/dev/null || echo "${CODE_GENERATOR_IN_GOPATH}" \
+        ls -d -1 "${CODE_GENERATOR_DIR_IN_MODULES}" 2>/dev/null || echo "${CODE_GENERATOR_DIR_IN_GOPATH}" \
     )}" \
 )
 

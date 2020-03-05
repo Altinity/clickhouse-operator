@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"github.com/MakeNowJust/heredoc"
 	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 	"strings"
 )
 

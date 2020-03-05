@@ -40,6 +40,7 @@ import (
 	"os"
 
 	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 )
 
 // NewController creates instance of Controller
@@ -457,9 +458,9 @@ func (c *Controller) deleteChit(chit *chi.ClickHouseInstallationTemplate) error 
 // addChopConfig
 func (c *Controller) addChopConfig(chopConfig *chi.ClickHouseOperatorConfiguration) error {
 	if c.chop.ConfigManager.IsConfigListed(chopConfig) {
-		log.V(1).Infof("addChopConfig(%s/%s) known config", chopConfig.Namespace, chopConfig.Name)
+		log.V(1).Infof("addChopConfig(%s/%s) already known config - do nothing", chopConfig.Namespace, chopConfig.Name)
 	} else {
-		log.V(1).Infof("addChopConfig(%s/%s) UNKNOWN CONFIG", chopConfig.Namespace, chopConfig.Name)
+		log.V(1).Infof("addChopConfig(%s/%s) new, previously unknown config, need to apply", chopConfig.Namespace, chopConfig.Name)
 		os.Exit(0)
 	}
 

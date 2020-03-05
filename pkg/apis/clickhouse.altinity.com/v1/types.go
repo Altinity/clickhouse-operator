@@ -441,4 +441,11 @@ type OperatorConfig struct {
 	CHUsername string `json:"chUsername" yaml:"chUsername"`
 	CHPassword string `json:"chPassword" yaml:"chPassword"`
 	CHPort     int    `json:"chPort"     yaml:"chPort""`
+
+	Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
+	Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`
+	V                string `json:"v"                yaml:"v"`
+	Stderrthreshold  string `json:"stderrthreshold"  yaml:"stderrthreshold"`
+	Vmodule          string `json:"vmodule"          yaml:"vmodule"`
+	Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
 }

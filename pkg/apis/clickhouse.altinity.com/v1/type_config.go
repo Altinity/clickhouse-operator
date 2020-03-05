@@ -18,6 +18,8 @@ import (
 	"bytes"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	log "github.com/golang/glog"
+	// log "k8s.io/klog"
+
 	"github.com/imdario/mergo"
 	"github.com/kubernetes-sigs/yaml"
 	"os"
@@ -281,6 +283,14 @@ func (config *OperatorConfig) normalize() {
 	if config.CHPort == 0 {
 		config.CHPort = defaultChPort
 	}
+
+	// Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
+	// Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`
+	// V                string `json:"v"                yaml:"v"`
+	// Stderrthreshold  string `json:"stderrthreshold"  yaml:"stderrthreshold"`
+	// Vmodule          string `json:"vmodule"          yaml:"vmodule"`
+	// Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
+
 }
 
 // applyEnvVarParams applies ENV VARS over config
@@ -424,6 +434,13 @@ func (config *OperatorConfig) String() string {
 	util.Fprintf(b, "CHUsername: %s\n", config.CHUsername)
 	util.Fprintf(b, "CHPassword: %s\n", config.CHPassword)
 	util.Fprintf(b, "CHPort: %d\n", config.CHPort)
+
+	util.Fprintf(b, "Logtostderr: %s\n", config.Logtostderr)
+	util.Fprintf(b, "Alsologtostderr: %s\n", config.Alsologtostderr)
+	util.Fprintf(b, "V: %s\n", config.V)
+	util.Fprintf(b, "Stderrthreshold: %s\n", config.Stderrthreshold)
+	util.Fprintf(b, "Vmodule: %s\n", config.Vmodule)
+	util.Fprintf(b, "Log_backtrace_at string: %s\n", config.Log_backtrace_at)
 
 	return b.String()
 }
