@@ -4,7 +4,10 @@ metadata:
   name: "$GRAFANA_NAME"
 spec:
   ingress:
-    enabled: True
+    enabled: False
+  client:
+    timeout: 30
+    preferService: true
   config:
     log:
       mode: "console"
