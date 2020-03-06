@@ -489,8 +489,8 @@ func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfigur
 	return nil
 }
 
-// updateChiObject updates ClickHouseInstallation object
-func (c *Controller) updateChiObject(chi *chi.ClickHouseInstallation) error {
+// updateCHIObject updates ClickHouseInstallation object
+func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
 	new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
 
 	if err != nil {
@@ -513,8 +513,8 @@ func (c *Controller) updateChiObject(chi *chi.ClickHouseInstallation) error {
 	return nil
 }
 
-// updateChiObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) updateChiObjectStatus(chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
+// updateCHIObjectStatus updates ClickHouseInstallation object's Status
+func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
 	log.V(1).Infof("Update CHI status (%s/%s)", chi.Namespace, chi.Name)
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(chi.Name, meta.GetOptions{})
 	if err != nil {
@@ -534,7 +534,7 @@ func (c *Controller) updateChiObjectStatus(chi *chi.ClickHouseInstallation, tole
 
 	// Update status of a real object
 	cur.Status = chi.Status
-	return c.updateChiObject(cur)
+	return c.updateCHIObject(cur)
 }
 
 // enqueueObject adds ClickHouseInstallation object to the workqueue
