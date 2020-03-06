@@ -10,8 +10,23 @@ LOG_DIR="${CUR_DIR}/log"
 source "${CUR_DIR}/go_build_config.sh"
 
 echo -n "Building ${OPERATOR_BIN}, please wait..."
-if "${CUR_DIR}/go_build_operator.sh"; then
-    echo "successfully built ${OPERATOR_BIN}. Starting"
+if [[ $1 == "nobuild" ]]; then
+    echo "Build step skipped, starting old binary"
+else
+    if "${CUR_DIR}/go_build_operator.sh"; then
+        echo "Successfully built ${OPERATOR_BIN}."
+    else
+        echo "Unable to build ${OPERATOR_BIN}. Abort."
+        exit 1
+    fi
+fi
+
+if [[ ! -x "${OPERATOR_BIN}" ]]; then
+    echo "Unable to start ${OPERATOR_BIN} Is not executable or found. Abort"
+    exit 2
+fi
+
+    echo "Starting ${OPERATOR_BIN}..."
 
     mkdir -p "${LOG_DIR}"
     rm -f "${LOG_DIR}"/clickhouse-operator.*.log.*
@@ -28,13 +43,13 @@ if "${CUR_DIR}/go_build_operator.sh"; then
 # -logtostderr=true  Logs are written to standard error instead of to files
 # -stderrthreshold=FATAL Log events at or above this severity are logged to standard	error as well as to files
 
+if [[ $2 == "noclean" ]]; then
+    echo "Clean step skipped"
+else
     # And clean binary after run. It'll be rebuilt next time
     "${CUR_DIR}/go_build_operator_clean.sh"
-
+fi
     echo "======================"
     echo "=== Logs available ==="
     echo "======================"
     ls "${LOG_DIR}"/*
-else
-    echo "unable to build ${OPERATOR_BIN}"
-fi
