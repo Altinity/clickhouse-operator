@@ -7,7 +7,7 @@ spec:
     enabled: False
   client:
     timeout: 30
-    preferService: true
+    preferService: True
   config:
     log:
       mode: "console"
