@@ -122,9 +122,10 @@ type ChiConfiguration struct {
 
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
-	Name      string           `json:"name"`
-	Layout    ChiClusterLayout `json:"layout"`
-	Templates ChiTemplateNames `json:"templates,omitempty"`
+	Name      string             `json:"name"`
+	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper"`
+	Layout    ChiClusterLayout   `json:"layout"`
+	Templates ChiTemplateNames   `json:"templates,omitempty"`
 
 	// Internal data
 	Address ChiClusterAddress       `json:"address"`

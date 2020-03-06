@@ -70,9 +70,15 @@ func (c *ClickHouseConfigGenerator) GetFiles() map[string]string {
 }
 
 // GetZookeeper creates data for "zookeeper.xml"
-func (c *ClickHouseConfigGenerator) GetZookeeper() string {
+func (c *ClickHouseConfigGenerator) GetZookeeper(host *chiv1.ChiHost) string {
 	// Convenience wrapper
 	zk := &c.chi.Spec.Configuration.Zookeeper
+	for index := range host.CHI.Spec.Configuration.Clusters {
+		if host.Address.ClusterName == host.CHI.Spec.Configuration.Clusters[index].Name &&
+			len(host.CHI.Spec.Configuration.Clusters[index].Zookeeper.Nodes) > 0 {
+			zk = &host.CHI.Spec.Configuration.Clusters[index].Zookeeper
+		}
+	}
 
 	if len(zk.Nodes) == 0 {
 		// No Zookeeper nodes provided
