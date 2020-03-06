@@ -52,7 +52,7 @@ func (c *Controller) deleteHost(host *chop.ChiHost) error {
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
 	host.CHI.Status.DeletedHostsCount++
-	_ = c.updateChiObjectStatus(host.CHI, true)
+	_ = c.updateCHIObjectStatus(host.CHI, true)
 
 	log.V(1).Infof("End delete host %s/%s", host.Address.ClusterName, host.Name)
 
@@ -202,11 +202,11 @@ func (c *Controller) deleteServiceCluster(cluster *chop.ChiCluster) error {
 	return c.deleteServiceIfExists(namespace, serviceName)
 }
 
-// deleteServiceChi
-func (c *Controller) deleteServiceChi(chi *chop.ClickHouseInstallation) error {
+// deleteServiceCHI
+func (c *Controller) deleteServiceCHI(chi *chop.ClickHouseInstallation) error {
 	serviceName := chopmodel.CreateChiServiceName(chi)
 	namespace := chi.Namespace
-	log.V(1).Infof("deleteServiceChi(%s/%s)", namespace, serviceName)
+	log.V(1).Infof("deleteServiceCHI(%s/%s)", namespace, serviceName)
 	return c.deleteServiceIfExists(namespace, serviceName)
 }
 

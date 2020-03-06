@@ -1,0 +1,15 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-018-configmap
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    users:
+      user2/networks/ip: "::/0"
+    clusters:
+    - name: default
+      layout:
+        shardsCount: 1
+        replicasCount: 1

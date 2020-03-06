@@ -95,14 +95,14 @@ func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host
 		// Object found - update it
 		err := c.updateStatefulSet(curStatefulSet, newStatefulSet)
 		host.CHI.Status.UpdatedHostsCount++
-		_ = c.updateChiObjectStatus(host.CHI, false)
+		_ = c.updateCHIObjectStatus(host.CHI, false)
 		// Object updated
 		return err
 	} else if apierrors.IsNotFound(err) {
 		// Object not found - create it
 		err := c.createStatefulSet(newStatefulSet, host)
 		host.CHI.Status.AddedHostsCount++
-		_ = c.updateChiObjectStatus(host.CHI, false)
+		_ = c.updateCHIObjectStatus(host.CHI, false)
 		return err
 	} else {
 		return err

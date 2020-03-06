@@ -23,31 +23,41 @@ import (
 type Settings map[string]interface{}
 
 func NewSettings() Settings {
-	return make(map[string]interface{})
+	return make(Settings)
 }
 
-func (settings Settings) fetchPort(name string) int32 {
-	port, ok := settings[name]
-	if ok {
-		switch port.(type) {
-		case string:
-			intValue, err := strconv.Atoi(port.(string))
-			if err == nil {
-				return int32(intValue)
-			}
-
-		case int, int8, int16, int32, uint, uint8, uint32:
-			return port.(int32)
-
-		case int64:
-			return int32(port.(int64))
-
-		case uint64:
-			return int32(port.(uint64))
+func getSettingsValueAsInt(value interface{}) int32 {
+	switch value.(type) {
+	case string:
+		intValue, err := strconv.Atoi(value.(string))
+		if err == nil {
+			return int32(intValue)
 		}
+
+	case int, int8, int16, int32, uint, uint8, uint32:
+		return value.(int32)
+
+	case int64:
+		return int32(value.(int64))
+
+	case uint64:
+		return int32(value.(uint64))
 	}
 
 	return 0
+}
+
+func (settings Settings) getValueByName(name string) (interface{}, bool) {
+	value, ok := settings[name]
+	return value, ok
+}
+
+func (settings Settings) fetchPort(name string) int32 {
+	if value, ok := settings.getValueByName(name); ok {
+		return getSettingsValueAsInt(value)
+	} else {
+		return 0
+	}
 }
 
 func (settings Settings) GetTCPPort() int32 {
@@ -101,7 +111,7 @@ func (settings Settings) NormalizePaths() {
 
 	// Find entries with paths to normalize
 	for key := range settings {
-		path := normalizePath(key)
+		path := normalizeSettingsKeyAsPath(key)
 		if len(path) != len(key) {
 			// Normalization worked. These paths have to be normalized
 			pathsToNormalize = append(pathsToNormalize, key)
@@ -110,8 +120,8 @@ func (settings Settings) NormalizePaths() {
 
 	// Add entries with normalized paths
 	for _, key := range pathsToNormalize {
-		path := normalizePath(key)
-		settings[path] = settings[key]
+		normalizedPath := normalizeSettingsKeyAsPath(key)
+		settings[normalizedPath] = settings[key]
 	}
 
 	// Delete entries with un-normalized paths
@@ -120,9 +130,9 @@ func (settings Settings) NormalizePaths() {
 	}
 }
 
-// normalizePath normalizes path in .spec.configuration.{users, profiles, quotas, settings} section
+// normalizeSettingsKeyAsPath normalizes path in .spec.configuration.{users, profiles, quotas, settings} section
 // Normalized path looks like 'a/b/c'
-func normalizePath(path string) string {
+func normalizeSettingsKeyAsPath(path string) string {
 	// Normalize multi-'/' values (like '//') to single-'/'
 	re := regexp.MustCompile("//+")
 	path = re.ReplaceAllString(path, "/")

@@ -55,12 +55,12 @@ const (
 	eventReasonDeleteFailed     = "DeleteFailed"
 )
 
-// eventChi creates CHI-related event
+// eventCHI creates CHI-related event
 // typ - type of the event - Normal, Warning, etc, one of eventType*
 // action - what action was attempted, and then succeeded/failed regarding to the Involved Object. One of eventAction*
 // reason - short, machine understandable string, one of eventReason*
 // message - human-readable description
-func (c *Controller) eventChi(
+func (c *Controller) eventCHI(
 	chi *chop.ClickHouseInstallation,
 	typ string,
 	action string,
