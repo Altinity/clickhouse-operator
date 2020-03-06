@@ -424,3 +424,15 @@ func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 		return "", fmt.Errorf("can not find %s label in meta", LabelChiName)
 	}
 }
+
+// getChiAnnotations returns chi annotations and excludes "kubectl.kubernetes.io/last-applied-configuration"
+func (l *Labeler) getChiAnnotations(host *chi.ChiHost) map[string]string {
+	annotations := make(map[string]string, 0)
+	for key, value := range host.CHI.Annotations {
+		if key != "kubectl.kubernetes.io/last-applied-configuration" {
+			annotations[key] = value
+		}
+	}
+
+	return annotations
+}
