@@ -87,7 +87,7 @@ func Run() {
 		os.Exit(1)
 	}()
 
-	log.V(1).Infof("Starting metrics exporter. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
+	log.Infof("Starting metrics exporter. Version:%s GitSHA:%s BuiltAt:%s\n", version.Version, version.GitSHA, version.BuiltAt)
 
 	// Initialize k8s API clients
 	_, chopClient := chop.GetClientset(kubeConfigFile, masterURL)

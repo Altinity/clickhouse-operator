@@ -102,7 +102,7 @@ func Run() {
 		chopInformerFactoryResyncPeriod = defaultInformerFactoryResyncDebugPeriod
 	}
 
-	log.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
+	log.Infof("Starting clickhouse-operator. Version:%s GitSHA:%s BuiltAt:%s\n", version.Version, version.GitSHA, version.BuiltAt)
 
 	// Initialize k8s API clients
 	kubeClient, chopClient := chop.GetClientset(kubeConfigFile, masterURL)

@@ -21,10 +21,10 @@ MAIN_SRC_FILE="${SRC_ROOT}/cmd/operator/main.go"
 if CGO_ENABLED=0 GO111MODULE=on go build \
     -mod="${MODULES_DIR}" \
     -a \
-    -ldflags " \\
-        -X ${REPO}/pkg/version.Version=${VERSION} \\
-        -X ${REPO}/pkg/version.GitSHA=${GIT_SHA}  \\
-        -X ${REPO}/pkg/version.BuiltAt=${NOW}     \\
+    -ldflags " \
+        -X ${REPO}/pkg/version.Version=${VERSION} \
+        -X ${REPO}/pkg/version.GitSHA=${GIT_SHA}  \
+        -X ${REPO}/pkg/version.BuiltAt=${NOW}     \
     " \
     -o "${OUTPUT_BINARY}" \
     "${MAIN_SRC_FILE}"
