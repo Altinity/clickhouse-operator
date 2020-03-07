@@ -19,3 +19,6 @@ var Version = "dev-version"
 
 // GitSHA represents the Git commit hash in short format
 var GitSHA string
+
+// BuiltAt represents date + time when binary was built
+var BuiltAt string
