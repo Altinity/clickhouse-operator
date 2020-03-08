@@ -17,8 +17,7 @@ GO111MODULE=on go mod "${MODULES_DIR}"
 OUTPUT_BINARY="${METRICS_EXPORTER_BIN}"
 MAIN_SRC_FILE="${SRC_ROOT}/cmd/metrics_exporter/main.go"
 
-#CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ${CUR_DIR}/clickhouse-operator ${SRC_ROOT}/cmd/clickhouse-operator
-if CGO_ENABLED=0 GO111MODULE=on go build \
+if CGO_ENABLED=0 GO111MODULE=on GOOS=linux GOARCH=amd64 go build \
     -mod="${MODULES_DIR}" \
     -a \
     -ldflags " \
