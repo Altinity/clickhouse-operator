@@ -204,7 +204,7 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 		}
 
 		// Wait some more time
-		log.V(2).Infof("waitStatefulSetGeneration(%s/%s):%s", namespace, name)
+		log.V(2).Infof("waitStatefulSetGeneration(%s/%s)", namespace, name)
 		select {
 		case <-time.After(time.Duration(c.chop.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}

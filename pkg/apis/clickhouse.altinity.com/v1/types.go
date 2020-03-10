@@ -85,6 +85,7 @@ type ChiStatus struct {
 	Pods              []string `json:"pods"`
 	FQDNs             []string `json:"fqdns"`
 	Endpoint          string   `json:"endpoint"`
+	NormalizedCHI     ChiSpec  `json:"normalized"`
 }
 
 // ChiDefaults defines defaults section of .spec
@@ -127,22 +128,22 @@ type ChiCluster struct {
 	Templates ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data
-	Address ChiClusterAddress       `json:"address"`
+	Address ChiClusterAddress       `json:"address,omitempty"`
 	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiClusterAddress defines address of a cluster within ClickHouseInstallation
 type ChiClusterAddress struct {
-	Namespace    string `json:"namespace"`
-	CHIName      string `json:"chiName"`
-	ClusterName  string `json:"clusterName"`
-	ClusterIndex int    `json:"clusterIndex"`
+	Namespace    string `json:"namespace,omitempty"`
+	CHIName      string `json:"chiName,omitempty"`
+	ClusterName  string `json:"clusterName,omitempty"`
+	ClusterIndex int    `json:"clusterIndex,omitempty"`
 }
 
 // ChiClusterLayout defines layout section of .spec.configuration.clusters
 type ChiClusterLayout struct {
 	// DEPRECATED - to be removed soon
-	Type          string `json:"type"`
+	Type          string `json:"type,omitempty"`
 	ShardsCount   int    `json:"shardsCount,omitempty"`
 	ReplicasCount int    `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiShard
@@ -223,13 +224,13 @@ type ChiHost struct {
 
 // ChiHostTemplate defines full Host Template
 type ChiHostTemplate struct {
-	Name             string                `json:"name"            yaml:"name"`
-	PortDistribution []ChiPortDistribution `json:"portDistribution" yaml:"portDistribution"`
-	Spec             ChiHost               `json:"spec"            yaml:"spec"`
+	Name             string                `json:"name"                       yaml:"name"`
+	PortDistribution []ChiPortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution"`
+	Spec             ChiHost               `json:"spec,omitempty"             yaml:"spec"`
 }
 
 type ChiPortDistribution struct {
-	Type string `json:"type"   yaml:"type"`
+	Type string `json:"type,omitempty"   yaml:"type"`
 }
 
 // ChiHostAddress defines address of a host within ClickHouseInstallation
@@ -270,10 +271,10 @@ type ChiTemplates struct {
 	ServiceTemplates     []ChiServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates"`
 
 	// Index maps template name to template itself
-	HostTemplatesIndex        map[string]*ChiHostTemplate        `testdiff:"ignore"`
-	PodTemplatesIndex         map[string]*ChiPodTemplate         `testdiff:"ignore"`
-	VolumeClaimTemplatesIndex map[string]*ChiVolumeClaimTemplate `testdiff:"ignore"`
-	ServiceTemplatesIndex     map[string]*ChiServiceTemplate     `testdiff:"ignore"`
+	HostTemplatesIndex        map[string]*ChiHostTemplate        `json:",omitempty" testdiff:"ignore"`
+	PodTemplatesIndex         map[string]*ChiPodTemplate         `json:",omitempty" testdiff:"ignore"`
+	VolumeClaimTemplatesIndex map[string]*ChiVolumeClaimTemplate `json:",omitempty" testdiff:"ignore"`
+	ServiceTemplatesIndex     map[string]*ChiServiceTemplate     `json:",omitempty" testdiff:"ignore"`
 }
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet

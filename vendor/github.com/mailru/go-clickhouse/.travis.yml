@@ -3,22 +3,21 @@ notifications:
   email: false
 language: go
 go:
-  - '1.9'
-  - '1.10'
   - '1.11'
   - '1.12'
+  - '1.13'
+  - '1.14'
 
 services:
   - docker
 
 before_install:
-  - travis_retry docker pull yandex/clickhouse-server
+  - travis_retry docker pull yandex/clickhouse-server:19.16.14.65
   - make up_docker_server
-  - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 
 install:
-  - make init
   - travis_retry go get -v github.com/mattn/goveralls/...
+  - make init
 
 before_script:
   - export TEST_CLICKHOUSE_DSN="http://localhost:8123/default"

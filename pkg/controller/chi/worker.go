@@ -165,7 +165,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	new.Status.AddedHostsCount = 0
 	new.Status.DeletedHostsCount = 0
 	new.Status.DeleteHostsCount = actionPlan.GetRemovedHostsNum()
-	if err := w.c.updateCHIObject(new); err != nil {
+	if err := w.c.updateCHIObjectStatus(new, false); err != nil {
 		log.V(1).Infof("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
 		return nil
 	}
