@@ -85,6 +85,7 @@ type ChiStatus struct {
 	Pods              []string `json:"pods"`
 	FQDNs             []string `json:"fqdns"`
 	Endpoint          string   `json:"endpoint"`
+	NormalizedCHI     ChiSpec  `json:"normalized"`
 }
 
 // ChiDefaults defines defaults section of .spec
