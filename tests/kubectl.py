@@ -126,9 +126,9 @@ def kube_wait_objects(chi, objects, ns="test"):
                 time.sleep(i*5)
         assert counts == objects, error()
 
-def kube_wait_object(type, name, label="", count = 1, ns="test"):
+def kube_wait_object(type, name, label="", count = 1, ns="test", retries = max_retries):
     with Then(f"{count} {type}(s) {name} should be created"):
-        for i in range(1,max_retries):
+        for i in range(1,retries):
             counts = kube_get_count(type, ns = ns, name = name, label = label)
             if counts >= count:
                 break
@@ -136,8 +136,8 @@ def kube_wait_object(type, name, label="", count = 1, ns="test"):
                 time.sleep(i*5)
         assert counts >= count, error()
 
-def kube_wait_chi_status(chi, status, ns="test"):
-    kube_wait_field("chi", chi, ".status.status", status, ns)
+def kube_wait_chi_status(chi, status, ns="test", retries = max_retries):
+    kube_wait_field("chi", chi, ".status.status", status, ns, retries)
 
 def kube_get_chi_status(chi, ns="test"):
     kube_get_field("chi", chi, ".status.status", ns)
@@ -145,9 +145,9 @@ def kube_get_chi_status(chi, ns="test"):
 def kube_wait_pod_status(pod, status, ns="test"):
     kube_wait_field("pod", pod, ".status.phase", status, ns)
 
-def kube_wait_field(object, name, field, value, ns="test"):
+def kube_wait_field(object, name, field, value, ns="test", retries = max_retries):
     with Then(f"{object} {name} {field} should be {value}"):
-        for i in range(1,max_retries):
+        for i in range(1,retries):
             obj_status = kubectl(f"get {object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
             if obj_status[1] == value:
                 break
