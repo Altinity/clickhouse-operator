@@ -14,7 +14,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/imdario/mergo v0.3.8
 	github.com/kubernetes-sigs/yaml v1.1.0
-	github.com/mailru/go-clickhouse v1.2.0
+	github.com/mailru/go-clickhouse v1.3.0
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/prometheus/client_golang v1.2.1
 	github.com/r3labs/diff v0.0.0-20191120142937-b4ed99a31f5a
