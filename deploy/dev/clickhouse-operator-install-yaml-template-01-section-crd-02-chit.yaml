@@ -78,6 +78,7 @@ spec:
               type: string
               enum:
                 # List StringBoolXXX constants from model
+                - ""
                 - "0"
                 - "1"
                 - "False"
@@ -111,6 +112,7 @@ spec:
                     type: string
                     enum:
                       # List useTypeXXX constants from model
+                      - ""
                       - "merge"
             defaults:
               type: object
@@ -120,6 +122,7 @@ spec:
                   type: string
                   enum:
                     # List StringBoolXXX constants from model
+                    - ""
                     - "0"
                     - "1"
                     - "False"
@@ -271,6 +274,7 @@ spec:
                                   type: string
                                   enum:
                                     # List StringBoolXXX constants from model
+                                    - ""
                                     - "0"
                                     - "1"
                                     - "False"
@@ -450,6 +454,7 @@ spec:
                               type: string
                               enum:
                                 # List PortDistributionXXX constants
+                                - ""
                                 - "Unspecified"
                                 - "ClusterScopeIndex"
                       spec:
@@ -518,6 +523,7 @@ spec:
                         # DEPRECATED
                         type: string
                         enum:
+                          - ""
                           - "Unspecified"
                           - "OnePerHost"
                       podDistribution:
@@ -531,6 +537,7 @@ spec:
                               type: string
                               enum:
                                 # List podDistributionXXX constants
+                                - ""
                                 - "Unspecified"
                                 - "ClickHouseAntiAffinity"
                                 - "ShardAntiAffinity"
@@ -566,6 +573,7 @@ spec:
                       reclaimPolicy:
                         type: string
                         enum:
+                          - ""
                           - "Retain"
                           - "Delete"
                       spec:

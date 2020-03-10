@@ -5,11 +5,6 @@ metadata:
 spec:
   templates:
     podTemplates:
-    - name: v19.6
-      spec:
-        containers:
-        - name: clickhouse
-          image: yandex/clickhouse-server:19.6
     - name: v19.11
       spec:
         containers:
@@ -25,11 +20,6 @@ spec:
         containers:
         - name: clickhouse
           image: yandex/clickhouse-server:19.16
-    - name: v19.17
-      spec:
-        containers:
-        - name: clickhouse
-          image: yandex/clickhouse-server:19.17
     - name: v20.1
       spec:
         containers:
@@ -42,19 +32,13 @@ spec:
         shards:
          - shard0:
            templates:
-             podTemplate: v19.6
+             podTemplate: v19.11
          - shard1:
            templates:
-             podTemplate: v19.11
+             podTemplate: v19.13
          - shard2:
            templates:
-             podTemplate: v19.13
-         - shard3:
-           templates:
              podTemplate: v19.16
-         - shard4:
-           templates:
-             podTemplate: v19.17
-         - shard5:
+         - shard3:
            templates:
              podTemplate: v20.1
