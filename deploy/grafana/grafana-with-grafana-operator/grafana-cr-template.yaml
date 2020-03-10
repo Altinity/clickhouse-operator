@@ -5,8 +5,6 @@ metadata:
 spec:
   ingress:
     enabled: False
-  service:
-    type: LoadBalancer
   client:
     timeout: 30
     preferService: True
