@@ -10,21 +10,23 @@ import (
 
 // Config is a configuration parsed from a DSN string
 type Config struct {
-	User            string
-	Password        string
-	Scheme          string
-	Host            string
-	Database        string
-	Timeout         time.Duration
-	IdleTimeout     time.Duration
-	ReadTimeout     time.Duration
-	WriteTimeout    time.Duration
-	Location        *time.Location
-	Debug           bool
-	UseDBLocation   bool
-	GzipCompression bool
-	Params          map[string]string
-	TLSConfig       string
+	User             string
+	Password         string
+	Scheme           string
+	Host             string
+	Database         string
+	Timeout          time.Duration
+	IdleTimeout      time.Duration
+	ReadTimeout      time.Duration
+	WriteTimeout     time.Duration
+	Location         *time.Location
+	Debug            bool
+	UseDBLocation    bool
+	GzipCompression  bool
+	Params           map[string]string
+	TLSConfig        string
+	KillQueryOnErr   bool // kill query on the server side if we have error from transport
+	KillQueryTimeout time.Duration
 }
 
 // NewConfig creates a new config with default values
@@ -63,6 +65,12 @@ func (cfg *Config) FormatDSN() string {
 	}
 	if cfg.Debug {
 		query.Set("debug", "1")
+	}
+	if cfg.KillQueryOnErr {
+		query.Set("kill_query", "1")
+	}
+	if cfg.KillQueryTimeout != 0 {
+		query.Set("kill_query_timeout", cfg.KillQueryTimeout.String())
 	}
 
 	u.RawQuery = query.Encode()
@@ -157,6 +165,10 @@ func parseDSNParams(cfg *Config, params map[string][]string) (err error) {
 			cfg.Params[k] = v[0]
 		case "tls_config":
 			cfg.TLSConfig = v[0]
+		case "kill_query":
+			cfg.KillQueryOnErr, err = strconv.ParseBool(v[0])
+		case "kill_query_timeout":
+			cfg.KillQueryTimeout, err = time.ParseDuration(v[0])
 		default:
 			cfg.Params[k] = v[0]
 		}
@@ -170,6 +182,11 @@ func parseDSNParams(cfg *Config, params map[string][]string) (err error) {
 
 func ensureHavePort(addr string) string {
 	if _, _, err := net.SplitHostPort(addr); err != nil {
+		// we get the missing port error here
+		if addr[0] == '[' && addr[len(addr)-1] == ']' {
+			// ipv6 brackets
+			addr = addr[1 : len(addr)-1]
+		}
 		return net.JoinHostPort(addr, "8123")
 	}
 	return addr
