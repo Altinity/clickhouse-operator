@@ -13,8 +13,4 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:19.16.14.65
-          #    command:
-          #      - "/bin/bash"
-          #      - "-c"
-          #      - "/entrypoint.sh; while true; do sleep 600; done"
+              image: yandex/clickhouse-server:19.11.12.69
