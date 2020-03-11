@@ -81,6 +81,8 @@ def test_ch_001():
             
         out = clickhouse_query_with_error(chi, "select t1.a t1_a, t2.a t2_a from t1 left outer join t2 using (a) order by t1_a settings join_use_nulls=1")
         print(out)
+        
+        # cat /var/log/clickhouse-server/clickhouse-server.log | grep t2 | grep -E "all_1_1_0|START|STOP"
 
 
         

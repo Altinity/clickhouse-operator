@@ -109,11 +109,9 @@ def test_008():
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
-def test_009():
-    version_from = "0.8.0"
-    version_to = settings.version
+def test_009(version_from = "0.8.0", version_to = settings.version):
     test_operator_upgrade("configs/test-009-operator-upgrade.yaml", version_from, version_to)
-    test_operator_upgrade("configs/test-009-operator-upgrade-2.yaml", "0.6.0", version_to)
+    test_operator_upgrade("configs/test-009-operator-upgrade-2.yaml", version_from, version_to)
 
 def set_operator_version(version, ns="kube-system", timeout=60):
     kubectl(f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:{version}", ns=ns)
