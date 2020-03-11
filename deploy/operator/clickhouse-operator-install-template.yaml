@@ -78,6 +78,7 @@ spec:
               type: string
               enum:
                 # List StringBoolXXX constants from model
+                - ""
                 - "0"
                 - "1"
                 - "False"
@@ -111,6 +112,7 @@ spec:
                     type: string
                     enum:
                       # List useTypeXXX constants from model
+                      - ""
                       - "merge"
             defaults:
               type: object
@@ -120,6 +122,7 @@ spec:
                   type: string
                   enum:
                     # List StringBoolXXX constants from model
+                    - ""
                     - "0"
                     - "1"
                     - "False"
@@ -271,6 +274,7 @@ spec:
                                   type: string
                                   enum:
                                     # List StringBoolXXX constants from model
+                                    - ""
                                     - "0"
                                     - "1"
                                     - "False"
@@ -450,6 +454,7 @@ spec:
                               type: string
                               enum:
                                 # List PortDistributionXXX constants
+                                - ""
                                 - "Unspecified"
                                 - "ClusterScopeIndex"
                       spec:
@@ -518,6 +523,7 @@ spec:
                         # DEPRECATED
                         type: string
                         enum:
+                          - ""
                           - "Unspecified"
                           - "OnePerHost"
                       podDistribution:
@@ -531,6 +537,7 @@ spec:
                               type: string
                               enum:
                                 # List podDistributionXXX constants
+                                - ""
                                 - "Unspecified"
                                 - "ClickHouseAntiAffinity"
                                 - "ShardAntiAffinity"
@@ -566,6 +573,7 @@ spec:
                       reclaimPolicy:
                         type: string
                         enum:
+                          - ""
                           - "Retain"
                           - "Delete"
                       spec:
@@ -670,6 +678,7 @@ spec:
               type: string
               enum:
                 # List StringBoolXXX constants from model
+                - ""
                 - "0"
                 - "1"
                 - "False"
@@ -703,6 +712,7 @@ spec:
                     type: string
                     enum:
                       # List useTypeXXX constants from model
+                      - ""
                       - "merge"
             defaults:
               type: object
@@ -712,6 +722,7 @@ spec:
                   type: string
                   enum:
                     # List StringBoolXXX constants from model
+                    - ""
                     - "0"
                     - "1"
                     - "False"
@@ -863,6 +874,7 @@ spec:
                                   type: string
                                   enum:
                                     # List StringBoolXXX constants from model
+                                    - ""
                                     - "0"
                                     - "1"
                                     - "False"
@@ -1042,6 +1054,7 @@ spec:
                               type: string
                               enum:
                                 # List PortDistributionXXX constants
+                                - ""
                                 - "Unspecified"
                                 - "ClusterScopeIndex"
                       spec:
@@ -1110,6 +1123,7 @@ spec:
                         # DEPRECATED
                         type: string
                         enum:
+                          - ""
                           - "Unspecified"
                           - "OnePerHost"
                       podDistribution:
@@ -1123,6 +1137,7 @@ spec:
                               type: string
                               enum:
                                 # List podDistributionXXX constants
+                                - ""
                                 - "Unspecified"
                                 - "ClickHouseAntiAffinity"
                                 - "ShardAntiAffinity"
@@ -1158,6 +1173,7 @@ spec:
                       reclaimPolicy:
                         type: string
                         enum:
+                          - ""
                           - "Retain"
                           - "Delete"
                       spec:
@@ -1250,6 +1266,18 @@ spec:
               type: integer
               minimum: 1
               maximum: 65535
+            logtostderr:
+              type: string
+            alsologtostderr:
+              type: string
+            v:
+              type: string
+            stderrthreshold:
+              type: string
+            vmodule:
+              type: string
+            log_backtrace_at:
+              type: string
 ---
 # Possible Template Parameters:
 #
@@ -1390,6 +1418,19 @@ data:
     chUsername: clickhouse_operator
     chPassword: clickhouse_operator_password
     chPort: 8123
+    
+    ################################################
+    ##
+    ## Log parameters
+    ##
+    ################################################
+    
+    logtostderr: "true"
+    alsologtostderr: "false"
+    v: "1"
+    stderrthreshold: ""
+    vmodule: ""
+    log_backtrace_at: ""
 
 ---
 # Possible Template Parameters:

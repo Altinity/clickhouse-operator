@@ -521,6 +521,7 @@ func (in *ChiStatus) DeepCopyInto(out *ChiStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	in.NormalizedCHI.DeepCopyInto(&out.NormalizedCHI)
 	return
 }
 

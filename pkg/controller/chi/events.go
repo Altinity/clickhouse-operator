@@ -16,9 +16,12 @@ package chi
 
 import (
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
+
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"time"
 )
 
@@ -52,12 +55,12 @@ const (
 	eventReasonDeleteFailed     = "DeleteFailed"
 )
 
-// eventChi creates CHI-related event
+// eventCHI creates CHI-related event
 // typ - type of the event - Normal, Warning, etc, one of eventType*
 // action - what action was attempted, and then succeeded/failed regarding to the Involved Object. One of eventAction*
 // reason - short, machine understandable string, one of eventReason*
 // message - human-readable description
-func (c *Controller) eventChi(
+func (c *Controller) eventCHI(
 	chi *chop.ClickHouseInstallation,
 	typ string,
 	action string,
@@ -98,6 +101,6 @@ func (c *Controller) eventChi(
 	_, err := c.kubeClient.CoreV1().Events(chi.Namespace).Create(event)
 
 	if err != nil {
-		glog.V(1).Infof("Create Event failed: %v", err)
+		log.V(1).Infof("Create Event failed: %v", err)
 	}
 }

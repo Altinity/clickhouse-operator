@@ -23,7 +23,8 @@ import (
 
 	"fmt"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 	"strings"
 )
 
@@ -58,7 +59,7 @@ func (s *Schemer) getObjectListFromClickHouse(serviceUrl string, sql string) ([]
 	names := make([]string, 0)
 	sqlStatements := make([]string, 0)
 
-	glog.V(1).Info(serviceUrl)
+	log.V(1).Info(serviceUrl)
 	conn := s.getCHConnection(serviceUrl)
 	var rows *sqlmodule.Rows = nil
 	var err error
@@ -155,7 +156,7 @@ func (s *Schemer) GetCreateReplicatedObjects(
 		}
 	}
 	if shard == nil {
-		glog.V(1).Info("Can not find shard for replica")
+		log.V(1).Info("Can not find shard for replica")
 		return nil, nil, nil
 	}
 	replicas := CreatePodFQDNsOfShard(shard)
@@ -287,7 +288,7 @@ func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 				if sqlerr != nil &&
 					strings.Contains(sqlerr.Error(), "Code: 253,") &&
 					strings.Contains(sql, "CREATE TABLE") {
-					glog.V(1).Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
+					log.V(1).Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
 					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
 					sqlerr = conn.Exec(sqlAttach)
 				}

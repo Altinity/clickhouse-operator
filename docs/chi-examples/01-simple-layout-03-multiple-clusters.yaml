@@ -7,7 +7,7 @@ spec:
     clusters:
       - name: "replicas"
         layout:
-          shardsCount: 1
+          shardsCount: 3
           replicasCount: 2
       - name: "shards"
         layout:

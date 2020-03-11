@@ -3,13 +3,13 @@
 
 ## Prerequisites
 
-1. ClickHouse operator [installed](operator_installation_details.md)
-1. Zookeeper [installed](zookeeper_setup.md)
+1. ClickHouse operator [installed][operator_installation_details.md]
+1. Zookeeper [installed][zookeeper_setup.md]
 
 
 ## Manifest
 
-Let's take a look on [example](./chi-examples/04-replication-zookeeper-05-simple-PV.yaml), which creates a cluster with 2 shards and 2 replicas and persistent storage.
+Let's take a look on [example][chi-examples/04-replication-zookeeper-05-simple-PV.yaml], which creates a cluster with 2 shards and 2 replicas and persistent storage.
 
 ```yaml
 apiVersion: "clickhouse.altinity.com/v1"
@@ -55,7 +55,7 @@ spec:
 ## Replicated table setup
 
 ### Macros
-Operator provides set of [macros](https://clickhouse.yandex/docs/en/operations/server_settings/settings/#macros), which are:
+Operator provides set of [macros][macros], which are:
  1. `{installation}` -- ClickHouse Installation name
  1. `{cluster}` -- primary cluster name
  1. `{replica}` -- replica name in the cluster, maps to pod service name
@@ -65,7 +65,7 @@ ClickHouse also supports internal macros `{database}` and `{table}` that maps to
 
 ### Create replicated table
 
-Now we can create [replicated table](https://clickhouse.yandex/docs/en/operations/table_engines/replication/), using specified macros
+Now we can create [replicated table][replication], using specified macros
 
 ```sql
 CREATE TABLE events_local on cluster '{cluster}' (
@@ -91,3 +91,9 @@ And check how these data are distributed over the cluster
 SELECT count() FROM events;
 SELECT count() FROM events_local;
 ```
+
+[operator_installation_details.md]: ./operator_installation_details.md
+[zookeeper_setup.md]: ./zookeeper_setup.md
+[chi-examples/04-replication-zookeeper-05-simple-PV.yaml]: ./chi-examples/04-replication-zookeeper-05-simple-PV.yaml
+[macros]: https://clickhouse.yandex/docs/en/operations/server_settings/settings/#macros
+[replication]: https://clickhouse.yandex/docs/en/operations/table_engines/replication/

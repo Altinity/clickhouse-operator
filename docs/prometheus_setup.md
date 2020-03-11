@@ -32,10 +32,10 @@ http://<service/clickhouse-operator-metrics>:8888/metrics
 ## Setup Prometheus and integrate it with clickhouse-operator
 In case we do not have Prometheus available, we can setup it directly into k8s and integrate with `clickhouse-operator` 
 
-We are going to setup and manage Prometheus with [Prometheus Operator](https://coreos.com/operators/prometheus/docs/latest/)
+We are going to setup and manage Prometheus with [Prometheus Operator][prometheus-operator]
 
-We already have [manifests available](../deploy/prometheus/). 
-We can either run [create-prometheus.sh](../deploy/prometheus/create-prometheus.sh) or setup the whole process by hands, in case we need to edit configuration.
+We already have [manifests available][deploy-prometheus]. 
+We can either run [create-prometheus.sh][create-prometheus.sh] or setup the whole process by hands, in case we need to edit configuration.
 
   - We'd like to setup all Prometheus-related components into dedicated `namespace`. Let's create it
   ```bash
@@ -74,4 +74,9 @@ and navigate browser to `http://localhost:9090` Prometheus should appear.
 
 We can check whether `clickhouse-operator` is available at `http://localhost:9090/targets`
 
-More Prometheus [docs](https://prometheus.io/docs/introduction/overview/)
+More Prometheus [docs][prometheus-docs]
+
+[prometheus-operator]: https://coreos.com/operators/prometheus/docs/latest/
+[deploy-prometheus]: ../deploy/prometheus/
+[create-prometheus.sh]: ../deploy/prometheus/create-prometheus.sh
+[prometheus-docs]: https://prometheus.io/docs/introduction/overview/

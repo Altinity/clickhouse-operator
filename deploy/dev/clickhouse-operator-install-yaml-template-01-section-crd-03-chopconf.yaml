@@ -66,3 +66,15 @@ spec:
               type: integer
               minimum: 1
               maximum: 65535
+            logtostderr:
+              type: string
+            alsologtostderr:
+              type: string
+            v:
+              type: string
+            stderrthreshold:
+              type: string
+            vmodule:
+              type: string
+            log_backtrace_at:
+              type: string

@@ -25,7 +25,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 )
 
 type Creator struct {
@@ -54,7 +55,7 @@ func NewCreator(
 func (c *Creator) CreateServiceChi() *corev1.Service {
 	serviceName := CreateChiServiceName(c.chi)
 
-	glog.V(1).Infof("createServiceChi(%s/%s)", c.chi.Namespace, serviceName)
+	log.V(1).Infof("createServiceChi(%s/%s)", c.chi.Namespace, serviceName)
 	if template, ok := c.chi.GetChiServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -101,7 +102,7 @@ func (c *Creator) CreateServiceChi() *corev1.Service {
 func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
 	serviceName := CreateClusterServiceName(cluster)
 
-	glog.V(1).Infof("createServiceCluster(%s/%s)", cluster.Address.Namespace, serviceName)
+	log.V(1).Infof("createServiceCluster(%s/%s)", cluster.Address.Namespace, serviceName)
 	if template, ok := cluster.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -120,7 +121,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 	serviceName := CreateShardServiceName(shard)
 
-	glog.V(1).Infof("createServiceShard(%s/%s)", shard.Address.Namespace, serviceName)
+	log.V(1).Infof("createServiceShard(%s/%s)", shard.Address.Namespace, serviceName)
 	if template, ok := shard.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -140,7 +141,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(host)
 	statefulSetName := CreateStatefulSetName(host)
 
-	glog.V(1).Infof("createServiceHost(%s/%s) for Set %s", host.Address.Namespace, serviceName, statefulSetName)
+	log.V(1).Infof("createServiceHost(%s/%s) for Set %s", host.Address.Namespace, serviceName, statefulSetName)
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -195,7 +196,7 @@ func (c *Creator) verifyServiceTemplatePorts(template *chiv1.ChiServiceTemplate)
 		servicePort := &template.Spec.Ports[i]
 		if (servicePort.Port < 1) || (servicePort.Port > 65535) {
 			msg := fmt.Sprintf("verifyServiceTemplatePorts(%s) INCORRECT PORT: %d ", template.Name, servicePort.Port)
-			glog.V(1).Infof(msg)
+			log.V(1).Infof(msg)
 			return fmt.Errorf(msg)
 		}
 	}
@@ -358,7 +359,7 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 				"while true; do sleep 30; done;",
 			},
 		})
-		glog.V(1).Infof("setupStatefulSetPodTemplate() add log container for statefulSet %s", statefulSetName)
+		log.V(1).Infof("setupStatefulSetPodTemplate() add log container for statefulSet %s", statefulSetName)
 	}
 }
 
@@ -372,11 +373,11 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 		// Host references known PodTemplate
 		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
 		podTemplate = podTemplate.DeepCopy()
-		glog.V(1).Infof("getPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
+		log.V(1).Infof("getPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
 	} else {
 		// Host references UNKNOWN PodTemplate, will use default one
 		podTemplate = newDefaultPodTemplate(statefulSetName)
-		glog.V(1).Infof("getPodTemplate() statefulSet %s use default generated template", statefulSetName)
+		log.V(1).Infof("getPodTemplate() statefulSet %s use default generated template", statefulSetName)
 	}
 
 	// Here we have local copy of Pod Template, to be used to create StatefulSet
@@ -473,14 +474,14 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplate(
 	// 3. Specified (by volumeClaimTemplateName) VolumeClaimTemplate has to be available as well
 	if _, ok := c.chi.GetVolumeClaimTemplate(volumeClaimTemplateName); !ok {
 		// Incorrect/unknown .templates.VolumeClaimTemplate specified
-		glog.V(1).Infof("Can not find volumeClaimTemplate %s. Volume claim can not be mounted", volumeClaimTemplateName)
+		log.V(1).Infof("Can not find volumeClaimTemplate %s. Volume claim can not be mounted", volumeClaimTemplateName)
 		return nil
 	}
 
 	// 4. Specified container has to be available
 	container := getContainerByName(statefulSet, containerName)
 	if container == nil {
-		glog.V(1).Infof("Can not find container %s. Volume claim can not be mounted", containerName)
+		log.V(1).Infof("Can not find container %s. Volume claim can not be mounted", containerName)
 		return nil
 	}
 
@@ -498,7 +499,7 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplate(
 		volumeMount := &container.VolumeMounts[i]
 		if volumeMount.Name == volumeClaimTemplateName {
 			// This .templates.VolumeClaimTemplate is already used in VolumeMount
-			glog.V(1).Infof(
+			log.V(1).Infof(
 				"setupStatefulSetApplyVolumeClaim(%s) container %s volumeClaimTemplateName %s already used",
 				statefulSet.Name,
 				container.Name,
@@ -518,7 +519,7 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplate(
 		volumeMount := &container.VolumeMounts[i]
 		if volumeMount.MountPath == mountPath {
 			// `mountPath` (say /var/lib/clickhouse) is already mounted
-			glog.V(1).Infof(
+			log.V(1).Infof(
 				"setupStatefulSetApplyVolumeClaim(%s) container %s mountPath %s already used",
 				statefulSet.Name,
 				container.Name,
@@ -540,7 +541,7 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplate(
 		)
 	}
 
-	glog.V(1).Infof("setupStatefulSetApplyVolumeClaim(%s) container %s mounted %s on %s",
+	log.V(1).Infof("setupStatefulSetApplyVolumeClaim(%s) container %s mounted %s on %s",
 		statefulSet.Name,
 		container.Name,
 		volumeClaimTemplateName,
@@ -620,8 +621,11 @@ func (c *Creator) statefulSetAppendVolumeClaimTemplate(
 		statefulSet.Spec.VolumeClaimTemplates,
 		corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   volumeClaimTemplate.Name,
-				Labels: c.labeler.getLabelsHostScope(host, false),
+				Name: volumeClaimTemplate.Name,
+				// TODO this has to wait until proper disk inheritance procedure will be available
+				// Right now we hit the following error:
+				// "Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
+				// Labels: c.labeler.getLabelsHostScope(host, false),
 			},
 			Spec: *volumeClaimTemplate.Spec.DeepCopy(),
 		},
@@ -671,34 +675,37 @@ func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 		},
 	}
 
-	addContainer(&podTemplate.Spec, corev1.Container{
-		Name:  ClickHouseContainerName,
-		Image: defaultClickHouseDockerImage,
-		Ports: []corev1.ContainerPort{
-			{
-				Name:          chDefaultHTTPPortName,
-				ContainerPort: chDefaultHTTPPortNumber,
-			},
-			{
-				Name:          chDefaultTCPPortName,
-				ContainerPort: chDefaultTCPPortNumber,
-			},
-			{
-				Name:          chDefaultInterserverHTTPPortName,
-				ContainerPort: chDefaultInterserverHTTPPortNumber,
-			},
-		},
-		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/ping",
-					Port: intstr.Parse(chDefaultHTTPPortName),
+	addContainer(
+		&podTemplate.Spec,
+		corev1.Container{
+			Name:  ClickHouseContainerName,
+			Image: defaultClickHouseDockerImage,
+			Ports: []corev1.ContainerPort{
+				{
+					Name:          chDefaultHTTPPortName,
+					ContainerPort: chDefaultHTTPPortNumber,
+				},
+				{
+					Name:          chDefaultTCPPortName,
+					ContainerPort: chDefaultTCPPortNumber,
+				},
+				{
+					Name:          chDefaultInterserverHTTPPortName,
+					ContainerPort: chDefaultInterserverHTTPPortNumber,
 				},
 			},
-			InitialDelaySeconds: 10,
-			PeriodSeconds:       10,
+			ReadinessProbe: &corev1.Probe{
+				Handler: corev1.Handler{
+					HTTPGet: &corev1.HTTPGetAction{
+						Path: "/ping",
+						Port: intstr.Parse(chDefaultHTTPPortName),
+					},
+				},
+				InitialDelaySeconds: 10,
+				PeriodSeconds:       10,
+			},
 		},
-	})
+	)
 
 	return podTemplate
 }

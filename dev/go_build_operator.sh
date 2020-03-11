@@ -14,13 +14,19 @@ source "${CUR_DIR}/go_build_config.sh"
 GO111MODULE=on go mod tidy
 GO111MODULE=on go mod "${MODULES_DIR}"
 
-#CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ${CUR_DIR}/clickhouse-operator ${SRC_ROOT}/cmd/clickhouse-operator
-if CGO_ENABLED=0 GO111MODULE=on go build \
+OUTPUT_BINARY="${OPERATOR_BIN}"
+MAIN_SRC_FILE="${SRC_ROOT}/cmd/operator/main.go"
+
+if CGO_ENABLED=0 GO111MODULE=on GOOS=linux GOARCH=amd64 go build \
     -mod="${MODULES_DIR}" \
     -a \
-    -ldflags "-X ${REPO}/pkg/version.Version=${VERSION} -X ${REPO}/pkg/version.GitSHA=${GIT_SHA}" \
-    -o "${OPERATOR_BIN}" \
-    "${SRC_ROOT}/cmd/operator/main.go"
+    -ldflags " \
+        -X ${REPO}/pkg/version.Version=${VERSION} \
+        -X ${REPO}/pkg/version.GitSHA=${GIT_SHA}  \
+        -X ${REPO}/pkg/version.BuiltAt=${NOW}     \
+    " \
+    -o "${OUTPUT_BINARY}" \
+    "${MAIN_SRC_FILE}"
 then
     echo "Build OK"
 else
