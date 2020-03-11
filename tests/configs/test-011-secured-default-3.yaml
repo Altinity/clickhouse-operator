@@ -6,6 +6,8 @@ spec:
   useTemplates:
     - name: clickhouse-version
   configuration:
+    settings:
+      logger/level: trace # We need to change settings in order to make sure all settings are propagated
     users:
       default/profile: readonly
     clusters:
