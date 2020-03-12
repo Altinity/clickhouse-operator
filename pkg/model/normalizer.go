@@ -44,8 +44,8 @@ func NewNormalizer(chop *chop.CHOp) *Normalizer {
 	}
 }
 
-// CreateTemplatedChi produces ready-to-use CHI object
-func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withDefaultCluster bool) (*chiv1.ClickHouseInstallation, error) {
+// CreateTemplatedCHI produces ready-to-use CHI object
+func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withDefaultCluster bool) (*chiv1.ClickHouseInstallation, error) {
 	// Should insert default cluster if no cluster specified
 	n.withDefaultCluster = withDefaultCluster
 
@@ -88,12 +88,12 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withD
 	// After all templates applied, place provided CHI on top of the whole stack
 	n.chi.MergeFrom(chi, chiv1.MergeTypeOverrideByNonEmptyValues)
 
-	return n.NormalizeChi(nil)
+	return n.NormalizeCHI(nil)
 }
 
-// NormalizeChi normalizes CHI.
+// NormalizeCHI normalizes CHI.
 // Returns normalized CHI
-func (n *Normalizer) NormalizeChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
+func (n *Normalizer) NormalizeCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
 	if chi != nil {
 		n.chi = chi
 	}
