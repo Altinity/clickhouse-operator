@@ -392,3 +392,23 @@ def test_018():
     
     kube_delete_chi("test-018-configmap")
 
+@TestScenario
+@Name("test-019-retain-volume. Test that volume is correctly retained and can be re-attached")
+def test_019(config = "configs/test-019-retain-volume.yaml"):
+    chi = get_chi_name(get_full_path(config))
+    create_and_check(config, {"pod_count": 1, "do_not_delete": 1})
+    clickhouse_query(chi, query = "create table test Engine = Log as select 1 as a")
+    with When("CHI with ratained volume is deleted"):
+        kube_delete_chi(chi)
+
+    with Then("PVC should be retained"):
+        assert kube_get_count("pvc") == 1
+        assert kube_get_count("pv") == 1
+
+    with When("Re-create CHI"):
+        create_and_check(config, {"pod_count": 1, "do_not_delete": 1})
+    with Then("PVC should be re-mounted and data should be in place"):
+        out = clickhouse_query(chi, query = "select a from test")
+        assert out == "1"
+
+    kube_delete_chi(chi)

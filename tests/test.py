@@ -41,7 +41,8 @@ if main():
                 test_006,
                 test_007,
                 test_008,
-                # test_009, # run separately for several versions
+                (test_009, {"version_from": "0.6.0"}),
+                (test_009, {"version_from": "0.8.0"}),
                 test_010,
                 test_011,
                 test_011_1,
@@ -56,13 +57,13 @@ if main():
             run_tests = all_tests
             
             # placeholder for selective test running
-            # run_tests = [test_018]
+            # run_tests = [test_019]
 
             for t in run_tests:
-                run(test=t, flags=TE)
-
-            run(test = test_009, args={"version_from": "0.6.0"})
-            run(test = test_009, args={"version_from": "0.8.0"})
+                if callable(t):
+                    run(test=t, flags=TE)
+                else:
+                    run(test = t[0], args = t[1], flags=TE)
 
         # python3 tests/test.py --only clickhouse*
         with Module("clickhouse", flags=TE):
