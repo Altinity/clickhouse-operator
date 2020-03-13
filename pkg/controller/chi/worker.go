@@ -127,9 +127,9 @@ func (w *worker) addCHI(new *chop.ClickHouseInstallation) error {
 
 func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseInstallation {
 	if chi == nil {
-		chi, _ = w.normalizer.CreateTemplatedChi(&chop.ClickHouseInstallation{}, false)
+		chi, _ = w.normalizer.CreateTemplatedCHI(&chop.ClickHouseInstallation{}, false)
 	} else {
-		chi, _ = w.normalizer.CreateTemplatedChi(chi, true)
+		chi, _ = w.normalizer.CreateTemplatedCHI(chi, true)
 	}
 
 	return chi
@@ -241,7 +241,7 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 // reconcileCHI reconciles CHI global objects
 func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	// 1. CHI Service
-	service := w.creator.CreateServiceChi()
+	service := w.creator.CreateServiceCHI()
 	if err := w.c.ReconcileService(service); err != nil {
 		return err
 	}
@@ -251,13 +251,13 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.creator.CreateConfigMapChiCommon()
+	configMapCommon := w.creator.CreateConfigMapCHICommon()
 	if err := w.c.ReconcileConfigMap(configMapCommon); err != nil {
 		return err
 	}
 
 	// ConfigMap common for all users resources in CHI
-	configMapUsers := w.creator.CreateConfigMapChiCommonUsers()
+	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
 	if err := w.c.ReconcileConfigMap(configMapUsers); err != nil {
 		return err
 	}
@@ -356,7 +356,7 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 
 	log.V(1).Infof("Start delete CHI %s/%s", chi.Namespace, chi.Name)
 
-	chi, err = w.normalizer.CreateTemplatedChi(chi, true)
+	chi, err = w.normalizer.CreateTemplatedCHI(chi, true)
 	if err != nil {
 		log.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
 		return err
@@ -434,7 +434,7 @@ func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.Cli
 		return nil, err
 	}
 
-	chi, err = w.normalizer.NormalizeChi(chi)
+	chi, err = w.normalizer.NormalizeCHI(chi)
 	if err != nil {
 		return nil, err
 	}

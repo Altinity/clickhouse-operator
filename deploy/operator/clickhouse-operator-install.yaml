@@ -1309,7 +1309,7 @@ subjects:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:0.9.3
+# altinity/clickhouse-operator:0.9.4
 # etc-clickhouse-operator-files
 #
 apiVersion: v1
@@ -1436,7 +1436,7 @@ data:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:0.9.3
+# altinity/clickhouse-operator:0.9.4
 # etc-clickhouse-operator-confd-files
 #
 apiVersion: v1
@@ -1451,7 +1451,7 @@ data:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:0.9.3
+# altinity/clickhouse-operator:0.9.4
 # etc-clickhouse-operator-configd-files
 #
 apiVersion: v1
@@ -1497,7 +1497,7 @@ data:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:0.9.3
+# altinity/clickhouse-operator:0.9.4
 # etc-clickhouse-operator-templatesd-files
 #
 apiVersion: v1
@@ -1596,7 +1596,7 @@ data:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:0.9.3
+# altinity/clickhouse-operator:0.9.4
 # etc-clickhouse-operator-usersd-files
 #
 apiVersion: v1
@@ -1645,8 +1645,8 @@ data:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:0.9.3
-# altinity/metrics-exporter:0.9.3
+# altinity/clickhouse-operator:0.9.4
+# altinity/metrics-exporter:0.9.4
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -1689,7 +1689,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.9.3
+          image: altinity/clickhouse-operator:0.9.4
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -1754,7 +1754,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.9.3
+          image: altinity/metrics-exporter:0.9.4
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder

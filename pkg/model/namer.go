@@ -487,9 +487,9 @@ func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
 	return newNameMacroReplacerChi(chi).Replace(configMapCommonUsersNamePattern)
 }
 
-// CreateChiServiceName creates a name of a Installation Service resource
-func CreateChiServiceName(chi *chop.ClickHouseInstallation) string {
-	if template, ok := chi.GetChiServiceTemplate(); ok {
+// CreateCHIServiceName creates a name of a Installation Service resource
+func CreateCHIServiceName(chi *chop.ClickHouseInstallation) string {
+	if template, ok := chi.GetCHIServiceTemplate(); ok {
 		// Service template available
 		if template.GenerateName != "" {
 			// Service template has explicitly specified service name template
@@ -501,11 +501,11 @@ func CreateChiServiceName(chi *chop.ClickHouseInstallation) string {
 	return newNameMacroReplacerChi(chi).Replace(chiServiceNamePattern)
 }
 
-// CreateChiServiceName creates a name of a Installation Service resource
+// CreateCHIServiceName creates a name of a Installation Service resource
 func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
 	return fmt.Sprintf(
 		serviceFQDNPattern,
-		CreateChiServiceName(chi),
+		CreateCHIServiceName(chi),
 		chi.Namespace,
 	)
 }

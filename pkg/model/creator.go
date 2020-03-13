@@ -51,19 +51,19 @@ func NewCreator(
 	return creator
 }
 
-// createServiceChi creates new corev1.Service for specified CHI
-func (c *Creator) CreateServiceChi() *corev1.Service {
-	serviceName := CreateChiServiceName(c.chi)
+// CreateServiceCHI creates new corev1.Service for specified CHI
+func (c *Creator) CreateServiceCHI() *corev1.Service {
+	serviceName := CreateCHIServiceName(c.chi)
 
-	log.V(1).Infof("createServiceChi(%s/%s)", c.chi.Namespace, serviceName)
-	if template, ok := c.chi.GetChiServiceTemplate(); ok {
+	log.V(1).Infof("CreateServiceCHI(%s/%s)", c.chi.Namespace, serviceName)
+	if template, ok := c.chi.GetCHIServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,
 			c.chi.Namespace,
 			serviceName,
-			c.labeler.getLabelsServiceChi(),
-			c.labeler.getSelectorChiScope(),
+			c.labeler.getLabelsServiceCHI(),
+			c.labeler.getSelectorCHIScope(),
 		)
 	} else {
 		// Incorrect/unknown .templates.ServiceTemplate specified
@@ -72,7 +72,7 @@ func (c *Creator) CreateServiceChi() *corev1.Service {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: c.chi.Namespace,
-				Labels:    c.labeler.getLabelsServiceChi(),
+				Labels:    c.labeler.getLabelsServiceCHI(),
 			},
 			Spec: corev1.ServiceSpec{
 				// ClusterIP: templateDefaultsServiceClusterIP,
@@ -90,9 +90,9 @@ func (c *Creator) CreateServiceChi() *corev1.Service {
 						TargetPort: intstr.FromString(chDefaultTCPPortName),
 					},
 				},
-				Selector: c.labeler.getSelectorChiScope(),
-				Type:     "LoadBalancer",
-				// ExternalTrafficPolicy: "Local",
+				Selector:              c.labeler.getSelectorCHIScope(),
+				Type:                  corev1.ServiceTypeLoadBalancer,
+				ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
 			},
 		}
 	}
@@ -102,7 +102,7 @@ func (c *Creator) CreateServiceChi() *corev1.Service {
 func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
 	serviceName := CreateClusterServiceName(cluster)
 
-	log.V(1).Infof("createServiceCluster(%s/%s)", cluster.Address.Namespace, serviceName)
+	log.V(1).Infof("CreateServiceCluster(%s/%s)", cluster.Address.Namespace, serviceName)
 	if template, ok := cluster.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -121,7 +121,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 	serviceName := CreateShardServiceName(shard)
 
-	log.V(1).Infof("createServiceShard(%s/%s)", shard.Address.Namespace, serviceName)
+	log.V(1).Infof("CreateServiceShard(%s/%s)", shard.Address.Namespace, serviceName)
 	if template, ok := shard.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -141,7 +141,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(host)
 	statefulSetName := CreateStatefulSetName(host)
 
-	log.V(1).Infof("createServiceHost(%s/%s) for Set %s", host.Address.Namespace, serviceName, statefulSetName)
+	log.V(1).Infof("CreateServiceHost(%s/%s) for Set %s", host.Address.Namespace, serviceName, statefulSetName)
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -237,28 +237,28 @@ func (c *Creator) createServiceFromTemplate(
 	return service
 }
 
-// createConfigMapChiCommon creates new corev1.ConfigMap
-func (c *Creator) CreateConfigMapChiCommon() *corev1.ConfigMap {
+// CreateConfigMapCHICommon creates new corev1.ConfigMap
+func (c *Creator) CreateConfigMapCHICommon() *corev1.ConfigMap {
 	c.chConfigSectionsGenerator.CreateConfigsCommon()
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonName(c.chi),
 			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsConfigMapChiCommon(),
+			Labels:    c.labeler.getLabelsConfigMapCHICommon(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigSectionsGenerator.commonConfigSections,
 	}
 }
 
-// createConfigMapChiCommonUsers creates new corev1.ConfigMap
-func (c *Creator) CreateConfigMapChiCommonUsers() *corev1.ConfigMap {
+// CreateConfigMapCHICommonUsers creates new corev1.ConfigMap
+func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 	c.chConfigSectionsGenerator.CreateConfigsUsers()
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonUsersName(c.chi),
 			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsConfigMapChiCommonUsers(),
+			Labels:    c.labeler.getLabelsConfigMapCHICommonUsers(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigSectionsGenerator.commonUsersConfigSections,
