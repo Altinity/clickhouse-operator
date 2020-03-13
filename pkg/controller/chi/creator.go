@@ -64,16 +64,30 @@ func (c *Controller) ReconcileService(service *core.Service) error {
 	if curService, err := c.getService(&service.ObjectMeta, false); curService != nil {
 		// Object found
 		log.V(1).Infof("Update Service %s/%s", service.Namespace, service.Name)
+
+		// Updating Service is a complicated business
+
 		// spec.resourceVersion is required in order to update object
 		service.ResourceVersion = curService.ResourceVersion
+
 		// spec.clusterIP field is immutable, need to use already assigned value
 		// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
 		// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
 		// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
 		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
 		service.Spec.ClusterIP = curService.Spec.ClusterIP
+
+		// spec.healthCheckNodePort field is used with ExternalTrafficPolicy=Local only and is immutable within ExternalTrafficPolicy=Local
+		// In case ExternalTrafficPolicy is changed it seems to be irrelevant
+		// https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+		if (curService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) &&
+			(service.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) {
+			service.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
+		}
+
+		// And only now we are ready to actually update the service with new version of the service
 		_, err := c.kubeClient.CoreV1().Services(service.Namespace).Update(service)
-		// Object updated
+
 		return err
 	} else if apierrors.IsNotFound(err) {
 		log.V(1).Infof("Create service %s/%s", service.Namespace, service.Name)
