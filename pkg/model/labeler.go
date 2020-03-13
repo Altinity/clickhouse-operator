@@ -76,13 +76,13 @@ func NewLabeler(chop *chop.CHOp, chi *chi.ClickHouseInstallation) *Labeler {
 	}
 }
 
-func (l *Labeler) getLabelsConfigMapChiCommon() map[string]string {
+func (l *Labeler) getLabelsConfigMapCHICommon() map[string]string {
 	return util.MergeStringMaps(l.getLabelsChiScope(), map[string]string{
 		LabelConfigMap: labelConfigMapValueChiCommon,
 	})
 }
 
-func (l *Labeler) getLabelsConfigMapChiCommonUsers() map[string]string {
+func (l *Labeler) getLabelsConfigMapCHICommonUsers() map[string]string {
 	return util.MergeStringMaps(l.getLabelsChiScope(), map[string]string{
 		LabelConfigMap: labelConfigMapValueChiCommonUsers,
 	})
@@ -94,7 +94,7 @@ func (l *Labeler) getLabelsConfigMapHost(host *chi.ChiHost) map[string]string {
 	})
 }
 
-func (l *Labeler) getLabelsServiceChi() map[string]string {
+func (l *Labeler) getLabelsServiceCHI() map[string]string {
 	return util.MergeStringMaps(l.getLabelsChiScope(), map[string]string{
 		LabelService: labelServiceValueChi,
 	})
@@ -129,8 +129,8 @@ func (l *Labeler) getLabelsChiScope() map[string]string {
 	})
 }
 
-// getSelectorChiScope gets labels to select a CHI-scoped object
-func (l *Labeler) getSelectorChiScope() map[string]string {
+// getSelectorCHIScope gets labels to select a CHI-scoped object
+func (l *Labeler) getSelectorCHIScope() map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelAppName: LabelAppValue,

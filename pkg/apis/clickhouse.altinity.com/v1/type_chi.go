@@ -565,7 +565,7 @@ func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceT
 }
 
 // GetServiceTemplate gets ChiServiceTemplate of a CHI
-func (chi *ClickHouseInstallation) GetChiServiceTemplate() (*ChiServiceTemplate, bool) {
+func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ChiServiceTemplate, bool) {
 	name := chi.Spec.Defaults.Templates.ServiceTemplate
 	template, ok := chi.GetServiceTemplate(name)
 	return template, ok

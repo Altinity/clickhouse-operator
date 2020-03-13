@@ -241,7 +241,7 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 // reconcileCHI reconciles CHI global objects
 func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	// 1. CHI Service
-	service := w.creator.CreateServiceChi()
+	service := w.creator.CreateServiceCHI()
 	if err := w.c.ReconcileService(service); err != nil {
 		return err
 	}
@@ -251,13 +251,13 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.creator.CreateConfigMapChiCommon()
+	configMapCommon := w.creator.CreateConfigMapCHICommon()
 	if err := w.c.ReconcileConfigMap(configMapCommon); err != nil {
 		return err
 	}
 
 	// ConfigMap common for all users resources in CHI
-	configMapUsers := w.creator.CreateConfigMapChiCommonUsers()
+	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
 	if err := w.c.ReconcileConfigMap(configMapUsers); err != nil {
 		return err
 	}
