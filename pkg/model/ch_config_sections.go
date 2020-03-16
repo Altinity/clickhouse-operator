@@ -69,7 +69,7 @@ func (c *configSections) CreateConfigsHost(host *chi.ChiHost) map[string]string 
 	hostConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(hostConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(host))
 	util.IncludeNonEmpty(hostConfigSections, filenamePortsXML, c.chConfigGenerator.GetHostPorts(host))
-	util.IncludeNonEmpty(hostConfigSections, filenameZookeeperXML, c.chConfigGenerator.GetZookeeper(host))
+	util.IncludeNonEmpty(hostConfigSections, filenameZookeeperXML, c.chConfigGenerator.GetHostZookeeper(host))
 	// Extra user-specified config files
 	util.MergeStringMaps(hostConfigSections, c.chopConfig.CHHostConfigs)
 

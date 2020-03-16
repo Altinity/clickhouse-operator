@@ -79,3 +79,22 @@ func (host *ChiHost) GetReplicasNum() int32 {
 func (host *ChiHost) GetSettings() Settings {
 	return host.CHI.Spec.Configuration.Settings
 }
+
+func (host *ChiHost) GetCluster() *ChiCluster {
+	// Host has to have filled Address
+	for index := range host.CHI.Spec.Configuration.Clusters {
+		cluster := &host.CHI.Spec.Configuration.Clusters[index]
+		if host.Address.ClusterName == cluster.Name {
+			return cluster
+		}
+	}
+
+	// This should not happen, actually
+
+	return nil
+}
+
+func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
+	cluster := host.GetCluster()
+	return &cluster.Zookeeper
+}

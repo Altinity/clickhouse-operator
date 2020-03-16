@@ -14,23 +14,27 @@
 
 package v1
 
-func (zoo *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeType) {
+func (zkc *ChiZookeeperConfig) IsEmpty() bool {
+	return len(zkc.Nodes) == 0
+}
+
+func (zkc *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeType) {
 	if from == nil {
 		return
 	}
 
-	if len(from.Nodes) > 0 {
+	if !from.IsEmpty() {
 		// Append Nodes from `from`
-		if zoo.Nodes == nil {
-			zoo.Nodes = make([]ChiZookeeperNode, 0)
+		if zkc.Nodes == nil {
+			zkc.Nodes = make([]ChiZookeeperNode, 0)
 		}
 		for fromIndex := range from.Nodes {
 			fromNode := &from.Nodes[fromIndex]
 
 			// Try to find equal entry
 			equalFound := false
-			for toIndex := range zoo.Nodes {
-				toNode := &zoo.Nodes[toIndex]
+			for toIndex := range zkc.Nodes {
+				toNode := &zkc.Nodes[toIndex]
 				if toNode.Equal(fromNode) {
 					// Received already have such a node
 					equalFound = true
@@ -40,21 +44,21 @@ func (zoo *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeTy
 
 			if !equalFound {
 				// Append Node from `from`
-				zoo.Nodes = append(zoo.Nodes, *fromNode.DeepCopy())
+				zkc.Nodes = append(zkc.Nodes, *fromNode.DeepCopy())
 			}
 		}
 	}
 
 	if from.SessionTimeoutMs > 0 {
-		zoo.SessionTimeoutMs = from.SessionTimeoutMs
+		zkc.SessionTimeoutMs = from.SessionTimeoutMs
 	}
 	if from.OperationTimeoutMs > 0 {
-		zoo.OperationTimeoutMs = from.OperationTimeoutMs
+		zkc.OperationTimeoutMs = from.OperationTimeoutMs
 	}
 	if from.Root != "" {
-		zoo.Root = from.Root
+		zkc.Root = from.Root
 	}
 	if from.Identity != "" {
-		zoo.Identity = from.Identity
+		zkc.Identity = from.Identity
 	}
 }

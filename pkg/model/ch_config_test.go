@@ -118,7 +118,7 @@ func TestGetZookeeper(t *testing.T) {
 
 	creator := NewCreator(CHOp, chi)
 	chi.WalkHostsTillError(func(host *chiv1.ChiHost) error {
-		str := creator.chConfigGenerator.GetZookeeper(host)
+		str := creator.chConfigGenerator.GetHostZookeeper(host)
 		if host.Address.ClusterName == "replcluster2" {
 			require.Equal(t, Cluster2ZookeeperConfigurationData, str, "unexpected zookeeper configuration")
 		} else {
