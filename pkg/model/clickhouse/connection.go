@@ -39,7 +39,7 @@ func NewConnection(params *CHConnectionParams) *CHConnection {
 
 func (c *CHConnection) connect() {
 	dsn := c.makeDSN()
-	log.V(1).Infof("Establishing connection: %s", dsn)
+	log.V(2).Infof("Establishing connection: %s", dsn)
 	dbConnection, err := sqlmodule.Open("clickhouse", dsn)
 	if err != nil {
 		log.V(1).Infof("FAILED Open(%s) %v", dsn, err)
@@ -61,7 +61,7 @@ func (c *CHConnection) connect() {
 
 func (c *CHConnection) ensureConnected() bool {
 	if c.conn != nil {
-		log.V(1).Infof("Already connected: %s", c.makeDSN())
+		log.V(2).Infof("Already connected: %s", c.makeDSN())
 		return true
 	}
 
