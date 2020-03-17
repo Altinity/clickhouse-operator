@@ -9,7 +9,6 @@ spec:
     zookeeper:
       nodes:
         - host: zookeeper-0.zookeepers.zoo1ns
-          port: 2181
     clusters:
       - name: replcluster1
         layout:
@@ -18,10 +17,7 @@ spec:
         zookeeper:
           nodes:
             - host: zookeeper-0.zookeepers.zoo3ns
-              port: 2181
             - host: zookeeper-1.zookeepers.zoo3ns
-              port: 2181
             - host: zookeeper-2.zookeepers.zoo3ns
-              port: 2181
         layout:
           replicasCount: 2
