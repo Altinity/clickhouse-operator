@@ -165,7 +165,7 @@ spec:
                             type: string
                           port:
                             type: integer
-                            minimum: 1
+                            minimum: 0
                             maximum: 65535
                     session_timeout_ms:
                       type: integer
@@ -212,7 +212,7 @@ spec:
                                   type: string
                                 port:
                                   type: integer
-                                  minimum: 1
+                                  minimum: 0
                                   maximum: 65535
                           session_timeout_ms:
                             type: integer
