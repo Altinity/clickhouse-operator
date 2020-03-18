@@ -7,4 +7,6 @@
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
-rm -f "${METRICS_EXPORTER_BIN}"
+OUTPUT_BINARY="${METRICS_EXPORTER_BIN}"
+
+rm -f "${OUTPUT_BINARY}"
