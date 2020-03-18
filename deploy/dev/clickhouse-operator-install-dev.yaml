@@ -97,23 +97,6 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
-            useTemplates:
-              type: array
-              items:
-                type: object
-                required:
-                  - name
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                  useType:
-                    type: string
-                    enum:
-                      # List useTypeXXX constants from model
-                      - ""
-                      - "merge"
             defaults:
               type: object
               properties:
@@ -182,7 +165,7 @@ spec:
                             type: string
                           port:
                             type: integer
-                            minimum: 1
+                            minimum: 0
                             maximum: 65535
                     session_timeout_ms:
                       type: integer
@@ -215,30 +198,29 @@ spec:
                         # See namePartClusterMaxLen const
                         maxLength: 15
                         pattern: "^[a-zA-Z0-9-]{0,15}$"
-                      shardsCount:
-                        type: integer
-                        minimum: 1
-                      replicasCount:
-                        type: integer
-                        minimum: 1
-                      templates:
+                      zookeeper:
                         type: object
                         properties:
-                          hostTemplate:
+                          nodes:
+                            type: array
+                            items:
+                              type: object
+                              required:
+                                - host
+                              properties:
+                                host:
+                                  type: string
+                                port:
+                                  type: integer
+                                  minimum: 0
+                                  maximum: 65535
+                          session_timeout_ms:
+                            type: integer
+                          operation_timeout_ms:
+                            type: integer
+                          root:
                             type: string
-                          podTemplate:
-                            type: string
-                          dataVolumeClaimTemplate:
-                            type: string
-                          logVolumeClaimTemplate:
-                            type: string
-                          serviceTemplate:
-                            type: string
-                          clusterServiceTemplate:
-                            type: string
-                          shardServiceTemplate:
-                            type: string
-                          replicaServiceTemplate:
+                          identity:
                             type: string
                       layout:
                         type: object
@@ -431,6 +413,25 @@ spec:
                                             type: string
                                           replicaServiceTemplate:
                                             type: string
+                      templates:
+                        type: object
+                        properties:
+                          hostTemplate:
+                            type: string
+                          podTemplate:
+                            type: string
+                          dataVolumeClaimTemplate:
+                            type: string
+                          logVolumeClaimTemplate:
+                            type: string
+                          serviceTemplate:
+                            type: string
+                          clusterServiceTemplate:
+                            type: string
+                          shardServiceTemplate:
+                            type: string
+                          replicaServiceTemplate:
+                            type: string
             templates:
               type: object
               properties:
@@ -597,6 +598,23 @@ spec:
                       spec:
                         # TODO specify ServiceSpec
                         type: object
+            useTemplates:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  useType:
+                    type: string
+                    enum:
+                      # List useTypeXXX constants from model
+                      - ""
+                      - "merge"
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -697,23 +715,6 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
-            useTemplates:
-              type: array
-              items:
-                type: object
-                required:
-                  - name
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                  useType:
-                    type: string
-                    enum:
-                      # List useTypeXXX constants from model
-                      - ""
-                      - "merge"
             defaults:
               type: object
               properties:
@@ -782,7 +783,7 @@ spec:
                             type: string
                           port:
                             type: integer
-                            minimum: 1
+                            minimum: 0
                             maximum: 65535
                     session_timeout_ms:
                       type: integer
@@ -815,30 +816,29 @@ spec:
                         # See namePartClusterMaxLen const
                         maxLength: 15
                         pattern: "^[a-zA-Z0-9-]{0,15}$"
-                      shardsCount:
-                        type: integer
-                        minimum: 1
-                      replicasCount:
-                        type: integer
-                        minimum: 1
-                      templates:
+                      zookeeper:
                         type: object
                         properties:
-                          hostTemplate:
+                          nodes:
+                            type: array
+                            items:
+                              type: object
+                              required:
+                                - host
+                              properties:
+                                host:
+                                  type: string
+                                port:
+                                  type: integer
+                                  minimum: 0
+                                  maximum: 65535
+                          session_timeout_ms:
+                            type: integer
+                          operation_timeout_ms:
+                            type: integer
+                          root:
                             type: string
-                          podTemplate:
-                            type: string
-                          dataVolumeClaimTemplate:
-                            type: string
-                          logVolumeClaimTemplate:
-                            type: string
-                          serviceTemplate:
-                            type: string
-                          clusterServiceTemplate:
-                            type: string
-                          shardServiceTemplate:
-                            type: string
-                          replicaServiceTemplate:
+                          identity:
                             type: string
                       layout:
                         type: object
@@ -1031,6 +1031,25 @@ spec:
                                             type: string
                                           replicaServiceTemplate:
                                             type: string
+                      templates:
+                        type: object
+                        properties:
+                          hostTemplate:
+                            type: string
+                          podTemplate:
+                            type: string
+                          dataVolumeClaimTemplate:
+                            type: string
+                          logVolumeClaimTemplate:
+                            type: string
+                          serviceTemplate:
+                            type: string
+                          clusterServiceTemplate:
+                            type: string
+                          shardServiceTemplate:
+                            type: string
+                          replicaServiceTemplate:
+                            type: string
             templates:
               type: object
               properties:
@@ -1197,6 +1216,23 @@ spec:
                       spec:
                         # TODO specify ServiceSpec
                         type: object
+            useTemplates:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  useType:
+                    type: string
+                    enum:
+                      # List useTypeXXX constants from model
+                      - ""
+                      - "merge"
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -1309,7 +1345,7 @@ subjects:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.3
+# altinity/clickhouse-operator:0.9.4
 # etc-clickhouse-operator-files
 #
 apiVersion: v1
@@ -1436,7 +1472,7 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.3
+# altinity/clickhouse-operator:0.9.4
 # etc-clickhouse-operator-confd-files
 #
 apiVersion: v1
@@ -1451,7 +1487,7 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.3
+# altinity/clickhouse-operator:0.9.4
 # etc-clickhouse-operator-configd-files
 #
 apiVersion: v1
@@ -1497,7 +1533,7 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.3
+# altinity/clickhouse-operator:0.9.4
 # etc-clickhouse-operator-templatesd-files
 #
 apiVersion: v1
@@ -1596,7 +1632,7 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.3
+# altinity/clickhouse-operator:0.9.4
 # etc-clickhouse-operator-usersd-files
 #
 apiVersion: v1
@@ -1645,8 +1681,8 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.3
-# altinity/metrics-exporter:0.9.3
+# altinity/clickhouse-operator:0.9.4
+# altinity/metrics-exporter:0.9.4
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -1689,7 +1725,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.9.3
+          image: altinity/clickhouse-operator:0.9.4
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -1754,7 +1790,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.9.3
+          image: altinity/metrics-exporter:0.9.4
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder

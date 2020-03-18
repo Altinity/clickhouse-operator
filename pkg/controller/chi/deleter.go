@@ -204,7 +204,7 @@ func (c *Controller) deleteServiceCluster(cluster *chop.ChiCluster) error {
 
 // deleteServiceCHI
 func (c *Controller) deleteServiceCHI(chi *chop.ClickHouseInstallation) error {
-	serviceName := chopmodel.CreateChiServiceName(chi)
+	serviceName := chopmodel.CreateCHIServiceName(chi)
 	namespace := chi.Namespace
 	log.V(1).Infof("deleteServiceCHI(%s/%s)", namespace, serviceName)
 	return c.deleteServiceIfExists(namespace, serviceName)

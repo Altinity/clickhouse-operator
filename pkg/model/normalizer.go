@@ -44,8 +44,8 @@ func NewNormalizer(chop *chop.CHOp) *Normalizer {
 	}
 }
 
-// CreateTemplatedChi produces ready-to-use CHI object
-func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withDefaultCluster bool) (*chiv1.ClickHouseInstallation, error) {
+// CreateTemplatedCHI produces ready-to-use CHI object
+func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withDefaultCluster bool) (*chiv1.ClickHouseInstallation, error) {
 	// Should insert default cluster if no cluster specified
 	n.withDefaultCluster = withDefaultCluster
 
@@ -88,12 +88,12 @@ func (n *Normalizer) CreateTemplatedChi(chi *chiv1.ClickHouseInstallation, withD
 	// After all templates applied, place provided CHI on top of the whole stack
 	n.chi.MergeFrom(chi, chiv1.MergeTypeOverrideByNonEmptyValues)
 
-	return n.NormalizeChi(nil)
+	return n.NormalizeCHI(nil)
 }
 
-// NormalizeChi normalizes CHI.
+// NormalizeCHI normalizes CHI.
 // Returns normalized CHI
-func (n *Normalizer) NormalizeChi(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
+func (n *Normalizer) NormalizeCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
 	if chi != nil {
 		n.chi = chi
 	}
@@ -980,7 +980,7 @@ func (n *Normalizer) ensureCluster() {
 
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
 func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
-	host.Config.ZookeeperFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
+	host.Config.ZookeeperFingerprint = fingerprint(*host.GetZookeeper())
 	host.Config.SettingsFingerprint = fingerprint(castToSliceOfStrings(n.chi.Spec.Configuration.Settings))
 
 	return nil
@@ -1147,6 +1147,10 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chiv1.Settings) {
 func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 	// Use PodTemplate from .spec.defaults
 	cluster.InheritTemplatesFrom(n.chi)
+	// Use ChiZookeeperConfig from .spec.configuration.zookeeper
+	cluster.InheritZookeeperFrom(n.chi)
+
+	n.normalizeConfigurationZookeeper(&cluster.Zookeeper)
 
 	n.normalizeClusterLayoutShardsCountAndReplicasCount(&cluster.Layout)
 

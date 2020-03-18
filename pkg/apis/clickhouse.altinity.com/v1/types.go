@@ -123,9 +123,10 @@ type ChiConfiguration struct {
 
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
-	Name      string           `json:"name"`
-	Layout    ChiClusterLayout `json:"layout"`
-	Templates ChiTemplateNames `json:"templates,omitempty"`
+	Name      string             `json:"name"`
+	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper"`
+	Layout    ChiClusterLayout   `json:"layout"`
+	Templates ChiTemplateNames   `json:"templates,omitempty"`
 
 	// Internal data
 	Address ChiClusterAddress       `json:"address,omitempty"`
@@ -347,8 +348,8 @@ type ChiZookeeperConfig struct {
 
 // ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
 type ChiZookeeperNode struct {
-	Host string `json:"host" yaml:"host"`
-	Port int32  `json:"port" yaml:"port"`
+	Host string `json:"host,omitempty" yaml:"host"`
+	Port int32  `json:"port,omitempty" yaml:"port"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

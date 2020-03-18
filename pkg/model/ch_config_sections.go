@@ -43,11 +43,9 @@ func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig 
 func (c *configSections) CreateConfigsCommon() {
 	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. remote servers
-	// 2. zookeeper
-	// 3. settings
-	// 4. files
+	// 2. settings
+	// 3. files
 	util.IncludeNonEmpty(c.commonConfigSections, filenameRemoteServersXML, c.chConfigGenerator.GetRemoteServers())
-	util.IncludeNonEmpty(c.commonConfigSections, filenameZookeeperXML, c.chConfigGenerator.GetZookeeper())
 	util.IncludeNonEmpty(c.commonConfigSections, filenameSettingsXML, c.chConfigGenerator.GetSettings())
 	util.MergeStringMaps(c.commonConfigSections, c.chConfigGenerator.GetFiles())
 	// Extra user-specified config files
@@ -71,6 +69,7 @@ func (c *configSections) CreateConfigsHost(host *chi.ChiHost) map[string]string 
 	hostConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(hostConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(host))
 	util.IncludeNonEmpty(hostConfigSections, filenamePortsXML, c.chConfigGenerator.GetHostPorts(host))
+	util.IncludeNonEmpty(hostConfigSections, filenameZookeeperXML, c.chConfigGenerator.GetHostZookeeper(host))
 	// Extra user-specified config files
 	util.MergeStringMaps(hostConfigSections, c.chopConfig.CHHostConfigs)
 

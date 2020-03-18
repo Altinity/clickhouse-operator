@@ -69,12 +69,11 @@ func (c *ClickHouseConfigGenerator) GetFiles() map[string]string {
 	return c.chi.Spec.Configuration.Files.GetStringMap()
 }
 
-// GetZookeeper creates data for "zookeeper.xml"
-func (c *ClickHouseConfigGenerator) GetZookeeper() string {
-	// Convenience wrapper
-	zk := &c.chi.Spec.Configuration.Zookeeper
+// GetHostZookeeper creates data for "zookeeper.xml"
+func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string {
+	zk := host.GetZookeeper()
 
-	if len(zk.Nodes) == 0 {
+	if zk.IsEmpty() {
 		// No Zookeeper nodes provided
 		return ""
 	}

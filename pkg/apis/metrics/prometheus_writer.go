@@ -84,7 +84,7 @@ func (w *PrometheusWriter) WriteTableSizes(data [][]string) {
 		}
 		writeSingleMetricToPrometheus(w.out, "table_partitions", "Number of partitions of the table", metric[2], prometheus.GaugeValue,
 			[]string{"chi", "namespace", "hostname", "database", "table"},
-			w.chi.Name, w.hostname, metric[0], metric[1])
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
 		writeSingleMetricToPrometheus(w.out, "table_parts", "Number of parts of the table", metric[3], prometheus.GaugeValue,
 			[]string{"chi", "namespace", "hostname", "database", "table"},
 			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
