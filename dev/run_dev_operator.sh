@@ -5,9 +5,10 @@
 
 # Source configuration
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-LOG_DIR="${CUR_DIR}/log"
-
 source "${CUR_DIR}/go_build_config.sh"
+
+# Setup paths
+LOG_DIR="${CUR_DIR}/log"
 
 echo -n "Building ${OPERATOR_BIN}, please wait..."
 if [[ $1 == "nobuild" ]]; then
@@ -22,7 +23,7 @@ else
 fi
 
 if [[ ! -x "${OPERATOR_BIN}" ]]; then
-    echo "Unable to start ${OPERATOR_BIN} Is not executable or found. Abort"
+    echo "Unable to start ${OPERATOR_BIN} Is not executable or not found. Abort"
     exit 2
 fi
 

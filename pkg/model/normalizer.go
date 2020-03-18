@@ -980,7 +980,7 @@ func (n *Normalizer) ensureCluster() {
 
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
 func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
-	host.Config.ZookeeperFingerprint = fingerprint(n.chi.Spec.Configuration.Zookeeper)
+	host.Config.ZookeeperFingerprint = fingerprint(*host.GetZookeeper())
 	host.Config.SettingsFingerprint = fingerprint(castToSliceOfStrings(n.chi.Spec.Configuration.Settings))
 
 	return nil
@@ -1147,6 +1147,10 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chiv1.Settings) {
 func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 	// Use PodTemplate from .spec.defaults
 	cluster.InheritTemplatesFrom(n.chi)
+	// Use ChiZookeeperConfig from .spec.configuration.zookeeper
+	cluster.InheritZookeeperFrom(n.chi)
+
+	n.normalizeConfigurationZookeeper(&cluster.Zookeeper)
 
 	n.normalizeClusterLayoutShardsCountAndReplicasCount(&cluster.Layout)
 

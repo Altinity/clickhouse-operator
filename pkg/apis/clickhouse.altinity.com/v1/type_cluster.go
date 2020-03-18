@@ -14,6 +14,12 @@
 
 package v1
 
+func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
+	if cluster.Zookeeper.IsEmpty() {
+		(&cluster.Zookeeper).MergeFrom(&chi.Spec.Configuration.Zookeeper, MergeTypeFillEmptyValues)
+	}
+}
+
 func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
 	(&cluster.Templates).MergeFrom(&chi.Spec.Defaults.Templates, MergeTypeFillEmptyValues)
 	(&cluster.Templates).HandleDeprecatedFields()
