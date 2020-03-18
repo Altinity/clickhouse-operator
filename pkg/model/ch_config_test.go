@@ -18,16 +18,9 @@ spec:
   configuration:
     zookeeper:
       nodes:
-        - host: zookeeper-0.zookeepers.zoo3ns
-          port: 2181
-        - host: zookeeper-1.zookeepers.zoo3ns
-          port: 2181
-        - host: zookeeper-2.zookeepers.zoo3ns
-          port: 2181
+        - host: zookeeper-0.zookeepers.zoo1ns
       session_timeout_ms: 30000
       operation_timeout_ms: 10000
-      root: /path/to/zookeeper/node
-      identity: user:password
     clusters:
       - name: replcluster1
         layout:
@@ -36,22 +29,38 @@ spec:
       - name: replcluster2
         zookeeper:
           nodes:
-            - host: zookeeper-0.zookeepers.zoo5ns
-              port: 2181
-            - host: zookeeper-1.zookeepers.zoo5ns
-              port: 2181
-            - host: zookeeper-2.zookeepers.zoo5ns
-              port: 2181
-            - host: zookeeper-3.zookeepers.zoo5ns
-              port: 2181
-            - host: zookeeper-4.zookeepers.zoo5ns
-              port: 2181
+            - host: zookeeper-0.zookeepers.zoo3ns
+            - host: zookeeper-1.zookeepers.zoo3ns
+            - host: zookeeper-2.zookeepers.zoo3ns
         layout:
           shardsCount: 3
           replicasCount: 2
 `
 
 var Cluster1ZookeeperConfigurationData = `<yandex>
+    <zookeeper>
+        <node>
+            <host>zookeeper-0.zookeepers.zoo1ns</host>
+            <port>2181</port>
+        </node>
+        <node>
+            <host>zookeeper-1.zookeepers.zoo1ns</host>
+            <port>2181</port>
+        </node>
+        <node>
+            <host>zookeeper-2.zookeepers.zoo1ns</host>
+            <port>2181</port>
+        </node>
+        <session_timeout_ms>30000</session_timeout_ms>
+        <operation_timeout_ms>10000</operation_timeout_ms>
+    </zookeeper>
+    <distributed_ddl>
+        <path>/clickhouse/repl-06/task_queue/ddl</path>
+    </distributed_ddl>
+</yandex>
+`
+
+var Cluster2ZookeeperConfigurationData = `<yandex>
     <zookeeper>
         <node>
             <host>zookeeper-0.zookeepers.zoo3ns</host>
@@ -63,39 +72,6 @@ var Cluster1ZookeeperConfigurationData = `<yandex>
         </node>
         <node>
             <host>zookeeper-2.zookeepers.zoo3ns</host>
-            <port>2181</port>
-        </node>
-        <session_timeout_ms>30000</session_timeout_ms>
-        <operation_timeout_ms>10000</operation_timeout_ms>
-        <root>/path/to/zookeeper/node</root>
-        <identity>user:password</identity>
-    </zookeeper>
-    <distributed_ddl>
-        <path>/clickhouse/repl-06/task_queue/ddl</path>
-    </distributed_ddl>
-</yandex>
-`
-
-var Cluster2ZookeeperConfigurationData = `<yandex>
-    <zookeeper>
-        <node>
-            <host>zookeeper-0.zookeepers.zoo5ns</host>
-            <port>2181</port>
-        </node>
-        <node>
-            <host>zookeeper-1.zookeepers.zoo5ns</host>
-            <port>2181</port>
-        </node>
-        <node>
-            <host>zookeeper-2.zookeepers.zoo5ns</host>
-            <port>2181</port>
-        </node>
-        <node>
-            <host>zookeeper-3.zookeepers.zoo5ns</host>
-            <port>2181</port>
-        </node>
-        <node>
-            <host>zookeeper-4.zookeepers.zoo5ns</host>
             <port>2181</port>
         </node>
     </zookeeper>
@@ -113,7 +89,7 @@ func TestGetZookeeper(t *testing.T) {
 	CHOp := chop.NewCHOp("", nil, "")
 	CHOp.Init()
 	normalizer := NewNormalizer(CHOp)
-	chi, err = normalizer.NormalizeChi(chi)
+	chi, err = normalizer.NormalizeCHI(chi)
 	require.Nil(t, err, "failed to normalize chi")
 
 	creator := NewCreator(CHOp, chi)
