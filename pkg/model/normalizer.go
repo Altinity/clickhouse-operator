@@ -364,9 +364,15 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 		switch podDistribution.Type {
 		case
 			chiv1.PodDistributionUnspecified,
+
+			// AntiAffinity section
 			chiv1.PodDistributionClickHouseAntiAffinity,
 			chiv1.PodDistributionShardAntiAffinity,
-			chiv1.PodDistributionReplicaAntiAffinity,
+			chiv1.PodDistributionReplicaAntiAffinity:
+			if podDistribution.Scope == "" {
+				podDistribution.Scope = chiv1.PodDistributionScopeCluster
+			}
+		case
 			chiv1.PodDistributionAnotherNamespaceAntiAffinity,
 			chiv1.PodDistributionAnotherClickHouseInstallationAntiAffinity,
 			chiv1.PodDistributionAnotherClusterAntiAffinity:
@@ -378,6 +384,7 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 				podDistribution.Number = 0
 			}
 		case
+			// Affinity section
 			chiv1.PodDistributionNamespaceAffinity,
 			chiv1.PodDistributionClickHouseInstallationAffinity,
 			chiv1.PodDistributionClusterAffinity,
@@ -387,19 +394,45 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 			// PodDistribution is known
 
 		case chiv1.PodDistributionCircularReplication:
+			// Shortcut section
+			// All shortcuts have to be expanded
+
 			// PodDistribution is known
+
+			if podDistribution.Scope == "" {
+				podDistribution.Scope = chiv1.PodDistributionScopeCluster
+			}
+
 			// TODO need to support multi-cluster
 			cluster := &n.chi.Spec.Configuration.Clusters[0]
 
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionShardAntiAffinity})
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionReplicaAntiAffinity})
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionMaxNumberPerNode, Number: cluster.Layout.ReplicasCount})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
+				Type:  chiv1.PodDistributionShardAntiAffinity,
+				Scope: podDistribution.Scope,
+			})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
+				Type:  chiv1.PodDistributionReplicaAntiAffinity,
+				Scope: podDistribution.Scope,
+			})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
+				Type:   chiv1.PodDistributionMaxNumberPerNode,
+				Scope:  podDistribution.Scope,
+				Number: cluster.Layout.ReplicasCount,
+			})
 
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionPreviousTailAffinity})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
+				Type: chiv1.PodDistributionPreviousTailAffinity,
+			})
 
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionNamespaceAffinity})
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionClickHouseInstallationAffinity})
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{Type: chiv1.PodDistributionClusterAffinity})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
+				Type: chiv1.PodDistributionNamespaceAffinity,
+			})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
+				Type: chiv1.PodDistributionClickHouseInstallationAffinity,
+			})
+			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
+				Type: chiv1.PodDistributionClusterAffinity,
+			})
 
 		default:
 			// PodDistribution is not known
@@ -592,6 +625,13 @@ func (n *Normalizer) newPodAffinity(template *chiv1.ChiPodTemplate) *v1.PodAffin
 				},
 			)
 		case chiv1.PodDistributionPreviousTailAffinity:
+			// Newer k8s insists on Required for this Affinity
+			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
+				podAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+				map[string]string{
+					LabelClusterScopeIndex: macrosClusterScopeCycleHeadPointsToPreviousCycleTail,
+				},
+			)
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
@@ -663,10 +703,52 @@ func (n *Normalizer) mergePodAffinity(dst *v1.PodAffinity, src *v1.PodAffinity) 
 	return dst
 }
 
+func (n *Normalizer) newMatchLabels(
+	podDistribution *chiv1.ChiPodDistribution,
+	matchLabels map[string]string,
+) map[string]string {
+	var scopeLabels map[string]string
+
+	switch podDistribution.Scope {
+	case chiv1.PodDistributionScopeShard:
+		scopeLabels = map[string]string{
+			LabelNamespace:   macrosNamespace,
+			LabelChiName:     macrosChiName,
+			LabelClusterName: macrosClusterName,
+			LabelShardName:   macrosShardName,
+		}
+	case chiv1.PodDistributionScopeReplica:
+		scopeLabels = map[string]string{
+			LabelNamespace:   macrosNamespace,
+			LabelChiName:     macrosChiName,
+			LabelClusterName: macrosClusterName,
+			LabelReplicaName: macrosReplicaName,
+		}
+	case chiv1.PodDistributionScopeCluster:
+		scopeLabels = map[string]string{
+			LabelNamespace:   macrosNamespace,
+			LabelChiName:     macrosChiName,
+			LabelClusterName: macrosClusterName,
+		}
+	case chiv1.PodDistributionScopeClickHouseInstallation:
+		scopeLabels = map[string]string{
+			LabelNamespace: macrosNamespace,
+			LabelChiName:   macrosChiName,
+		}
+	case chiv1.PodDistributionScopeNamespace:
+		scopeLabels = map[string]string{
+			LabelNamespace: macrosNamespace,
+		}
+	}
+
+	return util.MergeStringMaps(matchLabels, scopeLabels)
+}
+
 func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodAntiAffinity {
 	podAntiAffinity := &v1.PodAntiAffinity{}
 
 	// Distribution
+	// DEPRECATED
 	if template.Distribution == chiv1.PodDistributionOnePerHost {
 		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
@@ -683,30 +765,42 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 		case chiv1.PodDistributionClickHouseAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				map[string]string{
-					LabelAppName: LabelAppValue,
-				},
+				n.newMatchLabels(
+					podDistribution,
+					map[string]string{
+						LabelAppName: LabelAppValue,
+					},
+				),
 			)
 		case chiv1.PodDistributionMaxNumberPerNode:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				map[string]string{
-					LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
-				},
+				n.newMatchLabels(
+					podDistribution,
+					map[string]string{
+						LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
+					},
+				),
 			)
 		case chiv1.PodDistributionShardAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				map[string]string{
-					LabelShardName: macrosShardName,
-				},
+				n.newMatchLabels(
+					podDistribution,
+					map[string]string{
+						LabelShardName: macrosShardName,
+					},
+				),
 			)
 		case chiv1.PodDistributionReplicaAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				map[string]string{
-					LabelReplicaName: macrosReplicaName,
-				},
+				n.newMatchLabels(
+					podDistribution,
+					map[string]string{
+						LabelReplicaName: macrosReplicaName,
+					},
+				),
 			)
 		case chiv1.PodDistributionAnotherNamespaceAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchExpressions(

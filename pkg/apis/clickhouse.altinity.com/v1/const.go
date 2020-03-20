@@ -56,21 +56,33 @@ const (
 )
 
 const (
-	PodDistributionUnspecified                               = "Unspecified"
+	PodDistributionUnspecified = "Unspecified"
+	// AntiAffinity section
 	PodDistributionClickHouseAntiAffinity                    = "ClickHouseAntiAffinity"
 	PodDistributionShardAntiAffinity                         = "ShardAntiAffinity"
 	PodDistributionReplicaAntiAffinity                       = "ReplicaAntiAffinity"
 	PodDistributionAnotherNamespaceAntiAffinity              = "AnotherNamespaceAntiAffinity"
 	PodDistributionAnotherClickHouseInstallationAntiAffinity = "AnotherClickHouseInstallationAntiAffinity"
 	PodDistributionAnotherClusterAntiAffinity                = "AnotherClusterAntiAffinity"
-	PodDistributionMaxNumberPerNode                          = "MaxNumberPerNode"
-	PodDistributionNamespaceAffinity                         = "NamespaceAffinity"
-	PodDistributionClickHouseInstallationAffinity            = "ClickHouseInstallationAffinity"
-	PodDistributionClusterAffinity                           = "ClusterAffinity"
-	PodDistributionShardAffinity                             = "ShardAffinity"
-	PodDistributionReplicaAffinity                           = "ReplicaAffinity"
-	PodDistributionPreviousTailAffinity                      = "PreviousTailAffinity"
-	PodDistributionCircularReplication                       = "CircularReplication"
+	// Affinity section
+	PodDistributionNamespaceAffinity              = "NamespaceAffinity"
+	PodDistributionClickHouseInstallationAffinity = "ClickHouseInstallationAffinity"
+	PodDistributionClusterAffinity                = "ClusterAffinity"
+	PodDistributionShardAffinity                  = "ShardAffinity"
+	PodDistributionReplicaAffinity                = "ReplicaAffinity"
+	PodDistributionPreviousTailAffinity           = "PreviousTailAffinity"
+	// Misc section
+	PodDistributionMaxNumberPerNode = "MaxNumberPerNode"
+	PodDistributionMaxNumberPerNodeEqualsReplicasCount = 2000000000
+	// Shortcuts section
+	PodDistributionCircularReplication = "CircularReplication"
+
+	PodDistributionScopeUnspecified            = "Unspecified"
+	PodDistributionScopeShard                  = "Shard"
+	PodDistributionScopeReplica                = "Replica"
+	PodDistributionScopeCluster                = "Cluster"
+	PodDistributionScopeClickHouseInstallation = "ClickHouseInstallation"
+	PodDistributionScopeNamespace              = "Namespace"
 
 	// Deprecated value
 	PodDistributionOnePerHost = "OnePerHost"
