@@ -83,6 +83,7 @@ const (
 	PodDistributionScopeCluster                = "Cluster"
 	PodDistributionScopeClickHouseInstallation = "ClickHouseInstallation"
 	PodDistributionScopeNamespace              = "Namespace"
+	PodDistributionScopeGlobal                 = "Global"
 
 	// Deprecated value
 	PodDistributionOnePerHost = "OnePerHost"
