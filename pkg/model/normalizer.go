@@ -739,6 +739,8 @@ func (n *Normalizer) newMatchLabels(
 		scopeLabels = map[string]string{
 			LabelNamespace: macrosNamespace,
 		}
+	case chiv1.PodDistributionScopeGlobal:
+		scopeLabels = map[string]string{}
 	}
 
 	return util.MergeStringMaps(matchLabels, scopeLabels)
