@@ -72,7 +72,7 @@ const (
 	PodDistributionReplicaAffinity                = "ReplicaAffinity"
 	PodDistributionPreviousTailAffinity           = "PreviousTailAffinity"
 	// Misc section
-	PodDistributionMaxNumberPerNode = "MaxNumberPerNode"
+	PodDistributionMaxNumberPerNode                    = "MaxNumberPerNode"
 	PodDistributionMaxNumberPerNodeEqualsReplicasCount = 2000000000
 	// Shortcuts section
 	PodDistributionCircularReplication = "CircularReplication"
