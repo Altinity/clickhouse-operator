@@ -537,7 +537,7 @@ spec:
                             type:
                               type: string
                               enum:
-                                # List podDistributionXXX constants
+                                # List PodDistributionXXX constants
                                 - ""
                                 - "Unspecified"
                                 - "ClickHouseAntiAffinity"
@@ -554,6 +554,17 @@ spec:
                                 - "ReplicaAffinity"
                                 - "PreviousTailAffinity"
                                 - "CircularReplication"
+                            scope:
+                              type: string
+                              enum:
+                                # list PodDistributionScopeXXX constants
+                                - ""
+                                - "Unspecified"
+                                - "Shard"
+                                - "Replica"
+                                - "Cluster"
+                                - "ClickHouseInstallation"
+                                - "Namespace"
                             number:
                               type: integer
                               minimum: 0

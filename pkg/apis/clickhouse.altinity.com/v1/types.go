@@ -294,8 +294,9 @@ type ChiPodTemplateZone struct {
 }
 
 type ChiPodDistribution struct {
-	Type   string `json:"type"   yaml:"type"`
-	Number int    `json:"number" yaml:"number"`
+	Type   string `json:"type,omitempty"   yaml:"type"`
+	Scope  string `json:"scope,omitempty"  yaml:"scope"`
+	Number int    `json:"number,omitempty" yaml:"number"`
 }
 
 // ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
