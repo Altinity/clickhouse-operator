@@ -327,14 +327,28 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 	podTemplate := c.getPodTemplate(host)
 	statefulSetApplyPodTemplate(statefulSet, podTemplate)
 
+	// Post-process StatefulSet
+	c.ensureStatefulSetIntegrity(statefulSet, host)
 	c.personalizeStatefulSetTemplate(statefulSet, host)
+}
+
+func (c *Creator) ensureStatefulSetIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	ensureClickHouseContainer(statefulSet, host)
+	ensureNamedPortsSpecified(statefulSet, host)
+}
+
+func ensureClickHouseContainer(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	if _, ok := getClickHouseContainer(statefulSet); !ok {
+		// No ClickHouse container available
+		addContainer(
+			&statefulSet.Spec.Template.Spec,
+			newDefaultClickHouseContainer(),
+		)
+	}
 }
 
 func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	statefulSetName := CreateStatefulSetName(host)
-
-	// Ensure necessary named ports and respecified
-	ensureNamedPortsSpecified(statefulSet, host)
 
 	// Ensure pod created by this StatefulSet has alias 127.0.0.1
 	statefulSet.Spec.Template.Spec.HostAliases = []corev1.HostAlias{
@@ -564,16 +578,21 @@ func statefulSetApplyPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTe
 	dst.Spec.Template.Spec = template.Spec
 }
 
-func getClickHouseContainer(statefulSet *apps.StatefulSet) *corev1.Container {
-	return &statefulSet.Spec.Template.Spec.Containers[0]
+func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
+	if len(statefulSet.Spec.Template.Spec.Containers) > 0 {
+		return &statefulSet.Spec.Template.Spec.Containers[0], true
+	} else {
+		return nil, false
+	}
 }
 
 func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	chContainer := getClickHouseContainer(statefulSet)
 	// Ensure ClickHouse container has all named ports specified
-	ensurePortByName(chContainer, chDefaultTCPPortName, host.TCPPort)
-	ensurePortByName(chContainer, chDefaultHTTPPortName, host.HTTPPort)
-	ensurePortByName(chContainer, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
+	if chContainer, ok := getClickHouseContainer(statefulSet); ok {
+		ensurePortByName(chContainer, chDefaultTCPPortName, host.TCPPort)
+		ensurePortByName(chContainer, chDefaultHTTPPortName, host.HTTPPort)
+		ensurePortByName(chContainer, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
+	}
 }
 
 func ensurePortByName(container *corev1.Container, name string, port int32) {
@@ -677,37 +696,42 @@ func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 
 	addContainer(
 		&podTemplate.Spec,
-		corev1.Container{
-			Name:  ClickHouseContainerName,
-			Image: defaultClickHouseDockerImage,
-			Ports: []corev1.ContainerPort{
-				{
-					Name:          chDefaultHTTPPortName,
-					ContainerPort: chDefaultHTTPPortNumber,
-				},
-				{
-					Name:          chDefaultTCPPortName,
-					ContainerPort: chDefaultTCPPortNumber,
-				},
-				{
-					Name:          chDefaultInterserverHTTPPortName,
-					ContainerPort: chDefaultInterserverHTTPPortNumber,
-				},
-			},
-			ReadinessProbe: &corev1.Probe{
-				Handler: corev1.Handler{
-					HTTPGet: &corev1.HTTPGetAction{
-						Path: "/ping",
-						Port: intstr.Parse(chDefaultHTTPPortName),
-					},
-				},
-				InitialDelaySeconds: 10,
-				PeriodSeconds:       10,
-			},
-		},
+		newDefaultClickHouseContainer(),
 	)
 
 	return podTemplate
+}
+
+// newDefaultClickHouseContainer returns default ClickHouse Container
+func newDefaultClickHouseContainer() corev1.Container {
+	return corev1.Container{
+		Name:  ClickHouseContainerName,
+		Image: defaultClickHouseDockerImage,
+		Ports: []corev1.ContainerPort{
+			{
+				Name:          chDefaultHTTPPortName,
+				ContainerPort: chDefaultHTTPPortNumber,
+			},
+			{
+				Name:          chDefaultTCPPortName,
+				ContainerPort: chDefaultTCPPortNumber,
+			},
+			{
+				Name:          chDefaultInterserverHTTPPortName,
+				ContainerPort: chDefaultInterserverHTTPPortNumber,
+			},
+		},
+		ReadinessProbe: &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/ping",
+					Port: intstr.Parse(chDefaultHTTPPortName),
+				},
+			},
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       10,
+		},
+	}
 }
 
 // addContainer adds container to ChiPodTemplate
