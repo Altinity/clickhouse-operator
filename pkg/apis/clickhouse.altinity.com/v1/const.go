@@ -77,13 +77,19 @@ const (
 	// Shortcuts section
 	PodDistributionCircularReplication = "CircularReplication"
 
-	PodDistributionScopeUnspecified            = "Unspecified"
-	PodDistributionScopeShard                  = "Shard"
-	PodDistributionScopeReplica                = "Replica"
-	PodDistributionScopeCluster                = "Cluster"
+	PodDistributionScopeUnspecified = "Unspecified"
+	// Pods from different ClickHouseInstallation.Cluster.Shard can co-exist on one node
+	PodDistributionScopeShard = "Shard"
+	// Pods from different ClickHouseInstallation.Cluster.Replica can co-exist on one node
+	PodDistributionScopeReplica = "Replica"
+	// Pods from different ClickHouseInstallation.Cluster can co-exist on one node
+	PodDistributionScopeCluster = "Cluster"
+	// Pods from different ClickHouseInstallations can co-exist on one node
 	PodDistributionScopeClickHouseInstallation = "ClickHouseInstallation"
-	PodDistributionScopeNamespace              = "Namespace"
-	PodDistributionScopeGlobal                 = "Global"
+	// Pods from different Namespaces can co-exist on one node
+	PodDistributionScopeNamespace = "Namespace"
+	// No Pods can co-exist on one node
+	PodDistributionScopeGlobal = "Global"
 
 	// Deprecated value
 	PodDistributionOnePerHost = "OnePerHost"

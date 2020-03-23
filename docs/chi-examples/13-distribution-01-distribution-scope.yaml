@@ -1,0 +1,39 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "ch1"
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  templates:
+    podTemplates:
+      - name: default
+        podDistribution:
+          - type: ClickHouseAntiAffinity
+            scope: ClickHouseInstallation
+  configuration:
+    clusters:
+      - name: "c1"
+        layout:
+          shardsCount: 3
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "ch2"
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  templates:
+    podTemplates:
+      - name: default
+        podDistribution:
+          - type: ClickHouseAntiAffinity
+            scope: ClickHouseInstallation
+  configuration:
+    clusters:
+      - name: "c1"
+        layout:
+          shardsCount: 3
