@@ -41,8 +41,8 @@ if main():
                 test_006,
                 test_007,
                 test_008,
-                (test_009, {"version_from": "0.6.0"}),
-                (test_009, {"version_from": "0.8.0"}),
+                # (test_009, {"version_from": "0.8.0"}),
+                (test_009, {"version_from": "0.9.3"}),
                 test_010,
                 test_011,
                 test_011_1,
@@ -53,6 +53,7 @@ if main():
                 test_016,
                 test_017,
                 test_018,
+                test_019,
             ]
             run_tests = all_tests
             
