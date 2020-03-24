@@ -99,3 +99,8 @@ const (
 	PortDistributionUnspecified       = "Unspecified"
 	PortDistributionClusterScopeIndex = "ClusterScopeIndex"
 )
+
+const (
+	UsernameReplacer = "***"
+	PasswordReplacer = "***"
+)
