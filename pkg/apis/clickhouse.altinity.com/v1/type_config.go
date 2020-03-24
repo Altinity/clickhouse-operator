@@ -460,7 +460,7 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 
 // WriteToLog writes OperatorConfig into log
 func (config *OperatorConfig) WriteToLog() {
-	log.V(1).Infof("OperatorConfig:\n%s", config.String())
+	log.V(1).Infof("OperatorConfig:\n%s", config.String(true))
 }
 
 // stringSlice returns string of named []string OperatorConfig param

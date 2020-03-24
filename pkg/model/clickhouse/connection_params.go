@@ -26,6 +26,12 @@ const (
 	// http://user:password@host:8123/
 	chDsnUrlPattern = "http://%s%s:%s/"
 	defaultTimeout  = 10 * time.Second
+
+	usernameReplacer = "***"
+	passwordReplacer = "***"
+
+	dsnUsernamePasswordPairPattern             = "%s:%s@"
+	dsnUsernamePasswordPairUsernameOnlyPattern = "%s@"
 )
 
 type CHConnectionParams struct {
@@ -61,7 +67,7 @@ func (c *CHConnectionParams) makeUsernamePassword(hidden bool) string {
 
 	// In case of hidden username+password pair we'd just return replacement
 	if hidden {
-		return "***:***@"
+		return fmt.Sprintf(dsnUsernamePasswordPairPattern, usernameReplacer, passwordReplacer)
 	}
 
 	// We may have neither username nor password
@@ -71,11 +77,11 @@ func (c *CHConnectionParams) makeUsernamePassword(hidden bool) string {
 
 	// Password may be omitted
 	if c.password == "" {
-		return c.username + "@"
+		return fmt.Sprintf(dsnUsernamePasswordPairUsernameOnlyPattern, c.username)
 	}
 
 	// Expecting both username and password to be in place
-	return c.username + ":" + c.password + "@"
+	return fmt.Sprintf(dsnUsernamePasswordPairPattern, c.username, c.password)
 }
 
 // makeDSN makes ClickHouse DSN
