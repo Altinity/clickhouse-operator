@@ -56,21 +56,40 @@ const (
 )
 
 const (
-	PodDistributionUnspecified                               = "Unspecified"
+	PodDistributionUnspecified = "Unspecified"
+	// AntiAffinity section
 	PodDistributionClickHouseAntiAffinity                    = "ClickHouseAntiAffinity"
 	PodDistributionShardAntiAffinity                         = "ShardAntiAffinity"
 	PodDistributionReplicaAntiAffinity                       = "ReplicaAntiAffinity"
 	PodDistributionAnotherNamespaceAntiAffinity              = "AnotherNamespaceAntiAffinity"
 	PodDistributionAnotherClickHouseInstallationAntiAffinity = "AnotherClickHouseInstallationAntiAffinity"
 	PodDistributionAnotherClusterAntiAffinity                = "AnotherClusterAntiAffinity"
-	PodDistributionMaxNumberPerNode                          = "MaxNumberPerNode"
-	PodDistributionNamespaceAffinity                         = "NamespaceAffinity"
-	PodDistributionClickHouseInstallationAffinity            = "ClickHouseInstallationAffinity"
-	PodDistributionClusterAffinity                           = "ClusterAffinity"
-	PodDistributionShardAffinity                             = "ShardAffinity"
-	PodDistributionReplicaAffinity                           = "ReplicaAffinity"
-	PodDistributionPreviousTailAffinity                      = "PreviousTailAffinity"
-	PodDistributionCircularReplication                       = "CircularReplication"
+	// Affinity section
+	PodDistributionNamespaceAffinity              = "NamespaceAffinity"
+	PodDistributionClickHouseInstallationAffinity = "ClickHouseInstallationAffinity"
+	PodDistributionClusterAffinity                = "ClusterAffinity"
+	PodDistributionShardAffinity                  = "ShardAffinity"
+	PodDistributionReplicaAffinity                = "ReplicaAffinity"
+	PodDistributionPreviousTailAffinity           = "PreviousTailAffinity"
+	// Misc section
+	PodDistributionMaxNumberPerNode                    = "MaxNumberPerNode"
+	PodDistributionMaxNumberPerNodeEqualsReplicasCount = 2000000000
+	// Shortcuts section
+	PodDistributionCircularReplication = "CircularReplication"
+
+	PodDistributionScopeUnspecified = "Unspecified"
+	// Pods from different ClickHouseInstallation.Cluster.Shard can co-exist on one node
+	PodDistributionScopeShard = "Shard"
+	// Pods from different ClickHouseInstallation.Cluster.Replica can co-exist on one node
+	PodDistributionScopeReplica = "Replica"
+	// Pods from different ClickHouseInstallation.Cluster can co-exist on one node
+	PodDistributionScopeCluster = "Cluster"
+	// Pods from different ClickHouseInstallations can co-exist on one node
+	PodDistributionScopeClickHouseInstallation = "ClickHouseInstallation"
+	// Pods from different Namespaces can co-exist on one node
+	PodDistributionScopeNamespace = "Namespace"
+	// No Pods can co-exist on one node
+	PodDistributionScopeGlobal = "Global"
 
 	// Deprecated value
 	PodDistributionOnePerHost = "OnePerHost"

@@ -84,7 +84,7 @@ const (
     	    toString(filesystemFree())                 AS value,
 	        'Free disk space available at file system' AS description,
 	        'gauge'                                    AS type
-		`
+	`
 
 	queryTableSizesSQL = `
 		SELECT
@@ -98,7 +98,7 @@ const (
 		FROM system.parts
 		WHERE active = 1
 		GROUP BY database, table
-		`
+	`
 
 	queryMutationsSQL = `
 		SELECT
@@ -109,7 +109,7 @@ const (
 		FROM system.mutations 
 		WHERE is_done = 0 
 		GROUP BY database, table
-		`
+	`
 )
 
 type ClickHouseFetcher struct {
