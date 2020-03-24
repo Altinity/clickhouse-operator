@@ -34,21 +34,36 @@ type CHConnectionParams struct {
 	password string
 	port     int
 
+	dsn                  string
+	dsnHiddenCredentials string
+
 	timeout time.Duration
 }
 
 func NewCHConnectionParams(hostname, username, password string, port int) *CHConnectionParams {
-	return &CHConnectionParams{
+	params := &CHConnectionParams{
 		hostname: hostname,
 		username: username,
 		password: password,
 		port:     port,
-		timeout:  defaultTimeout,
+
+		timeout: defaultTimeout,
 	}
+
+	params.dsn = params.makeDSN(false)
+	params.dsnHiddenCredentials = params.makeDSN(true)
+
+	return params
 }
 
 // makeUsernamePassword makes "username:password" pair for connection
-func (c *CHConnectionParams) makeUsernamePassword() string {
+func (c *CHConnectionParams) makeUsernamePassword(hidden bool) string {
+
+	// In case of hidden username+password pair we'd just return replacement
+	if hidden {
+		return "***:***@"
+	}
+
 	// We may have neither username nor password
 	if c.username == "" && c.password == "" {
 		return ""
@@ -64,6 +79,19 @@ func (c *CHConnectionParams) makeUsernamePassword() string {
 }
 
 // makeDSN makes ClickHouse DSN
-func (c *CHConnectionParams) makeDSN() string {
-	return fmt.Sprintf(chDsnUrlPattern, c.makeUsernamePassword(), c.hostname, strconv.Itoa(c.port))
+func (c *CHConnectionParams) makeDSN(hideCredentials bool) string {
+	return fmt.Sprintf(
+		chDsnUrlPattern,
+		c.makeUsernamePassword(hideCredentials),
+		c.hostname,
+		strconv.Itoa(c.port),
+	)
+}
+
+func (c *CHConnectionParams) GetDSN() string {
+	return c.dsn
+}
+
+func (c *CHConnectionParams) GetDSNWithHiddenCredentials() string {
+	return c.dsnHiddenCredentials
 }
