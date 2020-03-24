@@ -209,7 +209,9 @@ def kube_check_pod_antiaffinity(chi_name, ns):
                     {
                         "labelSelector": {
                             "matchLabels": {
-                                    "clickhouse.altinity.com/app": "chop"
+                                    "clickhouse.altinity.com/app": "chop",
+                                    "clickhouse.altinity.com/chi": f"{chi_name}",
+                                    "clickhouse.altinity.com/namespace": f"{ns}"
                             }
                         },
                         "topologyKey": "kubernetes.io/hostname"
