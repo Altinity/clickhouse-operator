@@ -400,7 +400,10 @@ func (config *OperatorConfig) isCHITemplateExt(file string) bool {
 }
 
 // String returns string representation of a OperatorConfig
-func (config *OperatorConfig) String() string {
+func (config *OperatorConfig) String(hideCredentials bool) string {
+	var username string
+	var password string
+
 	b := &bytes.Buffer{}
 
 	util.Fprintf(b, "ConfigFilePath: %s\n", config.ConfigFilePath)
@@ -428,11 +431,21 @@ func (config *OperatorConfig) String() string {
 	util.Fprintf(b, "CHConfigUserDefaultProfile: %s\n", config.CHConfigUserDefaultProfile)
 	util.Fprintf(b, "CHConfigUserDefaultQuota: %s\n", config.CHConfigUserDefaultQuota)
 	util.Fprintf(b, "%s", config.stringSlice("CHConfigUserDefaultNetworksIP", config.CHConfigUserDefaultNetworksIP))
-	util.Fprintf(b, "CHConfigUserDefaultPassword: %s\n", config.CHConfigUserDefaultPassword)
+	password = config.CHConfigUserDefaultPassword
+	if hideCredentials {
+		password = PasswordReplacer
+	}
+	util.Fprintf(b, "CHConfigUserDefaultPassword: %s\n", password)
 	util.Fprintf(b, "CHConfigNetworksHostRegexpTemplate: %s\n", config.CHConfigNetworksHostRegexpTemplate)
 
-	util.Fprintf(b, "CHUsername: %s\n", config.CHUsername)
-	util.Fprintf(b, "CHPassword: %s\n", config.CHPassword)
+	username = config.CHUsername
+	password = config.CHPassword
+	if hideCredentials {
+		username = UsernameReplacer
+		password = PasswordReplacer
+	}
+	util.Fprintf(b, "CHUsername: %s\n", username)
+	util.Fprintf(b, "CHPassword: %s\n", password)
 	util.Fprintf(b, "CHPort: %d\n", config.CHPort)
 
 	util.Fprintf(b, "Logtostderr: %s\n", config.Logtostderr)
@@ -447,7 +460,7 @@ func (config *OperatorConfig) String() string {
 
 // WriteToLog writes OperatorConfig into log
 func (config *OperatorConfig) WriteToLog() {
-	log.V(1).Infof("OperatorConfig:\n%s", config.String())
+	log.V(1).Infof("OperatorConfig:\n%s", config.String(true))
 }
 
 // stringSlice returns string of named []string OperatorConfig param
