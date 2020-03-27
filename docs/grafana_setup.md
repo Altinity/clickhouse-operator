@@ -21,7 +21,7 @@ bash install-grafana-with-operator.sh
 ```
 Run port forward for access to Grafana instance as `localhost`:
 ```bash
-kubectl --namespace=grafana port-forward service/grafana 3000
+kubectl --namespace=grafana port-forward service/grafana-service 3000
 ```
 and navigate browser to `http://localhost:3000` Grafana should appear.
 Login credentials:
