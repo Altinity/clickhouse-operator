@@ -1,0 +1,79 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "zonedist1"
+spec:
+  templates:
+    podTemplates:
+      - name: clickhouse-in-zone-us-east-1a
+        zone:
+          values:
+            - "us-east-1a"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
+            scope: ClickHouseInstallation
+      - name: clickhouse-in-zone-us-east-1b
+        zone:
+          values:
+            - "us-east-1b"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
+            scope: ClickHouseInstallation
+      - name: clickhouse-in-zone-us-east-1f
+        zone:
+          values:
+            - "us-east-1c"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
+            scope: ClickHouseInstallation
+  configuration:
+    clusters:
+      - name: "c1"
+        layout:
+          replicas:
+            - templates:
+                podTemplate: clickhouse-in-zone-us-east-1a
+            - templates:
+                podTemplate: clickhouse-in-zone-us-east-1b
+            - templates:
+                podTemplate: clickhouse-in-zone-us-east-1c
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "zonedist2"
+spec:
+  templates:
+    podTemplates:
+      - name: clickhouse-in-zone-us-east-1a
+        zone:
+          values:
+            - "us-east-1a"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
+            scope: ClickHouseInstallation
+      - name: clickhouse-in-zone-us-east-1b
+        zone:
+          values:
+            - "us-east-1b"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
+            scope: ClickHouseInstallation
+      - name: clickhouse-in-zone-us-east-1c
+        zone:
+          values:
+            - "us-east-1c"
+        podDistribution:
+          - type: ClickHouseAntiAffinity
+            scope: ClickHouseInstallation
+  configuration:
+    clusters:
+      - name: "c1"
+        layout:
+          replicas:
+            - templates:
+                podTemplate: clickhouse-in-zone-us-east-1a
+            - templates:
+                podTemplate: clickhouse-in-zone-us-east-1b
+            - templates:
+                podTemplate: clickhouse-in-zone-us-east-1c
