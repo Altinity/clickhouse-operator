@@ -11,7 +11,7 @@ kubectl config set-context altinity.k8s.local
 We can access any service inside k8s cluster on `localhost` via port-forwarding feature.
 Example: forwarding Graphana dashboard to `localhost:3090`
 ```bash
-kubectl --namespace=grafana port-forward service/grafana 3090:3000
+kubectl --namespace=grafana port-forward service/grafana-service 3090:3000
 ```
 Point browser to `http://localhost:3090` in order to access Grafana  
 

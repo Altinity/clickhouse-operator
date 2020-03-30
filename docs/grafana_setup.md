@@ -21,7 +21,7 @@ bash install-grafana-with-operator.sh
 ```
 Run port forward for access to Grafana instance as `localhost`:
 ```bash
-kubectl --namespace=grafana port-forward service/grafana 3000
+kubectl --namespace=grafana port-forward service/grafana-service 3000
 ```
 and navigate browser to `http://localhost:3000` Grafana should appear.
 Login credentials:
@@ -50,7 +50,7 @@ At this point Grafana is up and running. Let's check it out.
 Grafana is running in k8s cluster and is available via Service of type ClusterIP and named as `grafana`.
 It is located in the same namespace as Grafana:
 ```bash
-kubectl --namespace=grafana get service grafana 
+kubectl --namespace=grafana get service grafana-service
 ```
 ```text
 NAME      TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
@@ -58,7 +58,7 @@ grafana   ClusterIP   10.98.42.192   <none>        3000/TCP   14h
 ```
 Let's get access to Grafana. Port-forward Grafana to `localhost` as:
 ```bash
-kubectl --namespace=grafana port-forward service/grafana 3000
+kubectl --namespace=grafana port-forward service/grafana-service 3000
 ```
 and navigate browser to `http://localhost:3000` Grafana should appear.
 Login credentials:

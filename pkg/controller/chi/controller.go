@@ -24,6 +24,7 @@ import (
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
+	log "github.com/golang/glog"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -37,9 +38,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"os"
-
-	log "github.com/golang/glog"
 	// log "k8s.io/klog"
 )
 
@@ -461,7 +459,9 @@ func (c *Controller) addChopConfig(chopConfig *chi.ClickHouseOperatorConfigurati
 		log.V(1).Infof("addChopConfig(%s/%s) already known config - do nothing", chopConfig.Namespace, chopConfig.Name)
 	} else {
 		log.V(1).Infof("addChopConfig(%s/%s) new, previously unknown config, need to apply", chopConfig.Namespace, chopConfig.Name)
-		os.Exit(0)
+		// TODO
+		// NEED REFACTORING
+		// os.Exit(0)
 	}
 
 	return nil
@@ -476,7 +476,9 @@ func (c *Controller) updateChopConfig(old, new *chi.ClickHouseOperatorConfigurat
 	}
 
 	log.V(2).Infof("updateChopConfig(%s/%s):", new.Namespace, new.Name)
-	os.Exit(0)
+	// TODO
+	// NEED REFACTORING
+	//os.Exit(0)
 
 	return nil
 }
@@ -484,7 +486,9 @@ func (c *Controller) updateChopConfig(old, new *chi.ClickHouseOperatorConfigurat
 // deleteChit deletes CHIT
 func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfiguration) error {
 	log.V(2).Infof("deleteChopConfig(%s/%s):", chopConfig.Namespace, chopConfig.Name)
-	os.Exit(0)
+	// TODO
+	// NEED REFACTORING
+	//os.Exit(0)
 
 	return nil
 }
