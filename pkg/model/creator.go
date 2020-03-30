@@ -319,7 +319,8 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 	// Initial PodTemplateSpec
 	statefulSet.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels: c.labeler.getLabelsHostScope(host, true),
+			Labels:      c.labeler.getLabelsHostScope(host, true),
+			Annotations: c.labeler.getAnnotationsHostScope(host),
 		},
 	}
 

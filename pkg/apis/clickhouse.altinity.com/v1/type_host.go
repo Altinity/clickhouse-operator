@@ -98,3 +98,24 @@ func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
 	cluster := host.GetCluster()
 	return &cluster.Zookeeper
 }
+
+// GetAnnotations returns chi annotations and excludes
+func (host *ChiHost) GetAnnotations() map[string]string {
+	annotations := make(map[string]string, 0)
+	for key, value := range host.CHI.Annotations {
+		if isAnnotationToBeSkipped(key) {
+			continue
+		}
+		annotations[key] = value
+	}
+	return annotations
+}
+
+// isAnnotationToBeSkipped checks whether an annotation be skipped
+func isAnnotationToBeSkipped(annotation string) bool {
+	switch annotation {
+	case "kubectl.kubernetes.io/last-applied-configuration":
+		return true
+	}
+	return false
+}

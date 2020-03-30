@@ -221,6 +221,12 @@ func (l *Labeler) appendChiLabels(dst map[string]string) map[string]string {
 	return util.MergeStringMaps(dst, l.chi.Labels)
 }
 
+// getAnnotationsHostScope gets annotations for Host-scoped object
+func (l *Labeler) getAnnotationsHostScope(host *chi.ChiHost) map[string]string {
+	// We may want to append some annotations in here
+	return host.GetAnnotations()
+}
+
 // getSelectorShardScope gets labels to select a Host-scoped object
 func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 	// Do not include CHI-provided labels
