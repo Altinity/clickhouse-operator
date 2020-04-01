@@ -80,6 +80,10 @@ func (host *ChiHost) GetSettings() Settings {
 	return host.CHI.Spec.Configuration.Settings
 }
 
+func (host *ChiHost) GetCHI() *ClickHouseInstallation {
+	return host.CHI
+}
+
 func (host *ChiHost) GetCluster() *ChiCluster {
 	// Host has to have filled Address
 	for index := range host.CHI.Spec.Configuration.Clusters {
@@ -97,6 +101,22 @@ func (host *ChiHost) GetCluster() *ChiCluster {
 func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
 	cluster := host.GetCluster()
 	return &cluster.Zookeeper
+}
+
+func (host *ChiHost) CanDeleteAllPVCs() bool {
+	canDeleteAllPVCs := true
+	host.CHI.WalkVolumeClaimTemplates(func(template *ChiVolumeClaimTemplate) {
+		if template.PVCReclaimPolicy == PVCReclaimPolicyRetain {
+			// At least one template wants to keep its PVC
+			canDeleteAllPVCs = false
+		}
+	})
+
+	return canDeleteAllPVCs
+}
+
+func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
+	host.CHI.WalkVolumeClaimTemplates(f)
 }
 
 // GetAnnotations returns chi annotations and excludes

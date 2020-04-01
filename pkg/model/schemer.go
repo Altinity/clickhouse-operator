@@ -82,12 +82,12 @@ func (s *Schemer) getObjectListFromClickHouse(serviceUrl string, sql string) ([]
 	return names, sqlStatements, nil
 }
 
-// GetCreateDistributedObjects returns a list of objects that needs to be created on a shard in a cluster
+// clusterGetCreateDistributedObjects returns a list of objects that needs to be created on a shard in a cluster
 // That includes all Distributed tables, corresponding local tables, and databases, if necessary
-func (s *Schemer) ClusterGetCreateDistributedObjects(chi *chop.ClickHouseInstallation, cluster *chop.ChiCluster) ([]string, []string, error) {
+func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) ([]string, []string, error) {
 	// system_tables := fmt.Sprintf("cluster('%s', system, tables)", cluster.Name)
 	hosts := CreatePodFQDNsOfCluster(cluster)
-	system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
+		system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
 
 	sql := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
@@ -134,20 +134,16 @@ func (s *Schemer) ClusterGetCreateDistributedObjects(chi *chop.ClickHouseInstall
 		system_tables,
 	))
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(chi), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(cluster.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
-// GetCreateReplicatedObjects returns a list of objects that needs to be created on a host in a cluster
-func (s *Schemer) GetCreateReplicatedObjects(
-	chi *chop.ClickHouseInstallation,
-	cluster *chop.ChiCluster,
-	host *chop.ChiHost,
-) ([]string, []string, error) {
+// getCreateReplicatedObjects returns a list of objects that needs to be created on a host in a cluster
+func (s *Schemer) getCreateReplicatedObjects(host *chop.ChiHost) ([]string, []string, error) {
 
 	var shard *chop.ChiShard = nil
-	for shardIndex := range cluster.Layout.Shards {
-		shard = &cluster.Layout.Shards[shardIndex]
+	for shardIndex := range host.GetCluster().Layout.Shards {
+		shard = &host.GetCluster().Layout.Shards[shardIndex]
 		for replicaIndex := range shard.Hosts {
 			replica := shard.Hosts[replicaIndex]
 			if replica == host {
@@ -180,12 +176,12 @@ func (s *Schemer) GetCreateReplicatedObjects(
 		system_tables,
 	))
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(chi), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(host.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
-// ClusterGetCreateDatabases returns list of DB names and list of 'CREATE DATABASE ...' SQLs for these DBs
-func (s *Schemer) ClusterGetCreateDatabases(chi *chop.ClickHouseInstallation, cluster *chop.ChiCluster) ([]string, []string, error) {
+// clusterGetCreateDatabases returns list of DB names and list of 'CREATE DATABASE ...' SQLs for these DBs
+func (s *Schemer) clusterGetCreateDatabases(cluster *chop.ChiCluster) ([]string, []string, error) {
 	sql := heredoc.Docf(`
 		SELECT
 			distinct name AS name,
@@ -196,14 +192,15 @@ func (s *Schemer) ClusterGetCreateDatabases(chi *chop.ClickHouseInstallation, cl
 		SETTINGS skip_unavailable_shards = 1
 		`,
 		cluster.Name,
-		ignoredDBs)
+		ignoredDBs,
+	)
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(chi), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(cluster.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
-// ClusterGetCreateTables returns list of table names and list of 'CREATE TABLE ...' SQLs for these tables
-func (s *Schemer) ClusterGetCreateTables(chi *chop.ClickHouseInstallation, cluster *chop.ChiCluster) ([]string, []string, error) {
+// clusterGetCreateTables returns list of table names and list of 'CREATE TABLE ...' SQLs for these tables
+func (s *Schemer) clusterGetCreateTables(cluster *chop.ChiCluster) ([]string, []string, error) {
 	sql := heredoc.Docf(`
 		SELECT
 			distinct name, 
@@ -215,14 +212,15 @@ func (s *Schemer) ClusterGetCreateTables(chi *chop.ClickHouseInstallation, clust
 		SETTINGS skip_unavailable_shards = 1
 		`,
 		cluster.Name,
-		ignoredDBs)
+		ignoredDBs,
+	)
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(chi), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(cluster.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
-// ReplicaGetDropTables returns set of 'DROP TABLE ...' SQLs
-func (s *Schemer) HostGetDropTables(host *chop.ChiHost) ([]string, []string, error) {
+// hostGetDropTables returns set of 'DROP TABLE ...' SQLs
+func (s *Schemer) hostGetDropTables(host *chop.ChiHost) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Docf(`
@@ -233,38 +231,66 @@ func (s *Schemer) HostGetDropTables(host *chop.ChiHost) ([]string, []string, err
 		WHERE database not in (%s) 
 			AND engine like 'Replicated%%'
 		`,
-		ignoredDBs)
+		ignoredDBs,
+	)
 
 	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDN(host), sql)
 	return names, sqlStatements, nil
 }
 
-// ChiDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
-func (s *Schemer) ChiDropDnsCache(chi *chop.ClickHouseInstallation) error {
+// HostDeleteTables
+func (s *Schemer) HostDeleteTables(host *chop.ChiHost) error {
+	tableNames, dropTableSQLs, _ := s.hostGetDropTables(host)
+	log.V(1).Infof("Drop tables: %v as %v", tableNames, dropTableSQLs)
+	return s.hostApplySQLs(host, dropTableSQLs, false)
+}
+
+// HostCreateTables
+func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
+
+	names, createSQLs, _ := s.getCreateReplicatedObjects(host)
+	log.V(1).Infof("Creating replicated objects: %v", names)
+	_ = s.hostApplySQLs(host, createSQLs, true)
+
+	names, createSQLs, _ = s.clusterGetCreateDistributedObjects(host.GetCluster())
+	log.V(1).Infof("Creating distributed objects: %v", names)
+	return s.hostApplySQLs(host, createSQLs, true)
+}
+
+// ShardCreateTables
+func (s *Schemer) ShardCreateTables(shard *chop.ChiShard) error {
+
+	names, createSQLs, _ := s.clusterGetCreateDistributedObjects(shard.GetCluster())
+	log.V(1).Infof("Creating distributed objects: %v", names)
+	return s.shardApplySQLs(shard, createSQLs, true)
+}
+
+// CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
+func (s *Schemer) CHIDropDnsCache(chi *chop.ClickHouseInstallation) error {
 	sqls := []string{
 		`SYSTEM DROP DNS CACHE`,
 	}
-	return s.ChiApplySQLs(chi, sqls, false)
+	return s.chiApplySQLs(chi, sqls, false)
 }
 
-// ChiApplySQLs runs set of SQL queries over the whole CHI
-func (s *Schemer) ChiApplySQLs(chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
+// chiApplySQLs runs set of SQL queries over the whole CHI
+func (s *Schemer) chiApplySQLs(chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
 	return s.applySQLs(CreatePodFQDNsOfChi(chi), sqls, retry)
 }
 
-// ClusterApplySQLs runs set of SQL queries over the cluster
-func (s *Schemer) ClusterApplySQLs(cluster *chop.ChiCluster, sqls []string, retry bool) error {
+// clusterApplySQLs runs set of SQL queries over the cluster
+func (s *Schemer) clusterApplySQLs(cluster *chop.ChiCluster, sqls []string, retry bool) error {
 	return s.applySQLs(CreatePodFQDNsOfCluster(cluster), sqls, retry)
 }
 
-// ReplicaApplySQLs runs set of SQL queries over the replica
-func (s *Schemer) HostApplySQLs(host *chop.ChiHost, sqls []string, retry bool) error {
+// hostApplySQLs runs set of SQL queries over the replica
+func (s *Schemer) hostApplySQLs(host *chop.ChiHost, sqls []string, retry bool) error {
 	hosts := []string{CreatePodFQDN(host)}
 	return s.applySQLs(hosts, sqls, retry)
 }
 
-// ShardApplySQLs runs set of SQL queries over the shard replicas
-func (s *Schemer) ShardApplySQLs(shard *chop.ChiShard, sqls []string, retry bool) error {
+// shardApplySQLs runs set of SQL queries over the shard replicas
+func (s *Schemer) shardApplySQLs(shard *chop.ChiShard, sqls []string, retry bool) error {
 	return s.applySQLs(CreatePodFQDNsOfShard(shard), sqls, retry)
 }
 

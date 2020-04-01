@@ -101,7 +101,7 @@ func (w *worker) processItem(item interface{}) error {
 		drop, _ := item.(*DropDns)
 		if chi, err := w.createCHIFromObjectMeta(drop.initiator); err == nil {
 			log.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", drop.initiator.Namespace, drop.initiator.Name, chi.Name)
-			_ = w.schemer.ChiDropDnsCache(chi)
+			_ = w.schemer.CHIDropDnsCache(chi)
 		} else {
 			log.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", drop.initiator.Namespace, drop.initiator.Name, drop.initiator.Labels)
 		}
@@ -189,14 +189,14 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 			log.V(1).Info(str)
 			w.c.eventCHI(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, str)
 
-			_ = w.createTablesOnShard(new, shard)
+			_ = w.schemer.ShardCreateTables(shard)
 		},
 		func(host *chop.ChiHost) {
 			str := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 			log.V(1).Info(str)
 			w.c.eventCHI(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, str)
 
-			_ = w.createTablesOnHost(new, host)
+			_ = w.schemer.HostCreateTables(host)
 		},
 	)
 
@@ -311,45 +311,6 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	return nil
 }
 
-// createTablesOnHost
-// TODO move this into Schemer
-func (w *worker) createTablesOnHost(chi *chop.ClickHouseInstallation, host *chop.ChiHost) error {
-	cluster := &chi.Spec.Configuration.Clusters[host.Address.ClusterIndex]
-
-	names, createSQLs, _ := w.schemer.GetCreateReplicatedObjects(chi, cluster, host)
-	log.V(1).Infof("Creating replicated objects: %v", names)
-	_ = w.schemer.HostApplySQLs(host, createSQLs, true)
-
-	names, createSQLs, _ = w.schemer.ClusterGetCreateDistributedObjects(chi, cluster)
-	log.V(1).Infof("Creating distributed objects: %v", names)
-	_ = w.schemer.HostApplySQLs(host, createSQLs, true)
-
-	return nil
-}
-
-// createTablesOnShard
-// TODO move this into Schemer
-func (w *worker) createTablesOnShard(chi *chop.ClickHouseInstallation, shard *chop.ChiShard) error {
-	cluster := &chi.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
-
-	names, createSQLs, _ := w.schemer.ClusterGetCreateDistributedObjects(chi, cluster)
-	log.V(1).Infof("Creating distributed objects: %v", names)
-	_ = w.schemer.ShardApplySQLs(shard, createSQLs, true)
-
-	return nil
-}
-
-// deleteTablesOnHost deletes ClickHouse tables on a host
-// TODO move this into Schemer
-func (w *worker) deleteTablesOnHost(host *chop.ChiHost) error {
-	// Delete tables on replica
-	tableNames, dropTableSQLs, _ := w.schemer.HostGetDropTables(host)
-	log.V(1).Infof("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	_ = w.schemer.HostApplySQLs(host, dropTableSQLs, false)
-
-	return nil
-}
-
 // deleteCHI deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
 func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 	var err error
@@ -393,7 +354,9 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 	// Need to delete all these item
 	log.V(1).Infof("Worker delete host %s/%s", host.Address.ClusterName, host.Name)
 
-	_ = w.deleteTablesOnHost(host)
+	if host.CanDeleteAllPVCs() {
+		_ = w.schemer.HostDeleteTables(host)
+	}
 
 	return w.c.deleteHost(host)
 }

@@ -138,25 +138,31 @@ func (c *Controller) persistentVolumeClaimDelete(host *chop.ChiHost) error {
 
 	namespace := host.Address.Namespace
 	labeler := chopmodel.NewLabeler(c.chop, host.CHI)
+
 	listOptions := newListOptions(labeler.GetSelectorHostScope(host))
-	if list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(listOptions); err == nil {
-		log.V(1).Infof("OK get list of PVC for host %s/%s", namespace, host.Name)
-		for i := range list.Items {
-			pvc := &list.Items[i]
-
-			if chopmodel.HostCanDeletePVC(host, pvc.Name) {
-				if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, newDeleteOptions()); err == nil {
-					log.V(1).Infof("OK delete PVC %s/%s", namespace, pvc.Name)
-				} else {
-					log.V(1).Infof("FAIL delete PVC %s/%s %v", namespace, pvc.Name, err)
-				}
-			} else {
-				log.V(1).Infof("PVC should not be deleted, leave them intact")
-			}
-
-		}
-	} else {
+	list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(listOptions)
+	if err != nil {
 		log.V(1).Infof("FAIL get list of PVC for host %s/%s %v", namespace, host.Name, err)
+		return err
+	}
+
+	log.V(1).Infof("OK get list of PVC for host %s/%s", namespace, host.Name)
+	for i := range list.Items {
+		// Convenience wrapper
+		pvc := &list.Items[i]
+
+		if !chopmodel.HostCanDeletePVC(host, pvc.Name) {
+			log.V(1).Infof("PVC %s/%s should not be deleted, leave it intact", namespace, pvc.Name)
+			// Move to the next PVC
+			continue
+		}
+
+		// Actually delete PVC
+		if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, newDeleteOptions()); err == nil {
+			log.V(1).Infof("OK delete PVC %s/%s", namespace, pvc.Name)
+		} else {
+			log.V(1).Infof("FAIL delete PVC %s/%s %v", namespace, pvc.Name, err)
+		}
 	}
 
 	return nil

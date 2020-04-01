@@ -208,6 +208,10 @@ def test_011():
         with And("User with both plain and sha256 password should get the latter one"):
             out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'", user = "user3", pwd = "clickhouse_operator_password")
             assert out == 'OK'
+        
+        with And("User with row-level security should have it applied"):
+            out = clickhouse_query_with_error("test-011-secured-cluster", "select * from system.numbers limit 1", user = "restricted", pwd = "secret")
+            assert out == '1000'
 
         kube_delete_chi("test-011-secured-cluster")
         kube_delete_chi("test-011-insecured-cluster")
