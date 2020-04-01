@@ -17,6 +17,9 @@ spec:
       # user3 should get sha256 correctly
       user3/password: abcd
       user3/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
+      # restricted user with row-level security
+      restricted/password: secret
+      restricted/databases/system/numbers/filter: "number=1000"
     clusters:
     - name: default
       layout:
