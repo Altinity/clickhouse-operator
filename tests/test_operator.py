@@ -399,20 +399,41 @@ def test_018():
 @TestScenario
 @Name("test-019-retain-volume. Test that volume is correctly retained and can be re-attached")
 def test_019(config = "configs/test-019-retain-volume.yaml"):
+    require_zookeeper()
+
     chi = get_chi_name(get_full_path(config))
     create_and_check(config, {"pod_count": 1, "do_not_delete": 1})
-    clickhouse_query(chi, query = "create table test Engine = Log as select 1 as a")
-    with When("CHI with ratained volume is deleted"):
+    
+    create_nonreplicated_table = "create table t1 Engine = Log as select 1 as a"
+    create_replicated_table = """
+    create table t2 
+    Engine = ReplicatedMergeTree('/clickhouse/{installation}/{cluster}/tables/{shard}/{database}/{table}', '{replica}')
+    partition by tuple() order by a
+    as select 1 as a""".replace('\r', '').replace('\n', '')
+
+    with Given("ClickHouse has some data in place"):
+        clickhouse_query(chi, query = create_nonreplicated_table)
+        clickhouse_query(chi, query = create_replicated_table)
+
+    with When("CHI with retained volume is deleted"):
+        pvc_count = kube_get_count("pvc")
+        pv_count = kube_get_count("pv")
+        
         kube_delete_chi(chi)
 
-    with Then("PVC should be retained"):
-        assert kube_get_count("pvc") == 1
-        assert kube_get_count("pv") == 1
+        with Then("PVC should be retained"):
+            assert kube_get_count("pvc") == pvc_count
+            assert kube_get_count("pv") == pv_count
 
     with When("Re-create CHI"):
         create_and_check(config, {"pod_count": 1, "do_not_delete": 1})
-    with Then("PVC should be re-mounted and data should be in place"):
-        out = clickhouse_query(chi, query = "select a from test")
-        assert out == "1"
+    
+    with Then("PVC should be re-mounted"):
+        with And("Non-replicated table should have data"):
+            out = clickhouse_query(chi, query = "select a from t1")
+            assert out == "1"
+        with And("Replicated table should have data"):
+            out = clickhouse_query(chi, query = "select a from t2")
+            assert out == "1"
 
     kube_delete_chi(chi)

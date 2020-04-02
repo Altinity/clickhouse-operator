@@ -15,10 +15,10 @@ spec:
           port: 2181
     profiles:
       default/insert_quorum: 2
-      default/insert_quorum_timeout: 10000
+      default/insert_quorum_timeout: 5000
       default/parallel_view_processing: 1
-      default/send_timeout: 5
-      default/receive_timeout: 5
+      default/send_timeout: 3
+      default/receive_timeout: 3
     clusters:
       - name: default
         layout:
