@@ -1,0 +1,17 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "labels-annot"
+  labels:
+    label1: label1_value
+    label2: label2_value
+  annotations:
+    annotation1: annotation1_value
+    annotation2: annotation2_value
+spec:
+  configuration:
+    clusters:
+      - name: "cluster"
+        layout:
+          shardsCount: 1
+          replicasCount: 2
