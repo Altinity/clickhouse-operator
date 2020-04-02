@@ -1,6 +1,6 @@
 import kubectl
 
-version = "0.9.5"
+version = "0.9.6"
 test_namespace = "test"
 clickhouse_template = "templates/tpl-clickhouse-stable.yaml"
 # clickhouse_template = "templates/tpl-clickhouse-19.11.yaml"

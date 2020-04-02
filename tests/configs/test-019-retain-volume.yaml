@@ -8,6 +8,10 @@ spec:
   useTemplates:
     - name: clickhouse-version
   configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
     clusters:
     - name: simple
       layout:

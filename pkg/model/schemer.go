@@ -87,7 +87,7 @@ func (s *Schemer) getObjectListFromClickHouse(serviceUrl string, sql string) ([]
 func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) ([]string, []string, error) {
 	// system_tables := fmt.Sprintf("cluster('%s', system, tables)", cluster.Name)
 	hosts := CreatePodFQDNsOfCluster(cluster)
-		system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
+	system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
 
 	sql := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 

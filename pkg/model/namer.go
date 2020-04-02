@@ -288,7 +288,7 @@ func (n *namer) getNamePartNamespace(obj interface{}) string {
 	return "ERROR"
 }
 
-func (n *namer) getNamePartChiName(obj interface{}) string {
+func (n *namer) getNamePartCHIName(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ClickHouseInstallation:
 		chi := obj.(*chop.ClickHouseInstallation)
@@ -344,15 +344,15 @@ func (n *namer) getNamePartHostName(host *chop.ChiHost) string {
 	return n.namePartHostName(host.Address.HostName)
 }
 
-func (n *namer) getNamePartChiScopeCycleSize(host *chop.ChiHost) string {
+func (n *namer) getNamePartCHIScopeCycleSize(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeCycleSize)
 }
 
-func (n *namer) getNamePartChiScopeCycleIndex(host *chop.ChiHost) string {
+func (n *namer) getNamePartCHIScopeCycleIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeCycleIndex)
 }
 
-func (n *namer) getNamePartChiScopeCycleOffset(host *chop.ChiHost) string {
+func (n *namer) getNamePartCHIScopeCycleOffset(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeCycleOffset)
 }
 
@@ -368,7 +368,7 @@ func (n *namer) getNamePartClusterScopeCycleOffset(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeCycleOffset)
 }
 
-func (n *namer) getNamePartChiScopeIndex(host *chop.ChiHost) string {
+func (n *namer) getNamePartCHIScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeIndex)
 }
 
