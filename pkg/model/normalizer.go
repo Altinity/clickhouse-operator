@@ -597,7 +597,7 @@ func (n *Normalizer) newPodAffinity(template *chiv1.ChiPodTemplate) *v1.PodAffin
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
 				map[string]string{
-					LabelChiName: macrosChiName,
+					LabelCHIName: macrosChiName,
 				},
 			)
 		case chiv1.PodDistributionClusterAffinity:
@@ -713,27 +713,27 @@ func (n *Normalizer) newMatchLabels(
 	case chiv1.PodDistributionScopeShard:
 		scopeLabels = map[string]string{
 			LabelNamespace:   macrosNamespace,
-			LabelChiName:     macrosChiName,
+			LabelCHIName:     macrosChiName,
 			LabelClusterName: macrosClusterName,
 			LabelShardName:   macrosShardName,
 		}
 	case chiv1.PodDistributionScopeReplica:
 		scopeLabels = map[string]string{
 			LabelNamespace:   macrosNamespace,
-			LabelChiName:     macrosChiName,
+			LabelCHIName:     macrosChiName,
 			LabelClusterName: macrosClusterName,
 			LabelReplicaName: macrosReplicaName,
 		}
 	case chiv1.PodDistributionScopeCluster:
 		scopeLabels = map[string]string{
 			LabelNamespace:   macrosNamespace,
-			LabelChiName:     macrosChiName,
+			LabelCHIName:     macrosChiName,
 			LabelClusterName: macrosClusterName,
 		}
 	case chiv1.PodDistributionScopeClickHouseInstallation:
 		scopeLabels = map[string]string{
 			LabelNamespace: macrosNamespace,
-			LabelChiName:   macrosChiName,
+			LabelCHIName:   macrosChiName,
 		}
 	case chiv1.PodDistributionScopeNamespace:
 		scopeLabels = map[string]string{
@@ -822,7 +822,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				[]v12.LabelSelectorRequirement{
 					{
-						Key:      LabelChiName,
+						Key:      LabelCHIName,
 						Operator: v12.LabelSelectorOpNotIn,
 						Values: []string{
 							macrosChiName,

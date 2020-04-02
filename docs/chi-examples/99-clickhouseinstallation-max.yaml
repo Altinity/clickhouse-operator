@@ -5,6 +5,12 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
   name: "clickhouse-installation-max"
+  labels:
+    label1: label1_value
+    label2: label2_value
+  annotations:
+    annotation1: annotation1_value
+    annotation2: annotation2_value
 
 spec:
 

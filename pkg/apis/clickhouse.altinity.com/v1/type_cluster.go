@@ -31,6 +31,10 @@ func (cluster *ChiCluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	return template, ok
 }
 
+func (cluster *ChiCluster) GetCHI() *ClickHouseInstallation {
+	return cluster.CHI
+}
+
 func (cluster *ChiCluster) GetShard(shard int) *ChiShard {
 	return &cluster.Layout.Shards[shard]
 }

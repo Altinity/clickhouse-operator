@@ -46,3 +46,11 @@ func (shard *ChiShard) HostsCount() int {
 	})
 	return count
 }
+
+func (shard *ChiShard) GetCHI() *ClickHouseInstallation {
+	return shard.CHI
+}
+
+func (shard *ChiShard) GetCluster() *ChiCluster {
+	return &shard.CHI.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
+}
