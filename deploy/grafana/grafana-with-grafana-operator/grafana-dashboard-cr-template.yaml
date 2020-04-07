@@ -8,7 +8,9 @@ spec:
   name: ${GRAFANA_DASHBOARD_NAME}.json
   url: https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/grafana-dashboard/Altinity_ClickHouse_Operator_dashboard.json
   datasources:
-    - inputName: "DS_MYPROMETHEUS"
-      datasourceName: "Prometheus"
     - inputName: "DS_PROMETHEUS"
-      datasourceName: "Prometheus"
+      datasourceName: "$GRAFANA_PROMETHEUS_DATASOURCE_NAME"
+  # TODO remove this plugin definition after resolve https://github.com/integr8ly/grafana-operator/issues/155
+  plugins:
+    - name: "vertamedia-clickhouse-datasource"
+      version: "1.9.5"
