@@ -210,8 +210,10 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 		LabelClusterScopeCycleOffset: l.namer.getNamePartClusterScopeCycleOffset(host),
 	}
 	if applySupplementaryServiceLabels {
+		// TODO
+		// When we'll have Cluster Discovery functionality we can refactor this properly
 		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
-		labels[LabelSettingsConfigVersion] = host.Config.SettingsFingerprint
+		labels[LabelSettingsConfigVersion] = fingerprint(host.Config.SettingsFingerprint + host.Config.FilesFingerprint)
 	}
 	return l.appendCHILabels(labels)
 }

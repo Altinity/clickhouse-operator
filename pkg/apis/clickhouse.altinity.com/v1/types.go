@@ -218,8 +218,8 @@ type ChiHost struct {
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data
-	Address ChiHostAddress          `json:"address"`
-	Config  ChiHostConfig           `json:"config"`
+	Address ChiHostAddress          `json:"-"`
+	Config  ChiHostConfig           `json:"-"`
 	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
@@ -261,6 +261,7 @@ type ChiHostAddress struct {
 type ChiHostConfig struct {
 	ZookeeperFingerprint string `json:"zookeeperfingerprint"`
 	SettingsFingerprint  string `json:"settingsfingerprint"`
+	FilesFingerprint     string `json:"filesfingerprint"`
 }
 
 // CHITemplates defines templates section of .spec
