@@ -69,13 +69,14 @@ Vagrant.configure(2) do |config|
     minikube addons enable metrics-server
     ln -svf $(find /var/lib/minikube/binaries/ -type f -name kubectl) /bin/kubectl
 
+    cd /vagrant/
+
     git_branch=$(git rev-parse --abbrev-ref HEAD)
+    export OPERATOR_RELEASE=$(cat release)
     export BRANCH=${BRANCH:-$git_branch}
     export OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-kube-system}
-    export OPERATOR_IMAGE=${OPERATOR_IMAGE:-altinity/clickhouse-operator:latest}
-    export METRICS_EXPORTER_IMAGE=${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:latest}
-
-    cd /vagrant/
+    export OPERATOR_IMAGE=altinity/clickhouse-operator:${OPERATOR_RELEASE}
+    export METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:${OPERATOR_RELEASE}
 
     if ! kubectl get deployment clickhouse-operator -n "${OPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
         cd /vagrant/deploy/operator/
@@ -85,19 +86,21 @@ Vagrant.configure(2) do |config|
 
     export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-prometheus}
     cd /vagrant/deploy/prometheus/
-    bash -x ./create-prometheus.sh
+    bash -e ./create-prometheus.sh
     cd /vagrant/
 
     export GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE:-grafana}
     cd /vagrant/deploy/grafana/grafana-with-grafana-operator/
-    bash -x ./install-grafana-operator.sh
-    bash -x ./install-grafana-with-operator.sh
+    bash -e ./install-grafana-operator.sh
+    bash -e ./install-grafana-with-operator.sh
     cd /vagrant
 
+    echo "Wait when clickhouse operator installation finished"
     while [[ $(kubectl get pods --all-namespaces -l app=clickhouse-operator | wc -l) != "2" ]]; do
-        echo .
+        printf "."
         sleep 1
     done
+    echo "...DONE"
 
     # kubectl --namespace=${PROMETHEUS_NAMESPACE} port-forward service/prometheus 9090
     # open http://localhost:9090/targets and check clickhouse-monitor is exists

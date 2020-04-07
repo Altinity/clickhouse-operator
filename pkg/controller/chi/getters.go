@@ -172,7 +172,7 @@ func (c *Controller) getStatefulSet(objMeta *meta.ObjectMeta, byNameOnly bool) (
 
 // GetChiByObjectMeta gets CHI by namespaced name
 func (c *Controller) GetChiByObjectMeta(objectMeta *meta.ObjectMeta) (*chiv1.ClickHouseInstallation, error) {
-	chiName, err := chopmodel.GetChiNameFromObjectMeta(objectMeta)
+	chiName, err := chopmodel.GetCHINameFromObjectMeta(objectMeta)
 	if err != nil {
 		return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", objectMeta.Name, err)
 	}

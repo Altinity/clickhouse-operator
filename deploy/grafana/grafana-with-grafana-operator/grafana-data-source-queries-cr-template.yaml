@@ -1,0 +1,26 @@
+apiVersion: integreatly.org/v1alpha1
+kind: GrafanaDataSource
+metadata:
+  name: "${GRAFANA_CLICKHOUSE_DATASOURCE_NAME}"
+spec:
+  name: ${ENDPOINT}.yaml
+  datasources:
+    - name: "${GRAFANA_CLICKHOUSE_DATASOURCE_NAME}"
+      type: vertamedia-clickhouse-datasource
+      access: proxy
+      url: "${CLICKHOUSE_URL}"
+      basicAuth: true
+      basicAuthUser: "${OPERATOR_CH_USER}"
+      basicAuthPassword: "${OPERATOR_CH_PASS}"
+      isDefault: false
+      version: 1
+      editable: true
+      jsonData:
+        tlsSkipVerify: true
+        # TODO uncomment when resolve https://github.com/integr8ly/grafana-operator/issues/156
+        # addCorsHeader: true
+        # defaultDatabase: "default"
+        # usePOST: true
+        # useYandexCloudAuthorization: true
+        # xHeaderUser: "${OPERATOR_CH_USER}"
+        # xHeaderKey: "${OPERATOR_CH_PASS}"
