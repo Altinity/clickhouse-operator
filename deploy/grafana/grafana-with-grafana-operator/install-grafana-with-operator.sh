@@ -64,7 +64,11 @@ kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
 )
 
 echo "Waiting to start Grafana custom resource $GRAFANA_NAME"
-sleep 10
+while [[ "0" = $(kubectl get deployments --namespace="${GRAFANA_NAMESPACE}" | grep "${GRAFANA_NAME}-deployment" | grep "1/1" | wc -l) ]]; do
+    printf "."
+    sleep 1
+done
+echo "...DONE"
 
 kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-data-source-cr-template.yaml | \
@@ -74,7 +78,16 @@ kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
 )
 
 echo "Waiting to apply GraganaDatasource custom resource $GRAFANA_PROMETHEUS_DATASOURCE_NAME"
-sleep 10
+while [[ "0" = $(kubectl get grafanadatasources --namespace="${GRAFANA_NAMESPACE}" -o=custom-columns=NAME:.metadata.name,STATUS:.status.message ${GRAFANA_PROMETHEUS_DATASOURCE_NAME} | grep -i "success" | wc -l) ]]; do
+    printf "."
+    sleep 1
+done
+
+while [[ "0" = $(kubectl get deployments --namespace="${GRAFANA_NAMESPACE}" | grep "${GRAFANA_NAME}-deployment" | grep "1/1" | wc -l) ]]; do
+    printf "."
+    sleep 1
+done
+echo "...DONE"
 
 kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-cr-template.yaml | \
@@ -84,8 +97,16 @@ kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
 )
 
 echo "Waiting to apply vertamedia-clickhouse-datasource plugin"
-sleep 10
+while [[ "0" = $(kubectl get deployments --namespace="${GRAFANA_NAMESPACE}" -o='custom-columns=PLUGINS:.spec.template.spec.initContainers[*].env[?(@.name=="GRAFANA_PLUGINS")].value' | grep "vertamedia" | wc -l) ]]; do
+    printf "."
+    sleep 1
+done
 
+while [[ "0" = $(kubectl get deployments --namespace="${GRAFANA_NAMESPACE}" | grep "${GRAFANA_NAME}-deployment" | grep "1/1" | wc -l) ]]; do
+    printf "."
+    sleep 1
+done
+echo "...DONE"
 
 # TODO get clickhouse password from Vault-k8s secrets ?
 # more precise but required yq
