@@ -107,6 +107,12 @@ do
     GRAFANA_CLICKHOUSE_DATASOURCE_NAME="k8s-${NAMESPACE}-${CHI}"
     CLICKHOUSE_URL="http://${ENDPOINT}:${PORT}"
 
+    # create system.query_log in each pod on CHI
+    for POD in $(kubectl get --namespace="${NAMESPACE}" pods -l "clickhouse.altinity.com/app=chop,clickhouse.altinity.com/chi=${CHI}" -o='custom-columns=NAME:.metadata.name' | tail -n +2)
+    do
+        kubectl exec --namespace="${NAMESPACE}" ${POD} -- clickhouse-client --echo -mn -q 'SELECT hostName(), dummy FROM system.one SETTINGS log_queries=1; SYSTEM FLUSH LOGS'
+    done
+
     kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <(
         cat ${CUR_DIR}/grafana-data-source-queries-cr-template.yaml | \
         GRAFANA_CLICKHOUSE_DATASOURCE_NAME="$GRAFANA_CLICKHOUSE_DATASOURCE_NAME" \
