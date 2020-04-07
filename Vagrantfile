@@ -69,13 +69,14 @@ Vagrant.configure(2) do |config|
     minikube addons enable metrics-server
     ln -svf $(find /var/lib/minikube/binaries/ -type f -name kubectl) /bin/kubectl
 
+    cd /vagrant/
+
     git_branch=$(git rev-parse --abbrev-ref HEAD)
+    export OPERATOR_RELEASE=$(cat release)
     export BRANCH=${BRANCH:-$git_branch}
     export OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-kube-system}
-    export OPERATOR_IMAGE=${OPERATOR_IMAGE:-altinity/clickhouse-operator:latest}
-    export METRICS_EXPORTER_IMAGE=${METRICS_EXPORTER_IMAGE:-altinity/metrics-exporter:latest}
-
-    cd /vagrant/
+    export OPERATOR_IMAGE=altinity/clickhouse-operator:${OPERATOR_RELEASE}
+    export METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:${OPERATOR_RELEASE}
 
     if ! kubectl get deployment clickhouse-operator -n "${OPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
         cd /vagrant/deploy/operator/
