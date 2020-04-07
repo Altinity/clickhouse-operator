@@ -117,8 +117,7 @@ OPERATOR_CH_USER=$(grep chUsername ${CUR_DIR}/../../../config/config.yaml | cut 
 OPERATOR_CH_PASS=$(grep chPassword ${CUR_DIR}/../../../config/config.yaml | cut -d " " -f 2-)
 
 IFS=$'\n'
-for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,ENDPOINT:.status.endpoint | tail -n +2);
-do
+for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,ENDPOINT:.status.endpoint | tail -n +2); do
     ITEMS=( $(grep -Eo '([^[:space:]]+)' <<<"$LINE") )
     NAMESPACE=${ITEMS[0]}
     CHI=${ITEMS[1]}
@@ -129,8 +128,7 @@ do
     CLICKHOUSE_URL="http://${ENDPOINT}:${PORT}"
 
     # create system.query_log in each pod on CHI
-    for POD in $(kubectl get --namespace="${NAMESPACE}" pods -l "clickhouse.altinity.com/app=chop,clickhouse.altinity.com/chi=${CHI}" -o='custom-columns=NAME:.metadata.name' | tail -n +2)
-    do
+    for POD in $(kubectl get --namespace="${NAMESPACE}" pods -l "clickhouse.altinity.com/app=chop,clickhouse.altinity.com/chi=${CHI}" -o='custom-columns=NAME:.metadata.name' | tail -n +2); do
         kubectl exec --namespace="${NAMESPACE}" ${POD} -- clickhouse-client --echo -mn -q 'SELECT hostName(), dummy FROM system.one SETTINGS log_queries=1; SYSTEM FLUSH LOGS'
     done
 
@@ -141,7 +139,7 @@ do
         ENDPOINT="$ENDPOINT" \
         OPERATOR_CH_USER="$OPERATOR_CH_USER" \
         OPERATOR_CH_PASS="$OPERATOR_CH_PASS" \
-        envsubst
+        envsubst \
     )
 
 done
@@ -152,6 +150,5 @@ sleep 10
 kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <(
     cat ${CUR_DIR}/grafana-dashboard-queries-cr-template.yaml | \
     GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME" \
-    envsubst
+    envsubst \
 )
-
