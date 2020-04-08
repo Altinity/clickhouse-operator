@@ -54,20 +54,26 @@ func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
 	return clickhouse.GetPooledDBConnection(clickhouse.NewCHConnectionParams(hostname, s.Username, s.Password, s.Port))
 }
 
-func (s *Schemer) getObjectListFromClickHouse(serviceUrl string, sql string) ([]string, []string, error) {
+func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]string, []string, error) {
 	// Results
 	names := make([]string, 0)
 	sqlStatements := make([]string, 0)
 
-	log.V(1).Info(serviceUrl)
-	conn := s.getCHConnection(serviceUrl)
 	var rows *sqlmodule.Rows = nil
 	var err error
-	rows, err = conn.Query(sql)
+	for _, service := range services {
+		log.V(1).Infof("Trying %s", service)
+		conn := s.getCHConnection(service)
+
+		rows, err = conn.Query(sql)
+		if err == nil {
+			defer rows.Close()
+			break
+		}
+	}
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
 
 	// Some data fetched
 	for rows.Next() {
@@ -134,7 +140,7 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 		system_tables,
 	))
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(cluster.GetCHI()), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
@@ -176,7 +182,7 @@ func (s *Schemer) getCreateReplicatedObjects(host *chop.ChiHost) ([]string, []st
 		system_tables,
 	))
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(host.GetCHI()), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(host.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
@@ -195,7 +201,7 @@ func (s *Schemer) clusterGetCreateDatabases(cluster *chop.ChiCluster) ([]string,
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(cluster.GetCHI()), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
@@ -215,7 +221,7 @@ func (s *Schemer) clusterGetCreateTables(cluster *chop.ChiCluster) ([]string, []
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(cluster.GetCHI()), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
@@ -234,7 +240,7 @@ func (s *Schemer) hostGetDropTables(host *chop.ChiHost) ([]string, []string, err
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDN(host), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse([]string{CreatePodFQDN(host)}, sql)
 	return names, sqlStatements, nil
 }
 
