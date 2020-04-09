@@ -18,21 +18,12 @@ import (
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 	log "github.com/golang/glog"
+	"time"
+
 	// log "k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// newDeleteOptions returns filled *metav1.DeleteOptions
-func newDeleteOptions() *metav1.DeleteOptions {
-	gracePeriodSeconds := int64(0)
-	propagationPolicy := metav1.DeletePropagationForeground
-	return &metav1.DeleteOptions{
-		GracePeriodSeconds: &gracePeriodSeconds,
-		PropagationPolicy:  &propagationPolicy,
-	}
-}
 
 // deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
 func (c *Controller) deleteHost(host *chop.ChiHost) error {
@@ -45,9 +36,9 @@ func (c *Controller) deleteHost(host *chop.ChiHost) error {
 	// Need to delete all these item
 	log.V(1).Infof("Controller delete host %s/%s", host.Address.ClusterName, host.Name)
 
-	_ = c.statefulSetDelete(host)
-	_ = c.persistentVolumeClaimDelete(host)
-	_ = c.configMapDelete(host)
+	_ = c.deleteStatefulSet(host)
+	_ = c.deletePVC(host)
+	_ = c.deleteConfigMap(host)
 	_ = c.deleteServiceHost(host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
@@ -59,10 +50,9 @@ func (c *Controller) deleteHost(host *chop.ChiHost) error {
 	return nil
 }
 
-// deleteConfigMapsChi
-func (c *Controller) deleteConfigMapsChi(chi *chop.ClickHouseInstallation) error {
+// deleteConfigMapsCHI
+func (c *Controller) deleteConfigMapsCHI(chi *chop.ClickHouseInstallation) error {
 	// Delete common ConfigMap's
-	// Delete CHI service
 	//
 	// chi-b3d29f-common-configd   2      61s
 	// chi-b3d29f-common-usersd    0      61s
@@ -98,8 +88,16 @@ func (c *Controller) statefulSetDeletePod(statefulSet *apps.StatefulSet) error {
 	return c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(name, newDeleteOptions())
 }
 
-// statefulSetDelete gracefully deletes StatefulSet through zeroing Pod's count
-func (c *Controller) statefulSetDelete(host *chop.ChiHost) error {
+func (c *Controller) FindStatefulSet(host *chop.ChiHost) (*apps.StatefulSet, error) {
+	// Namespaced name
+	name := chopmodel.CreateStatefulSetName(host)
+	namespace := host.Address.Namespace
+
+	return c.statefulSetLister.StatefulSets(namespace).Get(name)
+}
+
+// deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
+func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 	// IMPORTANT
 	// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
 	// To achieve ordered and graceful termination of the pods in the StatefulSet,
@@ -109,15 +107,16 @@ func (c *Controller) statefulSetDelete(host *chop.ChiHost) error {
 	name := chopmodel.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
 
-	log.V(1).Infof("statefulSetDelete(%s/%s)", namespace, name)
+	log.V(1).Infof("deleteStatefulSet(%s/%s)", namespace, name)
 
-	statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name)
+	statefulSet, err := c.FindStatefulSet(host)
 	if err != nil {
 		log.V(1).Infof("error get StatefulSet %s/%s", namespace, name)
 		return nil
 	}
 
-	// Zero pods count. This is the proper and graceful way to delete StatefulSet
+	// Scale StatefulSet down to 0 pods count.
+	// This is the proper and graceful way to delete StatefulSet
 	var zero int32 = 0
 	statefulSet.Spec.Replicas = &zero
 	statefulSet, _ = c.kubeClient.AppsV1().StatefulSets(namespace).Update(statefulSet)
@@ -128,19 +127,30 @@ func (c *Controller) statefulSetDelete(host *chop.ChiHost) error {
 		log.V(1).Infof("StatefulSet %s/%s deleted", namespace, name)
 	} else {
 		log.V(1).Infof("StatefulSet %s/%s FAILED TO DELETE %v", namespace, name, err)
+		return nil
+	}
+
+	for {
+		if _, err := c.FindStatefulSet(host); err == nil {
+			log.V(1).Infof("StatefulSet %s/%s deleted, cache NOT yet synced", namespace, name)
+			time.Sleep(5*time.Second)
+			continue
+		} else {
+			log.V(1).Infof("StatefulSet %s/%s deleted, cache synced. Desc: %v", namespace, name, err)
+			break
+		}
 	}
 
 	return nil
 }
 
-// persistentVolumeClaimDelete deletes PersistentVolumeClaim
-func (c *Controller) persistentVolumeClaimDelete(host *chop.ChiHost) error {
+// deletePVC deletes PersistentVolumeClaim
+func (c *Controller) deletePVC(host *chop.ChiHost) error {
 
 	namespace := host.Address.Namespace
 	labeler := chopmodel.NewLabeler(c.chop, host.CHI)
 
-	listOptions := newListOptions(labeler.GetSelectorHostScope(host))
-	list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(listOptions)
+	list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newListOptions(labeler.GetSelectorHostScope(host)))
 	if err != nil {
 		log.V(1).Infof("FAIL get list of PVC for host %s/%s %v", namespace, host.Name, err)
 		return err
@@ -168,12 +178,12 @@ func (c *Controller) persistentVolumeClaimDelete(host *chop.ChiHost) error {
 	return nil
 }
 
-// configMapDelete deletes ConfigMap
-func (c *Controller) configMapDelete(host *chop.ChiHost) error {
+// deleteConfigMap deletes ConfigMap
+func (c *Controller) deleteConfigMap(host *chop.ChiHost) error {
 	name := chopmodel.CreateConfigMapPodName(host)
 	namespace := host.Address.Namespace
 
-	log.V(1).Infof("configMapDelete(%s/%s)", namespace, name)
+	log.V(1).Infof("deleteConfigMap(%s/%s)", namespace, name)
 
 	if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(name, newDeleteOptions()); err == nil {
 		log.V(1).Infof("ConfigMap %s/%s deleted", namespace, name)
@@ -220,8 +230,8 @@ func (c *Controller) deleteServiceCHI(chi *chop.ClickHouseInstallation) error {
 func (c *Controller) deleteServiceIfExists(namespace, name string) error {
 	// Delete Service in case it does not exist
 
-	// Check service exists
-	_, err := c.kubeClient.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
+	// Check specified service exists
+	_, err := c.kubeClient.CoreV1().Services(namespace).Get(name, newGetOptions())
 
 	if err != nil {
 		// No such a service, nothing to delete

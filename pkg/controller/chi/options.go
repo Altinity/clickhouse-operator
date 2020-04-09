@@ -20,9 +20,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// newListOptions returns filled metav1.ListOptions
 func newListOptions(labelsMap map[string]string) metav1.ListOptions {
 	labelSelector := labels.SelectorFromSet(labelsMap)
 	return metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
+	}
+}
+
+// newGetOptions returns filled metav1.GetOptions
+func newGetOptions() metav1.GetOptions {
+	return metav1.GetOptions{}
+}
+
+// newDeleteOptions returns filled *metav1.DeleteOptions
+func newDeleteOptions() *metav1.DeleteOptions {
+	gracePeriodSeconds := int64(0)
+	propagationPolicy := metav1.DeletePropagationForeground
+	return &metav1.DeleteOptions{
+		GracePeriodSeconds: &gracePeriodSeconds,
+		PropagationPolicy:  &propagationPolicy,
 	}
 }
