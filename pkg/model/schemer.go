@@ -91,9 +91,9 @@ func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]
 // clusterGetCreateDistributedObjects returns a list of objects that needs to be created on a shard in a cluster
 // That includes all Distributed tables, corresponding local tables, and databases, if necessary
 func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) ([]string, []string, error) {
-	// system_tables := fmt.Sprintf("cluster('%s', system, tables)", cluster.Name)
+	// cluster_tables := fmt.Sprintf("cluster('%s', system, tables)", cluster.Name)
 	hosts := CreatePodFQDNsOfCluster(cluster)
-	system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
+	cluster_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
 
 	sql := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
@@ -101,46 +101,39 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 			concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_query
 		FROM 
 		(
-			SELECT DISTINCT database
-			FROM system.tables tables
-			WHERE engine = 'Distributed'
-			SETTINGS skip_unavailable_shards = 1
-			UNION ALL
-			SELECT DISTINCT extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS shard_database
-			FROM system.tables tables
+			SELECT DISTINCT arrayJoin([database, extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+')]) database
+			FROM cluster('all-sharded', system.tables) tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 		) databases
 		UNION ALL
 		SELECT DISTINCT 
-			table as name, 
+			concat(database,'.', name) as name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
 		FROM 
 		(
 			SELECT 
 			    database, name,
-				concat(database,'.', name) table,
 				create_table_query,
 				2 AS order
-			FROM system.tables tables
+			FROM cluster('all-sharded', system.tables) tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
 			SELECT 
 				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS database, 
 				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
-				concat(database,'.', name) table,
-				shards.create_table_query,
+				tables.create_table_query,
 				1 AS order
-			FROM system.tables tables
-			LEFT JOIN (select distinct database, name, create_table_query from system.tables tables SETTINGS skip_unavailable_shards = 1) shards USING (database, name)
-			WHERE engine = 'Distributed'
+			FROM cluster('all-sharded', system.tables) local_tables
+			LEFT JOIN system.tables tables USING (database, name)
+			WHERE engine = 'Distributed' AND tables.create_table_query != ''
 			SETTINGS skip_unavailable_shards = 1
 		) tables
 		ORDER BY order
 		`,
-		"system.tables",
-		system_tables,
+		"cluster('all-sharded', system.tables)",
+		cluster_tables,
 	))
 
 	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sql)
