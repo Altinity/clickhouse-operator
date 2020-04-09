@@ -98,7 +98,7 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 	sql := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
 			database AS name, 
-			concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_db_query
+			concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_query
 		FROM 
 		(
 			SELECT DISTINCT database
@@ -110,30 +110,33 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 			FROM system.tables 
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
-		) 
+		) databases
 		UNION ALL
 		SELECT DISTINCT 
-			name, 
+			table as name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
 		FROM 
 		(
 			SELECT 
-				database, 
-				name,
+			    database, name,
+				concat(database,'.', name) table,
+				create_table_query,
 				2 AS order
 			FROM system.tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
 			SELECT 
-				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS shard_database, 
-				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS shard_table,
+				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS database, 
+				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
+				concat(database,'.', name) table,
+				shards.create_table_query,
 				1 AS order
 			FROM system.tables
+			LEFT JOIN (select distinct database, name, create_table_query from system.tables SETTINGS skip_unavailable_shards = 1) shards USING (database, name)
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
-		) 
-		LEFT JOIN (select distinct database, name, create_table_query from system.tables SETTINGS skip_unavailable_shards = 1) USING (database, name)
+		) tables
 		ORDER BY order
 		`,
 		"system.tables",
