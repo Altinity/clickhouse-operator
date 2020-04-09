@@ -123,11 +123,11 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 			SELECT 
 				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS database, 
 				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
-				tables.create_table_query,
+				t.create_table_query,
 				1 AS order
-			FROM cluster('all-sharded', system.tables) local_tables
-			LEFT JOIN system.tables tables USING (database, name)
-			WHERE engine = 'Distributed' AND tables.create_table_query != ''
+			FROM cluster('all-sharded', system.tables) tables
+			LEFT JOIN system.tables t USING (database, name)
+			WHERE engine = 'Distributed' AND t.create_table_query != ''
 			SETTINGS skip_unavailable_shards = 1
 		) tables
 		ORDER BY order
