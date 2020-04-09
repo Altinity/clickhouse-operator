@@ -102,12 +102,12 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 		FROM 
 		(
 			SELECT DISTINCT database
-			FROM system.tables
+			FROM system.tables tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
 			SELECT DISTINCT extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS shard_database
-			FROM system.tables 
+			FROM system.tables tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 		) databases
@@ -122,7 +122,7 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 				concat(database,'.', name) table,
 				create_table_query,
 				2 AS order
-			FROM system.tables
+			FROM system.tables tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
@@ -132,8 +132,8 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 				concat(database,'.', name) table,
 				shards.create_table_query,
 				1 AS order
-			FROM system.tables
-			LEFT JOIN (select distinct database, name, create_table_query from system.tables SETTINGS skip_unavailable_shards = 1) shards USING (database, name)
+			FROM system.tables tables
+			LEFT JOIN (select distinct database, name, create_table_query from system.tables tables SETTINGS skip_unavailable_shards = 1) shards USING (database, name)
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 		) tables
