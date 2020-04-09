@@ -329,7 +329,7 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 	})
 
 	// Delete ConfigMap(s)
-	err = w.c.deleteConfigMapsChi(chi)
+	err = w.c.deleteConfigMapsCHI(chi)
 
 	// Delete Service
 	err = w.c.deleteServiceCHI(chi)
@@ -345,6 +345,15 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 
 // deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
 func (w *worker) deleteHost(host *chop.ChiHost) error {
+	log.V(1).Infof("Worker delete host %s/%s", host.Address.ClusterName, host.Name)
+
+	if _,err := w.c.FindStatefulSet(host); err != nil {
+		log.V(1).Infof("Worker delete host %s/%s - StatefulSet not found - already deleted?", host.Address.ClusterName, host.Name)
+		return nil
+	}
+
+	log.V(1).Infof("Worker delete host %s/%s - StatefulSet found - start delete process", host.Address.ClusterName, host.Name)
+
 	// Each host consists of
 	// 1. Tables on host - we need to delete tables on the host in order to clean Zookeeper data
 	// 2. StatefulSet
@@ -352,7 +361,6 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 	// 4. ConfigMap
 	// 5. Service
 	// Need to delete all these item
-	log.V(1).Infof("Worker delete host %s/%s", host.Address.ClusterName, host.Name)
 
 	if host.CanDeleteAllPVCs() {
 		_ = w.schemer.HostDeleteTables(host)
@@ -392,7 +400,7 @@ func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
 }
 
 func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.ClickHouseInstallation, error) {
-	chi, err := w.c.GetChiByObjectMeta(objectMeta)
+	chi, err := w.c.GetCHIByObjectMeta(objectMeta)
 	if err != nil {
 		return nil, err
 	}
