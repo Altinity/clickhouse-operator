@@ -251,11 +251,11 @@ func (s *Schemer) HostDeleteTables(host *chop.ChiHost) error {
 func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
 
 	names, createSQLs, _ := s.getCreateReplicatedObjects(host)
-	log.V(1).Infof("Creating replicated objects %v at %s", names, host)
+	log.V(1).Infof("Creating replicated objects %v at %s", names, host.Address.HostName)
 	_ = s.hostApplySQLs(host, createSQLs, true)
 
 	names, createSQLs, _ = s.clusterGetCreateDistributedObjects(host.GetCluster())
-	log.V(1).Infof("Creating distributed objects %v at %s", names, host)
+	log.V(1).Infof("Creating distributed objects %v at %s", names, host.Address.HostName)
 	return s.hostApplySQLs(host, createSQLs, true)
 }
 
