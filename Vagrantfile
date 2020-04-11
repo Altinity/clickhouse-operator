@@ -87,19 +87,21 @@ Vagrant.configure(2) do |config|
 
     export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-prometheus}
     cd /vagrant/deploy/prometheus/
-    bash -x ./create-prometheus.sh
+    bash -e ./create-prometheus.sh
     cd /vagrant/
 
     export GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE:-grafana}
     cd /vagrant/deploy/grafana/grafana-with-grafana-operator/
-    bash -x ./install-grafana-operator.sh
-    bash -x ./install-grafana-with-operator.sh
+    bash -e ./install-grafana-operator.sh
+    bash -e ./install-grafana-with-operator.sh
     cd /vagrant
 
+    echo "Wait when clickhouse operator installation finished"
     while [[ $(kubectl get pods --all-namespaces -l app=clickhouse-operator | wc -l) != "2" ]]; do
-        echo .
+        printf "."
         sleep 1
     done
+    echo "...DONE"
 
     # kubectl --namespace=${PROMETHEUS_NAMESPACE} port-forward service/prometheus 9090
     # open http://localhost:9090/targets and check clickhouse-monitor is exists
