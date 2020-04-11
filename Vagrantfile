@@ -59,8 +59,9 @@ Vagrant.configure(2) do |config|
     # minikube
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
-
-    K8S_VERSION=${K8S_VERSION:-1.17.3}
+    # 1.14.10
+    # 1.15.11
+    K8S_VERSION=${K8S_VERSION:-1.14.10}
     minikube config set vm-driver none
     minikube config set kubernetes-version ${K8S_VERSION}
     minikube start
@@ -111,8 +112,11 @@ Vagrant.configure(2) do |config|
         docker pull ${image}
     done
 
-    python3 /vagrant/tests/test.py
-    python3 /vagrant/tests/test_examples.py
-    python3 /vagrant/tests/test_metrics_exporter.py
+    # currently test_clickhouse.py broke on test_ch_001 last step, `we can't reach quorum after previouse instert`
+    python3 /vagrant/tests/test.py --only=operator/* -o short
+    python3 /vagrant/tests/test.py --only=clickhouse/* -o short
+    # currently test_metrics_exporter.py failed cause /chi doesn't clear after `kubectl delete ns test`
+    python3 /vagrant/tests/test_metrics_exporter.py -o short
+    python3 /vagrant/tests/test_examples.py -o short
   SHELL
 end

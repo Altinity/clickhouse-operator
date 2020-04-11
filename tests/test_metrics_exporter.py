@@ -7,40 +7,44 @@ import json
 import kubectl
 import settings
 
-def set_metrics_exporter_version(version, ns="kube-system"):
-    kubectl.kubectl(f"set image deployment.v1.apps/clickhouse-operator metrics-exporter=altinity/metrics-exporter:{version}", ns=ns)
-    kubectl.kubectl("rollout status deployment.v1.apps/clickhouse-operator", ns=ns)
-
 
 @TestScenario
 @Name("Check metrics server setup and version")
-def test_metrics_exporter_setup():
+def test_metrics_exporter_setup(self):
     with Given("clickhouse-operator is installed"):
         assert kubectl.kube_get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") > 0, error()
         with And(f"Set metrics-exporter version {settings.version}"):
-            set_metrics_exporter_version(settings.version)
+            kubectl.kubectl(
+                f"set image deployment.v1.apps/clickhouse-operator metrics-exporter=altinity/metrics-exporter:{settings.version}",
+                ns="kube-system"
+            )
+            kubectl.kubectl("rollout status deployment.v1.apps/clickhouse-operator", ns="kube-system")
 
 
 @TestScenario
 @Name("Check metrics server state after reboot")
-def test_metrics_exporter_reboot():
-    def check_monitoring_chi(operator_namespace, operator_pod, expect_result, max_retries=10):
+def test_metrics_exporter_reboot(self):
+    def check_monitoring_chi(ns, pod, expect_result, max_retries=10):
         with And(f"metrics-exporter /chi enpoint result should return {expect_result}"):
             for i in range(1, max_retries):
-                out = kubectl.kubectl(
-                    f"exec {operator_pod} -c metrics-exporter wget -- -O- -q http://127.0.0.1:8888/chi",
-                    ns=operator_namespace
+                chi_list = kubectl.kubectl(
+                    f"exec {pod} -c metrics-exporter wget -- -O- -q http://127.0.0.1:8888/chi",
+                    ns=ns
                 )
-                out = json.loads(out)
-                if out == expect_result:
+                chi_list = json.loads(chi_list)
+                if chi_list == expect_result:
                     break
                 with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                     time.sleep(i * 5)
-            assert out == expect_result, error()
+            assert chi_list == expect_result, error()
 
     with Given("clickhouse-operator is installed"):
-        kubectl.kube_wait_field("pods", "-l app=clickhouse-operator", ".status.containerStatuses[*].ready", "true,true",
-                                ns="kube-system")
+        kubectl.kube_wait_field(
+            "pods",
+            "-l app=clickhouse-operator", ".status.containerStatuses[*].ready",
+            "true,true",
+            ns="kube-system"
+        )
         assert kubectl.kube_get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") > 0, error()
 
         out = kubectl.kubectl("get pods -l app=clickhouse-operator", ns='kube-system').splitlines()[1]

@@ -1,14 +1,13 @@
-from  clickhouse import * 
-from kubectl import * 
-import settings
-from test_operator import require_zookeeper 
+from testflows.core import TestScenario, Name, When, Then, Given, And
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
-from testflows.asserts import error
+from clickhouse import *
+from kubectl import *
+from helpers import require_zookeeper
+
 
 @TestScenario
 @Name("test_ch_001. Insert quorum")
-def test_ch_001():
+def test_ch_001(self):
     require_zookeeper()
     
     create_and_check("configs/test-ch-001-insert-quorum.yaml", 
@@ -52,18 +51,18 @@ def test_ch_001():
         clickhouse_query(chi, "insert into t1(a) values(1)")
         
         with When("Stop fetches for t2 at replica1"):
-            clickhouse_query(chi, "system stop fetches default.t2", host = host1)
+            clickhouse_query(chi, "system stop fetches default.t2", host=host1)
         
             with Then("Insert should fail since it can not reach the quorum"): 
                 out = clickhouse_query_with_error(chi, "insert into t1(a) values(2)",  host=host0)
                 assert "Timeout while waiting for quorum" in out
         
         # kubectl(f"exec {host0}-0 -n test -- cp /var/lib//clickhouse/data/default/t2/all_1_1_0/a.mrk2 /var/lib//clickhouse/data/default/t2/all_1_1_0/a.bin")
-        #with Then("Corrupt data part in t2"):
+        # with Then("Corrupt data part in t2"):
         #    kubectl(f"exec {host0}-0 -n test -- sed -i \"s/b/c/\" /var/lib/clickhouse/data/default/t2/all_1_1_0/a.bin")
         
         with When("Resume fetches for t2 at replica1"):
-            clickhouse_query(chi, "system start fetches default.t2", host = host1)
+            clickhouse_query(chi, "system start fetches default.t2", host=host1)
             time.sleep(5)
 
             with Then("Inserts should fail with an error regarding not satisfied quorum"):
@@ -71,7 +70,7 @@ def test_ch_001():
                 assert "Quorum for previous write has not been satisfied yet" in out
                 
             with And("Second insert of the same block should pass"):
-                clickhouse_query(chi, "insert into t1(a) values(3)",  host=host0)
+                clickhouse_query(chi, "insert into t1(a) values(3)", host=host0)
                 
             with And("Insert of the new block should fail"):
                 out = clickhouse_query_with_error(chi, "insert into t1(a) values(4)",  host=host0)
@@ -85,26 +84,48 @@ def test_ch_001():
         print(out)
         
         with When("Stop fetches for t1 at replica1"):
-            clickhouse_query(chi, "system stop fetches default.t1", host = host1)
+            clickhouse_query(chi, "system stop fetches default.t1", host=host1)
             
             with Then("Insert should fail since it can not reach the quorum"): 
                 out = clickhouse_query_with_error(chi, "insert into t1(a,d) values(6, now())",  host=host0)
                 assert "Timeout while waiting for quorum" in out
-            
-            with Then("Wait 10 seconds and the data should be dropped by TTL"):
-                time.sleep(10)
-                out = clickhouse_query(chi, "select count() from t1 where a=6", host=host0)
-                assert out == "0"
+
+            ttl_tries = 3
+            for i in range(ttl_tries):
+                replica_pause = 10 * (i + 1)
+                with Then(f"Wait {replica_pause} seconds and the data should be dropped by TTL, try={i}"):
+                    time.sleep(replica_pause)
+                    out = clickhouse_query(chi, "select count() from t1 where a=6", host=host0)
+                    if out == "0":
+                        break
+
+            assert out == "0", error()
         
         with When("Resume fetches for t1 at replica1"):
-            clickhouse_query(chi, "system start fetches default.t1", host = host1)
-            time.sleep(5)
-            
+            clickhouse_query(chi, "system start fetches default.t1", host=host1)
+
+            replica_tries = 3
+
+            for i in range(replica_tries):
+                replica_pause = 10 * (i + 1)
+                with Then(f"Wait {replica_pause} seconds and the data should replicated"):
+                    time.sleep(replica_pause)
+                    host1_delay = clickhouse_query(
+                        chi,
+                        "SELECT absolute_delay,queue_size FROM system.replicas WHERE database='default' AND table='t1'",
+                        host=host1
+                    )
+                    host0_delay = clickhouse_query(
+                        chi,
+                        "SELECT absolute_delay,queue_size FROM system.replicas WHERE database='default' AND table='t1'",
+                        host=host0
+                    )
+                    if host1_delay == "0\t0" and host0_delay == "0\t0":
+                        break
+
+                assert host1_delay == "0\t0" and host0_delay == "0\t0", error()
+
             with Then("Inserts should resume"):
                 clickhouse_query(chi, "insert into t1(a) values(7)",  host=host0)
-        
+
         # cat /var/log/clickhouse-server/clickhouse-server.log | grep t2 | grep -E "all_1_1_0|START|STOP"
-
-
-        
- 

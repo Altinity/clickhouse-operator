@@ -1,1 +1,1 @@
-testflows>=1.3.44
+testflows==1.4.2

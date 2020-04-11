@@ -1,11 +1,7 @@
-from clickhouse import * 
-from kubectl import *
-import settings 
-from test_operator import *
-from test_clickhouse import *  
+from testflows.core import Given, main, run, Module, TE
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE, args
-from testflows.asserts import error
+from test_clickhouse import *
+from test_operator import *
 
 if main():
     with Module("main", flags=TE):
@@ -28,7 +24,7 @@ if main():
             kube_apply(get_full_path(settings.clickhouse_template), settings.test_namespace)
 
         with Given(f"ClickHouse version {settings.clickhouse_version}"):
-            1 == 1
+            pass
 
         # python3 tests/test.py --only operator*
         with Module("operator", flags=TE):
@@ -64,7 +60,7 @@ if main():
                 if callable(t):
                     run(test=t, flags=TE)
                 else:
-                    run(test = t[0], args = t[1], flags=TE)
+                    run(test=t[0], args=t[1], flags=TE)
 
         # python3 tests/test.py --only clickhouse*
         with Module("clickhouse", flags=TE):
