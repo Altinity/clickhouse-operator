@@ -86,6 +86,8 @@ Vagrant.configure(2) do |config|
     fi
 
     export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-prometheus}
+    # strange behavior for 1.14.10
+    export VALIDATE_YAML=false
     cd /vagrant/deploy/prometheus/
     bash -e ./create-prometheus.sh
     cd /vagrant/
