@@ -59,7 +59,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1586247624124,
+  "iteration": 1586668145107,
   "links": [],
   "panels": [
     {
@@ -769,7 +769,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Query",
+      "title": "Queries",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -787,7 +787,7 @@
       "yaxes": [
         {
           "format": "short",
-          "label": "queries / sec",
+          "label": "",
           "logBase": 1,
           "max": null,
           "min": null,
@@ -899,7 +899,7 @@
       "yaxes": [
         {
           "format": "bytes",
-          "label": "bytes / sec",
+          "label": "",
           "logBase": 1,
           "max": null,
           "min": null,
@@ -2085,7 +2085,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Zookeeper Requests in fly",
+      "title": "Zookeeper Requests",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -2190,7 +2190,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Read/Write syscalls in fly",
+      "title": "Read/Write syscalls",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -2300,7 +2300,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Marks Cache Efficiency 1 min",
+      "title": "Marks Cache Hit Rate",
       "tooltip": {
         "msResolution": false,
         "shared": true,
