@@ -47,7 +47,7 @@ const (
 const (
 	// TODO probably this should be added as a CLI/Config param
 	// Default number of controller threads running concurrently (used in case no other specified in config)
-	defaultControllerThreadsNum = 1
+	defaultControllerThreadsNum = 10
 )
 
 // CLI parameter variables
