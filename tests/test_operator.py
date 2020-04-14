@@ -277,14 +277,18 @@ def test_013():
                          "CREATE TABLE test_local Engine = Log as select * from system.one")
         clickhouse_query("test-013-add-shards", 
                          "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
+        clickhouse_query("test-013-add-shards", 
+                         "CREATE TABLE events_distr as system.events ENGINE = Distributed('all-sharded', system, events)")
 
     with Then("Add one more shard"):
         create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2, 2, 3], "do_not_delete": 1})
     with And("Table should be created on a second shard"):
-        out = clickhouse_query("test-013-add-shards", "select count() from default.test_distr",
+        clickhouse_query("test-013-add-shards", "select count() from default.test_distr",
                                host="chi-test-013-add-shards-default-1-0")
-        assert out == "1"
-    
+
+        clickhouse_query("test-013-add-shards", "select count() from default.events_distr",
+                               host="chi-test-013-add-shards-default-1-0")
+
     with Then("Remove shard"):
         create_and_check("configs/test-013-add-shards-1.yaml", {"object_counts": [1,1,2]})
 
@@ -324,6 +328,13 @@ def test_014():
                                    host="chi-test-014-replication-default-0-2")
             assert out == "1"
 
+    with When("Remove replica"):
+        create_and_check("configs/test-014-replication.yaml", {"pod_count": 1, "do_not_delete": 1})
+
+        with Then("Replica needs to be removed from the Zookeeper as well"):
+            out = clickhouse_query("test-014-replication", "select count() from system.replicas where table='t'")
+            assert out == "1" 
+    
     kube_delete_chi("test-014-replication")
 
 @TestScenario
