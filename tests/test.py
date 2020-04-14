@@ -28,7 +28,7 @@ if main():
             kube_apply(get_full_path(settings.clickhouse_template), settings.test_namespace)
 
         with Given(f"ClickHouse version {settings.clickhouse_version}"):
-            1 == 1
+            pass
 
         # python3 tests/test.py --only operator*
         with Module("operator", flags=TE):
