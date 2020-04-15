@@ -1,0 +1,35 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "monitoring-demo"
+spec:
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper.zoo1ns
+          port: 2181
+    clusters:
+      - name: replcluster
+        templates:
+          podTemplate: clickhouse-with-volume-template
+        layout:
+          shardsCount: 2
+          replicasCount: 2
+  templates:
+    podTemplates:
+      - name: clickhouse-with-volume-template
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:19.16.10.44
+              volumeMounts:
+                - name: clickhouse-storage-template
+                  mountPath: /var/lib/clickhouse
+    volumeClaimTemplates:
+      - name: clickhouse-storage-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
