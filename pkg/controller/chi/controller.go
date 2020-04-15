@@ -105,7 +105,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
-			//log.V(1).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
+			log.V(2).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
 			c.enqueueObject(NewReconcileChi(reconcileAdd, nil, chi))
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -114,7 +114,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(newChi.Namespace) {
 				return
 			}
-			//log.V(1).Info("chiInformer.UpdateFunc")
+			log.V(2).Info("chiInformer.UpdateFunc")
 			c.enqueueObject(NewReconcileChi(reconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -122,7 +122,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
-			//log.V(1).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
+			log.V(2).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
 			c.enqueueObject(NewReconcileChi(reconcileDelete, chi, nil))
 		},
 	})
@@ -133,7 +133,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
-			//log.V(1).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
+			log.V(2).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
 			c.enqueueObject(NewReconcileChit(reconcileAdd, nil, chit))
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -142,7 +142,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(newChit.Namespace) {
 				return
 			}
-			//log.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
+			log.V(2).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
 			c.enqueueObject(NewReconcileChit(reconcileUpdate, oldChit, newChit))
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -150,7 +150,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
-			//log.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
+			log.V(2).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
 			c.enqueueObject(NewReconcileChit(reconcileDelete, chit, nil))
 		},
 	})
@@ -161,7 +161,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
-			//log.V(1).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
+			log.V(2).Infof("chopInformer.AddFunc - %s/%s added", chopConfig.Namespace, chopConfig.Name)
 			c.enqueueObject(NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -170,7 +170,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(newChopConfig.Namespace) {
 				return
 			}
-			//log.V(1).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
+			log.V(2).Infof("chopInformer.UpdateFunc - %s/%s", newChopConfig.Namespace, newChopConfig.Name)
 			c.enqueueObject(NewReconcileChopConfig(reconcileUpdate, oldChopConfig, newChopConfig))
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -178,7 +178,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
-			//log.V(1).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
+			log.V(2).Infof("chopInformer.DeleteFunc - %s/%s deleted", chopConfig.Namespace, chopConfig.Name)
 			c.enqueueObject(NewReconcileChopConfig(reconcileDelete, chopConfig, nil))
 		},
 	})
@@ -189,7 +189,7 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("serviceInformer AddFunc %s/%s", service.Namespace, service.Name)
+			log.V(2).Infof("serviceInformer AddFunc %s/%s", service.Namespace, service.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldService := old.(*core.Service)
@@ -202,7 +202,7 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("serviceInformer DeleteFunc %s/%s", service.Namespace, service.Name)
+			log.V(2).Infof("serviceInformer DeleteFunc %s/%s", service.Namespace, service.Name)
 		},
 	})
 
@@ -212,7 +212,7 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("endpointsInformer AddFunc %s/%s", endpoints.Namespace, endpoints.Name)
+			log.V(2).Infof("endpointsInformer AddFunc %s/%s", endpoints.Namespace, endpoints.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldEndpoints := old.(*core.Endpoints)
@@ -223,7 +223,7 @@ func (c *Controller) addEventHandlers(
 
 			diff, equal := messagediff.DeepDiff(oldEndpoints, newEndpoints)
 			if equal {
-				//log.V(1).Infof("onUpdateEndpoints(%s/%s): no changes found", oldEndpoints.Namespace, oldEndpoints.Name)
+				log.V(2).Infof("onUpdateEndpoints(%s/%s): no changes found", oldEndpoints.Namespace, oldEndpoints.Name)
 				// No need to react
 				return
 			}
@@ -255,7 +255,7 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("endpointsInformer DeleteFunc %s/%s", endpoints.Namespace, endpoints.Name)
+			log.V(2).Infof("endpointsInformer DeleteFunc %s/%s", endpoints.Namespace, endpoints.Name)
 		},
 	})
 
@@ -265,21 +265,21 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("configMapInformer AddFunc %s/%s", configMap.Namespace, configMap.Name)
+			log.V(2).Infof("configMapInformer AddFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			configMap := old.(*core.ConfigMap)
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("configMapInformer UpdateFunc %s/%s", configMap.Namespace, configMap.Name)
+			log.V(2).Infof("configMapInformer UpdateFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("configMapInformer DeleteFunc %s/%s", configMap.Namespace, configMap.Name)
+			log.V(2).Infof("configMapInformer DeleteFunc %s/%s", configMap.Namespace, configMap.Name)
 		},
 	})
 
@@ -289,7 +289,7 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("statefulSetInformer AddFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			log.V(2).Infof("statefulSetInformer AddFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
 			//controller.handleObject(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -297,14 +297,14 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("statefulSetInformer UpdateFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			log.V(2).Infof("statefulSetInformer UpdateFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("statefulSetInformer DeleteFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			log.V(2).Infof("statefulSetInformer DeleteFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
 			//controller.handleObject(obj)
 		},
 	})
@@ -315,28 +315,28 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("podInformer AddFunc %s/%s", pod.Namespace, pod.Name)
+			log.V(2).Infof("podInformer AddFunc %s/%s", pod.Namespace, pod.Name)
 		},
 		UpdateFunc: func(old, new interface{}) {
 			pod := old.(*core.Pod)
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("podInformer UpdateFunc %s/%s", pod.Namespace, pod.Name)
+			log.V(2).Infof("podInformer UpdateFunc %s/%s", pod.Namespace, pod.Name)
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
-			//log.V(1).Infof("podInformer DeleteFunc %s/%s", pod.Namespace, pod.Name)
+			log.V(2).Infof("podInformer DeleteFunc %s/%s", pod.Namespace, pod.Name)
 		},
 	})
 }
 
 // isTrackedObject checks whether operator is interested in changes of this object
 func (c *Controller) isTrackedObject(objectMeta *meta.ObjectMeta) bool {
-	return c.chop.Config().IsWatchedNamespace(objectMeta.Namespace) && chopmodels.IsChopGeneratedObject(objectMeta)
+	return c.chop.Config().IsWatchedNamespace(objectMeta.Namespace) && chopmodels.IsCHOPGeneratedObject(objectMeta)
 }
 
 // Run syncs caches, starts workers

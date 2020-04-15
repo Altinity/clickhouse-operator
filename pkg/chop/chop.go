@@ -50,31 +50,31 @@ func (c *CHOp) Config() *v1.OperatorConfig {
 func (c *CHOp) SetupLog() {
 	updated := false
 	if c.Config().Logtostderr != "" {
-		log.Infof("Log option cur value %s=%s\n", "logtostderr", flag.Lookup("logtostderr").Value)
-		log.Infof("Log option new value %s=%s\n", "logtostderr", c.Config().Logtostderr)
+		log.V(1).Infof("Log option cur value %s=%s\n", "logtostderr", flag.Lookup("logtostderr").Value)
+		log.V(1).Infof("Log option new value %s=%s\n", "logtostderr", c.Config().Logtostderr)
 		updated = true
 		_ = flag.Set("logtostderr", c.Config().Logtostderr)
 	}
 	if c.Config().Alsologtostderr != "" {
-		log.Infof("Log option cur value %s=%s\n", "alsologtostderr", flag.Lookup("alsologtostderr").Value)
-		log.Infof("Log option new value %s=%s\n", "alsologtostderr", c.Config().Alsologtostderr)
+		log.V(1).Infof("Log option cur value %s=%s\n", "alsologtostderr", flag.Lookup("alsologtostderr").Value)
+		log.V(1).Infof("Log option new value %s=%s\n", "alsologtostderr", c.Config().Alsologtostderr)
 		updated = true
 		_ = flag.Set("alsologtostderr", c.Config().Alsologtostderr)
 	}
 	if c.Config().Stderrthreshold != "" {
-		log.Infof("Log option cur value %s=%s\n", "stderrthreshold", flag.Lookup("stderrthreshold").Value)
-		log.Infof("Log option new value %s=%s\n", "stderrthreshold", c.Config().Stderrthreshold)
+		log.V(1).Infof("Log option cur value %s=%s\n", "stderrthreshold", flag.Lookup("stderrthreshold").Value)
+		log.V(1).Infof("Log option new value %s=%s\n", "stderrthreshold", c.Config().Stderrthreshold)
 		updated = true
 		_ = flag.Set("stderrthreshold", c.Config().Stderrthreshold)
 	}
 	if c.Config().V != "" {
-		log.Infof("Log option cur value %s=%s\n", "v", flag.Lookup("v").Value)
-		log.Infof("Log option new value %s=%s\n", "v", c.Config().V)
+		log.V(1).Infof("Log option cur value %s=%s\n", "v", flag.Lookup("v").Value)
+		log.V(1).Infof("Log option new value %s=%s\n", "v", c.Config().V)
 		updated = true
 		_ = flag.Set("v", c.Config().V)
 	}
 
 	if updated {
-		log.Infof("Additional log options applied\n")
+		log.V(1).Infof("Additional log options applied\n")
 	}
 }

@@ -136,5 +136,5 @@ func (c *Controller) labelMyObjectsTree() {
 
 func (c *Controller) addLabels(meta *v1.ObjectMeta) {
 	meta.Labels[model.LabelAppName] = model.LabelAppValue
-	meta.Labels[model.LabelChop] = c.chop.Version
+	meta.Labels[model.LabelCHOP] = c.chop.Version
 }

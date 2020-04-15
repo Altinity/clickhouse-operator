@@ -55,7 +55,7 @@ func ReadFilesIntoMap(path string, isOurFile func(string) bool) map[string]strin
 			file := matches[i]
 			if isOurFile(file) {
 				// Pick our files only
-				log.Infof("Reading file %s\n", file)
+				log.V(2).Infof("Reading file %s\n", file)
 				if content, err := ioutil.ReadFile(file); (err == nil) && (len(content) > 0) {
 					// File content read successfully and file has some content
 					if files == nil {

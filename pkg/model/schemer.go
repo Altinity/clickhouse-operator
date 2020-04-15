@@ -54,20 +54,26 @@ func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
 	return clickhouse.GetPooledDBConnection(clickhouse.NewCHConnectionParams(hostname, s.Username, s.Password, s.Port))
 }
 
-func (s *Schemer) getObjectListFromClickHouse(serviceUrl string, sql string) ([]string, []string, error) {
+func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]string, []string, error) {
 	// Results
 	names := make([]string, 0)
 	sqlStatements := make([]string, 0)
 
-	log.V(1).Info(serviceUrl)
-	conn := s.getCHConnection(serviceUrl)
 	var rows *sqlmodule.Rows = nil
 	var err error
-	rows, err = conn.Query(sql)
+	for _, service := range services {
+		log.V(1).Infof("Trying %s", service)
+		conn := s.getCHConnection(service)
+
+		rows, err = conn.Query(sql)
+		if err == nil {
+			defer rows.Close()
+			break
+		}
+	}
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
 
 	// Some data fetched
 	for rows.Next() {
@@ -85,56 +91,52 @@ func (s *Schemer) getObjectListFromClickHouse(serviceUrl string, sql string) ([]
 // clusterGetCreateDistributedObjects returns a list of objects that needs to be created on a shard in a cluster
 // That includes all Distributed tables, corresponding local tables, and databases, if necessary
 func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) ([]string, []string, error) {
-	// system_tables := fmt.Sprintf("cluster('%s', system, tables)", cluster.Name)
+	// cluster_tables := fmt.Sprintf("cluster('%s', system, tables)", cluster.Name)
 	hosts := CreatePodFQDNsOfCluster(cluster)
-	system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
+	cluster_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
 
 	sql := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
 			database AS name, 
-			concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_db_query
+			concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_query
 		FROM 
 		(
-			SELECT DISTINCT database
-			FROM system.tables
+			SELECT DISTINCT arrayJoin([database, extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+')]) database
+			FROM cluster('all-sharded', system.tables) tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
-			UNION ALL
-			SELECT DISTINCT extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS shard_database
-			FROM system.tables 
-			WHERE engine = 'Distributed'
-			SETTINGS skip_unavailable_shards = 1
-		) 
+		) databases
 		UNION ALL
 		SELECT DISTINCT 
-			name, 
+			concat(database,'.', name) as name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
 		FROM 
 		(
 			SELECT 
-				database, 
-				name,
+			    database, name,
+				create_table_query,
 				2 AS order
-			FROM system.tables
+			FROM cluster('all-sharded', system.tables) tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
 			SELECT 
-				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS shard_database, 
-				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS shard_table,
+				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS database, 
+				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
+				t.create_table_query,
 				1 AS order
-			FROM system.tables
-			WHERE engine = 'Distributed'
+			FROM cluster('all-sharded', system.tables) tables
+			LEFT JOIN system.tables t USING (database, name)
+			WHERE engine = 'Distributed' AND t.create_table_query != ''
 			SETTINGS skip_unavailable_shards = 1
-		) 
-		LEFT JOIN (select distinct database, name, create_table_query from system.tables SETTINGS skip_unavailable_shards = 1) USING (database, name)
+		) tables
 		ORDER BY order
 		`,
-		"system.tables",
-		system_tables,
+		"cluster('all-sharded', system.tables)",
+		cluster_tables,
 	))
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(cluster.GetCHI()), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
@@ -176,7 +178,7 @@ func (s *Schemer) getCreateReplicatedObjects(host *chop.ChiHost) ([]string, []st
 		system_tables,
 	))
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(host.GetCHI()), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(host.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
@@ -195,7 +197,7 @@ func (s *Schemer) clusterGetCreateDatabases(cluster *chop.ChiCluster) ([]string,
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(cluster.GetCHI()), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
@@ -215,7 +217,7 @@ func (s *Schemer) clusterGetCreateTables(cluster *chop.ChiCluster) ([]string, []
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreateChiServiceFQDN(cluster.GetCHI()), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
@@ -234,7 +236,7 @@ func (s *Schemer) hostGetDropTables(host *chop.ChiHost) ([]string, []string, err
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDN(host), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse([]string{CreatePodFQDN(host)}, sql)
 	return names, sqlStatements, nil
 }
 
@@ -249,11 +251,11 @@ func (s *Schemer) HostDeleteTables(host *chop.ChiHost) error {
 func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
 
 	names, createSQLs, _ := s.getCreateReplicatedObjects(host)
-	log.V(1).Infof("Creating replicated objects: %v", names)
+	log.V(1).Infof("Creating replicated objects %v at %s", names, host.Address.HostName)
 	_ = s.hostApplySQLs(host, createSQLs, true)
 
 	names, createSQLs, _ = s.clusterGetCreateDistributedObjects(host.GetCluster())
-	log.V(1).Infof("Creating distributed objects: %v", names)
+	log.V(1).Infof("Creating distributed objects %v at %s", names, host.Address.HostName)
 	return s.hostApplySQLs(host, createSQLs, true)
 }
 
@@ -261,7 +263,7 @@ func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
 func (s *Schemer) ShardCreateTables(shard *chop.ChiShard) error {
 
 	names, createSQLs, _ := s.clusterGetCreateDistributedObjects(shard.GetCluster())
-	log.V(1).Infof("Creating distributed objects: %v", names)
+	log.V(1).Infof("Creating distributed objects %v at %s", names, shard.Name)
 	return s.shardApplySQLs(shard, createSQLs, true)
 }
 

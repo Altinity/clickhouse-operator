@@ -24,13 +24,17 @@ if [[ "${MINIKUBE}" == "yes" ]]; then
     # We'd like to build for minikube
     eval $(minikube docker-env)
 fi
-docker build -t "${TAG}" -f "${DOCKERFILE}" "${SRC_ROOT}"
 
-# Publish image
-if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
-    if [[ ! -z "${DOCKERHUB_LOGIN}" ]]; then
-        echo "Dockerhub login specified: '${DOCKERHUB_LOGIN}', perform login"
-        docker login -u "${DOCKERHUB_LOGIN}"
+if docker build -t "${TAG}" -f "${DOCKERFILE}" "${SRC_ROOT}"; then
+    # Image ready, time to publish it
+    if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
+        if [[ ! -z "${DOCKERHUB_LOGIN}" ]]; then
+            echo "Dockerhub login specified: '${DOCKERHUB_LOGIN}', perform login"
+            docker login -u "${DOCKERHUB_LOGIN}"
+        fi
+        docker push "${TAG}"
     fi
-    docker push "${TAG}"
+else
+    echo "FAILED docker build! Abort."
+    exit 1
 fi
