@@ -96,7 +96,7 @@ func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*sqlmodule
 		return nil, err
 	}
 
-	// log.V(1).Infof("clickhouse.Query(%s):'%s'", c.Hostname, sql)
+	log.V(2).Infof("clickhouse.QueryContext():'%s'", sql)
 
 	return rows, nil
 }
@@ -127,7 +127,7 @@ func (c *CHConnection) ExecContext(ctx context.Context, sql string) error {
 		return err
 	}
 
-	// log.V(1).Infof("clickhouse.Exec(%s):'%s'", c.Hostname, sql)
+	log.V(2).Infof("clickhouse.ExecContext():'%s'", sql)
 
 	return nil
 }

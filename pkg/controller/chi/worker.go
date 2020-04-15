@@ -347,7 +347,7 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 func (w *worker) deleteHost(host *chop.ChiHost) error {
 	log.V(1).Infof("Worker delete host %s/%s", host.Address.ClusterName, host.Name)
 
-	if _,err := w.c.FindStatefulSet(host); err != nil {
+	if _, err := w.c.FindStatefulSet(host); err != nil {
 		log.V(1).Infof("Worker delete host %s/%s - StatefulSet not found - already deleted?", host.Address.ClusterName, host.Name)
 		return nil
 	}

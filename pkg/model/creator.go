@@ -589,14 +589,17 @@ func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, b
 
 func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	// Ensure ClickHouse container has all named ports specified
-	if chContainer, ok := getClickHouseContainer(statefulSet); ok {
-		ensurePortByName(chContainer, chDefaultTCPPortName, host.TCPPort)
-		ensurePortByName(chContainer, chDefaultHTTPPortName, host.HTTPPort)
-		ensurePortByName(chContainer, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
+	chContainer, ok := getClickHouseContainer(statefulSet)
+	if !ok {
+		return
 	}
+	ensurePortByName(chContainer, chDefaultTCPPortName, host.TCPPort)
+	ensurePortByName(chContainer, chDefaultHTTPPortName, host.HTTPPort)
+	ensurePortByName(chContainer, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
 }
 
 func ensurePortByName(container *corev1.Container, name string, port int32) {
+	// Find port with specified name
 	for i := range container.Ports {
 		containerPort := &container.Ports[i]
 		if containerPort.Name == name {
@@ -606,7 +609,7 @@ func ensurePortByName(container *corev1.Container, name string, port int32) {
 		}
 	}
 
-	// port with specified name not found. Need to append
+	// Port with specified name not found. Need to append
 	container.Ports = append(container.Ports, corev1.ContainerPort{
 		Name:          name,
 		ContainerPort: port,
