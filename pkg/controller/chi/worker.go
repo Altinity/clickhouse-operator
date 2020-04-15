@@ -189,7 +189,8 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 			log.V(1).Info(str)
 			w.c.eventCHI(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, str)
 
-			_ = w.schemer.ShardCreateTables(shard)
+			//This is not needed, since tables will be added by HostCreateTables call below
+			//_ = w.schemer.ShardCreateTables(shard)
 		},
 		func(host *chop.ChiHost) {
 			str := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
