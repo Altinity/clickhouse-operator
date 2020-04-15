@@ -30,7 +30,7 @@ func Retry(tries int, desc string, f func() error) error {
 			// All ok, no need to retry more
 			if try > 1 {
 				// Done, but after some retries, this is not 'clean'
-				log.V(2).Infof("DONE attempt %d of %d: %s", try, tries, desc)
+				log.V(1).Infof("DONE attempt %d of %d: %s", try, tries, desc)
 			}
 			return nil
 		}
