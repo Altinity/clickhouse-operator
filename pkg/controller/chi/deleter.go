@@ -135,7 +135,7 @@ func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 		// There should be better way to sync cache
 		if _, err := c.FindStatefulSet(host); err == nil {
 			log.V(1).Infof("StatefulSet %s/%s deleted, cache NOT yet synced", namespace, name)
-			time.Sleep(5*time.Second)
+			time.Sleep(5 * time.Second)
 		} else {
 			log.V(1).Infof("StatefulSet %s/%s deleted, cache synced. Desc: %v", namespace, name, err)
 			break
