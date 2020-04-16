@@ -39,6 +39,9 @@ spec:
           containers:
             - name: clickhouse
               image: yandex/clickhouse-server:19.16
+              volumeMounts:
+                - name: sidecar-configmap-volume
+                  mountPath: /configmap-volume
 
             - name: custom-sidecar
               image: busybox
