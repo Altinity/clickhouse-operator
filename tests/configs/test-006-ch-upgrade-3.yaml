@@ -5,14 +5,14 @@ metadata:
 spec:
   templates:
     podTemplates:
-    - name: clickhouse-latest
+    - name: clickhouse-new
       spec:
         containers:
         - name: clickhouse-pod
-          image: yandex/clickhouse-server:19.11.8.46
+          image: yandex/clickhouse-server:19.11
   defaults:
     templates:
-      podTemplate: clickhouse-latest
+      podTemplate: clickhouse-new
   configuration:
     clusters:
     - name: shards
