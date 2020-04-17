@@ -3,6 +3,8 @@ kind: "ClickHouseInstallation"
 metadata:
   name: test-015-host-network
 spec:
+  useTemplates:
+    - name: clickhouse-version
   defaults:
     templates:
       podTemplate: pod-distribution
@@ -38,6 +40,4 @@ spec:
         spec:
           hostNetwork: true
           # dnsPolicy: ClusterFirstWithHostNet
-          containers:
-            - name: clickhouse
-              image: yandex/clickhouse-server:19.16.10.44
+

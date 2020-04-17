@@ -10,11 +10,6 @@ spec:
         containers:
         - name: clickhouse-pod
           image: yandex/clickhouse-server:19.11
-    - name: v19.13
-      spec:
-        containers:
-        - name: clickhouse-pod
-          image: yandex/clickhouse-server:19.13
     - name: v19.16
       spec:
         containers:
@@ -25,6 +20,11 @@ spec:
         containers:
         - name: clickhouse
           image: yandex/clickhouse-server:20.1
+    - name: v20.3
+      spec:
+        containers:
+        - name: clickhouse
+          image: yandex/clickhouse-server:20.3
   configuration:
     clusters:
     - name: default
@@ -35,10 +35,10 @@ spec:
              podTemplate: v19.11
          - shard1:
            templates:
-             podTemplate: v19.13
+             podTemplate: v19.16
          - shard2:
            templates:
-             podTemplate: v19.16
+             podTemplate: v20.1
          - shard3:
            templates:
-             podTemplate: v20.1
+             podTemplate: v20.3

@@ -12,21 +12,15 @@ def test_001():
     create_and_check("configs/test-001.yaml", {"object_counts": [1, 1, 2]})
     
 @TestScenario
-@Name("test_002. useTemplates for pod and volume templates")
+@Name("test_002. useTemplates for pod, volume templates, and distribution")
 def test_002():
     create_and_check("configs/test-002-tpl.yaml", 
                      {"pod_count": 1,
-                      "apply_templates": {settings.clickhouse_template, "templates/tpl-log-volume.yaml"},
+                      "apply_templates": {settings.clickhouse_template, 
+                                          "templates/tpl-log-volume.yaml",
+                                          "templates/tpl-one-per-host.yaml"},
                       "pod_image": settings.clickhouse_version,
-                      "pod_volumes": {"/var/log/clickhouse-server"}})
-
-@TestScenario
-@Name("test_003. useTemplates for pod and distribution templates")
-def test_003():
-    create_and_check("configs/test-003-tpl.yaml", 
-                     {"pod_count": 1,
-                      "apply_templates": {settings.clickhouse_template, "templates/tpl-one-per-host.yaml"},
-                      "pod_image": settings.clickhouse_version,
+                      "pod_volumes": {"/var/log/clickhouse-server"},
                       "pod_podAntiAffinity": 1})
 
 @TestScenario
@@ -41,7 +35,6 @@ def test_004():
 def test_005():
     create_and_check("configs/test-005-acm.yaml", 
                      {"pod_count": 1,
-                      "pod_image": "yandex/clickhouse-server:19.11.8.46",
                       "pod_volumes": {"/var/lib/clickhouse"}})
 
 @TestScenario
@@ -49,17 +42,17 @@ def test_005():
 def test_006():
     create_and_check("configs/test-006-ch-upgrade-1.yaml", 
                      {"pod_count": 2,
-                      "pod_image": "yandex/clickhouse-server:19.11.8.46",
+                      "pod_image": "yandex/clickhouse-server:19.11",
                       "do_not_delete": 1})
     with Then("Use different podTemplate and confirm that pod image is updated"):  
         create_and_check("configs/test-006-ch-upgrade-2.yaml", 
                          {"pod_count": 2,
-                          "pod_image": "yandex/clickhouse-server:latest",
+                          "pod_image": "yandex/clickhouse-server:19.16",
                           "do_not_delete": 1})
         with Then("Change image in podTemplate itself and confirm that pod image is updated"):
             create_and_check("configs/test-006-ch-upgrade-3.yaml", 
                              {"pod_count": 2,
-                              "pod_image": "yandex/clickhouse-server:19.11.8.46"})
+                              "pod_image": "yandex/clickhouse-server:19.11"})
 
 @TestScenario
 @Name("test_007. Test template with custom clickhouse ports")
@@ -67,7 +60,7 @@ def test_007():
     create_and_check("configs/test-007-custom-ports.yaml", 
                      {"pod_count": 1,
                       "apply_templates": {"templates/tpl-custom-ports.yaml"},
-                      "pod_image": "yandex/clickhouse-server:19.11.8.46",
+                      "pod_image": "yandex/clickhouse-server:19.11",
                       "pod_ports": [8124,9001,9010]})
 
 def test_operator_upgrade(config, version_from, version_to = settings.version):
@@ -188,7 +181,7 @@ def test_011():
         with And("Connection from insecured to secured host should fail for user with no password"):
             out = clickhouse_query_with_error("test-011-insecured-cluster", "select 'OK'",
                                               host="chi-test-011-secured-cluster-default-1-0", user="user1")
-            assert "Password required" in out
+            assert "Password" in out or "password" in out 
     
         with And("Connection from insecured to secured host should work for user with password"):
             out = clickhouse_query_with_error("test-011-insecured-cluster","select 'OK'", 
@@ -379,6 +372,7 @@ def test_017():
     for shard in range(4):
         host = f"chi-{chi}-default-{shard}-0"
         clickhouse_query(chi, host=host, query=test_query)
+        clickhouse_query(chi, host=host, query="SYSTEM FLUSH LOGS")
         out = clickhouse_query(chi, host=host,
                                query="select query from system.query_log order by event_time desc limit 1")
         ver = clickhouse_query(chi, host=host, query="select version()")

@@ -1,27 +1,40 @@
 apiVersion: clickhouse.altinity.com/v1
 kind: ClickHouseInstallation
 metadata:
-  name: acmtest
+  name: test-005-acm
 spec:
   templates:
     podTemplates:
-    - name: clickhouse-v19.11.8.46
+    - name: clickhouse-v20.3
       spec:
         containers:
         - name: clickhouse-pod
-          image: yandex/clickhouse-server:19.11.8.46
+          image: yandex/clickhouse-server:20.3
           ports:
           - name: http
             containerPort: 8123
-          - name: tcp
+          - name: https
+            containerPort: 8443
+          - name: client
             containerPort: 9000
+          - name: secureclient
+            containerPort: 9440
           - name: interserver
             containerPort: 9009
+          command:
+          - /bin/bash
+          - -c
+          - /entrypoint.sh; while true; do sleep 600; done
           resources:
             requests:
               memory: 300Mi
+              cpu: "1"
             limits:
               memory: 300Mi
+              cpu: "1"
+      podDistribution:
+      - scope: ClickHouseInstallation
+        type: ClickHouseAntiAffinity
     volumeClaimTemplates:
     - name: default-volumeclaim-template
       reclaimPolicy: Delete
@@ -30,26 +43,73 @@ spec:
         - ReadWriteOnce
         resources:
           requests:
-            storage: 10Gi
+            storage: 1Gi
+    serviceTemplates:
+    - name: default-service-template
+      generateName: clickhouse-{chi}
+      spec:
+        ports:
+        - name: http
+          port: 8123
+        - name: client
+          port: 9000
+        type: LoadBalancer
+        externalTrafficPolicy: Local
   defaults:
     templates:
-      podTemplate: pod-template-resource-limit
+      podTemplate: clickhouse-v20.3
       volumeClaimTemplate: default-volumeclaim-template
+      serviceTemplate: default-service-template
   configuration:
+    files:
+      settings.xml: |
+        <yandex>
+          <https_port>8443</https_port>
+          <tcp_port_secure>9440</tcp_port_secure>
+          <openSSL>
+            <server>
+              <certificateFile>/etc/clickhouse-server/config.d/node.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/config.d/node.key</privateKeyFile>
+              <dhParamsFile>/etc/clickhouse-server/config.d/dhparam.pem</dhParamsFile>
+              <verificationMode>none</verificationMode>
+              <loadDefaultCAFile>true</loadDefaultCAFile>
+              <cacheSessions>true</cacheSessions>
+              <disableProtocols>sslv2,sslv3</disableProtocols>
+              <preferServerCiphers>true</preferServerCiphers>
+            </server>
+          </openSSL>
+          <http_server_default_response>&lt;!doctype html&gt; &lt;html ng-app="SMI2"&gt; &lt;head&gt; &lt;meta charset="utf-8"&gt; &lt;title&gt;ACM Tabix&lt;/title&gt; &lt;meta name="viewport" content="width=device-width"&gt; &lt;meta http-equiv="X-UA-Compatible" content="IE=edge"&gt; &lt;link rel="shortcut icon" href="/favicon.ico"&gt; &lt;base href="/"&gt; &lt;link rel="stylesheet" href="https://acm.altinity.com/tabix/styles/vendor-05d49847d5.css"&gt; &lt;link rel="stylesheet" href="https://acm.altinity.com/tabix/styles/app-721d08f0a8.css"&gt; &lt;/head&gt; &lt;body&gt;&lt;!--[if lt IE 10]&gt; &lt;p class="browsehappy"&gt;You are using an &lt;strong&gt;outdated&lt;/strong&gt; browser. Please &lt;a href="http://browsehappy.com/"&gt;upgrade your browser&lt;/a&gt; to improve your experience.&lt;/p&gt; &lt;![endif]--&gt; &lt;script src="https://acm.altinity.com/tabix/scripts/plotly.min.js"&gt;&lt;/script&gt; &lt;script type="text/javascript"&gt; window.TabixBuildDate = "20180701"; window.TabixVersion = "18.07.1"; &lt;/script&gt; &lt;div ui-view="" class="content-ui"&gt;&lt;/div&gt; &lt;script src="https://acm.altinity.com/tabix/scripts/vendor-bad6a329f6.js"&gt;&lt;/script&gt; &lt;script src="https://acm.altinity.com/tabix/scripts/app-65ac869b2e.js"&gt;&lt;/script&gt; &lt;/body&gt; &lt;/html&gt;</http_server_default_response>
+        </yandex>
+      node.csr:
+      - '**** HIDDEN ****'
+      node.key:
+      - '**** HIDDEN ****'
+      node.crt:
+      - '**** HIDDEN ****'
+      dhparam.pem:
+      - '**** HIDDEN ****'
     profiles:
-      readonly/readonly: "1"
+      default/max_memory_usage: "1932735283"
+      default/max_memory_usage_for_user: "1932735283"
+      default/max_memory_usage_for_all_queries: "1932735283"
+      default/max_bytes_before_external_group_by: "1073741824"
+      default/max_bytes_before_external_sort: "1073741824"
     users:
-      readonly/profile: readonly
-      readonly/quota: default
+      default/profile: default
+      default/quota: default
+      default/networks/ip:
+      - 127.0.0.1
+      - 88.99.208.194
+      admin/password_sha256_hex: 628b49d96dcde97a430dd4f597705899e09a968f793491e4b704cae33a40dc02
       admin/profile: default
       admin/quota: default
       admin/networks/ip:
       - 0.0.0.0/0
       - ::/0
     clusters:
-    - name: acmtest
+    - name: t1
       layout:
         shardsCount: 1
         replicasCount: 1
       templates:
-        podTemplate: clickhouse-v19.11.8.46
+        podTemplate: clickhouse-v20.3
