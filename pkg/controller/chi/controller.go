@@ -374,6 +374,11 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 	<-ctx.Done()
 }
 
+// enqueueObject adds ClickHouseInstallation object to the workqueue
+func (c *Controller) enqueueObject(obj interface{}) {
+	c.queue.AddRateLimited(obj)
+}
+
 // runWorker is an endless work loop running in a thread
 func (c *Controller) runWorker() {
 	worker := c.newWorker()
@@ -385,19 +390,18 @@ func (c *Controller) runWorker() {
 			return
 		}
 
-		if err := worker.processItem(item); err == nil {
-			// Item processed
-			// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
-			// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
-			// still have to call `Done` on the queue.
-			c.queue.Forget(item)
-		} else {
+		if err := worker.processItem(item); err != nil {
 			// Item not processed
 			// this code cannot return an error and needs to indicate error has been ignored
 			utilruntime.HandleError(err)
 		}
 
-		// Must call Done(item) when processing completed
+		// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
+		// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
+		// still have to call `Done` on the queue.
+		c.queue.Forget(item)
+
+		// Remove item from processing set when processing completed
 		c.queue.Done(item)
 	}
 }
@@ -539,11 +543,6 @@ func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tole
 	// Update status of a real object
 	cur.Status = chi.Status
 	return c.updateCHIObject(cur)
-}
-
-// enqueueObject adds ClickHouseInstallation object to the workqueue
-func (c *Controller) enqueueObject(obj interface{}) {
-	c.queue.AddRateLimited(obj)
 }
 
 // handleObject enqueues CHI which is owner of `obj` into reconcile loop
