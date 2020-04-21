@@ -437,6 +437,7 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 	}
 	util.Fprintf(b, "CHConfigUserDefaultPassword: %s\n", password)
 	util.Fprintf(b, "CHConfigNetworksHostRegexpTemplate: %s\n", config.CHConfigNetworksHostRegexpTemplate)
+	util.Fprintf(b, "CHConfigInterServerHttpHost: %s\n", config.CHConfigInterServerHttpHost)
 
 	username = config.CHUsername
 	password = config.CHPassword

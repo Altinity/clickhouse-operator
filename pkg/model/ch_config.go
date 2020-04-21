@@ -254,6 +254,21 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 	return b.String()
 }
 
+// GetInterServer creates "inter_server.xml" content
+func (c *ClickHouseConfigGenerator) GetInterServer(interserver string) string {
+	b := &bytes.Buffer{}
+
+	// <yandex>
+	//		<interserver_http_host from_env="INTERSERVER_HOST"/>
+	cline(b, 0, "<"+xmlTagYandex+">")
+	cline(b, 4, "<interserver_http_host from_env=\"%s\" />", interserver)
+
+	// </yandex>
+	cline(b, 0, "</"+xmlTagYandex+">")
+
+	return b.String()
+}
+
 // GetHostMacros creates "macros.xml" content
 func (c *ClickHouseConfigGenerator) GetHostMacros(host *chiv1.ChiHost) string {
 	b := &bytes.Buffer{}

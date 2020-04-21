@@ -46,6 +46,9 @@ func (c *configSections) CreateConfigsCommon() {
 	// 2. settings
 	// 3. files
 	util.IncludeNonEmpty(c.commonConfigSections, filenameRemoteServersXML, c.chConfigGenerator.GetRemoteServers())
+	if len(c.chopConfig.CHConfigInterServerHttpHost) > 0 {
+		util.IncludeNonEmpty(c.commonConfigSections, filenameInterServerXML, c.chConfigGenerator.GetInterServer(c.chopConfig.CHConfigInterServerHttpHost))
+	}
 	util.IncludeNonEmpty(c.commonConfigSections, filenameSettingsXML, c.chConfigGenerator.GetSettings())
 	util.MergeStringMaps(c.commonConfigSections, c.chConfigGenerator.GetFiles())
 	// Extra user-specified config files

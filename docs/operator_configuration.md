@@ -98,6 +98,9 @@ chConfigUserDefaultNetworksIP:
   - "::/0"
 chConfigUserDefaultPassword: "default"
 
+## Default env variable used to populate inter server http host
+chConfigInterServerHttpHost: "pod_ip"
+
 ################################################
 ##
 ## Operator's access to ClickHouse instances

@@ -24,6 +24,7 @@ const (
 	configProfiles      = "profiles"
 	configQuotas        = "quotas"
 	configRemoteServers = "remote_servers"
+	configInterServer   = "interserver_http_host"
 	configSettings      = "settings"
 	configUsers         = "users"
 	configZookeeper     = "zookeeper"
@@ -45,6 +46,8 @@ const (
 	filenameQuotasXML = configQuotas + dotXML
 	// remote_servers.xml
 	filenameRemoteServersXML = configRemoteServers + dotXML
+	// inter_server.xml
+	filenameInterServerXML = configInterServer + dotXML
 	// settings.xml
 	filenameSettingsXML = configSettings + dotXML
 	// users.xml

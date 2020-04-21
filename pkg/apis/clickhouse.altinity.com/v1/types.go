@@ -437,6 +437,9 @@ type OperatorConfig struct {
 	CHConfigUserDefaultNetworksIP []string `json:"chConfigUserDefaultNetworksIP" yaml:"chConfigUserDefaultNetworksIP"`
 	CHConfigUserDefaultPassword   string   `json:"chConfigUserDefaultPassword"   yaml:"chConfigUserDefaultPassword"`
 
+	// Default env variable used to populate inter server http host
+	CHConfigInterServerHttpHost string `json:"chConfigInterServerHttpHost"   yaml:"chConfigInterServerHttpHost"`
+
 	CHConfigNetworksHostRegexpTemplate string `json:"chConfigNetworksHostRegexpTemplate" yaml:"chConfigNetworksHostRegexpTemplate"`
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
