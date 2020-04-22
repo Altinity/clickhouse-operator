@@ -260,7 +260,7 @@ spec:
             - name: interserver
               port: 9009
           type: ClusterIP
-          ClusterIP: None
+          clusterIP: None
 
       - name: preserve-client-source-ip
         # For more details on Preserving Client Source IP check
