@@ -173,6 +173,7 @@ def test_011():
             assert out != 'OK'
 
         with And("Connection from insecured to secured host should fail for user with no password"):
+            time.sleep(10) # FIXME
             out = clickhouse_query_with_error("test-011-insecured-cluster", "select 'OK'",
                                               host="chi-test-011-secured-cluster-default-1-0", user="user1")
             assert "Password" in out or "password" in out 
@@ -436,7 +437,9 @@ def test_019(config = "configs/test-019-retain-volume.yaml"):
 @Name("test-020-multi-volume. Test multi-volume configuration")
 def test_020(config = "configs/test-020-multi-volume.yaml"):
     chi = get_chi_name(get_full_path(config))
-    create_and_check(config, {"pod_count": 1, "do_not_delete": 1})
+    create_and_check(config, {"pod_count": 1,
+                              "pod_volumes": {"/var/lib/clickhouse","/var/lib/clickhouse2"}, 
+                              "do_not_delete": 1})
     
     with When("Create a table and insert 1 row"):
         clickhouse_query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
