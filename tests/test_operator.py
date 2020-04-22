@@ -163,12 +163,6 @@ def test_011():
             assert out == 'OK'
 
         with And("Connection from secured to secured host should succeed"):
-            kube_wait_field("ep", "chi-test-011-secured-cluster-default-1-0",
-                            ".subsets[*].addresses[*].hostname", "chi-test-011-secured-cluster-default-1-0-0")
-            kube_wait_field("ep", "chi-test-011-secured-cluster-default-0-0",
-                            ".subsets[*].addresses[*].hostname", "chi-test-011-secured-cluster-default-0-0-0")
-            with And("hmm, service created but DNS still not updated? wait 10 sec"):
-                time.sleep(10)
             out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'",
                                               host="chi-test-011-secured-cluster-default-1-0")
             assert out == 'OK'
@@ -297,8 +291,7 @@ def test_014():
 
     create_and_check("configs/test-014-replication.yaml", 
                     {"apply_templates": {settings.clickhouse_template},
-                     "pod_count": 2,
-                     "do_not_delete": 1})
+                     "object_counts": [2, 2, 3], "do_not_delete": 1})
 
     with Given("Table is created on a first replica and data is inserted"):
         clickhouse_query("test-014-replication", create_table, host="chi-test-014-replication-default-0-0")
@@ -306,24 +299,20 @@ def test_014():
         with When("Table is created on the second replica"):
             clickhouse_query("test-014-replication", create_table, host="chi-test-014-replication-default-0-1")
             with Then("Data should be replicated"):
-                out = clickhouse_query("test-014-replication", "select a from t",
-                                       host="chi-test-014-replication-default-0-1")
+                out = clickhouse_query("test-014-replication", "select a from t", host="chi-test-014-replication-default-0-1")
                 assert out == "1"
 
     with When("Add one more replica"):
         create_and_check("configs/test-014-replication-2.yaml", 
-                         {"pod_count": 3,
-                          "do_not_delete": 1})
+                         {"pod_count": 3, "do_not_delete": 1})
         # that also works:
         # kubectl patch chi test-014-replication -n test --type=json -p '[{"op":"add", "path": "/spec/configuration/clusters/0/layout/shards/0/replicasCount", "value": 3}]'
         with Then("Replicated table should be automatically created"):
-            out = clickhouse_query("test-014-replication", "select a from t",
-                                   host="chi-test-014-replication-default-0-2")
+            out = clickhouse_query("test-014-replication", "select a from t", host="chi-test-014-replication-default-0-2")
             assert out == "1"
 
     with When("Remove replica"):
         create_and_check("configs/test-014-replication.yaml", {"pod_count": 1, "do_not_delete": 1})
-
         with Then("Replica needs to be removed from the Zookeeper as well"):
             out = clickhouse_query("test-014-replication", "select count() from system.replicas where table='t'")
             assert out == "1" 
@@ -442,3 +431,29 @@ def test_019(config = "configs/test-019-retain-volume.yaml"):
             assert out == "1"
 
     kube_delete_chi(chi)
+    
+@TestScenario
+@Name("test-020-multi-volume. Test multi-volume configuration")
+def test_020(config = "configs/test-020-multi-volume.yaml"):
+    chi = get_chi_name(get_full_path(config))
+    create_and_check(config, {"pod_count": 1, "do_not_delete": 1})
+    
+    with When("Create a table and insert 1 row"):
+        clickhouse_query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
+        clickhouse_query(chi, "insert into test_disks values (1)")
+        
+        with Then("Data should be placed on default disk"):
+            out = clickhouse_query(chi, "select disk_name from system.parts where table='test_disks'")
+            assert out == 'default'
+    
+    with When("alter table test_disks move partition tuple() to disk 'disk2'"):
+        clickhouse_query(chi, "alter table test_disks move partition tuple() to disk 'disk2'")
+        
+        with Then("Data should be placed on disk2"):
+            out = clickhouse_query(chi, "select disk_name from system.parts where table='test_disks'")
+            assert out == 'disk2'
+    
+    kube_delete_chi(chi)
+    
+    
+    

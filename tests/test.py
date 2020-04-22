@@ -53,11 +53,12 @@ if main():
                 test_017,
                 test_018,
                 test_019,
+                test_020,
             ]
             run_tests = all_tests
             
             # placeholder for selective test running
-            # run_tests = [test_017]
+            # run_tests = [test_020]
 
             for t in run_tests:
                 if callable(t):
