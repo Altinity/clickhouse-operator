@@ -339,18 +339,22 @@ def test_015():
     kube_delete_chi("test-015-host-network")
 
 @TestScenario
-@Name("test_016. Test files and dictionaries setup")
+@Name("test_016. Test advanced settings options")
 def test_016():
-    create_and_check("configs/test-016-dict.yaml",
+    create_and_check("configs/test-016-settings.yaml",
                      {"apply_templates": {settings.clickhouse_template},
                       "pod_count": 1,
                       "do_not_delete": 1})
 
     with Then("dictGet() should work"):
-        out = clickhouse_query("test-016-dict", query = "select dictGet('one', 'one', toUInt64(0))")
+        out = clickhouse_query("test-016-settings", query = "select dictGet('one', 'one', toUInt64(0))")
         assert out == "0"
 
-    kube_delete_chi("test-016-dict")
+    with Then("Custom macro 'layer' should be available:"):
+        out = clickhouse_query("test-016-settings", query = "select substitution from system.macros where macro='layer'")
+        assert out == "01"
+
+    kube_delete_chi("test-016-settings")
 
 @TestScenario
 @Name("test-017-multi-version. Test certain functions across multiple versions")
