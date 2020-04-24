@@ -374,9 +374,10 @@ func (c *Controller) Run(ctx context.Context) {
 	//
 	// Start threads
 	//
-	log.V(1).Info("ClickHouseInstallation controller: starting workers")
-	for i := 0; i < c.numThreads; i++ {
-		log.V(1).Infof("ClickHouseInstallation controller: starting worker %d with poll period %d", i+1, runWorkerPeriod)
+	workersNum := len(c.queues)
+	log.V(1).Infof("ClickHouseInstallation controller: starting workers number: %d", workersNum)
+	for i := 0; i < workersNum; i++ {
+		log.V(1).Infof("ClickHouseInstallation controller: starting worker %d out of %d", i+1, workersNum)
 		worker := c.newWorker(c.queues[i])
 		go wait.Until(worker.run, runWorkerPeriod, ctx.Done())
 	}

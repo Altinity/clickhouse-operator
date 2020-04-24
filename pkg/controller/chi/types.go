@@ -32,8 +32,6 @@ import (
 
 // Controller defines CRO controller
 type Controller struct {
-	numThreads int
-
 	// Instance of Operator
 	chop *chop.CHOp
 
