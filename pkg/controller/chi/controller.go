@@ -49,7 +49,6 @@ func NewController(
 	kubeClient kube.Interface,
 	chopInformerFactory chopinformers.SharedInformerFactory,
 	kubeInformerFactory kubeinformers.SharedInformerFactory,
-	numThreads int,
 ) *Controller {
 
 	// Initializations
@@ -72,7 +71,6 @@ func NewController(
 
 	// Create Controller instance
 	controller := &Controller{
-		numThreads:              numThreads,
 		chop:                    chop,
 		kubeClient:              kubeClient,
 		chopClient:              chopClient,
@@ -99,7 +97,7 @@ func NewController(
 }
 
 func (c *Controller) initQueues() {
-	for i := 0; i < c.numThreads; i++ {
+	for i := 0; i < c.chop.Config().ReconcileThreadsNumber; i++ {
 		c.queues = append(c.queues, workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("chi%d", i)))
 	}
 }
