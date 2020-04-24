@@ -133,6 +133,7 @@ func Run() {
 		kubeClient,
 		chopInformerFactory,
 		kubeInformerFactory,
+		controllerThreadsNum,
 	)
 
 	// Setup OS signals and termination context
@@ -160,7 +161,7 @@ func Run() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		chiController.Run(ctx, controllerThreadsNum)
+		chiController.Run(ctx)
 	}()
 	<-ctx.Done()
 	wg.Wait()

@@ -17,6 +17,8 @@ package chi
 import (
 	"fmt"
 	log "github.com/golang/glog"
+	"k8s.io/client-go/util/workqueue"
+
 	// log "k8s.io/klog"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -27,14 +29,16 @@ import (
 
 type worker struct {
 	c          *Controller
+	queue      workqueue.RateLimitingInterface
 	normalizer *chopmodels.Normalizer
 	schemer    *chopmodels.Schemer
 	creator    *chopmodels.Creator
 }
 
-func (c *Controller) newWorker() *worker {
+func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
 	return &worker{
 		c:          c,
+		queue:      queue,
 		normalizer: chopmodels.NewNormalizer(c.chop),
 		schemer: chopmodels.NewSchemer(
 			c.chop.Config().CHUsername,
@@ -42,6 +46,32 @@ func (c *Controller) newWorker() *worker {
 			c.chop.Config().CHPort,
 		),
 		creator: nil,
+	}
+}
+
+// run is an endless work loop, expected to be runin a thread
+func (w *worker) run() {
+	for {
+		// Get() blocks until it can return an item
+		item, shutdown := w.queue.Get()
+		if shutdown {
+			log.V(1).Info("runWorker(): shutdown request")
+			return
+		}
+
+		if err := w.processItem(item); err != nil {
+			// Item not processed
+			// this code cannot return an error and needs to indicate error has been ignored
+			utilruntime.HandleError(err)
+		}
+
+		// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
+		// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
+		// still have to call `Done` on the queue.
+		w.queue.Forget(item)
+
+		// Remove item from processing set when processing completed
+		w.queue.Done(item)
 	}
 }
 

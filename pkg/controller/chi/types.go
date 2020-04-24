@@ -32,6 +32,8 @@ import (
 
 // Controller defines CRO controller
 type Controller struct {
+	numThreads int
+
 	// Instance of Operator
 	chop *chop.CHOp
 
@@ -69,8 +71,8 @@ type Controller struct {
 	// podListerSynced used in waitForCacheSync()
 	podListerSynced cache.InformerSynced
 
-	// queue used to organize events queue processed by operator
-	queue workqueue.RateLimitingInterface
+	// queues used to organize events queue processed by operator
+	queues []workqueue.RateLimitingInterface
 	// not used explicitly
 	recorder record.EventRecorder
 }
