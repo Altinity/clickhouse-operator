@@ -1501,7 +1501,7 @@ data:
     ################################################
     
     # Max number of concurrent reconciles in progress
-    reconcileThreadsNumber: 1
+    reconcileThreadsNumber: 10
 
 ---
 # Possible Template Parameters:
