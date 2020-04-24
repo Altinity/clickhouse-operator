@@ -97,7 +97,7 @@ data:
     
     ################################################
     ##
-    ## Operator's access to ClickHouse instances
+    ## Access to ClickHouse instances
     ##
     ################################################
     
@@ -123,6 +123,15 @@ data:
     stderrthreshold: ""
     vmodule: ""
     log_backtrace_at: ""
+    
+    ################################################
+    ##
+    ## Runtime parameters
+    ##
+    ################################################
+    
+    # Max number of concurrent reconciles in progress
+    reconcileThreadsNumber: 1
 
 ---
 # Possible Template Parameters:
