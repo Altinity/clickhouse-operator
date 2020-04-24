@@ -8,12 +8,12 @@ from testflows.asserts import error
 
 @TestScenario
 @Name("test_001. 1 node")
-def test_001():
+def test_001(self):
     create_and_check("configs/test-001.yaml", {"object_counts": [1, 1, 2]})
     
 @TestScenario
 @Name("test_002. useTemplates for pod, volume templates, and distribution")
-def test_002():
+def test_002(self):
     create_and_check("configs/test-002-tpl.yaml", 
                      {"pod_count": 1,
                       "apply_templates": {settings.clickhouse_template, 
@@ -25,21 +25,21 @@ def test_002():
 
 @TestScenario
 @Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
-def test_004():
+def test_004(self):
     create_and_check("configs/test-004-tpl.yaml", 
                      {"pod_count": 1,
                       "pod_volumes": {"/var/lib/clickhouse"}})
 
 @TestScenario
 @Name("test_005. Test manifest created by ACM")
-def test_005():
+def test_005(self):
     create_and_check("configs/test-005-acm.yaml", 
                      {"pod_count": 1,
                       "pod_volumes": {"/var/lib/clickhouse"}})
 
 @TestScenario
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
-def test_006():
+def test_006(self):
     create_and_check("configs/test-006-ch-upgrade-1.yaml", 
                      {"pod_count": 2,
                       "pod_image": "yandex/clickhouse-server:19.11",
@@ -56,7 +56,7 @@ def test_006():
 
 @TestScenario
 @Name("test_007. Test template with custom clickhouse ports")
-def test_007():
+def test_007(self):
     create_and_check("configs/test-007-custom-ports.yaml", 
                      {"pod_count": 1,
                       "apply_templates": {"templates/tpl-custom-ports.yaml"},
@@ -74,7 +74,7 @@ def test_operator_upgrade(config, version_from, version_to = settings.version):
 
         with When(f"upgrade operator to {version_to}"):
             set_operator_version(version_to, timeout=120)
-            kube_wait_chi_status(chi, "Completed", retries = 5)
+            kube_wait_chi_status(chi, "Completed", retries=10)
             kube_wait_objects(chi, [1,1,2])
 
         kube_delete_chi(chi)
@@ -96,13 +96,13 @@ def test_operator_restart(config, version = settings.version):
 
 @TestScenario
 @Name("test_008. Test operator restart")
-def test_008():
+def test_008(self):
     test_operator_restart("configs/test-009-operator-upgrade.yaml")
     test_operator_restart("configs/test-009-operator-upgrade-2.yaml")
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
-def test_009(version_from = "0.8.0", version_to = settings.version):
+def test_009(self, version_from="0.8.0", version_to=settings.version):
     test_operator_upgrade("configs/test-009-operator-upgrade.yaml", version_from, version_to)
     test_operator_upgrade("configs/test-009-operator-upgrade-2.yaml", version_from, version_to)
 
@@ -130,7 +130,7 @@ def require_zookeeper():
 
 @TestScenario
 @Name("test_010. Test zookeeper initialization")
-def test_010():
+def test_010(self):
     require_zookeeper()
 
     create_and_check("configs/test-010-zkroot.yaml", 
@@ -145,7 +145,7 @@ def test_010():
 
 @TestScenario
 @Name("test_011. Test user security and network isolation")    
-def test_011():
+def test_011(self):
     
     with Given("test-011-secured-cluster.yaml and test-011-insecured-cluster.yaml"):
         create_and_check("configs/test-011-secured-cluster.yaml", 
@@ -167,8 +167,9 @@ def test_011():
                             ".subsets[*].addresses[*].hostname", "chi-test-011-secured-cluster-default-1-0-0")
             kube_wait_field("ep", "chi-test-011-secured-cluster-default-0-0",
                             ".subsets[*].addresses[*].hostname", "chi-test-011-secured-cluster-default-0-0-0")
-            with And("hmm, service created but DNS still not updated? wait 10 sec"):
-                time.sleep(10)
+            dns_timeout = 30
+            with And(f"hmm, service created but DNS still not updated? wait {dns_timeout} sec"):
+                time.sleep(dns_timeout)
             out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'",
                                               host="chi-test-011-secured-cluster-default-1-0")
             assert out == 'OK'
@@ -211,7 +212,7 @@ def test_011():
 
 @TestScenario
 @Name("test_011_1. Test default user security")    
-def test_011_1():    
+def test_011_1(self):
     with Given("test-011-secured-default.yaml with password_sha256_hex for default user"):
         create_and_check("configs/test-011-secured-default.yaml", 
                          {"pod_count": 1,
@@ -244,7 +245,7 @@ def test_011_1():
 
 @TestScenario
 @Name("test_012. Test service templates")
-def test_012():
+def test_012(self):
     create_and_check("configs/test-012-service-template.yaml", 
                      {"object_counts": [2,2,4],
                       "service": ["service-test-012","ClusterIP"],
@@ -260,7 +261,7 @@ def test_012():
 
 @TestScenario
 @Name("test_013. Test adding shards and creating local and distributed tables automatically")
-def test_013():
+def test_013(self):
     create_and_check("configs/test-013-add-shards-1.yaml",
                      {"apply_templates": {settings.clickhouse_template},
                       "object_counts": [1, 1, 2], "do_not_delete": 1})
@@ -276,18 +277,30 @@ def test_013():
     with Then("Add one more shard"):
         create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2, 2, 3], "do_not_delete": 1})
     with And("Table should be created on a second shard"):
-        clickhouse_query("test-013-add-shards", "select count() from default.test_distr",
-                               host="chi-test-013-add-shards-default-1-0")
+        retries = 10
+        wait = 30
+        for i in range(retries + 1):
+            tables = clickhouse_query("test-013-add-shards", "SHOW TABLES FROM default",
+                                      host="chi-test-013-add-shards-default-1-0")
+            if 'test_distr' not in tables and 'events_distr' not in tables:
+                with And(f"Wait {wait} seconds, when operator create tables"):
+                    time.sleep(wait)
+                    kubectl('logs -n kube-system -lapp=clickhouse-operator --tail=100 -c clickhouse-operator')
+            else:
+                break
 
-        clickhouse_query("test-013-add-shards", "select count() from default.events_distr",
-                               host="chi-test-013-add-shards-default-1-0")
+        clickhouse_query("test-013-add-shards", "SELECT count() from default.test_distr",
+                         host="chi-test-013-add-shards-default-1-0")
+
+        clickhouse_query("test-013-add-shards", "SELECT count() from default.events_distr",
+                         host="chi-test-013-add-shards-default-1-0")
 
     with Then("Remove shard"):
         create_and_check("configs/test-013-add-shards-1.yaml", {"object_counts": [1,1,2]})
 
 @TestScenario
 @Name("test_014. Test that replication works")
-def test_014():
+def test_014(self):
     require_zookeeper()
  
     create_table = """
@@ -332,7 +345,7 @@ def test_014():
 
 @TestScenario
 @Name("test_015. Test circular replication with hostNetwork")
-def test_015():
+def test_015(self):
     create_and_check("configs/test-015-host-network.yaml", 
                      {"pod_count": 2,
                       "do_not_delete": 1})
@@ -350,7 +363,7 @@ def test_015():
 
 @TestScenario
 @Name("test_016. Test files and dictionaries setup")
-def test_016():
+def test_016(self):
     create_and_check("configs/test-016-dict.yaml",
                      {"apply_templates": {settings.clickhouse_template},
                       "pod_count": 1,
@@ -364,7 +377,7 @@ def test_016():
 
 @TestScenario
 @Name("test-017-multi-version. Test certain functions across multiple versions")
-def test_017():
+def test_017(self):
     create_and_check("configs/test-017-multi-version.yaml", {"pod_count": 4, "do_not_delete": 1})
     chi = "test-017-multi-version"
 
@@ -385,7 +398,7 @@ def test_017():
     
 @TestScenario
 @Name("test-018-configmap. Test that configuration is properly updated")
-def test_018():
+def test_018(self):
     create_and_check("configs/test-018-configmap.yaml", {"pod_count": 1, "do_not_delete": 1})
     
     with Then("user1/networks/ip should be in config"):
@@ -403,7 +416,7 @@ def test_018():
 
 @TestScenario
 @Name("test-019-retain-volume. Test that volume is correctly retained and can be re-attached")
-def test_019(config = "configs/test-019-retain-volume.yaml"):
+def test_019(self, config="configs/test-019-retain-volume.yaml"):
     require_zookeeper()
 
     chi = get_chi_name(get_full_path(config))

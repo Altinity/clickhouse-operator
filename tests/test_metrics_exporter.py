@@ -14,7 +14,7 @@ def set_metrics_exporter_version(version, ns="kube-system"):
 
 @TestScenario
 @Name("Check metrics server setup and version")
-def test_metrics_exporter_setup():
+def test_metrics_exporter_setup(self):
     with Given("clickhouse-operator is installed"):
         assert kubectl.kube_get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") > 0, error()
         with And(f"Set metrics-exporter version {settings.version}"):
@@ -23,7 +23,7 @@ def test_metrics_exporter_setup():
 
 @TestScenario
 @Name("Check metrics server state after reboot")
-def test_metrics_exporter_reboot():
+def test_metrics_exporter_reboot(self):
     def check_monitoring_chi(operator_namespace, operator_pod, expect_result, max_retries=10):
         with And(f"metrics-exporter /chi enpoint result should return {expect_result}"):
             for i in range(1, max_retries):
@@ -68,7 +68,7 @@ def test_metrics_exporter_reboot():
 
 
 if main():
-    with Module("metrics_exporter", flags=TE):
+    with Module("metrics_exporter"):
         examples = [test_metrics_exporter_setup, test_metrics_exporter_reboot]
         for t in examples:
             run(test=t, flags=TE)

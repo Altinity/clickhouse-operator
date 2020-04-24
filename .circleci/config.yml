@@ -3,6 +3,7 @@ jobs:
   build_master:
     machine:
       enabled: true
+      docker_layer_caching: true
     steps:
       - checkout
       - run:
@@ -27,6 +28,8 @@ jobs:
   build_branch:
     machine:
       enabled: true
+      docker_layer_caching: true
+
     steps:
       - checkout
       - run:
@@ -50,6 +53,104 @@ jobs:
 
             docker push $COMPANY_REPO/clickhouse-operator:$CHO_RELEASE
             docker push $COMPANY_REPO/metrics-exporter:$CHO_RELEASE
+
+  # howto run test local
+  # mkdir -v -m 0777 -p /circleci/home/circleci/.minikube /circleci/var/lib/docker /circleci/root/.cache
+  # circleci local execute -v ${PWD}:/workdir -v /circleci/home/circleci/.minikube:/home/circleci/.minikube -v /circleci/var/lib/docker:/var/lib/docker -v /circleci/root/.cache:/root/.cache -e COMPANY_REPO=${COMPANY_REPO:-alinity} -e DOCKER_USER=${DOCKER_USER} --job=integration_tests
+  integration_tests:
+    machine:
+      enabled: true
+      docker_layer_caching: true
+    environment:
+      K8S_VERSION: v1.18.2
+      KUBECONFIG: /home/circleci/.kube/config
+      MINIKUBE_VERSION: v1.9.2
+      MINIKUBE_WANTUPDATENOTIFICATION: false
+      MINIKUBE_WANTREPORTERRORPROMPT: false
+      MINIKUBE_HOME: /home/circleci
+    steps:
+      # TODO fix for local builds https://github.com/CircleCI-Public/circleci-cli/issues/330
+      - run:
+          name: Local build handling
+          command: |
+            if [[ ${CIRCLE_SHELL_ENV} =~ "localbuild" ]]; then
+              if [ -d /workdir ]; then
+                ln -s /workdir /tmp/_circleci_local_build_repo
+              else
+                echo "Run this local build using: circleci build -v \$(pwd):/workdir"
+                exit 1
+              fi
+            fi
+      - checkout
+      - run:
+          name: Setup minikube
+          command: |
+            mkdir -p /home/circleci/.minikube/cache/
+            wget -c --progress=bar:force:noscroll -O /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64
+            sudo chmod +x /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION}
+            sudo ln -svf /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} /usr/local/bin/minikube
+      - run:
+          name: Building Docker image for Integration test
+          command: |
+            export CHO_RELEASE=$(cat release)
+            docker build -f dockerfile/operator/Dockerfile -t clickhouse-operator:e2e .
+            docker build -f dockerfile/metrics-exporter/Dockerfile -t metrics-exporter:e2e .
+
+            echo "Tag builded version as ${CHO_RELEASE}"
+            docker tag clickhouse-operator:e2e ${COMPANY_REPO:-altinity}/clickhouse-operator:${CHO_RELEASE}
+            docker tag metrics-exporter:e2e ${COMPANY_REPO:-altinity}/metrics-exporter:${CHO_RELEASE}
+      - run:
+          name: Start minikube
+          command: |
+            mkdir -p ${HOME}/.kube
+            touch ${HOME}/.kube/config
+            sudo apt-get install conntrack
+            minikube start --driver=docker --cpus 8 --memory 4096M --kubernetes-version=${K8S_VERSION} -v=9 --addons=ingress,ingress-dns
+            sudo ln -svf $(find /home/circleci/.minikube/cache/ -type f -name kubectl) /usr/local/bin/kubectl
+            kubectl get nodes
+      - run:
+          name: Install python and testflows
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends apt-transport-https
+            sudo wget -O /etc/apt/trusted.gpg.d/unofficial-python-all.asc https://people.debian.org/~paravoid/python-all/unofficial-python-all.asc
+            echo "deb http://people.debian.org/~paravoid/python-all stretch main" | sudo tee /etc/apt/sources.list.d/python-all.list
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends python3.7
+            sudo curl -sL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+            sudo python3.7 get-pip.py
+            sudo pip3 --version
+            sudo pip3 install -U PyYAML
+            sudo pip3 install -U -r ./tests/requirements.txt
+      - run:
+          name: Setup YQ
+          command: |
+            docker pull mikefarah/yq:latest
+      - run:
+          name: Docker Pull required Clickhouse images
+          command: |
+            for image in $(docker run --rm -v "${PWD}":/workdir mikefarah/yq yq r /workdir/tests/configs/test-017-multi-version.yaml "spec.templates.podTemplates[*].spec.containers[*].image"); do
+              docker pull ${image}
+            done
+      - run:
+          name: Prepare clickhouse operator installator Environment variables
+          command: |
+            echo 'export OPERATOR_VERSION=$(cat release)' >> $BASH_ENV
+            echo 'export BRANCH=${BRANCH:-$git_branch}' >> $BASH_ENV
+            echo 'export OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-kube-system}' >> $BASH_ENV
+            echo 'export OPERATOR_IMAGE=${COMPANY_REPO}/clickhouse-operator:${OPERATOR_VERSION}' >> $BASH_ENV
+            echo 'export METRICS_EXPORTER_IMAGE=${COMPANY_REPO}/metrics-exporter:${OPERATOR_VERSION}' >> $BASH_ENV
+      - run:
+          name: Install operator
+          command: |
+            sudo apt-get install -y gettext-base
+            curl -sL https://github.com/Altinity/clickhouse-operator/raw/master/deploy/operator-web-installer/clickhouse-operator-install.sh | bash -xue
+      - run:
+          name: Run integration tests
+          command: |
+            python3.7 ./tests/test.py --only=operator/* --no-colors
+            python3.7 ./tests/test_metrics_exporter.py --only=metrics_exporter/* --no-colors
+
 workflows:
   version: 2
   build_and_deploy:
@@ -63,3 +164,9 @@ workflows:
             branches:
               only: /[0-9]+\.[0-9]+\.[0-9]+/
   
+  build_and_run_e2e_tests:
+    jobs:
+      - integration_tests:
+          filters:
+            branches:
+              ignore: /^(master|[0-9]+\.[0-9]+\.[0-9]+)/

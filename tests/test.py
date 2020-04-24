@@ -61,9 +61,9 @@ if main():
 
             for t in run_tests:
                 if callable(t):
-                    run(test=t, flags=TE)
+                    run(test=t)
                 else:
-                    run(test = t[0], args = t[1], flags=TE)
+                    run(test = t[0], args = t[1])
 
         # python3 tests/test.py --only clickhouse*
         with Module("clickhouse", flags=TE):

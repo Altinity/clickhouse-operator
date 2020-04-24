@@ -8,7 +8,7 @@ from testflows.asserts import error
 
 @TestScenario
 @Name("test_ch_001. Insert quorum")
-def test_ch_001():
+def test_ch_001(self):
     require_zookeeper()
     
     create_and_check("configs/test-ch-001-insert-quorum.yaml", 
