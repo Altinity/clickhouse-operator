@@ -35,14 +35,13 @@ if main():
             all_tests = [
                 test_001,
                 test_002,
-                test_003,
                 test_004,
                 test_005,
                 test_006,
                 test_007,
                 test_008,
                 # (test_009, {"version_from": "0.8.0"}),
-                (test_009, {"version_from": "0.9.3"}),
+                (test_009, {"version_from": "0.9.6"}),
                 test_010,
                 test_011,
                 test_011_1,
@@ -54,11 +53,12 @@ if main():
                 test_017,
                 test_018,
                 test_019,
+                test_020,
             ]
             run_tests = all_tests
             
             # placeholder for selective test running
-            # run_tests = [test_011]
+            # run_tests = [test_020]
 
             for t in run_tests:
                 if callable(t):
