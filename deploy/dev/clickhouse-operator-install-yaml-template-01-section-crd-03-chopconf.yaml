@@ -78,3 +78,7 @@ spec:
               type: string
             log_backtrace_at:
               type: string
+            reconcileThreadsNumber:
+              type: integer
+              minimum: 1
+              maximum: 65535

@@ -82,7 +82,7 @@ ChConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi
 
 ################################################
 ##
-## Operator's access to ClickHouse instances
+## Access to ClickHouse instances
 ##
 ################################################
 
@@ -108,3 +108,12 @@ v: "1"
 stderrthreshold: ""
 vmodule: ""
 log_backtrace_at: ""
+
+################################################
+##
+## Runtime parameters
+##
+################################################
+
+# Max number of concurrent reconciles in progress
+reconcileThreadsNumber: 10

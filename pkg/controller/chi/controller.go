@@ -24,6 +24,7 @@ import (
 	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	log "github.com/golang/glog"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -87,12 +88,18 @@ func NewController(
 		statefulSetListerSynced: kubeInformerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
 		podLister:               kubeInformerFactory.Core().V1().Pods().Lister(),
 		podListerSynced:         kubeInformerFactory.Core().V1().Pods().Informer().HasSynced,
-		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "chi"),
 		recorder:                recorder,
 	}
+	controller.initQueues()
 	controller.addEventHandlers(chopInformerFactory, kubeInformerFactory)
 
 	return controller
+}
+
+func (c *Controller) initQueues() {
+	for i := 0; i < c.chop.Config().ReconcileThreadsNumber; i++ {
+		c.queues = append(c.queues, workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("chi%d", i)))
+	}
 }
 
 func (c *Controller) addEventHandlers(
@@ -106,7 +113,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
-			c.enqueueObject(NewReconcileChi(reconcileAdd, nil, chi))
+			c.enqueueObject(chi.Namespace, chi.Name, NewReconcileChi(reconcileAdd, nil, chi))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldChi := old.(*chi.ClickHouseInstallation)
@@ -115,7 +122,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Info("chiInformer.UpdateFunc")
-			c.enqueueObject(NewReconcileChi(reconcileUpdate, oldChi, newChi))
+			c.enqueueObject(newChi.Namespace, newChi.Name, NewReconcileChi(reconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: func(obj interface{}) {
 			chi := obj.(*chi.ClickHouseInstallation)
@@ -123,7 +130,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
-			c.enqueueObject(NewReconcileChi(reconcileDelete, chi, nil))
+			c.enqueueObject(chi.Namespace, chi.Name, NewReconcileChi(reconcileDelete, chi, nil))
 		},
 	})
 
@@ -134,7 +141,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
-			c.enqueueObject(NewReconcileChit(reconcileAdd, nil, chit))
+			c.enqueueObject(chit.Namespace, chit.Name, NewReconcileChit(reconcileAdd, nil, chit))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldChit := old.(*chi.ClickHouseInstallationTemplate)
@@ -143,7 +150,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
-			c.enqueueObject(NewReconcileChit(reconcileUpdate, oldChit, newChit))
+			c.enqueueObject(newChit.Namespace, newChit.Name, NewReconcileChit(reconcileUpdate, oldChit, newChit))
 		},
 		DeleteFunc: func(obj interface{}) {
 			chit := obj.(*chi.ClickHouseInstallationTemplate)
@@ -151,7 +158,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
-			c.enqueueObject(NewReconcileChit(reconcileDelete, chit, nil))
+			c.enqueueObject(chit.Namespace, chit.Name, NewReconcileChit(reconcileDelete, chit, nil))
 		},
 	})
 
@@ -162,7 +169,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chopInformer.AddFunc - %s/%s added", chopConfig.Namespace, chopConfig.Name)
-			c.enqueueObject(NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
+			c.enqueueObject(chopConfig.Namespace, chopConfig.Name, NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			newChopConfig := new.(*chi.ClickHouseOperatorConfiguration)
@@ -171,7 +178,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chopInformer.UpdateFunc - %s/%s", newChopConfig.Namespace, newChopConfig.Name)
-			c.enqueueObject(NewReconcileChopConfig(reconcileUpdate, oldChopConfig, newChopConfig))
+			c.enqueueObject(newChopConfig.Namespace, newChopConfig.Name, NewReconcileChopConfig(reconcileUpdate, oldChopConfig, newChopConfig))
 		},
 		DeleteFunc: func(obj interface{}) {
 			chopConfig := obj.(*chi.ClickHouseOperatorConfiguration)
@@ -179,7 +186,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chopInformer.DeleteFunc - %s/%s deleted", chopConfig.Namespace, chopConfig.Name)
-			c.enqueueObject(NewReconcileChopConfig(reconcileDelete, chopConfig, nil))
+			c.enqueueObject(chopConfig.Namespace, chopConfig.Name, NewReconcileChopConfig(reconcileDelete, chopConfig, nil))
 		},
 	})
 
@@ -247,7 +254,7 @@ func (c *Controller) addEventHandlers(
 
 			if added {
 				log.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) IP ASSIGNED %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.Subsets)
-				c.enqueueObject(NewDropDns(&newEndpoints.ObjectMeta))
+				c.enqueueObject(newEndpoints.Namespace, newEndpoints.Name, NewDropDns(&newEndpoints.ObjectMeta))
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -340,9 +347,13 @@ func (c *Controller) isTrackedObject(objectMeta *meta.ObjectMeta) bool {
 }
 
 // Run syncs caches, starts workers
-func (c *Controller) Run(ctx context.Context, threadiness int) {
+func (c *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
-	defer c.queue.ShutDown()
+	defer func() {
+		for i := range c.queues {
+			c.queues[i].ShutDown()
+		}
+	}()
 
 	log.V(1).Info("Starting ClickHouseInstallation controller")
 	if !waitForCacheSync(
@@ -363,10 +374,12 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 	//
 	// Start threads
 	//
-	log.V(1).Info("ClickHouseInstallation controller: starting workers")
-	for i := 0; i < threadiness; i++ {
-		log.V(1).Infof("ClickHouseInstallation controller: starting worker %d with poll period %d", i+1, runWorkerPeriod)
-		go wait.Until(c.runWorker, runWorkerPeriod, ctx.Done())
+	workersNum := len(c.queues)
+	log.V(1).Infof("ClickHouseInstallation controller: starting workers number: %d", workersNum)
+	for i := 0; i < workersNum; i++ {
+		log.V(1).Infof("ClickHouseInstallation controller: starting worker %d out of %d", i+1, workersNum)
+		worker := c.newWorker(c.queues[i])
+		go wait.Until(worker.run, runWorkerPeriod, ctx.Done())
 	}
 	defer log.V(1).Info("ClickHouseInstallation controller: shutting down workers")
 
@@ -374,32 +387,10 @@ func (c *Controller) Run(ctx context.Context, threadiness int) {
 	<-ctx.Done()
 }
 
-// runWorker is an endless work loop running in a thread
-func (c *Controller) runWorker() {
-	worker := c.newWorker()
-	for {
-		// Get() blocks until it can return an item
-		item, shutdown := c.queue.Get()
-		if shutdown {
-			log.V(1).Info("runWorker(): shutdown request")
-			return
-		}
+// enqueueObject adds ClickHouseInstallation object to the workqueue
+func (c *Controller) enqueueObject(namespace, name string, obj interface{}) {
 
-		if err := worker.processItem(item); err == nil {
-			// Item processed
-			// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
-			// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
-			// still have to call `Done` on the queue.
-			c.queue.Forget(item)
-		} else {
-			// Item not processed
-			// this code cannot return an error and needs to indicate error has been ignored
-			utilruntime.HandleError(err)
-		}
-
-		// Must call Done(item) when processing completed
-		c.queue.Done(item)
-	}
+	c.queues[util.HashIntoIntTopped([]byte(fmt.Sprintf("%s/%s", namespace, name)), len(c.queues))].AddRateLimited(obj)
 }
 
 func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
@@ -541,11 +532,6 @@ func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tole
 	return c.updateCHIObject(cur)
 }
 
-// enqueueObject adds ClickHouseInstallation object to the workqueue
-func (c *Controller) enqueueObject(obj interface{}) {
-	c.queue.AddRateLimited(obj)
-}
-
 // handleObject enqueues CHI which is owner of `obj` into reconcile loop
 func (c *Controller) handleObject(obj interface{}) {
 	object, ok := obj.(meta.Object)
@@ -587,7 +573,7 @@ func (c *Controller) handleObject(obj interface{}) {
 	}
 
 	// Add CHI object into reconcile loop
-	c.enqueueObject(chi)
+	c.enqueueObject(chi.Namespace, chi.Name, chi)
 }
 
 // waitForCacheSync is a logger-wrapper over cache.WaitForCacheSync() and it waits for caches to populate
