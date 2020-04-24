@@ -1,0 +1,45 @@
+# This file is part of the Clickhouse operator helm chart
+#    https://gitlab.com/MatthiasLohr/clickhouse-operator-helm-chart
+#
+# Copyright 2020 Matthias Lohr <mail@mlohr.com>
+#                Dorian Cantzen <dorian@extrument.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v2
+name: clickhouse-operator
+version: 0.1.0-alpha
+kubeVersion: ">= 1.15"
+description: Helm Chart for easy deployment of Altinity's Clickhouse operator
+type: application
+home: https://gitlab.com/MatthiasLohr/clickhouse-operator-helm-chart
+icon:
+appVersion: 0.9.0
+
+keywords:
+  - clickhouse
+
+sources:
+  - https://github.com/Altinity/clickhouse-operator
+
+maintainers:
+  - name: Matthias Lohr
+    email: mail@mlohr.com
+    url: https://mlohr.com/
+
+  - name: Dorian Cantzen
+    email: dorian@extrument.com
+    url: https://extrument.com/
+
+# Chart.yaml reference:
+# https://helm.sh/docs/topics/charts/#the-chart-yaml-file

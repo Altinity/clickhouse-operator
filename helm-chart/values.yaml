@@ -1,0 +1,35 @@
+
+operator:
+  # List of namespaces where clickhouse-operator watches for events.
+  # Concurrently running operators should watch on different namespaces
+  watchNamespaces:
+
+  # How many seconds to wait for created/updated StatefulSet to be Ready
+  statefulSetUpdateTimeout: 300
+
+  # How many seconds to wait between checks for created/updated StatefulSet status
+  statefulSetUpdatePollPeriod: 5
+
+  # What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+  # Possible options:
+  #   abort  - do nothing, just break the process and wait for admin
+  #   delete - delete newly created problematic StatefulSet
+  #   ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
+  onStatefulSetCreateFailureAction: ignore
+
+  # What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+  # Possible options:
+  #   abort    - do nothing, just break the process and wait for admin
+  #   rollback - delete Pod and rollback StatefulSet to previous Generation.
+  #              Pod would be recreated by StatefulSet based on rollback-ed configuration
+  #   ignore   - ignore error, pretend nothing happened and move on to the next StatefulSet
+  onStatefulSetUpdateFailureAction: rollback
+
+  image: altinity/clickhouse-operator:0.9.0
+  imagePullPolicy: Always
+
+  metrics:
+    enabled: false
+    port: 8888
+    image: altinity/metrics-exporter:0.9.0
+    imagePullPolicy: Always

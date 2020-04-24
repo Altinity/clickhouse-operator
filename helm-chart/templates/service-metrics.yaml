@@ -1,0 +1,17 @@
+# References:
+# - https://github.com/Altinity/clickhouse-operator/blob/0.9.0/deploy/operator/clickhouse-operator-install.yaml#L1742
+{{- if .Values.operator.metrics.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "defaultObjectFullName" . }}-metrics
+  labels:
+    {{- include "defaultLabels" . | nindent 4 }}
+spec:
+  ports:
+    - port: {{ .Values.operator.metrics.port }}
+      name: {{ include "defaultObjectFullName" . }}-metrics
+  selector:
+    {{- include "defaultMatchLabels" . | nindent 4 }}
+{{- end }}

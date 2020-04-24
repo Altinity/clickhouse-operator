@@ -1,0 +1,114 @@
+# References:
+# - https://github.com/Altinity/clickhouse-operator/blob/0.9.0/deploy/operator/clickhouse-operator-install.yaml#L1618
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "defaultObjectFullName" . }}
+  labels:
+    {{- include "defaultLabels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "defaultMatchLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "defaultLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "defaultObjectFullName" . }}
+      volumes:
+        - name: clickhouse-operator-config
+          configMap:
+            name: {{ include "defaultObjectFullName" . }}-operator-config
+        #- name: etc-clickhouse-operator-configd-folder
+        #  configMap:
+        #    name: etc-clickhouse-operator-configd-files
+        - name: clickhouse-operator-users-config
+          configMap:
+            name: {{ include "defaultObjectFullName" . }}-users-config
+        - name: clickhouse-operator-templates-config
+          configMap:
+            name: {{ include "defaultObjectFullName" . }}-templates-config
+      containers:
+        - name: clickhouse-operator
+          image: {{ .Values.operator.image }}
+          imagePullPolicy: {{ .Values.operator.imagePullPolicy }}
+          volumeMounts:
+            - name: clickhouse-operator-config
+              mountPath: /etc/clickhouse-operator
+            #- name: etc-clickhouse-operator-configd-folder
+            #  mountPath: /etc/clickhouse-operator/config.d
+            - name: clickhouse-operator-users-config
+              mountPath: /etc/clickhouse-operator/users.d
+            - name: clickhouse-operator-templates-config
+              mountPath: /etc/clickhouse-operator/templates.d
+          env:
+            # Pod-specific
+            # spec.nodeName: ip-172-20-52-62.ec2.internal
+            - name: OPERATOR_POD_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            # metadata.name: clickhouse-operator-6f87589dbb-ftcsf
+            - name: OPERATOR_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # metadata.namespace: kube-system
+            - name: OPERATOR_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            # status.podIP: 100.96.3.2
+            - name: OPERATOR_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            # spec.serviceAccount: clickhouse-operator
+            # spec.serviceAccountName: clickhouse-operator
+            - name: OPERATOR_POD_SERVICE_ACCOUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+
+            # Container-specific
+            - name: OPERATOR_CONTAINER_CPU_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: clickhouse-operator
+                  resource: requests.cpu
+            - name: OPERATOR_CONTAINER_CPU_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: clickhouse-operator
+                  resource: limits.cpu
+            - name: OPERATOR_CONTAINER_MEM_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: clickhouse-operator
+                  resource: requests.memory
+            - name: OPERATOR_CONTAINER_MEM_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: clickhouse-operator
+                  resource: limits.memory
+{{- if .Values.operator.metrics.enabled }}
+        - name: metrics-exporter
+          image: {{ .Values.operator.metrics.image }}
+          imagePullPolicy: {{ .Values.operator.metrics.imagePullPolicy }}
+          volumeMounts:
+            - name: etc-clickhouse-operator-folder
+              mountPath: /etc/clickhouse-operator
+            - name: etc-clickhouse-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/conf.d
+            - name: etc-clickhouse-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/config.d
+            - name: etc-clickhouse-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/templates.d
+            - name: etc-clickhouse-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/users.d
+{{- end }}
