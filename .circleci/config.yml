@@ -96,8 +96,8 @@ jobs:
           name: Install python and testflows
           command: |
             sudo python3 --version
+            sudo apt-get install -y --no-install-recommends apt-transport-https
             if [[ "0" == $(lsb_release -a | grep Ubuntu | wc -l)]]; then
-              sudo apt-get install -y --no-install-recommends apt-transport-https
               sudo wget -O /etc/apt/trusted.gpg.d/unofficial-python-all.asc https://people.debian.org/~paravoid/python-all/unofficial-python-all.asc
               echo "deb http://people.debian.org/~paravoid/python-all stretch main" | sudo tee /etc/apt/sources.list.d/python-all.list
               sudo apt-get update
