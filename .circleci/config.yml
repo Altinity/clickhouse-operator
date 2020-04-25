@@ -95,14 +95,14 @@ jobs:
               echo "deb http://people.debian.org/~paravoid/python-all stretch main" | sudo tee /etc/apt/sources.list.d/python-all.list
               sudo apt-get update
               sudo apt-get install -y --no-install-recommends python3.7
-              sudo curl -sL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-              sudo python3.7 get-pip.py
             else
               sudo apt-get install -y --no-install-recommends software-properties-common
               sudo add-apt-repository -y ppa:deadsnakes/ppa
               sudo apt-get update
-              sudo apt-get install -y --no-install-recommends python3.7 python3.7-venv
+              sudo apt-get install -y --no-install-recommends python3.7
             fi
+            sudo curl -sL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+            sudo python3.7 get-pip.py
             sudo pip3 --version
             sudo pip3 install -U PyYAML
             sudo pip3 install -U -r ./tests/requirements.txt
