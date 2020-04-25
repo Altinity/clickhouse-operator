@@ -1,8 +1,16 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
+
+def total_cpus
+  require 'etc'
+  Etc.nprocessors
+end
+
+
 Vagrant.configure(2) do |config|
   config.vm.box = "ubuntu/bionic64"
   config.vm.box_check_update = false
+  config.vm.synced_folder ".", "/vagrant", type: "nfs"
 
 
   if Vagrant.has_plugin?("vagrant-vbguest")
@@ -23,9 +31,12 @@ Vagrant.configure(2) do |config|
 
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
-    vb.cpus = 8
-    vb.memory = "10240"
+    vb.cpus = total_cpus
+    vb.memory = "4096"
     vb.default_nic_type = "virtio"
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+    vb.customize ["modifyvm", :id, "--ioapic", "on"]
   end
 
   config.vm.provision "shell", inline: <<-SHELL
@@ -61,11 +72,11 @@ Vagrant.configure(2) do |config|
 
     # k9s CLI
     K9S_VERSION=$(curl -sL https://github.com/derailed/k9s/releases/latest -H "Accept: application/json" | jq -r .tag_name)
-    wget -c --progress=bar:force:noscroll -O /usr/local/bin/k9s_Linux_x86_64.tar.gz https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_x86_64.tar.gz
+    wget -c --progress=bar:force:noscroll -O /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_x86_64.tar.gz
     curl -sL https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/checksums.txt | grep Linux_x86_64.tar.gz > /usr/local/bin/k9s.sha256
-    sed -i -e "s/k9s_Linux_x86_64\.tar\.gz/\\/usr\\/local\\/bin\\/k9s_Linux_x86_64\\.tar\\.gz/g" /usr/local/bin/k9s.sha256
+    sed -i -e "s/k9s_Linux_x86_64\.tar\.gz/\\/usr\\/local\\/bin\\/k9s_${K9S_VERSION}_Linux_x86_64\\.tar\\.gz/g" /usr/local/bin/k9s.sha256
     sha256sum -c /usr/local/bin/k9s.sha256
-    tar --verbose -zxvf /usr/local/bin/k9s_Linux_x86_64.tar.gz -C /usr/local/bin k9s
+    tar --verbose -zxvf /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz -C /usr/local/bin k9s
 
 
     # minikube
