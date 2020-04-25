@@ -96,14 +96,20 @@ jobs:
           name: Install python and testflows
           command: |
             sudo python3 --version
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends apt-transport-https
-            sudo wget -O /etc/apt/trusted.gpg.d/unofficial-python-all.asc https://people.debian.org/~paravoid/python-all/unofficial-python-all.asc
-            echo "deb http://people.debian.org/~paravoid/python-all stretch main" | sudo tee /etc/apt/sources.list.d/python-all.list
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends python3.7
-            sudo curl -sL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-            sudo python3.7 get-pip.py
+            if [[ "0" == $(lsb_release -a | grep Ubuntu | wc -l)]]; then
+              sudo apt-get install -y --no-install-recommends apt-transport-https
+              sudo wget -O /etc/apt/trusted.gpg.d/unofficial-python-all.asc https://people.debian.org/~paravoid/python-all/unofficial-python-all.asc
+              echo "deb http://people.debian.org/~paravoid/python-all stretch main" | sudo tee /etc/apt/sources.list.d/python-all.list
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends python3.7
+              sudo curl -sL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+              sudo python3.7 get-pip.py
+            else
+              sudo apt-get install -y --no-install-recomments software-properties-common
+              sudo add-apt-repository ppa:deadsnakes/ppa
+              sudo apt-get update
+              sudo apt-get install python3.6
+            fi
             sudo pip3 --version
             sudo pip3 install -U PyYAML
             sudo pip3 install -U -r ./tests/requirements.txt
