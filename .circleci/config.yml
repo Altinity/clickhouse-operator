@@ -86,18 +86,11 @@ jobs:
             fi
       - checkout
       - run:
-          name: Setup minikube
-          command: |
-            mkdir -p /home/circleci/.minikube/cache/
-            wget -c --progress=bar:force:noscroll -O /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64
-            sudo chmod +x /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION}
-            sudo ln -svf /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} /usr/local/bin/minikube
-      - run:
           name: Install python and testflows
           command: |
             sudo python3 --version
             sudo apt-get install -y --no-install-recommends apt-transport-https
-            if [[ "0" == $(lsb_release -a | grep Ubuntu | wc -l)]]; then
+            if [[ "0" == $(lsb_release -a | grep Ubuntu | wc -l) ]]; then
               sudo wget -O /etc/apt/trusted.gpg.d/unofficial-python-all.asc https://people.debian.org/~paravoid/python-all/unofficial-python-all.asc
               echo "deb http://people.debian.org/~paravoid/python-all stretch main" | sudo tee /etc/apt/sources.list.d/python-all.list
               sudo apt-get update
@@ -113,6 +106,13 @@ jobs:
             sudo pip3 --version
             sudo pip3 install -U PyYAML
             sudo pip3 install -U -r ./tests/requirements.txt
+      - run:
+          name: Setup minikube
+          command: |
+            mkdir -p /home/circleci/.minikube/cache/
+            wget -c --progress=bar:force:noscroll -O /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64
+            sudo chmod +x /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION}
+            sudo ln -svf /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} /usr/local/bin/minikube
       - run:
           name: Start minikube
           command: |
