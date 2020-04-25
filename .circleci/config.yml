@@ -103,15 +103,6 @@ jobs:
             docker tag clickhouse-operator:e2e ${COMPANY_REPO:-altinity}/clickhouse-operator:${CHO_RELEASE}
             docker tag metrics-exporter:e2e ${COMPANY_REPO:-altinity}/metrics-exporter:${CHO_RELEASE}
       - run:
-          name: Start minikube
-          command: |
-            mkdir -p ${HOME}/.kube
-            touch ${HOME}/.kube/config
-            sudo apt-get install conntrack
-            minikube start --driver=docker --cpus 8 --memory 4096M --kubernetes-version=${K8S_VERSION} -v=9 --addons=ingress,ingress-dns
-            sudo ln -svf $(find /home/circleci/.minikube/cache/ -type f -name kubectl) /usr/local/bin/kubectl
-            kubectl get nodes
-      - run:
           name: Install python and testflows
           command: |
             sudo apt-get update
@@ -125,6 +116,15 @@ jobs:
             sudo pip3 --version
             sudo pip3 install -U PyYAML
             sudo pip3 install -U -r ./tests/requirements.txt
+      - run:
+          name: Start minikube
+          command: |
+            mkdir -p ${HOME}/.kube
+            touch ${HOME}/.kube/config
+            sudo apt-get install conntrack
+            minikube start --driver=docker --cpus 8 --memory 4096M --kubernetes-version=${K8S_VERSION} -v=9 --addons=ingress,ingress-dns
+            sudo ln -svf $(find /home/circleci/.minikube/cache/ -type f -name kubectl) /usr/local/bin/kubectl
+            kubectl get nodes
       - run:
           name: Setup YQ
           command: |
