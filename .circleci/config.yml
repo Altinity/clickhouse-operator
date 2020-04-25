@@ -93,18 +93,9 @@ jobs:
             sudo chmod +x /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION}
             sudo ln -svf /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} /usr/local/bin/minikube
       - run:
-          name: Building Docker image for Integration test
-          command: |
-            export CHO_RELEASE=$(cat release)
-            docker build -f dockerfile/operator/Dockerfile -t clickhouse-operator:e2e .
-            docker build -f dockerfile/metrics-exporter/Dockerfile -t metrics-exporter:e2e .
-
-            echo "Tag builded version as ${CHO_RELEASE}"
-            docker tag clickhouse-operator:e2e ${COMPANY_REPO:-altinity}/clickhouse-operator:${CHO_RELEASE}
-            docker tag metrics-exporter:e2e ${COMPANY_REPO:-altinity}/metrics-exporter:${CHO_RELEASE}
-      - run:
           name: Install python and testflows
           command: |
+            sudo python3 --version
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends apt-transport-https
             sudo wget -O /etc/apt/trusted.gpg.d/unofficial-python-all.asc https://people.debian.org/~paravoid/python-all/unofficial-python-all.asc
@@ -125,6 +116,16 @@ jobs:
             minikube start --driver=docker --cpus 8 --memory 4096M --kubernetes-version=${K8S_VERSION} -v=9 --addons=ingress,ingress-dns
             sudo ln -svf $(find /home/circleci/.minikube/cache/ -type f -name kubectl) /usr/local/bin/kubectl
             kubectl get nodes
+      - run:
+          name: Building Docker image for Integration test
+          command: |
+            export CHO_RELEASE=$(cat release)
+            docker build -f dockerfile/operator/Dockerfile -t clickhouse-operator:e2e .
+            docker build -f dockerfile/metrics-exporter/Dockerfile -t metrics-exporter:e2e .
+
+            echo "Tag builded version as ${CHO_RELEASE}"
+            docker tag clickhouse-operator:e2e ${COMPANY_REPO:-altinity}/clickhouse-operator:${CHO_RELEASE}
+            docker tag metrics-exporter:e2e ${COMPANY_REPO:-altinity}/metrics-exporter:${CHO_RELEASE}
       - run:
           name: Setup YQ
           command: |
