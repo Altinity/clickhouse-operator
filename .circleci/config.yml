@@ -99,10 +99,6 @@ jobs:
               sudo apt-get install -y --no-install-recommends python3.7 python3.7-venv
             else
               sudo apt-get install -y --no-install-recommends apt-transport-https ca-certificates
-              sudo apt-get install -y --no-install-recommends software-properties-common
-              sudo add-apt-repository -y ppa:deadsnakes/ppa
-              sudo apt-get update
-              sudo apt-get install -y --no-install-recommends python3.7 python3.7-venv
               # Ugly hack for trusty ;(
               if [[ "0" != $(lsb_release -a | grep trusty | wc -l) ]]; then
                 curl https://www.openssl.org/source/openssl-1.0.2l.tar.gz | tar xz
@@ -113,6 +109,10 @@ jobs:
                 whereis openssl
                 openssl version -v
               fi
+              sudo apt-get install -y --no-install-recommends software-properties-common
+              sudo add-apt-repository -y ppa:deadsnakes/ppa
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends python3.7 python3.7-venv
             fi
             curl -sL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
             python3.7 -m venv ~/clickhouse-operator/venv
