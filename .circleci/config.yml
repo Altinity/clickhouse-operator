@@ -106,8 +106,9 @@ jobs:
               if [[ "0" != $(lsb_release -a | grep trusty | wc -l) ]]; then
                 curl https://www.openssl.org/source/openssl-1.0.2l.tar.gz | tar xz
                 cd openssl-1.0.2l && sudo ./config && sudo make && sudo make install
-                sudo ln -sf /usr/local/ssl/bin/openssl ‘which openssl’
+                sudo ln -svf $(find ./ -type f -name openssl) /usr/local/ssl/bin/openssl
                 cd ${HOME}
+                openssl version -v
               fi
             fi
             curl -sL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
