@@ -89,35 +89,28 @@ jobs:
           name: Install python and testflows
           command: |
             set -xueo pipefail
-            sudo python3 --version
+            python3 --version
             if [[ "0" == $(lsb_release -a | grep Ubuntu | wc -l) ]]; then
               sudo apt-get update
               sudo apt-get install -y --no-install-recommends apt-transport-https ca-certificates openssl
               sudo wget -O /etc/apt/trusted.gpg.d/unofficial-python-all.asc https://people.debian.org/~paravoid/python-all/unofficial-python-all.asc
               echo "deb http://people.debian.org/~paravoid/python-all stretch main" | sudo tee /etc/apt/sources.list.d/python-all.list
               sudo apt-get update
-              sudo apt-get install -y --no-install-recommends python3.7 python3.7-venv
+              sudo apt-get install -y --no-install-recommends python3.6 python3.6-venv
             else
               sudo apt-get install -y --no-install-recommends apt-transport-https ca-certificates
-              # Ugly hack for trusty ;(
-              if [[ "0" != $(lsb_release -a | grep trusty | wc -l) ]]; then
-                curl https://www.openssl.org/source/openssl-1.0.2l.tar.gz | tar xz
-                cd openssl-1.0.2l && sudo ./config && sudo make && sudo make install
-                sudo rm -fv /usr/bin/openssl
-                sudo ln -svf $(find $PWD -type f -name openssl) /usr/bin/openssl
-                cd ${HOME}
-                whereis openssl
-                openssl version -v
-              fi
               sudo apt-get install -y --no-install-recommends software-properties-common
               sudo add-apt-repository -y ppa:deadsnakes/ppa
               sudo apt-get update
-              sudo apt-get install -y --no-install-recommends python3.7 python3.7-venv
+              sudo apt-get install -y --no-install-recommends python3.6 python3.6-venv
             fi
             curl -sL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-            python3.7 -m venv ~/clickhouse-operator/venv
+            python --version
+            python3 --version
+            python3.6 --version
+            python3.6 -m venv ~/clickhouse-operator/venv
             ~/clickhouse-operator/venv/bin/pip3 --version
-            ~/clickhouse-operator/venv/bin/python3.7 get-pip.py
+            ~/clickhouse-operator/venv/bin/python3 get-pip.py
             ~/clickhouse-operator/venv/bin/pip3 --version
             ~/clickhouse-operator/venv/bin/pip3 install -U -r ./tests/requirements.txt
       - run:
