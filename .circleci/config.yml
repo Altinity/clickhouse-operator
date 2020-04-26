@@ -108,7 +108,7 @@ jobs:
                 curl https://www.openssl.org/source/openssl-1.0.2l.tar.gz | tar xz
                 cd openssl-1.0.2l && sudo ./config && sudo make && sudo make install
                 sudo rm -fv /usr/bin/openssl
-                sudo ln -svf $(find ./ -type f -name openssl) /usr/bin/openssl
+                sudo ln -svf $(find $PWD -type f -name openssl) /usr/bin/openssl
                 cd ${HOME}
                 whereis openssl
                 openssl version -v
