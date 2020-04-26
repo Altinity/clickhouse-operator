@@ -89,7 +89,6 @@ jobs:
           name: Install python and testflows
           command: |
             set -xueo pipefail
-            python3 --version
             if [[ "0" == $(lsb_release -a | grep Ubuntu | wc -l) ]]; then
               sudo apt-get update
               sudo apt-get install -y --no-install-recommends apt-transport-https ca-certificates openssl
@@ -105,12 +104,11 @@ jobs:
               sudo apt-get install -y --no-install-recommends python3.6 python3.6-venv
             fi
             curl -sL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-            python --version
             python3 --version
             python3.6 --version
             python3.6 -m venv ~/clickhouse-operator/venv
             ~/clickhouse-operator/venv/bin/pip3 --version
-            ~/clickhouse-operator/venv/bin/python3 get-pip.py
+            ~/clickhouse-operator/venv/bin/python3.6 -m pip install -U pip
             ~/clickhouse-operator/venv/bin/pip3 --version
             ~/clickhouse-operator/venv/bin/pip3 install -U -r ./tests/requirements.txt
       - run:
