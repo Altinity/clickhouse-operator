@@ -52,6 +52,9 @@ const (
 	defaultChUsername = ""
 	defaultChPassword = ""
 	defaultChPort     = 8123
+
+	// Default number of controller threads running concurrently (used in case no other specified in config)
+	defaultReconcileThreadsNumber = 1
 )
 
 // MergeFrom merges
@@ -291,6 +294,9 @@ func (config *OperatorConfig) normalize() {
 	// Vmodule          string `json:"vmodule"          yaml:"vmodule"`
 	// Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
 
+	if config.ReconcileThreadsNumber == 0 {
+		config.ReconcileThreadsNumber = defaultReconcileThreadsNumber
+	}
 }
 
 // applyEnvVarParams applies ENV VARS over config
@@ -454,6 +460,8 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 	util.Fprintf(b, "Stderrthreshold: %s\n", config.Stderrthreshold)
 	util.Fprintf(b, "Vmodule: %s\n", config.Vmodule)
 	util.Fprintf(b, "Log_backtrace_at string: %s\n", config.Log_backtrace_at)
+
+	util.Fprintf(b, "ReconcileThreadsNumber: %d\n", config.ReconcileThreadsNumber)
 
 	return b.String()
 }

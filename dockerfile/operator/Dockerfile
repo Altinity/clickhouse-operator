@@ -1,4 +1,6 @@
-# === Builder ===
+# ===================
+# ===== Builder =====
+# ===================
 
 FROM golang:1.12.7 AS builder-operator
 
@@ -19,7 +21,9 @@ RUN GO111MODULE=on go mod vendor
 # Build operator binary with explicitly specified output
 RUN OPERATOR_BIN=/tmp/clickhouse-operator ./dev/go_build_operator.sh
 
-# === Operator ===
+# ====================
+# ===== Operator =====
+# ====================
 
 FROM alpine:3.10 AS operator
 

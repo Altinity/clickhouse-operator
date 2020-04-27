@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package model
+package util
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"fmt"
-	"sort"
+	"hash/fnv"
 )
 
 func serialize(obj interface{}) []byte {
@@ -34,41 +34,18 @@ func serialize(obj interface{}) []byte {
 	return b.Bytes()
 }
 
-func hash(b []byte) string {
+func HashIntoString(b []byte) string {
 	hasher := sha1.New()
 	hasher.Write(b)
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func fingerprint(obj interface{}) string {
-	return hash(serialize(obj))
+func HashIntoInt(b []byte) int {
+	h := fnv.New32a()
+	h.Write(b)
+	return int(h.Sum32())
 }
 
-func castToSliceOfStrings(m map[string]interface{}) []string {
-	res := make([]string, 0, 0)
-
-	// Sort keys
-	var keys []string
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	// Walk over sorted keys
-	for _, key := range keys {
-		res = append(res, key)
-
-		switch m[key].(type) {
-		case string, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
-			value := fmt.Sprint(m[key])
-			res = append(res, value)
-		case []string, []int, []int8, []int16, []int32, []int64, []uint, []uint8, []uint16, []uint32, []uint64, []float32, []float64, []interface{}:
-			for _, v := range m[key].([]interface{}) {
-				value := fmt.Sprint(v)
-				res = append(res, value)
-			}
-		}
-	}
-
-	return res
+func HashIntoIntTopped(b []byte, top int) int {
+	return HashIntoInt(b) % top
 }

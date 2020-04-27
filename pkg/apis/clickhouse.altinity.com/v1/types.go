@@ -452,4 +452,18 @@ type OperatorConfig struct {
 	Stderrthreshold  string `json:"stderrthreshold"  yaml:"stderrthreshold"`
 	Vmodule          string `json:"vmodule"          yaml:"vmodule"`
 	Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
+
+	// Max number of concurrent reconciles in progress
+	ReconcileThreadsNumber int `json:"reconcileThreadsNumber" yaml:"reconcileThreadsNumber"`
+
+	//
+	// The end of OperatorConfig
+	//
+	// !!! IMPORTANT !!!
+	// !!! IMPORTANT !!!
+	// !!! IMPORTANT !!!
+	// !!! IMPORTANT !!!
+	// !!! IMPORTANT !!!
+	// Do not forget to update func (config *OperatorConfig) String()
+	// Do not forget to update CRD spec
 }

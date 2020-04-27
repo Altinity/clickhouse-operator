@@ -5,4 +5,5 @@
     <partition_by>toMonday(event_date)</partition_by>
     <flush_interval_milliseconds>7500</flush_interval_milliseconds>
 </query_log>
+<query_thread_log remove="1"/>
 </yandex>

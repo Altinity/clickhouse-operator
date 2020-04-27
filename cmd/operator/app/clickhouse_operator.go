@@ -44,12 +44,6 @@ const (
 	defaultInformerFactoryResyncDebugPeriod = 60 * time.Second
 )
 
-const (
-	// TODO probably this should be added as a CLI/Config param
-	// Default number of controller threads running concurrently (used in case no other specified in config)
-	defaultControllerThreadsNum = 1
-)
-
 // CLI parameter variables
 var (
 	// versionRequest defines request for clickhouse-operator version report. Operator should exit after version printed
@@ -74,10 +68,6 @@ var (
 	// Informer fires Update() func to periodically verify current state
 	kubeInformerFactoryResyncPeriod = defaultInformerFactoryResyncPeriod
 	chopInformerFactoryResyncPeriod = defaultInformerFactoryResyncPeriod
-)
-
-var (
-	controllerThreadsNum = defaultControllerThreadsNum
 )
 
 func init() {
@@ -160,7 +150,7 @@ func Run() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		chiController.Run(ctx, controllerThreadsNum)
+		chiController.Run(ctx)
 	}()
 	<-ctx.Done()
 	wg.Wait()

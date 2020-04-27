@@ -14,6 +14,11 @@
 
 package util
 
+import (
+	"fmt"
+	"sort"
+)
+
 // InArray checks whether needle is in haystack
 func InArray(needle string, haystack []string) bool {
 	for _, b := range haystack {
@@ -35,4 +40,33 @@ func Unzip(slice [][]string) ([]string, []string) {
 		}
 	}
 	return col1, col2
+}
+
+func CastToSliceOfStrings(m map[string]interface{}) []string {
+	res := make([]string, 0, 0)
+
+	// Sort keys
+	var keys []string
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	// Walk over sorted keys
+	for _, key := range keys {
+		res = append(res, key)
+
+		switch m[key].(type) {
+		case string, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+			value := fmt.Sprint(m[key])
+			res = append(res, value)
+		case []string, []int, []int8, []int16, []int32, []int64, []uint, []uint8, []uint16, []uint32, []uint64, []float32, []float64, []interface{}:
+			for _, v := range m[key].([]interface{}) {
+				value := fmt.Sprint(v)
+				res = append(res, value)
+			}
+		}
+	}
+
+	return res
 }
