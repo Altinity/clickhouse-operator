@@ -98,7 +98,7 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 	sql := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
 			database AS name, 
-			concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_query
+			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_query
 		FROM 
 		(
 			SELECT DISTINCT arrayJoin([database, extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+')]) database
@@ -162,7 +162,7 @@ func (s *Schemer) getCreateReplicatedObjects(host *chop.ChiHost) ([]string, []st
 	sql := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
 			database AS name, 
-			concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_db_query
+			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_db_query
 		FROM system.tables
 		WHERE engine_full LIKE 'Replicated%'
 		SETTINGS skip_unavailable_shards = 1
@@ -187,7 +187,7 @@ func (s *Schemer) clusterGetCreateDatabases(cluster *chop.ChiCluster) ([]string,
 	sql := heredoc.Docf(`
 		SELECT
 			distinct name AS name,
-			concat('CREATE DATABASE IF NOT EXISTS ', name) AS create_db_query
+			concat('CREATE DATABASE IF NOT EXISTS "', name, "'") AS create_db_query
 		FROM cluster('%s', system, databases) 
 		WHERE name not in (%s)
 		ORDER BY name
@@ -228,7 +228,7 @@ func (s *Schemer) hostGetDropTables(host *chop.ChiHost) ([]string, []string, err
 	sql := heredoc.Docf(`
 		SELECT
 			distinct name, 
-			concat('DROP TABLE IF EXISTS ', database, '.', name)
+			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"')
 		FROM system.tables
 		WHERE database not in (%s) 
 			AND engine like 'Replicated%%'
