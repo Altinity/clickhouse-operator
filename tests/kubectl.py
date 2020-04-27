@@ -118,22 +118,24 @@ def kube_delete(config, ns="test"):
 
 def kube_wait_objects(chi, objects, ns="test"):
     with Then(f"{objects[0]} statefulsets, {objects[1]} pods and {objects[2]} services should be created"):
-        for i in range(1,max_retries):
+        for i in range(1, max_retries):
             counts = kube_count_resources(label = f"-l clickhouse.altinity.com/chi={chi}", ns = ns)
             if counts == objects:
                 break
-            with Then("Not ready. Wait for " + str(i*5) + " seconds"):
-                time.sleep(i*5)
+            wait = i * 10
+            with Then("Not ready. Wait for " + str(wait) + " seconds"):
+                time.sleep(wait)
         assert counts == objects, error()
 
 def kube_wait_object(type, name, label="", count = 1, ns="test", retries = max_retries):
     with Then(f"{count} {type}(s) {name} should be created"):
-        for i in range(1,retries):
+        for i in range(1, retries):
             counts = kube_get_count(type, ns = ns, name = name, label = label)
             if counts >= count:
                 break
-            with Then("Not ready. Wait for " + str(i*5) + " seconds"):
-                time.sleep(i*5)
+            wait = i * 10
+            with Then("Not ready. Wait for " + str(wait) + " seconds"):
+                time.sleep(wait)
         assert counts >= count, error()
 
 def kube_wait_chi_status(chi, status, ns="test", retries = max_retries):
@@ -147,12 +149,13 @@ def kube_wait_pod_status(pod, status, ns="test"):
 
 def kube_wait_field(object, name, field, value, ns="test", retries = max_retries):
     with Then(f"{object} {name} {field} should be {value}"):
-        for i in range(1,retries):
+        for i in range(1, retries):
             obj_status = kubectl(f"get {object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
             if obj_status[1] == value:
                 break
-            with Then("Not ready. Wait for " + str(i*5) + " seconds"):
-                time.sleep(i*5)
+            wait = i * 10
+            with Then("Not ready. Wait for " + str(wait) + " seconds"):
+                time.sleep(wait)
         assert obj_status[1] == value, error()
 
 def kube_get_field(object, name, field, ns="test"):
