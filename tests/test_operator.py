@@ -350,9 +350,14 @@ def test_016():
         out = clickhouse_query("test-016-settings", query = "select dictGet('one', 'one', toUInt64(0))")
         assert out == "0"
 
-    with Then("Custom macro 'layer' should be available:"):
+    with Then("Custom macro 'layer' should be available"):
         out = clickhouse_query("test-016-settings", query = "select substitution from system.macros where macro='layer'")
         assert out == "01"
+    
+    with Then("query_log should be disabled"):
+        clickhouse_query("test-016-settings", query = "system flush logs")
+        out = clickhouse_query_with_error("test-016-settings", query = "select count() from system.query_log")
+        assert "doesn't exist" in out
 
     kube_delete_chi("test-016-settings")
 
