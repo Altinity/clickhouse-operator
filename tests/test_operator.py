@@ -269,28 +269,27 @@ def test_013(self):
         clickhouse_query("test-013-add-shards", 
                          "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
         clickhouse_query("test-013-add-shards", 
-                         "CREATE TABLE events_distr as system.events ENGINE = Distributed('all-sharded', system, events)")
+                         "CREATE DATABASE \\\"test-db\\\"")
+        clickhouse_query("test-013-add-shards",
+                         "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events ENGINE = Distributed('all-sharded', system, events)")
+
 
     with Then("Add one more shard"):
         create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2, 2, 3], "do_not_delete": 1})
     with And("Table should be created on a second shard"):
-        retries = 10
-        wait = 30
-        for i in range(retries + 1):
-            tables = clickhouse_query("test-013-add-shards", "SHOW TABLES FROM default",
-                                      host="chi-test-013-add-shards-default-1-0")
-            if 'test_distr' not in tables and 'events_distr' not in tables:
-                with And(f"Wait {wait} seconds, when operator create tables"):
-                    time.sleep(wait)
-                    kubectl('logs -n kube-system -lapp=clickhouse-operator --tail=100 -c clickhouse-operator')
-            else:
-                break
+        out = clickhouse_query("test-013-add-shards", "select count() from system.tables where name = 'test_distr'",
+                               host="chi-test-013-add-shards-default-1-0")
+        assert out == "1"
 
-        clickhouse_query("test-013-add-shards", "SELECT count() from default.test_distr",
-                         host="chi-test-013-add-shards-default-1-0")
+    with And("Database with weird name should be created on a second shard"):
+        out = clickhouse_query("test-013-add-shards", "select count() from system.databases where name = 'test-db'",
+                               host="chi-test-013-add-shards-default-1-0")
+        assert out == "1"
 
-        clickhouse_query("test-013-add-shards", "SELECT count() from default.events_distr",
-                         host="chi-test-013-add-shards-default-1-0")
+    with And("Table with weird name should be created on a second shard"):
+        out = clickhouse_query("test-013-add-shards", "select count() from system.tables where name = 'events-distr'",
+                               host="chi-test-013-add-shards-default-1-0")
+        assert out == "1"
 
     with Then("Remove shard"):
         create_and_check("configs/test-013-add-shards-1.yaml", {"object_counts": [1,1,2]})
@@ -365,9 +364,14 @@ def test_016(self):
         out = clickhouse_query("test-016-settings", query = "select dictGet('one', 'one', toUInt64(0))")
         assert out == "0"
 
-    with Then("Custom macro 'layer' should be available:"):
+    with Then("Custom macro 'layer' should be available"):
         out = clickhouse_query("test-016-settings", query = "select substitution from system.macros where macro='layer'")
         assert out == "01"
+
+    with Then("query_log should be disabled"):
+        clickhouse_query("test-016-settings", query = "system flush logs")
+        out = clickhouse_query_with_error("test-016-settings", query = "select count() from system.query_log")
+        assert "doesn't exist" in out
 
     kube_delete_chi("test-016-settings")
 

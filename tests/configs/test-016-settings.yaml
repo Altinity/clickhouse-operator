@@ -15,6 +15,7 @@ spec:
     settings:
       dictionaries_config: config.d/*.dict
       macros/layer: "01"
+      query_log: _removed_
     files:
       dict_one.dict: |
         <yandex>
