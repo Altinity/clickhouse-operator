@@ -266,16 +266,27 @@ def test_013():
         clickhouse_query("test-013-add-shards", 
                          "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
         clickhouse_query("test-013-add-shards", 
-                         "CREATE TABLE events_distr as system.events ENGINE = Distributed('all-sharded', system, events)")
+                         "CREATE DATABASE \\\"test-db\\\"")
+        clickhouse_query("test-013-add-shards", 
+                         "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events ENGINE = Distributed('all-sharded', system, events)")
+
 
     with Then("Add one more shard"):
         create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2, 2, 3], "do_not_delete": 1})
     with And("Table should be created on a second shard"):
-        clickhouse_query("test-013-add-shards", "select count() from default.test_distr",
+        out = clickhouse_query("test-013-add-shards", "select count() from system.tables where name = 'test_distr'",
                                host="chi-test-013-add-shards-default-1-0")
+        assert out == "1"
 
-        clickhouse_query("test-013-add-shards", "select count() from default.events_distr",
+    with And("Database with weird name should be created on a second shard"):
+        out = clickhouse_query("test-013-add-shards", "select count() from system.databases where name = 'test-db'",
                                host="chi-test-013-add-shards-default-1-0")
+        assert out == "1"
+        
+    with And("Table with weird name should be created on a second shard"):
+        out = clickhouse_query("test-013-add-shards", "select count() from system.tables where name = 'events-distr'",
+                               host="chi-test-013-add-shards-default-1-0")
+        assert out == "1"
 
     with Then("Remove shard"):
         create_and_check("configs/test-013-add-shards-1.yaml", {"object_counts": [1,1,2]})
