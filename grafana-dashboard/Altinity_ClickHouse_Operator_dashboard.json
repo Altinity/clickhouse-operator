@@ -59,7 +59,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1586668145107,
+  "iteration": 1588072585010,
   "links": [],
   "panels": [
     {
@@ -1601,7 +1601,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "## MemoryTrackingInBackgroundProcessingPool\t\n\nTotal amount of memory (bytes) allocated in background processing pool (that is dedicated for backround merges, mutations and fetches). \n\n\n## MemoryTrackingInBackgroundMoveProcessingPool\n\nTotal amount of memory (bytes) allocated in background processing pool (that is dedicated for backround moves). \n\n\n## MemoryTrackingInBackgroundSchedulePool\n\nTotal amount of memory (bytes) allocated in background schedule pool (that is dedicated for bookkeeping tasks of Replicated tables).\n\n\n## MemoryTrackingForMerges\n\nTotal amount of memory (bytes) allocated for background merges. Included in MemoryTrackingInBackgroundProcessingPool. \n\n\nNote that this values may include a drift when the memory was allocated in a context of background processing pool and freed in other context or vice-versa. This happens naturally due to caches for tables indexes and doesn't indicate memory leaks.\n",
+      "description": "## ReplicasMaxQueueSize\nMaximum replication queue size between all replicated tables\n\n##  ReplicasMaxInsertsInQueue\nMaximum insert blocks in replication queue between all replicated tables\n\n## ReplicasMaxMergesInQueue\nMaximum insert blocks in replication queue between all replicated tables",
       "editable": true,
       "error": false,
       "fill": 1,
@@ -1652,11 +1652,13 @@
         {
           "expr": "chi_clickhouse_metric_ReplicasMaxQueueSize{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
           "intervalFactor": 2,
-          "legendFormat": "queue size bytes {{hostname}}",
+          "legendFormat": "max queue size {{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
+          "expr": "chi_clickhouse_metric_ReplicasMaxAbsoluteDelay{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "legendFormat": "max absolute replica delay {{hostname}}",
           "refId": "B"
         }
       ],
@@ -1681,7 +1683,7 @@
       },
       "yaxes": [
         {
-          "format": "bytes",
+          "format": "short",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -2905,5 +2907,5 @@
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
   "uid": "HBIYxc8Wk",
-  "version": 4
+  "version": 5
 }
