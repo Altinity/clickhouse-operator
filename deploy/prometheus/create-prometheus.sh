@@ -24,12 +24,33 @@ echo "Apply options now..."
 # Let's setup all prometheus-related stuff into dedicated namespace called "prometheus"
 kubectl create namespace "${PROMETHEUS_NAMESPACE}"
 
+# Create prometheus-operator's CRDs
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/prometheus-operator-crd/monitoring.coreos.com_alertmanagers.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/prometheus-operator-crd/monitoring.coreos.com_prometheuses.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
+
 # Setup prometheus-operator into specified namespace. Would manage prometheus instances
-# install CRD, RBAC, Deployments and Services
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f  <( \
     wget -qO- https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/bundle.yaml | \
     PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
 )
+
+# Setup RBAC
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
+    wget -qO- https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/rbac/prometheus/prometheus-cluster-role-binding.yaml | \
+    PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
+)
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/rbac/prometheus/prometheus-cluster-role.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/rbac/prometheus/prometheus-service-account.yaml
 
 # Setup Prometheus instance via prometheus-operator into dedicated namespace
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f prometheus.yaml

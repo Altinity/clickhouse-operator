@@ -1,8 +1,17 @@
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
+
+def total_cpus
+  require 'etc'
+  Etc.nprocessors
+end
+
+
 Vagrant.configure(2) do |config|
   config.vm.box = "ubuntu/bionic64"
   config.vm.box_check_update = false
+  config.vm.synced_folder ".", "/vagrant", type: "nfs"
+
 
   if Vagrant.has_plugin?("vagrant-vbguest")
     config.vbguest.auto_update = false
@@ -10,16 +19,29 @@ Vagrant.configure(2) do |config|
 
   config.vm.define :clickhouse_operator do |clickhouse_operator|
     clickhouse_operator.vm.network "private_network", ip: "172.16.2.99", nic_type: "virtio"
+    # port forwarding works only when pair with kubectl port-forward
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 3000, host_ip: "127.0.0.1", host: 3000
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 8888, host_ip: "127.0.0.1", host: 8888
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 9090, host_ip: "127.0.0.1", host: 9090
+
     clickhouse_operator.vm.host_name = "local-altinity-clickhouse-operator"
+    # vagrant plugin install vagrant-disksize
+    clickhouse_operator.disksize.size = '50GB'
   end
 
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
+    vb.cpus = total_cpus
     vb.memory = "4096"
+    vb.default_nic_type = "virtio"
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+    vb.customize ["modifyvm", :id, "--ioapic", "on"]
   end
 
   config.vm.provision "shell", inline: <<-SHELL
     set -xeuo pipefail
+    export DEBIAN_FRONTEND=noninteractive
 
     apt-get update
     apt-get install --no-install-recommends -y apt-transport-https ca-certificates software-properties-common curl
@@ -32,7 +54,7 @@ Vagrant.configure(2) do |config|
 
     # clickhouse
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E0C56BD4
-    add-apt-repository "deb http://repo.yandex.ru/clickhouse/deb/stable/ main/"
+    add-apt-repository "deb http://repo.clickhouse.tech/deb/stable/ main/"
     apt-get install --no-install-recommends -y clickhouse-client
 
     # docker
@@ -41,24 +63,27 @@ Vagrant.configure(2) do |config|
     apt-get install --no-install-recommends -y docker-ce
 
     # docker compose
-    apt-get install --no-install-recommends -y python3-pip
-    python3 -m pip install -U pip
-    rm -rf /usr/bin/pip3
+    apt-get install -y --no-install-recommends python3-distutils
+    curl -sL https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py
+    python3 /tmp/get-pip.py
+
     pip3 install -U setuptools
     pip3 install -U docker-compose
-    pip3 install -U -r /vagrant/tests/requirements.txt
 
     # k9s CLI
     K9S_VERSION=$(curl -sL https://github.com/derailed/k9s/releases/latest -H "Accept: application/json" | jq -r .tag_name)
-    wget -c --progress=bar:force:noscroll -O /usr/local/bin/k9s_Linux_x86_64.tar.gz https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_x86_64.tar.gz
+    wget -c --progress=bar:force:noscroll -O /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_x86_64.tar.gz
     curl -sL https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/checksums.txt | grep Linux_x86_64.tar.gz > /usr/local/bin/k9s.sha256
-    sed -i -e "s/k9s_Linux_x86_64\.tar\.gz/\\/usr\\/local\\/bin\\/k9s_Linux_x86_64\\.tar\\.gz/g" /usr/local/bin/k9s.sha256
+    sed -i -e "s/k9s_Linux_x86_64\.tar\.gz/\\/usr\\/local\\/bin\\/k9s_${K9S_VERSION}_Linux_x86_64\\.tar\\.gz/g" /usr/local/bin/k9s.sha256
     sha256sum -c /usr/local/bin/k9s.sha256
-    tar --verbose -zxvf /usr/local/bin/k9s_Linux_x86_64.tar.gz -C /usr/local/bin k9s
+    tar --verbose -zxvf /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz -C /usr/local/bin k9s
+
 
     # minikube
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
+    # required for k8s 1.18+
+    apt-get install -y conntrack
 
     K8S_VERSION=${K8S_VERSION:-1.17.3}
     minikube config set vm-driver none
@@ -86,13 +111,13 @@ Vagrant.configure(2) do |config|
 
     export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-prometheus}
     cd /vagrant/deploy/prometheus/
-    kubectl delete ns ${PROMETHEUS_NAMESPACE}
+    kubectl delete ns ${PROMETHEUS_NAMESPACE} || true
     bash -e ./create-prometheus.sh
     cd /vagrant/
 
     export GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE:-grafana}
     cd /vagrant/deploy/grafana/grafana-with-grafana-operator/
-    kubectl delete ns ${GRAFANA_NAMESPACE}
+    kubectl delete ns ${GRAFANA_NAMESPACE} || true
     bash -e ./install-grafana-operator.sh
     bash -e ./install-grafana-with-operator.sh
     cd /vagrant
@@ -115,7 +140,9 @@ Vagrant.configure(2) do |config|
         docker pull ${image}
     done
 
-    python3 /vagrant/tests/test.py
+    pip3 install -r /vagrant/tests/requirements.txt
+
+    python3 /vagrant/tests/test.py --only=operator/*
     python3 /vagrant/tests/test_examples.py
     python3 /vagrant/tests/test_metrics_exporter.py
   SHELL
