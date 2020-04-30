@@ -111,13 +111,15 @@ Vagrant.configure(2) do |config|
 
     export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-prometheus}
     cd /vagrant/deploy/prometheus/
-    bash -e ./create-prometheus.sh
+    kubectl delete ns ${PROMETHEUS_NAMESPACE}
+    bash -xe ./create-prometheus.sh
     cd /vagrant/
 
     export GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE:-grafana}
     cd /vagrant/deploy/grafana/grafana-with-grafana-operator/
-    bash -e ./install-grafana-operator.sh
-    bash -e ./install-grafana-with-operator.sh
+    kubectl delete ns ${GRAFANA_NAMESPACE}
+    bash -xe ./install-grafana-operator.sh
+    bash -xe ./install-grafana-with-operator.sh
     cd /vagrant
 
     echo "Wait when clickhouse operator installation finished"
@@ -147,11 +149,11 @@ Vagrant.configure(2) do |config|
 
     # Circle CI
     # TODO wait when resolve https://github.com/CircleCI-Public/circleci-cli/issues/394
+    # TODO wait when resolve https://github.com/CircleCI-Public/circleci-cli/issues/402
     curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | VERSION=0.1.6893 bash -x
 
     # circleci optimizations for speedup run
     mkdir -p /circleci
-    # mount -t tmpfs -o size=7000m tmpfs /circleci
     mkdir -v -m 0777 -p /circleci/home/circleci/.minikube /circleci/var/lib/docker /circleci/root/.cache
 
     # Run tests local with circleci
