@@ -21,7 +21,7 @@ def test_ch_001():
     host1 = "chi-test-ch-001-insert-quorum-default-0-1"
 
     create_table = """
-    create table t1 on cluster default (a Int8, d DateTime default toStartOfDay(today()+1))
+    create table t1 on cluster default (a Int8, d Date default today())
     Engine = ReplicatedMergeTree('/clickhouse/tables/{table}', '{replica}')
     partition by d order by a 
     TTL d + interval 5 second
@@ -49,6 +49,24 @@ def test_ch_001():
         clickhouse_query(chi, create_mv2)
         clickhouse_query(chi, create_mv3)
         
+        with When("Add a row to an old partition"):
+            clickhouse_query(chi, "insert into t1(a,d) values(6, today()-1)",  host=host0)
+
+        with When("Stop fetches for t1 at replica1"):
+            clickhouse_query(chi, "system stop fetches default.t1", host = host1)
+
+            with Then("Wait 10 seconds and the data should be dropped by TTL"):
+                time.sleep(10)
+                out = clickhouse_query(chi, "select count() from t1 where a=6", host=host0)
+                assert out == "0"
+        
+        with When("Resume fetches for t1 at replica1"):
+            clickhouse_query(chi, "system start fetches default.t1", host = host1)
+            time.sleep(5)
+            
+            with Then("Inserts should resume"):
+                clickhouse_query(chi, "insert into t1(a) values(7)",  host=host0)
+
         clickhouse_query(chi, "insert into t1(a) values(1)")
         
         with When("Stop fetches for t2 at replica1"):
@@ -83,26 +101,7 @@ def test_ch_001():
             
         out = clickhouse_query_with_error(chi, "select t1.a t1_a, t2.a t2_a from t1 left outer join t2 using (a) order by t1_a settings join_use_nulls=1")
         print(out)
-        
-        with When("Stop fetches for t1 at replica1"):
-            clickhouse_query(chi, "system stop fetches default.t1", host = host1)
-            
-            with Then("Insert should fail since it can not reach the quorum"): 
-                out = clickhouse_query_with_error(chi, "insert into t1(a,d) values(6, now())",  host=host0)
-                assert "Timeout while waiting for quorum" in out
-            
-            with Then("Wait 10 seconds and the data should be dropped by TTL"):
-                time.sleep(10)
-                out = clickhouse_query(chi, "select count() from t1 where a=6", host=host0)
-                assert out == "0"
-        
-        with When("Resume fetches for t1 at replica1"):
-            clickhouse_query(chi, "system start fetches default.t1", host = host1)
-            time.sleep(5)
-            
-            with Then("Inserts should resume"):
-                clickhouse_query(chi, "insert into t1(a) values(7)",  host=host0)
-        
+                
         # cat /var/log/clickhouse-server/clickhouse-server.log | grep t2 | grep -E "all_1_1_0|START|STOP"
 
 

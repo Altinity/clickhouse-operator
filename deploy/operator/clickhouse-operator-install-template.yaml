@@ -1336,6 +1336,10 @@ spec:
               type: string
             log_backtrace_at:
               type: string
+            reconcileThreadsNumber:
+              type: integer
+              minimum: 1
+              maximum: 65535
 ---
 # Possible Template Parameters:
 #
@@ -1463,7 +1467,7 @@ data:
     
     ################################################
     ##
-    ## Operator's access to ClickHouse instances
+    ## Access to ClickHouse instances
     ##
     ################################################
     
@@ -1489,6 +1493,15 @@ data:
     stderrthreshold: ""
     vmodule: ""
     log_backtrace_at: ""
+    
+    ################################################
+    ##
+    ## Runtime parameters
+    ##
+    ################################################
+    
+    # Max number of concurrent reconciles in progress
+    reconcileThreadsNumber: 10
 
 ---
 # Possible Template Parameters:
@@ -1550,7 +1563,9 @@ data:
         <partition_by>toMonday(event_date)</partition_by>
         <flush_interval_milliseconds>7500</flush_interval_milliseconds>
     </query_log>
+    <query_thread_log remove="1"/>
     </yandex>
+
 ---
 # Possible Template Parameters:
 #
@@ -1632,6 +1647,7 @@ data:
         podTemplates:
           - name: default-oneperhost-pod-template
             distribution: "OnePerHost"
+
   default-storage-template.yaml.example: |
     apiVersion: "clickhouse.altinity.com/v1"
     kind: "ClickHouseInstallationTemplate"
@@ -1650,6 +1666,7 @@ data:
 
   readme: |
     Templates in this folder are packaged with an operator and available via 'useTemplate'
+
 ---
 # Possible Template Parameters:
 #
@@ -1699,6 +1716,7 @@ data:
         </default>
       </profiles>
     </yandex>
+
 ---
 # Possible Template Parameters:
 #

@@ -12,21 +12,15 @@ def test_001():
     create_and_check("configs/test-001.yaml", {"object_counts": [1, 1, 2]})
     
 @TestScenario
-@Name("test_002. useTemplates for pod and volume templates")
+@Name("test_002. useTemplates for pod, volume templates, and distribution")
 def test_002():
     create_and_check("configs/test-002-tpl.yaml", 
                      {"pod_count": 1,
-                      "apply_templates": {settings.clickhouse_template, "templates/tpl-log-volume.yaml"},
+                      "apply_templates": {settings.clickhouse_template, 
+                                          "templates/tpl-log-volume.yaml",
+                                          "templates/tpl-one-per-host.yaml"},
                       "pod_image": settings.clickhouse_version,
-                      "pod_volumes": {"/var/log/clickhouse-server"}})
-
-@TestScenario
-@Name("test_003. useTemplates for pod and distribution templates")
-def test_003():
-    create_and_check("configs/test-003-tpl.yaml", 
-                     {"pod_count": 1,
-                      "apply_templates": {settings.clickhouse_template, "templates/tpl-one-per-host.yaml"},
-                      "pod_image": settings.clickhouse_version,
+                      "pod_volumes": {"/var/log/clickhouse-server"},
                       "pod_podAntiAffinity": 1})
 
 @TestScenario
@@ -41,7 +35,6 @@ def test_004():
 def test_005():
     create_and_check("configs/test-005-acm.yaml", 
                      {"pod_count": 1,
-                      "pod_image": "yandex/clickhouse-server:19.11.8.46",
                       "pod_volumes": {"/var/lib/clickhouse"}})
 
 @TestScenario
@@ -49,17 +42,17 @@ def test_005():
 def test_006():
     create_and_check("configs/test-006-ch-upgrade-1.yaml", 
                      {"pod_count": 2,
-                      "pod_image": "yandex/clickhouse-server:19.11.8.46",
+                      "pod_image": "yandex/clickhouse-server:19.11",
                       "do_not_delete": 1})
     with Then("Use different podTemplate and confirm that pod image is updated"):  
         create_and_check("configs/test-006-ch-upgrade-2.yaml", 
                          {"pod_count": 2,
-                          "pod_image": "yandex/clickhouse-server:latest",
+                          "pod_image": "yandex/clickhouse-server:19.16",
                           "do_not_delete": 1})
         with Then("Change image in podTemplate itself and confirm that pod image is updated"):
             create_and_check("configs/test-006-ch-upgrade-3.yaml", 
                              {"pod_count": 2,
-                              "pod_image": "yandex/clickhouse-server:19.11.8.46"})
+                              "pod_image": "yandex/clickhouse-server:19.11"})
 
 @TestScenario
 @Name("test_007. Test template with custom clickhouse ports")
@@ -67,7 +60,7 @@ def test_007():
     create_and_check("configs/test-007-custom-ports.yaml", 
                      {"pod_count": 1,
                       "apply_templates": {"templates/tpl-custom-ports.yaml"},
-                      "pod_image": "yandex/clickhouse-server:19.11.8.46",
+                      "pod_image": "yandex/clickhouse-server:19.11",
                       "pod_ports": [8124,9001,9010]})
 
 def test_operator_upgrade(config, version_from, version_to = settings.version):
@@ -170,12 +163,6 @@ def test_011():
             assert out == 'OK'
 
         with And("Connection from secured to secured host should succeed"):
-            kube_wait_field("ep", "chi-test-011-secured-cluster-default-1-0",
-                            ".subsets[*].addresses[*].hostname", "chi-test-011-secured-cluster-default-1-0-0")
-            kube_wait_field("ep", "chi-test-011-secured-cluster-default-0-0",
-                            ".subsets[*].addresses[*].hostname", "chi-test-011-secured-cluster-default-0-0-0")
-            with And("hmm, service created but DNS still not updated? wait 10 sec"):
-                time.sleep(10)
             out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'",
                                               host="chi-test-011-secured-cluster-default-1-0")
             assert out == 'OK'
@@ -186,9 +173,10 @@ def test_011():
             assert out != 'OK'
 
         with And("Connection from insecured to secured host should fail for user with no password"):
+            time.sleep(10) # FIXME
             out = clickhouse_query_with_error("test-011-insecured-cluster", "select 'OK'",
                                               host="chi-test-011-secured-cluster-default-1-0", user="user1")
-            assert "Password required" in out
+            assert "Password" in out or "password" in out 
     
         with And("Connection from insecured to secured host should work for user with password"):
             out = clickhouse_query_with_error("test-011-insecured-cluster","select 'OK'", 
@@ -278,16 +266,27 @@ def test_013():
         clickhouse_query("test-013-add-shards", 
                          "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
         clickhouse_query("test-013-add-shards", 
-                         "CREATE TABLE events_distr as system.events ENGINE = Distributed('all-sharded', system, events)")
+                         "CREATE DATABASE \\\"test-db\\\"")
+        clickhouse_query("test-013-add-shards", 
+                         "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events ENGINE = Distributed('all-sharded', system, events)")
+
 
     with Then("Add one more shard"):
         create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2, 2, 3], "do_not_delete": 1})
     with And("Table should be created on a second shard"):
-        clickhouse_query("test-013-add-shards", "select count() from default.test_distr",
+        out = clickhouse_query("test-013-add-shards", "select count() from system.tables where name = 'test_distr'",
                                host="chi-test-013-add-shards-default-1-0")
+        assert out == "1"
 
-        clickhouse_query("test-013-add-shards", "select count() from default.events_distr",
+    with And("Database with weird name should be created on a second shard"):
+        out = clickhouse_query("test-013-add-shards", "select count() from system.databases where name = 'test-db'",
                                host="chi-test-013-add-shards-default-1-0")
+        assert out == "1"
+        
+    with And("Table with weird name should be created on a second shard"):
+        out = clickhouse_query("test-013-add-shards", "select count() from system.tables where name = 'events-distr'",
+                               host="chi-test-013-add-shards-default-1-0")
+        assert out == "1"
 
     with Then("Remove shard"):
         create_and_check("configs/test-013-add-shards-1.yaml", {"object_counts": [1,1,2]})
@@ -304,8 +303,7 @@ def test_014():
 
     create_and_check("configs/test-014-replication.yaml", 
                     {"apply_templates": {settings.clickhouse_template},
-                     "pod_count": 2,
-                     "do_not_delete": 1})
+                     "object_counts": [2, 2, 3], "do_not_delete": 1})
 
     with Given("Table is created on a first replica and data is inserted"):
         clickhouse_query("test-014-replication", create_table, host="chi-test-014-replication-default-0-0")
@@ -313,24 +311,20 @@ def test_014():
         with When("Table is created on the second replica"):
             clickhouse_query("test-014-replication", create_table, host="chi-test-014-replication-default-0-1")
             with Then("Data should be replicated"):
-                out = clickhouse_query("test-014-replication", "select a from t",
-                                       host="chi-test-014-replication-default-0-1")
+                out = clickhouse_query("test-014-replication", "select a from t", host="chi-test-014-replication-default-0-1")
                 assert out == "1"
 
     with When("Add one more replica"):
         create_and_check("configs/test-014-replication-2.yaml", 
-                         {"pod_count": 3,
-                          "do_not_delete": 1})
+                         {"pod_count": 3, "do_not_delete": 1})
         # that also works:
         # kubectl patch chi test-014-replication -n test --type=json -p '[{"op":"add", "path": "/spec/configuration/clusters/0/layout/shards/0/replicasCount", "value": 3}]'
         with Then("Replicated table should be automatically created"):
-            out = clickhouse_query("test-014-replication", "select a from t",
-                                   host="chi-test-014-replication-default-0-2")
+            out = clickhouse_query("test-014-replication", "select a from t", host="chi-test-014-replication-default-0-2")
             assert out == "1"
 
     with When("Remove replica"):
         create_and_check("configs/test-014-replication.yaml", {"pod_count": 1, "do_not_delete": 1})
-
         with Then("Replica needs to be removed from the Zookeeper as well"):
             out = clickhouse_query("test-014-replication", "select count() from system.replicas where table='t'")
             assert out == "1" 
@@ -356,18 +350,27 @@ def test_015():
     kube_delete_chi("test-015-host-network")
 
 @TestScenario
-@Name("test_016. Test files and dictionaries setup")
+@Name("test_016. Test advanced settings options")
 def test_016():
-    create_and_check("configs/test-016-dict.yaml",
+    create_and_check("configs/test-016-settings.yaml",
                      {"apply_templates": {settings.clickhouse_template},
                       "pod_count": 1,
                       "do_not_delete": 1})
 
     with Then("dictGet() should work"):
-        out = clickhouse_query("test-016-dict", query = "select dictGet('one', 'one', toUInt64(0))")
+        out = clickhouse_query("test-016-settings", query = "select dictGet('one', 'one', toUInt64(0))")
         assert out == "0"
 
-    kube_delete_chi("test-016-dict")
+    with Then("Custom macro 'layer' should be available"):
+        out = clickhouse_query("test-016-settings", query = "select substitution from system.macros where macro='layer'")
+        assert out == "01"
+    
+    with Then("query_log should be disabled"):
+        clickhouse_query("test-016-settings", query = "system flush logs")
+        out = clickhouse_query_with_error("test-016-settings", query = "select count() from system.query_log")
+        assert "doesn't exist" in out
+
+    kube_delete_chi("test-016-settings")
 
 @TestScenario
 @Name("test-017-multi-version. Test certain functions across multiple versions")
@@ -379,6 +382,7 @@ def test_017():
     for shard in range(4):
         host = f"chi-{chi}-default-{shard}-0"
         clickhouse_query(chi, host=host, query=test_query)
+        clickhouse_query(chi, host=host, query="SYSTEM FLUSH LOGS")
         out = clickhouse_query(chi, host=host,
                                query="select query from system.query_log order by event_time desc limit 1")
         ver = clickhouse_query(chi, host=host, query="select version()")
@@ -448,3 +452,31 @@ def test_019(config = "configs/test-019-retain-volume.yaml"):
             assert out == "1"
 
     kube_delete_chi(chi)
+    
+@TestScenario
+@Name("test-020-multi-volume. Test multi-volume configuration")
+def test_020(config = "configs/test-020-multi-volume.yaml"):
+    chi = get_chi_name(get_full_path(config))
+    create_and_check(config, {"pod_count": 1,
+                              "pod_volumes": {"/var/lib/clickhouse","/var/lib/clickhouse2"}, 
+                              "do_not_delete": 1})
+    
+    with When("Create a table and insert 1 row"):
+        clickhouse_query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
+        clickhouse_query(chi, "insert into test_disks values (1)")
+        
+        with Then("Data should be placed on default disk"):
+            out = clickhouse_query(chi, "select disk_name from system.parts where table='test_disks'")
+            assert out == 'default'
+    
+    with When("alter table test_disks move partition tuple() to disk 'disk2'"):
+        clickhouse_query(chi, "alter table test_disks move partition tuple() to disk 'disk2'")
+        
+        with Then("Data should be placed on disk2"):
+            out = clickhouse_query(chi, "select disk_name from system.parts where table='test_disks'")
+            assert out == 'disk2'
+    
+    kube_delete_chi(chi)
+    
+    
+    

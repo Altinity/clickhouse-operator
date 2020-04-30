@@ -13,7 +13,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:19.16.16.72
+              image: yandex/clickhouse-server:19.16.19.85
           #    command:
           #      - "/bin/bash"
           #      - "-c"

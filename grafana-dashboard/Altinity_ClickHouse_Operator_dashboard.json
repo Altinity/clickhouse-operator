@@ -59,7 +59,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1586668145107,
+  "iteration": 1588087517206,
   "links": [],
   "panels": [
     {
@@ -560,7 +560,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -568,7 +568,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         }
       ],
@@ -681,7 +681,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -790,7 +790,7 @@
           "label": "",
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -798,7 +798,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         }
       ],
@@ -902,7 +902,7 @@
           "label": "",
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -1007,7 +1007,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -1015,7 +1015,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         }
       ],
@@ -1112,7 +1112,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -1217,7 +1217,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -1322,7 +1322,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -1455,7 +1455,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -1463,7 +1463,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         }
       ],
@@ -1526,20 +1526,7 @@
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "alias": "/merges.*/",
-          "bars": false,
-          "lines": true
-        },
-        {
-          "alias": "/rows.*/",
-          "bars": true,
-          "lines": false,
-          "yaxis": 2,
-          "zindex": -1
-        }
-      ],
+      "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": true,
@@ -1575,7 +1562,7 @@
         {
           "decimals": null,
           "format": "short",
-          "label": "merges",
+          "label": "",
           "logBase": 1,
           "max": null,
           "min": "0",
@@ -1583,11 +1570,11 @@
         },
         {
           "format": "short",
-          "label": "rows / sec",
+          "label": "",
           "logBase": 1,
           "max": null,
-          "min": null,
-          "show": false
+          "min": "0",
+          "show": true
         }
       ],
       "yaxis": {
@@ -1601,7 +1588,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "## MemoryTrackingInBackgroundProcessingPool\t\n\nTotal amount of memory (bytes) allocated in background processing pool (that is dedicated for backround merges, mutations and fetches). \n\n\n## MemoryTrackingInBackgroundMoveProcessingPool\n\nTotal amount of memory (bytes) allocated in background processing pool (that is dedicated for backround moves). \n\n\n## MemoryTrackingInBackgroundSchedulePool\n\nTotal amount of memory (bytes) allocated in background schedule pool (that is dedicated for bookkeeping tasks of Replicated tables).\n\n\n## MemoryTrackingForMerges\n\nTotal amount of memory (bytes) allocated for background merges. Included in MemoryTrackingInBackgroundProcessingPool. \n\n\nNote that this values may include a drift when the memory was allocated in a context of background processing pool and freed in other context or vice-versa. This happens naturally due to caches for tables indexes and doesn't indicate memory leaks.\n",
+      "description": "## ReplicasMaxQueueSize\nMaximum replication queue size between all replicated tables\n\n##  ReplicasMaxInsertsInQueue\nMaximum insert blocks in replication queue between all replicated tables\n\n## ReplicasMaxMergesInQueue\nMaximum insert blocks in replication queue between all replicated tables",
       "editable": true,
       "error": false,
       "fill": 1,
@@ -1652,11 +1639,13 @@
         {
           "expr": "chi_clickhouse_metric_ReplicasMaxQueueSize{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
           "intervalFactor": 2,
-          "legendFormat": "queue size bytes {{hostname}}",
+          "legendFormat": "max queue size {{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
+          "expr": "chi_clickhouse_metric_ReplicasMaxAbsoluteDelay{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "legendFormat": "max absolute replica delay {{hostname}}",
           "refId": "B"
         }
       ],
@@ -1681,11 +1670,11 @@
       },
       "yaxes": [
         {
-          "format": "bytes",
+          "format": "short",
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -1693,8 +1682,8 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
-          "show": true
+          "min": "0",
+          "show": false
         }
       ],
       "yaxis": {
@@ -1789,7 +1778,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -1797,8 +1786,8 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
-          "show": true
+          "min": "0",
+          "show": false
         }
       ],
       "yaxis": {
@@ -1860,20 +1849,7 @@
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "alias": "/merges.*/",
-          "bars": false,
-          "lines": true
-        },
-        {
-          "alias": "/rows.*/",
-          "bars": true,
-          "lines": false,
-          "yaxis": 2,
-          "zindex": -1
-        }
-      ],
+      "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": true,
@@ -1921,7 +1897,7 @@
           "logBase": 1,
           "max": null,
           "min": null,
-          "show": false
+          "show": true
         }
       ],
       "yaxis": {
@@ -2006,7 +1982,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -2015,7 +1991,7 @@
           "logBase": 1,
           "max": null,
           "min": null,
-          "show": true
+          "show": false
         }
       ],
       "yaxis": {
@@ -2106,7 +2082,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -2115,7 +2091,7 @@
           "logBase": 1,
           "max": null,
           "min": null,
-          "show": true
+          "show": false
         }
       ],
       "yaxis": {
@@ -2211,7 +2187,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -2441,7 +2417,7 @@
           "label": "parts",
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -2450,7 +2426,7 @@
           "logBase": 1,
           "max": null,
           "min": null,
-          "show": true
+          "show": false
         }
       ],
       "yaxis": {
@@ -2544,7 +2520,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
@@ -2905,5 +2881,5 @@
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
   "uid": "HBIYxc8Wk",
-  "version": 4
+  "version": 6
 }

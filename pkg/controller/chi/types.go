@@ -69,8 +69,8 @@ type Controller struct {
 	// podListerSynced used in waitForCacheSync()
 	podListerSynced cache.InformerSynced
 
-	// queue used to organize events queue processed by operator
-	queue workqueue.RateLimitingInterface
+	// queues used to organize events queue processed by operator
+	queues []workqueue.RateLimitingInterface
 	// not used explicitly
 	recorder record.EventRecorder
 }

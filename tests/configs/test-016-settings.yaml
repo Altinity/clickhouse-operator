@@ -2,7 +2,7 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 
 metadata:
-  name: test-016-dict
+  name: test-016-settings
 
 spec:
   useTemplates:
@@ -14,6 +14,8 @@ spec:
           shardsCount: 1
     settings:
       dictionaries_config: config.d/*.dict
+      macros/layer: "01"
+      query_log: _removed_
     files:
       dict_one.dict: |
         <yandex>

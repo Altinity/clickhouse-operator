@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: "ConfigMap"
+metadata:
+  name: "sidecar-mounted-configmap"
+data:
+  config-file-1.xml: |
+    <tag1>
+        <!-- Here goes some example config -->
+        <listen_host_1>0.0.0.0</listen_host_1>
+    </tag1>
+  config-file-2.xml: |
+    <tag2>
+        <!-- Here goes some example config -->
+        <listen_host_2>0.0.0.0</listen_host_2>
+    </tag2>
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "sidecar"
+spec:
+  configuration:
+    clusters:
+      - name: "sc"
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  defaults:
+    templates:
+      # Templates are specified as default for all clusters
+      podTemplate: pod-template
+      dataVolumeClaimTemplate: data-volume-template
+      logVolumeClaimTemplate: log-volume-template
+
+  templates:
+    podTemplates:
+      - name: pod-template
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:19.16
+              volumeMounts:
+                - name: sidecar-configmap-volume
+                  mountPath: /configmap-volume
+
+            - name: custom-sidecar
+              image: busybox
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "--"
+              args:
+                - "while true; do sleep 30; done;"
+              volumeMounts:
+                - name: sidecar-configmap-volume
+                  mountPath: /configmap-volume
+          volumes:
+            - name: sidecar-configmap-volume
+              configMap:
+                name: sidecar-mounted-configmap
+
+    volumeClaimTemplates:
+      - name: data-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+      - name: log-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi

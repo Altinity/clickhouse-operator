@@ -1,4 +1,6 @@
-# === Builder ===
+# ===================
+# ===== Builder =====
+# ====================
 
 FROM golang:1.12.7 AS builder-metrics-exporter
 
@@ -19,7 +21,9 @@ RUN GO111MODULE=on go mod vendor
 # Build operator binary with explicitly specified output
 RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter ./dev/go_build_metrics_exporter.sh
 
-# === Metrics exporter ===
+# ============================
+# ===== Metrics exporter =====
+# ============================
 
 FROM alpine:3.10 AS metrics-exporter
 

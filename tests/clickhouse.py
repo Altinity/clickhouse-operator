@@ -2,7 +2,11 @@ from kubectl import *
 
 
 def clickhouse_query(chi_name, query, with_error=False, host="127.0.0.1", port="9000", user="default", pwd="", ns="test"):
-    pod_name = kube_get_pod_names(chi_name, ns)[0]
+    pod_names = kube_get_pod_names(chi_name, ns)
+    pod_name = pod_names[0]
+    for p in pod_names:
+        if host in p:
+            pod_name = p
 
     if pwd != "":
         pwd_str = f"--password={pwd}"
