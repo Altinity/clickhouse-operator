@@ -16,10 +16,10 @@ require (
 	github.com/kubernetes-sigs/yaml v1.1.0
 	github.com/mailru/go-clickhouse v1.3.0
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
-	github.com/prometheus/client_golang v1.2.1
+	github.com/prometheus/client_golang v1.6.0
 	github.com/r3labs/diff v0.0.0-20191120142937-b4ed99a31f5a
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0 // indirect
 	gopkg.in/d4l3k/messagediff.v1 v1.2.1
