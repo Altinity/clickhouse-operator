@@ -111,13 +111,13 @@ Vagrant.configure(2) do |config|
 
     export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-prometheus}
     cd /vagrant/deploy/prometheus/
-    kubectl delete ns ${PROMETHEUS_NAMESPACE}
+    kubectl delete ns ${PROMETHEUS_NAMESPACE} || true
     bash -xe ./create-prometheus.sh
     cd /vagrant/
 
     export GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE:-grafana}
     cd /vagrant/deploy/grafana/grafana-with-grafana-operator/
-    kubectl delete ns ${GRAFANA_NAMESPACE}
+    kubectl delete ns ${GRAFANA_NAMESPACE} || true
     bash -xe ./install-grafana-operator.sh
     bash -xe ./install-grafana-with-operator.sh
     cd /vagrant
