@@ -16,7 +16,6 @@ package chi
 
 import (
 	"k8s.io/apimachinery/pkg/labels"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

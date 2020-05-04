@@ -15,13 +15,12 @@
 package chi
 
 import (
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model"
-
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model"
 )
 
 func (c *Controller) labelMyObjectsTree() {

@@ -16,8 +16,10 @@ package chi
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+
 	"gopkg.in/d4l3k/messagediff.v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // ActionPlan is an action plan with list of differences between two CHIs

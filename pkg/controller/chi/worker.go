@@ -16,19 +16,18 @@ package chi
 
 import (
 	"fmt"
-	log "github.com/golang/glog"
-	"k8s.io/client-go/util/workqueue"
 
-	// log "k8s.io/klog"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/util/workqueue"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 type worker struct {
 	c          *Controller
+	a          Announcer
 	queue      workqueue.RateLimitingInterface
 	normalizer *chopmodels.Normalizer
 	schemer    *chopmodels.Schemer
@@ -38,6 +37,7 @@ type worker struct {
 func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
 	return &worker{
 		c:          c,
+		a:          NewAnnouncer(c),
 		queue:      queue,
 		normalizer: chopmodels.NewNormalizer(c.chop),
 		schemer: chopmodels.NewSchemer(
@@ -55,7 +55,7 @@ func (w *worker) run() {
 		// Get() blocks until it can return an item
 		item, shutdown := w.queue.Get()
 		if shutdown {
-			log.V(1).Info("runWorker(): shutdown request")
+			w.a.Info("runWorker(): shutdown request")
 			return
 		}
 
@@ -130,10 +130,10 @@ func (w *worker) processItem(item interface{}) error {
 	case *DropDns:
 		drop, _ := item.(*DropDns)
 		if chi, err := w.createCHIFromObjectMeta(drop.initiator); err == nil {
-			log.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", drop.initiator.Namespace, drop.initiator.Name, chi.Name)
+			w.a.V(2).Info("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", drop.initiator.Namespace, drop.initiator.Name, chi.Name)
 			_ = w.schemer.CHIDropDnsCache(chi)
 		} else {
-			log.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", drop.initiator.Namespace, drop.initiator.Name, drop.initiator.Labels)
+			w.a.Error("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", drop.initiator.Namespace, drop.initiator.Name, drop.initiator.Labels)
 		}
 		return nil
 	}
@@ -149,10 +149,22 @@ func (w *worker) addCHI(new *chop.ClickHouseInstallation) error {
 	// CHI is a new one - need to create normalized CHI
 	// Operator receives CHI struct partially filled by data from .yaml file provided by user
 	// We need to create full normalized specification
-	log.V(1).Infof("addCHI(%s/%s)", new.Namespace, new.Name)
-	w.c.eventCHI(new, eventTypeNormal, eventActionCreate, eventReasonCreateCompleted, fmt.Sprintf("ClickHouseInstallation (%s): start add process", new.Name))
 
-	return w.updateCHI(nil, new)
+	w.a.WithEvent(new, eventActionCreate, eventReasonCreateStarted).
+		WithStatusAction(new).
+		Info("addCHI(%s/%s) started", new.Namespace, new.Name)
+
+	if err := w.updateCHI(nil, new); err != nil {
+		w.a.WithEvent(new, eventActionCreate, eventReasonCreateFailed).
+			WithStatusError(new).
+			Error("addCHI(%s/%s) error %v", new.Namespace, new.Name, err)
+		return err
+	}
+
+	w.a.WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
+		WithStatusAction(new).
+		Info("addCHI(%s/%s) completed", new.Namespace, new.Name)
+	return nil
 }
 
 func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseInstallation {
@@ -169,7 +181,7 @@ func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseIns
 func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 
 	if (old != nil) && (new != nil) && (old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion) {
-		log.V(2).Infof("updateCHI(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
+		w.a.V(2).Info("updateCHI(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
 		// No need to react
 		return nil
 	}
@@ -181,13 +193,9 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 
 	if !actionPlan.HasActionsToDo() {
 		// Nothing to do - no changes found - no need to react
-		log.V(2).Infof("updateCHI(%s/%s) - no changes found", new.Namespace, new.Name)
+		w.a.V(2).Info("updateCHI(%s/%s) - no changes found", new.Namespace, new.Name)
 		return nil
 	}
-
-	log.V(1).Infof("updateCHI(%s/%s) - start reconcile with action plan >>>\n%s",
-		new.Namespace, new.Name, actionPlan.String(),
-	)
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	new.Status.Status = chop.StatusInProgress
@@ -196,54 +204,90 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	new.Status.DeletedHostsCount = 0
 	new.Status.DeleteHostsCount = actionPlan.GetRemovedHostsNum()
 	if err := w.c.updateCHIObjectStatus(new, false); err != nil {
-		log.V(1).Infof("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
+		w.a.V(1).Info("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
 		return nil
 	}
 
+	w.a.V(1).
+		WithEvent(new, eventActionReconcile, eventReasonReconcileStarted).
+		WithStatusAction(new).
+		Info("updateCHI(%s/%s) reconcile started", new.Namespace, new.Name)
+	w.a.V(2).Info("updateCHI(%s/%s) - action plan\n%s\n", new.Namespace, new.Name, actionPlan.String())
+
 	if err := w.reconcile(new); err != nil {
-		str := fmt.Sprintf("FAILED update: %v", err)
-		log.V(1).Info(str)
-		w.c.eventCHI(new, eventTypeError, eventActionUpdate, eventReasonUpdateFailed, str)
+		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).WithStatusError(new).Error("FAILED update: %v", err)
 		return nil
 	}
 
 	// Post-process added items
 	actionPlan.WalkAdded(
 		func(cluster *chop.ChiCluster) {
-			str := fmt.Sprintf("Added cluster %s", cluster.Name)
-			log.V(1).Info(str)
-			w.c.eventCHI(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, str)
+			w.a.V(1).WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
+				WithStatusAction(new).
+				Info("Added cluster %s", cluster.Name)
 		},
 		func(shard *chop.ChiShard) {
-			str := fmt.Sprintf("Added shard %d to cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName)
-			log.V(1).Info(str)
-			w.c.eventCHI(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, str)
-
-			//This is not needed, since tables will be added by HostCreateTables call below
-			//_ = w.schemer.ShardCreateTables(shard)
+			w.a.V(1).WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
+				WithStatusAction(new).
+				Info("Added shard %d to cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName)
 		},
 		func(host *chop.ChiHost) {
-			str := fmt.Sprintf("Added replica %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-			log.V(1).Info(str)
-			w.c.eventCHI(new, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, str)
+			w.a.V(1).WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
+				WithStatusAction(new).
+				Info("Added replica %d to shard %d in cluster %s",
+					host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
-			_ = w.schemer.HostCreateTables(host)
+			if err := w.schemer.HostCreateTables(host); err != nil {
+				w.a.WithEvent(new, eventActionUpdate, eventReasonUpdateFailed).WithStatusError(new).
+					Error("FAILED to create tables on host %s with error %v", host.Name, err)
+			}
 		},
 	)
 
 	// Remove deleted items
 	actionPlan.WalkRemoved(
 		func(cluster *chop.ChiCluster) {
-			w.c.eventCHI(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete cluster %s", cluster.Name))
-			_ = w.deleteCluster(cluster)
+			w.a.V(1).WithEvent(old, eventActionDelete, eventReasonDeleteStarted).
+				WithStatusAction(old).
+				Info("delete cluster %s started", cluster.Name)
+			if err := w.deleteCluster(cluster); err != nil {
+				w.a.WithEvent(old, eventActionDelete, eventReasonDeleteFailed).WithStatusError(old).
+					Error("FAILED to delete cluster %s with error %v", cluster.Name, err)
+			} else {
+				w.a.V(1).WithEvent(old, eventActionDelete, eventReasonDeleteCompleted).
+					WithStatusAction(old).
+					Info("delete cluster %s completed", cluster.Name)
+			}
 		},
 		func(shard *chop.ChiShard) {
-			w.c.eventCHI(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete shard %d in cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName))
-			_ = w.deleteShard(shard)
+			w.a.V(1).WithEvent(old, eventActionDelete, eventReasonDeleteStarted).
+				WithStatusAction(old).
+				Info("delete shard %d in cluster %s started", shard.Address.ShardIndex, shard.Address.ClusterName)
+			if err := w.deleteShard(shard); err != nil {
+				w.a.WithEvent(old, eventActionDelete, eventReasonDeleteFailed).WithStatusError(old).
+					Error("FAILED to delete shard %d in cluster %s with error %v",
+						shard.Address.ShardIndex, shard.Address.ClusterName, err)
+			} else {
+				w.a.V(1).WithEvent(old, eventActionDelete, eventReasonDeleteCompleted).
+					WithStatusAction(old).
+					Info("delete shard %d in cluster %s completed", shard.Address.ShardIndex, shard.Address.ClusterName)
+			}
 		},
 		func(host *chop.ChiHost) {
-			w.c.eventCHI(old, eventTypeNormal, eventActionUpdate, eventReasonUpdateInProgress, fmt.Sprintf("delete replica %d from shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName))
-			_ = w.deleteHost(host)
+			w.a.V(1).WithEvent(old, eventActionDelete, eventReasonDeleteStarted).
+				WithStatusAction(old).
+				Info("delete replica %d from shard %d in cluster %s started",
+					host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			if err := w.deleteHost(host); err != nil {
+				w.a.WithEvent(old, eventActionDelete, eventReasonDeleteFailed).WithStatusError(old).
+					Error("FAILED to delete replica %d from shard %d in cluster %s with error %v",
+						host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName, err)
+			} else {
+				w.a.V(1).WithEvent(old, eventActionDelete, eventReasonDeleteCompleted).
+					WithStatusAction(old).
+					Info("delete replica %d from shard %d in cluster %s completed",
+						host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			}
 		},
 	)
 
@@ -253,7 +297,10 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 
 	w.c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
 
-	log.V(1).Infof("updateCHI(%s/%s) - complete reconcile <<<", new.Namespace, new.Name)
+	w.a.V(1).
+		WithEvent(new, eventActionReconcile, eventReasonReconcileCompleted).
+		WithStatusAction(new).
+		Info("updateCHI(%s/%s) reconcile completed", new.Namespace, new.Name)
 
 	return nil
 }
@@ -346,11 +393,16 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 	var err error
 
-	log.V(1).Infof("Start delete CHI %s/%s", chi.Namespace, chi.Name)
+	w.a.V(1).
+		WithEvent(chi, eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(chi).
+		Info("Start delete CHI %s/%s", chi.Namespace, chi.Name)
 
 	chi, err = w.normalizer.CreateTemplatedCHI(chi, true)
 	if err != nil {
-		log.V(1).Infof("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
+		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(chi).
+			Error("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
 		return err
 	}
 
@@ -365,25 +417,35 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 	// Delete Service
 	err = w.c.deleteServiceCHI(chi)
 
-	w.c.eventCHI(chi, eventTypeNormal, eventActionDelete, eventReasonDeleteCompleted, "deleted")
+	w.a.V(1).
+		WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
+		WithStatusAction(chi).
+		Info("End delete CHI %s/%s", chi.Namespace, chi.Name)
 
+	// Exclude this CHI from monitoring
 	w.c.deleteWatch(chi.Namespace, chi.Name)
-
-	log.V(1).Infof("End delete CHI %s/%s", chi.Namespace, chi.Name)
 
 	return nil
 }
 
 // deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
 func (w *worker) deleteHost(host *chop.ChiHost) error {
-	log.V(1).Infof("Worker delete host %s/%s", host.Address.ClusterName, host.Name)
+	w.a.V(1).
+		WithEvent(host.CHI, eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(host.CHI).
+		Info("Worker delete host %s/%s", host.Address.ClusterName, host.Name)
 
 	if _, err := w.c.FindStatefulSet(host); err != nil {
-		log.V(1).Infof("Worker delete host %s/%s - StatefulSet not found - already deleted?", host.Address.ClusterName, host.Name)
+		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
+			WithStatusAction(host.CHI).
+			Error("Worker delete host %s/%s - StatefulSet not found - already deleted? %v",
+				host.Address.ClusterName, host.Name, err)
 		return nil
 	}
 
-	log.V(1).Infof("Worker delete host %s/%s - StatefulSet found - start delete process", host.Address.ClusterName, host.Name)
+	w.a.V(1).
+		WithEvent(host.CHI, eventActionDelete, eventReasonDeleteInProgress).
+		Info("Worker delete host %s/%s - StatefulSet found - start delete process", host.Address.ClusterName, host.Name)
 
 	// Each host consists of
 	// 1. Tables on host - we need to delete tables on the host in order to clean Zookeeper data
@@ -402,21 +464,30 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 
 // deleteShard deletes all kubernetes resources related to shard *chop.ChiShard
 func (w *worker) deleteShard(shard *chop.ChiShard) error {
-	log.V(1).Infof("Start delete shard %s/%s", shard.Address.Namespace, shard.Name)
+	w.a.V(1).
+		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(shard.CHI).
+		Info("Start delete shard %s/%s", shard.Address.Namespace, shard.Name)
 
 	// Delete all replicas
 	shard.WalkHosts(w.deleteHost)
 
 	// Delete Shard Service
 	_ = w.c.deleteServiceShard(shard)
-	log.V(1).Infof("End delete shard %s/%s", shard.Address.Namespace, shard.Name)
+	w.a.V(1).
+		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteCompleted).
+		WithStatusAction(shard.CHI).
+		Info("End delete shard %s/%s", shard.Address.Namespace, shard.Name)
 
 	return nil
 }
 
 // deleteCluster deletes all kubernetes resources related to cluster *chop.ChiCluster
 func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
-	log.V(1).Infof("Start delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
+	w.a.V(1).
+		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(cluster.CHI).
+		Info("Start delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
 
 	// Delete all shards
 	cluster.WalkShards(func(index int, shard *chop.ChiShard) error {
@@ -425,7 +496,10 @@ func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
 
 	// Delete Cluster Service
 	_ = w.c.deleteServiceCluster(cluster)
-	log.V(1).Infof("End delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
+	w.a.V(1).
+		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteCompleted).
+		WithStatusAction(cluster.CHI).
+		Info("End delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
 
 	return nil
 }

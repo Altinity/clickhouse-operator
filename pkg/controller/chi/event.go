@@ -15,54 +15,86 @@
 package chi
 
 import (
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"time"
+
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
-
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"time"
+	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 const (
-	// Event type (Normal, Warning) specifies what event type is this
-	eventTypeNormal  = "Normal"
+	// Event type (Info, Warning, Error) specifies what event type is this
+	eventTypeInfo    = "Info"
 	eventTypeWarning = "Warning"
 	eventTypeError   = "Error"
 )
 
 const (
 	// Event action describes what action was taken
-	eventActionCreate = "Create"
-	eventActionUpdate = "Update"
-	eventActionDelete = "Delete"
+	eventActionReconcile = "Reconcile"
+	eventActionCreate    = "Create"
+	eventActionUpdate    = "Update"
+	eventActionDelete    = "Delete"
 )
 
 const (
 	// Short, machine understandable string that gives the reason for the transition into the object's current status
-	eventReasonCreateStarted    = "CreateStarted"
-	eventReasonCreateInProgress = "CreateInProgress"
-	eventReasonCreateCompleted  = "CreateCompleted"
-	eventReasonCreateFailed     = "CreateFailed"
-	eventReasonUpdateStarted    = "UpdateStarted"
-	eventReasonUpdateInProgress = "UpdateInProgress"
-	eventReasonUpdateCompleted  = "UpdateCompleted"
-	eventReasonUpdateFailed     = "UpdateFailed"
-	eventReasonDeleteStarted    = "DeleteStarted"
-	eventReasonDeleteInProgress = "DeleteInProgress"
-	eventReasonDeleteCompleted  = "DeleteCompleted"
-	eventReasonDeleteFailed     = "DeleteFailed"
+	eventReasonReconcileStarted    = "ReconcileStarted"
+	eventReasonReconcileInProgress = "ReconcileInProgress"
+	eventReasonReconcileCompleted  = "ReconcileCompleted"
+	eventReasonReconcileFailed     = "ReconcileFailed"
+	eventReasonCreateStarted       = "CreateStarted"
+	eventReasonCreateInProgress    = "CreateInProgress"
+	eventReasonCreateCompleted     = "CreateCompleted"
+	eventReasonCreateFailed        = "CreateFailed"
+	eventReasonUpdateStarted       = "UpdateStarted"
+	eventReasonUpdateInProgress    = "UpdateInProgress"
+	eventReasonUpdateCompleted     = "UpdateCompleted"
+	eventReasonUpdateFailed        = "UpdateFailed"
+	eventReasonDeleteStarted       = "DeleteStarted"
+	eventReasonDeleteInProgress    = "DeleteInProgress"
+	eventReasonDeleteCompleted     = "DeleteCompleted"
+	eventReasonDeleteFailed        = "DeleteFailed"
 )
 
-// eventCHI creates CHI-related event
+func (c *Controller) eventInfo(
+	chi *chop.ClickHouseInstallation,
+	action string,
+	reason string,
+	message string,
+) {
+	c.emitEvent(chi, eventTypeInfo, action, reason, message)
+}
+
+func (c *Controller) eventWarning(
+	chi *chop.ClickHouseInstallation,
+	action string,
+	reason string,
+	message string,
+) {
+	c.emitEvent(chi, eventTypeWarning, action, reason, message)
+}
+
+func (c *Controller) eventError(
+	chi *chop.ClickHouseInstallation,
+	action string,
+	reason string,
+	message string,
+) {
+	c.emitEvent(chi, eventTypeWarning, action, reason, message)
+}
+
+// emitEvent creates CHI-related event
 // typ - type of the event - Normal, Warning, etc, one of eventType*
 // action - what action was attempted, and then succeeded/failed regarding to the Involved Object. One of eventAction*
 // reason - short, machine understandable string, one of eventReason*
 // message - human-readable description
-func (c *Controller) eventCHI(
+func (c *Controller) emitEvent(
 	chi *chop.ClickHouseInstallation,
-	typ string,
+	_type string,
 	action string,
 	reason string,
 	message string,
@@ -92,7 +124,7 @@ func (c *Controller) eventCHI(
 			Time: now,
 		},
 		Count:               1,
-		Type:                typ,
+		Type:                _type,
 		Action:              action,
 		ReportingController: "clickhouse-operator",
 		// ID of the controller instance, e.g. `kubelet-xyzf`.
