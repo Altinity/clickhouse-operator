@@ -17,21 +17,24 @@ package chi
 import (
 	"fmt"
 
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
+	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
 type worker struct {
 	c          *Controller
 	a          Announcer
 	queue      workqueue.RateLimitingInterface
-	normalizer *chopmodels.Normalizer
-	schemer    *chopmodels.Schemer
-	creator    *chopmodels.Creator
+	normalizer *chopmodel.Normalizer
+	schemer    *chopmodel.Schemer
+	creator    *chopmodel.Creator
 }
 
 func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
@@ -39,8 +42,8 @@ func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
 		c:          c,
 		a:          NewAnnouncer(c),
 		queue:      queue,
-		normalizer: chopmodels.NewNormalizer(c.chop),
-		schemer: chopmodels.NewSchemer(
+		normalizer: chopmodel.NewNormalizer(c.chop),
+		schemer: chopmodel.NewSchemer(
 			c.chop.Config().CHUsername,
 			c.chop.Config().CHPassword,
 			c.chop.Config().CHPort,
@@ -295,7 +298,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	new.Status.Status = chop.StatusCompleted
 	_ = w.c.updateCHIObjectStatus(new, false)
 
-	w.c.updateWatch(new.Namespace, new.Name, chopmodels.CreatePodFQDNsOfChi(new))
+	w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfChi(new))
 
 	w.a.V(1).
 		WithEvent(new, eventActionReconcile, eventReasonReconcileCompleted).
@@ -307,7 +310,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 
 // reconcile reconciles ClickHouseInstallation
 func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
-	w.creator = chopmodels.NewCreator(w.c.chop, chi)
+	w.creator = chopmodel.NewCreator(w.c.chop, chi)
 	return chi.WalkTillError(
 		w.reconcileCHI,
 		w.reconcileCluster,
@@ -320,7 +323,7 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	// 1. CHI Service
 	service := w.creator.CreateServiceCHI()
-	if err := w.c.ReconcileService(service); err != nil {
+	if err := w.ReconcileService(chi, service); err != nil {
 		return err
 	}
 
@@ -330,13 +333,13 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
 	configMapCommon := w.creator.CreateConfigMapCHICommon()
-	if err := w.c.ReconcileConfigMap(configMapCommon); err != nil {
+	if err := w.ReconcileConfigMap(chi, configMapCommon); err != nil {
 		return err
 	}
 
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
-	if err := w.c.ReconcileConfigMap(configMapUsers); err != nil {
+	if err := w.ReconcileConfigMap(chi, configMapUsers); err != nil {
 		return err
 	}
 
@@ -349,7 +352,7 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 func (w *worker) reconcileCluster(cluster *chop.ChiCluster) error {
 	// Add Cluster's Service
 	if service := w.creator.CreateServiceCluster(cluster); service != nil {
-		return w.c.ReconcileService(service)
+		return w.ReconcileService(cluster.CHI, service)
 	} else {
 		return nil
 	}
@@ -359,7 +362,7 @@ func (w *worker) reconcileCluster(cluster *chop.ChiCluster) error {
 func (w *worker) reconcileShard(shard *chop.ChiShard) error {
 	// Add Shard's Service
 	if service := w.creator.CreateServiceShard(shard); service != nil {
-		return w.c.ReconcileService(service)
+		return w.ReconcileService(shard.CHI, service)
 	} else {
 		return nil
 	}
@@ -370,19 +373,19 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 	// Add host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)
-	if err := w.c.ReconcileConfigMap(configMap); err != nil {
+	if err := w.ReconcileConfigMap(host.CHI, configMap); err != nil {
 		return err
 	}
 
 	// Add host's StatefulSet
 	statefulSet := w.creator.CreateStatefulSet(host)
-	if err := w.c.ReconcileStatefulSet(statefulSet, host); err != nil {
+	if err := w.ReconcileStatefulSet(statefulSet, host); err != nil {
 		return err
 	}
 
 	// Add host's Service
 	service := w.creator.CreateServiceHost(host)
-	if err := w.c.ReconcileService(service); err != nil {
+	if err := w.ReconcileService(host.CHI, service); err != nil {
 		return err
 	}
 
@@ -435,7 +438,7 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 		WithStatusAction(host.CHI).
 		Info("Worker delete host %s/%s", host.Address.ClusterName, host.Name)
 
-	if _, err := w.c.FindStatefulSet(host); err != nil {
+	if _, err := w.c.getStatefulSetByHost(host); err != nil {
 		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusAction(host.CHI).
 			Error("Worker delete host %s/%s - StatefulSet not found - already deleted? %v",
@@ -519,7 +522,7 @@ func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.Cli
 }
 
 func (w *worker) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.ChiCluster, error) {
-	clusterName, err := chopmodels.GetClusterNameFromObjectMeta(objectMeta)
+	clusterName, err := chopmodel.GetClusterNameFromObjectMeta(objectMeta)
 	if err != nil {
 		return nil, fmt.Errorf("ObjectMeta %s does not generated by CHI %v", objectMeta.Name, err)
 	}
@@ -535,4 +538,128 @@ func (w *worker) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop
 	}
 
 	return cluster, nil
+}
+
+// ReconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
+func (w *worker) ReconcileConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
+	// Check whether this object already exists in k8s
+	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, false)
+
+	if curConfigMap != nil {
+		// Object found - update it
+		_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
+
+		w.a.V(1).
+			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
+			WithStatusAction(chi).
+			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+
+		return err
+	}
+
+	if apierrors.IsNotFound(err) {
+		// Object not found - create it
+		_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
+
+		w.a.V(1).
+			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(chi).
+			Info("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+
+		return err
+	}
+
+	return err
+}
+
+// ReconcileService reconciles core.Service
+func (w *worker) ReconcileService(chi *chop.ClickHouseInstallation, service *core.Service) error {
+	// Check whether this object already exists in k8s
+	curService, err := w.c.getService(&service.ObjectMeta, false)
+
+	if curService != nil {
+		// Object found - update it
+
+		// Updating Service is a complicated business
+
+		// spec.resourceVersion is required in order to update object
+		service.ResourceVersion = curService.ResourceVersion
+
+		// spec.clusterIP field is immutable, need to use already assigned value
+		// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+		// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
+		// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
+		service.Spec.ClusterIP = curService.Spec.ClusterIP
+
+		// spec.healthCheckNodePort field is used with ExternalTrafficPolicy=Local only and is immutable within ExternalTrafficPolicy=Local
+		// In case ExternalTrafficPolicy is changed it seems to be irrelevant
+		// https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+		if (curService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) &&
+			(service.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) {
+			service.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
+		}
+
+		// And only now we are ready to actually update the service with new version of the service
+		_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Update(service)
+
+		w.a.V(1).
+			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
+			WithStatusAction(chi).
+			Info("Update Service %s/%s", service.Namespace, service.Name)
+
+		return err
+	}
+
+	if apierrors.IsNotFound(err) {
+		// Object not found - create it
+		_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
+
+		w.a.V(1).
+			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(chi).
+			Info("Create Service %s/%s", service.Namespace, service.Name)
+
+		return err
+	}
+
+	return err
+}
+
+// ReconcileStatefulSet reconciles apps.StatefulSet
+func (w *worker) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+	// Check whether this object already exists in k8s
+	curStatefulSet, err := w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
+
+	if curStatefulSet != nil {
+		// Object found - update it
+		err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet)
+
+		host.CHI.Status.UpdatedHostsCount++
+		_ = w.c.updateCHIObjectStatus(host.CHI, false)
+
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
+			WithStatusAction(host.CHI).
+			Info("Update StatefulSet %s/%s", newStatefulSet.Namespace, newStatefulSet.Name)
+
+		return err
+	}
+
+	if apierrors.IsNotFound(err) {
+		// Object not found - create it
+		err := w.c.createStatefulSet(newStatefulSet, host)
+
+		host.CHI.Status.AddedHostsCount++
+		_ = w.c.updateCHIObjectStatus(host.CHI, false)
+
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(host.CHI).
+			Info("Create StatefulSet %s/%s", newStatefulSet.Namespace, newStatefulSet.Name)
+
+		return err
+	}
+
+	return err
 }

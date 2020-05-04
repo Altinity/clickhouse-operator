@@ -84,7 +84,7 @@ func (c *Controller) eventError(
 	reason string,
 	message string,
 ) {
-	c.emitEvent(chi, eventTypeWarning, action, reason, message)
+	c.emitEvent(chi, eventTypeError, action, reason, message)
 }
 
 // emitEvent creates CHI-related event
@@ -100,22 +100,28 @@ func (c *Controller) emitEvent(
 	message string,
 ) {
 	now := time.Now()
+	kind := "ClickHouseInstallation"
+	namespace := chi.Namespace
+	name := chi.Name
+	uid := chi.UID
+	resourceVersion := chi.ResourceVersion
+
 	event := &core.Event{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: "chop-chi-",
 		},
 		InvolvedObject: core.ObjectReference{
-			Kind:            "ClickHouseInstallation",
-			Namespace:       chi.Namespace,
-			Name:            chi.Name,
-			UID:             chi.UID,
+			Kind:            kind,
+			Namespace:       namespace,
+			Name:            name,
+			UID:             uid,
 			APIVersion:      "clickhouse.altinity.com/v1",
-			ResourceVersion: chi.ResourceVersion,
+			ResourceVersion: resourceVersion,
 		},
 		Reason:  reason,
 		Message: message,
 		Source: core.EventSource{
-			Component: "clickhouse-operator",
+			Component: componentName,
 		},
 		FirstTimestamp: meta.Time{
 			Time: now,
@@ -126,11 +132,11 @@ func (c *Controller) emitEvent(
 		Count:               1,
 		Type:                _type,
 		Action:              action,
-		ReportingController: "clickhouse-operator",
+		ReportingController: componentName,
 		// ID of the controller instance, e.g. `kubelet-xyzf`.
 		// ReportingInstance:
 	}
-	_, err := c.kubeClient.CoreV1().Events(chi.Namespace).Create(event)
+	_, err := c.kubeClient.CoreV1().Events(namespace).Create(event)
 
 	if err != nil {
 		log.V(1).Infof("Create Event failed: %v", err)

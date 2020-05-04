@@ -88,14 +88,6 @@ func (c *Controller) statefulSetDeletePod(statefulSet *apps.StatefulSet) error {
 	return c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(name, newDeleteOptions())
 }
 
-func (c *Controller) FindStatefulSet(host *chop.ChiHost) (*apps.StatefulSet, error) {
-	// Namespaced name
-	name := chopmodel.CreateStatefulSetName(host)
-	namespace := host.Address.Namespace
-
-	return c.statefulSetLister.StatefulSets(namespace).Get(name)
-}
-
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
 func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 	// IMPORTANT
@@ -109,7 +101,7 @@ func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 
 	log.V(1).Infof("deleteStatefulSet(%s/%s)", namespace, name)
 
-	statefulSet, err := c.FindStatefulSet(host)
+	statefulSet, err := c.getStatefulSetByHost(host)
 	if err != nil {
 		log.V(1).Infof("error get StatefulSet %s/%s", namespace, name)
 		return nil
@@ -133,7 +125,7 @@ func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 	for {
 		// TODO
 		// There should be better way to sync cache
-		if _, err := c.FindStatefulSet(host); err == nil {
+		if _, err := c.getStatefulSetByHost(host); err == nil {
 			log.V(1).Infof("StatefulSet %s/%s deleted, cache NOT yet synced", namespace, name)
 			time.Sleep(5 * time.Second)
 		} else {

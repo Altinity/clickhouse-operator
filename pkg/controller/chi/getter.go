@@ -24,6 +24,7 @@ import (
 	kublabels "k8s.io/apimachinery/pkg/labels"
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
@@ -169,6 +170,15 @@ func (c *Controller) getStatefulSet(objMeta *meta.ObjectMeta, byNameOnly bool) (
 
 	// Too much objects found by labels
 	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
+}
+
+// getStatefulSetByHost finds StatefulSet of a specified host
+func (c *Controller) getStatefulSetByHost(host *chop.ChiHost) (*apps.StatefulSet, error) {
+	// Namespaced name
+	name := chopmodel.CreateStatefulSetName(host)
+	namespace := host.Address.Namespace
+
+	return c.statefulSetLister.StatefulSets(namespace).Get(name)
 }
 
 // GetCHIByObjectMeta gets CHI by namespaced name
