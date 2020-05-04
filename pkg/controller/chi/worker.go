@@ -86,7 +86,7 @@ func (w *worker) processItem(item interface{}) error {
 		reconcile, _ := item.(*ReconcileChi)
 		switch reconcile.cmd {
 		case reconcileAdd:
-			return w.addCHI(reconcile.new)
+			return w.updateCHI(nil, reconcile.new)
 		case reconcileUpdate:
 			return w.updateCHI(reconcile.old, reconcile.new)
 		case reconcileDelete:
@@ -144,29 +144,6 @@ func (w *worker) processItem(item interface{}) error {
 	// Unknown item type, don't know what to do with it
 	// Just skip it and behave like it never existed
 	utilruntime.HandleError(fmt.Errorf("unexpected item in the queue - %#v", item))
-	return nil
-}
-
-// addCHI normalize CHI - updates CHI object to normalized
-func (w *worker) addCHI(new *chop.ClickHouseInstallation) error {
-	// CHI is a new one - need to create normalized CHI
-	// Operator receives CHI struct partially filled by data from .yaml file provided by user
-	// We need to create full normalized specification
-
-	w.a.WithEvent(new, eventActionCreate, eventReasonCreateStarted).
-		WithStatusAction(new).
-		Info("addCHI(%s/%s) started", new.Namespace, new.Name)
-
-	if err := w.updateCHI(nil, new); err != nil {
-		w.a.WithEvent(new, eventActionCreate, eventReasonCreateFailed).
-			WithStatusError(new).
-			Error("addCHI(%s/%s) error %v", new.Namespace, new.Name, err)
-		return err
-	}
-
-	w.a.WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
-		WithStatusAction(new).
-		Info("addCHI(%s/%s) completed", new.Namespace, new.Name)
 	return nil
 }
 
@@ -250,44 +227,44 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	// Remove deleted items
 	actionPlan.WalkRemoved(
 		func(cluster *chop.ChiCluster) {
-			w.a.V(1).WithEvent(old, eventActionDelete, eventReasonDeleteStarted).
-				WithStatusAction(old).
+			w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteStarted).
+				WithStatusAction(new).
 				Info("delete cluster %s started", cluster.Name)
 			if err := w.deleteCluster(cluster); err != nil {
-				w.a.WithEvent(old, eventActionDelete, eventReasonDeleteFailed).WithStatusError(old).
+				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
 					Error("FAILED to delete cluster %s with error %v", cluster.Name, err)
 			} else {
-				w.a.V(1).WithEvent(old, eventActionDelete, eventReasonDeleteCompleted).
-					WithStatusAction(old).
+				w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteCompleted).
+					WithStatusAction(new).
 					Info("delete cluster %s completed", cluster.Name)
 			}
 		},
 		func(shard *chop.ChiShard) {
-			w.a.V(1).WithEvent(old, eventActionDelete, eventReasonDeleteStarted).
-				WithStatusAction(old).
+			w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteStarted).
+				WithStatusAction(new).
 				Info("delete shard %d in cluster %s started", shard.Address.ShardIndex, shard.Address.ClusterName)
 			if err := w.deleteShard(shard); err != nil {
-				w.a.WithEvent(old, eventActionDelete, eventReasonDeleteFailed).WithStatusError(old).
+				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
 					Error("FAILED to delete shard %d in cluster %s with error %v",
 						shard.Address.ShardIndex, shard.Address.ClusterName, err)
 			} else {
-				w.a.V(1).WithEvent(old, eventActionDelete, eventReasonDeleteCompleted).
-					WithStatusAction(old).
+				w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteCompleted).
+					WithStatusAction(new).
 					Info("delete shard %d in cluster %s completed", shard.Address.ShardIndex, shard.Address.ClusterName)
 			}
 		},
 		func(host *chop.ChiHost) {
-			w.a.V(1).WithEvent(old, eventActionDelete, eventReasonDeleteStarted).
-				WithStatusAction(old).
+			w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteStarted).
+				WithStatusAction(new).
 				Info("delete replica %d from shard %d in cluster %s started",
 					host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 			if err := w.deleteHost(host); err != nil {
-				w.a.WithEvent(old, eventActionDelete, eventReasonDeleteFailed).WithStatusError(old).
+				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
 					Error("FAILED to delete replica %d from shard %d in cluster %s with error %v",
 						host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName, err)
 			} else {
-				w.a.V(1).WithEvent(old, eventActionDelete, eventReasonDeleteCompleted).
-					WithStatusAction(old).
+				w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteCompleted).
+					WithStatusAction(new).
 					Info("delete replica %d from shard %d in cluster %s completed",
 						host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 			}
