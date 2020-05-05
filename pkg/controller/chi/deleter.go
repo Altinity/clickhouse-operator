@@ -34,18 +34,15 @@ func (c *Controller) deleteHost(host *chop.ChiHost) error {
 	// 4. ConfigMap
 	// 5. Service
 	// Need to delete all these item
-	log.V(1).Infof("Controller delete host %s/%s", host.Address.ClusterName, host.Name)
+
+	log.V(1).Infof("Controller delete host started %s/%s", host.Address.ClusterName, host.Name)
 
 	_ = c.deleteStatefulSet(host)
 	_ = c.deletePVC(host)
 	_ = c.deleteConfigMap(host)
 	_ = c.deleteServiceHost(host)
 
-	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
-	host.CHI.Status.DeletedHostsCount++
-	_ = c.updateCHIObjectStatus(host.CHI, true)
-
-	log.V(1).Infof("End delete host %s/%s", host.Address.ClusterName, host.Name)
+	log.V(1).Infof("Controller delete host completed %s/%s", host.Address.ClusterName, host.Name)
 
 	return nil
 }

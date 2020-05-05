@@ -504,7 +504,13 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 		}
 	}
 
-	return w.c.deleteHost(host)
+	err := w.c.deleteHost(host)
+
+	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
+	host.CHI.Status.DeletedHostsCount++
+	_ = w.c.updateCHIObjectStatus(host.CHI, true)
+
+	return err
 }
 
 // deleteShard deletes all kubernetes resources related to shard *chop.ChiShard
