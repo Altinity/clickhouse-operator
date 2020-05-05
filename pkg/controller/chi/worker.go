@@ -431,13 +431,13 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 	w.a.V(1).
 		WithEvent(chi, eventActionDelete, eventReasonDeleteStarted).
 		WithStatusAction(chi).
-		Info("Start delete CHI %s/%s", chi.Namespace, chi.Name)
+		Info("Delete CHI %s/%s started", chi.Namespace, chi.Name)
 
 	chi, err = w.normalizer.CreateTemplatedCHI(chi, true)
 	if err != nil {
 		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(chi).
-			Error("ClickHouseInstallation (%q): unable to normalize: %q", chi.Name, err)
+			Error("Delete CHI %s/%s failed - unable to normalize: %q", chi.Namespace, chi.Name, err)
 		return err
 	}
 
@@ -455,7 +455,7 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 	w.a.V(1).
 		WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
 		WithStatusAction(chi).
-		Info("End delete CHI %s/%s", chi.Namespace, chi.Name)
+		Info("Delete CHI %s/%s - completed", chi.Namespace, chi.Name)
 
 	// Exclude this CHI from monitoring
 	w.c.deleteWatch(chi.Namespace, chi.Name)
@@ -468,19 +468,15 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionDelete, eventReasonDeleteStarted).
 		WithStatusAction(host.CHI).
-		Info("Worker delete host %s/%s", host.Address.ClusterName, host.Name)
+		Info("Delete host %s/%s - started", host.Address.ClusterName, host.Name)
 
 	if _, err := w.c.getStatefulSetByHost(host); err != nil {
 		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusAction(host.CHI).
-			Error("Worker delete host %s/%s - StatefulSet not found - already deleted? %v",
+			Error("Delete host %s/%s failed - StatefulSet not found - already deleted? %v",
 				host.Address.ClusterName, host.Name, err)
 		return nil
 	}
-
-	w.a.V(1).
-		WithEvent(host.CHI, eventActionDelete, eventReasonDeleteInProgress).
-		Info("Worker delete host %s/%s - StatefulSet found - start delete process", host.Address.ClusterName, host.Name)
 
 	// Each host consists of
 	// 1. Tables on host - we need to delete tables on the host in order to clean Zookeeper data
@@ -494,12 +490,14 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 		err := w.schemer.HostDeleteTables(host)
 
 		if err == nil {
-			w.a.V(1).WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
+			w.a.V(1).
+				WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
 				WithStatusAction(host.CHI).
 				Info("Deleted tables on host %s replica %d to shard %d in cluster %s",
 					host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		} else {
-			w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).WithStatusError(host.CHI).
+			w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
+				WithStatusError(host.CHI).
 				Error("FAILED to delete tables on host %s with error %v", host.Name, err)
 		}
 	}
@@ -510,6 +508,17 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 	host.CHI.Status.DeletedHostsCount++
 	_ = w.c.updateCHIObjectStatus(host.CHI, true)
 
+	if err == nil {
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(host.CHI).
+			Info("Delete host %s/%s - completed", host.Address.ClusterName, host.Name)
+	} else {
+		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(host.CHI).
+			Error("FAILED Delete host %s/%s - completed", host.Address.ClusterName, host.Name)
+	}
+
 	return err
 }
 
@@ -518,7 +527,7 @@ func (w *worker) deleteShard(shard *chop.ChiShard) error {
 	w.a.V(1).
 		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteStarted).
 		WithStatusAction(shard.CHI).
-		Info("Start delete shard %s/%s", shard.Address.Namespace, shard.Name)
+		Info("Delete shard %s/%s - started", shard.Address.Namespace, shard.Name)
 
 	// Delete all replicas
 	shard.WalkHosts(w.deleteHost)
@@ -529,7 +538,7 @@ func (w *worker) deleteShard(shard *chop.ChiShard) error {
 	w.a.V(1).
 		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteCompleted).
 		WithStatusAction(shard.CHI).
-		Info("End delete shard %s/%s", shard.Address.Namespace, shard.Name)
+		Info("Delete shard %s/%s - completed", shard.Address.Namespace, shard.Name)
 
 	return nil
 }
@@ -539,7 +548,7 @@ func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
 	w.a.V(1).
 		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteStarted).
 		WithStatusAction(cluster.CHI).
-		Info("Start delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
+		Info("Delete cluster %s/%s - started", cluster.Address.Namespace, cluster.Name)
 
 	// Delete all shards
 	cluster.WalkShards(func(index int, shard *chop.ChiShard) error {
@@ -552,7 +561,7 @@ func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
 	w.a.V(1).
 		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteCompleted).
 		WithStatusAction(cluster.CHI).
-		Info("End delete cluster %s/%s", cluster.Address.Namespace, cluster.Name)
+		Info("Delete cluster %s/%s - completed", cluster.Address.Namespace, cluster.Name)
 
 	return nil
 }
