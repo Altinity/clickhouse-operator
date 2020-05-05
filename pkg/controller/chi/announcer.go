@@ -123,10 +123,14 @@ func (a Announcer) Error(format string, args ...interface{}) {
 func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 	if a.writeStatusAction {
 		(&a.chi.Status).PushAction(fmt.Sprintf(format, args...))
-		_ = a.c.updateCHIObjectStatus(a.chi, true)
 	}
+
 	if a.writeStatusError {
 		(&a.chi.Status).PushError(fmt.Sprintf(format, args...))
+	}
+
+	// Propagate status updates into object
+	if a.writeStatusAction || a.writeStatusError {
 		_ = a.c.updateCHIObjectStatus(a.chi, true)
 	}
 }
