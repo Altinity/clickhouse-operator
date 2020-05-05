@@ -352,23 +352,45 @@ func (w *worker) reconcileShard(shard *chop.ChiShard) error {
 // reconcileHost reconciles ClickHouse host
 func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
+	w.a.V(1).
+		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileStarted).
+		WithStatusAction(host.CHI).
+		Info("Reconcile Host %s started", host.Name)
+
 	// Add host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)
 	if err := w.ReconcileConfigMap(host.CHI, configMap); err != nil {
+		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(host.CHI).
+			WithStatusError(host.CHI).
+			Error("Reconcile Host %s failed to reconcile ConfigMap %s", host.Name, configMap.Name)
 		return err
 	}
 
 	// Add host's StatefulSet
 	statefulSet := w.creator.CreateStatefulSet(host)
 	if err := w.ReconcileStatefulSet(statefulSet, host); err != nil {
+		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(host.CHI).
+			WithStatusError(host.CHI).
+			Error("Reconcile Host %s failed to reconcile StatefulSet %s", host.Name, statefulSet.Name)
 		return err
 	}
 
 	// Add host's Service
 	service := w.creator.CreateServiceHost(host)
 	if err := w.ReconcileService(host.CHI, service); err != nil {
+		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(host.CHI).
+			WithStatusError(host.CHI).
+			Error("Reconcile Host %s failed to reconcile Service %s", host.Name, service.Name)
 		return err
 	}
+
+	w.a.V(1).
+		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
+		WithStatusAction(host.CHI).
+		Info("Reconcile Host %s completed", host.Name)
 
 	return nil
 }
