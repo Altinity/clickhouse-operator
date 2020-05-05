@@ -271,19 +271,19 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 			// Delete Host
 			w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteStarted).
 				WithStatusAction(new).
-				Info("delete replica %d from shard %d in cluster %s started",
-					host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+				Info("Delete host %s replica %d from shard %d in cluster %s started",
+					host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
 			err := w.deleteHost(host)
 			if err == nil {
 				w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteCompleted).
 					WithStatusAction(new).
-					Info("delete replica %d from shard %d in cluster %s completed",
-						host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+					Info("Delete host %s replica %d from shard %d in cluster %s completed",
+						host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 			} else {
 				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
-					Error("FAILED to delete replica %d from shard %d in cluster %s with error %v",
-						host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName, err)
+					Error("FAILED to delete host %s replica %d from shard %d in cluster %s with error %v",
+						host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName, err)
 			}
 		},
 	)
