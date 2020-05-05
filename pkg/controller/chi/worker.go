@@ -226,7 +226,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 					Info("Added items - tables on host %s replica %d to shard %d in cluster %s",
 						host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 			} else {
-				w.a.WithEvent(new, eventActionUpdate, eventReasonUpdateFailed).WithStatusError(new).
+				w.a.WithEvent(new, eventActionCreate, eventReasonCreateFailed).WithStatusError(new).
 					Error("FAILED to create tables on host %s with error %v", host.Name, err)
 			}
 		},
@@ -317,7 +317,7 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	// 1. CHI Service
 	service := w.creator.CreateServiceCHI()
-	if err := w.ReconcileService(chi, service); err != nil {
+	if err := w.reconcileService(chi, service); err != nil {
 		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
@@ -363,7 +363,7 @@ func (w *worker) reconcileCluster(cluster *chop.ChiCluster) error {
 		// For somewhat reason Service is not created, this is an error, but not clear what to do about it
 		return nil
 	}
-	return w.ReconcileService(cluster.CHI, service)
+	return w.reconcileService(cluster.CHI, service)
 }
 
 // reconcileShard reconciles Shard, excluding nested replicas
@@ -375,7 +375,7 @@ func (w *worker) reconcileShard(shard *chop.ChiShard) error {
 		// For somewhat reason Service is not created, this is an error, but not clear what to do about it
 		return nil
 	}
-	return w.ReconcileService(shard.CHI, service)
+	return w.reconcileService(shard.CHI, service)
 }
 
 // reconcileHost reconciles ClickHouse host
@@ -398,7 +398,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 	// Add host's StatefulSet
 	statefulSet := w.creator.CreateStatefulSet(host)
-	if err := w.ReconcileStatefulSet(statefulSet, host); err != nil {
+	if err := w.reconcileStatefulSet(statefulSet, host); err != nil {
 		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusAction(host.CHI).
 			WithStatusError(host.CHI).
@@ -408,7 +408,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 	// Add host's Service
 	service := w.creator.CreateServiceHost(host)
-	if err := w.ReconcileService(host.CHI, service); err != nil {
+	if err := w.reconcileService(host.CHI, service); err != nil {
 		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusAction(host.CHI).
 			WithStatusError(host.CHI).
@@ -491,7 +491,17 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 	// Need to delete all these item
 
 	if host.CanDeleteAllPVCs() {
-		_ = w.schemer.HostDeleteTables(host)
+		err := w.schemer.HostDeleteTables(host)
+
+		if err == nil {
+			w.a.V(1).WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
+				WithStatusAction(host.CHI).
+				Info("Deleted tables on host %s replica %d to shard %d in cluster %s",
+					host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		} else {
+			w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).WithStatusError(host.CHI).
+				Error("FAILED to delete tables on host %s with error %v", host.Name, err)
+		}
 	}
 
 	return w.c.deleteHost(host)
@@ -620,8 +630,8 @@ func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap 
 	return err
 }
 
-// ReconcileService reconciles core.Service
-func (w *worker) ReconcileService(chi *chop.ClickHouseInstallation, service *core.Service) error {
+// reconcileService reconciles core.Service
+func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *core.Service) error {
 	// Check whether this object already exists in k8s
 	curService, err := w.c.getService(&service.ObjectMeta, false)
 
@@ -688,8 +698,8 @@ func (w *worker) ReconcileService(chi *chop.ClickHouseInstallation, service *cor
 	return err
 }
 
-// ReconcileStatefulSet reconciles apps.StatefulSet
-func (w *worker) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+// reconcileStatefulSet reconciles apps.StatefulSet
+func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	// Check whether this object already exists in k8s
 	curStatefulSet, err := w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 

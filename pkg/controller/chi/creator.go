@@ -33,7 +33,7 @@ const (
 	waitStatefulSetGenerationTimeoutToCreateStatefulSet  = 30
 )
 
-// createStatefulSet is an internal function, used in ReconcileStatefulSet only
+// createStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	log.V(1).Infof("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
@@ -50,7 +50,7 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 	return fmt.Errorf("unexpected flow")
 }
 
-// updateStatefulSet is an internal function, used in ReconcileStatefulSet only
+// updateStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet) error {
 	// Convenience shortcuts
 	namespace := newStatefulSet.Namespace
