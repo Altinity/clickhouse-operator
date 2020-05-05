@@ -301,6 +301,10 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	// 1. CHI Service
 	service := w.creator.CreateServiceCHI()
 	if err := w.ReconcileService(chi, service); err != nil {
+		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("Reconcile CHI %s failed to reconcile Service %s", chi.Name, service.Name)
 		return err
 	}
 
@@ -310,13 +314,21 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
 	configMapCommon := w.creator.CreateConfigMapCHICommon()
-	if err := w.ReconcileConfigMap(chi, configMapCommon); err != nil {
+	if err := w.reconcileConfigMap(chi, configMapCommon); err != nil {
+		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("Reconcile CHI %s failed to reconcile ConfigMap %s", chi.Name, configMapCommon.Name)
 		return err
 	}
 
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
-	if err := w.ReconcileConfigMap(chi, configMapUsers); err != nil {
+	if err := w.reconcileConfigMap(chi, configMapUsers); err != nil {
+		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("Reconcile CHI %s failed to reconcile ConfigMap %s", chi.Name, configMapUsers.Name)
 		return err
 	}
 
@@ -359,7 +371,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 	// Add host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)
-	if err := w.ReconcileConfigMap(host.CHI, configMap); err != nil {
+	if err := w.reconcileConfigMap(host.CHI, configMap); err != nil {
 		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusAction(host.CHI).
 			WithStatusError(host.CHI).
@@ -543,8 +555,8 @@ func (w *worker) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop
 	return cluster, nil
 }
 
-// ReconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
-func (w *worker) ReconcileConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
+// reconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
+func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
 	// Check whether this object already exists in k8s
 	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, false)
 
