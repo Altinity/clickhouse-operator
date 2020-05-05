@@ -195,19 +195,28 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	w.a.V(2).Info("updateCHI(%s/%s) - action plan\n%s\n", new.Namespace, new.Name, actionPlan.String())
 
 	if err := w.reconcile(new); err != nil {
-		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).WithStatusError(new).Error("FAILED update: %v", err)
+		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusError(new).
+			Error("FAILED update: %v", err)
 		return nil
 	}
+
+	w.a.V(1).
+		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
+		WithStatusAction(new).
+		Info("updateCHI(%s/%s) post-process added items", new.Namespace, new.Name)
 
 	// Post-process added items
 	actionPlan.WalkAdded(
 		func(cluster *chop.ChiCluster) {
-			w.a.V(1).WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
+			w.a.V(1).
+				WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
 				WithStatusAction(new).
 				Info("Added items - cluster %s", cluster.Name)
 		},
 		func(shard *chop.ChiShard) {
-			w.a.V(1).WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
+			w.a.V(1).
+				WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
 				WithStatusAction(new).
 				Info("Added items - shard %d to cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName)
 		},
@@ -215,82 +224,52 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 			// Create Tables on a Host
 			err := w.schemer.HostCreateTables(host)
 
-			w.a.V(1).WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
+			w.a.V(1).
+				WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
 				WithStatusAction(new).
 				Info("Added items - host %s replica %d to shard %d in cluster %s",
 					host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
 			if err == nil {
-				w.a.V(1).WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
+				w.a.V(1).
+					WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
 					WithStatusAction(new).
 					Info("Added items - tables on host %s replica %d to shard %d in cluster %s",
 						host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 			} else {
-				w.a.WithEvent(new, eventActionCreate, eventReasonCreateFailed).WithStatusError(new).
+				w.a.WithEvent(new, eventActionCreate, eventReasonCreateFailed).
+					WithStatusError(new).
 					Error("FAILED to create tables on host %s with error %v", host.Name, err)
 			}
 		},
 	)
 
+	w.a.V(1).
+		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
+		WithStatusAction(new).
+		Info("updateCHI(%s/%s) remove scheduled for deletion items", new.Namespace, new.Name)
+
 	// Remove deleted items
 	actionPlan.WalkRemoved(
 		func(cluster *chop.ChiCluster) {
-			// Delete Cluster
-			w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteStarted).
-				WithStatusAction(new).
-				Info("delete cluster %s started", cluster.Name)
-
-			err := w.deleteCluster(cluster)
-			if err == nil {
-				w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteCompleted).
-					WithStatusAction(new).
-					Info("delete cluster %s completed", cluster.Name)
-			} else {
-				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
-					Error("FAILED to delete cluster %s with error %v", cluster.Name, err)
-			}
+			_ = w.deleteCluster(cluster)
 		},
 		func(shard *chop.ChiShard) {
-			// Delete Shard
-			w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteStarted).
-				WithStatusAction(new).
-				Info("delete shard %d in cluster %s started", shard.Address.ShardIndex, shard.Address.ClusterName)
-
-			err := w.deleteShard(shard)
-			if err == nil {
-				w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteCompleted).
-					WithStatusAction(new).
-					Info("delete shard %d in cluster %s completed", shard.Address.ShardIndex, shard.Address.ClusterName)
-			} else {
-				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
-					Error("FAILED to delete shard %d in cluster %s with error %v",
-						shard.Address.ShardIndex, shard.Address.ClusterName, err)
-			}
+			_ = w.deleteShard(shard)
 		},
 		func(host *chop.ChiHost) {
-			// Delete Host
-			w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteStarted).
-				WithStatusAction(new).
-				Info("Delete host %s replica %d from shard %d in cluster %s started",
-					host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-
-			err := w.deleteHost(host)
-			if err == nil {
-				w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteCompleted).
-					WithStatusAction(new).
-					Info("Delete host %s replica %d from shard %d in cluster %s completed",
-						host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-			} else {
-				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
-					Error("FAILED to delete host %s replica %d from shard %d in cluster %s with error %v",
-						host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName, err)
-			}
+			_ = w.deleteHost(host)
 		},
 	)
 
 	// Update CHI object
 	new.Status.Status = chop.StatusCompleted
 	_ = w.c.updateCHIObjectStatus(new, false)
+
+	w.a.V(1).
+		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
+		WithStatusAction(new).
+		Info("updateCHI(%s/%s) update monitoring list", new.Namespace, new.Name)
 
 	w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfChi(new))
 
@@ -471,9 +450,9 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 		Info("Delete host %s/%s - started", host.Address.ClusterName, host.Name)
 
 	if _, err := w.c.getStatefulSetByHost(host); err != nil {
-		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
+		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
 			WithStatusAction(host.CHI).
-			Error("Delete host %s/%s failed - StatefulSet not found - already deleted? %v",
+			Info("Delete host %s/%s - completed StatefulSet not found - already deleted? err: %v",
 				host.Address.ClusterName, host.Name, err)
 		return nil
 	}
@@ -720,6 +699,11 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 
 	if curStatefulSet != nil {
 		// Object found - update it
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
+			WithStatusAction(host.CHI).
+			Info("Update StatefulSet %s/%s - started", newStatefulSet.Namespace, newStatefulSet.Name)
+
 		err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet)
 
 		host.CHI.Status.UpdatedHostsCount++
@@ -729,12 +713,12 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 			w.a.V(1).
 				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
 				WithStatusAction(host.CHI).
-				Info("Update StatefulSet %s/%s", newStatefulSet.Namespace, newStatefulSet.Name)
+				Info("Update StatefulSet %s/%s - completed", newStatefulSet.Namespace, newStatefulSet.Name)
 		} else {
 			w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
 				WithStatusAction(host.CHI).
 				WithStatusError(host.CHI).
-				Error("Update StatefulSet %s/%s failed with error %v", newStatefulSet.Namespace, newStatefulSet.Name, err)
+				Error("Update StatefulSet %s/%s - failed with error %v", newStatefulSet.Namespace, newStatefulSet.Name, err)
 		}
 
 		return err
@@ -742,6 +726,11 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 
 	if apierrors.IsNotFound(err) {
 		// Object not found - create it
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
+			WithStatusAction(host.CHI).
+			Info("Create StatefulSet %s/%s - started", newStatefulSet.Namespace, newStatefulSet.Name)
+
 		err := w.c.createStatefulSet(newStatefulSet, host)
 
 		host.CHI.Status.AddedHostsCount++
@@ -751,16 +740,21 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 			w.a.V(1).
 				WithEvent(host.CHI, eventActionCreate, eventReasonCreateCompleted).
 				WithStatusAction(host.CHI).
-				Info("Create StatefulSet %s/%s", newStatefulSet.Namespace, newStatefulSet.Name)
+				Info("Create StatefulSet %s/%s - completed", newStatefulSet.Namespace, newStatefulSet.Name)
 		} else {
 			w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
 				WithStatusAction(host.CHI).
 				WithStatusError(host.CHI).
-				Error("Create StatefulSet %s/%s failed with error %v", newStatefulSet.Namespace, newStatefulSet.Name, err)
+				Error("Create StatefulSet %s/%s - failed with error %v", newStatefulSet.Namespace, newStatefulSet.Name, err)
 		}
 
 		return err
 	}
+
+	w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
+		WithStatusAction(host.CHI).
+		WithStatusError(host.CHI).
+		Error("Create or Update StatefulSet %s/%s - UNEXPECTED FLOW", newStatefulSet.Namespace, newStatefulSet.Name)
 
 	return err
 }
