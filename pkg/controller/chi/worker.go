@@ -328,21 +328,25 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 // reconcileCluster reconciles Cluster, excluding nested shards
 func (w *worker) reconcileCluster(cluster *chop.ChiCluster) error {
 	// Add Cluster's Service
-	if service := w.creator.CreateServiceCluster(cluster); service != nil {
-		return w.ReconcileService(cluster.CHI, service)
-	} else {
+	service := w.creator.CreateServiceCluster(cluster)
+	if service == nil {
+		// TODO
+		// For somewhat reason Service is not created, this is an error, but not clear what to do about it
 		return nil
 	}
+	return w.ReconcileService(cluster.CHI, service)
 }
 
 // reconcileShard reconciles Shard, excluding nested replicas
 func (w *worker) reconcileShard(shard *chop.ChiShard) error {
 	// Add Shard's Service
-	if service := w.creator.CreateServiceShard(shard); service != nil {
-		return w.ReconcileService(shard.CHI, service)
-	} else {
+	service := w.creator.CreateServiceShard(shard)
+	if service == nil {
+		// TODO
+		// For somewhat reason Service is not created, this is an error, but not clear what to do about it
 		return nil
 	}
+	return w.ReconcileService(shard.CHI, service)
 }
 
 // reconcileHost reconciles ClickHouse host
