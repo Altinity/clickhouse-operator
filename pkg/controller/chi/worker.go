@@ -204,20 +204,28 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		func(cluster *chop.ChiCluster) {
 			w.a.V(1).WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
 				WithStatusAction(new).
-				Info("Added cluster %s", cluster.Name)
+				Info("Added items - cluster %s", cluster.Name)
 		},
 		func(shard *chop.ChiShard) {
 			w.a.V(1).WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
 				WithStatusAction(new).
-				Info("Added shard %d to cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName)
+				Info("Added items - shard %d to cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName)
 		},
 		func(host *chop.ChiHost) {
+			// Create Tables on a Host
+			err := w.schemer.HostCreateTables(host)
+
 			w.a.V(1).WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
 				WithStatusAction(new).
-				Info("Added replica %d to shard %d in cluster %s",
-					host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+				Info("Added items - host %s replica %d to shard %d in cluster %s",
+					host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
-			if err := w.schemer.HostCreateTables(host); err != nil {
+			if err == nil {
+				w.a.V(1).WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
+					WithStatusAction(new).
+					Info("Added items - tables on host %s replica %d to shard %d in cluster %s",
+						host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			} else {
 				w.a.WithEvent(new, eventActionUpdate, eventReasonUpdateFailed).WithStatusError(new).
 					Error("FAILED to create tables on host %s with error %v", host.Name, err)
 			}
@@ -227,46 +235,55 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	// Remove deleted items
 	actionPlan.WalkRemoved(
 		func(cluster *chop.ChiCluster) {
+			// Delete Cluster
 			w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteStarted).
 				WithStatusAction(new).
 				Info("delete cluster %s started", cluster.Name)
-			if err := w.deleteCluster(cluster); err != nil {
-				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
-					Error("FAILED to delete cluster %s with error %v", cluster.Name, err)
-			} else {
+
+			err := w.deleteCluster(cluster)
+			if err == nil {
 				w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteCompleted).
 					WithStatusAction(new).
 					Info("delete cluster %s completed", cluster.Name)
+			} else {
+				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
+					Error("FAILED to delete cluster %s with error %v", cluster.Name, err)
 			}
 		},
 		func(shard *chop.ChiShard) {
+			// Delete Shard
 			w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteStarted).
 				WithStatusAction(new).
 				Info("delete shard %d in cluster %s started", shard.Address.ShardIndex, shard.Address.ClusterName)
-			if err := w.deleteShard(shard); err != nil {
-				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
-					Error("FAILED to delete shard %d in cluster %s with error %v",
-						shard.Address.ShardIndex, shard.Address.ClusterName, err)
-			} else {
+
+			err := w.deleteShard(shard)
+			if err == nil {
 				w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteCompleted).
 					WithStatusAction(new).
 					Info("delete shard %d in cluster %s completed", shard.Address.ShardIndex, shard.Address.ClusterName)
+			} else {
+				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
+					Error("FAILED to delete shard %d in cluster %s with error %v",
+						shard.Address.ShardIndex, shard.Address.ClusterName, err)
 			}
 		},
 		func(host *chop.ChiHost) {
+			// Delete Host
 			w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteStarted).
 				WithStatusAction(new).
 				Info("delete replica %d from shard %d in cluster %s started",
 					host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-			if err := w.deleteHost(host); err != nil {
-				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
-					Error("FAILED to delete replica %d from shard %d in cluster %s with error %v",
-						host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName, err)
-			} else {
+
+			err := w.deleteHost(host)
+			if err == nil {
 				w.a.V(1).WithEvent(new, eventActionDelete, eventReasonDeleteCompleted).
 					WithStatusAction(new).
 					Info("delete replica %d from shard %d in cluster %s completed",
 						host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			} else {
+				w.a.WithEvent(new, eventActionDelete, eventReasonDeleteFailed).WithStatusError(new).
+					Error("FAILED to delete replica %d from shard %d in cluster %s with error %v",
+						host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName, err)
 			}
 		},
 	)
@@ -492,6 +509,7 @@ func (w *worker) deleteShard(shard *chop.ChiShard) error {
 
 	// Delete Shard Service
 	_ = w.c.deleteServiceShard(shard)
+
 	w.a.V(1).
 		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteCompleted).
 		WithStatusAction(shard.CHI).
@@ -514,6 +532,7 @@ func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
 
 	// Delete Cluster Service
 	_ = w.c.deleteServiceCluster(cluster)
+
 	w.a.V(1).
 		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteCompleted).
 		WithStatusAction(cluster.CHI).
@@ -564,10 +583,17 @@ func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap 
 		// Object found - update it
 		_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
 
-		w.a.V(1).
-			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
-			WithStatusAction(chi).
-			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+		if err == nil {
+			w.a.V(1).
+				WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
+				WithStatusAction(chi).
+				Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+		} else {
+			w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
+				WithStatusAction(chi).
+				WithStatusError(chi).
+				Error("Update ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
+		}
 
 		return err
 	}
@@ -576,10 +602,17 @@ func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap 
 		// Object not found - create it
 		_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
 
-		w.a.V(1).
-			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
-			WithStatusAction(chi).
-			Info("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+		if err == nil {
+			w.a.V(1).
+				WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
+				WithStatusAction(chi).
+				Info("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+		} else {
+			w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
+				WithStatusAction(chi).
+				WithStatusError(chi).
+				Error("Create ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
+		}
 
 		return err
 	}
@@ -618,10 +651,17 @@ func (w *worker) ReconcileService(chi *chop.ClickHouseInstallation, service *cor
 		// And only now we are ready to actually update the service with new version of the service
 		_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Update(service)
 
-		w.a.V(1).
-			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
-			WithStatusAction(chi).
-			Info("Update Service %s/%s", service.Namespace, service.Name)
+		if err == nil {
+			w.a.V(1).
+				WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
+				WithStatusAction(chi).
+				Info("Update Service %s/%s", service.Namespace, service.Name)
+		} else {
+			w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
+				WithStatusAction(chi).
+				WithStatusError(chi).
+				Error("Update Service %s/%s failed with error %v", service.Namespace, service.Name, err)
+		}
 
 		return err
 	}
@@ -630,10 +670,17 @@ func (w *worker) ReconcileService(chi *chop.ClickHouseInstallation, service *cor
 		// Object not found - create it
 		_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
 
-		w.a.V(1).
-			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
-			WithStatusAction(chi).
-			Info("Create Service %s/%s", service.Namespace, service.Name)
+		if err == nil {
+			w.a.V(1).
+				WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
+				WithStatusAction(chi).
+				Info("Create Service %s/%s", service.Namespace, service.Name)
+		} else {
+			w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
+				WithStatusAction(chi).
+				WithStatusError(chi).
+				Error("Create Service %s/%s failed with error %v", service.Namespace, service.Name, err)
+		}
 
 		return err
 	}
@@ -653,10 +700,17 @@ func (w *worker) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 		host.CHI.Status.UpdatedHostsCount++
 		_ = w.c.updateCHIObjectStatus(host.CHI, false)
 
-		w.a.V(1).
-			WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
-			WithStatusAction(host.CHI).
-			Info("Update StatefulSet %s/%s", newStatefulSet.Namespace, newStatefulSet.Name)
+		if err == nil {
+			w.a.V(1).
+				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
+				WithStatusAction(host.CHI).
+				Info("Update StatefulSet %s/%s", newStatefulSet.Namespace, newStatefulSet.Name)
+		} else {
+			w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
+				WithStatusAction(host.CHI).
+				WithStatusError(host.CHI).
+				Error("Update StatefulSet %s/%s failed with error %v", newStatefulSet.Namespace, newStatefulSet.Name, err)
+		}
 
 		return err
 	}
@@ -668,10 +722,17 @@ func (w *worker) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 		host.CHI.Status.AddedHostsCount++
 		_ = w.c.updateCHIObjectStatus(host.CHI, false)
 
-		w.a.V(1).
-			WithEvent(host.CHI, eventActionCreate, eventReasonCreateCompleted).
-			WithStatusAction(host.CHI).
-			Info("Create StatefulSet %s/%s", newStatefulSet.Namespace, newStatefulSet.Name)
+		if err == nil {
+			w.a.V(1).
+				WithEvent(host.CHI, eventActionCreate, eventReasonCreateCompleted).
+				WithStatusAction(host.CHI).
+				Info("Create StatefulSet %s/%s", newStatefulSet.Namespace, newStatefulSet.Name)
+		} else {
+			w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
+				WithStatusAction(host.CHI).
+				WithStatusError(host.CHI).
+				Error("Create StatefulSet %s/%s failed with error %v", newStatefulSet.Namespace, newStatefulSet.Name, err)
+		}
 
 		return err
 	}
