@@ -25,16 +25,16 @@ import (
 
 // Announcer handler all log/event/status messages going outside of controller/worker
 type Announcer struct {
-	c                 *Controller
-	chi               *chop.ClickHouseInstallation
-	v                 log.Level
-	writeLog          bool
-	writeEvent        bool
-	eventAction       string
-	eventReason       string
-	writeStatusAction bool
+	c                  *Controller
+	chi                *chop.ClickHouseInstallation
+	v                  log.Level
+	writeLog           bool
+	writeEvent         bool
+	eventAction        string
+	eventReason        string
+	writeStatusAction  bool
 	writeStatusActions bool
-	writeStatusError  bool
+	writeStatusError   bool
 }
 
 // NewAnnouncer creates new announcer
