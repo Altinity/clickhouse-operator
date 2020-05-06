@@ -33,6 +33,7 @@ type Announcer struct {
 	eventAction       string
 	eventReason       string
 	writeStatusAction bool
+	writeStatusActions bool
 	writeStatusError  bool
 }
 
@@ -70,6 +71,15 @@ func (a Announcer) WithEvent(
 func (a Announcer) WithStatusAction(chi *chop.ClickHouseInstallation) Announcer {
 	b := a
 	b.writeStatusAction = true
+	b.writeStatusActions = true
+	b.chi = chi
+	return b
+}
+
+// WithStatusActions is used in chained calls in order to produce action in ClickHouseInstallation.Status.Actions
+func (a Announcer) WithStatusActions(chi *chop.ClickHouseInstallation) Announcer {
+	b := a
+	b.writeStatusActions = true
 	b.chi = chi
 	return b
 }
@@ -122,15 +132,17 @@ func (a Announcer) Error(format string, args ...interface{}) {
 // writeCHIStatus is internal function which writes ClickHouseInstallation.Status
 func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 	if a.writeStatusAction {
+		a.chi.Status.Action = fmt.Sprintf(format, args...)
+	}
+	if a.writeStatusActions {
 		(&a.chi.Status).PushAction(fmt.Sprintf(format, args...))
 	}
-
 	if a.writeStatusError {
-		(&a.chi.Status).PushError(fmt.Sprintf(format, args...))
+		(&a.chi.Status).SetAndPushError(fmt.Sprintf(format, args...))
 	}
 
 	// Propagate status updates into object
-	if a.writeStatusAction || a.writeStatusError {
+	if a.writeStatusAction || a.writeStatusActions || a.writeStatusError {
 		_ = a.c.updateCHIObjectStatus(a.chi, true)
 	}
 }

@@ -253,10 +253,6 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		},
 	)
 
-	// Update CHI object
-	(&new.Status).ReconcileComplete()
-	_ = w.c.updateCHIObjectStatus(new, false)
-
 	w.a.V(1).
 		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
 		WithStatusAction(new).
@@ -264,9 +260,13 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 
 	w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfChi(new))
 
+	// Update CHI object
+	(&new.Status).ReconcileComplete()
+	_ = w.c.updateCHIObjectStatus(new, false)
+
 	w.a.V(1).
 		WithEvent(new, eventActionReconcile, eventReasonReconcileCompleted).
-		WithStatusAction(new).
+		WithStatusActions(new).
 		Info("updateCHI(%s/%s) reconcile completed", new.Namespace, new.Name)
 
 	return nil

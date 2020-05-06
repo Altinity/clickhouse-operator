@@ -42,14 +42,13 @@ const (
 )
 
 func (s *ChiStatus) PushAction(action string) {
-	s.Action = action
 	s.Actions = append(s.Actions, action)
 	if len(s.Actions) > maxActions {
 		s.Actions = s.Actions[1:]
 	}
 }
 
-func (s *ChiStatus) PushError(error string) {
+func (s *ChiStatus) SetAndPushError(error string) {
 	s.Error = error
 	s.Errors = append(s.Errors, error)
 	if len(s.Errors) > maxErrors {
