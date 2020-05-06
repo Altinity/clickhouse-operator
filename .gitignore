@@ -24,3 +24,6 @@ dev/bin
 dev/log
 
 .vagrant
+
+# Ignore DevSpace cache and log folder
+.devspace/

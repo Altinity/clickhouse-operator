@@ -1,0 +1,6 @@
+- command: update
+  path: "[.kind='Deployment' and .metadata.name='clickhouse-operator'].spec.template.spec.containers[name='clickhouse-operator'].image"
+  value: "altinity/clickhouse-operator"
+- command: update
+  path: "[*][kind='Deployment'][.metadata.name='clickhouse-operator'].spec.template.spec.containers[name='metrics-exportr'].image"
+  value: "altinity/clickhouse-operator"

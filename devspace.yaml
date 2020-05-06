@@ -1,0 +1,69 @@
+version: v1beta9
+images:
+  metrics-exporter:
+    image: altinity/metrics-exporter
+    dockerfile: ./dockerfile/metrics-exporter/Dockerfile
+    context: ./
+    preferSyncOverRebuild: true
+    injectRestartHelper: true
+    build:
+      docker:
+        skipPush: true
+  clickhouse-operator:
+    image: altinity/clickhouse-operator
+    dockerfile: ./dockerfile/metrics-exporter/Dockerfile
+    context: ./
+    preferSyncOverRebuild: true
+    injectRestartHelper: true
+    build:
+      docker:
+        skipPush: true
+
+deployments:
+- name: metrics-exporter
+  kubectl:
+    kustomize: true
+    manifests:
+      - deploy/devspace/
+- name: clickhouse-operator
+  kubectl:
+    kustomize: true
+    manifests:
+      - deploy/devspace/
+
+dev:
+  ports:
+  - imageName: metrics-exporter
+    forward:
+    - port: 8888
+  open:
+  - url: http://localhost:8888
+  sync:
+  - imageName: metrics-exporter
+    excludePaths:
+    - .git/
+    uploadExcludePaths:
+    - vendor
+    - .vagrant
+    - .idea
+    - '*.log'
+    - devspace.yaml
+    onUpload:
+      restartContainer: true
+  - imageName: clickhouse-operator
+    excludePaths:
+      - .git/
+    uploadExcludePaths:
+      - vendor
+      - .vagrant
+      - .idea
+      - '*.log'
+      - devspace.yaml
+    onUpload:
+      restartContainer: true
+
+profiles:
+- name: production
+  patches:
+  - op: remove
+    path: images.app.injectRestartHelper

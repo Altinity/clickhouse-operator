@@ -103,18 +103,30 @@ Vagrant.configure(2) do |config|
     export OPERATOR_IMAGE=altinity/clickhouse-operator:${OPERATOR_RELEASE}
     export METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:${OPERATOR_RELEASE}
 
+    # docker build
+    export COMPANY_REPO=${COMPANY_REPO:-altinity}
+    docker build -f dockerfile/operator/Dockerfile -t $COMPANY_REPO/clickhouse-operator:$OPERATOR_RELEASE .
+    docker build -f dockerfile/metrics-exporter/Dockerfile -t $COMPANY_REPO/metrics-exporter:$OPERATOR_RELEASE .
+
+    # devspace
+    curl -s -L "https://github.com/devspace-cloud/devspace/releases/latest" | sed -nE 's!.*"([^"]*devspace-linux-amd64)".*!https://github.com\1!p' | xargs -n 1 curl -L -o /usr/local/bin/devspace
+    chmod +x /usr/local/bin/devspace
+
+    # install clickhouse-operator
     if ! kubectl get deployment clickhouse-operator -n "${OPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
         cd /vagrant/deploy/operator/
         bash -x ./clickhouse-operator-install.sh
         cd /vagrant
     fi
 
+    # install prometheus-operator + prometheus instance + ServiceMonitor for clickhouse
     export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-prometheus}
     cd /vagrant/deploy/prometheus/
     kubectl delete ns ${PROMETHEUS_NAMESPACE} || true
     bash -e ./create-prometheus.sh
     cd /vagrant/
 
+    # install grafana-operator + grafana instance + GrafanaDashboard, GrafanaDatasource for clickhouse
     export GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE:-grafana}
     cd /vagrant/deploy/grafana/grafana-with-grafana-operator/
     kubectl delete ns ${GRAFANA_NAMESPACE} || true
@@ -142,8 +154,8 @@ Vagrant.configure(2) do |config|
 
     pip3 install -r /vagrant/tests/requirements.txt
 
+    python3 /vagrant/tests/test_metrics_exporter.py
     python3 /vagrant/tests/test.py --only=operator/*
     python3 /vagrant/tests/test_examples.py
-    python3 /vagrant/tests/test_metrics_exporter.py
   SHELL
 end
