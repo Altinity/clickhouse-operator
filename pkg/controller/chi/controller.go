@@ -537,6 +537,7 @@ func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tole
 
 // handleObject enqueues CHI which is owner of `obj` into reconcile loop
 func (c *Controller) handleObject(obj interface{}) {
+	// TODO review
 	object, ok := obj.(meta.Object)
 	if !ok {
 		ts, ok := obj.(cache.DeletedFinalStateUnknown)

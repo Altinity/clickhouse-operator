@@ -148,10 +148,20 @@ func (w *worker) processItem(item interface{}) error {
 }
 
 func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseInstallation {
+	var withDefaultCluster bool
+
 	if chi == nil {
-		chi, _ = w.normalizer.CreateTemplatedCHI(&chop.ClickHouseInstallation{}, false)
+		chi = &chop.ClickHouseInstallation{}
+		withDefaultCluster = false
 	} else {
-		chi, _ = w.normalizer.CreateTemplatedCHI(chi, true)
+		withDefaultCluster = true
+	}
+
+	chi, err := w.normalizer.CreateTemplatedCHI(chi, withDefaultCluster)
+	if err != nil {
+		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusError(chi).
+			Error("FAILED to normalize CHI : %v", err)
 	}
 
 	return chi
