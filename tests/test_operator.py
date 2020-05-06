@@ -122,8 +122,8 @@ def restart_operator(ns = "kube-system", timeout=60):
 
 def require_zookeeper():
     with Given("Install Zookeeper if missing"):
-        if kube_get_count("service", name="zookeepers") == 0:
-            config = get_full_path("../deploy/zookeeper/quick-start-volume-emptyDir/zookeeper-1-node.yaml")
+        if kube_get_count("service", name="zookeeper") == 0:
+            config = get_full_path("../deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node.yaml")
             kube_apply(config)
             kube_wait_object("pod", "zookeeper-0")
             kube_wait_pod_status("zookeeper-0", "Running")
@@ -302,7 +302,7 @@ def test_014():
     partition by tuple() order by a""".replace('\r', '').replace('\n', '')
 
     create_and_check("configs/test-014-replication.yaml", 
-                    {"apply_templates": {settings.clickhouse_template},
+                    {"apply_templates": {settings.clickhouse_template, "templates/tpl-persistent-volume-100Mi.yaml"},
                      "object_counts": [2, 2, 3], "do_not_delete": 1})
 
     with Given("Table is created on a first replica and data is inserted"):
@@ -329,6 +329,24 @@ def test_014():
             out = clickhouse_query("test-014-replication", "select count() from system.replicas where table='t'")
             assert out == "1" 
     
+    with When("Restart Zookeeper pod"):
+        kubectl("delete pod zookeeper-0")
+        kube_wait_object("pod", "zookeeper-0")
+        kube_wait_pod_status("zookeeper-0", "Running")
+        
+        with Then("Insert into the table -- table should be in readonly mode"):
+            out = clickhouse_query_with_error("test-014-replication", "insert into t values(2)")
+            assert "Table is in readonly mode" in out
+
+        with Then("Wait 30 seconds for ClickHouse to reconnect"):
+            time.sleep(30)
+        # with Then("Restart clickhouse pods"):
+        #    kubectl("delete pod chi-test-014-replication-default-0-0-0")
+        #    kubectl("delete pod chi-test-014-replication-default-0-1-0")
+
+        with Then("Table should be back to normal"):
+            clickhouse_query("test-014-replication", "insert into t values(2)")
+
     kube_delete_chi("test-014-replication")
 
 @TestScenario
