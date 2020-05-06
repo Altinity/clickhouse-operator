@@ -512,7 +512,7 @@ func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
 func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
 	namespace, name := NamespaceName(chi.ObjectMeta)
-	log.V(1).Infof("Update CHI status (%s/%s)", namespace, name)
+	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
 
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
 	if err != nil {
