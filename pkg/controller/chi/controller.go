@@ -486,18 +486,19 @@ func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfigur
 
 // updateCHIObject updates ClickHouseInstallation object
 func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
-	new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
+	namespace, name := NamespaceName(chi.ObjectMeta)
+	new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Update(chi)
 
 	if err != nil {
 		// Error update
-		log.V(1).Infof("ERROR update CHI (%s/%s): %q", chi.Namespace, chi.Name, err)
+		log.V(1).Infof("ERROR update CHI (%s/%s): %q", namespace, name, err)
 		return err
 	}
 
 	if chi.ObjectMeta.ResourceVersion != new.ObjectMeta.ResourceVersion {
 		// Updated
 		log.V(2).Infof("CHI (%s/%s) bump resource version %d/%d",
-			chi.Namespace, chi.Name, chi.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion,
+			namespace, name, chi.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion,
 		)
 		chi.ObjectMeta.ResourceVersion = new.ObjectMeta.ResourceVersion
 		return nil
@@ -510,21 +511,23 @@ func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
 func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
-	log.V(1).Infof("Update CHI status (%s/%s)", chi.Namespace, chi.Name)
-	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(chi.Name, meta.GetOptions{})
+	namespace, name := NamespaceName(chi.ObjectMeta)
+	log.V(1).Infof("Update CHI status (%s/%s)", namespace, name)
+
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
 	if err != nil {
 		if tolerateAbsence {
 			return nil
 		}
-		log.V(1).Infof("ERROR GetCHI (%s/%s): %q", chi.Namespace, chi.Name, err)
+		log.V(1).Infof("ERROR GetCHI (%s/%s): %q", namespace, name, err)
 		return err
 	}
 	if cur == nil {
 		if tolerateAbsence {
 			return nil
 		}
-		log.V(1).Infof("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
-		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
+		log.V(1).Infof("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
+		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
 	}
 
 	// Update status of a real object
@@ -534,6 +537,7 @@ func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tole
 
 // handleObject enqueues CHI which is owner of `obj` into reconcile loop
 func (c *Controller) handleObject(obj interface{}) {
+	// TODO review
 	object, ok := obj.(meta.Object)
 	if !ok {
 		ts, ok := obj.(cache.DeletedFinalStateUnknown)

@@ -1,1 +1,4 @@
-vendor
+vendor/
+docs/
+.vagrant/
+*.log
