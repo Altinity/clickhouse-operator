@@ -12,23 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package model
+package chi
 
-import (
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"io"
-	"strconv"
-)
+import "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-func cline(w io.Writer, i int, format string, a ...interface{}) {
-	if i == 0 {
-		util.Fprintf(w, format, a...)
-		util.Fprintf(w, "\n")
-	} else {
-		// %16s
-		template := "%" + strconv.Itoa(i) + "s"
-		util.Fprintf(w, template, " ")
-		util.Fprintf(w, format, a...)
-		util.Fprintf(w, "\n")
-	}
+func NamespaceName(meta v1.ObjectMeta) (string, string) {
+	return meta.Namespace, meta.Name
 }

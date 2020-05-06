@@ -23,7 +23,6 @@ import (
 	// log "k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,97 +33,7 @@ const (
 	waitStatefulSetGenerationTimeoutToCreateStatefulSet  = 30
 )
 
-// reconcileConfigMap reconciles core.ConfigMap
-func (c *Controller) ReconcileConfigMap(configMap *core.ConfigMap) error {
-	log.V(1).Infof("Reconcile ConfigMap %s/%s", configMap.Namespace, configMap.Name)
-	// Check whether this object already exists in k8s
-	if curConfigMap, err := c.getConfigMap(&configMap.ObjectMeta, false); curConfigMap != nil {
-		// Object found
-		log.V(1).Infof("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
-		_, err := c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
-		// Object updated
-		return err
-	} else if apierrors.IsNotFound(err) {
-		// Object not found - create it
-		log.V(1).Infof("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
-		_, err := c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
-		// Object created
-		return err
-	} else {
-		return err
-	}
-
-	return fmt.Errorf("unexpected flow")
-}
-
-// reconcileService reconciles core.Service
-func (c *Controller) ReconcileService(service *core.Service) error {
-	log.V(1).Infof("Reconcile Service %s/%s", service.Namespace, service.Name)
-	// Check whether this object already exists in k8s
-	if curService, err := c.getService(&service.ObjectMeta, false); curService != nil {
-		// Object found
-		log.V(1).Infof("Update Service %s/%s", service.Namespace, service.Name)
-
-		// Updating Service is a complicated business
-
-		// spec.resourceVersion is required in order to update object
-		service.ResourceVersion = curService.ResourceVersion
-
-		// spec.clusterIP field is immutable, need to use already assigned value
-		// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
-		// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
-		// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
-		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
-		service.Spec.ClusterIP = curService.Spec.ClusterIP
-
-		// spec.healthCheckNodePort field is used with ExternalTrafficPolicy=Local only and is immutable within ExternalTrafficPolicy=Local
-		// In case ExternalTrafficPolicy is changed it seems to be irrelevant
-		// https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
-		if (curService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) &&
-			(service.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) {
-			service.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
-		}
-
-		// And only now we are ready to actually update the service with new version of the service
-		_, err := c.kubeClient.CoreV1().Services(service.Namespace).Update(service)
-
-		return err
-	} else if apierrors.IsNotFound(err) {
-		log.V(1).Infof("Create service %s/%s", service.Namespace, service.Name)
-		// Object not found - create it
-		_, err := c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
-		// Object created
-		return err
-	} else {
-		return err
-	}
-
-	return fmt.Errorf("unexpected flow")
-}
-
-// reconcileStatefulSet reconciles apps.StatefulSet
-func (c *Controller) ReconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
-	// Check whether this object already exists in k8s
-	if curStatefulSet, err := c.getStatefulSet(&newStatefulSet.ObjectMeta, false); curStatefulSet != nil {
-		// Object found - update it
-		err := c.updateStatefulSet(curStatefulSet, newStatefulSet)
-		host.CHI.Status.UpdatedHostsCount++
-		_ = c.updateCHIObjectStatus(host.CHI, false)
-		// Object updated
-		return err
-	} else if apierrors.IsNotFound(err) {
-		// Object not found - create it
-		err := c.createStatefulSet(newStatefulSet, host)
-		host.CHI.Status.AddedHostsCount++
-		_ = c.updateCHIObjectStatus(host.CHI, false)
-		return err
-	} else {
-		return err
-	}
-
-	return fmt.Errorf("unexpected flow")
-}
-
+// createStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	log.V(1).Infof("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
@@ -141,6 +50,7 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 	return fmt.Errorf("unexpected flow")
 }
 
+// updateStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet) error {
 	// Convenience shortcuts
 	namespace := newStatefulSet.Namespace
@@ -177,7 +87,8 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 	return fmt.Errorf("unexpected flow")
 }
 
-// waitStatefulSetGeneration polls StatefulSet for reaching target generation
+// waitStatefulSetGeneration polls StatefulSet for reaching target generation.
+// Used in createStatefulSet, updateStatefulSet and deleteStatefulSet function only
 func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGeneration int64) error {
 	// Wait for some limited time for StatefulSet to reach target generation
 	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds

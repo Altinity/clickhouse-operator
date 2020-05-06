@@ -35,6 +35,5 @@ then
 else
     echo "WARNING! BUILD FAILED!"
     echo "Check logs for details"
+    exit 1
 fi
-
-exit $?
