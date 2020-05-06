@@ -33,8 +33,9 @@ import (
 )
 
 type Normalizer struct {
-	chop               *chop.CHOp
-	chi                *chiv1.ClickHouseInstallation
+	chop *chop.CHOp
+	chi  *chiv1.ClickHouseInstallation
+	// Whether should insert default cluster if no cluster specified
 	withDefaultCluster bool
 }
 
@@ -46,7 +47,7 @@ func NewNormalizer(chop *chop.CHOp) *Normalizer {
 
 // CreateTemplatedCHI produces ready-to-use CHI object
 func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withDefaultCluster bool) (*chiv1.ClickHouseInstallation, error) {
-	// Should insert default cluster if no cluster specified
+	// Whether should insert default cluster if no cluster specified
 	n.withDefaultCluster = withDefaultCluster
 
 	// What base should be used to create CHI

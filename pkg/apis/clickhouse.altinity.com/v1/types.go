@@ -71,23 +71,6 @@ type ChiUseTemplate struct {
 	UseType   string `json:"useType"   yaml:"useType"`
 }
 
-// ChiStatus defines status section of ClickHouseInstallation resource
-type ChiStatus struct {
-	Version           string   `json:"version"`
-	ClustersCount     int      `json:"clusters"`
-	ShardsCount       int      `json:"shards"`
-	HostsCount        int      `json:"hosts"`
-	Status            string   `json:"status"`
-	UpdatedHostsCount int      `json:"updated"`
-	AddedHostsCount   int      `json:"added"`
-	DeletedHostsCount int      `json:"deleted"`
-	DeleteHostsCount  int      `json:"delete"`
-	Pods              []string `json:"pods"`
-	FQDNs             []string `json:"fqdns"`
-	Endpoint          string   `json:"endpoint"`
-	NormalizedCHI     ChiSpec  `json:"normalized"`
-}
-
 // ChiDefaults defines defaults section of .spec
 type ChiDefaults struct {
 	ReplicasUseFQDN string            `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN"`

@@ -2,9 +2,8 @@ vendor
 deploy/
 docs/
 .git/
-.vagrant
-.idea
+.devspace/
+.vagrant/
+.idea/
 *.log
-
-# Ignore devspace.yaml file to prevent image rebuilding after config changes
 devspace.yaml
