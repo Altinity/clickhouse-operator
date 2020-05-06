@@ -56,3 +56,16 @@ func (s *ChiStatus) PushError(error string) {
 		s.Errors = s.Errors[1:]
 	}
 }
+
+func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
+	s.Status = StatusInProgress
+	s.UpdatedHostsCount = 0
+	s.AddedHostsCount = 0
+	s.DeletedHostsCount = 0
+	s.DeleteHostsCount = DeleteHostsCount
+}
+
+func (s *ChiStatus) ReconcileComplete() {
+	s.Status = StatusCompleted
+	s.Action = ""
+}

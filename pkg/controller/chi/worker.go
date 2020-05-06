@@ -188,11 +188,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	}
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
-	new.Status.Status = chop.StatusInProgress
-	new.Status.UpdatedHostsCount = 0
-	new.Status.AddedHostsCount = 0
-	new.Status.DeletedHostsCount = 0
-	new.Status.DeleteHostsCount = actionPlan.GetRemovedHostsNum()
+	(&new.Status).ReconcileStart(actionPlan.GetRemovedHostsNum())
 	if err := w.c.updateCHIObjectStatus(new, false); err != nil {
 		w.a.V(1).Info("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
 		return nil
@@ -219,27 +215,12 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	// Post-process added items
 	actionPlan.WalkAdded(
 		func(cluster *chop.ChiCluster) {
-			w.a.V(1).
-				WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
-				WithStatusAction(new).
-				Info("Added items - cluster %s", cluster.Name)
 		},
 		func(shard *chop.ChiShard) {
-			w.a.V(1).
-				WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
-				WithStatusAction(new).
-				Info("Added items - shard %d to cluster %s", shard.Address.ShardIndex, shard.Address.ClusterName)
 		},
 		func(host *chop.ChiHost) {
 			// Create Tables on a Host
 			err := w.schemer.HostCreateTables(host)
-
-			w.a.V(1).
-				WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
-				WithStatusAction(new).
-				Info("Added items - host %s replica %d to shard %d in cluster %s",
-					host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-
 			if err == nil {
 				w.a.V(1).
 					WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
@@ -273,7 +254,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	)
 
 	// Update CHI object
-	new.Status.Status = chop.StatusCompleted
+	(&new.Status).ReconcileComplete()
 	_ = w.c.updateCHIObjectStatus(new, false)
 
 	w.a.V(1).
