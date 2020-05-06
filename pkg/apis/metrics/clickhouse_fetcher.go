@@ -47,14 +47,14 @@ const (
     	SELECT 
 	        concat('metric.', metric) AS metric, 
 	        toString(value)           AS value, 
-    	    description               AS description,       
+    	    ''                        AS description,       
 	        'gauge'                   AS type   
 	    FROM system.metrics
 	    UNION ALL 
 	    SELECT
 	        concat('event.', event)   AS metric,
 	        toString(value)           AS value,
-	        description               AS description,
+	        ''                        AS description,
 	        'counter'                 AS type
 	    FROM system.events
 	    UNION ALL
