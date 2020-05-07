@@ -161,113 +161,113 @@ func newNamer(ctx namerContext) *namer {
 }
 
 func (n *namer) namePartNamespace(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartChiMaxLenLabelsCtx
+		_len = namePartChiMaxLenLabelsCtx
 	} else {
-		len = namePartChiMaxLenNamesCtx
+		_len = namePartChiMaxLenNamesCtx
 	}
-	return sanitize(util.StringHead(name, len))
+	return sanitize(util.StringHead(name, _len))
 }
 
 func (n *namer) namePartChiName(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartChiMaxLenLabelsCtx
+		_len = namePartChiMaxLenLabelsCtx
 	} else {
-		len = namePartChiMaxLenNamesCtx
+		_len = namePartChiMaxLenNamesCtx
 	}
-	return sanitize(util.StringHead(name, len))
+	return sanitize(util.StringHead(name, _len))
 }
 
 func (n *namer) namePartChiNameID(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartChiMaxLenLabelsCtx
+		_len = namePartChiMaxLenLabelsCtx
 	} else {
-		len = namePartChiMaxLenNamesCtx
+		_len = namePartChiMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, len)
+	return util.CreateStringID(name, _len)
 }
 
 func (n *namer) namePartClusterName(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartClusterMaxLenLabelsCtx
+		_len = namePartClusterMaxLenLabelsCtx
 	} else {
-		len = namePartClusterMaxLenNamesCtx
+		_len = namePartClusterMaxLenNamesCtx
 	}
-	return sanitize(util.StringHead(name, len))
+	return sanitize(util.StringHead(name, _len))
 }
 
 func (n *namer) namePartClusterNameID(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartClusterMaxLenLabelsCtx
+		_len = namePartClusterMaxLenLabelsCtx
 	} else {
-		len = namePartClusterMaxLenNamesCtx
+		_len = namePartClusterMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, len)
+	return util.CreateStringID(name, _len)
 }
 
 func (n *namer) namePartShardName(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartShardMaxLenLabelsCtx
+		_len = namePartShardMaxLenLabelsCtx
 	} else {
-		len = namePartShardMaxLenNamesCtx
+		_len = namePartShardMaxLenNamesCtx
 	}
-	return sanitize(util.StringHead(name, len))
+	return sanitize(util.StringHead(name, _len))
 }
 
 func (n *namer) namePartShardNameID(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartShardMaxLenLabelsCtx
+		_len = namePartShardMaxLenLabelsCtx
 	} else {
-		len = namePartShardMaxLenNamesCtx
+		_len = namePartShardMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, len)
+	return util.CreateStringID(name, _len)
 }
 
 func (n *namer) namePartReplicaName(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartReplicaMaxLenLabelsCtx
+		_len = namePartReplicaMaxLenLabelsCtx
 	} else {
-		len = namePartReplicaMaxLenNamesCtx
+		_len = namePartReplicaMaxLenNamesCtx
 	}
-	return sanitize(util.StringHead(name, len))
+	return sanitize(util.StringHead(name, _len))
 }
 
 func (n *namer) namePartReplicaNameID(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartReplicaMaxLenLabelsCtx
+		_len = namePartReplicaMaxLenLabelsCtx
 	} else {
-		len = namePartReplicaMaxLenNamesCtx
+		_len = namePartReplicaMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, len)
+	return util.CreateStringID(name, _len)
 }
 
 func (n *namer) namePartHostName(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartReplicaMaxLenLabelsCtx
+		_len = namePartReplicaMaxLenLabelsCtx
 	} else {
-		len = namePartReplicaMaxLenNamesCtx
+		_len = namePartReplicaMaxLenNamesCtx
 	}
-	return sanitize(util.StringHead(name, len))
+	return sanitize(util.StringHead(name, _len))
 }
 
 func (n *namer) namePartHostNameID(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartReplicaMaxLenLabelsCtx
+		_len = namePartReplicaMaxLenLabelsCtx
 	} else {
-		len = namePartReplicaMaxLenNamesCtx
+		_len = namePartReplicaMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, len)
+	return util.CreateStringID(name, _len)
 }
 
 func (n *namer) getNamePartNamespace(obj interface{}) string {
