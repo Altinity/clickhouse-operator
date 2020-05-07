@@ -685,7 +685,7 @@ func CreatePodFQDN(host *chop.ChiHost) string {
 
 	if host.CHI.Spec.NamespaceDomainPattern != "" {
 		// NamespaceDomainPattern has been explicitly specified
-		pattern = "%s."+host.CHI.Spec.NamespaceDomainPattern
+		pattern = "%s." + host.CHI.Spec.NamespaceDomainPattern
 	}
 
 	// Create FQDN based on pattern available
@@ -716,8 +716,8 @@ func CreatePodFQDNsOfShard(shard *chop.ChiShard) []string {
 	return fqdns
 }
 
-// CreatePodFQDNsOfChi creates fully qualified domain names of all pods in a CHI
-func CreatePodFQDNsOfChi(chi *chop.ClickHouseInstallation) []string {
+// CreatePodFQDNsOfCHI creates fully qualified domain names of all pods in a CHI
+func CreatePodFQDNsOfCHI(chi *chop.ClickHouseInstallation) []string {
 	fqdns := make([]string, 0)
 	chi.WalkHosts(func(host *chop.ChiHost) error {
 		fqdns = append(fqdns, CreatePodFQDN(host))
