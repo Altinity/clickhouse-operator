@@ -106,7 +106,7 @@ func TestCreateChiServiceFQDN(t *testing.T) {
 	require.Nil(t, err, "failed to unmarshal chi")
 	chi, err = normalizer.NormalizeCHI(chi)
 	require.Nil(t, err, "failed to normalize chi")
-	name := CreateChiServiceFQDN(chi)
+	name := CreateCHIServiceFQDN(chi)
 	require.Equal(t, "clickhouse-namespace-domain-pattern.kube-system.svc", name, "unexpected chi service fqdn")
 
 	// Test no namespaceDomainPattern specified in CHI
@@ -115,7 +115,7 @@ func TestCreateChiServiceFQDN(t *testing.T) {
 	require.Nil(t, err, "failed to unmarshal chi")
 	chi1, err = normalizer.NormalizeCHI(chi1)
 	require.Nil(t, err, "failed to normalize chi")
-	name1 := CreateChiServiceFQDN(chi1)
+	name1 := CreateCHIServiceFQDN(chi1)
 	require.Equal(t, "clickhouse-namespace-domain-pattern.kube-system.svc.cluster.local", name1, "unexpected chi service fqdn")
 }
 

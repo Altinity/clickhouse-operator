@@ -509,19 +509,22 @@ func CreateCHIServiceName(chi *chop.ClickHouseInstallation) string {
 	return newNameMacroReplacerChi(chi).Replace(pattern)
 }
 
-// CreateCHIServiceName creates a name of a Installation Service resource
-func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
+// CreateCHIServiceFQDN creates a name of a Installation Service resource
+func CreateCHIServiceFQDN(chi *chop.ClickHouseInstallation) string {
+	// FQDN can be generated either from default pattern,
+	// or from personal pattern provided
+
+	// Start with default pattern
+	pattern := serviceFQDNPattern
+
 	if chi.Spec.NamespaceDomainPattern != "" {
 		// NamespaceDomainPattern has been explicitly specified
-		return fmt.Sprintf(
-			"%s."+chi.Spec.NamespaceDomainPattern,
-			CreateCHIServiceName(chi),
-			chi.Namespace,
-		)
+		pattern = "%s." + chi.Spec.NamespaceDomainPattern
 	}
 
+	// Create FQDN based on pattern available
 	return fmt.Sprintf(
-		serviceFQDNPattern,
+		pattern,
 		CreateCHIServiceName(chi),
 		chi.Namespace,
 	)
@@ -674,16 +677,20 @@ func CreatePodHostname(host *chop.ChiHost) string {
 // CreatePodFQDN creates a fully qualified domain name of a pod
 // ss-1eb454-2-0.my-dev-domain.svc.cluster.local
 func CreatePodFQDN(host *chop.ChiHost) string {
+	// FQDN can be generated either from default pattern,
+	// or from personal pattern provided
+
+	// Start with default pattern
+	pattern := podFQDNPattern
+
 	if host.CHI.Spec.NamespaceDomainPattern != "" {
-		return fmt.Sprintf(
-			"%s."+host.CHI.Spec.NamespaceDomainPattern,
-			CreatePodHostname(host),
-			host.Address.Namespace,
-		)
+		// NamespaceDomainPattern has been explicitly specified
+		pattern = "%s."+host.CHI.Spec.NamespaceDomainPattern
 	}
 
+	// Create FQDN based on pattern available
 	return fmt.Sprintf(
-		podFQDNPattern,
+		pattern,
 		CreatePodHostname(host),
 		host.Address.Namespace,
 	)
