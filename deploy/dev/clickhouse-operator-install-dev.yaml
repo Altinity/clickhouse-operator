@@ -97,6 +97,8 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
+            namespaceDomainPattern:
+              type: string
             defaults:
               type: object
               properties:
@@ -508,6 +510,8 @@ spec:
                       - name
                     properies:
                       name:
+                        type: string
+                      generateName:
                         type: string
                       zone:
                         type: object
@@ -726,6 +730,8 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
+            namespaceDomainPattern:
+              type: string
             defaults:
               type: object
               properties:
@@ -1137,6 +1143,8 @@ spec:
                       - name
                     properies:
                       name:
+                        type: string
+                      generateName:
                         type: string
                       zone:
                         type: object
@@ -1371,7 +1379,7 @@ subjects:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.9.10
 # etc-clickhouse-operator-files
 #
 apiVersion: v1
@@ -1507,7 +1515,7 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.9.10
 # etc-clickhouse-operator-confd-files
 #
 apiVersion: v1
@@ -1522,7 +1530,7 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.9.10
 # etc-clickhouse-operator-configd-files
 #
 apiVersion: v1
@@ -1569,7 +1577,7 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.9.10
 # etc-clickhouse-operator-templatesd-files
 #
 apiVersion: v1
@@ -1668,7 +1676,7 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.9.10
 # etc-clickhouse-operator-usersd-files
 #
 apiVersion: v1
@@ -1717,8 +1725,8 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.9
-# altinity/metrics-exporter:0.9.9
+# altinity/clickhouse-operator:0.9.10
+# altinity/metrics-exporter:0.9.10
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -1761,7 +1769,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.9.9
+          image: altinity/clickhouse-operator:0.9.10
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -1826,7 +1834,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.9.9
+          image: altinity/metrics-exporter:0.9.10
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder

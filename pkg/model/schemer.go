@@ -136,7 +136,7 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 		cluster_tables,
 	))
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(cluster.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
@@ -178,7 +178,7 @@ func (s *Schemer) getCreateReplicatedObjects(host *chop.ChiHost) ([]string, []st
 		system_tables,
 	))
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(host.GetCHI()), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
@@ -197,7 +197,7 @@ func (s *Schemer) clusterGetCreateDatabases(cluster *chop.ChiCluster) ([]string,
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(cluster.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
@@ -217,7 +217,7 @@ func (s *Schemer) clusterGetCreateTables(cluster *chop.ChiCluster) ([]string, []
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sql)
+	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(cluster.GetCHI()), sql)
 	return names, sqlStatements, nil
 }
 
@@ -277,7 +277,7 @@ func (s *Schemer) CHIDropDnsCache(chi *chop.ClickHouseInstallation) error {
 
 // chiApplySQLs runs set of SQL queries over the whole CHI
 func (s *Schemer) chiApplySQLs(chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
-	return s.applySQLs(CreatePodFQDNsOfChi(chi), sqls, retry)
+	return s.applySQLs(CreatePodFQDNsOfCHI(chi), sqls, retry)
 }
 
 // clusterApplySQLs runs set of SQL queries over the cluster

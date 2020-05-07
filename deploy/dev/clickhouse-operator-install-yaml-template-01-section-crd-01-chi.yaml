@@ -97,6 +97,8 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
+            namespaceDomainPattern:
+              type: string
             defaults:
               type: object
               properties:
@@ -508,6 +510,8 @@ spec:
                       - name
                     properies:
                       name:
+                        type: string
+                      generateName:
                         type: string
                       zone:
                         type: object

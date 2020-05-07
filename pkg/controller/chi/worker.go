@@ -258,7 +258,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		WithStatusAction(new).
 		Info("updateCHI(%s/%s) update monitoring list", new.Namespace, new.Name)
 
-	w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfChi(new))
+	w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfCHI(new))
 
 	// Update CHI object
 	(&new.Status).ReconcileComplete()

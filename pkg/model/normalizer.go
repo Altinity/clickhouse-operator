@@ -233,7 +233,7 @@ func hostApplyHostTemplate(host *chiv1.ChiHost, template *chiv1.ChiHostTemplate)
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := CreateChiServiceFQDN(n.chi)
+	endpoint := CreateCHIServiceFQDN(n.chi)
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
 	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {

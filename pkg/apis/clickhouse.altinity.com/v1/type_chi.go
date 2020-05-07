@@ -15,8 +15,9 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/version"
 	"math"
+
+	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 // fillStatus fills .Status
@@ -448,10 +449,16 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		if spec.Stop == "" {
 			spec.Stop = from.Stop
 		}
+		if spec.NamespaceDomainPattern == "" {
+			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
+		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if from.Stop != "" {
 			// Override by non-empty values only
 			spec.Stop = from.Stop
+		}
+		if from.NamespaceDomainPattern != "" {
+			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
 		}
 	}
 
