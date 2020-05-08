@@ -1,7 +1,5 @@
-vendor
-deploy/
+vendor/
 docs/
-.git/
 .devspace/
 .vagrant/
 .idea/

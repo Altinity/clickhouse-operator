@@ -20,9 +20,19 @@ Vagrant.configure(2) do |config|
   config.vm.define :clickhouse_operator do |clickhouse_operator|
     clickhouse_operator.vm.network "private_network", ip: "172.16.2.99", nic_type: "virtio"
     # port forwarding works only when pair with kubectl port-forward
+    # grafana
     clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 3000, host_ip: "127.0.0.1", host: 3000
+    # metrics-exporter
     clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 8888, host_ip: "127.0.0.1", host: 8888
+    # prometheus
     clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 9090, host_ip: "127.0.0.1", host: 9090
+
+    # devspace UI
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 8090, host_ip: "127.0.0.1", host: 8090
+
+    # delve for devspace
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 40001, host_ip: "127.0.0.1", host: 40001
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 40002, host_ip: "127.0.0.1", host: 40002
 
     clickhouse_operator.vm.host_name = "local-altinity-clickhouse-operator"
     # vagrant plugin install vagrant-disksize

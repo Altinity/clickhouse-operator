@@ -21,6 +21,19 @@ RUN GO111MODULE=on go mod vendor
 # Build operator binary with explicitly specified output
 RUN OPERATOR_BIN=/tmp/clickhouse-operator ./dev/go_build_operator.sh
 
+FROM builder-operator AS delve
+WORKDIR /tmp/
+RUN go get -v github.com/go-delve/delve/cmd/dlv
+
+# Add config files from local source dir into image
+ADD config/config.yaml   /etc/clickhouse-operator/
+ADD config/conf.d/*      /etc/clickhouse-operator/conf.d/
+ADD config/config.d/*    /etc/clickhouse-operator/config.d/
+ADD config/templates.d/* /etc/clickhouse-operator/templates.d/
+ADD config/users.d/*     /etc/clickhouse-operator/users.d/
+
+CMD ["/go/bin/dlv", "--listen=:40001", "--headless=true", "--api-version=2", "exec", "/tmp/clickhouse-operator","--","-logtostderr=true", "-v=5"]
+
 # ====================
 # ===== Operator =====
 # ====================
