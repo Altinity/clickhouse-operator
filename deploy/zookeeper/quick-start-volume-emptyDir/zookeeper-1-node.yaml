@@ -110,6 +110,8 @@ spec:
               CLIENT_PORT=2181 &&
               SERVER_PORT=2888 &&
               ELECTION_PORT=3888 &&
+              ZOO_DATA_DIR=/var/lib/zookeeper/data &&
+              ZOO_DATA_LOG_DIR=/var/lib/zookeeper/datalog &&
               {
                 echo "clientPort=${CLIENT_PORT}"
                 echo 'tickTime=2000'
@@ -117,8 +119,8 @@ spec:
                 echo 'syncLimit=10'
                 echo 'maxClientCnxns=2000'
                 echo 'maxSessionTimeout=60000000'
-                echo 'dataDir=/var/lib/zookeeper/data'
-                echo 'dataLogDir=/var/lib/zookeeper/data/log'
+                echo "dataDir=${ZOO_DATA_DIR}"
+                echo "dataLogDir=${ZOO_DATA_LOG_DIR}"
                 echo 'autopurge.snapRetainCount=10'
                 echo 'autopurge.purgeInterval=1'
                 echo 'preAllocSize=131072'
@@ -144,6 +146,8 @@ spec:
                   echo "Fialed to parse name and ordinal of Pod"
                   exit 1
               fi &&
+              mkdir -p ${ZOO_DATA_DIR} &&
+              mkdir -p ${ZOO_DATA_LOG_DIR} &&
               export MY_ID=$((ORD+1)) &&
               echo $MY_ID > $ZOO_DATA_DIR/myid &&
               if [[ $SERVERS -gt 1 ]]; then
