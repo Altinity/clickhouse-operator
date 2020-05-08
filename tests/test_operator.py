@@ -106,13 +106,13 @@ def test_009(version_from = "0.8.0", version_to = settings.version):
     test_operator_upgrade("configs/test-009-operator-upgrade.yaml", version_from, version_to)
     test_operator_upgrade("configs/test-009-operator-upgrade-2.yaml", version_from, version_to)
 
-def set_operator_version(version, ns="kube-system", timeout=60):
+def set_operator_version(version, ns=settings.operator_namespace, timeout=60):
     kubectl(f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:{version}", ns=ns)
     kubectl(f"set image deployment.v1.apps/clickhouse-operator metrics-exporter=altinity/metrics-exporter:{version}", ns=ns)
     kubectl("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
     assert kube_get_count("pod", ns=ns, label="-l app=clickhouse-operator") > 0, error()
     
-def restart_operator(ns = "kube-system", timeout=60):
+def restart_operator(ns = settings.operator_namespace, timeout=60):
     pod_name = kube_get("pod", name="", ns=ns, label="-l app=clickhouse-operator")["items"][0]["metadata"]["name"]
     kubectl(f"delete pod {pod_name}", ns = ns, timeout = timeout)
     kube_wait_object("pod", name="", ns = ns, label="-l app=clickhouse-operator")
