@@ -5,6 +5,7 @@ import pathlib
 version = open(os.path.join(pathlib.Path(__file__).parent.absolute(),"../release")).read(1024)
 # version = "0.9.7" 
 test_namespace = "test"
+operator_namespace = os.getenv('OPERATOR_NAMESPACE') if 'OPERATOR_NAMESPACE' in os.environ else 'kube-system'
 clickhouse_template = "templates/tpl-clickhouse-stable.yaml"
 # clickhouse_template = "templates/tpl-clickhouse-19.11.yaml"
 # clickhouse_template = "templates/tpl-clickhouse-20.1.yaml"

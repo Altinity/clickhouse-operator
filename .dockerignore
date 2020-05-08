@@ -1,5 +1,6 @@
-.git
-.idea
-.vagrant
-.circleci
+vendor/
+docs/
+.circleci/
+.vagrant/
+.devspace/
 *.log

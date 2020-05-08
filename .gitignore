@@ -13,6 +13,8 @@
 
 # IDE folders
 .idea
+/.project
+/.pydevproject
 
 # Skip log folder
 log
@@ -23,4 +25,6 @@ __pycache__
 dev/bin
 dev/log
 
-.vagrant
+/.vagrant
+/.DS_Store
+/.devspace
