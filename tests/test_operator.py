@@ -63,8 +63,8 @@ def test_007(self):
                       "pod_image": "yandex/clickhouse-server:19.11",
                       "pod_ports": [8124,9001,9010]})
 
-def test_operator_upgrade(config, version_from, version_to = settings.version):
-    version_to = settings.version
+def test_operator_upgrade(config, version_from, version_to = settings.operator_version):
+    version_to = settings.operator_version
     with Given(f"clickhouse-operator {version_from}"):
         set_operator_version(version_from)
         config = get_full_path(config)
@@ -79,7 +79,7 @@ def test_operator_upgrade(config, version_from, version_to = settings.version):
 
         kube_delete_chi(chi)
 
-def test_operator_restart(config, version = settings.version):
+def test_operator_restart(config, version = settings.operator_version):
     with Given(f"clickhouse-operator {version}"):
         set_operator_version(version)
         config = get_full_path(config)
@@ -102,7 +102,7 @@ def test_008(self):
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
-def test_009(self, version_from="0.8.0", version_to=settings.version):
+def test_009(self, version_from="0.8.0", version_to=settings.operator_version):
     test_operator_upgrade("configs/test-009-operator-upgrade.yaml", version_from, version_to)
     test_operator_upgrade("configs/test-009-operator-upgrade-2.yaml", version_from, version_to)
 
@@ -476,7 +476,7 @@ def test_019(self, config="configs/test-019-retain-volume.yaml"):
 
 @TestScenario
 @Name("test-020-multi-volume. Test multi-volume configuration")
-def test_020(config = "configs/test-020-multi-volume.yaml"):
+def test_020(self, config = "configs/test-020-multi-volume.yaml"):
     chi = get_chi_name(get_full_path(config))
     create_and_check(config, {"pod_count": 1,
                               "pod_volumes": {"/var/lib/clickhouse","/var/lib/clickhouse2"},
