@@ -32,8 +32,8 @@ const (
 
 // ClickHouseInstallation defines the Installation of a ClickHouse Database Cluster
 type ClickHouseInstallation struct {
-	metav1.TypeMeta             `json:",inline"`
-	metav1.ObjectMeta           `json:"metadata,omitempty" yaml:"metadata"`
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty" yaml:"metadata"`
 	Spec              ChiSpec   `json:"spec"               yaml:"spec"`
 	Status            ChiStatus `json:"status"`
 }
