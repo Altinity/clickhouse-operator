@@ -1078,8 +1078,8 @@ func (n *Normalizer) ensureCluster() {
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
 func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
 	host.Config.ZookeeperFingerprint = util.Fingerprint(*host.GetZookeeper())
-	host.Config.SettingsFingerprint = util.Fingerprint(n.chi.Spec.Configuration.Settings.SliceOfStrings())
-	host.Config.FilesFingerprint = util.Fingerprint(n.chi.Spec.Configuration.Files.SliceOfStrings())
+	host.Config.SettingsFingerprint = util.Fingerprint(n.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings())
+	host.Config.FilesFingerprint = util.Fingerprint(n.chi.Spec.Configuration.Files.AsSortedSliceOfStrings())
 
 	return nil
 }
