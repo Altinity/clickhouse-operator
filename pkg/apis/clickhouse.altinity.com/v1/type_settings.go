@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -65,6 +66,13 @@ func (s *Setting) Vector() []string {
 	return s.vector
 }
 
+func (s *Setting) AsVector() []string {
+	if s.isScalar {
+		return []string{s.scalar}
+	}
+	return s.vector
+}
+
 func (s *Setting) String() string {
 	if s.isScalar {
 		return s.scalar
@@ -86,6 +94,10 @@ func (settings *Settings) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	if *settings == nil {
+		*settings = NewSettings()
+	}
+
 	for name, untyped := range raw {
 		if scalar, ok := unmarshalScalar(untyped); ok {
 			(*settings)[name] = NewScalarSetting(scalar)
@@ -97,6 +109,20 @@ func (settings *Settings) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+func (settings Settings) MarshalJSON() ([]byte, error) {
+	raw := make(map[string]interface{})
+
+	for name, setting := range settings {
+		if setting.isScalar {
+			raw[name] = setting.scalar
+		} else {
+			raw[name] = setting.vector
+		}
+	}
+
+	return json.Marshal(raw)
 }
 
 func unmarshalScalar(untyped interface{}) (string, bool) {
@@ -218,11 +244,20 @@ func (settings Settings) GetStringMap() map[string]string {
 	return m
 }
 
-func (settings Settings) SliceOfStrings() []string {
+func (settings Settings) AsSortedSliceOfStrings() []string {
+	// Sort keys
+	var keys []string
+	for key := range settings {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
 	var s []string
 
-	for _, setting := range settings {
-		s = append(s, setting.String())
+	// Walk over sorted keys
+	for _, key := range keys {
+		s = append(s, key)
+		s = append(s, settings[key].String())
 	}
 
 	return s
