@@ -1078,8 +1078,8 @@ func (n *Normalizer) ensureCluster() {
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
 func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
 	host.Config.ZookeeperFingerprint = util.Fingerprint(*host.GetZookeeper())
-	host.Config.SettingsFingerprint = util.Fingerprint(util.CastToSliceOfStrings(n.chi.Spec.Configuration.Settings))
-	host.Config.FilesFingerprint = util.Fingerprint(util.CastToSliceOfStrings(n.chi.Spec.Configuration.Files))
+	host.Config.SettingsFingerprint = util.Fingerprint(n.chi.Spec.Configuration.Settings.SliceOfStrings())
+	host.Config.FilesFingerprint = util.Fingerprint(n.chi.Spec.Configuration.Files.SliceOfStrings())
 
 	return nil
 }
@@ -1113,7 +1113,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiv1.Settings) {
 		*users = chiv1.NewSettings()
 	}
 
-	(*users).NormalizePaths()
+	(*users).Normalize()
 
 	// Extract username from path
 	usernameMap := make(map[string]bool)
@@ -1141,19 +1141,19 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiv1.Settings) {
 	for username := range usernameMap {
 		if _, ok := (*users)[username+"/profile"]; !ok {
 			// No 'user/profile' section
-			(*users)[username+"/profile"] = n.chop.Config().CHConfigUserDefaultProfile
+			(*users)[username+"/profile"] = chiv1.NewScalarSetting(n.chop.Config().CHConfigUserDefaultProfile)
 		}
 		if _, ok := (*users)[username+"/quota"]; !ok {
 			// No 'user/quota' section
-			(*users)[username+"/quota"] = n.chop.Config().CHConfigUserDefaultQuota
+			(*users)[username+"/quota"] = chiv1.NewScalarSetting(n.chop.Config().CHConfigUserDefaultQuota)
 		}
 		if _, ok := (*users)[username+"/networks/ip"]; !ok {
 			// No 'user/networks/ip' section
-			(*users)[username+"/networks/ip"] = n.chop.Config().CHConfigUserDefaultNetworksIP
+			(*users)[username+"/networks/ip"] = chiv1.NewVectorSetting(n.chop.Config().CHConfigUserDefaultNetworksIP)
 		}
 		if _, ok := (*users)[username+"/networks/host_regexp"]; !ok {
 			// No 'user/networks/host_regexp' section
-			(*users)[username+"/networks/host_regexp"] = CreatePodRegexp(n.chi, n.chop.Config().CHConfigNetworksHostRegexpTemplate)
+			(*users)[username+"/networks/host_regexp"] = chiv1.NewScalarSetting(CreatePodRegexp(n.chi, n.chop.Config().CHConfigNetworksHostRegexpTemplate))
 		}
 
 		var pass = ""
@@ -1168,7 +1168,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiv1.Settings) {
 		// if SHA256 is not set, initialize it from the password
 		if pass != "" && !okPasswordSHA256 {
 			pass_sha256 := sha256.Sum256([]byte(pass))
-			(*users)[username+"/password_sha256_hex"] = hex.EncodeToString(pass_sha256[:])
+			(*users)[username+"/password_sha256_hex"] = chiv1.NewScalarSetting(hex.EncodeToString(pass_sha256[:]))
 			okPasswordSHA256 = true
 		}
 
@@ -1176,7 +1176,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiv1.Settings) {
 			// ClickHouse does not start if both password and sha256 are defined
 			if username == "default" {
 				// Set remove password flag for default user that is empty in stock ClickHouse users.xml
-				(*users)[username+"/password"] = "_removed_"
+				(*users)[username+"/password"] = chiv1.NewScalarSetting("_removed_")
 			} else {
 				delete(*users, username+"/password")
 			}
@@ -1195,7 +1195,7 @@ func (n *Normalizer) normalizeConfigurationProfiles(profiles *chiv1.Settings) {
 	if *profiles == nil {
 		*profiles = chiv1.NewSettings()
 	}
-	(*profiles).NormalizePaths()
+	(*profiles).Normalize()
 }
 
 // normalizeConfigurationQuotas normalizes .spec.configuration.quotas
@@ -1210,7 +1210,7 @@ func (n *Normalizer) normalizeConfigurationQuotas(quotas *chiv1.Settings) {
 		*quotas = chiv1.NewSettings()
 	}
 
-	(*quotas).NormalizePaths()
+	(*quotas).Normalize()
 }
 
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
@@ -1225,7 +1225,7 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chiv1.Settings) {
 		*settings = chiv1.NewSettings()
 	}
 
-	(*settings).NormalizePaths()
+	(*settings).Normalize()
 }
 
 // normalizeConfigurationFiles normalizes .spec.configuration.files
