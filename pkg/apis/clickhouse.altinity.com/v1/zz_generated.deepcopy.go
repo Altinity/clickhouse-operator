@@ -788,7 +788,7 @@ func (in *ClickHouseInstallation) DeepCopyObject() runtime.Object {
 func (in *ClickHouseInstallationList) DeepCopyInto(out *ClickHouseInstallationList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ClickHouseInstallation, len(*in))
@@ -849,7 +849,7 @@ func (in *ClickHouseInstallationTemplate) DeepCopyObject() runtime.Object {
 func (in *ClickHouseInstallationTemplateList) DeepCopyInto(out *ClickHouseInstallationTemplateList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ClickHouseInstallationTemplate, len(*in))
@@ -909,7 +909,7 @@ func (in *ClickHouseOperatorConfiguration) DeepCopyObject() runtime.Object {
 func (in *ClickHouseOperatorConfigurationList) DeepCopyInto(out *ClickHouseOperatorConfigurationList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ClickHouseOperatorConfiguration, len(*in))
