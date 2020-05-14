@@ -153,7 +153,7 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 			hostTemplate = newDefaultHostTemplate(statefulSetName)
 		}
 
-		log.V(2).Infof("getHostTemplate() statefulSet %s use default host template", statefulSetName)
+		log.V(3).Infof("getHostTemplate() statefulSet %s use default host template", statefulSetName)
 	}
 
 	return hostTemplate

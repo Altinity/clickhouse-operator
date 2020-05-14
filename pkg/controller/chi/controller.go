@@ -497,7 +497,7 @@ func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
 
 	if chi.ObjectMeta.ResourceVersion != new.ObjectMeta.ResourceVersion {
 		// Updated
-		log.V(2).Infof("CHI (%s/%s) bump resource version %s/%s",
+		log.V(2).Infof("updateCHIObject(%s/%s): ResourceVersion bump %s=>%s",
 			namespace, name, chi.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion,
 		)
 		chi.ObjectMeta.ResourceVersion = new.ObjectMeta.ResourceVersion
