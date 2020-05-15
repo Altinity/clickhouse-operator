@@ -72,6 +72,7 @@ spec:
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             # Need to be StringBool
             stop:
@@ -735,6 +736,7 @@ spec:
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             # Need to be StringBool
             stop:
@@ -1353,6 +1355,7 @@ spec:
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             watchNamespaces:
               type: array
