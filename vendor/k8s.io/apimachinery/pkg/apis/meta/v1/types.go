@@ -43,14 +43,14 @@ type TypeMeta struct {
 	// Servers may infer this from the endpoint the client submits requests to.
 	// Cannot be updated.
 	// In CamelCase.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	Kind string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
 
 	// APIVersion defines the versioned schema of this representation of an object.
 	// Servers should convert recognized schemas to the latest internal value, and
 	// may reject unrecognized values.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
 }
@@ -61,10 +61,6 @@ type ListMeta struct {
 	// selfLink is a URL representing this object.
 	// Populated by the system.
 	// Read-only.
-	//
-	// DEPRECATED
-	// Kubernetes will stop propagating this field in 1.20 release and the field is planned
-	// to be removed in 1.21 release.
 	// +optional
 	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,1,opt,name=selfLink"`
 
@@ -73,7 +69,7 @@ type ListMeta struct {
 	// Value must be treated as opaque by clients and passed unmodified back to the server.
 	// Populated by the system.
 	// Read-only.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency
 	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,2,opt,name=resourceVersion"`
 
@@ -95,6 +91,9 @@ type ListMeta struct {
 	// Servers older than v1.15 do not set this field.
 	// The intended use of the remainingItemCount is *estimating* the size of a collection. Clients
 	// should not rely on the remainingItemCount to be set or to be exact.
+	//
+	// This field is alpha and can be changed or removed without notice.
+	//
 	// +optional
 	RemainingItemCount *int64 `json:"remainingItemCount,omitempty" protobuf:"bytes,4,opt,name=remainingItemCount"`
 }
@@ -131,7 +130,7 @@ type ObjectMeta struct {
 	// should retry (optionally after the time indicated in the Retry-After header).
 	//
 	// Applied only if Name is not specified.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#idempotency
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#idempotency
 	// +optional
 	GenerateName string `json:"generateName,omitempty" protobuf:"bytes,2,opt,name=generateName"`
 
@@ -149,10 +148,6 @@ type ObjectMeta struct {
 	// SelfLink is a URL representing this object.
 	// Populated by the system.
 	// Read-only.
-	//
-	// DEPRECATED
-	// Kubernetes will stop propagating this field in 1.20 release and the field is planned
-	// to be removed in 1.21 release.
 	// +optional
 	SelfLink string `json:"selfLink,omitempty" protobuf:"bytes,4,opt,name=selfLink"`
 
@@ -175,7 +170,7 @@ type ObjectMeta struct {
 	// Populated by the system.
 	// Read-only.
 	// Value must be treated as opaque by clients and .
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency
 	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,6,opt,name=resourceVersion"`
 
@@ -191,7 +186,7 @@ type ObjectMeta struct {
 	// Populated by the system.
 	// Read-only.
 	// Null for lists.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	CreationTimestamp Time `json:"creationTimestamp,omitempty" protobuf:"bytes,8,opt,name=creationTimestamp"`
 
@@ -212,7 +207,7 @@ type ObjectMeta struct {
 	//
 	// Populated by the system when a graceful deletion is requested.
 	// Read-only.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	DeletionTimestamp *Time `json:"deletionTimestamp,omitempty" protobuf:"bytes,9,opt,name=deletionTimestamp"`
 
@@ -246,19 +241,23 @@ type ObjectMeta struct {
 	// +patchStrategy=merge
 	OwnerReferences []OwnerReference `json:"ownerReferences,omitempty" patchStrategy:"merge" patchMergeKey:"uid" protobuf:"bytes,13,rep,name=ownerReferences"`
 
+	// An initializer is a controller which enforces some system invariant at object creation time.
+	// This field is a list of initializers that have not yet acted on this object. If nil or empty,
+	// this object has been completely initialized. Otherwise, the object is considered uninitialized
+	// and is hidden (in list/watch and get calls) from clients that haven't explicitly asked to
+	// observe uninitialized objects.
+	//
+	// When an object is created, the system will populate this list with the current set of initializers.
+	// Only privileged users may set or modify this list. Once it is empty, it may not be modified further
+	// by any user.
+	//
+	// DEPRECATED - initializers are an alpha field and will be removed in v1.15.
+	Initializers *Initializers `json:"initializers,omitempty" protobuf:"bytes,16,opt,name=initializers"`
+
 	// Must be empty before the object is deleted from the registry. Each entry
 	// is an identifier for the responsible component that will remove the entry
 	// from the list. If the deletionTimestamp of the object is non-nil, entries
 	// in this list can only be removed.
-	// Finalizers may be processed and removed in any order.  Order is NOT enforced
-	// because it introduces significant risk of stuck finalizers.
-	// finalizers is a shared field, any actor with permission can reorder it.
-	// If the finalizer list is processed in order, then this can lead to a situation
-	// in which the component responsible for the first finalizer in the list is
-	// waiting for a signal (field value, external system, or other) produced by a
-	// component responsible for a finalizer later in the list, resulting in a deadlock.
-	// Without enforced ordering finalizers are free to order amongst themselves and
-	// are not vulnerable to ordering changes in the list.
 	// +optional
 	// +patchStrategy=merge
 	Finalizers []string `json:"finalizers,omitempty" patchStrategy:"merge" protobuf:"bytes,14,rep,name=finalizers"`
@@ -277,8 +276,30 @@ type ObjectMeta struct {
 	// "ci-cd". The set of fields is always in the version that the
 	// workflow used when modifying the object.
 	//
+	// This field is alpha and can be changed or removed without notice.
+	//
 	// +optional
 	ManagedFields []ManagedFieldsEntry `json:"managedFields,omitempty" protobuf:"bytes,17,rep,name=managedFields"`
+}
+
+// Initializers tracks the progress of initialization.
+type Initializers struct {
+	// Pending is a list of initializers that must execute in order before this object is visible.
+	// When the last pending initializer is removed, and no failing result is set, the initializers
+	// struct will be set to nil and the object is considered as initialized and visible to all
+	// clients.
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Pending []Initializer `json:"pending" protobuf:"bytes,1,rep,name=pending" patchStrategy:"merge" patchMergeKey:"name"`
+	// If result is set with the Failure field, the object will be persisted to storage and then deleted,
+	// ensuring that other clients can observe the deletion.
+	Result *Status `json:"result,omitempty" protobuf:"bytes,2,opt,name=result"`
+}
+
+// Initializer is information about an initializer that has not yet completed.
+type Initializer struct {
+	// name of the process that is responsible for initializing this object.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 }
 
 const (
@@ -301,7 +322,7 @@ type OwnerReference struct {
 	// API version of the referent.
 	APIVersion string `json:"apiVersion" protobuf:"bytes,5,opt,name=apiVersion"`
 	// Kind of the referent.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 	// Name of the referent.
 	// More info: http://kubernetes.io/docs/user-guide/identifiers#names
@@ -322,7 +343,6 @@ type OwnerReference struct {
 	BlockOwnerDeletion *bool `json:"blockOwnerDeletion,omitempty" protobuf:"varint,7,opt,name=blockOwnerDeletion"`
 }
 
-// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ListOptions is the query options to a standard REST list call.
@@ -352,6 +372,9 @@ type ListOptions struct {
 	// If this is not a watch, this field is ignored.
 	// If the feature gate WatchBookmarks is not enabled in apiserver,
 	// this field is ignored.
+	//
+	// This field is alpha and can be changed or removed without notice.
+	//
 	// +optional
 	AllowWatchBookmarks bool `json:"allowWatchBookmarks,omitempty" protobuf:"varint,9,opt,name=allowWatchBookmarks"`
 
@@ -402,7 +425,6 @@ type ListOptions struct {
 	Continue string `json:"continue,omitempty" protobuf:"bytes,8,opt,name=continue"`
 }
 
-// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ExportOptions is the query options to the standard REST get call.
@@ -417,7 +439,6 @@ type ExportOptions struct {
 	Exact bool `json:"exact" protobuf:"varint,2,opt,name=exact"`
 }
 
-// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // GetOptions is the standard query options to the standard REST get call.
@@ -455,7 +476,6 @@ const (
 	DryRunAll = "All"
 )
 
-// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeleteOptions may be provided when deleting an API object.
@@ -471,7 +491,6 @@ type DeleteOptions struct {
 
 	// Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be
 	// returned.
-	// +k8s:conversion-gen=false
 	// +optional
 	Preconditions *Preconditions `json:"preconditions,omitempty" protobuf:"bytes,2,opt,name=preconditions"`
 
@@ -502,7 +521,6 @@ type DeleteOptions struct {
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,5,rep,name=dryRun"`
 }
 
-// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CreateOptions may be provided when creating an API object.
@@ -526,7 +544,6 @@ type CreateOptions struct {
 	FieldManager string `json:"fieldManager,omitempty" protobuf:"bytes,3,name=fieldManager"`
 }
 
-// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PatchOptions may be provided when patching an API object.
@@ -559,7 +576,6 @@ type PatchOptions struct {
 	FieldManager string `json:"fieldManager,omitempty" protobuf:"bytes,3,name=fieldManager"`
 }
 
-// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // UpdateOptions may be provided when updating an API object.
@@ -599,13 +615,13 @@ type Preconditions struct {
 type Status struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Status of the operation.
 	// One of: "Success" or "Failure".
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
 	// +optional
 	Status string `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 	// A human-readable description of the status of this operation.
@@ -644,7 +660,7 @@ type StatusDetails struct {
 	Group string `json:"group,omitempty" protobuf:"bytes,2,opt,name=group"`
 	// The kind attribute of the resource associated with the status StatusReason.
 	// On some operations may differ from the requested resource Kind.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	Kind string `json:"kind,omitempty" protobuf:"bytes,3,opt,name=kind"`
 	// UID of the resource.
@@ -776,13 +792,11 @@ const (
 	// doesn't make any sense, for example deleting a read-only object.  This is different than
 	// StatusReasonInvalid above which indicates that the API call could possibly succeed, but the
 	// data was invalid.  API calls that return BadRequest can never succeed.
-	// Status code 400
 	StatusReasonBadRequest StatusReason = "BadRequest"
 
 	// StatusReasonMethodNotAllowed means that the action the client attempted to perform on the
 	// resource was not supported by the code - for instance, attempting to delete a resource that
 	// can only be created. API calls that return MethodNotAllowed can never succeed.
-	// Status code 405
 	StatusReasonMethodNotAllowed StatusReason = "MethodNotAllowed"
 
 	// StatusReasonNotAcceptable means that the accept types indicated by the client were not acceptable
@@ -881,7 +895,7 @@ const (
 type List struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -1114,16 +1128,9 @@ type ManagedFieldsEntry struct {
 	// Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'
 	// +optional
 	Time *Time `json:"time,omitempty" protobuf:"bytes,4,opt,name=time"`
-
-	// Fields is tombstoned to show why 5 is a reserved protobuf tag.
-	//Fields *Fields `json:"fields,omitempty" protobuf:"bytes,5,opt,name=fields,casttype=Fields"`
-
-	// FieldsType is the discriminator for the different fields format and version.
-	// There is currently only one possible value: "FieldsV1"
-	FieldsType string `json:"fieldsType,omitempty" protobuf:"bytes,6,opt,name=fieldsType"`
-	// FieldsV1 holds the first JSON version format as described in the "FieldsV1" type.
+	// Fields identifies a set of fields.
 	// +optional
-	FieldsV1 *FieldsV1 `json:"fieldsV1,omitempty" protobuf:"bytes,7,opt,name=fieldsV1"`
+	Fields *Fields `json:"fields,omitempty" protobuf:"bytes,5,opt,name=fields,casttype=Fields"`
 }
 
 // ManagedFieldsOperationType is the type of operation which lead to a ManagedFieldsEntry being created.
@@ -1134,20 +1141,21 @@ const (
 	ManagedFieldsOperationUpdate ManagedFieldsOperationType = "Update"
 )
 
-// FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.
-//
-// Each key is either a '.' representing the field itself, and will always map to an empty set,
-// or a string representing a sub-field or item. The string will follow one of these four formats:
-// 'f:<name>', where <name> is the name of a field in a struct, or key in a map
-// 'v:<value>', where <value> is the exact json formatted value of a list item
-// 'i:<index>', where <index> is position of a item in a list
-// 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values
-// If a key maps to an empty Fields value, the field that key represents is part of the set.
-//
-// The exact format is defined in sigs.k8s.io/structured-merge-diff
-type FieldsV1 struct {
-	// Raw is the underlying serialization of this object.
-	Raw []byte `json:"-" protobuf:"bytes,1,opt,name=Raw"`
+// Fields stores a set of fields in a data structure like a Trie.
+// To understand how this is used, see: https://github.com/kubernetes-sigs/structured-merge-diff
+type Fields struct {
+	// Map stores a set of fields in a data structure like a Trie.
+	//
+	// Each key is either a '.' representing the field itself, and will always map to an empty set,
+	// or a string representing a sub-field or item. The string will follow one of these four formats:
+	// 'f:<name>', where <name> is the name of a field in a struct, or key in a map
+	// 'v:<value>', where <value> is the exact json formatted value of a list item
+	// 'i:<index>', where <index> is position of a item in a list
+	// 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values
+	// If a key maps to an empty Fields value, the field that key represents is part of the set.
+	//
+	// The exact format is defined in k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal
+	Map map[string]Fields `json:",inline" protobuf:"bytes,1,rep,name=map"`
 }
 
 // TODO: Table does not generate to protobuf because of the interface{} - fix protobuf
@@ -1162,7 +1170,7 @@ type FieldsV1 struct {
 type Table struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	ListMeta `json:"metadata,omitempty"`
 
@@ -1272,7 +1280,6 @@ const (
 )
 
 // TableOptions are used when a Table is requested by the caller.
-// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TableOptions struct {
 	TypeMeta `json:",inline"`
@@ -1294,7 +1301,7 @@ type TableOptions struct {
 type PartialObjectMetadata struct {
 	TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
 	// +optional
 	ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 }
@@ -1304,7 +1311,7 @@ type PartialObjectMetadata struct {
 type PartialObjectMetadataList struct {
 	TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
 	// +optional
 	ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
