@@ -2,7 +2,7 @@
 # ===== Builder =====
 # ====================
 
-FROM golang:1.13 AS builder-metrics-exporter
+FROM golang:1.13 AS builder
 
 # Install required packages
 RUN apt-get update && apt-get install -y apt-utils gettext-base
