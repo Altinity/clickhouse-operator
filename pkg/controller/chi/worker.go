@@ -171,7 +171,7 @@ func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseIns
 func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 
 	if (old != nil) && (new != nil) && (old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion) {
-		w.a.V(2).Info("updateCHI(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
+		w.a.V(3).Info("updateCHI(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
 		// No need to react
 		return nil
 	}
@@ -183,7 +183,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 
 	if !actionPlan.HasActionsToDo() {
 		// Nothing to do - no changes found - no need to react
-		w.a.V(2).Info("updateCHI(%s/%s) - no changes found", new.Namespace, new.Name)
+		w.a.V(3).Info("updateCHI(%s/%s) - ResourceVersion changed, but no actual changes found", new.Namespace, new.Name)
 		return nil
 	}
 
