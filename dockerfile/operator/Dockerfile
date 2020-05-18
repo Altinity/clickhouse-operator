@@ -2,7 +2,7 @@
 # ===== Builder =====
 # ===================
 
-FROM golang:1.12.7 AS builder-operator
+FROM golang:1.13 AS builder-operator
 
 # Install required packages
 RUN apt-get update && apt-get install -y apt-utils gettext-base
