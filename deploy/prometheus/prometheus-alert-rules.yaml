@@ -1,0 +1,105 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: prometheus
+    role: alert-rules
+  name: prometheus-clickhouse-operator-rules
+spec:
+  groups:
+    - name: ./clickhouse-operator.rules
+      rules:
+        - alert: MetricsExporterDown
+          expr: absent(up{job='clickhouse-operator-metrics'})
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.pod }}"
+            summary: "metrics-exporter possible down"
+            description: "`{{ $labels.pod }}` in namespace `{{ $labels.namespace }}` not sent data more than 1 minutes. Please check instance status via `kubectl logs -n {{ $labels.namespace }} {{ $labels.pod }}`"
+
+        - alert: ClickHouseServerDown
+          expr: absent(chi_clickhouse_metric_Uptime)
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "clickhouse-server possible down"
+            description: "`{{ $labels.hostname }}` in namespace {{ $labels.exported_namespace }} not sent data more than 1 minute. Please check instance status via `kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1)`"
+
+        - alert: ClickHouseServerRestartRecently
+          expr: chi_clickhouse_metric_Uptime > 1 < 180
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "clickhouse-server started recently"
+            description: "{{ $labels.hostname }} in namespace {{ $labels.exported_namespace }} has been start less than 3 minutes ago."
+
+        - alert: ClickHouseDNSErrors
+          expr: increase(chi_clickhouse_event_DNSError[1m]) > 0 or increase(chi_clickhouse_event_NetworkErrors[1m]) > 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "DNS errors occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+              Please check DNS settings and remote_servers part of /etc/clickhouse-server/
+              See documentation:
+              - https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
+              - https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-disable-internal-dns-cache
+              - https://clickhouse.tech/docs/en/query_language/system/#query_language-system-drop-dns-cache
+
+        - alert: DistributedFilesToInsertHigh
+          expr: chi_clickhouse_metric_DistributedFilesToInsert > 50
+          for: 1m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "clickhouse-server have Distributed Files to Insert > 50"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have too much files which not insert to `*MergeTree` tables via `Distributed` table engine
+              https://clickhouse.tech/docs/en/operations/table_engines/distributed/
+              When you insert data to `Distributed` table.
+              Data is written to target `*MergreTree` tables asynchronously.
+              When inserted in the table, the data block is just written to the local file system.
+              The data is sent to the remote servers in the background as soon as possible.
+              The period for sending data is managed by the `distributed_directory_monitor_sleep_time_ms` and `distributed_directory_monitor_max_sleep_time_ms` settings.
+              The Distributed engine sends each file with inserted data separately, but you can enable batch sending of files with the `distributed_directory_monitor_batch_inserts` setting
+
+              Also, you can manage distributed tables
+              https://clickhouse.tech/docs/en/sql-reference/statements/system/#query-language-system-distributed
+
+        - alert: DistributedConnectionExpections
+          expr: increase(chi_clickhouse_event_DistributedConnectionFailTry[1m]) > 0 or increase(chi_clickhouse_event_DistributedConnectionFailAtAll[1m]) > 0
+          for: 1m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Distributed connections fails occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+              please check communications between clickhouse server and host `remote_servers` in `/etc/clickhouse-server/`
+              https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
+              also, you can check logs via `kubectl logs -n {{ $labels.exported_namespace }} $( echo {{ $labels.hostname }} | cut -d '.' -f 1)-0`
+
+        - alert: DistributedConnectionExpections
+          expr: increase(chi_clickhouse_metric_DelayedInserts[1m]) > 0
+          for: 1m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Delayed INSERT queries occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have INSERT queries that are throttled due to high number of active data parts for partition in a MergeTree, please decrease INSERT frequency
+              https://clickhouse.tech/docs/en/development/architecture/#merge-tree
+
