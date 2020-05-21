@@ -159,12 +159,12 @@
         {
           "targetBlank": true,
           "title": "Restore After Failures",
-          "url": "https://clickhouse.tech/docs/en/operations/table_engines/replication/#recovery-after-failures"
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/#recovery-after-failures"
         },
         {
           "targetBlank": true,
           "title": "Restore After Data Loss",
-          "url": "https://clickhouse.tech/docs/en/operations/table_engines/replication/#recovery-after-complete-data-loss"
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/#recovery-after-complete-data-loss"
         }
       ],
       "mappingType": 1,
@@ -319,7 +319,7 @@
         {
           "targetBlank": true,
           "title": "max_connections",
-          "url": "https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-connections"
+          "url": "https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#max-connections"
         },
         {
           "targetBlank": true,
@@ -465,7 +465,7 @@
         {
           "targetBlank": true,
           "title": "system.zookeeper",
-          "url": "https://clickhouse.tech/docs/en/operations/system_tables/#system-zookeeper"
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-zookeeper"
         },
         {
           "targetBlank": true,
@@ -611,12 +611,12 @@
         {
           "targetBlank": true,
           "title": "Manage Distributed tables",
-          "url": "https://clickhouse.tech/docs/en/query_language/system/#query_language-system-distributed"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/system/#query-language-system-distributed"
         },
         {
           "targetBlank": true,
-          "title": "NetworkErrors",
-          "url": "https://github.com/ClickHouse/ClickHouse/search?q=NetworkErrors"
+          "title": "DNSError",
+          "url": "https://github.com/ClickHouse/ClickHouse/search?q=DNSError"
         }
       ],
       "nullPointMode": "null",
@@ -736,12 +736,12 @@
         {
           "targetBlank": true,
           "title": "max_concurent_queries",
-          "url": "https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-concurrent-queries"
+          "url": "https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#max-concurrent-queries"
         },
         {
           "targetBlank": true,
           "title": "max_execution_time",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#max-execution-time"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#max-execution-time"
         }
       ],
       "nullPointMode": "connected",
@@ -843,8 +843,9 @@
       "linewidth": 2,
       "links": [
         {
+          "targetBlank": true,
           "title": "I/O buffers architecture",
-          "url": "https://clickhouse.tech/docs/en/development/architecture/#i-o"
+          "url": "https://clickhouse.tech/docs/en/development/architecture/#io"
         }
       ],
       "nullPointMode": "connected",
@@ -958,7 +959,7 @@
         {
           "targetBlank": true,
           "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#settings_max_memory_usage"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
         }
       ],
       "nullPointMode": "null",
@@ -1062,7 +1063,7 @@
         {
           "targetBlank": true,
           "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#settings_max_memory_usage"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
         }
       ],
       "nullPointMode": "null",
@@ -1167,7 +1168,7 @@
         {
           "targetBlank": true,
           "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#settings_max_memory_usage"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
         }
       ],
       "nullPointMode": "null",
@@ -1272,7 +1273,7 @@
         {
           "targetBlank": true,
           "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#settings_max_memory_usage"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
         }
       ],
       "nullPointMode": "null",
@@ -1377,22 +1378,22 @@
         {
           "targetBlank": true,
           "title": "FETCH PARTITION",
-          "url": "https://clickhouse.tech/docs/en/query_language/alter/#alter_fetch-partition"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_fetch-partition"
         },
         {
           "targetBlank": true,
           "title": "Mutations of data",
-          "url": "https://clickhouse.tech/docs/en/query_language/alter/#alter-mutations"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter-mutations"
         },
         {
           "targetBlank": true,
           "title": "Data TTL",
-          "url": "https://clickhouse.tech/docs/en/operations/table_engines/mergetree/#table_engine-mergetree-ttl"
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#table_engine-mergetree-ttl"
         },
         {
           "targetBlank": true,
           "title": "MOVE PARTITION",
-          "url": "https://clickhouse.tech/docs/en/query_language/alter/#alter_move-partition"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_move-partition"
         }
       ],
       "nullPointMode": "connected",
@@ -1510,12 +1511,12 @@
         {
           "targetBlank": true,
           "title": "START/STOP Merges",
-          "url": "https://clickhouse.tech/docs/en/query_language/system/#query_language-system-stop-merges"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/system/#query_language-system-stop-merges"
         },
         {
           "targetBlank": true,
           "title": "MegreTree Engine description",
-          "url": "https://clickhouse.tech/docs/en/operations/table_engines/mergetree/"
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/"
         }
       ],
       "nullPointMode": "null",
@@ -1620,7 +1621,7 @@
         {
           "targetBlank": true,
           "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#settings_max_memory_usage"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
         }
       ],
       "nullPointMode": "null",
@@ -1727,12 +1728,12 @@
         {
           "targetBlank": true,
           "title": "system.parts",
-          "url": "https://clickhouse.tech/docs/en/operations/system_tables/#system_tables-parts"
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-parts"
         },
         {
           "targetBlank": true,
           "title": "parts_to_delay_insert",
-          "url": "https://github.com/ClickHouse/ClickHouse/blob/master/dbms/src/Storages/MergeTree/MergeTreeSettings.h#L43"
+          "url": "https://github.com/ClickHouse/ClickHouse/search?q=parts_to_delay_insert"
         }
       ],
       "nullPointMode": "null",
@@ -1833,12 +1834,12 @@
         {
           "targetBlank": true,
           "title": "START/STOP Merges",
-          "url": "https://clickhouse.tech/docs/en/query_language/system/#query_language-system-stop-merges"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/system/#query_language-system-stop-merges"
         },
         {
           "targetBlank": true,
           "title": "MegreTree Engine description",
-          "url": "https://clickhouse.tech/docs/en/operations/table_engines/mergetree/"
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/"
         }
       ],
       "nullPointMode": "null",
@@ -1935,8 +1936,9 @@
       "linewidth": 1,
       "links": [
         {
+          "targetBlank": true,
           "title": "Mutations",
-          "url": "https://clickhouse.tech/docs/en/sql_reference/statements/alter/#alter-mutations"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter-mutations"
         }
       ],
       "nullPointMode": "null",
@@ -2035,6 +2037,7 @@
       "linewidth": 2,
       "links": [
         {
+          "targetBlank": true,
           "title": "Replication architecture",
           "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
         }
@@ -2242,7 +2245,7 @@
         {
           "targetBlank": true,
           "title": "mark_cache_size",
-          "url": "https://clickhouse.tech/docs/en/operations/server_settings/settings/#server-mark-cache-size"
+          "url": "https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-mark-cache-size"
         },
         {
           "targetBlank": true,
@@ -2353,7 +2356,7 @@
         {
           "targetBlank": true,
           "title": "How replication works",
-          "url": "https://clickhouse.tech/docs/en/operations/table_engines/replication/"
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/"
         }
       ],
       "nullPointMode": "connected",
@@ -2470,6 +2473,7 @@
       "linewidth": 2,
       "links": [
         {
+          "targetBlank": true,
           "title": "Replication architecture",
           "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
         }
@@ -2575,7 +2579,7 @@
         {
           "targetBlank": true,
           "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#settings_max_memory_usage"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
         }
       ],
       "nullPointMode": "null",
