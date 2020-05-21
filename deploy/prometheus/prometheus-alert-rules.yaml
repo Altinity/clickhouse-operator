@@ -21,7 +21,8 @@ spec:
             description: "`{{ $labels.pod }}` in namespace `{{ $labels.namespace }}` not sent data more than 1 minutes. Please check instance status via `kubectl logs -n {{ $labels.namespace }} {{ $labels.pod }}`"
 
         - alert: ClickHouseServerDown
-          expr: absent(chi_clickhouse_metric_Uptime)
+          # TODO need change to chi_clickhouse_metric_Fetch < 1 wait https://github.com/Altinity/clickhouse-operator/issues/390
+          expr: max_over_time(chi_clickhouse_metric_Uptime[4h]) unless chi_clickhouse_metric_Uptime
           for: 1m
           labels:
             severity: critical
