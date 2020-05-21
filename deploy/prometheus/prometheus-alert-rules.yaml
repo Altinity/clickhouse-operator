@@ -92,7 +92,7 @@ spec:
               https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
               also, you can check logs via `kubectl logs -n {{ $labels.exported_namespace }} $( echo {{ $labels.hostname }} | cut -d '.' -f 1)-0`
 
-        - alert: DistributedConnectionExpections
+        - alert: DelayedInsertThrottling
           expr: increase(chi_clickhouse_metric_DelayedInserts[1m]) > 0
           for: 1m
           labels:
@@ -104,3 +104,23 @@ spec:
               `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have INSERT queries that are throttled due to high number of active data parts for partition in a MergeTree, please decrease INSERT frequency
               https://clickhouse.tech/docs/en/development/architecture/#merge-tree
 
+        - alert: LongestRunningQuery
+          expr: chi_clickhouse_metric_LongestRunningQuery > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Long running queries occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have queries that running more than 10 minutes
+              https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-processes
+
+        - alert: QueryPreempted
+          expr: chi_clickhouse_metric_QueryPreempted > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Preempted queries occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have queries that are throttled due to high number of active data parts for partition in a MergeTree, please decrease INSERT frequency
