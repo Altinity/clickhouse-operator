@@ -1,0 +1,53 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "template-pod-res"
+spec:
+  configuration:
+    clusters:
+      - name: "resources-limit"
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  defaults:
+    templates:
+      # Templates are specified as default for all clusters
+      podTemplate: pod-template-resource-limit
+      hostTemplate: host-template-custom-ports
+
+  templates:
+
+    hostTemplates:
+      - name: host-template-custom-ports
+        spec:
+          tcpPort: 7000
+          httpPort: 7001
+          interserverHTTPPort: 7002
+
+    podTemplates:
+      - name: pod-template-resource-limit
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:19.16
+              volumeMounts:
+                - name: clickhouse-data-storage
+                  mountPath: /var/lib/clickhouse
+              # Container has explicitly specified resource limits
+              resources:
+                requests:
+                  memory: "512Mi"
+                  cpu: "500m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+
+    volumeClaimTemplates:
+      - name: clickhouse-data-storage
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          # VolumeClaim has explicitly specified resource limits
+          resources:
+            requests:
+              storage: 500Mi
