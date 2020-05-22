@@ -89,7 +89,7 @@ const (
 			'metric.LongestRunningQuery'               AS metric,
 			toString(max(elapsed))                     AS value,
 			'the longest currently running query time' AS description,
-            'gauge'                                    AS type
+			'gauge'                                    AS type
 		FROM system.processes
 	`
 
