@@ -59,7 +59,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1588087517206,
+  "iteration": 1590141481678,
   "links": [],
   "panels": [
     {
@@ -113,7 +113,7 @@
       ],
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_Uptime",
+          "expr": "chi_clickhouse_metric_Uptime{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
           "metric": "chi_clickhouse_metric_Uptime",
@@ -159,12 +159,12 @@
         {
           "targetBlank": true,
           "title": "Restore After Failures",
-          "url": "https://clickhouse.tech/docs/en/operations/table_engines/replication/#recovery-after-failures"
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/#recovery-after-failures"
         },
         {
           "targetBlank": true,
           "title": "Restore After Data Loss",
-          "url": "https://clickhouse.tech/docs/en/operations/table_engines/replication/#recovery-after-complete-data-loss"
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/#recovery-after-complete-data-loss"
         }
       ],
       "mappingType": 1,
@@ -202,7 +202,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "sum(chi_clickhouse_metric_ReadonlyReplica{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"})",
+          "expr": "sum(chi_clickhouse_metric_ReadonlyReplica{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
           "intervalFactor": 2,
           "legendFormat": "",
           "refId": "A",
@@ -267,7 +267,7 @@
       ],
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_VersionInteger",
+          "expr": "chi_clickhouse_metric_VersionInteger{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
           "metric": "chi_clickhouse_metric_VersionInteger",
@@ -319,7 +319,7 @@
         {
           "targetBlank": true,
           "title": "max_connections",
-          "url": "https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-connections"
+          "url": "https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#max-connections"
         },
         {
           "targetBlank": true,
@@ -356,28 +356,28 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_TCPConnection{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_TCPConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "tcp {{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_HTTPConnection{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_HTTPConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "http {{hostname}}",
           "refId": "B",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_InterserverConnection{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_InterserverConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "interserver {{hostname}}",
           "refId": "C",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_MySQLConnection{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_MySQLConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "mysql {{hostname}}",
           "refId": "D",
@@ -465,7 +465,7 @@
         {
           "targetBlank": true,
           "title": "system.zookeeper",
-          "url": "https://clickhouse.tech/docs/en/operations/system_tables/#system-zookeeper"
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-zookeeper"
         },
         {
           "targetBlank": true,
@@ -487,7 +487,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_ReadonlyReplica{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_ReadonlyReplica{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "hide": false,
           "intervalFactor": 2,
           "legendFormat": "ReadonlyReplica {{hostname}}",
@@ -496,7 +496,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_ReplicaPartialShutdown{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[5m])",
+          "expr": "increase(chi_clickhouse_event_ReplicaPartialShutdown{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
           "intervalFactor": 2,
           "legendFormat": "ReplicaPartialShutdown {{hostname}}",
           "metric": "chi_clickhouse_event_ReplicaPartialShutdown",
@@ -504,7 +504,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_ZooKeeperUserExceptions{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[5m])",
+          "expr": "increase(chi_clickhouse_event_ZooKeeperUserExceptions{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
           "intervalFactor": 2,
           "legendFormat": "ZooKeeperUserExceptions  {{hostname}}",
           "metric": "chi_clickhouse_event_ZooKeeperUserExceptions",
@@ -512,7 +512,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_ZooKeeperInit{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[5m])",
+          "expr": "increase(chi_clickhouse_event_ZooKeeperInit{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
           "intervalFactor": 2,
           "legendFormat": "ZooKeeperInit {{hostname}}",
           "metric": "chi_clickhouse_event_ZooKeeperInit",
@@ -520,7 +520,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_metric_ZooKeeperSession{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[5m])",
+          "expr": "increase(chi_clickhouse_metric_ZooKeeperSession{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
           "intervalFactor": 2,
           "legendFormat": "ZooKeeperSession  {{hostname}}",
           "metric": "chi_clickhouse_metric_ZooKeeperSession",
@@ -528,7 +528,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_ZooKeeperHardwareExceptions{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[5m])",
+          "expr": "increase(chi_clickhouse_event_ZooKeeperHardwareExceptions{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
           "intervalFactor": 2,
           "legendFormat": "ZooKeeperHardwareExceptions  {{hostname}}",
           "metric": "chi_clickhouse_event_ZooKeeperUserExceptions",
@@ -611,12 +611,12 @@
         {
           "targetBlank": true,
           "title": "Manage Distributed tables",
-          "url": "https://clickhouse.tech/docs/en/query_language/system/#query_language-system-distributed"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/system/#query-language-system-distributed"
         },
         {
           "targetBlank": true,
-          "title": "NetworkErrors",
-          "url": "https://github.com/ClickHouse/ClickHouse/search?q=NetworkErrors"
+          "title": "DNSError",
+          "url": "https://github.com/ClickHouse/ClickHouse/search?q=DNSError"
         }
       ],
       "nullPointMode": "null",
@@ -633,7 +633,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "increase(chi_clickhouse_event_NetworkErrors{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_NetworkErrors{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "DNSErrors {{hostname}}",
           "metric": "chi_clickhouse_event_NetworkErrors",
@@ -649,7 +649,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_DistributedConnectionFailTry{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_DistributedConnectionFailTry{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "DistributedConnectionFailTry {{hostname}}",
           "metric": "chi_clickhouse_event_DistributedConnectionFailTry",
@@ -736,12 +736,12 @@
         {
           "targetBlank": true,
           "title": "max_concurent_queries",
-          "url": "https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-concurrent-queries"
+          "url": "https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#max-concurrent-queries"
         },
         {
           "targetBlank": true,
           "title": "max_execution_time",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#max-execution-time"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#max-execution-time"
         }
       ],
       "nullPointMode": "connected",
@@ -758,7 +758,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(chi_clickhouse_event_Query{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[1m])",
+          "expr": "rate(chi_clickhouse_event_Query{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
           "refId": "B",
@@ -843,8 +843,9 @@
       "linewidth": 2,
       "links": [
         {
+          "targetBlank": true,
           "title": "I/O buffers architecture",
-          "url": "https://clickhouse.tech/docs/en/development/architecture/#i-o"
+          "url": "https://clickhouse.tech/docs/en/development/architecture/#io"
         }
       ],
       "nullPointMode": "connected",
@@ -861,14 +862,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(chi_clickhouse_event_CompressedReadBufferBytes{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[1m])",
+          "expr": "rate(chi_clickhouse_event_CompressedReadBufferBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
-          "expr": "rate(chi_clickhouse_event_ReadCompressedBytes{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[1m])",
+          "expr": "rate(chi_clickhouse_event_ReadCompressedBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "hide": true,
           "interval": "",
           "intervalFactor": 2,
@@ -958,7 +959,7 @@
         {
           "targetBlank": true,
           "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#settings_max_memory_usage"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
         }
       ],
       "nullPointMode": "null",
@@ -975,7 +976,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_MemoryTracking{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_MemoryTracking{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
           "refId": "A",
@@ -1062,7 +1063,7 @@
         {
           "targetBlank": true,
           "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#settings_max_memory_usage"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
         }
       ],
       "nullPointMode": "null",
@@ -1082,7 +1083,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(chi_clickhouse_event_InsertQuery{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[5m])",
+          "expr": "rate(chi_clickhouse_event_InsertQuery{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
           "legendFormat": "Insert queries {{hostname}}",
           "refId": "C"
         }
@@ -1167,7 +1168,7 @@
         {
           "targetBlank": true,
           "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#settings_max_memory_usage"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
         }
       ],
       "nullPointMode": "null",
@@ -1187,7 +1188,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(chi_clickhouse_event_InsertedRows{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[1m])",
+          "expr": "rate(chi_clickhouse_event_InsertedRows{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Insert rows {{hostname}}",
           "refId": "A"
         }
@@ -1272,7 +1273,7 @@
         {
           "targetBlank": true,
           "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#settings_max_memory_usage"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
         }
       ],
       "nullPointMode": "null",
@@ -1292,7 +1293,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(chi_clickhouse_event_InsertedBytes{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[1m])",
+          "expr": "rate(chi_clickhouse_event_InsertedBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Insert bytes {{hostname}}",
           "refId": "A"
         }
@@ -1377,22 +1378,22 @@
         {
           "targetBlank": true,
           "title": "FETCH PARTITION",
-          "url": "https://clickhouse.tech/docs/en/query_language/alter/#alter_fetch-partition"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_fetch-partition"
         },
         {
           "targetBlank": true,
           "title": "Mutations of data",
-          "url": "https://clickhouse.tech/docs/en/query_language/alter/#alter-mutations"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter-mutations"
         },
         {
           "targetBlank": true,
           "title": "Data TTL",
-          "url": "https://clickhouse.tech/docs/en/operations/table_engines/mergetree/#table_engine-mergetree-ttl"
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#table_engine-mergetree-ttl"
         },
         {
           "targetBlank": true,
           "title": "MOVE PARTITION",
-          "url": "https://clickhouse.tech/docs/en/query_language/alter/#alter_move-partition"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_move-partition"
         }
       ],
       "nullPointMode": "connected",
@@ -1409,21 +1410,21 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_BackgroundPoolTask{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_BackgroundPoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "merge, mutate, fetch {{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_BackgroundSchedulePoolTask{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_BackgroundSchedulePoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "clean, alter, replica re-init {{hostname}}",
           "refId": "B",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_BackgroundMovePoolTask{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_BackgroundMovePoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "moves {{hostname}}",
           "refId": "C",
@@ -1510,12 +1511,12 @@
         {
           "targetBlank": true,
           "title": "START/STOP Merges",
-          "url": "https://clickhouse.tech/docs/en/query_language/system/#query_language-system-stop-merges"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/system/#query_language-system-stop-merges"
         },
         {
           "targetBlank": true,
           "title": "MegreTree Engine description",
-          "url": "https://clickhouse.tech/docs/en/operations/table_engines/mergetree/"
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/"
         }
       ],
       "nullPointMode": "null",
@@ -1532,7 +1533,7 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "rate(chi_clickhouse_event_Merge{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[1m])",
+          "expr": "rate(chi_clickhouse_event_Merge{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "merges {{hostname}}",
           "refId": "A",
@@ -1620,7 +1621,7 @@
         {
           "targetBlank": true,
           "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#settings_max_memory_usage"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
         }
       ],
       "nullPointMode": "null",
@@ -1637,14 +1638,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_ReplicasMaxQueueSize{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_ReplicasMaxQueueSize{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "max queue size {{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_ReplicasMaxAbsoluteDelay{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_ReplicasMaxAbsoluteDelay{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "max absolute replica delay {{hostname}}",
           "refId": "B"
         }
@@ -1727,12 +1728,12 @@
         {
           "targetBlank": true,
           "title": "system.parts",
-          "url": "https://clickhouse.tech/docs/en/operations/system_tables/#system_tables-parts"
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-parts"
         },
         {
           "targetBlank": true,
           "title": "parts_to_delay_insert",
-          "url": "https://github.com/ClickHouse/ClickHouse/blob/master/dbms/src/Storages/MergeTree/MergeTreeSettings.h#L43"
+          "url": "https://github.com/ClickHouse/ClickHouse/search?q=parts_to_delay_insert"
         }
       ],
       "nullPointMode": "null",
@@ -1833,12 +1834,12 @@
         {
           "targetBlank": true,
           "title": "START/STOP Merges",
-          "url": "https://clickhouse.tech/docs/en/query_language/system/#query_language-system-stop-merges"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/system/#query_language-system-stop-merges"
         },
         {
           "targetBlank": true,
           "title": "MegreTree Engine description",
-          "url": "https://clickhouse.tech/docs/en/operations/table_engines/mergetree/"
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/"
         }
       ],
       "nullPointMode": "null",
@@ -1855,7 +1856,7 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "rate(chi_clickhouse_event_MergedRows{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[1m])",
+          "expr": "rate(chi_clickhouse_event_MergedRows{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "rows {{hostname}}",
           "refId": "B",
@@ -1935,8 +1936,9 @@
       "linewidth": 1,
       "links": [
         {
+          "targetBlank": true,
           "title": "Mutations",
-          "url": "https://clickhouse.tech/docs/en/sql_reference/statements/alter/#alter-mutations"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter-mutations"
         }
       ],
       "nullPointMode": "null",
@@ -1953,7 +1955,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_PartMutation{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_PartMutation{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "{{hostname}}",
           "refId": "A"
         }
@@ -2035,6 +2037,7 @@
       "linewidth": 2,
       "links": [
         {
+          "targetBlank": true,
           "title": "Replication architecture",
           "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
         }
@@ -2053,7 +2056,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_ZooKeeperRequest{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_ZooKeeperRequest{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "refId": "B"
         }
       ],
@@ -2148,14 +2151,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_Read{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_Read{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "read {{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_Write{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_Write{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "write {{hostname}}",
           "refId": "B",
@@ -2242,7 +2245,7 @@
         {
           "targetBlank": true,
           "title": "mark_cache_size",
-          "url": "https://clickhouse.tech/docs/en/operations/server_settings/settings/#server-mark-cache-size"
+          "url": "https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-mark-cache-size"
         },
         {
           "targetBlank": true,
@@ -2353,7 +2356,7 @@
         {
           "targetBlank": true,
           "title": "How replication works",
-          "url": "https://clickhouse.tech/docs/en/operations/table_engines/replication/"
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/"
         }
       ],
       "nullPointMode": "connected",
@@ -2370,14 +2373,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_ReplicatedChecks{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_ReplicatedChecks{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "check {{hostname}}",
           "refId": "A",
           "step": 20
         },
         {
-          "expr": "chi_clickhouse_metric_ReplicatedFetch{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_ReplicatedFetch{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "interval": "",
           "intervalFactor": 2,
           "legendFormat": "fetch {{hostname}}",
@@ -2385,7 +2388,7 @@
           "step": 20
         },
         {
-          "expr": "chi_clickhouse_metric_ReplicatedSend{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_ReplicatedSend{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "send {{hostname}}",
           "refId": "C",
@@ -2470,6 +2473,7 @@
       "linewidth": 2,
       "links": [
         {
+          "targetBlank": true,
           "title": "Replication architecture",
           "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
         }
@@ -2488,7 +2492,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_LeaderReplica{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_LeaderReplica{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
           "refId": "A",
@@ -2575,7 +2579,7 @@
         {
           "targetBlank": true,
           "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query_complexity/#settings_max_memory_usage"
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
         }
       ],
       "nullPointMode": "null",
@@ -2592,28 +2596,28 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_MemoryTrackingInBackgroundProcessingPool{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_MemoryTrackingInBackgroundProcessingPool{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "merge, mutate, fetch {{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_MemoryTrackingInBackgroundMoveProcessingPool{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_MemoryTrackingInBackgroundMoveProcessingPool{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "moves {{hostname}}",
           "refId": "B",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_MemoryTrackingInBackgroundSchedulePool{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_MemoryTrackingInBackgroundSchedulePool{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "alter, clean, replica re-init {{hostname}}",
           "refId": "C",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_MemoryTrackingForMerges{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}",
+          "expr": "chi_clickhouse_metric_MemoryTrackingForMerges{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "merges {{hostname}}",
           "refId": "D",
@@ -2668,6 +2672,307 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "shows how much space the data stored in the ClickHouse takes from the free space inside <path> ClickHouse setting in the kubernetes pod\n\nbe careful with multiple volumes configuration, kubernetes volume claims and S3 as storage backend ",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 53
+      },
+      "hiddenSeries": false,
+      "id": 39,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "filesystemFree()",
+          "url": "https://clickhouse.tech/docs/en/sql-reference/functions/other-functions/#filesystemfree"
+        },
+        {
+          "targetBlank": true,
+          "title": "system.parts",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-parts"
+        },
+        {
+          "targetBlank": true,
+          "title": "Multiple Disk Volumes",
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#table_engine-mergetree-multiple-volumes"
+        }
+      ],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "chi_clickhouse_metric_DiskDataBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"} / (chi_clickhouse_metric_DiskFreeBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"} + chi_clickhouse_metric_DiskDataBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "legendFormat": "{{hostname}}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Disk Space Usage",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "decimals": null,
+          "format": "percentunit",
+          "label": null,
+          "logBase": 1,
+          "max": "1",
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "description": "Total data size for all ClickHouse *MergeTree tables\n\n",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 53
+      },
+      "hiddenSeries": false,
+      "id": 41,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "system.parts",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-parts"
+        }
+      ],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "chi_clickhouse_metric_DiskDataBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "{{ hostname }}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Clickhouse Data size on Disk",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "decbytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "description": "Memory size allocated for dictionaries",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 53
+      },
+      "hiddenSeries": false,
+      "id": 43,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "system.dictionaries",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-dictionaries"
+        },
+        {
+          "targetBlank": true,
+          "title": "CREATE DICTIONARY",
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/create/#create-dictionary-query"
+        }
+      ],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "chi_clickhouse_metric_MemoryDictionaryBytesAllocated{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "{{ hostname }}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Dictionary Memory",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "decbytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
       "description": "",
       "editable": true,
       "error": false,
@@ -2678,7 +2983,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 53
+        "y": 61
       },
       "hiddenSeries": false,
       "id": 24,
@@ -2754,6 +3059,101 @@
           "logBase": 1,
           "max": null,
           "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "description": "Memory size allocated for primary keys",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 61
+      },
+      "hiddenSeries": false,
+      "id": 45,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "How to choose right primary key",
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#selecting-the-primary-key"
+        }
+      ],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "chi_clickhouse_metric_MemoryPrimaryKeyBytesAllocated",
+          "legendFormat": "{{ hostname }}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Primary Keys Memory",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
           "show": true
         },
         {
@@ -2881,5 +3281,5 @@
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
   "uid": "HBIYxc8Wk",
-  "version": 6
+  "version": 7
 }
