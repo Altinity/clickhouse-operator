@@ -204,16 +204,15 @@ func (ap *ActionPlan) String() string {
 func (ap *ActionPlan) stringItem(banner string, items map[*messagediff.Path]interface{}) string {
 	var str string
 	str += fmt.Sprintf("%s: %d\n", banner, len(items))
-	str += fmt.Sprintf("----------\n")
 	for pathPtr := range items {
-		str += fmt.Sprintf("----- path:\n")
+		str += fmt.Sprintf("----- ap item path  -----\n")
 		for _, pathNode := range *pathPtr {
 			str += fmt.Sprintf("%s\n", pathNode.String())
 		}
-		str += fmt.Sprintf("----- value:\n")
-		str += fmt.Sprintf("%s\n", items[pathPtr])
-		str += fmt.Sprintf("----------\n")
+		str += fmt.Sprintf("----- ap item value -----\n")
+		str += fmt.Sprintf("%v\n", items[pathPtr])
 	}
+	str += fmt.Sprintf("-------------------------\n")
 
 	return str
 }
