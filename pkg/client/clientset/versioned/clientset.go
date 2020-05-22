@@ -28,8 +28,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	ClickhouseV1() clickhousev1.ClickhouseV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Clickhouse() clickhousev1.ClickhouseV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -41,12 +39,6 @@ type Clientset struct {
 
 // ClickhouseV1 retrieves the ClickhouseV1Client
 func (c *Clientset) ClickhouseV1() clickhousev1.ClickhouseV1Interface {
-	return c.clickhouseV1
-}
-
-// Deprecated: Clickhouse retrieves the default version of ClickhouseClient.
-// Please explicitly pick a version.
-func (c *Clientset) Clickhouse() clickhousev1.ClickhouseV1Interface {
 	return c.clickhouseV1
 }
 

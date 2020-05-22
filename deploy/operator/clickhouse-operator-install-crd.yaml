@@ -72,6 +72,7 @@ spec:
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             # Need to be StringBool
             stop:
@@ -179,14 +180,44 @@ spec:
                       type: string
                 users:
                   type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: integer
+                      - type: array
+                        items:
+                          type: string
                 profiles:
                   type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: integer
+                      - type: array
+                        items:
+                          type: string
                 quotas:
                   type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: integer
+                      - type: array
+                        items:
+                          type: string
                 settings:
                   type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: integer
+                      - type: array
+                        items:
+                          type: string
                 files:
                   type: object
+                  additionalProperties:
+                    type: string
                 clusters:
                   type: array
                   items:
@@ -705,6 +736,7 @@ spec:
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             # Need to be StringBool
             stop:
@@ -812,14 +844,44 @@ spec:
                       type: string
                 users:
                   type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: integer
+                      - type: array
+                        items:
+                          type: string
                 profiles:
                   type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: integer
+                      - type: array
+                        items:
+                          type: string
                 quotas:
                   type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: integer
+                      - type: array
+                        items:
+                          type: string
                 settings:
                   type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: integer
+                      - type: array
+                        items:
+                          type: string
                 files:
                   type: object
+                  additionalProperties:
+                    type: string
                 clusters:
                   type: array
                   items:
@@ -1293,6 +1355,7 @@ spec:
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             watchNamespaces:
               type: array

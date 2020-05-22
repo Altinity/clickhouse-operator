@@ -13,16 +13,16 @@ if main():
             kube_deletens(settings.test_namespace)
             kube_createns(settings.test_namespace)
 
-        with Given(f"clickhouse-operator version {settings.version} is installed"):
-            if kube_get_count("pod", ns='kube-system', label="-l app=clickhouse-operator") == 0:
+        with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
+            if kube_get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
                 config = get_full_path('../deploy/operator/clickhouse-operator-install-template.yaml')
                 kube_apply(f"<(cat {config} | "
-                           f"OPERATOR_IMAGE=\"altinity/clickhouse-operator:{settings.version}\" "
-                           f"OPERATOR_NAMESPACE=\"kube-system\" "
-                           f"METRICS_EXPORTER_IMAGE=\"altinity/metrics-exporter:{settings.version}\" "
-                           f"METRICS_EXPORTER_NAMESPACE=\"kube-system\" "
-                           f"envsubst)", ns="kube-system")
-            set_operator_version(settings.version)
+                           f"OPERATOR_IMAGE=\"altinity/clickhouse-operator:{settings.operator_version}\" "
+                           f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
+                           f"METRICS_EXPORTER_IMAGE=\"altinity/metrics-exporter:{settings.operator_version}\" "
+                           f"METRICS_EXPORTER_NAMESPACE=\"{settings.operator_namespace}\" "
+                           f"envsubst)", ns=settings.operator_namespace)
+            set_operator_version(settings.operator_version)
 
         with Given(f"Install ClickHouse template {settings.clickhouse_template}"):
             kube_apply(get_full_path(settings.clickhouse_template), settings.test_namespace)
