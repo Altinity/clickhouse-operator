@@ -84,6 +84,12 @@ const (
     	    toString(filesystemFree())                 AS value,
 	        'Free disk space available at file system' AS description,
 	        'gauge'                                    AS type
+		UNION ALL
+		SELECT
+			'metric.LongestRunningQuery'               AS metric,
+			toString(max(elapsed))                     AS value,
+			'the longest currently running query time' AS description,
+            'gauge'                                    AS type
 	`
 
 	queryTableSizesSQL = `
