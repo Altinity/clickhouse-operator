@@ -11,8 +11,12 @@ source "${CUR_DIR}/go_build_config.sh"
 "${MANIFESTS_ROOT}/operator/build-clickhouse-operator-install-yaml.sh"
 
 # Prepare modules
-GO111MODULE=on go mod tidy
-GO111MODULE=on go mod "${MODULES_DIR}"
+# Prepare modules
+if [[ "0" == "${BUILD_IN_DOCKER:-0}" ]]; then
+    export GO111MODULE=on
+    go mod tidy
+    go mod "${MODULES_DIR}"
+fi
 
 OUTPUT_BINARY="${METRICS_EXPORTER_BIN}"
 MAIN_SRC_FILE="${SRC_ROOT}/cmd/metrics_exporter/main.go"

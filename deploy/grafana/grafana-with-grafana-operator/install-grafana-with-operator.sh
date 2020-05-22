@@ -42,7 +42,7 @@ echo "\$PROMETHEUS_URL=$PROMETHEUS_URL"
 echo ""
 echo "!!! IMPORTANT !!!"
 echo "If you do not agree with specified options, press ctrl-c now"
-sleep 30
+sleep ${SLEEP_BEFORE_RUN:-30}
 echo "Apply options now..."
 
 

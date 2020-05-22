@@ -18,7 +18,7 @@ echo "Validate .yaml file   \$VALIDATE_YAML=${VALIDATE_YAML}"
 echo ""
 echo "!!! IMPORTANT !!!"
 echo "If you do not agree with specified options, press ctrl-c now"
-sleep 30
+sleep ${SLEEP_BEFORE_RUN:-30}
 echo "Apply options now..."
 
 # Let's setup all prometheus-related stuff into dedicated namespace called "prometheus"

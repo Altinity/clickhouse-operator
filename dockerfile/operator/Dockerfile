@@ -2,7 +2,7 @@
 # ===== Builder =====
 # ===================
 
-FROM golang:1.12.7 AS builder-operator
+FROM golang:1.14.3 AS builder-operator
 
 # Install required packages
 RUN apt-get update && apt-get install -y apt-utils gettext-base
@@ -14,9 +14,12 @@ RUN echo "WORKDIR=$GOPATH/src/github.com/altinity/clickhouse-operator"
 # Reconstruct source tree inside docker
 WORKDIR $GOPATH/src/github.com/altinity/clickhouse-operator
 ADD . .
-# ./vendor is excluded in .dockerignore, reconstruct it with 'mod' tool
-RUN GO111MODULE=on go mod tidy
-RUN GO111MODULE=on go mod vendor
+
+# speedup docker build if vendor exists
+# ./vendor is included in .dockerignore
+# RUN go mod tidy
+# RUN go mod vendor
+ENV BUILD_IN_DOCKER=1
 
 # Build operator binary with explicitly specified output
 RUN OPERATOR_BIN=/tmp/clickhouse-operator ./dev/go_build_operator.sh
