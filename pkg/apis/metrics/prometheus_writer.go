@@ -121,13 +121,13 @@ func (w *PrometheusWriter) WriteMutations(data [][]string) {
 }
 
 func (w *PrometheusWriter) WriteErrorFetch(fetch_type string) {
-	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "Number of errors fetching metrics from ClickHouse", "1", prometheus.CounterValue,
+	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "1", prometheus.GaugeValue,
 		[]string{"chi", "namespace", "hostname", "fetch_type"},
 		w.chi.Name, w.chi.Namespace, w.hostname, fetch_type)
 }
 
 func (w *PrometheusWriter) WriteOKFetch(fetch_type string) {
-	writeSingleMetricToPrometheus(w.out, "metric_fetches", "Number of successful metric fetches from ClickHouse", "1", prometheus.CounterValue,
+	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "0", prometheus.GaugeValue,
 		[]string{"chi", "namespace", "hostname", "fetch_type"},
 		w.chi.Name, w.chi.Namespace, w.hostname, fetch_type)
 }
