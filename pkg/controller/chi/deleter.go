@@ -114,24 +114,28 @@ func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 	// And now delete empty StatefulSet
 	if err := c.kubeClient.AppsV1().StatefulSets(namespace).Delete(name, newDeleteOptions()); err == nil {
 		log.V(1).Infof("StatefulSet %s/%s deleted", namespace, name)
+		c.syncStatefulSet(host)
 	} else {
 		log.V(1).Infof("StatefulSet %s/%s FAILED TO DELETE %v", namespace, name, err)
 		return nil
 	}
 
+	return nil
+}
+
+// syncStatefulSet
+func (c *Controller) syncStatefulSet(host *chop.ChiHost) {
 	for {
 		// TODO
 		// There should be better way to sync cache
 		if _, err := c.getStatefulSetByHost(host); err == nil {
-			log.V(1).Infof("StatefulSet %s/%s deleted, cache NOT yet synced", namespace, name)
-			time.Sleep(5 * time.Second)
+			log.V(2).Infof("cache NOT yet synced")
+			time.Sleep(15 * time.Second)
 		} else {
-			log.V(1).Infof("StatefulSet %s/%s deleted, cache synced. Desc: %v", namespace, name, err)
-			break
+			log.V(1).Infof("cache synced")
+			return
 		}
 	}
-
-	return nil
 }
 
 // deletePVC deletes PersistentVolumeClaim
