@@ -25,7 +25,7 @@ def test_002(self):
 
 @TestScenario
 @Name("test_003. 4 nodes with custom layout definition")
-def test_003():
+def test_003(self):
     create_and_check("configs/test-003-complex-layout.yaml", {"object_counts": [4, 4, 5]})
 
 @TestScenario
@@ -69,7 +69,6 @@ def test_007(self):
                       "pod_ports": [8124,9001,9010]})
 
 def test_operator_upgrade(config, version_from, version_to = settings.operator_version):
-    version_to = settings.operator_version
     with Given(f"clickhouse-operator {version_from}"):
         set_operator_version(version_from)
         config = get_full_path(config)
