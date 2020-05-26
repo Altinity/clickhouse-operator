@@ -36,21 +36,21 @@ import (
 
 type Setting struct {
 	isScalar bool
-	scalar string
-	vector []string
+	scalar   string
+	vector   []string
 }
 
 func NewScalarSetting(scalar string) *Setting {
 	return &Setting{
 		isScalar: true,
-		scalar: scalar,
+		scalar:   scalar,
 	}
 }
 
 func NewVectorSetting(vector []string) *Setting {
 	return &Setting{
 		isScalar: false,
-		vector: vector,
+		vector:   vector,
 	}
 }
 
@@ -81,7 +81,7 @@ func (s *Setting) String() string {
 	return strings.Join(s.vector, ",")
 }
 
-type Settings map[string] *Setting
+type Settings map[string]*Setting
 
 func NewSettings() Settings {
 	return make(Settings)
