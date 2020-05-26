@@ -745,21 +745,22 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 		Info("Update StatefulSet %s/%s - started", newStatefulSet.Namespace, newStatefulSet.Name)
 
 	err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet)
-
-	host.CHI.Status.UpdatedHostsCount++
-	_ = w.c.updateCHIObjectStatus(host.CHI, false)
-
 	if err == nil {
+		host.CHI.Status.UpdatedHostsCount++
+		_ = w.c.updateCHIObjectStatus(host.CHI, false)
 		w.a.V(1).
 			WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
 			WithStatusAction(host.CHI).
 			Info("Update StatefulSet %s/%s - completed", newStatefulSet.Namespace, newStatefulSet.Name)
-	} else {
-		w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
-			WithStatusAction(host.CHI).
-			WithStatusError(host.CHI).
-			Error("Update StatefulSet %s/%s - failed with error %v", newStatefulSet.Namespace, newStatefulSet.Name, err)
+		return nil
 	}
 
-	return err
+	w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
+		WithStatusAction(host.CHI).
+		WithStatusError(host.CHI).
+		Error("Update StatefulSet %s/%s - failed with error\n---\n%v\n--\nContinue with recreate", newStatefulSet.Namespace, newStatefulSet.Name, err)
+
+	err = w.c.deleteStatefulSet(host)
+
+	return w.createStatefulSet(newStatefulSet, host)
 }
