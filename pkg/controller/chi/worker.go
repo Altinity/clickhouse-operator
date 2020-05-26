@@ -797,10 +797,13 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 	w.a.V(2).Info("updateStatefulSet() - start")
 	defer w.a.V(2).Info("updateStatefulSet() - end")
 
+	namespace := newStatefulSet.Namespace
+	name := newStatefulSet.Name
+
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
 		WithStatusAction(host.CHI).
-		Info("Update StatefulSet %s/%s - started", newStatefulSet.Namespace, newStatefulSet.Name)
+		Info("Update StatefulSet %s/%s - started", namespace, name)
 
 	err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet)
 	if err == nil {
@@ -809,14 +812,14 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 		w.a.V(1).
 			WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
 			WithStatusAction(host.CHI).
-			Info("Update StatefulSet %s/%s - completed", newStatefulSet.Namespace, newStatefulSet.Name)
+			Info("Update StatefulSet %s/%s - completed", namespace, name)
 		return nil
 	}
 
 	w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
 		WithStatusAction(host.CHI).
 		WithStatusError(host.CHI).
-		Error("Update StatefulSet %s/%s - failed with error\n---\n%v\n--\nContinue with recreate", newStatefulSet.Namespace, newStatefulSet.Name, err)
+		Error("Update StatefulSet %s/%s - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
 
 	err = w.c.deleteStatefulSet(host)
 
