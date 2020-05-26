@@ -20,6 +20,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
@@ -822,6 +823,42 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 		Error("Update StatefulSet %s/%s - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
 
 	err = w.c.deleteStatefulSet(host)
+
+	host.WalkVolumeClaimTemplates(func(template *chop.ChiVolumeClaimTemplate) {
+		pvcName := chopmodel.CreatePVCName(template, host)
+		w.a.V(2).Info("processing PVC(%s/%s)", namespace, pvcName)
+
+		pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(pvcName, newGetOptions())
+		if err != nil {
+			w.a.Error("unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
+			return
+		}
+
+		pvcRequests := pvc.Spec.Resources.Requests
+		var pvcResourceQuantity resource.Quantity
+		var pvcResourceQuantityOk bool
+		if pvcRequests != nil {
+			pvcResourceQuantity, pvcResourceQuantityOk = pvcRequests[core.ResourceStorage]
+		}
+		templateRequests := template.Spec.Resources.Requests
+		var templateResourceQuantity resource.Quantity
+		var templateResourceQuantityOk bool
+		if templateRequests != nil {
+			templateResourceQuantity, templateResourceQuantityOk = templateRequests[core.ResourceStorage]
+		}
+
+		if pvcResourceQuantityOk && templateResourceQuantityOk {
+			if !pvcResourceQuantity.Equal(templateResourceQuantity) {
+				w.a.V(2).Info("processing PVC(%s/%s) - unequal requests, want to update", namespace, pvcName)
+				pvc.Spec.Resources.Requests[core.ResourceStorage] = template.Spec.Resources.Requests[core.ResourceStorage]
+				_, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(pvc)
+				if err != nil {
+					w.a.Error("unable to update PVC(%s/%s) err: %v", namespace, pvcName, err)
+					return
+				}
+			}
+		}
+	})
 
 	return w.createStatefulSet(newStatefulSet, host)
 }
