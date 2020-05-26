@@ -81,9 +81,16 @@ const (
 	    UNION ALL
 	    SELECT 
 	        'metric.DiskFreeBytes'                     AS metric,
-    	    toString(filesystemFree())                 AS value,
+    	         toString(filesystemFree())                 AS value,
 	        'Free disk space available at file system' AS description,
 	        'gauge'                                    AS type
+	    UNION ALL
+	    SELECT
+		'metric.LongestRunningQuery' AS metric,
+		toString(max(elapsed))       AS value,
+		'Longest running query time' AS description,
+		'gauge'                      AS type
+	    FROM system.processes
 	`
 
 	queryTableSizesSQL = `
