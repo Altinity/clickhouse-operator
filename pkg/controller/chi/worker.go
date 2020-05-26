@@ -37,6 +37,7 @@ type worker struct {
 	creator    *chopmodel.Creator
 }
 
+// newWorker
 func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
 	return &worker{
 		c:          c,
@@ -147,6 +148,7 @@ func (w *worker) processItem(item interface{}) error {
 	return nil
 }
 
+// normalize
 func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseInstallation {
 	var withDefaultCluster bool
 
@@ -536,6 +538,7 @@ func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
 	return nil
 }
 
+// createCHIFromObjectMeta
 func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.ClickHouseInstallation, error) {
 	chi, err := w.c.GetCHIByObjectMeta(objectMeta)
 	if err != nil {
@@ -550,6 +553,7 @@ func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.Cli
 	return chi, nil
 }
 
+// createClusterFromObjectMeta
 func (w *worker) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.ChiCluster, error) {
 	clusterName, err := chopmodel.GetClusterNameFromObjectMeta(objectMeta)
 	if err != nil {
