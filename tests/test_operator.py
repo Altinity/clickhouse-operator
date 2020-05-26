@@ -24,6 +24,11 @@ def test_002(self):
                       "pod_podAntiAffinity": 1})
 
 @TestScenario
+@Name("test_003. 4 nodes with custom layout definition")
+def test_003():
+    create_and_check("configs/test-003-complex-layout.yaml", {"object_counts": [4, 4, 5]})
+
+@TestScenario
 @Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
 def test_004(self):
     create_and_check("configs/test-004-tpl.yaml", 
@@ -123,7 +128,7 @@ def restart_operator(ns = settings.operator_namespace, timeout=60):
 def require_zookeeper():
     with Given("Install Zookeeper if missing"):
         if kube_get_count("service", name="zookeeper") == 0:
-            config = get_full_path("../deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node.yaml")
+            config = get_full_path("../deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node-1GB-for-tests-only.yaml")
             kube_apply(config)
             kube_wait_object("pod", "zookeeper-0")
             kube_wait_pod_status("zookeeper-0", "Running")
