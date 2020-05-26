@@ -55,11 +55,14 @@ func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
 
 // run is an endless work loop, expected to be runin a thread
 func (w *worker) run() {
+	w.a.V(2).Info("run() - start")
+	defer w.a.V(2).Info("run() - end")
+
 	for {
 		// Get() blocks until it can return an item
 		item, shutdown := w.queue.Get()
 		if shutdown {
-			w.a.Info("runWorker(): shutdown request")
+			w.a.Info("shutdown request")
 			return
 		}
 
@@ -81,6 +84,9 @@ func (w *worker) run() {
 
 // processWorkItem processes one work item according to its type
 func (w *worker) processItem(item interface{}) error {
+	w.a.V(3).Info("processItem() - start")
+	defer w.a.V(3).Info("processItem() - end")
+
 	switch item.(type) {
 
 	case *ReconcileChi:
@@ -150,6 +156,9 @@ func (w *worker) processItem(item interface{}) error {
 
 // normalize
 func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseInstallation {
+	w.a.V(3).Info("normalize() - start")
+	defer w.a.V(3).Info("normalize() - end")
+
 	var withDefaultCluster bool
 
 	if chi == nil {
@@ -171,6 +180,8 @@ func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseIns
 
 // updateCHI sync CHI which was already created earlier
 func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
+	w.a.V(3).Info("updateCHI() - start")
+	defer w.a.V(3).Info("updateCHI() - end")
 
 	if (old != nil) && (new != nil) && (old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion) {
 		w.a.V(3).Info("updateCHI(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
@@ -276,6 +287,9 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 
 // reconcile reconciles ClickHouseInstallation
 func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
+	w.a.V(2).Info("reconcile() - start")
+	defer w.a.V(2).Info("reconcile() - end")
+
 	w.creator = chopmodel.NewCreator(w.c.chop, chi)
 	return chi.WalkTillError(
 		w.reconcileCHI,
@@ -287,6 +301,9 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 
 // reconcileCHI reconciles CHI global objects
 func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
+	w.a.V(2).Info("reconcileCHI() - start")
+	defer w.a.V(2).Info("reconcileCHI() - end")
+
 	// 1. CHI Service
 	service := w.creator.CreateServiceCHI()
 	if err := w.reconcileService(chi, service); err != nil {
@@ -328,6 +345,9 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 
 // reconcileCluster reconciles Cluster, excluding nested shards
 func (w *worker) reconcileCluster(cluster *chop.ChiCluster) error {
+	w.a.V(2).Info("reconcileCluster() - start")
+	defer w.a.V(2).Info("reconcileCluster() - end")
+
 	// Add Cluster's Service
 	service := w.creator.CreateServiceCluster(cluster)
 	if service == nil {
@@ -340,6 +360,9 @@ func (w *worker) reconcileCluster(cluster *chop.ChiCluster) error {
 
 // reconcileShard reconciles Shard, excluding nested replicas
 func (w *worker) reconcileShard(shard *chop.ChiShard) error {
+	w.a.V(2).Info("reconcileShard() - start")
+	defer w.a.V(2).Info("reconcileShard() - end")
+
 	// Add Shard's Service
 	service := w.creator.CreateServiceShard(shard)
 	if service == nil {
@@ -352,6 +375,8 @@ func (w *worker) reconcileShard(shard *chop.ChiShard) error {
 
 // reconcileHost reconciles ClickHouse host
 func (w *worker) reconcileHost(host *chop.ChiHost) error {
+	w.a.V(2).Info("reconcileHost() - start")
+	defer w.a.V(2).Info("reconcileHost() - end")
 
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileStarted).
@@ -398,6 +423,9 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 // deleteCHI deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
 func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
+	w.a.V(2).Info("deleteCHI() - start")
+	defer w.a.V(2).Info("deleteCHI() - end")
+
 	var err error
 
 	w.a.V(1).
@@ -437,6 +465,9 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 
 // deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
 func (w *worker) deleteHost(host *chop.ChiHost) error {
+	w.a.V(2).Info("deleteHost() - start")
+	defer w.a.V(2).Info("deleteHost() - end")
+
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionDelete, eventReasonDeleteStarted).
 		WithStatusAction(host.CHI).
@@ -496,6 +527,9 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 
 // deleteShard deletes all kubernetes resources related to shard *chop.ChiShard
 func (w *worker) deleteShard(shard *chop.ChiShard) error {
+	w.a.V(2).Info("deleteShard() - start")
+	defer w.a.V(2).Info("deleteShard() - end")
+
 	w.a.V(1).
 		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteStarted).
 		WithStatusAction(shard.CHI).
@@ -517,6 +551,9 @@ func (w *worker) deleteShard(shard *chop.ChiShard) error {
 
 // deleteCluster deletes all kubernetes resources related to cluster *chop.ChiCluster
 func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
+	w.a.V(2).Info("deleteCluster() - start")
+	defer w.a.V(2).Info("deleteCluster() - end")
+
 	w.a.V(1).
 		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteStarted).
 		WithStatusAction(cluster.CHI).
@@ -540,6 +577,9 @@ func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
 
 // createCHIFromObjectMeta
 func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.ClickHouseInstallation, error) {
+	w.a.V(3).Info("createCHIFromObjectMeta() - start")
+	defer w.a.V(3).Info("createCHIFromObjectMeta() - end")
+
 	chi, err := w.c.GetCHIByObjectMeta(objectMeta)
 	if err != nil {
 		return nil, err
@@ -555,6 +595,9 @@ func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.Cli
 
 // createClusterFromObjectMeta
 func (w *worker) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.ChiCluster, error) {
+	w.a.V(3).Info("createClusterFromObjectMeta() - start")
+	defer w.a.V(3).Info("createClusterFromObjectMeta() - end")
+
 	clusterName, err := chopmodel.GetClusterNameFromObjectMeta(objectMeta)
 	if err != nil {
 		return nil, fmt.Errorf("ObjectMeta %s does not generated by CHI %v", objectMeta.Name, err)
@@ -575,6 +618,9 @@ func (w *worker) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop
 
 // reconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
 func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
+	w.a.V(2).Info("reconcileConfigMap() - start")
+	defer w.a.V(2).Info("reconcileConfigMap() - end")
+
 	// Check whether this object already exists in k8s
 	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, false)
 
@@ -621,6 +667,9 @@ func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap 
 
 // reconcileService reconciles core.Service
 func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *core.Service) error {
+	w.a.V(2).Info("reconcileService() - start")
+	defer w.a.V(2).Info("reconcileService() - end")
+
 	// Check whether this object already exists in k8s
 	curService, err := w.c.getService(&service.ObjectMeta, false)
 
@@ -689,6 +738,9 @@ func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *cor
 
 // reconcileStatefulSet reconciles apps.StatefulSet
 func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+	w.a.V(2).Info("reconcileStatefulSet() - start")
+	defer w.a.V(2).Info("reconcileStatefulSet() - end")
+
 	// Check whether this object already exists in k8s
 	curStatefulSet, err := w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
@@ -712,6 +764,9 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 
 // createStatefulSet
 func (w *worker) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+	w.a.V(2).Info("createStatefulSet() - start")
+	defer w.a.V(2).Info("createStatefulSet() - end")
+
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
 		WithStatusAction(host.CHI).
@@ -739,6 +794,9 @@ func (w *worker) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.Chi
 
 // updateStatefulSet
 func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+	w.a.V(2).Info("updateStatefulSet() - start")
+	defer w.a.V(2).Info("updateStatefulSet() - end")
+
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
 		WithStatusAction(host.CHI).
