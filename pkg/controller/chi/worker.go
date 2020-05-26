@@ -689,63 +689,73 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 	curStatefulSet, err := w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
 	if curStatefulSet != nil {
-		// Object found - update it
-		w.a.V(1).
-			WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
-			WithStatusAction(host.CHI).
-			Info("Update StatefulSet %s/%s - started", newStatefulSet.Namespace, newStatefulSet.Name)
-
-		err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet)
-
-		host.CHI.Status.UpdatedHostsCount++
-		_ = w.c.updateCHIObjectStatus(host.CHI, false)
-
-		if err == nil {
-			w.a.V(1).
-				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
-				WithStatusAction(host.CHI).
-				Info("Update StatefulSet %s/%s - completed", newStatefulSet.Namespace, newStatefulSet.Name)
-		} else {
-			w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
-				WithStatusAction(host.CHI).
-				WithStatusError(host.CHI).
-				Error("Update StatefulSet %s/%s - failed with error %v", newStatefulSet.Namespace, newStatefulSet.Name, err)
-		}
-
-		return err
+		return w.updateStatefulSet(curStatefulSet, newStatefulSet, host)
 	}
 
 	if apierrors.IsNotFound(err) {
-		// Object not found - create it
-		w.a.V(1).
-			WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
-			WithStatusAction(host.CHI).
-			Info("Create StatefulSet %s/%s - started", newStatefulSet.Namespace, newStatefulSet.Name)
-
-		err := w.c.createStatefulSet(newStatefulSet, host)
-
-		host.CHI.Status.AddedHostsCount++
-		_ = w.c.updateCHIObjectStatus(host.CHI, false)
-
-		if err == nil {
-			w.a.V(1).
-				WithEvent(host.CHI, eventActionCreate, eventReasonCreateCompleted).
-				WithStatusAction(host.CHI).
-				Info("Create StatefulSet %s/%s - completed", newStatefulSet.Namespace, newStatefulSet.Name)
-		} else {
-			w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
-				WithStatusAction(host.CHI).
-				WithStatusError(host.CHI).
-				Error("Create StatefulSet %s/%s - failed with error %v", newStatefulSet.Namespace, newStatefulSet.Name, err)
-		}
-
-		return err
+		return w.createStatefulSet(newStatefulSet, host)
 	}
+
+	// Not create, not update - weird thing
 
 	w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
 		WithStatusAction(host.CHI).
 		WithStatusError(host.CHI).
 		Error("Create or Update StatefulSet %s/%s - UNEXPECTED FLOW", newStatefulSet.Namespace, newStatefulSet.Name)
+
+	return err
+}
+
+// createStatefulSet
+func (w *worker) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+	w.a.V(1).
+		WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
+		WithStatusAction(host.CHI).
+		Info("Create StatefulSet %s/%s - started", statefulSet.Namespace, statefulSet.Name)
+
+	err := w.c.createStatefulSet(statefulSet, host)
+
+	host.CHI.Status.AddedHostsCount++
+	_ = w.c.updateCHIObjectStatus(host.CHI, false)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(host.CHI).
+			Info("Create StatefulSet %s/%s - completed", statefulSet.Namespace, statefulSet.Name)
+	} else {
+		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(host.CHI).
+			WithStatusError(host.CHI).
+			Error("Create StatefulSet %s/%s - failed with error %v", statefulSet.Namespace, statefulSet.Name, err)
+	}
+
+	return err
+}
+
+// updateStatefulSet
+func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+	w.a.V(1).
+		WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
+		WithStatusAction(host.CHI).
+		Info("Update StatefulSet %s/%s - started", newStatefulSet.Namespace, newStatefulSet.Name)
+
+	err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet)
+
+	host.CHI.Status.UpdatedHostsCount++
+	_ = w.c.updateCHIObjectStatus(host.CHI, false)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
+			WithStatusAction(host.CHI).
+			Info("Update StatefulSet %s/%s - completed", newStatefulSet.Namespace, newStatefulSet.Name)
+	} else {
+		w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
+			WithStatusAction(host.CHI).
+			WithStatusError(host.CHI).
+			Error("Update StatefulSet %s/%s - failed with error %v", newStatefulSet.Namespace, newStatefulSet.Name, err)
+	}
 
 	return err
 }
