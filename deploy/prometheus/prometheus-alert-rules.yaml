@@ -272,3 +272,15 @@ spec:
               - Check connections between `clickhouse-server` kubernetes pods
               - Check connections between `clickhouse-server` and `zookeeper`
               https://clickhouse.tech/docs/en/operations/table_engines/distributed/
+
+        - alert: SystemSettingsChanged
+          expr: chi_clickhouse_metric_ChangedSettingsHash - chi_clickhouse_metric_ChangedSettingsHash offset 1m != 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "`system.settings` changed"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+
