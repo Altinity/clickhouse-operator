@@ -59,7 +59,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1590328587857,
+  "iteration": 1590569457236,
   "links": [],
   "panels": [
     {
@@ -716,18 +716,23 @@
           "step": 10
         },
         {
-          "expr": "increase(chi_clickhouse_event_DelayedInserts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_DelayedInserts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
           "intervalFactor": 2,
           "legendFormat": "delayed blocks {{hostname}}",
           "refId": "B",
           "step": 10
         },
         {
-          "expr": "increase(chi_clickhouse_event_RejectedInserts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_RejectedInserts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
           "intervalFactor": 2,
           "legendFormat": "rejected blocks {{hostname}}",
           "refId": "C",
           "step": 10
+        },
+        {
+          "expr": "chi_clickhouse_metric_DistributedFilesToInsert{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "delayed distributed files {{ hostname }}",
+          "refId": "D"
         }
       ],
       "thresholds": [],
@@ -3707,5 +3712,5 @@
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
   "uid": "HBIYxc8Wk",
-  "version": 5
+  "version": 2
 }
