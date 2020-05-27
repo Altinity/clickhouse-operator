@@ -274,7 +274,7 @@ spec:
               https://clickhouse.tech/docs/en/operations/table_engines/distributed/
 
         - alert: SystemSettingsChanged
-          expr: chi_clickhouse_metric_ChangedSettingsHash - chi_clickhouse_metric_ChangedSettingsHash offset 1m != 0
+          expr: delta(chi_clickhouse_metric_ChangedSettingsHash[5m]) != 0
           for: 1m
           labels:
             severity: warning
@@ -284,3 +284,27 @@ spec:
             description: |-
               `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
 
+        - alert: VersionChanged
+          expr: delta(chi_clickhouse_metric_VersionInteger[5m]) != 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "ClickHouse version changed"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+
+        - alert: ZooKeeperSession
+          expr: chi_clickhouse_metric_ZooKeeperSession > 1
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "ZooKeeperSession > 1"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+              Number of sessions (connections) to ZooKeeper should be no more than one, because using more than one
+              connection to ZooKeeper may lead to bugs due to lack of linearizability (stale reads)
+              that ZooKeeper consistency model allows.
