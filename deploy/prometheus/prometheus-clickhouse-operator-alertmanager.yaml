@@ -11,15 +11,21 @@ stringData:
     {{ define "custom_title" }}[ {{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }} ] {{ if or (and (eq (len .Alerts.Firing) 1) (eq (len .Alerts.Resolved) 0)) (and (eq (len .Alerts.Firing) 0) (eq (len .Alerts.Resolved) 1)) }}{{ template "__single_message_title" . }}{{ end }}{{ end }}
     {{ define "custom_slack_message" }}
       {{ if or (and (eq (len .Alerts.Firing) 1) (eq (len .Alerts.Resolved) 0)) (and (eq (len .Alerts.Firing) 0) (eq (len .Alerts.Resolved) 1)) }}
-        {{ range .Alerts.Firing }}{{ .Annotations.description }}{{ end }}{{ range .Alerts.Resolved }}{{ .Annotations.description }}{{ end }}
+        {{ range .Alerts.Firing }}{{ .Annotations.summary }}: {{ .Annotations.description }}{{ end }}{{ range .Alerts.Resolved }}{{ .Annotations.summary }}: {{ .Annotations.description }}{{ end }}
       {{ else }}
         {{ if gt (len .Alerts.Firing) 0 }}
     *Alerts Firing:*
-    {{ range .Alerts.Firing }}- {{ .Annotations.summary }}: {{ .Annotations.description }}{{ end }}
+
+    {{ range .Alerts.Firing }}
+    - {{ .Annotations.summary }}: {{ .Annotations.description }}
+    {{ end }}
         {{ end }}
         {{ if gt (len .Alerts.Resolved) 0 }}
     *Alerts Resolved:*
-    {{ range .Alerts.Resolved }}- {{ .Annotations.summary }}: {{ .Annotations.description }}{{ end }}
+
+    {{ range .Alerts.Resolved }}
+    - {{ .Annotations.summary }}: {{ .Annotations.description }}
+    {{ end }}
         {{ end }}
       {{ end }}
     {{ end }}

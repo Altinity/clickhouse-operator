@@ -18,7 +18,7 @@ spec:
           annotations:
             identifier: "{{ $labels.pod }}"
             summary: "metrics-exporter possible down"
-            description: "`{{ $labels.pod }}` in namespace `{{ $labels.namespace }}` not sent data more than 1 minutes. Please check instance status via `kubectl logs -f -n {{ $labels.namespace }} {{ $labels.pod }} -c metrics-exporter`"
+            description: "`{{ $labels.pod }}` in namespace `{{ $labels.namespace }}` not sent data more than 1 minutes. Please check instance status via ```kubectl logs -f -n {{ $labels.namespace }} {{ $labels.pod }} -c metrics-exporter```"
 
         - alert: ClickHouseServerDown
           expr: chi_clickhouse_metric_fetch_errors > 0
@@ -28,7 +28,10 @@ spec:
           annotations:
             identifier: "{{ $labels.hostname }}"
             summary: "clickhouse-server possible down"
-            description: "`{{ $labels.hostname }}` in namespace {{ $labels.exported_namespace }} failed metrics fetch {{ $labels.fetch_type }}. Please check instance status via `kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1)`"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` failed metrics fetch `{{ $labels.fetch_type }}`.
+              Please check instance status
+              ```kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1)```
 
         - alert: ClickHouseServerRestartRecently
           expr: chi_clickhouse_metric_Uptime > 1 < 180
@@ -38,7 +41,8 @@ spec:
           annotations:
             identifier: "{{ $labels.hostname }}"
             summary: "clickhouse-server started recently"
-            description: "{{ $labels.hostname }} in namespace {{ $labels.exported_namespace }} has been start less than 3 minutes ago."
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` has been start less than 3 minutes ago.
 
         - alert: ClickHouseDNSErrors
           expr: increase(chi_clickhouse_event_DNSError[1m]) > 0 or increase(chi_clickhouse_event_NetworkErrors[1m]) > 0
@@ -89,7 +93,8 @@ spec:
               `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
               please check communications between clickhouse server and host `remote_servers` in `/etc/clickhouse-server/`
               https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
-              also, you can check logs via `kubectl logs -n {{ $labels.exported_namespace }} $( echo {{ $labels.hostname }} | cut -d '.' -f 1)-0`
+              also, you can check logs:
+              ```kubectl logs -n {{ $labels.exported_namespace }} $( echo {{ $labels.hostname }} | cut -d '.' -f 1)-0```
 
         - alert: RejectedInsert
           expr: increase(chi_clickhouse_event_RejectedInserts[1m]) > 0
@@ -252,3 +257,18 @@ spec:
               - https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-concurrent-queries
               - https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-query_log
 
+        - alert: TooMuchDistributedFilesToInsert
+          expr: chi_clickhouse_metric_DistributedFilesToInsert > 100
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Too much DistributedFilesToInsert"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have temporary delayed distibuted files > 100.
+
+              - Please check replication status
+              - Check connections between `clickhouse-server` kubernetes pods
+              - Check connections between `clickhouse-server` and `zookeeper`
+              https://clickhouse.tech/docs/en/operations/table_engines/distributed/
