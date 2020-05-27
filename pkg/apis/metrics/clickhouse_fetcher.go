@@ -91,7 +91,12 @@ const (
 		'Longest running query time' AS description,
 		'gauge'                      AS type
 	    FROM system.processes
-	`
+		UNION ALL
+		SELECT
+		'metric.ChangedSettingsHash'       AS metric,
+		(SELECT toString(groupBitXor(cityHash64(name,value))) FROM system.settings WHERE changed) AS value,
+	    'Control sum for changed settings' AS description
+        'gauge'                            AS type`
 
 	queryTableSizesSQL = `
 		SELECT
