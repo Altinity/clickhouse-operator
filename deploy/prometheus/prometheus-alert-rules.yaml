@@ -18,18 +18,17 @@ spec:
           annotations:
             identifier: "{{ $labels.pod }}"
             summary: "metrics-exporter possible down"
-            description: "`{{ $labels.pod }}` in namespace `{{ $labels.namespace }}` not sent data more than 1 minutes. Please check instance status via `kubectl logs -n {{ $labels.namespace }} {{ $labels.pod }}`"
+            description: "`{{ $labels.pod }}` in namespace `{{ $labels.namespace }}` not sent data more than 1 minutes. Please check instance status via `kubectl logs -f -n {{ $labels.namespace }} {{ $labels.pod }} -c metrics-exporter`"
 
         - alert: ClickHouseServerDown
-          # TODO need change to chi_clickhouse_metric_Fetch < 1 wait https://github.com/Altinity/clickhouse-operator/issues/390
-          expr: max_over_time(chi_clickhouse_metric_Uptime[4h]) unless chi_clickhouse_metric_Uptime
+          expr: chi_clickhouse_metric_fetch_errors > 0
           for: 1m
           labels:
             severity: critical
           annotations:
             identifier: "{{ $labels.hostname }}"
             summary: "clickhouse-server possible down"
-            description: "`{{ $labels.hostname }}` in namespace {{ $labels.exported_namespace }} not sent data more than 1 minute. Please check instance status via `kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1)`"
+            description: "`{{ $labels.hostname }}` in namespace {{ $labels.exported_namespace }} failed metrics fetch {{ $labels.fetch_type }}. Please check instance status via `kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1)`"
 
         - alert: ClickHouseServerRestartRecently
           expr: chi_clickhouse_metric_Uptime > 1 < 180
