@@ -94,10 +94,11 @@ const (
 		UNION ALL
 		SELECT
 		'metric.ChangedSettingsHash'       AS metric,
-		(SELECT toString(groupBitXor(cityHash64(name,value))) FROM system.settings WHERE changed) AS value,
-	    'Control sum for changed settings' AS description
-        'gauge'                            AS type`
-
+		toString(groupBitXor(cityHash64(name,value))) AS value,
+		'Control sum for changed settings' AS description,
+		'gauge'                            AS type
+		FROM system.settings WHERE changed
+	`
 	queryTableSizesSQL = `
 		SELECT
 			database,
