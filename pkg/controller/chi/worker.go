@@ -617,6 +617,25 @@ func (w *worker) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop
 	return cluster, nil
 }
 
+// updateConfigMap
+func (w *worker) updateConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
+	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
+			WithStatusAction(chi).
+			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+	} else {
+		w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("Update ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
+	}
+
+	return err
+}
+
 // reconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
 func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
 	w.a.V(2).Info("reconcileConfigMap() - start")
@@ -626,22 +645,7 @@ func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap 
 	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, false)
 
 	if curConfigMap != nil {
-		// Object found - update it
-		_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
-
-		if err == nil {
-			w.a.V(1).
-				WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
-				WithStatusAction(chi).
-				Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
-		} else {
-			w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
-				WithStatusAction(chi).
-				WithStatusError(chi).
-				Error("Update ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
-		}
-
-		return err
+		return w.updateConfigMap(chi, configMap)
 	}
 
 	if apierrors.IsNotFound(err) {
