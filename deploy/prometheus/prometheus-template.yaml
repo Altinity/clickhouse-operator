@@ -14,12 +14,16 @@ spec:
   serviceMonitorSelector:
     matchLabels:
       service: clickhouse-operator
+  ruleSelector:
+    matchLabels:
+      role: alert-rules
+      prometheus: prometheus
   enableAdminAPI: false
-#  alerting:
-#    alertmanagers:
-#    - namespace: default
-#      name: alertmanager
-#      port: web
+  alerting:
+    alertmanagers:
+    - namespace: ${PROMETHEUS_NAMESPACE}
+      name: alertmanager
+      port: web
 ---
 # Setup ClusterIP Service
 # Service would be created in kubectl-specified namespace

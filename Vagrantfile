@@ -19,10 +19,15 @@ Vagrant.configure(2) do |config|
 
   config.vm.define :clickhouse_operator do |clickhouse_operator|
     clickhouse_operator.vm.network "private_network", ip: "172.16.2.99", nic_type: "virtio"
-    # port forwarding works only when pair with kubectl port-forward
+    # port forwarding works only when pair with kubectl port-forward 
+    # grafana	
     clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 3000, host_ip: "127.0.0.1", host: 3000
+    # mertics-exporter
     clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 8888, host_ip: "127.0.0.1", host: 8888
+    # prometheus
     clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 9090, host_ip: "127.0.0.1", host: 9090
+    # alertmanager
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 9093, host_ip: "127.0.0.1", host: 9093
 
     clickhouse_operator.vm.host_name = "local-altinity-clickhouse-operator"
     # vagrant plugin install vagrant-disksize
@@ -32,7 +37,7 @@ Vagrant.configure(2) do |config|
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
     vb.cpus = total_cpus
-    vb.memory = "4096"
+    vb.memory = "6144"
     vb.default_nic_type = "virtio"
     vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
     vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
@@ -85,7 +90,12 @@ Vagrant.configure(2) do |config|
     # required for k8s 1.18+
     apt-get install -y conntrack
 
-    K8S_VERSION=${K8S_VERSION:-1.17.3}
+    K8S_VERSION=${K8S_VERSION:-1.14.10}
+    export VALIDATE_YAML=false # only for 1.14
+#    K8S_VERSION=${K8S_VERSION:-1.15.12}
+#    K8S_VERSION=${K8S_VERSION:-1.16.9}
+#    K8S_VERSION=${K8S_VERSION:-1.17.5}
+#    K8S_VERSION=${K8S_VERSION:-1.18.2}
     minikube config set vm-driver none
     minikube config set kubernetes-version ${K8S_VERSION}
     minikube start
@@ -112,14 +122,14 @@ Vagrant.configure(2) do |config|
     export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-prometheus}
     cd /vagrant/deploy/prometheus/
     kubectl delete ns ${PROMETHEUS_NAMESPACE} || true
-    bash -e ./create-prometheus.sh
+    bash -xe ./create-prometheus.sh
     cd /vagrant/
 
     export GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE:-grafana}
     cd /vagrant/deploy/grafana/grafana-with-grafana-operator/
     kubectl delete ns ${GRAFANA_NAMESPACE} || true
-    bash -e ./install-grafana-operator.sh
-    bash -e ./install-grafana-with-operator.sh
+    bash -xe ./install-grafana-operator.sh
+    bash -xe ./install-grafana-with-operator.sh
     cd /vagrant
 
     echo "Wait when clickhouse operator installation finished"
@@ -129,12 +139,19 @@ Vagrant.configure(2) do |config|
     done
     echo "...DONE"
 
-    # kubectl --namespace=${PROMETHEUS_NAMESPACE} port-forward service/prometheus 9090
     # open http://localhost:9090/targets and check clickhouse-monitor is exists
-    # kubectl --namespace="${GRAFANA_NAMESPACE}" port-forward service/grafana-service 3000
+    kubectl --namespace=${PROMETHEUS_NAMESPACE} port-forward service/prometheus 9090 </dev/null &>/dev/null &
+
+    # open http://localhost:9093/alerts and check which alerts is exists
+    kubectl --namespace=${PROMETHEUS_NAMESPACE} port-forward service/alertmanager 9093 </dev/null &>/dev/null &
+
     # open http://localhost:3000/ and check prometheus datasource exists and grafana dashboard exists
-    # kubectl --namespace="${OPERATOR_NAMESPACE}" port-forward service/clickhouse-operator-metrics 8888
-    # open http://localhost:3000/chi and check exists
+    kubectl --namespace="${GRAFANA_NAMESPACE}" port-forward service/grafana-service 3000 </dev/null &>/dev/null &
+
+    # open http://localhost:8888/chi and check exists clickhouse installations
+    kubectl --namespace="${OPERATOR_NAMESPACE}" port-forward service/clickhouse-operator-metrics 8888 </dev/null &>/dev/null &
+
+
 
     for image in $(cat ./tests/configs/test-017-multi-version.yaml | yq r - "spec.templates.podTemplates[*].spec.containers[*].image"); do
         docker pull ${image}
