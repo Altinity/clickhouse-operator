@@ -505,15 +505,14 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 	}
 
 	// Each host consists of
-	// 1. Tables on host - we need to delete tables on the host in order to clean Zookeeper data
-	// 2. StatefulSet
-	// 3. PersistentVolumeClaim
-	// 4. ConfigMap
-	// 5. Service
-	// Need to delete all these item
+	// 1. User-level objects - tables on the host
+	//    We need to delete tables on the host in order to clean Zookeeper data.
+	//    If just delete tables, Zookeeper will still keep track of non-existent tables
+	// 2. Kubernetes-level objects - such as StatefulSet, PVC(s), ConfigMap(s), Service(s)
+	// Need to delete all these items
 
-	err := w.deleteTables(host)
-
+	var err error
+	err = w.deleteTables(host)
 	err = w.c.deleteHost(host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
