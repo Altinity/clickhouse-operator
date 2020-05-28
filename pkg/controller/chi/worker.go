@@ -676,7 +676,7 @@ func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap 
 
 // updateService
 func (w *worker) updateService(chi *chop.ClickHouseInstallation, curService, newService *core.Service) error {
-	// Updating Service is a complicated business
+	// Updating a Service is a complicated business
 
 	// spec.resourceVersion is required in order to update object
 	newService.ResourceVersion = curService.ResourceVersion
@@ -714,6 +714,25 @@ func (w *worker) updateService(chi *chop.ClickHouseInstallation, curService, new
 	return err
 }
 
+// createService
+func (w *worker) createService(chi *chop.ClickHouseInstallation, service *core.Service) error {
+	_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(chi).
+			Info("Create Service %s/%s", service.Namespace, service.Name)
+	} else {
+		w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("Create Service %s/%s failed with error %v", service.Namespace, service.Name, err)
+	}
+
+	return err
+}
+
 // reconcileService reconciles core.Service
 func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *core.Service) error {
 	w.a.V(2).Info("reconcileService() - start")
@@ -727,22 +746,7 @@ func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *cor
 	}
 
 	if apierrors.IsNotFound(err) {
-		// Object not found - create it
-		_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
-
-		if err == nil {
-			w.a.V(1).
-				WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
-				WithStatusAction(chi).
-				Info("Create Service %s/%s", service.Namespace, service.Name)
-		} else {
-			w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
-				WithStatusAction(chi).
-				WithStatusError(chi).
-				Error("Create Service %s/%s failed with error %v", service.Namespace, service.Name, err)
-		}
-
-		return err
+		return w.createService(chi, service)
 	}
 
 	return err
