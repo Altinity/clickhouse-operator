@@ -826,7 +826,7 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
 		WithStatusAction(host.CHI).
-		Info("Update StatefulSet %s/%s - started", namespace, name)
+		Info("Update StatefulSet(%s/%s) - started", namespace, name)
 
 	err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet)
 	if err == nil {
@@ -835,14 +835,14 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 		w.a.V(1).
 			WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
 			WithStatusAction(host.CHI).
-			Info("Update StatefulSet %s/%s - completed", namespace, name)
+			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
 		return nil
 	}
 
 	w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
 		WithStatusAction(host.CHI).
 		WithStatusError(host.CHI).
-		Error("Update StatefulSet %s/%s - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
+		Error("Update StatefulSet(%s/%s) - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
 
 	err = w.c.deleteStatefulSet(host)
 
@@ -871,7 +871,7 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 
 		if pvcResourceQuantityOk && templateResourceQuantityOk {
 			if !pvcResourceQuantity.Equal(templateResourceQuantity) {
-				w.a.V(2).Info("processing PVC(%s/%s) - unequal requests, want to update", namespace, pvcName)
+				w.a.V(2).Info("reconcile PVC(%s/%s) - unequal requests, want to update", namespace, pvcName)
 				pvc.Spec.Resources.Requests[core.ResourceStorage] = template.Spec.Resources.Requests[core.ResourceStorage]
 				_, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(pvc)
 				if err != nil {
