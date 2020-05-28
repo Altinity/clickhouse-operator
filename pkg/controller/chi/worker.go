@@ -636,6 +636,25 @@ func (w *worker) updateConfigMap(chi *chop.ClickHouseInstallation, configMap *co
 	return err
 }
 
+// createConfigMap
+func (w *worker) createConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
+	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(chi).
+			Info("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+	} else {
+		w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("Create ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
+	}
+
+	return err
+}
+
 // reconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
 func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
 	w.a.V(2).Info("reconcileConfigMap() - start")
@@ -649,22 +668,7 @@ func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap 
 	}
 
 	if apierrors.IsNotFound(err) {
-		// Object not found - create it
-		_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
-
-		if err == nil {
-			w.a.V(1).
-				WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
-				WithStatusAction(chi).
-				Info("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
-		} else {
-			w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
-				WithStatusAction(chi).
-				WithStatusError(chi).
-				Error("Create ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
-		}
-
-		return err
+		return w.createConfigMap(chi, configMap)
 	}
 
 	return err
