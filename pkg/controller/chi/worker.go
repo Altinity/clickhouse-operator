@@ -54,7 +54,7 @@ func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
 	}
 }
 
-// run is an endless work loop, expected to be runin a thread
+// run is an endless work loop, expected to be run in a thread
 func (w *worker) run() {
 	w.a.V(2).Info("run() - start")
 	defer w.a.V(2).Info("run() - end")
@@ -464,6 +464,28 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 	return nil
 }
 
+// deleteTables
+func (w *worker) deleteTables(host *chop.ChiHost) error {
+	if !host.CanDeleteAllPVCs() {
+		return nil
+	}
+	err := w.schemer.HostDeleteTables(host)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(host.CHI).
+			Info("Deleted tables on host %s replica %d to shard %d in cluster %s",
+				host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+	} else {
+		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(host.CHI).
+			Error("FAILED to delete tables on host %s with error %v", host.Name, err)
+	}
+
+	return err
+}
+
 // deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
 func (w *worker) deleteHost(host *chop.ChiHost) error {
 	w.a.V(2).Info("deleteHost() - start")
@@ -490,23 +512,9 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 	// 5. Service
 	// Need to delete all these item
 
-	if host.CanDeleteAllPVCs() {
-		err := w.schemer.HostDeleteTables(host)
+	err := w.deleteTables(host)
 
-		if err == nil {
-			w.a.V(1).
-				WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
-				WithStatusAction(host.CHI).
-				Info("Deleted tables on host %s replica %d to shard %d in cluster %s",
-					host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-		} else {
-			w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
-				WithStatusError(host.CHI).
-				Error("FAILED to delete tables on host %s with error %v", host.Name, err)
-		}
-	}
-
-	err := w.c.deleteHost(host)
+	err = w.c.deleteHost(host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
 	host.CHI.Status.DeletedHostsCount++
