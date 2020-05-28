@@ -57,7 +57,7 @@ kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}
 
 # Setup Prometheus instance via prometheus-operator into dedicated namespace
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
-    cat prometheus.yaml | PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} envsubst \
+    cat prometheus-template.yaml | PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} envsubst \
 )
 
 # Setup "Prometheus <-> clickhouse-operator" integration.
@@ -90,8 +90,7 @@ fi
 
 source ./prometheus-sensitive-data.sh
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
-    cat ./prometheus-clickhouse-operator-alertmanager.yaml | \
-    OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} sed "s/- kube-system/- ${OPERATOR_NAMESPACE}/" | \
+    cat ./prometheus-alertmanager-template.yaml | \
     envsubst \
 )
 
