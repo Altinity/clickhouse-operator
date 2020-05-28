@@ -674,53 +674,56 @@ func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap 
 	return err
 }
 
+// updateService
+func (w *worker) updateService(chi *chop.ClickHouseInstallation, curService, newService *core.Service) error {
+	// Updating Service is a complicated business
+
+	// spec.resourceVersion is required in order to update object
+	newService.ResourceVersion = curService.ResourceVersion
+
+	// spec.clusterIP field is immutable, need to use already assigned value
+	// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+	// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
+	// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+	// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
+	newService.Spec.ClusterIP = curService.Spec.ClusterIP
+
+	// spec.healthCheckNodePort field is used with ExternalTrafficPolicy=Local only and is immutable within ExternalTrafficPolicy=Local
+	// In case ExternalTrafficPolicy is changed it seems to be irrelevant
+	// https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+	if (curService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) &&
+		(newService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) {
+		newService.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
+	}
+
+	// And only now we are ready to actually update the service with new version of the service
+	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(newService)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
+			WithStatusAction(chi).
+			Info("Update Service %s/%s", newService.Namespace, newService.Name)
+	} else {
+		w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("Update Service %s/%s failed with error %v", newService.Namespace, newService.Name, err)
+	}
+
+	return err
+}
+
 // reconcileService reconciles core.Service
 func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *core.Service) error {
 	w.a.V(2).Info("reconcileService() - start")
 	defer w.a.V(2).Info("reconcileService() - end")
 
-	// Check whether this object already exists in k8s
+	// Check whether this object already exists
 	curService, err := w.c.getService(&service.ObjectMeta, false)
 
 	if curService != nil {
-		// Object found - update it
-
-		// Updating Service is a complicated business
-
-		// spec.resourceVersion is required in order to update object
-		service.ResourceVersion = curService.ResourceVersion
-
-		// spec.clusterIP field is immutable, need to use already assigned value
-		// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
-		// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
-		// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
-		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
-		service.Spec.ClusterIP = curService.Spec.ClusterIP
-
-		// spec.healthCheckNodePort field is used with ExternalTrafficPolicy=Local only and is immutable within ExternalTrafficPolicy=Local
-		// In case ExternalTrafficPolicy is changed it seems to be irrelevant
-		// https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
-		if (curService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) &&
-			(service.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) {
-			service.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
-		}
-
-		// And only now we are ready to actually update the service with new version of the service
-		_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Update(service)
-
-		if err == nil {
-			w.a.V(1).
-				WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
-				WithStatusAction(chi).
-				Info("Update Service %s/%s", service.Namespace, service.Name)
-		} else {
-			w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
-				WithStatusAction(chi).
-				WithStatusError(chi).
-				Error("Update Service %s/%s failed with error %v", service.Namespace, service.Name, err)
-		}
-
-		return err
+		return w.updateService(chi, curService, service)
 	}
 
 	if apierrors.IsNotFound(err) {
