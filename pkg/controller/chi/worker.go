@@ -845,7 +845,12 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 		Error("Update StatefulSet(%s/%s) - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
 
 	err = w.c.deleteStatefulSet(host)
+	err = w.reconcilePVC(host)
+	return w.createStatefulSet(newStatefulSet, host)
+}
 
+func (w *worker) reconcilePVC(host *chop.ChiHost) error {
+	namespace := host.Address.Namespace
 	host.WalkVolumeClaimTemplates(func(template *chop.ChiVolumeClaimTemplate) {
 		pvcName := chopmodel.CreatePVCName(template, host)
 		w.a.V(2).Info("processing PVC(%s/%s)", namespace, pvcName)
@@ -882,5 +887,5 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 		}
 	})
 
-	return w.createStatefulSet(newStatefulSet, host)
+	return nil
 }
