@@ -17,8 +17,8 @@ def set_metrics_exporter_version(version, ns=settings.operator_namespace):
 def test_metrics_exporter_setup(self):
     with Given("clickhouse-operator is installed"):
         assert kubectl.kube_get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") > 0, error()
-        with And(f"Set metrics-exporter version {settings.version}"):
-            set_metrics_exporter_version(settings.version)
+        with And(f"Set metrics-exporter version {settings.operator_version}"):
+            set_metrics_exporter_version(settings.operator_version)
 
 
 @TestScenario

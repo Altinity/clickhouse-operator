@@ -59,7 +59,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1590328587828,
+  "iteration": 1590569457236,
   "links": [],
   "panels": [
     {
@@ -155,7 +155,13 @@
       "id": 47,
       "interval": "",
       "isNew": true,
-      "links": [],
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "metric_fetch_errors",
+          "url": "https://github.com/Altinity/clickhouse-operator/search?q=metric_fetch_errors"
+        }
+      ],
       "mappingType": 1,
       "mappingTypes": [
         {
@@ -192,7 +198,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "sum(chi_clickhouse_metric_fetch_errors{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",fetch_type=\"system.metric\"})",
+          "expr": "sum(chi_clickhouse_metric_fetch_errors{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",fetch_type=\"system.metrics\"})",
           "intervalFactor": 2,
           "legendFormat": "",
           "refId": "A",
@@ -345,7 +351,8 @@
         "fillColor": "rgba(31, 118, 189, 0.18)",
         "full": false,
         "lineColor": "rgb(31, 120, 193)",
-        "show": false
+        "show": true,
+        "ymin": 0
       },
       "tableColumn": "",
       "targets": [
@@ -376,309 +383,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "Show different types of connections for each server",
-      "editable": true,
-      "error": false,
-      "fill": 1,
-      "fillGradient": 0,
-      "grid": {},
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 0,
-        "y": 4
-      },
-      "hiddenSeries": false,
-      "id": 5,
-      "isNew": true,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "max_connections",
-          "url": "https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#max-connections"
-        },
-        {
-          "targetBlank": true,
-          "title": "max_distributed_connections",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/settings/#max-distributed-connections"
-        },
-        {
-          "targetBlank": true,
-          "title": "MySQL Protocol",
-          "url": "https://clickhouse.tech/docs/en/interfaces/mysql/"
-        },
-        {
-          "targetBlank": true,
-          "title": "HTTP Protocol",
-          "url": "https://clickhouse.tech/docs/en/interfaces/http/"
-        },
-        {
-          "targetBlank": true,
-          "title": "Native Protocol",
-          "url": "https://clickhouse.tech/docs/en/interfaces/tcp/"
-        }
-      ],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
-      "percentage": false,
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "chi_clickhouse_metric_TCPConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "intervalFactor": 2,
-          "legendFormat": "tcp {{hostname}}",
-          "refId": "A",
-          "step": 10
-        },
-        {
-          "expr": "chi_clickhouse_metric_HTTPConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "intervalFactor": 2,
-          "legendFormat": "http {{hostname}}",
-          "refId": "B",
-          "step": 10
-        },
-        {
-          "expr": "chi_clickhouse_metric_InterserverConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "intervalFactor": 2,
-          "legendFormat": "interserver {{hostname}}",
-          "refId": "C",
-          "step": 10
-        },
-        {
-          "expr": "chi_clickhouse_metric_MySQLConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "intervalFactor": 2,
-          "legendFormat": "mysql {{hostname}}",
-          "refId": "D",
-          "step": 10
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Connections",
-      "tooltip": {
-        "msResolution": false,
-        "shared": true,
-        "sort": 0,
-        "value_type": "cumulative"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
-      "description": "Show readonly and partial shutdown replicas, zookeeer exceptions, zookeeer sessions, zookeeper init requests",
-      "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 8,
-        "y": 4
-      },
-      "hiddenSeries": false,
-      "id": 19,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": true,
-        "hideZero": false,
-        "max": true,
-        "min": true,
-        "show": false,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "Recommened Zookeeper Settings",
-          "url": "https://clickhouse.tech/docs/en/operations/tips/#zookeeper"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.zookeeper",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-zookeeper"
-        },
-        {
-          "targetBlank": true,
-          "title": "Replication details",
-          "url": "https://www.slideshare.net/Altinity/introduction-to-the-mysteries-of-clickhouse-replication-by-robert-hodges-and-altinity-engineering-team"
-        }
-      ],
-      "nullPointMode": "null",
-      "options": {
-        "dataLinks": []
-      },
-      "percentage": false,
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "chi_clickhouse_metric_ReadonlyReplica{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "hide": false,
-          "intervalFactor": 2,
-          "legendFormat": "ReadonlyReplica {{hostname}}",
-          "metric": "chi_clickhouse_metric_ReadonlyReplica",
-          "refId": "D",
-          "step": 120
-        },
-        {
-          "expr": "increase(chi_clickhouse_event_ReplicaPartialShutdown{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
-          "intervalFactor": 2,
-          "legendFormat": "ReplicaPartialShutdown {{hostname}}",
-          "metric": "chi_clickhouse_event_ReplicaPartialShutdown",
-          "refId": "E",
-          "step": 120
-        },
-        {
-          "expr": "increase(chi_clickhouse_event_ZooKeeperUserExceptions{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
-          "intervalFactor": 2,
-          "legendFormat": "ZooKeeperUserExceptions  {{hostname}}",
-          "metric": "chi_clickhouse_event_ZooKeeperUserExceptions",
-          "refId": "B",
-          "step": 120
-        },
-        {
-          "expr": "increase(chi_clickhouse_event_ZooKeeperInit{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
-          "intervalFactor": 2,
-          "legendFormat": "ZooKeeperInit {{hostname}}",
-          "metric": "chi_clickhouse_event_ZooKeeperInit",
-          "refId": "A",
-          "step": 120
-        },
-        {
-          "expr": "increase(chi_clickhouse_metric_ZooKeeperSession{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
-          "intervalFactor": 2,
-          "legendFormat": "ZooKeeperSession  {{hostname}}",
-          "metric": "chi_clickhouse_metric_ZooKeeperSession",
-          "refId": "C",
-          "step": 120
-        },
-        {
-          "expr": "increase(chi_clickhouse_event_ZooKeeperHardwareExceptions{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
-          "intervalFactor": 2,
-          "legendFormat": "ZooKeeperHardwareExceptions  {{hostname}}",
-          "metric": "chi_clickhouse_event_ZooKeeperUserExceptions",
-          "refId": "F",
-          "step": 120
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Replication and ZooKeeper Exceptions",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
       "description": "Show DNS errors and distributed server-server connections failures",
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
         "h": 7,
         "w": 8,
-        "x": 16,
+        "x": 0,
         "y": 4
       },
       "hiddenSeries": false,
@@ -793,7 +504,286 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "Number of queries started to be interpreted and maybe executed. Does not include queries that are failed to parse, that are rejected due to AST size limits; rejected due to quota limits or limits on number of simultaneously running queries. May include internal queries initiated by ClickHouse itself. Does not count subqueries.",
+      "description": "Show readonly and partial shutdown replicas, zookeeer exceptions, zookeeer sessions, zookeeper init requests",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 4
+      },
+      "hiddenSeries": false,
+      "id": 19,
+      "legend": {
+        "alignAsTable": true,
+        "avg": true,
+        "current": true,
+        "hideZero": false,
+        "max": true,
+        "min": true,
+        "show": false,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Recommened Zookeeper Settings",
+          "url": "https://clickhouse.tech/docs/en/operations/tips/#zookeeper"
+        },
+        {
+          "targetBlank": true,
+          "title": "system.zookeeper",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-zookeeper"
+        },
+        {
+          "targetBlank": true,
+          "title": "Replication details",
+          "url": "https://www.slideshare.net/Altinity/introduction-to-the-mysteries-of-clickhouse-replication-by-robert-hodges-and-altinity-engineering-team"
+        }
+      ],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": true,
+      "targets": [
+        {
+          "expr": "chi_clickhouse_metric_ReadonlyReplica{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "hide": false,
+          "intervalFactor": 2,
+          "legendFormat": "ReadonlyReplica {{hostname}}",
+          "metric": "chi_clickhouse_metric_ReadonlyReplica",
+          "refId": "D",
+          "step": 120
+        },
+        {
+          "expr": "increase(chi_clickhouse_event_ReplicaPartialShutdown{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
+          "intervalFactor": 2,
+          "legendFormat": "ReplicaPartialShutdown {{hostname}}",
+          "metric": "chi_clickhouse_event_ReplicaPartialShutdown",
+          "refId": "E",
+          "step": 120
+        },
+        {
+          "expr": "increase(chi_clickhouse_event_ZooKeeperUserExceptions{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
+          "intervalFactor": 2,
+          "legendFormat": "ZooKeeperUserExceptions  {{hostname}}",
+          "metric": "chi_clickhouse_event_ZooKeeperUserExceptions",
+          "refId": "B",
+          "step": 120
+        },
+        {
+          "expr": "increase(chi_clickhouse_event_ZooKeeperInit{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
+          "intervalFactor": 2,
+          "legendFormat": "ZooKeeperInit {{hostname}}",
+          "metric": "chi_clickhouse_event_ZooKeeperInit",
+          "refId": "A",
+          "step": 120
+        },
+        {
+          "expr": "increase(chi_clickhouse_metric_ZooKeeperSession{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
+          "intervalFactor": 2,
+          "legendFormat": "ZooKeeperSession  {{hostname}}",
+          "metric": "chi_clickhouse_metric_ZooKeeperSession",
+          "refId": "C",
+          "step": 120
+        },
+        {
+          "expr": "increase(chi_clickhouse_event_ZooKeeperHardwareExceptions{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
+          "intervalFactor": 2,
+          "legendFormat": "ZooKeeperHardwareExceptions  {{hostname}}",
+          "metric": "chi_clickhouse_event_ZooKeeperUserExceptions",
+          "refId": "F",
+          "step": 120
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Replication and ZooKeeper Exceptions",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "description": "delayed query\nNumber of INSERT queries that are throttled due to high number of active data parts for partition in a *MergeTree table.\n\ndelayed blocks\nNumber of times the INSERT of a block to a *MergeTree table was throttled due to high number of active data parts for partition. \n\nrejected blocks\nNumber of times the INSERT of a block to a MergeTree table was rejected with 'Too many parts' exception due to high number of active data parts for partition.\n\n\nplease look\nparts_to_delay_insert\nparts_to_throw_insert\n\nin system.merge_tree_settings table",
+      "editable": true,
+      "error": false,
+      "fill": 1,
+      "fillGradient": 0,
+      "grid": {},
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 4
+      },
+      "hiddenSeries": false,
+      "id": 5,
+      "isNew": true,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "system.parts_log",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
+        },
+        {
+          "targetBlank": true,
+          "title": "system.merge_tree_settings",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
+        }
+      ],
+      "nullPointMode": "connected",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "chi_clickhouse_metric_DelayedInserts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "delayed  queries {{hostname}}",
+          "refId": "A",
+          "step": 10
+        },
+        {
+          "expr": "increase(chi_clickhouse_event_DelayedInserts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
+          "intervalFactor": 2,
+          "legendFormat": "delayed blocks {{hostname}}",
+          "refId": "B",
+          "step": 10
+        },
+        {
+          "expr": "increase(chi_clickhouse_event_RejectedInserts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[5m])",
+          "intervalFactor": 2,
+          "legendFormat": "rejected blocks {{hostname}}",
+          "refId": "C",
+          "step": 10
+        },
+        {
+          "expr": "chi_clickhouse_metric_DistributedFilesToInsert{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "delayed distributed files {{ hostname }}",
+          "refId": "D"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Delayed/Rejected Inserts",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "description": "Number of SELECT queries started to be interpreted and maybe executed. Does not include queries that are failed to parse, that are rejected due to AST size limits; rejected due to quota limits or limits on number of simultaneously running queries. May include internal queries initiated by ClickHouse itself. Does not count subqueries.",
       "editable": true,
       "error": false,
       "fill": 1,
@@ -843,14 +833,22 @@
       "renderer": "flot",
       "seriesOverrides": [],
       "spaceLength": 10,
-      "stack": true,
-      "steppedLine": false,
+      "stack": false,
+      "steppedLine": true,
       "targets": [
         {
-          "expr": "rate(chi_clickhouse_event_Query{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "rate(chi_clickhouse_event_SelectQuery{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
           "refId": "B",
+          "step": 10
+        },
+        {
+          "expr": "rate(chi_clickhouse_event_Query{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": true,
+          "intervalFactor": 2,
+          "legendFormat": "total {{hostname}}",
+          "refId": "A",
           "step": 10
         }
       ],
@@ -858,7 +856,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Queries",
+      "title": "Select Queries",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -906,7 +904,7 @@
       "editable": true,
       "error": false,
       "fill": 1,
-      "fillGradient": 0,
+      "fillGradient": 1,
       "grid": {},
       "gridPos": {
         "h": 7,
@@ -945,25 +943,57 @@
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
+      "seriesOverrides": [
+        {
+          "alias": "/^uncompressed.+/",
+          "color": "#73BF69"
+        },
+        {
+          "alias": "/^(file descriptor|os).+/",
+          "color": "#F2495C"
+        },
+        {
+          "alias": "/^compressed.+/",
+          "color": "#FADE2A"
+        }
+      ],
       "spaceLength": 10,
-      "stack": true,
+      "stack": false,
       "steppedLine": false,
       "targets": [
         {
           "expr": "rate(chi_clickhouse_event_CompressedReadBufferBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
           "intervalFactor": 2,
-          "legendFormat": "{{hostname}}",
+          "legendFormat": "uncompressed {{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
           "expr": "rate(chi_clickhouse_event_ReadCompressedBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
-          "hide": true,
+          "hide": false,
           "interval": "",
           "intervalFactor": 2,
           "legendFormat": "compressed {{hostname}}",
           "refId": "C",
+          "step": 10
+        },
+        {
+          "expr": "rate(chi_clickhouse_event_ReadBufferFromFileDescriptorReadBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "file descriptor {{hostname}}",
+          "refId": "B",
+          "step": 10
+        },
+        {
+          "expr": "rate(chi_clickhouse_event_OSReadBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "os {{hostname}}",
+          "refId": "D",
           "step": 10
         }
       ],
@@ -971,7 +1001,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Compressed Read Buffer",
+      "title": "Read Bytes",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -990,7 +1020,7 @@
         {
           "format": "bytes",
           "label": "",
-          "logBase": 1,
+          "logBase": 2,
           "max": null,
           "min": "0",
           "show": true
@@ -998,7 +1028,7 @@
         {
           "decimals": null,
           "format": "short",
-          "label": "ratio",
+          "label": "",
           "logBase": 1,
           "max": null,
           "min": null,
@@ -1120,7 +1150,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "## Tracks amount of inserted data.",
+      "description": "Number of INSERT queries to be interpreted and potentially executed. Does not include queries that failed to parse or were rejected due to AST size limits, quota limits or limits on the number of simultaneously running queries. May include internal queries initiated by ClickHouse itself. Does not count subqueries.",
       "editable": true,
       "error": false,
       "fill": 1,
@@ -1181,112 +1211,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Insert Requests",
-      "tooltip": {
-        "msResolution": false,
-        "shared": true,
-        "sort": 0,
-        "value_type": "cumulative"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "reqps",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": false
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
-      "description": "## Tracks rows of inserted data.",
-      "editable": true,
-      "error": false,
-      "fill": 1,
-      "fillGradient": 0,
-      "grid": {},
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 8,
-        "y": 18
-      },
-      "hiddenSeries": false,
-      "id": 32,
-      "isNew": true,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
-        }
-      ],
-      "nullPointMode": "null",
-      "options": {
-        "dataLinks": []
-      },
-      "percentage": false,
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {},
-        {}
-      ],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "rate(chi_clickhouse_event_InsertedRows{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
-          "legendFormat": "Insert rows {{hostname}}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Rows Inserted",
+      "title": "Insert Queries",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -1339,7 +1264,7 @@
       "gridPos": {
         "h": 7,
         "w": 8,
-        "x": 16,
+        "x": 8,
         "y": 18
       },
       "hiddenSeries": false,
@@ -1409,6 +1334,111 @@
       "yaxes": [
         {
           "format": "bytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "reqps",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "description": "## Tracks rows of inserted data.",
+      "editable": true,
+      "error": false,
+      "fill": 1,
+      "fillGradient": 0,
+      "grid": {},
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 18
+      },
+      "hiddenSeries": false,
+      "id": 32,
+      "isNew": true,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "max_memory_usage",
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
+        }
+      ],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {},
+        {}
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "rate(chi_clickhouse_event_InsertedRows{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "legendFormat": "Insert rows {{hostname}}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Rows Inserted",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -1813,11 +1843,6 @@
           "legendFormat": "max queue size {{hostname}}",
           "refId": "A",
           "step": 10
-        },
-        {
-          "expr": "chi_clickhouse_metric_ReplicasMaxAbsoluteDelay{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "max absolute replica delay {{hostname}}",
-          "refId": "B"
         }
       ],
       "thresholds": [],
@@ -1868,7 +1893,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "Number of Replicated tables that are leaders. Leader replica is responsible for assigning merges, cleaning old blocks for deduplications and a few more bookkeeping tasks. There may be no more than one leader across all replicas at one moment of time. If there is no leader it will be elected soon or it indicate an issue.",
+      "description": "Show seconds when replicated servers can be delayed relative to current time,  when you insert directly in *ReplicatedMegreTree table on one server clickhouse need time to replicate new parts of data to another servers in same shard in background",
       "editable": true,
       "error": false,
       "fill": 1,
@@ -1901,6 +1926,16 @@
           "targetBlank": true,
           "title": "Replication architecture",
           "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
+        },
+        {
+          "targetBlank": true,
+          "title": "ReplicatedMergeTree engine",
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/"
+        },
+        {
+          "targetBlank": true,
+          "title": "max_replica_delay_for_distributed_queries",
+          "url": "https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries"
         }
       ],
       "nullPointMode": "connected",
@@ -1911,16 +1946,32 @@
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
+      "seriesOverrides": [
+        {
+          "alias": "/^absolute.+/",
+          "color": "#F2495C"
+        },
+        {
+          "alias": "/^relative.+/",
+          "color": "#FADE2A"
+        }
+      ],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_LeaderReplica{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_ReplicasMaxAbsoluteDelay{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
-          "legendFormat": "{{hostname}}",
+          "legendFormat": "absolute {{hostname}}",
           "refId": "A",
+          "step": 10
+        },
+        {
+          "expr": "chi_clickhouse_metric_ReplicasMaxRelativeDelay{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "relative {{hostname}}",
+          "refId": "B",
           "step": 10
         }
       ],
@@ -1928,7 +1979,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Replicated tables leaders",
+      "title": "Max Replica Delay",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -2066,7 +2117,7 @@
       "yaxes": [
         {
           "format": "short",
-          "label": "parts",
+          "label": "",
           "logBase": 1,
           "max": null,
           "min": "0",
@@ -2092,7 +2143,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "BackgroundPoolTask\t\n---\nNumber of active tasks in BackgroundProcessingPool (merges, mutations, fetches, or replication queue bookkeeping)\n\n\nBackgroundMovePoolTask\n---\nNumber of active tasks in BackgroundProcessingPool for moves\n\n\nBackgroundSchedulePoolTask\t\n---\nA number of active tasks in BackgroundSchedulePool. This pool is used for periodic ReplicatedMergeTree tasks, like cleaning old data parts, altering data parts, replica re-initialization, etc.",
+      "description": "Each logical partition defined over `PARTITION BY` contains few physical data \"parts\" ",
       "editable": true,
       "error": false,
       "fill": 1,
@@ -2105,7 +2156,7 @@
         "y": 39
       },
       "hiddenSeries": false,
-      "id": 9,
+      "id": 4,
       "isNew": true,
       "legend": {
         "avg": false,
@@ -2123,23 +2174,18 @@
       "links": [
         {
           "targetBlank": true,
-          "title": "FETCH PARTITION",
-          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_fetch-partition"
+          "title": "Custom Partitioning Key",
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/custom-partitioning-key/"
         },
         {
           "targetBlank": true,
-          "title": "Mutations of data",
-          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter-mutations"
+          "title": "system.parts",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-parts"
         },
         {
           "targetBlank": true,
-          "title": "Data TTL",
-          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#table_engine-mergetree-ttl"
-        },
-        {
-          "targetBlank": true,
-          "title": "MOVE PARTITION",
-          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_move-partition"
+          "title": "system.part_log",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
         }
       ],
       "nullPointMode": "connected",
@@ -2156,24 +2202,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_BackgroundPoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_MaxPartCountForPartition{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
-          "legendFormat": "merge, mutate, fetch {{hostname}}",
+          "legendFormat": "{{hostname}}",
           "refId": "A",
-          "step": 10
-        },
-        {
-          "expr": "chi_clickhouse_metric_BackgroundSchedulePoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "intervalFactor": 2,
-          "legendFormat": "clean, alter, replica re-init {{hostname}}",
-          "refId": "B",
-          "step": 10
-        },
-        {
-          "expr": "chi_clickhouse_metric_BackgroundMovePoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "intervalFactor": 2,
-          "legendFormat": "moves {{hostname}}",
-          "refId": "C",
           "step": 10
         }
       ],
@@ -2181,7 +2213,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Background Tasks",
+      "title": "Max Part count for Partition",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -2210,7 +2242,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": "0",
+          "min": null,
           "show": true
         }
       ],
@@ -2430,7 +2462,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "Number of requests to ZooKeeper in fly.",
+      "description": "BackgroundPoolTask\t\n---\nNumber of active tasks in BackgroundProcessingPool (merges, mutations, fetches, or replication queue bookkeeping)\n\n\nBackgroundMovePoolTask\n---\nNumber of active tasks in BackgroundProcessingPool for moves\n\n\nBackgroundSchedulePoolTask\t\n---\nA number of active tasks in BackgroundSchedulePool. This pool is used for periodic ReplicatedMergeTree tasks, like cleaning old data parts, altering data parts, replica re-initialization, etc.",
       "editable": true,
       "error": false,
       "fill": 1,
@@ -2443,10 +2475,10 @@
         "y": 46
       },
       "hiddenSeries": false,
-      "id": 34,
+      "id": 9,
       "isNew": true,
       "legend": {
-        "avg": true,
+        "avg": false,
         "current": true,
         "hideEmpty": false,
         "hideZero": false,
@@ -2461,8 +2493,23 @@
       "links": [
         {
           "targetBlank": true,
-          "title": "Replication architecture",
-          "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
+          "title": "FETCH PARTITION",
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_fetch-partition"
+        },
+        {
+          "targetBlank": true,
+          "title": "Mutations of data",
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter-mutations"
+        },
+        {
+          "targetBlank": true,
+          "title": "Data TTL",
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#table_engine-mergetree-ttl"
+        },
+        {
+          "targetBlank": true,
+          "title": "MOVE PARTITION",
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_move-partition"
         }
       ],
       "nullPointMode": "connected",
@@ -2479,16 +2526,32 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_ZooKeeperRequest{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "{{ hostname }}",
-          "refId": "B"
+          "expr": "chi_clickhouse_metric_BackgroundPoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "merge, mutate, fetch {{hostname}}",
+          "refId": "A",
+          "step": 10
+        },
+        {
+          "expr": "chi_clickhouse_metric_BackgroundSchedulePoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "clean, alter, replica re-init {{hostname}}",
+          "refId": "B",
+          "step": 10
+        },
+        {
+          "expr": "chi_clickhouse_metric_BackgroundMovePoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "moves {{hostname}}",
+          "refId": "C",
+          "step": 10
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Zookeeper Requests",
+      "title": "Background Tasks",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -2517,227 +2580,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
-          "show": false
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
-      "description": "Total data size for all ClickHouse *MergeTree tables\n\n",
-      "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 8,
-        "y": 46
-      },
-      "hiddenSeries": false,
-      "id": 41,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-parts"
-        }
-      ],
-      "nullPointMode": "null",
-      "options": {
-        "dataLinks": []
-      },
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "chi_clickhouse_metric_DiskDataBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "{{ hostname }}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Clickhouse Data size on Disk",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "decbytes",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
-      "description": "## MemoryTrackingInBackgroundProcessingPool\t\n\nTotal amount of memory (bytes) allocated in background processing pool (that is dedicated for backround merges, mutations and fetches). \n\n\n## MemoryTrackingInBackgroundMoveProcessingPool\n\nTotal amount of memory (bytes) allocated in background processing pool (that is dedicated for backround moves). \n\n\n## MemoryTrackingInBackgroundSchedulePool\n\nTotal amount of memory (bytes) allocated in background schedule pool (that is dedicated for bookkeeping tasks of Replicated tables).\n\n\n## MemoryTrackingForMerges\n\nTotal amount of memory (bytes) allocated for background merges. Included in MemoryTrackingInBackgroundProcessingPool. \n\n\nNote that this values may include a drift when the memory was allocated in a context of background processing pool and freed in other context or vice-versa. This happens naturally due to caches for tables indexes and doesn't indicate memory leaks.\n",
-      "editable": true,
-      "error": false,
-      "fill": 1,
-      "fillGradient": 0,
-      "grid": {},
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 16,
-        "y": 46
-      },
-      "hiddenSeries": false,
-      "id": 28,
-      "isNew": true,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": false,
-        "min": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "max_memory_usage",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
-        }
-      ],
-      "nullPointMode": "null",
-      "options": {
-        "dataLinks": []
-      },
-      "percentage": false,
-      "pointradius": 5,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "chi_clickhouse_metric_MemoryTrackingInBackgroundProcessingPool{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "intervalFactor": 2,
-          "legendFormat": "merge, mutate, fetch {{hostname}}",
-          "refId": "A",
-          "step": 10
-        },
-        {
-          "expr": "chi_clickhouse_metric_MemoryTrackingInBackgroundMoveProcessingPool{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "intervalFactor": 2,
-          "legendFormat": "moves {{hostname}}",
-          "refId": "B",
-          "step": 10
-        },
-        {
-          "expr": "chi_clickhouse_metric_MemoryTrackingInBackgroundSchedulePool{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "intervalFactor": 2,
-          "legendFormat": "alter, clean, replica re-init {{hostname}}",
-          "refId": "C",
-          "step": 10
-        },
-        {
-          "expr": "chi_clickhouse_metric_MemoryTrackingForMerges{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "intervalFactor": 2,
-          "legendFormat": "merges {{hostname}}",
-          "refId": "D",
-          "step": 10
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Background Pools Memory",
-      "tooltip": {
-        "msResolution": false,
-        "shared": true,
-        "sort": 0,
-        "value_type": "cumulative"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "bytes",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         }
       ],
@@ -2758,8 +2601,8 @@
       "gridPos": {
         "h": 7,
         "w": 8,
-        "x": 0,
-        "y": 53
+        "x": 8,
+        "y": 46
       },
       "hiddenSeries": false,
       "id": 39,
@@ -2858,41 +2701,41 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "Read\nNumber of read (read, pread, io_getevents, etc.) syscalls in fly\n\nWrite\nNumber of write (write, pwrite, io_getevents, etc.) syscalls in fly",
-      "editable": true,
-      "error": false,
+      "description": "Total data size for all ClickHouse *MergeTree tables\n\n",
       "fill": 1,
       "fillGradient": 0,
-      "grid": {},
       "gridPos": {
         "h": 7,
         "w": 8,
-        "x": 8,
-        "y": 53
+        "x": 16,
+        "y": 46
       },
       "hiddenSeries": false,
-      "id": 4,
-      "isNew": true,
+      "id": 41,
       "legend": {
         "avg": false,
-        "current": true,
-        "hideEmpty": false,
-        "hideZero": false,
+        "current": false,
         "max": false,
         "min": false,
         "show": false,
         "total": false,
-        "values": true
+        "values": false
       },
       "lines": true,
-      "linewidth": 2,
-      "links": [],
-      "nullPointMode": "connected",
+      "linewidth": 1,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "system.parts",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-parts"
+        }
+      ],
+      "nullPointMode": "null",
       "options": {
         "dataLinks": []
       },
       "percentage": false,
-      "pointradius": 5,
+      "pointradius": 2,
       "points": false,
       "renderer": "flot",
       "seriesOverrides": [],
@@ -2901,30 +2744,251 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_Read{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "intervalFactor": 2,
-          "legendFormat": "read {{hostname}}",
-          "refId": "A",
-          "step": 10
-        },
-        {
-          "expr": "chi_clickhouse_metric_Write{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "intervalFactor": 2,
-          "legendFormat": "write {{hostname}}",
-          "refId": "B",
-          "step": 10
+          "expr": "chi_clickhouse_metric_DiskDataBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "{{ hostname }}",
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Read/Write syscalls",
+      "title": "Clickhouse Data size on Disk",
       "tooltip": {
-        "msResolution": false,
         "shared": true,
         "sort": 0,
-        "value_type": "cumulative"
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "decbytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "description": "Memory size allocated for clickhouse-server process \n\nVIRT \nThe total amount of virtual memory used by the task. It includes all code, data and shared libraries plus pages that have been swapped out.\n\nVIRT = SWAP + RES\n\n\nSWAP -- Swapped size (kb)\nThe swapped out portion of a task's total virtual memory image.\n\nRES -- Resident size (kb)\nThe non-swapped physical memory a task has used.\nRES = CODE + USED DATA.\n\nCODE -- Code size (kb)\nThe amount of physical memory devoted to executable code, also known as the 'text resident set' size or TRS\n\nDATA -- Data+Stack size (kb)\nThe amount of physical memory allocated to other than executable code, also known as the 'data resident set' size or DRS.\n\nSHR -- Shared Mem size (kb)\nThe amount of shared memory used by a task. It simply reflects memory that could be potentially shared with other processes.",
+      "fill": 1,
+      "fillGradient": 2,
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 53
+      },
+      "hiddenSeries": false,
+      "id": 46,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Describe Linux Process Memory types",
+          "url": "https://elinux.org/Runtime_Memory_Measurement"
+        }
+      ],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "/VIRT.+/",
+          "color": "#73BF69"
+        },
+        {
+          "alias": "/DATA.+/",
+          "color": "#C4162A"
+        },
+        {
+          "alias": "/CODE.+/",
+          "color": "#FF9830"
+        },
+        {
+          "alias": "/RES.+/",
+          "color": "#FADE2A"
+        },
+        {
+          "alias": "/SHR.+/",
+          "color": "#5794F2"
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": true,
+      "targets": [
+        {
+          "expr": "chi_clickhouse_metric_MemoryCode{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "CODE {{ hostname }}",
+          "refId": "A"
+        },
+        {
+          "expr": "chi_clickhouse_metric_MemoryResident{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "RES {{ hostname }}",
+          "refId": "B"
+        },
+        {
+          "expr": "chi_clickhouse_metric_MemoryShared{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "SHR {{ hostname }}",
+          "refId": "C"
+        },
+        {
+          "expr": "chi_clickhouse_metric_MemoryDataAndStack{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "DATA {{ hostname }}",
+          "refId": "D"
+        },
+        {
+          "expr": "chi_clickhouse_metric_MemoryVirtual{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "VIRT {{ hostname }}",
+          "refId": "E"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": " clickhouse-server Process Memory",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "decbytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "description": "Memory size allocated for primary keys",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 53
+      },
+      "hiddenSeries": false,
+      "id": 45,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "How to choose right primary key",
+          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#selecting-the-primary-key"
+        }
+      ],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 2,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "chi_clickhouse_metric_MemoryPrimaryKeyBytesAllocated",
+          "legendFormat": "{{ hostname }}",
+          "refId": "A"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Primary Keys Memory",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
       },
       "type": "graph",
       "xaxis": {
@@ -2940,7 +3004,7 @@
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": "0",
+          "min": null,
           "show": true
         },
         {
@@ -3063,7 +3127,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "",
+      "description": "## MemoryTrackingInBackgroundProcessingPool\t\n\nTotal amount of memory (bytes) allocated in background processing pool (that is dedicated for backround merges, mutations and fetches). \n\n\n## MemoryTrackingInBackgroundMoveProcessingPool\n\nTotal amount of memory (bytes) allocated in background processing pool (that is dedicated for backround moves). \n\n\n## MemoryTrackingInBackgroundSchedulePool\n\nTotal amount of memory (bytes) allocated in background schedule pool (that is dedicated for bookkeeping tasks of Replicated tables).\n\n\n## MemoryTrackingForMerges\n\nTotal amount of memory (bytes) allocated for background merges. Included in MemoryTrackingInBackgroundProcessingPool. \n\n\nNote that this values may include a drift when the memory was allocated in a context of background processing pool and freed in other context or vice-versa. This happens naturally due to caches for tables indexes and doesn't indicate memory leaks.\n",
       "editable": true,
       "error": false,
       "fill": 1,
@@ -3074,6 +3138,378 @@
         "w": 8,
         "x": 0,
         "y": 60
+      },
+      "hiddenSeries": false,
+      "id": 28,
+      "isNew": true,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "max_memory_usage",
+          "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#settings_max_memory_usage"
+        }
+      ],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "chi_clickhouse_metric_MemoryTrackingInBackgroundProcessingPool{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "merge, mutate, fetch {{hostname}}",
+          "refId": "A",
+          "step": 10
+        },
+        {
+          "expr": "chi_clickhouse_metric_MemoryTrackingInBackgroundMoveProcessingPool{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "moves {{hostname}}",
+          "refId": "B",
+          "step": 10
+        },
+        {
+          "expr": "chi_clickhouse_metric_MemoryTrackingInBackgroundSchedulePool{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "alter, clean, replica re-init {{hostname}}",
+          "refId": "C",
+          "step": 10
+        },
+        {
+          "expr": "chi_clickhouse_metric_MemoryTrackingForMerges{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "merges {{hostname}}",
+          "refId": "D",
+          "step": 10
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Background Pools Memory",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "bytes",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "description": "Number of requests to ZooKeeper in fly.",
+      "editable": true,
+      "error": false,
+      "fill": 1,
+      "fillGradient": 0,
+      "grid": {},
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 60
+      },
+      "hiddenSeries": false,
+      "id": 34,
+      "isNew": true,
+      "legend": {
+        "avg": true,
+        "current": true,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "show": false,
+        "total": false,
+        "values": true
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "Replication architecture",
+          "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
+        }
+      ],
+      "nullPointMode": "connected",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "chi_clickhouse_metric_ZooKeeperRequest{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "{{ hostname }}",
+          "refId": "B"
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Zookeeper Requests",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": "0",
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": false
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "description": "Show different types of connections for each server",
+      "editable": true,
+      "error": false,
+      "fill": 1,
+      "fillGradient": 0,
+      "grid": {},
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 60
+      },
+      "hiddenSeries": false,
+      "id": 48,
+      "isNew": true,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "hideEmpty": false,
+        "hideZero": false,
+        "max": false,
+        "min": false,
+        "show": false,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 2,
+      "links": [
+        {
+          "targetBlank": true,
+          "title": "max_connections",
+          "url": "https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#max-connections"
+        },
+        {
+          "targetBlank": true,
+          "title": "max_distributed_connections",
+          "url": "https://clickhouse.tech/docs/en/operations/settings/settings/#max-distributed-connections"
+        },
+        {
+          "targetBlank": true,
+          "title": "MySQL Protocol",
+          "url": "https://clickhouse.tech/docs/en/interfaces/mysql/"
+        },
+        {
+          "targetBlank": true,
+          "title": "HTTP Protocol",
+          "url": "https://clickhouse.tech/docs/en/interfaces/http/"
+        },
+        {
+          "targetBlank": true,
+          "title": "Native Protocol",
+          "url": "https://clickhouse.tech/docs/en/interfaces/tcp/"
+        }
+      ],
+      "nullPointMode": "connected",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "expr": "chi_clickhouse_metric_TCPConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "tcp {{hostname}}",
+          "refId": "A",
+          "step": 10
+        },
+        {
+          "expr": "chi_clickhouse_metric_HTTPConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "http {{hostname}}",
+          "refId": "B",
+          "step": 10
+        },
+        {
+          "expr": "chi_clickhouse_metric_InterserverConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "interserver {{hostname}}",
+          "refId": "C",
+          "step": 10
+        },
+        {
+          "expr": "chi_clickhouse_metric_MySQLConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "intervalFactor": 2,
+          "legendFormat": "mysql {{hostname}}",
+          "refId": "D",
+          "step": 10
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Connections",
+      "tooltip": {
+        "msResolution": false,
+        "shared": true,
+        "sort": 0,
+        "value_type": "cumulative"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "${DS_PROMETHEUS}",
+      "description": "",
+      "editable": true,
+      "error": false,
+      "fill": 1,
+      "fillGradient": 0,
+      "grid": {},
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 67
       },
       "hiddenSeries": false,
       "id": 24,
@@ -3164,240 +3600,9 @@
         "align": false,
         "alignLevel": null
       }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
-      "description": "Memory size allocated for clickhouse-server process \n\n# VIRT \nThe total amount of virtual memory used by the task. It includes all code, data and shared libraries plus pages that have been swapped out.\n\nVIRT = SWAP + RES\n\n## SWAP -- Swapped size (kb)\nThe swapped out portion of a task's total virtual memory image.\n\n## RES -- Resident size (kb)\nThe non-swapped physical memory a task has used.\nRES = CODE + DATA.\n\n## CODE -- Code size (kb)\nThe amount of physical memory devoted to executable code, also known as the 'text resident set' size or TRS\n\n## DATA -- Data+Stack size (kb)\nThe amount of physical memory devoted to other than executable code, also known as the 'data resident set' size or DRS.\n\n## SHR -- Shared Mem size (kb)\nThe amount of shared memory used by a task. It simply reflects memory that could be potentially shared with other processes.",
-      "fill": 1,
-      "fillGradient": 2,
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 8,
-        "y": 60
-      },
-      "hiddenSeries": false,
-      "id": 46,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "Describe Linux Process Memory types",
-          "url": "https://elinux.org/Runtime_Memory_Measurement"
-        }
-      ],
-      "nullPointMode": "null",
-      "options": {
-        "dataLinks": []
-      },
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "alias": "/VIRT.+/",
-          "color": "#E02F44"
-        },
-        {
-          "alias": "/DATA.+/",
-          "color": "#FADE2A"
-        },
-        {
-          "alias": "/CODE.+/",
-          "color": "#73BF69"
-        },
-        {
-          "alias": "/RES.+/",
-          "color": "#FF9830"
-        },
-        {
-          "alias": "/SHR.+/",
-          "color": "#5794F2"
-        }
-      ],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": true,
-      "targets": [
-        {
-          "expr": "chi_clickhouse_metric_MemoryCode{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "CODE {{ hostname }}",
-          "refId": "A"
-        },
-        {
-          "expr": "chi_clickhouse_metric_MemoryResident{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "RES {{ hostname }}",
-          "refId": "B"
-        },
-        {
-          "expr": "chi_clickhouse_metric_MemoryShared{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "SHR {{ hostname }}",
-          "refId": "C"
-        },
-        {
-          "expr": "chi_clickhouse_metric_MemoryDataAndStack{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "DATA {{ hostname }}",
-          "refId": "D"
-        },
-        {
-          "expr": "chi_clickhouse_metric_MemoryVirtual{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "VIRT {{ hostname }}",
-          "refId": "E"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": " clickhouse-server Process Memory",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "decbytes",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
-    },
-    {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
-      "datasource": "${DS_PROMETHEUS}",
-      "description": "Memory size allocated for primary keys",
-      "fill": 1,
-      "fillGradient": 0,
-      "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 16,
-        "y": 60
-      },
-      "hiddenSeries": false,
-      "id": 45,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": false,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "How to choose right primary key",
-          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#selecting-the-primary-key"
-        }
-      ],
-      "nullPointMode": "null",
-      "options": {
-        "dataLinks": []
-      },
-      "percentage": false,
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
-      "targets": [
-        {
-          "expr": "chi_clickhouse_metric_MemoryPrimaryKeyBytesAllocated",
-          "legendFormat": "{{ hostname }}",
-          "refId": "A"
-        }
-      ],
-      "thresholds": [],
-      "timeFrom": null,
-      "timeRegions": [],
-      "timeShift": null,
-      "title": "Primary Keys Memory",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
-      "type": "graph",
-      "xaxis": {
-        "buckets": null,
-        "mode": "time",
-        "name": null,
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        },
-        {
-          "format": "short",
-          "label": null,
-          "logBase": 1,
-          "max": null,
-          "min": null,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false,
-        "alignLevel": null
-      }
     }
   ],
-  "refresh": false,
+  "refresh": "1m",
   "schemaVersion": 21,
   "style": "dark",
   "tags": [
@@ -3507,5 +3712,5 @@
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
   "uid": "HBIYxc8Wk",
-  "version": 4
+  "version": 2
 }
