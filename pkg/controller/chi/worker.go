@@ -849,11 +849,12 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 	return w.createStatefulSet(newStatefulSet, host)
 }
 
+// reconcilePVC
 func (w *worker) reconcilePVC(host *chop.ChiHost) error {
 	namespace := host.Address.Namespace
 	host.WalkVolumeClaimTemplates(func(template *chop.ChiVolumeClaimTemplate) {
 		pvcName := chopmodel.CreatePVCName(template, host)
-		w.a.V(2).Info("processing PVC(%s/%s)", namespace, pvcName)
+		w.a.V(2).Info("reconcile PVC(%s/%s)", namespace, pvcName)
 
 		pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(pvcName, newGetOptions())
 		if err != nil {
