@@ -18,3 +18,6 @@ clickhouse_template = "templates/tpl-clickhouse-stable.yaml"
 # clickhouse_template = "templates/tpl-clickhouse-20.1.yaml"
 # clickhouse_template = "templates/tpl-clickhouse-20.3.yaml"
 clickhouse_version = get_ch_version(clickhouse_template)
+
+prometheus_namespace = "prometheus"
+prometheus_operator_version = "0.38"

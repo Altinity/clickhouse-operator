@@ -11,8 +11,7 @@ spec:
     - name: ./clickhouse-operator.rules
       rules:
         - alert: MetricsExporterDown
-          expr: absent(up{job='clickhouse-operator-metrics'})
-          for: 1m
+          expr: up{job='clickhouse-operator-metrics'} == 0
           labels:
             severity: critical
           annotations:
@@ -22,7 +21,6 @@ spec:
 
         - alert: ClickHouseServerDown
           expr: chi_clickhouse_metric_fetch_errors > 0
-          for: 1m
           labels:
             severity: critical
           annotations:
@@ -35,7 +33,6 @@ spec:
 
         - alert: ClickHouseServerRestartRecently
           expr: chi_clickhouse_metric_Uptime > 1 < 180
-          for: 3m
           labels:
             severity: warning
           annotations:
@@ -46,7 +43,6 @@ spec:
 
         - alert: ClickHouseDNSErrors
           expr: increase(chi_clickhouse_event_DNSError[1m]) > 0 or increase(chi_clickhouse_event_NetworkErrors[1m]) > 0
-          for: 1m
           labels:
             severity: warning
           annotations:
@@ -62,7 +58,6 @@ spec:
 
         - alert: DistributedFilesToInsertHigh
           expr: chi_clickhouse_metric_DistributedFilesToInsert > 50
-          for: 1m
           labels:
             severity: high
           annotations:
@@ -83,7 +78,6 @@ spec:
 
         - alert: DistributedConnectionExpections
           expr: increase(chi_clickhouse_event_DistributedConnectionFailTry[1m]) > 0 or increase(chi_clickhouse_event_DistributedConnectionFailAtAll[1m]) > 0
-          for: 1m
           labels:
             severity: high
           annotations:
@@ -98,7 +92,6 @@ spec:
 
         - alert: RejectedInsert
           expr: increase(chi_clickhouse_event_RejectedInserts[1m]) > 0
-          for: 1m
           labels:
             severity: critical
           annotations:
@@ -116,7 +109,6 @@ spec:
 
         - alert: DelayedInsertThrottling
           expr: increase(chi_clickhouse_event_DelayedInserts[1m]) > 0
-          for: 1m
           labels:
             severity: high
           annotations:
@@ -128,7 +120,6 @@ spec:
 
         - alert: LongestRunningQuery
           expr: chi_clickhouse_metric_LongestRunningQuery > 600
-          for: 1m
           labels:
             severity: high
           annotations:
@@ -141,7 +132,6 @@ spec:
 
         - alert: QueryPreempted
           expr: chi_clickhouse_metric_QueryPreempted > 0
-          for: 1m
           labels:
             severity: high
           annotations:
@@ -154,7 +144,6 @@ spec:
 
         - alert: ReadonlyReplica
           expr: chi_clickhouse_metric_ReadonlyReplica > 0
-          for: 1m
           labels:
             severity: high
           annotations:
@@ -173,7 +162,6 @@ spec:
 
         - alert: ReplicasMaxAbsoluteDelay
           expr: chi_clickhouse_metric_ReplicasMaxAbsoluteDelay > 300
-          for: 1m
           labels:
             severity: high
           annotations:
@@ -190,7 +178,6 @@ spec:
 
         - alert: TooManyConnections
           expr: chi_clickhouse_metric_HTTPConnection + chi_clickhouse_metric_TCPConnection + chi_clickhouse_metric_MySQLConnection > 100
-          for: 1m
           labels:
             severity: warning
           annotations:
@@ -205,7 +192,6 @@ spec:
 
         - alert: MaxPartCountForPartition
           expr: chi_clickhouse_metric_MaxPartCountForPartition > 100
-          for: 1m
           labels:
             severity: high
           annotations:
@@ -220,7 +206,6 @@ spec:
 
         - alert: LowInsertRowsPerQuery
           expr: increase(chi_clickhouse_event_InsertQuery[1m]) > 0 and increase(chi_clickhouse_event_InsertRows[1m]) / increase(chi_clickhouse_event_InsertQuery[1m]) <= 1000
-          for: 1m
           labels:
             severity: warning
           annotations:
@@ -239,7 +224,6 @@ spec:
 
         - alert: TooMuchRunningQueries
           expr: chi_clickhouse_metric_Query > 90
-          for: 1m
           labels:
             severity: warning
           annotations:
@@ -259,7 +243,6 @@ spec:
 
         - alert: TooMuchDistributedFilesToInsert
           expr: chi_clickhouse_metric_DistributedFilesToInsert > 100
-          for: 1m
           labels:
             severity: warning
           annotations:
@@ -275,7 +258,6 @@ spec:
 
         - alert: SystemSettingsChanged
           expr: delta(chi_clickhouse_metric_ChangedSettingsHash[5m]) != 0
-          for: 1m
           labels:
             severity: warning
           annotations:
@@ -286,7 +268,6 @@ spec:
 
         - alert: VersionChanged
           expr: delta(chi_clickhouse_metric_VersionInteger[5m]) != 0
-          for: 1m
           labels:
             severity: warning
           annotations:
@@ -297,7 +278,6 @@ spec:
 
         - alert: ZooKeeperSession
           expr: chi_clickhouse_metric_ZooKeeperSession > 1
-          for: 1m
           labels:
             severity: warning
           annotations:
@@ -308,3 +288,20 @@ spec:
               Number of sessions (connections) to ZooKeeper should be no more than one, because using more than one
               connection to ZooKeeper may lead to bugs due to lack of linearizability (stale reads)
               that ZooKeeper consistency model allows.
+
+        - alert: DiskUsage
+          expr: (chi_clickhouse_metric_DiskDataBytes / (chi_clickhouse_metric_DiskFreeBytes + chi_clickhouse_metric_DiskDataBytes)) > 0.8
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Disk Usage in `&lt;yandex&gt;&lt;path&gt;` > 80%"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+              data size: {{ with printf "chi_clickhouse_metric_DiskDataBytes{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | humanize1024 }}B {{ end }}
+              disk free {{ with printf "chi_clickhouse_metric_DiskFreeBytes{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | humanize1024 }}B {{ end }}
+              currently k8s doesn't support resize of Persistent Volumes, but you can try add another volume to existing pod with restart pod
+              please read documentation:
+              - https://github.com/Altinity/clickhouse-operator/blob/master/docs/storage.md
+              - https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#table_engine-mergetree-multiple-volumes
+              - https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#mergetree-table-ttl

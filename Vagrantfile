@@ -140,10 +140,10 @@ Vagrant.configure(2) do |config|
     echo "...DONE"
 
     # open http://localhost:9090/targets and check clickhouse-monitor is exists
-    kubectl --namespace=${PROMETHEUS_NAMESPACE} port-forward service/prometheus 9090 </dev/null &>/dev/null &
+    kubectl --namespace="${PROMETHEUS_NAMESPACE}" port-forward service/prometheus 9090 </dev/null &>/dev/null &
 
     # open http://localhost:9093/alerts and check which alerts is exists
-    kubectl --namespace=${PROMETHEUS_NAMESPACE} port-forward service/alertmanager 9093 </dev/null &>/dev/null &
+    kubectl --namespace="${PROMETHEUS_NAMESPACE}" port-forward service/alertmanager 9093 </dev/null &>/dev/null &
 
     # open http://localhost:3000/ and check prometheus datasource exists and grafana dashboard exists
     kubectl --namespace="${GRAFANA_NAMESPACE}" port-forward service/grafana-service 3000 </dev/null &>/dev/null &
