@@ -190,7 +190,7 @@
       ],
       "sparkline": {
         "fillColor": "rgba(31, 118, 189, 0.18)",
-        "full": false,
+        "full": true,
         "lineColor": "rgb(31, 120, 193)",
         "show": true,
         "ymin": 0
@@ -349,7 +349,7 @@
       ],
       "sparkline": {
         "fillColor": "rgba(31, 118, 189, 0.18)",
-        "full": false,
+        "full": true,
         "lineColor": "rgb(31, 120, 193)",
         "show": true,
         "ymin": 0
@@ -703,7 +703,7 @@
           "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
         }
       ],
-      "nullPointMode": "connected",
+      "nullPointMode": "null",
       "options": {
         "dataLinks": []
       },
@@ -831,7 +831,7 @@
           "url": "https://clickhouse.tech/docs/en/operations/settings/query-complexity/#max-execution-time"
         }
       ],
-      "nullPointMode": "connected",
+      "nullPointMode": "null",
       "options": {
         "dataLinks": []
       },
@@ -943,7 +943,7 @@
           "url": "https://clickhouse.tech/docs/en/development/architecture/#io"
         }
       ],
-      "nullPointMode": "connected",
+      "nullPointMode": "null",
       "options": {
         "dataLinks": []
       },
@@ -1946,7 +1946,7 @@
           "url": "https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries"
         }
       ],
-      "nullPointMode": "connected",
+      "nullPointMode": "null",
       "options": {
         "dataLinks": []
       },
@@ -2067,7 +2067,7 @@
           "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/"
         }
       ],
-      "nullPointMode": "connected",
+      "nullPointMode": "null",
       "options": {
         "dataLinks": []
       },
@@ -2196,7 +2196,7 @@
           "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
         }
       ],
-      "nullPointMode": "connected",
+      "nullPointMode": "null",
       "options": {
         "dataLinks": []
       },
@@ -2520,7 +2520,7 @@
           "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_move-partition"
         }
       ],
-      "nullPointMode": "connected",
+      "nullPointMode": "null",
       "options": {
         "dataLinks": []
       },
@@ -2531,7 +2531,7 @@
       "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
-      "steppedLine": false,
+      "steppedLine": true,
       "targets": [
         {
           "expr": "chi_clickhouse_metric_BackgroundPoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
@@ -3295,7 +3295,7 @@
           "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
         }
       ],
-      "nullPointMode": "connected",
+      "nullPointMode": "null",
       "options": {
         "dataLinks": []
       },
@@ -3417,7 +3417,7 @@
           "url": "https://clickhouse.tech/docs/en/interfaces/tcp/"
         }
       ],
-      "nullPointMode": "connected",
+      "nullPointMode": "null",
       "options": {
         "dataLinks": []
       },
@@ -3428,7 +3428,7 @@
       "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
-      "steppedLine": false,
+      "steppedLine": true,
       "targets": [
         {
           "expr": "chi_clickhouse_metric_TCPConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
@@ -3720,5 +3720,5 @@
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
   "uid": "HBIYxc8Wk",
-  "version": 3
+  "version": 4
 }
