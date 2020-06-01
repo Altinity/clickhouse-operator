@@ -154,6 +154,16 @@ def kube_wait_field(object, name, field, value, ns="test", retries = max_retries
                 time.sleep(i*5)
         assert obj_status[1] == value, error()
 
+def kube_wait_jsonpath(object, name, field, value, ns="test", retries = max_retries):
+    with Then(f"{object} {name} -o jsonpath={field} should be {value}"):
+        for i in range(1,retries):
+            obj_status = kubectl(f"get {object} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
+            if obj_status[0] == value:
+                break
+            with Then("Not ready. Wait for " + str(i*5) + " seconds"):
+                time.sleep(i*5)
+        assert obj_status[0] == value, error()
+
 def kube_get_field(object, name, field, ns="test"):
     out = kubectl(f"get {object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
     return out[1]

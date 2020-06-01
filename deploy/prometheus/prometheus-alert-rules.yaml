@@ -76,7 +76,7 @@ spec:
               Also, you can manage distributed tables
               https://clickhouse.tech/docs/en/sql-reference/statements/system/#query-language-system-distributed
 
-        - alert: DistributedConnectionExpections
+        - alert: DistributedConnectionExceptions
           expr: increase(chi_clickhouse_event_DistributedConnectionFailTry[1m]) > 0 or increase(chi_clickhouse_event_DistributedConnectionFailAtAll[1m]) > 0
           labels:
             severity: high
