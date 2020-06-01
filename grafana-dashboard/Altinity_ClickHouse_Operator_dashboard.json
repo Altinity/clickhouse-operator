@@ -59,7 +59,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1590569457236,
+  "iteration": 1590726693892,
   "links": [],
   "panels": [
     {
@@ -435,7 +435,7 @@
         {
           "expr": "increase(chi_clickhouse_event_NetworkErrors{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
-          "legendFormat": "DNSErrors {{hostname}}",
+          "legendFormat": "NetworkErrors {{hostname}}",
           "metric": "chi_clickhouse_event_NetworkErrors",
           "refId": "A",
           "step": 120
@@ -454,6 +454,14 @@
           "legendFormat": "DistributedConnectionFailTry {{hostname}}",
           "metric": "chi_clickhouse_event_DistributedConnectionFailTry",
           "refId": "C",
+          "step": 120
+        },
+        {
+          "expr": "increase(chi_clickhouse_event_DNSError{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "intervalFactor": 2,
+          "legendFormat": "DNSErrors {{hostname}}",
+          "metric": "chi_clickhouse_event_NetworkErrors",
+          "refId": "D",
           "step": 120
         }
       ],
@@ -1020,7 +1028,7 @@
         {
           "format": "bytes",
           "label": "",
-          "logBase": 2,
+          "logBase": 10,
           "max": null,
           "min": "0",
           "show": true
@@ -3712,5 +3720,5 @@
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
   "uid": "HBIYxc8Wk",
-  "version": 2
+  "version": 3
 }
