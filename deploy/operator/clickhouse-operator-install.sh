@@ -21,4 +21,4 @@ fi
 
 # Setup into dedicated namespace
 echo "3. Install operator into ${OPERATOR_NAMESPACE} namespace"
-kubectl apply --namespace="${OPERATOR_NAMESPACE}" -f clickhouse-operator-install.yaml
+kubectl apply --namespace="${OPERATOR_NAMESPACE}" -f ${CUR_DIR}/clickhouse-operator-install.yaml

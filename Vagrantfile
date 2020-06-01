@@ -162,5 +162,6 @@ Vagrant.configure(2) do |config|
     python3 /vagrant/tests/test.py --only=operator/*
     python3 /vagrant/tests/test_examples.py
     python3 /vagrant/tests/test_metrics_exporter.py
+    python3 /vagrant/tests/test_metrics_alerts.py
   SHELL
 end
