@@ -282,6 +282,8 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(host)
 	serviceName := CreateStatefulSetServiceName(host)
 
+	var revisionHistoryLimit int32 = 10
+
 	// Create apps.StatefulSet object
 	replicasNum := host.GetReplicasNum()
 	// StatefulSet has additional label - ZK config fingerprint
@@ -297,13 +299,20 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 			Selector: &metav1.LabelSelector{
 				MatchLabels: c.labeler.GetSelectorHostScope(host),
 			},
-			// IMPORTANT
-			// VolumeClaimTemplates are to be setup later
-			VolumeClaimTemplates: nil,
 
 			// IMPORTANT
 			// Template is to be setup later
 			Template: corev1.PodTemplateSpec{},
+
+			// IMPORTANT
+			// VolumeClaimTemplates are to be setup later
+			VolumeClaimTemplates: nil,
+
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{
+				Type: apps.RollingUpdateStatefulSetStrategyType,
+			},
+			RevisionHistoryLimit: &revisionHistoryLimit,
 		},
 	}
 
@@ -338,7 +347,7 @@ func (c *Creator) ensureStatefulSetIntegrity(statefulSet *apps.StatefulSet, host
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
-func ensureClickHouseContainer(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+func ensureClickHouseContainer(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
 	if _, ok := getClickHouseContainer(statefulSet); !ok {
 		// No ClickHouse container available
 		addContainer(
@@ -639,20 +648,29 @@ func (c *Creator) statefulSetAppendVolumeClaimTemplate(
 	}
 
 	// VolumeClaimTemplate  is not listed in statefulSet.Spec.VolumeClaimTemplates
-	// Append copy of PersistentVolumeClaimSpec
-	statefulSet.Spec.VolumeClaimTemplates = append(
-		statefulSet.Spec.VolumeClaimTemplates,
-		corev1.PersistentVolumeClaim{
+	persistentVolumeClaim := corev1.PersistentVolumeClaim{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "PersistentVolumeClaim",
+				APIVersion: "v1",
+			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: volumeClaimTemplate.Name,
-				// TODO this has to wait until proper disk inheritance procedure will be available
+				// TODO
+				//  this has to wait until proper disk inheritance procedure will be available
+				// UPDATE
+				//  we are close to proper disk inheritance
 				// Right now we hit the following error:
 				// "Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
-				// Labels: c.labeler.getLabelsHostScope(host, false),
+				Labels: c.labeler.getLabelsHostScope(host, false),
 			},
 			Spec: *volumeClaimTemplate.Spec.DeepCopy(),
-		},
-	)
+		}
+	// TODO introduce normalization
+	volumeMode := corev1.PersistentVolumeFilesystem
+	persistentVolumeClaim.Spec.VolumeMode = &volumeMode
+
+	// Append copy of PersistentVolumeClaimSpec
+	statefulSet.Spec.VolumeClaimTemplates = append(statefulSet.Spec.VolumeClaimTemplates, persistentVolumeClaim)
 }
 
 // newDefaultHostTemplate returns default Host Template to be used with StatefulSet
@@ -745,6 +763,7 @@ func addContainer(podSpec *corev1.PodSpec, container corev1.Container) {
 
 // newVolumeForConfigMap returns corev1.Volume object with defined name
 func newVolumeForConfigMap(name string) corev1.Volume {
+	var defaultMode int32 = 0644
 	return corev1.Volume{
 		Name: name,
 		VolumeSource: corev1.VolumeSource{
@@ -752,6 +771,7 @@ func newVolumeForConfigMap(name string) corev1.Volume {
 				LocalObjectReference: corev1.LocalObjectReference{
 					Name: name,
 				},
+				DefaultMode: &defaultMode,
 			},
 		},
 	}
