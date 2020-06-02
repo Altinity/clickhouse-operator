@@ -847,8 +847,8 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 		WithStatusError(host.CHI).
 		Error("Update StatefulSet(%s/%s) - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
 
-	diff, equal := messagediff.DeepDiff(curStatefulSet, newStatefulSet)
-	w.a.Info("StatefulSet diff:")
+	diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, newStatefulSet.Spec)
+	w.a.Info("StatefulSet.Spec diff:")
 	w.a.Info(util.MessageDiffString(diff, equal))
 
 	err = w.c.deleteStatefulSet(host)
