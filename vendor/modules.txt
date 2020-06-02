@@ -40,6 +40,8 @@ github.com/hashicorp/golang-lru/simplelru
 github.com/imdario/mergo
 # github.com/json-iterator/go v1.1.9
 github.com/json-iterator/go
+# github.com/juliangruber/go-intersect v1.0.0
+github.com/juliangruber/go-intersect
 # github.com/kubernetes-sigs/yaml v1.1.0
 github.com/kubernetes-sigs/yaml
 # github.com/mailru/go-clickhouse v1.3.0
