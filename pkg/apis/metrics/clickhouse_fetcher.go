@@ -102,15 +102,15 @@ const (
 	queryTableSizesSQL = `
 		SELECT
 			database,
-			table, 
+			table,
+			toString(active)                       AS active,
 			toString(uniq(partition))              AS partitions, 
 			toString(count())                      AS parts, 
 			toString(sum(bytes))                   AS bytes, 
 			toString(sum(data_uncompressed_bytes)) AS uncompressed_bytes, 
 			toString(sum(rows))                    AS rows 
 		FROM system.parts
-		WHERE active = 1
-		GROUP BY database, table
+		GROUP BY active, database, table
 	`
 
 	queryMutationsSQL = `
@@ -158,9 +158,9 @@ func (f *ClickHouseFetcher) getClickHouseQueryTableSizes() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		queryTableSizesSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
-			var database, table, partitions, parts, bytes, uncompressed, _rows string
-			if err := rows.Scan(&database, &table, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
-				*data = append(*data, []string{database, table, partitions, parts, bytes, uncompressed, _rows})
+			var database, table, active, partitions, parts, bytes, uncompressed, _rows string
+			if err := rows.Scan(&database, &table, &active, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
+				*data = append(*data, []string{database, table, active, partitions, parts, bytes, uncompressed, _rows})
 			}
 			return nil
 		},
