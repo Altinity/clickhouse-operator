@@ -874,26 +874,29 @@ func (w *worker) reconcileResources(pvc *core.PersistentVolumeClaim, template *c
 
 // reconcileResourcesList
 func (w *worker) reconcileResourcesList(pvc *core.PersistentVolumeClaim, pvcResourceList, desiredResourceList core.ResourceList) {
-	var pvcResourceQuantity resource.Quantity
-	var pvcResourceQuantityOk bool
-	if pvcResourceList != nil {
-		pvcResourceQuantity, pvcResourceQuantityOk = pvcResourceList[core.ResourceStorage]
-	}
-	var desiredResourceQuantity resource.Quantity
-	var desiredResourceQuantityOk bool
-	if desiredResourceList != nil {
-		desiredResourceQuantity, desiredResourceQuantityOk = desiredResourceList[core.ResourceStorage]
+	var ok bool
+	if (pvcResourceList == nil) || (desiredResourceList == nil) {
+		return
 	}
 
-	if pvcResourceQuantityOk && desiredResourceQuantityOk {
-		if !pvcResourceQuantity.Equal(desiredResourceQuantity) {
-			w.a.V(2).Info("reconcile PVC(%s/%s) - unequal requests, want to update", pvc.Namespace, pvc.Name)
-			pvcResourceList[core.ResourceStorage] = desiredResourceList[core.ResourceStorage]
-			_, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(pvc)
-			if err != nil {
-				w.a.Error("unable to update PVC(%s/%s) err: %v", pvc.Namespace, pvc.Name, err)
-				return
-			}
-		}
+	var pvcResourceQuantity resource.Quantity
+	var desiredResourceQuantity resource.Quantity
+	if pvcResourceQuantity, ok = pvcResourceList[core.ResourceStorage]; !ok {
+		return
+	}
+	if desiredResourceQuantity, ok = desiredResourceList[core.ResourceStorage]; !ok {
+		return
+	}
+
+	if pvcResourceQuantity.Equal(desiredResourceQuantity) {
+		return
+	}
+
+	w.a.V(2).Info("reconcile PVC(%s/%s) - unequal requests, want to update", pvc.Namespace, pvc.Name)
+	pvcResourceList[core.ResourceStorage] = desiredResourceList[core.ResourceStorage]
+	_, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(pvc)
+	if err != nil {
+		w.a.Error("unable to update PVC(%s/%s) err: %v", pvc.Namespace, pvc.Name, err)
+		return
 	}
 }
