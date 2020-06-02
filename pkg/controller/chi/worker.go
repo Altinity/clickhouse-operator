@@ -17,6 +17,9 @@ package chi
 import (
 	"fmt"
 
+	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/juliangruber/go-intersect"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,9 +27,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
-
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
 type worker struct {
@@ -852,6 +852,9 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 // reconcilePVCs
 func (w *worker) reconcilePVCs(host *chop.ChiHost) error {
 	namespace := host.Address.Namespace
+	w.a.V(2).Info("reconcilePVCs(%s/%s) - start", namespace, host.Name)
+	defer w.a.V(2).Info("reconcilePVCs(%s/%s) - end", namespace, host.Name)
+
 	host.WalkVolumeClaimTemplates(func(template *chop.ChiVolumeClaimTemplate) {
 		pvcName := chopmodel.CreatePVCName(template, host)
 		w.a.V(2).Info("reconcile PVC(%s/%s)", namespace, pvcName)
@@ -874,6 +877,33 @@ func (w *worker) reconcileResources(pvc *core.PersistentVolumeClaim, template *c
 
 // reconcileResourcesList
 func (w *worker) reconcileResourcesList(pvc *core.PersistentVolumeClaim, pvcResourceList, desiredResourceList core.ResourceList) {
+	var pvcResourceNames []core.ResourceName
+	for resourceName := range pvcResourceList {
+		pvcResourceNames = append(pvcResourceNames, resourceName)
+	}
+	var desiredResourceNames []core.ResourceName
+	for resourceName := range desiredResourceList {
+		desiredResourceNames = append(desiredResourceNames, resourceName)
+	}
+
+	//diff, equal := messagediff.DeepDiff(pvcResourceNames, desiredResourceNames)
+
+	resourceNames := intersect.Simple(pvcResourceNames, desiredResourceNames)
+	for _, resourceName := range resourceNames.([]interface{}) {
+		w.reconcileResource(pvc, pvcResourceList, desiredResourceList, resourceName.(core.ResourceName))
+	}
+}
+
+// reconcileResourcesList
+func (w *worker) reconcileResource(
+	pvc *core.PersistentVolumeClaim,
+	pvcResourceList core.ResourceList,
+	desiredResourceList core.ResourceList,
+	resourceName core.ResourceName,
+) {
+	w.a.V(2).Info("reconcileResource(%s/%s/%s) - start", pvc.Namespace, pvc.Name, resourceName)
+	defer w.a.V(2).Info("reconcileResource(%s/%s/%s) - end", pvc.Namespace, pvc.Name, resourceName)
+
 	var ok bool
 	if (pvcResourceList == nil) || (desiredResourceList == nil) {
 		return
@@ -881,10 +911,10 @@ func (w *worker) reconcileResourcesList(pvc *core.PersistentVolumeClaim, pvcReso
 
 	var pvcResourceQuantity resource.Quantity
 	var desiredResourceQuantity resource.Quantity
-	if pvcResourceQuantity, ok = pvcResourceList[core.ResourceStorage]; !ok {
+	if pvcResourceQuantity, ok = pvcResourceList[resourceName]; !ok {
 		return
 	}
-	if desiredResourceQuantity, ok = desiredResourceList[core.ResourceStorage]; !ok {
+	if desiredResourceQuantity, ok = desiredResourceList[resourceName]; !ok {
 		return
 	}
 
@@ -892,11 +922,11 @@ func (w *worker) reconcileResourcesList(pvc *core.PersistentVolumeClaim, pvcReso
 		return
 	}
 
-	w.a.V(2).Info("reconcile PVC(%s/%s) - unequal requests, want to update", pvc.Namespace, pvc.Name)
-	pvcResourceList[core.ResourceStorage] = desiredResourceList[core.ResourceStorage]
+	w.a.V(2).Info("reconcileResource(%s/%s/%s) - unequal requests, want to update", pvc.Namespace, pvc.Name, resourceName)
+	pvcResourceList[resourceName] = desiredResourceList[resourceName]
 	_, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(pvc)
 	if err != nil {
-		w.a.Error("unable to update PVC(%s/%s) err: %v", pvc.Namespace, pvc.Name, err)
+		w.a.Error("unable to reconcileResource(%s/%s/%s) err: %v", pvc.Namespace, pvc.Name, resourceName, err)
 		return
 	}
 }
