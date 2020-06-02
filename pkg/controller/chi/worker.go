@@ -869,29 +869,29 @@ func (w *worker) reconcilePVCs(host *chop.ChiHost) error {
 
 // reconcileResources
 func (w *worker) reconcileResources(pvc *core.PersistentVolumeClaim, template *chop.ChiVolumeClaimTemplate) {
-	namespace := pvc.Namespace
-	pvcName := pvc.Name
+	w.reconcileResourcesList(pvc, pvc.Spec.Resources.Requests, template.Spec.Resources.Requests)
+}
 
-	pvcRequests := pvc.Spec.Resources.Requests
+// reconcileResourcesList
+func (w *worker) reconcileResourcesList(pvc *core.PersistentVolumeClaim, pvcResourceList, desiredResourceList core.ResourceList) {
 	var pvcResourceQuantity resource.Quantity
 	var pvcResourceQuantityOk bool
-	if pvcRequests != nil {
-		pvcResourceQuantity, pvcResourceQuantityOk = pvcRequests[core.ResourceStorage]
+	if pvcResourceList != nil {
+		pvcResourceQuantity, pvcResourceQuantityOk = pvcResourceList[core.ResourceStorage]
 	}
-	templateRequests := template.Spec.Resources.Requests
-	var templateResourceQuantity resource.Quantity
-	var templateResourceQuantityOk bool
-	if templateRequests != nil {
-		templateResourceQuantity, templateResourceQuantityOk = templateRequests[core.ResourceStorage]
+	var desiredResourceQuantity resource.Quantity
+	var desiredResourceQuantityOk bool
+	if desiredResourceList != nil {
+		desiredResourceQuantity, desiredResourceQuantityOk = desiredResourceList[core.ResourceStorage]
 	}
 
-	if pvcResourceQuantityOk && templateResourceQuantityOk {
-		if !pvcResourceQuantity.Equal(templateResourceQuantity) {
-			w.a.V(2).Info("reconcile PVC(%s/%s) - unequal requests, want to update", namespace, pvcName)
-			pvc.Spec.Resources.Requests[core.ResourceStorage] = template.Spec.Resources.Requests[core.ResourceStorage]
-			_, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(pvc)
+	if pvcResourceQuantityOk && desiredResourceQuantityOk {
+		if !pvcResourceQuantity.Equal(desiredResourceQuantity) {
+			w.a.V(2).Info("reconcile PVC(%s/%s) - unequal requests, want to update", pvc.Namespace, pvc.Name)
+			pvcResourceList[core.ResourceStorage] = desiredResourceList[core.ResourceStorage]
+			_, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(pvc)
 			if err != nil {
-				w.a.Error("unable to update PVC(%s/%s) err: %v", namespace, pvcName, err)
+				w.a.Error("unable to update PVC(%s/%s) err: %v", pvc.Namespace, pvc.Name, err)
 				return
 			}
 		}
