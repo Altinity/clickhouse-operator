@@ -15,11 +15,11 @@
 package chi
 
 import (
-	"fmt"
-
 	"gopkg.in/d4l3k/messagediff.v1"
 
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+
 )
 
 // ActionPlan is an action plan with list of differences between two CHIs
@@ -169,17 +169,17 @@ func (ap *ActionPlan) String() string {
 
 	if len(ap.specDiff.Added) > 0 {
 		// Something added
-		str += ap.stringItem("added spec items", ap.specDiff.Added)
+		str += util.MessageDiffItemString("added spec items", ap.specDiff.Added)
 	}
 
 	if len(ap.specDiff.Removed) > 0 {
 		// Something removed
-		str += ap.stringItem("removed spec items", ap.specDiff.Removed)
+		str += util.MessageDiffItemString("removed spec items", ap.specDiff.Removed)
 	}
 
 	if len(ap.specDiff.Modified) > 0 {
 		// Something modified
-		str += ap.stringItem("modified spec items", ap.specDiff.Modified)
+		str += util.MessageDiffItemString("modified spec items", ap.specDiff.Modified)
 	}
 
 	if len(ap.labelsDiff.Added) > 0 {
@@ -196,23 +196,6 @@ func (ap *ActionPlan) String() string {
 		// Something modified
 		str += "modified labels\n"
 	}
-
-	return str
-}
-
-// stringItem stringifies one map[*messagediff.Path]interface{} item
-func (ap *ActionPlan) stringItem(banner string, items map[*messagediff.Path]interface{}) string {
-	var str string
-	str += fmt.Sprintf("%s: %d\n", banner, len(items))
-	for pathPtr := range items {
-		str += fmt.Sprintf("----- ap item path  -----\n")
-		for _, pathNode := range *pathPtr {
-			str += fmt.Sprintf("%s\n", pathNode.String())
-		}
-		str += fmt.Sprintf("----- ap item value -----\n")
-		str += fmt.Sprintf("%v\n", items[pathPtr])
-	}
-	str += fmt.Sprintf("-------------------------\n")
 
 	return str
 }
