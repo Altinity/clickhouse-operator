@@ -649,22 +649,22 @@ func (c *Creator) statefulSetAppendVolumeClaimTemplate(
 
 	// VolumeClaimTemplate  is not listed in statefulSet.Spec.VolumeClaimTemplates
 	persistentVolumeClaim := corev1.PersistentVolumeClaim{
-			TypeMeta: metav1.TypeMeta{
-				Kind: "PersistentVolumeClaim",
-				APIVersion: "v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: volumeClaimTemplate.Name,
-				// TODO
-				//  this has to wait until proper disk inheritance procedure will be available
-				// UPDATE
-				//  we are close to proper disk inheritance
-				// Right now we hit the following error:
-				// "Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
-				Labels: c.labeler.getLabelsHostScope(host, false),
-			},
-			Spec: *volumeClaimTemplate.Spec.DeepCopy(),
-		}
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "PersistentVolumeClaim",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: volumeClaimTemplate.Name,
+			// TODO
+			//  this has to wait until proper disk inheritance procedure will be available
+			// UPDATE
+			//  we are close to proper disk inheritance
+			// Right now we hit the following error:
+			// "Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
+			Labels: c.labeler.getLabelsHostScope(host, false),
+		},
+		Spec: *volumeClaimTemplate.Spec.DeepCopy(),
+	}
 	// TODO introduce normalization
 	volumeMode := corev1.PersistentVolumeFilesystem
 	persistentVolumeClaim.Spec.VolumeMode = &volumeMode
