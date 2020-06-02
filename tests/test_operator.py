@@ -24,6 +24,11 @@ def test_002():
                       "pod_podAntiAffinity": 1})
 
 @TestScenario
+@Name("test_003. 4 nodes with custom layout definition")
+def test_003():
+    create_and_check("configs/test-003-complex-layout.yaml", {"object_counts": [4, 4, 5]})
+
+@TestScenario
 @Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
 def test_004():
     create_and_check("configs/test-004-tpl.yaml", 
@@ -63,8 +68,8 @@ def test_007():
                       "pod_image": "yandex/clickhouse-server:19.11",
                       "pod_ports": [8124,9001,9010]})
 
-def test_operator_upgrade(config, version_from, version_to = settings.version):
-    version_to = settings.version
+def test_operator_upgrade(config, version_from, version_to = settings.operator_version):
+    version_to = settings.operator_version
     with Given(f"clickhouse-operator {version_from}"):
         set_operator_version(version_from)
         config = get_full_path(config)
@@ -79,7 +84,7 @@ def test_operator_upgrade(config, version_from, version_to = settings.version):
 
         kube_delete_chi(chi)
 
-def test_operator_restart(config, version = settings.version):
+def test_operator_restart(config, version = settings.operator_version):
     with Given(f"clickhouse-operator {version}"):
         set_operator_version(version)
         config = get_full_path(config)
@@ -102,17 +107,17 @@ def test_008():
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
-def test_009(version_from = "0.8.0", version_to = settings.version):
+def test_009(version_from = "0.8.0", version_to = settings.operator_version):
     test_operator_upgrade("configs/test-009-operator-upgrade.yaml", version_from, version_to)
     test_operator_upgrade("configs/test-009-operator-upgrade-2.yaml", version_from, version_to)
 
-def set_operator_version(version, ns="kube-system", timeout=60):
+def set_operator_version(version, ns=settings.operator_namespace, timeout=60):
     kubectl(f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:{version}", ns=ns)
     kubectl(f"set image deployment.v1.apps/clickhouse-operator metrics-exporter=altinity/metrics-exporter:{version}", ns=ns)
     kubectl("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
     assert kube_get_count("pod", ns=ns, label="-l app=clickhouse-operator") > 0, error()
     
-def restart_operator(ns = "kube-system", timeout=60):
+def restart_operator(ns = settings.operator_namespace, timeout=60):
     pod_name = kube_get("pod", name="", ns=ns, label="-l app=clickhouse-operator")["items"][0]["metadata"]["name"]
     kubectl(f"delete pod {pod_name}", ns = ns, timeout = timeout)
     kube_wait_object("pod", name="", ns = ns, label="-l app=clickhouse-operator")
@@ -123,7 +128,7 @@ def restart_operator(ns = "kube-system", timeout=60):
 def require_zookeeper():
     with Given("Install Zookeeper if missing"):
         if kube_get_count("service", name="zookeeper") == 0:
-            config = get_full_path("../deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node.yaml")
+            config = get_full_path("../deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node-1GB-for-tests-only.yaml")
             kube_apply(config)
             kube_wait_object("pod", "zookeeper-0")
             kube_wait_pod_status("zookeeper-0", "Running")
