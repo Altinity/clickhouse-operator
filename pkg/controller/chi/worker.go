@@ -17,9 +17,8 @@ package chi
 import (
 	"fmt"
 
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/juliangruber/go-intersect"
+	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -27,6 +26,10 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
+
+	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type worker struct {
@@ -843,6 +846,10 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 		WithStatusAction(host.CHI).
 		WithStatusError(host.CHI).
 		Error("Update StatefulSet(%s/%s) - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
+
+	diff, equal := messagediff.DeepDiff(curStatefulSet, newStatefulSet)
+	w.a.Info("StatefulSet diff:")
+	w.a.Info(util.MessageDiffString(diff, equal))
 
 	err = w.c.deleteStatefulSet(host)
 	err = w.reconcilePVCs(host)
