@@ -861,32 +861,39 @@ func (w *worker) reconcilePVCs(host *chop.ChiHost) error {
 			w.a.Error("unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
 			return
 		}
-
-		pvcRequests := pvc.Spec.Resources.Requests
-		var pvcResourceQuantity resource.Quantity
-		var pvcResourceQuantityOk bool
-		if pvcRequests != nil {
-			pvcResourceQuantity, pvcResourceQuantityOk = pvcRequests[core.ResourceStorage]
-		}
-		templateRequests := template.Spec.Resources.Requests
-		var templateResourceQuantity resource.Quantity
-		var templateResourceQuantityOk bool
-		if templateRequests != nil {
-			templateResourceQuantity, templateResourceQuantityOk = templateRequests[core.ResourceStorage]
-		}
-
-		if pvcResourceQuantityOk && templateResourceQuantityOk {
-			if !pvcResourceQuantity.Equal(templateResourceQuantity) {
-				w.a.V(2).Info("reconcile PVC(%s/%s) - unequal requests, want to update", namespace, pvcName)
-				pvc.Spec.Resources.Requests[core.ResourceStorage] = template.Spec.Resources.Requests[core.ResourceStorage]
-				_, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(pvc)
-				if err != nil {
-					w.a.Error("unable to update PVC(%s/%s) err: %v", namespace, pvcName, err)
-					return
-				}
-			}
-		}
+		w.reconcileResources(pvc, template)
 	})
 
 	return nil
+}
+
+// reconcileResources
+func (w *worker) reconcileResources(pvc *core.PersistentVolumeClaim, template *chop.ChiVolumeClaimTemplate) {
+	namespace := pvc.Namespace
+	pvcName := pvc.Name
+
+	pvcRequests := pvc.Spec.Resources.Requests
+	var pvcResourceQuantity resource.Quantity
+	var pvcResourceQuantityOk bool
+	if pvcRequests != nil {
+		pvcResourceQuantity, pvcResourceQuantityOk = pvcRequests[core.ResourceStorage]
+	}
+	templateRequests := template.Spec.Resources.Requests
+	var templateResourceQuantity resource.Quantity
+	var templateResourceQuantityOk bool
+	if templateRequests != nil {
+		templateResourceQuantity, templateResourceQuantityOk = templateRequests[core.ResourceStorage]
+	}
+
+	if pvcResourceQuantityOk && templateResourceQuantityOk {
+		if !pvcResourceQuantity.Equal(templateResourceQuantity) {
+			w.a.V(2).Info("reconcile PVC(%s/%s) - unequal requests, want to update", namespace, pvcName)
+			pvc.Spec.Resources.Requests[core.ResourceStorage] = template.Spec.Resources.Requests[core.ResourceStorage]
+			_, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(pvc)
+			if err != nil {
+				w.a.Error("unable to update PVC(%s/%s) err: %v", namespace, pvcName, err)
+				return
+			}
+		}
+	}
 }
