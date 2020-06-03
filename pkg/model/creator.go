@@ -282,10 +282,9 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(host)
 	serviceName := CreateStatefulSetServiceName(host)
 
-	var revisionHistoryLimit int32 = 10
-
 	// Create apps.StatefulSet object
 	replicasNum := host.GetReplicasNum()
+	revisionHistoryLimit := int32(10)
 	// StatefulSet has additional label - ZK config fingerprint
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -443,9 +442,9 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 
 // setupStatefulSetApplyVolumeMounts applies `volumeMounts` of a `container`
 func (c *Creator) setupStatefulSetApplyVolumeMounts(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	// Deal with `volumeMounts` of a `container`, a.k.a.
+	// Deal with `volumeMounts` of a `container`, located by the path:
 	// .spec.templates.podTemplates.*.spec.containers.volumeMounts.*
-	// VolumeClaimTemplates, that are referenced in Containers' VolumeMount object(s)
+	// VolumeClaimTemplates, that are directly referenced in Containers' VolumeMount object(s)
 	// are appended to StatefulSet's Spec.VolumeClaimTemplates slice
 	for i := range statefulSet.Spec.Template.Spec.Containers {
 		// Convenience wrapper
@@ -461,6 +460,7 @@ func (c *Creator) setupStatefulSetApplyVolumeMounts(statefulSet *apps.StatefulSe
 	}
 }
 
+
 // setupStatefulSetApplyVolumeClaimTemplates applies Data and Log VolumeClaimTemplates on all containers
 func (c *Creator) setupStatefulSetApplyVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	// Mount all named (data and log so far) VolumeClaimTemplates into all containers
@@ -470,6 +470,56 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplates(statefulSet *apps.St
 		_ = c.setupStatefulSetApplyVolumeClaimTemplate(host, statefulSet, container.Name, host.Templates.DataVolumeClaimTemplate, dirPathClickHouseData)
 		_ = c.setupStatefulSetApplyVolumeClaimTemplate(host, statefulSet, container.Name, host.Templates.LogVolumeClaimTemplate, dirPathClickHouseLog)
 	}
+}
+
+// setupStatefulSetVolumeClaimTemplates performs VolumeClaimTemplate setup for Containers in PodTemplate of a StatefulSet
+func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	c.setupStatefulSetApplyVolumeMounts(statefulSet, host)
+	c.setupStatefulSetApplyVolumeClaimTemplates(statefulSet, host)
+}
+
+// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
+func statefulSetApplyPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
+	// StatefulSet's pod template is not directly compatible with ChiPodTemplate, we need some fields only
+	dst.Spec.Template.Name = template.Name
+	dst.Spec.Template.Spec = template.Spec
+}
+
+func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
+	if len(statefulSet.Spec.Template.Spec.Containers) > 0 {
+		return &statefulSet.Spec.Template.Spec.Containers[0], true
+	} else {
+		return nil, false
+	}
+}
+
+func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	// Ensure ClickHouse container has all named ports specified
+	chContainer, ok := getClickHouseContainer(statefulSet)
+	if !ok {
+		return
+	}
+	ensurePortByName(chContainer, chDefaultTCPPortName, host.TCPPort)
+	ensurePortByName(chContainer, chDefaultHTTPPortName, host.HTTPPort)
+	ensurePortByName(chContainer, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
+}
+
+func ensurePortByName(container *corev1.Container, name string, port int32) {
+	// Find port with specified name
+	for i := range container.Ports {
+		containerPort := &container.Ports[i]
+		if containerPort.Name == name {
+			containerPort.HostPort = 0
+			containerPort.ContainerPort = port
+			return
+		}
+	}
+
+	// Port with specified name not found. Need to append
+	container.Ports = append(container.Ports, corev1.ContainerPort{
+		Name:          name,
+		ContainerPort: port,
+	})
 }
 
 // setupStatefulSetApplyVolumeClaimTemplate applies .templates.volumeClaimTemplates.* to a StatefulSet
@@ -575,56 +625,6 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplate(
 	return nil
 }
 
-// setupStatefulSetVolumeClaimTemplates performs VolumeClaimTemplate setup for Containers in PodTemplate of a StatefulSet
-func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	c.setupStatefulSetApplyVolumeMounts(statefulSet, host)
-	c.setupStatefulSetApplyVolumeClaimTemplates(statefulSet, host)
-}
-
-// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
-func statefulSetApplyPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
-	// StatefulSet's pod template is not directly compatible with ChiPodTemplate, we need some fields only
-	dst.Spec.Template.Name = template.Name
-	dst.Spec.Template.Spec = template.Spec
-}
-
-func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
-	if len(statefulSet.Spec.Template.Spec.Containers) > 0 {
-		return &statefulSet.Spec.Template.Spec.Containers[0], true
-	} else {
-		return nil, false
-	}
-}
-
-func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	// Ensure ClickHouse container has all named ports specified
-	chContainer, ok := getClickHouseContainer(statefulSet)
-	if !ok {
-		return
-	}
-	ensurePortByName(chContainer, chDefaultTCPPortName, host.TCPPort)
-	ensurePortByName(chContainer, chDefaultHTTPPortName, host.HTTPPort)
-	ensurePortByName(chContainer, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
-}
-
-func ensurePortByName(container *corev1.Container, name string, port int32) {
-	// Find port with specified name
-	for i := range container.Ports {
-		containerPort := &container.Ports[i]
-		if containerPort.Name == name {
-			containerPort.HostPort = 0
-			containerPort.ContainerPort = port
-			return
-		}
-	}
-
-	// Port with specified name not found. Need to append
-	container.Ports = append(container.Ports, corev1.ContainerPort{
-		Name:          name,
-		ContainerPort: port,
-	})
-}
-
 // statefulSetAppendVolumeClaimTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' ChiVolumeClaimTemplate
 func (c *Creator) statefulSetAppendVolumeClaimTemplate(
 	host *chiv1.ChiHost,
@@ -647,7 +647,7 @@ func (c *Creator) statefulSetAppendVolumeClaimTemplate(
 		}
 	}
 
-	// VolumeClaimTemplate  is not listed in statefulSet.Spec.VolumeClaimTemplates
+	// VolumeClaimTemplate is not listed in statefulSet.Spec.VolumeClaimTemplates - let's add it
 	persistentVolumeClaim := corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
