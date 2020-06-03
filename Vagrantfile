@@ -17,6 +17,10 @@ Vagrant.configure(2) do |config|
     config.vbguest.auto_update = false
   end
 
+  if Vagrant.has_plugin?("vagrant-timezone")
+    config.timezone.value = "UTC"
+  end
+
   config.vm.define :clickhouse_operator do |clickhouse_operator|
     clickhouse_operator.vm.network "private_network", ip: "172.16.2.99", nic_type: "virtio"
     # port forwarding works only when pair with kubectl port-forward 
@@ -42,6 +46,7 @@ Vagrant.configure(2) do |config|
     vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
     vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
     vb.customize ["modifyvm", :id, "--ioapic", "on"]
+    vb.customize [ “guestproperty”, “set”, :id, “/VirtualBox/GuestAdd/VBoxService/--timesync-set-threshold”, 10000 ]
   end
 
   config.vm.provision "shell", inline: <<-SHELL
@@ -50,7 +55,7 @@ Vagrant.configure(2) do |config|
 
     apt-get update
     apt-get install --no-install-recommends -y apt-transport-https ca-certificates software-properties-common curl
-    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git
+    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git ntp
 
     # yq
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys CC86BB64

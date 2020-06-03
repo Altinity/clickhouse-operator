@@ -270,8 +270,8 @@ def test_distributed_connection_exceptions():
 
 
 @TestScenario
-@Name("Check RejectedInsert, DelayedInsertThrottling")
-def test_delayed_and_rejected_insert():
+@Name("Check RejectedInsert, DelayedInsertThrottling, MaxPartCountForPartition, LowInsertedRowsPerQuery")
+def test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_inserted_rows_per_query():
     create_mergetree_table_on_cluster()
     delayed_pod, delayed_svc, rejected_pod, rejected_svc = random_pod_choice_for_callbacks()
 
@@ -304,14 +304,26 @@ def test_delayed_and_rejected_insert():
 
     insert_many_parts_to_clickhouse()
     with Then("check DelayedInsertThrottling firing"):
-        fired = wait_alert_state("DelayedInsertThrottling", "firing", True, labels={"hostname": delayed_svc})
+        fired = wait_alert_state("DelayedInsertThrottling", "firing", True, labels={"hostname": delayed_svc}, sleep_time=5)
         assert fired, error("can't get DelayedInsertThrottling alert in firing state")
+    with Then("check MaxPartCountForPartition firing"):
+        fired = wait_alert_state("MaxPartCountForPartition", "firing", True, labels={"hostname": delayed_svc}, time_range="30s", sleep_time=5)
+        assert fired, error("can't get MaxPartCountForPartition alert in firing state")
+    with Then("check LowInsertedRowsPerQuery firing"):
+        fired = wait_alert_state("LowInsertedRowsPerQuery", "firing", True, labels={"hostname": delayed_svc}, time_range="60s", sleep_time=5)
+        assert fired, error("can't get LowInsertedRowsPerQuery alert in firing state")
 
     clickhouse.clickhouse_query(chi_name, "SYSTEM START MERGES default.test", host=selected_svc, ns=kubectl.namespace)
 
     with Then("check DelayedInsertThrottling gone away"):
-        resolved = wait_alert_state("DelayedInsertThrottling", "firing", False, labels={"hostname": delayed_svc})
+        resolved = wait_alert_state("DelayedInsertThrottling", "firing", False, labels={"hostname": delayed_svc}, sleep_time=5)
         assert resolved, error("can't check DelayedInsertThrottling alert is gone away")
+    with Then("check MaxPartCountForPartition gone away"):
+        resolved = wait_alert_state("MaxPartCountForPartition", "firing", False, labels={"hostname": delayed_svc}, sleep_time=5)
+        assert resolved, error("can't check MaxPartCountForPartition alert is gone away")
+    with Then("check LowInsertedRowsPerQuery gone away"):
+        resolved = wait_alert_state("LowInsertedRowsPerQuery", "firing", False, labels={"hostname": delayed_svc}, sleep_time=5)
+        assert resolved, error("can't check LowInsertedRowsPerQuery alert is gone away")
 
     parts_limits = parts_to_throw_insert
     selected_svc = rejected_svc
@@ -326,6 +338,21 @@ def test_delayed_and_rejected_insert():
 
     clickhouse.clickhouse_query(chi_name, "SYSTEM START MERGES default.test", host=selected_svc, ns=kubectl.namespace)
     drop_mergetree_table_on_cluster()
+
+@TestScenario
+@Name("Check LongestRunningQuery")
+def test_longest_running_query():
+    long_running_pod, long_running_svc, _, _ = random_pod_choice_for_callbacks()
+    # 600s trigger + 2*30s - double prometheus scraping interval
+    clickhouse.clickhouse_query(chi["metadata"]["name"], "SELECT now(),sleepEachRow(1),number FROM system.numbers LIMIT 660",
+                                host=long_running_svc, timeout=670)
+    with Then("check LongestRunningQuery firing"):
+        fired = wait_alert_state("LongestRunningQuery", "firing", True, labels={"hostname": long_running_svc},
+                                 time_range='30s', sleep_time=5)
+        assert fired, error("can't get LongestRunningQuery alert in firing state")
+    with Then("check LongestRunningQuery gone away"):
+        resolved = wait_alert_state("LongestRunningQuery", "firing", False, labels={"hostname": long_running_svc})
+        assert resolved, error("can't check LongestRunningQuery alert is gone away")
 
 
 if main():
@@ -366,14 +393,15 @@ if main():
             chi = kubectl.kube_get("chi", ns=kubectl.namespace, name="test-cluster-for-alerts")
 
         test_cases = [
-            test_prometheus_setup,
-            test_metrics_exporter_down,
-            test_clickhouse_server_reboot,
-            test_clickhouse_dns_errors,
+            # test_prometheus_setup,
+            # test_metrics_exporter_down,
+            # test_clickhouse_server_reboot,
+            # test_clickhouse_dns_errors,
             # @TODO uncomment it when  https://github.com/ClickHouse/ClickHouse/pull/11220 will merged to docker latest image
             # test_distributed_files_to_insert,
-            test_distributed_connection_exceptions,
-            test_delayed_and_rejected_insert,
+            # test_distributed_connection_exceptions,
+            test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_inserted_rows_per_query,
+            # test_longest_running_query,
         ]
         for t in test_cases:
             run(test=t)

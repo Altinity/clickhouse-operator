@@ -118,6 +118,39 @@ spec:
               `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have INSERT queries that are throttled due to high number of active data parts for partition in a MergeTree, please decrease INSERT frequency
               https://clickhouse.tech/docs/en/development/architecture/#merge-tree
 
+        - alert: MaxPartCountForPartition
+          expr: chi_clickhouse_metric_MaxPartCountForPartition > 100
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Max parts per partition > 100"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have too many parts in one partition.
+              Clickhouse MergeTree table engine split each INSERT query to partitions (PARTITION BY expression)
+              and add one or more PARTS per INSERT inside each partition, after that background merge process run,
+              and when you have too much unmerged parts inside partition,
+              SELECT queries performance can significate degrade, so clickhouse try delay or reject INSERT
+
+        - alert: LowInsertedRowsPerQuery
+          expr: increase(chi_clickhouse_event_InsertQuery[1m]) > 0 and (increase(chi_clickhouse_event_InsertedRows[1m]) / increase(chi_clickhouse_event_InsertQuery[1m]) <= 1000)
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "please increase inserted rows per INSERT query"
+            description: |-
+              Current insert speed {{ with printf "increase(chi_clickhouse_event_InsertedRows{hostname='%s',exported_namespace='%s'}[1m]) / increase(chi_clickhouse_event_InsertQuery{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} rows per query {{ end }}
+              https://clickhouse.tech/docs/en/introduction/performance/#performance-when-inserting-data
+              Clickhouse team recommends inserting data in packets of at least 1000 rows or no more than a single request per second.
+
+              Please use Buffer table
+              https://clickhouse.tech/docs/en/operations/table_engines/buffer/&#13;
+              or
+              https://github.com/nikepan/clickhouse-bulk
+              or
+              https://github.com/VKCOM/kittenhouse
+
         - alert: LongestRunningQuery
           expr: chi_clickhouse_metric_LongestRunningQuery > 600
           labels:
@@ -190,37 +223,6 @@ spec:
               Also read documentation:
               - https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-concurrent-queries
 
-        - alert: MaxPartCountForPartition
-          expr: chi_clickhouse_metric_MaxPartCountForPartition > 100
-          labels:
-            severity: high
-          annotations:
-            identifier: "{{ $labels.hostname }}"
-            summary: "Max parts per partition > 100"
-            description: |-
-              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have too many parts in one partition.
-              Clickhouse MergeTree table engine split each INSERT query to partitions (PARTITION BY expression)
-              and add one or more PARTS per INSERT inside each partition, after that background merge process run,
-              and when you have too much unmerged parts inside partition,
-              SELECT queries performance can significate degrade, so clickhouse try delay or reject INSERT
-
-        - alert: LowInsertRowsPerQuery
-          expr: increase(chi_clickhouse_event_InsertQuery[1m]) > 0 and increase(chi_clickhouse_event_InsertRows[1m]) / increase(chi_clickhouse_event_InsertQuery[1m]) <= 1000
-          labels:
-            severity: warning
-          annotations:
-            identifier: "{{ $labels.hostname }}"
-            summary: "please increase inserted rows per INSERT query"
-            description: |-
-              https://clickhouse.tech/docs/en/introduction/performance/#performance-when-inserting-data
-              Clickhouse team recommends inserting data in packets of at least 1000 rows or no more than a single request per second.
-
-              Please use Buffer table
-              https://clickhouse.tech/docs/en/operations/table_engines/buffer/&#13;
-              or
-              https://github.com/nikepan/clickhouse-bulk
-              or
-              https://github.com/VKCOM/kittenhouse
 
         - alert: TooMuchRunningQueries
           expr: chi_clickhouse_metric_Query > 90
