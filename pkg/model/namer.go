@@ -134,7 +134,9 @@ const (
 	// Hostname.domain.name
 	podFQDNPattern = "%s" + "." + namespaceDomainPattern
 
-	// podNamePattern is a name of a Pod as ServiceName-0
+	// podNamePattern is a name of a Pod within StatefulSet. In our setup each StatefulSet has only 1 pod,
+	// so all pods would have '-0' suffix after StatefulSet name
+	// Ex.: StatefulSetName-0
 	podNamePattern = "%s-0"
 )
 
