@@ -16,7 +16,6 @@ package chi
 
 import (
 	"fmt"
-
 	"github.com/juliangruber/go-intersect"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -859,16 +858,21 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 // reconcilePVCs
 func (w *worker) reconcilePVCs(host *chop.ChiHost) error {
 	namespace := host.Address.Namespace
-	w.a.V(2).Info("reconcilePVCs(%s/%s) - start", namespace, host.Name)
-	defer w.a.V(2).Info("reconcilePVCs(%s/%s) - end", namespace, host.Name)
+	w.a.V(2).Info("reconcilePVCs for host %s/%s - start", namespace, host.Name)
+	defer w.a.V(2).Info("reconcilePVCs for host %s/%s - end", namespace, host.Name)
 
 	host.WalkVolumeClaimTemplates(func(template *chop.ChiVolumeClaimTemplate) {
 		pvcName := chopmodel.CreatePVCName(template, host)
-		w.a.V(2).Info("reconcile PVC(%s/%s)", namespace, pvcName)
+		w.a.V(2).Info("reconcile template/pvc (%s/%s/%s) - start", namespace, template.Name, pvcName)
+		defer w.a.V(2).Info("reconcile template/pvc (%s/%s/%s) - end", namespace, template.Name, pvcName)
 
 		pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(pvcName, newGetOptions())
 		if err != nil {
-			w.a.Error("unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
+			if apierrors.IsNotFound(err) {
+				// This is not an error per se, means PVC is not created (yet)?
+			} else {
+				w.a.Error("ERROR unable to get PVC(%s/%s) template %s err: %v", namespace, pvcName, template.Name, err)
+			}
 			return
 		}
 		w.reconcileResources(pvc, template)
