@@ -15,8 +15,9 @@
 package model
 
 import (
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"k8s.io/api/core/v1"
+
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 func HostCanDeletePVC(host *chiv1.ChiHost, pvcName string) bool {
