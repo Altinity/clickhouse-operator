@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -202,9 +203,10 @@ type ChiHost struct {
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data
-	Address ChiHostAddress          `json:"-"`
-	Config  ChiHostConfig           `json:"-"`
-	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+	Address     ChiHostAddress          `json:"-"`
+	Config      ChiHostConfig           `json:"-"`
+	StatefulSet *v1.StatefulSet         `json:"-" testdiff:"ignore"`
+	CHI         *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiHostTemplate defines full Host Template
