@@ -16,6 +16,7 @@ package model
 
 import (
 	"fmt"
+	"k8s.io/api/core/v1"
 	"strconv"
 	"strings"
 
@@ -747,7 +748,7 @@ func CreatePodName(obj interface{}) string {
 	return "unknown-type"
 }
 
-// CreatePVCName create PVC name from PVC Template and host, to which PVC belongs to
-func CreatePVCName(template *chop.ChiVolumeClaimTemplate, host *chop.ChiHost) string {
+// CreatePVCName create PVC name from components, to which PVC belongs to
+func CreatePVCName(host *chop.ChiHost, _ *v1.VolumeMount, template *chop.ChiVolumeClaimTemplate) string {
 	return template.Name + "-" + CreatePodName(host)
 }
