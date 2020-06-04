@@ -355,6 +355,32 @@ def test_longest_running_query():
         assert resolved, error("can't check LongestRunningQuery alert is gone away")
 
 
+@TestScenario
+@Name("Check QueryPreempted")
+def test_query_preempted():
+    priority_pod, priority_svc, _, _ = random_pod_choice_for_callbacks()
+
+    def run_queries_with_priority():
+        sql = ""
+        for i in range(50):
+            sql += f"SET priority={i % 20};SELECT uniq(number) FROM numbers(20000000):"
+        cmd = f"echo \\\"{sql} SELECT 1\\\" | xargs -i'{{}}' --no-run-if-empty -d ':' -P 20 clickhouse-client --time -m -n -q \\\"{{}}\\\""
+        kubectl.kubectl(f"exec {priority_pod} -- bash -c \"{cmd}\"", timeout=120)
+        clickhouse.clickhouse_query(
+            chi["metadata"]["name"],
+            "SELECT event_time, CurrentMetric_QueryPreempted FROM system.metric_log WHERE CurrentMetric_QueryPreempted > 0",
+            host=priority_svc,
+        )
+
+    with Then("check QueryPreempted firing"):
+        fired = wait_alert_state("QueryPreempted", "firing", True, labels={"hostname": priority_svc},
+                                 time_range='30s', sleep_time=5, callback=run_queries_with_priority)
+        assert fired, error("can't get QueryPreempted alert in firing state")
+    with Then("check QueryPreempted gone away"):
+        resolved = wait_alert_state("QueryPreempted", "firing", False, labels={"hostname": priority_svc})
+        assert resolved, error("can't check QueryPreempted alert is gone away")
+
+
 if main():
     with Module("metrics_alerts"):
         with Given("get information about prometheus installation"):
@@ -400,8 +426,9 @@ if main():
             # @TODO uncomment it when  https://github.com/ClickHouse/ClickHouse/pull/11220 will merged to docker latest image
             # test_distributed_files_to_insert,
             # test_distributed_connection_exceptions,
-            test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_inserted_rows_per_query,
+            # test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_inserted_rows_per_query,
             # test_longest_running_query,
+            test_query_preempted,
         ]
         for t in test_cases:
             run(test=t)

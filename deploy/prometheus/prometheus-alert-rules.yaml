@@ -166,7 +166,7 @@ spec:
         - alert: QueryPreempted
           expr: chi_clickhouse_metric_QueryPreempted > 0
           labels:
-            severity: high
+            severity: warning
           annotations:
             identifier: "{{ $labels.hostname }}"
             summary: "Preempted queries occurred"
