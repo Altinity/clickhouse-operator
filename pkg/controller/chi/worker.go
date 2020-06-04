@@ -861,21 +861,28 @@ func (w *worker) reconcilePVCs(host *chop.ChiHost) error {
 	w.a.V(2).Info("reconcilePVCs for host %s/%s - start", namespace, host.Name)
 	defer w.a.V(2).Info("reconcilePVCs for host %s/%s - end", namespace, host.Name)
 
-	host.WalkVolumeClaimTemplates(func(template *chop.ChiVolumeClaimTemplate) {
-		pvcName := chopmodel.CreatePVCName(template, host)
-		w.a.V(2).Info("reconcile template/pvc (%s/%s/%s) - start", namespace, template.Name, pvcName)
-		defer w.a.V(2).Info("reconcile template/pvc (%s/%s/%s) - end", namespace, template.Name, pvcName)
+	host.WalkVolumeMounts(func(volumeMount *core.VolumeMount) {
+		volumeClaimTemplateName := volumeMount.Name
+		volumeClaimTemplate, ok := host.CHI.GetVolumeClaimTemplate(volumeClaimTemplateName)
+		if !ok {
+			// No this is not a reference to VolumeClaimTemplate
+			return
+		}
+
+		pvcName := chopmodel.CreatePVCName(host, volumeMount, volumeClaimTemplate)
+		w.a.V(2).Info("reconcile volumeMount (%s/%s/%s/%s) - start", namespace, host.Name, volumeMount.Name, pvcName)
+		defer w.a.V(2).Info("reconcile volumeMount (%s/%s/%s/%s) - end", namespace, host.Name, volumeMount.Name, pvcName)
 
 		pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(pvcName, newGetOptions())
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				// This is not an error per se, means PVC is not created (yet)?
 			} else {
-				w.a.Error("ERROR unable to get PVC(%s/%s) template %s err: %v", namespace, pvcName, template.Name, err)
+				w.a.Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
 			}
 			return
 		}
-		w.reconcileResources(pvc, template)
+		w.reconcileResources(pvc, volumeClaimTemplate)
 	})
 
 	return nil
