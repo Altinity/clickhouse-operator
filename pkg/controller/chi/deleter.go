@@ -144,16 +144,16 @@ func (c *Controller) deletePVC(host *chop.ChiHost) error {
 	namespace := host.Address.Namespace
 	labeler := chopmodel.NewLabeler(c.chop, host.CHI)
 
-	list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newListOptions(labeler.GetSelectorHostScope(host)))
+	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newListOptions(labeler.GetSelectorHostScope(host)))
 	if err != nil {
 		log.V(1).Infof("FAIL get list of PVC for host %s/%s %v", namespace, host.Name, err)
 		return err
 	}
 
 	log.V(1).Infof("OK get list of PVC for host %s/%s", namespace, host.Name)
-	for i := range list.Items {
+	for i := range pvcList.Items {
 		// Convenience wrapper
-		pvc := &list.Items[i]
+		pvc := &pvcList.Items[i]
 
 		if !chopmodel.HostCanDeletePVC(host, pvc.Name) {
 			log.V(1).Infof("PVC %s/%s should not be deleted, leave it intact", namespace, pvc.Name)
