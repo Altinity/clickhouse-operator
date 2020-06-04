@@ -21,6 +21,7 @@ limitations under the License.
 package v1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -239,6 +240,11 @@ func (in *ChiHost) DeepCopyInto(out *ChiHost) {
 	out.Templates = in.Templates
 	out.Address = in.Address
 	out.Config = in.Config
+	if in.StatefulSet != nil {
+		in, out := &in.StatefulSet, &out.StatefulSet
+		*out = new(appsv1.StatefulSet)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.CHI != nil {
 		in, out := &in.CHI, &out.CHI
 		*out = new(ClickHouseInstallation)
