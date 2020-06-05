@@ -265,7 +265,8 @@ def test_013():
                      {"apply_templates": {settings.clickhouse_template},
                       "object_counts": [1, 1, 2], "do_not_delete": 1})
     
-    with Then("Create local and distributed table"):
+    schema_objects = ['test_local', 'test_distr', 'events-distr']
+    with Then("Create local and distributed tables"):
         clickhouse_query("test-013-add-shards", 
                          "CREATE TABLE test_local Engine = Log as select * from system.one")
         clickhouse_query("test-013-add-shards", 
@@ -275,23 +276,14 @@ def test_013():
         clickhouse_query("test-013-add-shards", 
                          "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events ENGINE = Distributed('all-sharded', system, events)")
 
-
     with Then("Add one more shard"):
         create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2, 2, 3], "do_not_delete": 1})
-    with And("Table should be created on a second shard"):
-        out = clickhouse_query("test-013-add-shards", "select count() from system.tables where name = 'test_distr'",
-                               host="chi-test-013-add-shards-default-1-0")
-        assert out == "1"
-
-    with And("Database with weird name should be created on a second shard"):
-        out = clickhouse_query("test-013-add-shards", "select count() from system.databases where name = 'test-db'",
-                               host="chi-test-013-add-shards-default-1-0")
-        assert out == "1"
         
-    with And("Table with weird name should be created on a second shard"):
-        out = clickhouse_query("test-013-add-shards", "select count() from system.tables where name = 'events-distr'",
+    with And("Schema objects should be migrated to the new shard"):
+        for obj in schema_objects:
+            out = clickhouse_query("test-013-add-shards", f"select count() from system.tables where name = '{obj}'",
                                host="chi-test-013-add-shards-default-1-0")
-        assert out == "1"
+            assert out == "1"
 
     with Then("Remove shard"):
         create_and_check("configs/test-013-add-shards-1.yaml", {"object_counts": [1,1,2]})
@@ -302,7 +294,7 @@ def test_014():
     require_zookeeper()
  
     create_table = """
-    create table t (a Int8) 
+    create table test_local(a Int8) 
     Engine = ReplicatedMergeTree('/clickhouse/{installation}/{cluster}/tables/{shard}/{database}/{table}', '{replica}')
     partition by tuple() order by a""".replace('\r', '').replace('\n', '')
 
@@ -310,28 +302,41 @@ def test_014():
                     {"apply_templates": {settings.clickhouse_template, "templates/tpl-persistent-volume-100Mi.yaml"},
                      "object_counts": [2, 2, 3], "do_not_delete": 1})
 
-    with Given("Table is created on a first replica and data is inserted"):
+    schema_objects = ['test_local', 'test_view', 'test_mv', 'a_view']
+    with Given("Create schema objects"):
         clickhouse_query("test-014-replication", create_table, host="chi-test-014-replication-default-0-0")
-        clickhouse_query("test-014-replication", "insert into t values(1)", host="chi-test-014-replication-default-0-0")
+        clickhouse_query("test-014-replication", "CREATE VIEW test_view as SELECT * from test_local", host="chi-test-014-replication-default-0-0")
+        clickhouse_query("test-014-replication", "CREATE VIEW a_view as SELECT * from test_view", host="chi-test-014-replication-default-0-0")
+        clickhouse_query("test-014-replication", 
+                         "CREATE MATERIALIZED VIEW test_mv Engine = Log as SELECT * from test_local", host="chi-test-014-replication-default-0-0")
+
+    with Given("Replicated table is created on a first replica and data is inserted"):
+        clickhouse_query("test-014-replication", "insert into test_local values(1)", host="chi-test-014-replication-default-0-0")
         with When("Table is created on the second replica"):
             clickhouse_query("test-014-replication", create_table, host="chi-test-014-replication-default-0-1")
             with Then("Data should be replicated"):
-                out = clickhouse_query("test-014-replication", "select a from t", host="chi-test-014-replication-default-0-1")
+                out = clickhouse_query("test-014-replication", "select a from test_local", host="chi-test-014-replication-default-0-1")
                 assert out == "1"
-
+    
     with When("Add one more replica"):
         create_and_check("configs/test-014-replication-2.yaml", 
                          {"pod_count": 3, "do_not_delete": 1})
         # that also works:
         # kubectl patch chi test-014-replication -n test --type=json -p '[{"op":"add", "path": "/spec/configuration/clusters/0/layout/shards/0/replicasCount", "value": 3}]'
-        with Then("Replicated table should be automatically created"):
-            out = clickhouse_query("test-014-replication", "select a from t", host="chi-test-014-replication-default-0-2")
+        with Then("Schema objects should be migrated to the new replica"):
+            for obj in schema_objects:
+                out = clickhouse_query("test-014-replication", f"select count() from system.tables where name = '{obj}'",
+                                       host="chi-test-014-replication-default-0-2")
+                assert out == "1"
+        
+        with And("Replicated table should have the data"):
+            out = clickhouse_query("test-014-replication", "select a from test_local", host="chi-test-014-replication-default-0-2")
             assert out == "1"
 
     with When("Remove replica"):
         create_and_check("configs/test-014-replication.yaml", {"pod_count": 1, "do_not_delete": 1})
         with Then("Replica needs to be removed from the Zookeeper as well"):
-            out = clickhouse_query("test-014-replication", "select count() from system.replicas where table='t'")
+            out = clickhouse_query("test-014-replication", "select count() from system.replicas where table='test_local'")
             assert out == "1" 
     
     with When("Restart Zookeeper pod"):
@@ -340,7 +345,7 @@ def test_014():
         kube_wait_pod_status("zookeeper-0", "Running")
         
         with Then("Insert into the table -- table should be in readonly mode"):
-            out = clickhouse_query_with_error("test-014-replication", "insert into t values(2)")
+            out = clickhouse_query_with_error("test-014-replication", "insert into test_local values(2)")
             assert "Table is in readonly mode" in out
 
         with Then("Wait 30 seconds for ClickHouse to reconnect"):
@@ -350,7 +355,7 @@ def test_014():
         #    kubectl("delete pod chi-test-014-replication-default-0-1-0")
 
         with Then("Table should be back to normal"):
-            clickhouse_query("test-014-replication", "insert into t values(2)")
+            clickhouse_query("test-014-replication", "insert into test_local values(2)")
 
     kube_delete_chi("test-014-replication")
 
@@ -380,15 +385,19 @@ def test_016():
                       "pod_count": 1,
                       "do_not_delete": 1})
 
-    with Then("dictGet() should work"):
-        out = clickhouse_query("test-016-settings", query = "select dictGet('one', 'one', toUInt64(0))")
-        assert out == "0"
-
     with Then("Custom macro 'layer' should be available"):
         out = clickhouse_query("test-016-settings", query = "select substitution from system.macros where macro='layer'")
         assert out == "01"
+        
+    with And("Custom macro 'test' should be available"):
+        out = clickhouse_query("test-016-settings", query = "select substitution from system.macros where macro='test'")
+        assert out == "test"
+        
+    with And("dictGet() should work"):
+        out = clickhouse_query("test-016-settings", query = "select dictGet('one', 'one', toUInt64(0))")
+        assert out == "0"
     
-    with Then("query_log should be disabled"):
+    with And("query_log should be disabled"):
         clickhouse_query("test-016-settings", query = "system flush logs")
         out = clickhouse_query_with_error("test-016-settings", query = "select count() from system.query_log")
         assert "doesn't exist" in out
@@ -500,6 +509,35 @@ def test_020(config = "configs/test-020-multi-volume.yaml"):
             assert out == 'disk2'
     
     kube_delete_chi(chi)
+
+@TestScenario
+@Name("test-021-rescale-volume. Test rescaling storage")
+def test_021(config = "configs/test-021-rescale-volume.yaml"):
+    chi = get_chi_name(get_full_path(config))
+    create_and_check(config, {"pod_count": 1,
+                              "pod_volumes": {"/var/lib/clickhouse","/var/lib/clickhouse2"}, 
+                              "do_not_delete": 1})
     
+    with When("Create a table and insert 1 row"):
+        clickhouse_query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
+        clickhouse_query(chi, "insert into test_disks values (1)")
+        
+        with Then("Data should be placed on default disk"):
+            out = clickhouse_query(chi, "select disk_name from system.parts where table='test_disks'")
+            assert out == 'default'
     
+    create_and_check("configs/test-021-rescale-volume-add-disk.yaml", 
+                            {"pod_count": 1,
+                            "pod_volumes": {"/var/lib/clickhouse","/var/lib/clickhouse2"}, 
+                            "do_not_delete": 1})
+
+    with When("alter table test_disks move partition tuple() to disk 'disk2'"):
+        clickhouse_query(chi, "alter table test_disks move partition tuple() to disk 'disk2'")
+        
+        with Then("Data should be placed on disk2"):
+            out = clickhouse_query(chi, "select disk_name from system.parts where table='test_disks'")
+            assert out == 'disk2'
+
+    
+    kube_delete_chi(chi) 
     
