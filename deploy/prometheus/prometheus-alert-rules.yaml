@@ -140,7 +140,7 @@ spec:
             identifier: "{{ $labels.hostname }}"
             summary: "please increase inserted rows per INSERT query"
             description: |-
-              Current insert speed {{ with printf "increase(chi_clickhouse_event_InsertedRows{hostname='%s',exported_namespace='%s'}[1m]) / increase(chi_clickhouse_event_InsertQuery{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} rows per query {{ end }}
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have insert speed {{ with printf "increase(chi_clickhouse_event_InsertedRows{hostname='%s',exported_namespace='%s'}[1m]) / increase(chi_clickhouse_event_InsertQuery{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} rows per query {{ end }}
               https://clickhouse.tech/docs/en/introduction/performance/#performance-when-inserting-data
               Clickhouse team recommends inserting data in packets of at least 1000 rows or no more than a single request per second.
 

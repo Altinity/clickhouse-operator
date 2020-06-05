@@ -68,6 +68,16 @@ def random_pod_choice_for_callbacks():
     return second_pod, second_svc, first_pod, first_svc
 
 
+def drop_mergetree_table_on_cluster(cluster_name='all-sharded'):
+    drop_local_sql = 'DROP TABLE default.test ON CLUSTER \\\"' + cluster_name + '\\\"'
+    clickhouse.clickhouse_query(chi["metadata"]["name"], drop_local_sql)
+
+
+def create_mergetree_table_on_cluster(cluster_name='all-sharded'):
+    create_local_sql = 'CREATE TABLE default.test ON CLUSTER \\\"' + cluster_name + '\\\" (event_time DateTime, test UInt64) ENGINE MergeTree() ORDER BY tuple()'
+    clickhouse.clickhouse_query(chi["metadata"]["name"], create_local_sql)
+
+
 def drop_distributed_table_on_cluster(cluster_name='all-sharded'):
     drop_distr_sql = 'DROP TABLE default.test_distr ON CLUSTER \\\"' + cluster_name + '\\\"'
     clickhouse.clickhouse_query(chi["metadata"]["name"], drop_distr_sql)
@@ -80,15 +90,14 @@ def create_distributed_table_on_cluster(cluster_name='all-sharded'):
     clickhouse.clickhouse_query(chi["metadata"]["name"], create_distr_sql)
 
 
-def drop_mergetree_table_on_cluster(cluster_name='all-sharded'):
-    drop_local_sql = 'DROP TABLE default.test ON CLUSTER \\\"' + cluster_name + '\\\"'
-    clickhouse.clickhouse_query(chi["metadata"]["name"], drop_local_sql)
+def drop_replicated_table_on_cluster(cluster_name='all-replicated'):
+    drop_repl_sql = 'DROP TABLE default.test_repl ON CLUSTER \\\"' + cluster_name + '\\\"'
+    clickhouse.clickhouse_query(chi["metadata"]["name"], drop_repl_sql)
 
 
-def create_mergetree_table_on_cluster(cluster_name='all-sharded'):
-    create_local_sql = 'CREATE TABLE default.test ON CLUSTER \\\"' + cluster_name + '\\\" (event_time DateTime, test UInt64) ENGINE MergeTree() ORDER BY tuple()'
+def create_replicated_table_on_cluster(cluster_name='all-replicated'):
+    create_local_sql = 'CREATE TABLE default.test_repl ON CLUSTER \\\"' + cluster_name + '\\\" (event_time DateTime, test UInt64) ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/test_repl\', \'{replica}\') ORDER BY tuple()'
     clickhouse.clickhouse_query(chi["metadata"]["name"], create_local_sql)
-
 
 @TestScenario
 @Name("Check clickhouse-operator/prometheus/alertmanager setup")
@@ -380,6 +389,64 @@ def test_query_preempted():
         resolved = wait_alert_state("QueryPreempted", "firing", False, labels={"hostname": priority_svc})
         assert resolved, error("can't check QueryPreempted alert is gone away")
 
+@TestScenario
+@Name("Check ReadonlyReplica")
+def test_read_only_replica():
+    read_only_pod, read_only_svc, max_absolute_delay_pod, max_absolute_delay_svc = random_pod_choice_for_callbacks()
+    chi_name = chi["metadata"]["name"]
+    create_replicated_table_on_cluster()
+    def restart_zookeeper():
+        kubectl.kubectl(
+            f"exec -n {kubectl.namespace} zookeeper-0 -- sh -c \"kill 1\"",
+            ok_to_fail=True,
+        )
+        clickhouse.clickhouse_query_with_error(chi_name, "INSERT INTO default.test_repl VALUES(now(),rand())", host=read_only_svc)
+
+    with Then("check ReadonlyReplica firing"):
+        fired = wait_alert_state("ReadonlyReplica", "firing", True, labels={"hostname": read_only_svc},
+                                 time_range='30s', sleep_time=5, callback=restart_zookeeper)
+        assert fired, error("can't get ReadonlyReplica alert in firing state")
+    with Then("check ReadonlyReplica gone away"):
+        resolved = wait_alert_state("ReadonlyReplica", "firing", False, labels={"hostname": read_only_svc})
+        assert resolved, error("can't check ReadonlyReplica alert is gone away")
+
+    kubectl.kube_wait_pod_status("zookeeper-0", "Running", ns=kubectl.namespace)
+    kubectl.kube_wait_jsonpath("pod", "zookeeper-0", "{.status.containerStatuses[0].ready}", "true",
+                               ns=kubectl.namespace)
+    drop_replicated_table_on_cluster()
+
+@TestScenario
+@Name("Check ReplicasMaxAbsoluteDelay")
+def test_replicas_max_abosulute_delay():
+    stop_replica_pod, stop_replica_svc, insert_pod, insert_svc = random_pod_choice_for_callbacks()
+    create_replicated_table_on_cluster()
+    prometheus_scrape_interval = 30
+
+    def restart_clickhouse_and_insert_to_replicated_table():
+        with When(f"stop replica fetches on {stop_replica_svc}"):
+            sql = "SYSTEM STOP FETCHES default.test_repl"
+            kubectl.kubectl(
+                f"exec -n {kubectl.namespace} {stop_replica_pod} -c clickhouse -- clickhouse-client -q \"{sql}\"",
+                ok_to_fail=True,
+            )
+            sql = "INSERT INTO default.test_repl SELECT now(), number FROM numbers(100000)"
+            kubectl.kubectl(
+                f"exec -n {kubectl.namespace} {insert_pod} -c clickhouse -- clickhouse-client -q \"{sql}\"",
+            )
+
+    with Then("check ReplicasMaxAbsoluteDelay firing"):
+        fired = wait_alert_state("ReplicasMaxAbsoluteDelay", "firing", True, labels={"hostname": stop_replica_svc},
+                                 time_range='60s', sleep_time=prometheus_scrape_interval*2,
+                                 callback=restart_clickhouse_and_insert_to_replicated_table)
+        assert fired, error("can't get ReadonlyReplica alert in firing state")
+
+    clickhouse.clickhouse_query(chi["metadata"]["name"], "SYSTEM START FETCHES; SYSTEM SYNC REPLICA default.test_repl", timeout=180)
+    with Then("check ReplicasMaxAbsoluteDelay gone away"):
+        resolved = wait_alert_state("ReplicasMaxAbsoluteDelay", "firing", False, labels={"hostname": stop_replica_svc})
+        assert resolved, error("can't check ReplicasMaxAbsoluteDelay alert is gone away")
+
+    drop_replicated_table_on_cluster()
+
 
 if main():
     with Module("metrics_alerts"):
@@ -419,16 +486,17 @@ if main():
             chi = kubectl.kube_get("chi", ns=kubectl.namespace, name="test-cluster-for-alerts")
 
         test_cases = [
-            # test_prometheus_setup,
-            # test_metrics_exporter_down,
-            # test_clickhouse_server_reboot,
-            # test_clickhouse_dns_errors,
+            test_prometheus_setup,
+            test_metrics_exporter_down,
+            test_clickhouse_server_reboot,
+            test_clickhouse_dns_errors,
             # @TODO uncomment it when  https://github.com/ClickHouse/ClickHouse/pull/11220 will merged to docker latest image
             # test_distributed_files_to_insert,
-            # test_distributed_connection_exceptions,
-            # test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_inserted_rows_per_query,
-            # test_longest_running_query,
-            test_query_preempted,
+            test_distributed_connection_exceptions,
+            test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_inserted_rows_per_query,
+            test_longest_running_query,
+            test_read_only_replica,
+            test_replicas_max_abosulute_delay,
         ]
         for t in test_cases:
             run(test=t)
