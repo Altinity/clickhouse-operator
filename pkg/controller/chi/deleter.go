@@ -114,24 +114,28 @@ func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 	// And now delete empty StatefulSet
 	if err := c.kubeClient.AppsV1().StatefulSets(namespace).Delete(name, newDeleteOptions()); err == nil {
 		log.V(1).Infof("StatefulSet %s/%s deleted", namespace, name)
+		c.syncStatefulSet(host)
 	} else {
 		log.V(1).Infof("StatefulSet %s/%s FAILED TO DELETE %v", namespace, name, err)
 		return nil
 	}
 
+	return nil
+}
+
+// syncStatefulSet
+func (c *Controller) syncStatefulSet(host *chop.ChiHost) {
 	for {
 		// TODO
 		// There should be better way to sync cache
 		if _, err := c.getStatefulSetByHost(host); err == nil {
-			log.V(1).Infof("StatefulSet %s/%s deleted, cache NOT yet synced", namespace, name)
-			time.Sleep(5 * time.Second)
+			log.V(2).Infof("cache NOT yet synced")
+			time.Sleep(15 * time.Second)
 		} else {
-			log.V(1).Infof("StatefulSet %s/%s deleted, cache synced. Desc: %v", namespace, name, err)
-			break
+			log.V(1).Infof("cache synced")
+			return
 		}
 	}
-
-	return nil
 }
 
 // deletePVC deletes PersistentVolumeClaim
@@ -140,16 +144,16 @@ func (c *Controller) deletePVC(host *chop.ChiHost) error {
 	namespace := host.Address.Namespace
 	labeler := chopmodel.NewLabeler(c.chop, host.CHI)
 
-	list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newListOptions(labeler.GetSelectorHostScope(host)))
+	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newListOptions(labeler.GetSelectorHostScope(host)))
 	if err != nil {
 		log.V(1).Infof("FAIL get list of PVC for host %s/%s %v", namespace, host.Name, err)
 		return err
 	}
 
 	log.V(1).Infof("OK get list of PVC for host %s/%s", namespace, host.Name)
-	for i := range list.Items {
+	for i := range pvcList.Items {
 		// Convenience wrapper
-		pvc := &list.Items[i]
+		pvc := &pvcList.Items[i]
 
 		if !chopmodel.HostCanDeletePVC(host, pvc.Name) {
 			log.V(1).Infof("PVC %s/%s should not be deleted, leave it intact", namespace, pvc.Name)

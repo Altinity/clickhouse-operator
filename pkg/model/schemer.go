@@ -16,16 +16,16 @@ package model
 
 import (
 	sqlmodule "database/sql"
+	"fmt"
+	"strings"
+
+	"github.com/MakeNowJust/heredoc"
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-
-	"fmt"
-	"github.com/MakeNowJust/heredoc"
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
-	"strings"
 )
 
 const (
@@ -139,16 +139,16 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 		cluster_tables,
 	))
 
-	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sqlDBs)
-	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sqlTables)
-	return append(names1, names2...), append(sqlStatements1, sqlStatements2...) , nil
+	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(cluster.GetCHI()), sqlDBs)
+	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(cluster.GetCHI()), sqlTables)
+	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
 }
 
 // getCreateReplicaObjects returns a list of objects that needs to be created on a host in a cluster
 func (s *Schemer) getCreateReplicaObjects(host *chop.ChiHost) ([]string, []string, error) {
 
 	var shard *chop.ChiShard = nil
-    var replicaIndex int
+	var replicaIndex int
 	for shardIndex := range host.GetCluster().Layout.Shards {
 		shard = &host.GetCluster().Layout.Shards[shardIndex]
 		for replicaIndex = range shard.Hosts {
@@ -164,7 +164,7 @@ func (s *Schemer) getCreateReplicaObjects(host *chop.ChiHost) ([]string, []strin
 	}
 	replicas := CreatePodFQDNsOfShard(shard)
 	nReplicas := len(replicas)
-	if nReplicas <=1 {
+	if nReplicas <= 1 {
 		log.V(1).Info("Single replica in a shard. Nothing to create from")
 		return nil, nil, nil
 	}
@@ -172,16 +172,16 @@ func (s *Schemer) getCreateReplicaObjects(host *chop.ChiHost) ([]string, []strin
 	replicas[replicaIndex] = replicas[nReplicas-1]
 	replicas = replicas[:nReplicas-1]
 	log.V(1).Infof("Extracting table definitions from %v", replicas)
-	
+
 	system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(replicas, ","))
-	
+
 	sqlDBs := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
 			database AS name, 
 			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_db_query
 		FROM system.tables
 		WHERE database != 'system'
-		SETTINGS skip_unavailable_shards = 1`, 
+		SETTINGS skip_unavailable_shards = 1`,
 		"system.tables", system_tables,
 	))
 	sqlTables := heredoc.Doc(strings.ReplaceAll(`
@@ -195,9 +195,9 @@ func (s *Schemer) getCreateReplicaObjects(host *chop.ChiHost) ([]string, []strin
 		system_tables,
 	))
 
-	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(host.GetCHI()), sqlDBs)
-	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(host.GetCHI()), sqlTables)
-	return append(names1, names2...), append(sqlStatements1, sqlStatements2...) , nil
+	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
+	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
+	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
 }
 
 // hostGetDropTables returns set of 'DROP TABLE ...' SQLs
@@ -249,7 +249,7 @@ func (s *Schemer) CHIDropDnsCache(chi *chop.ClickHouseInstallation) error {
 
 // chiApplySQLs runs set of SQL queries over the whole CHI
 func (s *Schemer) chiApplySQLs(chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
-	return s.applySQLs(CreatePodFQDNsOfChi(chi), sqls, retry)
+	return s.applySQLs(CreatePodFQDNsOfCHI(chi), sqls, retry)
 }
 
 // clusterApplySQLs runs set of SQL queries over the cluster
@@ -296,7 +296,7 @@ func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 					sqls[i] = "" // Query is executed, removing from the list
 				} else {
 					runErr = err
-				} 
+				}
 			}
 			return runErr
 		})

@@ -14,7 +14,10 @@
 
 package v1
 
-import "github.com/altinity/clickhouse-operator/pkg/util"
+import (
+	"github.com/altinity/clickhouse-operator/pkg/util"
+	"k8s.io/api/core/v1"
+)
 
 func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *ChiHostTemplate) {
 	if shard != nil {
@@ -117,6 +120,20 @@ func (host *ChiHost) CanDeleteAllPVCs() bool {
 
 func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
 	host.CHI.WalkVolumeClaimTemplates(f)
+}
+
+func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *v1.VolumeMount)) {
+	if host.StatefulSet == nil {
+		return
+	}
+
+	for i := range host.StatefulSet.Spec.Template.Spec.Containers {
+		container := &host.StatefulSet.Spec.Template.Spec.Containers[i]
+		for j := range container.VolumeMounts {
+			volumeMount := &container.VolumeMounts[j]
+			f(volumeMount)
+		}
+	}
 }
 
 // GetAnnotations returns chi annotations and excludes

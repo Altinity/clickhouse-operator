@@ -16,11 +16,13 @@ package model
 
 import (
 	"fmt"
+	"k8s.io/api/core/v1"
+	"strconv"
+	"strings"
+
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	apps "k8s.io/api/apps/v1"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -133,7 +135,9 @@ const (
 	// Hostname.domain.name
 	podFQDNPattern = "%s" + "." + namespaceDomainPattern
 
-	// podNamePattern is a name of a Pod as ServiceName-0
+	// podNamePattern is a name of a Pod within StatefulSet. In our setup each StatefulSet has only 1 pod,
+	// so all pods would have '-0' suffix after StatefulSet name
+	// Ex.: StatefulSetName-0
 	podNamePattern = "%s-0"
 )
 
@@ -160,113 +164,113 @@ func newNamer(ctx namerContext) *namer {
 }
 
 func (n *namer) namePartNamespace(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartChiMaxLenLabelsCtx
+		_len = namePartChiMaxLenLabelsCtx
 	} else {
-		len = namePartChiMaxLenNamesCtx
+		_len = namePartChiMaxLenNamesCtx
 	}
-	return sanitize(util.StringHead(name, len))
+	return sanitize(util.StringHead(name, _len))
 }
 
 func (n *namer) namePartChiName(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartChiMaxLenLabelsCtx
+		_len = namePartChiMaxLenLabelsCtx
 	} else {
-		len = namePartChiMaxLenNamesCtx
+		_len = namePartChiMaxLenNamesCtx
 	}
-	return sanitize(util.StringHead(name, len))
+	return sanitize(util.StringHead(name, _len))
 }
 
 func (n *namer) namePartChiNameID(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartChiMaxLenLabelsCtx
+		_len = namePartChiMaxLenLabelsCtx
 	} else {
-		len = namePartChiMaxLenNamesCtx
+		_len = namePartChiMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, len)
+	return util.CreateStringID(name, _len)
 }
 
 func (n *namer) namePartClusterName(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartClusterMaxLenLabelsCtx
+		_len = namePartClusterMaxLenLabelsCtx
 	} else {
-		len = namePartClusterMaxLenNamesCtx
+		_len = namePartClusterMaxLenNamesCtx
 	}
-	return sanitize(util.StringHead(name, len))
+	return sanitize(util.StringHead(name, _len))
 }
 
 func (n *namer) namePartClusterNameID(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartClusterMaxLenLabelsCtx
+		_len = namePartClusterMaxLenLabelsCtx
 	} else {
-		len = namePartClusterMaxLenNamesCtx
+		_len = namePartClusterMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, len)
+	return util.CreateStringID(name, _len)
 }
 
 func (n *namer) namePartShardName(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartShardMaxLenLabelsCtx
+		_len = namePartShardMaxLenLabelsCtx
 	} else {
-		len = namePartShardMaxLenNamesCtx
+		_len = namePartShardMaxLenNamesCtx
 	}
-	return sanitize(util.StringHead(name, len))
+	return sanitize(util.StringHead(name, _len))
 }
 
 func (n *namer) namePartShardNameID(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartShardMaxLenLabelsCtx
+		_len = namePartShardMaxLenLabelsCtx
 	} else {
-		len = namePartShardMaxLenNamesCtx
+		_len = namePartShardMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, len)
+	return util.CreateStringID(name, _len)
 }
 
 func (n *namer) namePartReplicaName(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartReplicaMaxLenLabelsCtx
+		_len = namePartReplicaMaxLenLabelsCtx
 	} else {
-		len = namePartReplicaMaxLenNamesCtx
+		_len = namePartReplicaMaxLenNamesCtx
 	}
-	return sanitize(util.StringHead(name, len))
+	return sanitize(util.StringHead(name, _len))
 }
 
 func (n *namer) namePartReplicaNameID(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartReplicaMaxLenLabelsCtx
+		_len = namePartReplicaMaxLenLabelsCtx
 	} else {
-		len = namePartReplicaMaxLenNamesCtx
+		_len = namePartReplicaMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, len)
+	return util.CreateStringID(name, _len)
 }
 
 func (n *namer) namePartHostName(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartReplicaMaxLenLabelsCtx
+		_len = namePartReplicaMaxLenLabelsCtx
 	} else {
-		len = namePartReplicaMaxLenNamesCtx
+		_len = namePartReplicaMaxLenNamesCtx
 	}
-	return sanitize(util.StringHead(name, len))
+	return sanitize(util.StringHead(name, _len))
 }
 
 func (n *namer) namePartHostNameID(name string) string {
-	var len int
+	var _len int
 	if n.ctx == namerContextLabels {
-		len = namePartReplicaMaxLenLabelsCtx
+		_len = namePartReplicaMaxLenLabelsCtx
 	} else {
-		len = namePartReplicaMaxLenNamesCtx
+		_len = namePartReplicaMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, len)
+	return util.CreateStringID(name, _len)
 }
 
 func (n *namer) getNamePartNamespace(obj interface{}) string {
@@ -489,22 +493,41 @@ func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
 
 // CreateCHIServiceName creates a name of a Installation Service resource
 func CreateCHIServiceName(chi *chop.ClickHouseInstallation) string {
+	// Name can be generated either from default name pattern,
+	// or from personal name pattern provided in ServiceTemplate
+
+	// Start with default name pattern
+	pattern := chiServiceNamePattern
+
+	// ServiceTemplate may have personal name pattern specified
 	if template, ok := chi.GetCHIServiceTemplate(); ok {
-		// Service template available
+		// ServiceTemplate available
 		if template.GenerateName != "" {
-			// Service template has explicitly specified service name template
-			return newNameMacroReplacerChi(chi).Replace(template.GenerateName)
+			// ServiceTemplate has explicitly specified name pattern
+			pattern = template.GenerateName
 		}
 	}
 
-	// Create Service name based on default Service Name template
-	return newNameMacroReplacerChi(chi).Replace(chiServiceNamePattern)
+	// Create Service name based on name pattern available
+	return newNameMacroReplacerChi(chi).Replace(pattern)
 }
 
-// CreateCHIServiceName creates a name of a Installation Service resource
-func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
+// CreateCHIServiceFQDN creates a name of a Installation Service resource
+func CreateCHIServiceFQDN(chi *chop.ClickHouseInstallation) string {
+	// FQDN can be generated either from default pattern,
+	// or from personal pattern provided
+
+	// Start with default pattern
+	pattern := serviceFQDNPattern
+
+	if chi.Spec.NamespaceDomainPattern != "" {
+		// NamespaceDomainPattern has been explicitly specified
+		pattern = "%s." + chi.Spec.NamespaceDomainPattern
+	}
+
+	// Create FQDN based on pattern available
 	return fmt.Sprintf(
-		serviceFQDNPattern,
+		pattern,
 		CreateCHIServiceName(chi),
 		chi.Namespace,
 	)
@@ -512,30 +535,44 @@ func CreateChiServiceFQDN(chi *chop.ClickHouseInstallation) string {
 
 // CreateClusterServiceName returns a name of a cluster's Service
 func CreateClusterServiceName(cluster *chop.ChiCluster) string {
+	// Name can be generated either from default name pattern,
+	// or from personal name pattern provided in ServiceTemplate
+
+	// Start with default name pattern
+	pattern := clusterServiceNamePattern
+
+	// ServiceTemplate may have personal name pattern specified
 	if template, ok := cluster.GetServiceTemplate(); ok {
-		// Service template available
+		// ServiceTemplate available
 		if template.GenerateName != "" {
-			// Service template has explicitly specified service name template
-			return newNameMacroReplacerCluster(cluster).Replace(template.GenerateName)
+			// ServiceTemplate has explicitly specified name pattern
+			pattern = template.GenerateName
 		}
 	}
 
-	// Create Service name based on default Service Name template
-	return newNameMacroReplacerCluster(cluster).Replace(clusterServiceNamePattern)
+	// Create Service name based on name pattern available
+	return newNameMacroReplacerCluster(cluster).Replace(pattern)
 }
 
 // CreateShardServiceName returns a name of a shard's Service
 func CreateShardServiceName(shard *chop.ChiShard) string {
+	// Name can be generated either from default name pattern,
+	// or from personal name pattern provided in ServiceTemplate
+
+	// Start with default name pattern
+	pattern := shardServiceNamePattern
+
+	// ServiceTemplate may have personal name pattern specified
 	if template, ok := shard.GetServiceTemplate(); ok {
-		// Service template available
+		// ServiceTemplate available
 		if template.GenerateName != "" {
-			// Service template has explicitly specified service name template
-			return newNameMacroReplacerShard(shard).Replace(template.GenerateName)
+			// ServiceTemplate has explicitly specified name pattern
+			pattern = template.GenerateName
 		}
 	}
 
-	// Create Service name based on default Service Name template
-	return newNameMacroReplacerShard(shard).Replace(shardServiceNamePattern)
+	// Create Service name based on name pattern available
+	return newNameMacroReplacerShard(shard).Replace(pattern)
 }
 
 // CreateShardName return a name of a shard
@@ -594,21 +631,44 @@ func IsAutoGeneratedHostName(
 
 // CreateStatefulSetName creates a name of a StatefulSet for ClickHouse instance
 func CreateStatefulSetName(host *chop.ChiHost) string {
-	return newNameMacroReplacerHost(host).Replace(statefulSetNamePattern)
+	// Name can be generated either from default name pattern,
+	// or from personal name pattern provided in PodTemplate
+
+	// Start with default name pattern
+	pattern := statefulSetNamePattern
+
+	// PodTemplate may have personal name pattern specified
+	if template, ok := host.GetPodTemplate(); ok {
+		// PodTemplate available
+		if template.GenerateName != "" {
+			// PodTemplate has explicitly specified name pattern
+			pattern = template.GenerateName
+		}
+	}
+
+	// Create StatefulSet name based on name pattern available
+	return newNameMacroReplacerHost(host).Replace(pattern)
 }
 
 // CreateStatefulSetServiceName returns a name of a StatefulSet-related Service for ClickHouse instance
 func CreateStatefulSetServiceName(host *chop.ChiHost) string {
+	// Name can be generated either from default name pattern,
+	// or from personal name pattern provided in ServiceTemplate
+
+	// Start with default name pattern
+	pattern := statefulSetServiceNamePattern
+
+	// ServiceTemplate may have personal name pattern specified
 	if template, ok := host.GetServiceTemplate(); ok {
-		// Service template available
+		// ServiceTemplate available
 		if template.GenerateName != "" {
-			// Service template has explicitly specified service name template
-			return newNameMacroReplacerHost(host).Replace(template.GenerateName)
+			// ServiceTemplate has explicitly specified name pattern
+			pattern = template.GenerateName
 		}
 	}
 
-	// Create Service name based on default Service Name template
-	return newNameMacroReplacerHost(host).Replace(statefulSetServiceNamePattern)
+	// Create Service name based on name pattern available
+	return newNameMacroReplacerHost(host).Replace(pattern)
 }
 
 // CreatePodHostname returns a name of a Pod of a ClickHouse instance
@@ -620,8 +680,20 @@ func CreatePodHostname(host *chop.ChiHost) string {
 // CreatePodFQDN creates a fully qualified domain name of a pod
 // ss-1eb454-2-0.my-dev-domain.svc.cluster.local
 func CreatePodFQDN(host *chop.ChiHost) string {
+	// FQDN can be generated either from default pattern,
+	// or from personal pattern provided
+
+	// Start with default pattern
+	pattern := podFQDNPattern
+
+	if host.CHI.Spec.NamespaceDomainPattern != "" {
+		// NamespaceDomainPattern has been explicitly specified
+		pattern = "%s." + host.CHI.Spec.NamespaceDomainPattern
+	}
+
+	// Create FQDN based on pattern available
 	return fmt.Sprintf(
-		podFQDNPattern,
+		pattern,
 		CreatePodHostname(host),
 		host.Address.Namespace,
 	)
@@ -647,8 +719,8 @@ func CreatePodFQDNsOfShard(shard *chop.ChiShard) []string {
 	return fqdns
 }
 
-// CreatePodFQDNsOfChi creates fully qualified domain names of all pods in a CHI
-func CreatePodFQDNsOfChi(chi *chop.ClickHouseInstallation) []string {
+// CreatePodFQDNsOfCHI creates fully qualified domain names of all pods in a CHI
+func CreatePodFQDNsOfCHI(chi *chop.ClickHouseInstallation) []string {
 	fqdns := make([]string, 0)
 	chi.WalkHosts(func(host *chop.ChiHost) error {
 		fqdns = append(fqdns, CreatePodFQDN(host))
@@ -676,7 +748,7 @@ func CreatePodName(obj interface{}) string {
 	return "unknown-type"
 }
 
-// CreatePVCName create PVC name from PVC Template and host, to which PVC belongs to
-func CreatePVCName(template *chop.ChiVolumeClaimTemplate, host *chop.ChiHost) string {
+// CreatePVCName create PVC name from components, to which PVC belongs to
+func CreatePVCName(host *chop.ChiHost, _ *v1.VolumeMount, template *chop.ChiVolumeClaimTemplate) string {
 	return template.Name + "-" + CreatePodName(host)
 }
