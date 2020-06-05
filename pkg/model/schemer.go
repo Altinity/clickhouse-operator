@@ -16,16 +16,16 @@ package model
 
 import (
 	sqlmodule "database/sql"
+	"fmt"
+	"strings"
+
+	"github.com/MakeNowJust/heredoc"
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-
-	"fmt"
-	"github.com/MakeNowJust/heredoc"
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
-	"strings"
 )
 
 const (
@@ -62,7 +62,7 @@ func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]
 	var rows *sqlmodule.Rows = nil
 	var err error
 	for _, service := range services {
-		log.V(1).Infof("Trying %s", service)
+		log.V(2).Infof("Trying %s", service)
 		conn := s.getCHConnection(service)
 
 		rows, err = conn.Query(sql)
@@ -95,7 +95,7 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 	hosts := CreatePodFQDNsOfCluster(cluster)
 	cluster_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
 
-	sql := heredoc.Doc(strings.ReplaceAll(`
+	sqlDBs := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
 			database AS name, 
 			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_query
@@ -105,8 +105,11 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 			FROM cluster('all-sharded', system.tables) tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
-		) databases
-		UNION ALL
+		)`,
+		"cluster('all-sharded', system.tables)",
+		cluster_tables,
+	))
+	sqlTables := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
 			concat(database,'.', name) as name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
@@ -136,17 +139,19 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 		cluster_tables,
 	))
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(cluster.GetCHI()), sql)
-	return names, sqlStatements, nil
+	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(cluster.GetCHI()), sqlDBs)
+	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(cluster.GetCHI()), sqlTables)
+	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
 }
 
-// getCreateReplicatedObjects returns a list of objects that needs to be created on a host in a cluster
-func (s *Schemer) getCreateReplicatedObjects(host *chop.ChiHost) ([]string, []string, error) {
+// getCreateReplicaObjects returns a list of objects that needs to be created on a host in a cluster
+func (s *Schemer) getCreateReplicaObjects(host *chop.ChiHost) ([]string, []string, error) {
 
 	var shard *chop.ChiShard = nil
+	var replicaIndex int
 	for shardIndex := range host.GetCluster().Layout.Shards {
 		shard = &host.GetCluster().Layout.Shards[shardIndex]
-		for replicaIndex := range shard.Hosts {
+		for replicaIndex = range shard.Hosts {
 			replica := shard.Hosts[replicaIndex]
 			if replica == host {
 				break
@@ -158,67 +163,41 @@ func (s *Schemer) getCreateReplicatedObjects(host *chop.ChiHost) ([]string, []st
 		return nil, nil, nil
 	}
 	replicas := CreatePodFQDNsOfShard(shard)
+	nReplicas := len(replicas)
+	if nReplicas <= 1 {
+		log.V(1).Info("Single replica in a shard. Nothing to create from")
+		return nil, nil, nil
+	}
+	// remove new replica from the list. See https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
+	replicas[replicaIndex] = replicas[nReplicas-1]
+	replicas = replicas[:nReplicas-1]
+	log.V(1).Infof("Extracting table definitions from %v", replicas)
+
 	system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(replicas, ","))
-	sql := heredoc.Doc(strings.ReplaceAll(`
+
+	sqlDBs := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
 			database AS name, 
 			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_db_query
 		FROM system.tables
-		WHERE engine_full LIKE 'Replicated%'
-		SETTINGS skip_unavailable_shards = 1
-		UNION ALL
+		WHERE database != 'system'
+		SETTINGS skip_unavailable_shards = 1`,
+		"system.tables", system_tables,
+	))
+	sqlTables := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
 			name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
 		FROM system.tables
-		WHERE engine_full LIKE 'Replicated%'
-		SETTINGS skip_unavailable_shards = 1
-		`,
+		WHERE database != 'system' and create_table_query != '' and name not like '.inner.%'
+		SETTINGS skip_unavailable_shards = 1`,
 		"system.tables",
 		system_tables,
 	))
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sql)
-	return names, sqlStatements, nil
-}
-
-// clusterGetCreateDatabases returns list of DB names and list of 'CREATE DATABASE ...' SQLs for these DBs
-func (s *Schemer) clusterGetCreateDatabases(cluster *chop.ChiCluster) ([]string, []string, error) {
-	sql := heredoc.Docf(`
-		SELECT
-			distinct name AS name,
-			concat('CREATE DATABASE IF NOT EXISTS "', name, "'") AS create_db_query
-		FROM cluster('%s', system, databases) 
-		WHERE name not in (%s)
-		ORDER BY name
-		SETTINGS skip_unavailable_shards = 1
-		`,
-		cluster.Name,
-		ignoredDBs,
-	)
-
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(cluster.GetCHI()), sql)
-	return names, sqlStatements, nil
-}
-
-// clusterGetCreateTables returns list of table names and list of 'CREATE TABLE ...' SQLs for these tables
-func (s *Schemer) clusterGetCreateTables(cluster *chop.ChiCluster) ([]string, []string, error) {
-	sql := heredoc.Docf(`
-		SELECT
-			distinct name, 
-			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS') 
-		FROM cluster('%s', system, tables)
-		WHERE database not in (%s)
-			AND name not like '.inner.%%'
-		ORDER BY multiIf(engine not in ('Distributed', 'View', 'MaterializedView'), 1, engine = 'MaterializedView', 2, engine = 'Distributed', 3, 4), name
-		SETTINGS skip_unavailable_shards = 1
-		`,
-		cluster.Name,
-		ignoredDBs,
-	)
-
-	names, sqlStatements, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(cluster.GetCHI()), sql)
-	return names, sqlStatements, nil
+	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
+	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
+	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
 }
 
 // hostGetDropTables returns set of 'DROP TABLE ...' SQLs
@@ -249,22 +228,15 @@ func (s *Schemer) HostDeleteTables(host *chop.ChiHost) error {
 
 // HostCreateTables
 func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
+	log.V(1).Infof("Migrating schema objects to host %s", host.Address.HostName)
 
-	names, createSQLs, _ := s.getCreateReplicatedObjects(host)
-	log.V(1).Infof("Creating replicated objects %v at %s", names, host.Address.HostName)
+	names, createSQLs, _ := s.getCreateReplicaObjects(host)
+	log.V(1).Infof("Creating replica objects %v at %s", names, host.Address.HostName)
 	_ = s.hostApplySQLs(host, createSQLs, true)
 
 	names, createSQLs, _ = s.clusterGetCreateDistributedObjects(host.GetCluster())
 	log.V(1).Infof("Creating distributed objects %v at %s", names, host.Address.HostName)
 	return s.hostApplySQLs(host, createSQLs, true)
-}
-
-// ShardCreateTables
-func (s *Schemer) ShardCreateTables(shard *chop.ChiShard) error {
-
-	names, createSQLs, _ := s.clusterGetCreateDistributedObjects(shard.GetCluster())
-	log.V(1).Infof("Creating distributed objects %v at %s", names, shard.Name)
-	return s.shardApplySQLs(shard, createSQLs, true)
 }
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
@@ -297,37 +269,37 @@ func (s *Schemer) shardApplySQLs(shard *chop.ChiShard, sqls []string, retry bool
 }
 
 // applySQLs runs set of SQL queries on set on hosts
+// Retry logic traverses the list of SQLs multiple times until all SQLs succeed
 func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 	var err error = nil
 	// For each host in the list run all SQL queries
 	for _, host := range hosts {
 		conn := s.getCHConnection(host)
-		for _, sql := range sqls {
-			if len(sql) == 0 {
-				// Skip malformed SQL query, move to the next SQL query
-				continue
-			}
-			maxTries := 1
-			if retry {
-				maxTries = defaultMaxTries
-			}
-			err = util.Retry(maxTries, sql, func() error {
-				sqlerr := conn.Exec(sql)
-				if sqlerr != nil &&
-					strings.Contains(sqlerr.Error(), "Code: 253,") &&
-					strings.Contains(sql, "CREATE TABLE") {
+		maxTries := 1
+		if retry {
+			maxTries = defaultMaxTries
+		}
+		err = util.Retry(maxTries, "Applying sqls", func() error {
+			var runErr error = nil
+			for i, sql := range sqls {
+				if len(sql) == 0 {
+					// Skip malformed or already executed SQL query, move to the next one
+					continue
+				}
+				err = conn.Exec(sql)
+				if err != nil && strings.Contains(err.Error(), "Code: 253,") && strings.Contains(sql, "CREATE TABLE") {
 					log.V(1).Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
 					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
-					sqlerr = conn.Exec(sqlAttach)
+					err = conn.Exec(sqlAttach)
 				}
-				return sqlerr
-			})
-			if err != nil {
-				// Do not run any more SQL queries on this host in case of failure
-				// Move to next host
-				break
+				if err == nil {
+					sqls[i] = "" // Query is executed, removing from the list
+				} else {
+					runErr = err
+				}
 			}
-		}
+			return runErr
+		})
 	}
 
 	return err

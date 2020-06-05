@@ -226,34 +226,6 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	w.a.V(1).
 		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
 		WithStatusAction(new).
-		Info("updateCHI(%s/%s) post-process added items", new.Namespace, new.Name)
-
-	// Post-process added items
-	actionPlan.WalkAdded(
-		func(cluster *chop.ChiCluster) {
-		},
-		func(shard *chop.ChiShard) {
-		},
-		func(host *chop.ChiHost) {
-			// Create Tables on a Host
-			err := w.schemer.HostCreateTables(host)
-			if err == nil {
-				w.a.V(1).
-					WithEvent(new, eventActionCreate, eventReasonCreateCompleted).
-					WithStatusAction(new).
-					Info("Added items - tables on host %s replica %d to shard %d in cluster %s",
-						host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-			} else {
-				w.a.WithEvent(new, eventActionCreate, eventReasonCreateFailed).
-					WithStatusError(new).
-					Error("FAILED to create tables on host %s with error %v", host.Name, err)
-			}
-		},
-	)
-
-	w.a.V(1).
-		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
-		WithStatusAction(new).
 		Info("updateCHI(%s/%s) remove scheduled for deletion items", new.Namespace, new.Name)
 
 	// Remove deleted items
@@ -398,6 +370,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 	// Add host's StatefulSet
 	statefulSet := w.creator.CreateStatefulSet(host)
+	curStatefulSet, _ := w.c.getStatefulSet(&statefulSet.ObjectMeta, false)
 	if err := w.reconcileStatefulSet(statefulSet, host); err != nil {
 		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusAction(host.CHI).
@@ -420,6 +393,22 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
 		WithStatusAction(host.CHI).
 		Info("Reconcile Host %s completed", host.Name)
+
+	// Create Tables on a Host if new stateful set is created
+	if curStatefulSet == nil {
+		err := w.schemer.HostCreateTables(host)
+		if err == nil {
+			w.a.V(1).
+				WithEvent(host.CHI, eventActionCreate, eventReasonCreateCompleted).
+				WithStatusAction(host.CHI).
+				Info("Created schema objects on host %s replica %d to shard %d in cluster %s",
+					host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		} else {
+			w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
+				WithStatusError(host.CHI).
+				Error("FAILED to create schema objects on host %s with error %v", host.Name, err)
+		}
+	}
 
 	return nil
 }
