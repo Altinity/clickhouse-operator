@@ -64,8 +64,6 @@ def test_006():
 def test_007():
     create_and_check("configs/test-007-custom-ports.yaml", 
                      {"pod_count": 1,
-                      "apply_templates": {"templates/tpl-custom-ports.yaml"},
-                      "pod_image": "yandex/clickhouse-server:19.11",
                       "pod_ports": [8124,9001,9010]})
 
 def test_operator_upgrade(config, version_from, version_to = settings.operator_version):
@@ -76,11 +74,17 @@ def test_operator_upgrade(config, version_from, version_to = settings.operator_v
         chi = get_chi_name(config)
 
         create_and_check(config, {"object_counts": [1, 1, 2], "do_not_delete": 1})
+        start_time = kube_get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
 
         with When(f"upgrade operator to {version_to}"):
             set_operator_version(version_to, timeout=120)
             kube_wait_chi_status(chi, "Completed", retries = 5)
             kube_wait_objects(chi, [1,1,2])
+            new_start_time = kube_get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
+            # TODO: assert
+            if start_time != new_start_time:
+                print("!!!Pods have been restarted!!!")
+
 
         kube_delete_chi(chi)
 
@@ -91,25 +95,34 @@ def test_operator_restart(config, version = settings.operator_version):
         chi = get_chi_name(config)
 
         create_and_check(config, {"object_counts": [1, 1, 2], "do_not_delete": 1})
+        start_time = kube_get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
 
         with When("Restart operator"):
             restart_operator()
             kube_wait_chi_status(chi, "Completed")
             kube_wait_objects(chi, [1,1,2])
+            new_start_time = kube_get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
+            # TODO: assert
+            if start_time != new_start_time:
+                print("!!!Pods have been restarted!!!")
 
         kube_delete_chi(chi)
 
 @TestScenario
 @Name("test_008. Test operator restart")
 def test_008():
-    test_operator_restart("configs/test-009-operator-upgrade.yaml")
-    test_operator_restart("configs/test-009-operator-upgrade-2.yaml")
+    with Then("Test simple chi for operator restart"):
+        test_operator_restart("configs/test-009-operator-upgrade.yaml")
+    with Then("Test advanced chi for operator restart"):
+        test_operator_restart("configs/test-009-operator-upgrade-2.yaml")
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
 def test_009(version_from = "0.8.0", version_to = settings.operator_version):
-    test_operator_upgrade("configs/test-009-operator-upgrade.yaml", version_from, version_to)
-    test_operator_upgrade("configs/test-009-operator-upgrade-2.yaml", version_from, version_to)
+    with Then("Test simple chi for operator upgrade"):
+        test_operator_upgrade("configs/test-009-operator-upgrade.yaml", version_from, version_to)
+    with Then("Test advanced chi for operator upgrade"):
+        test_operator_upgrade("configs/test-009-operator-upgrade-2.yaml", version_from, version_to)
 
 def set_operator_version(version, ns=settings.operator_namespace, timeout=60):
     kubectl(f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:{version}", ns=ns)
@@ -513,30 +526,40 @@ def test_020(config = "configs/test-020-multi-volume.yaml"):
 @TestScenario
 @Name("test-021-rescale-volume. Test rescaling storage")
 def test_021(config = "configs/test-021-rescale-volume.yaml"):
+    with Given("Default storage class is expandable"):
+        allowVolumeExpansion = kube_get_field("storageclass", "standard", ".allowVolumeExpansion")
+        if allowVolumeExpansion != "true":
+            kubectl("patch storageclass standard -p '{\"allowVolumeExpansion\":true}'")
+
     chi = get_chi_name(get_full_path(config))
-    create_and_check(config, {"pod_count": 1,
-                              "pod_volumes": {"/var/lib/clickhouse","/var/lib/clickhouse2"}, 
-                              "do_not_delete": 1})
-    
-    with When("Create a table and insert 1 row"):
-        clickhouse_query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
-        clickhouse_query(chi, "insert into test_disks values (1)")
+    create_and_check(config, {"pod_count": 1,"do_not_delete": 1})
+
+    with Then("Storage size should be 100Mi"):
+        size = kube_get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+        assert size == "100Mi"
+
+    with When("Re-scale volume configuration to 200Mb"):
+        create_and_check("configs/test-021-rescale-volume-add-storage.yaml", {"pod_count": 1, "do_not_delete": 1})
         
-        with Then("Data should be placed on default disk"):
-            out = clickhouse_query(chi, "select disk_name from system.parts where table='test_disks'")
-            assert out == 'default'
+        with Then("Storage size should be 200Mi"):
+            size = kube_get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            assert size == "200Mi"
     
-    create_and_check("configs/test-021-rescale-volume-add-disk.yaml", 
+    with When("Add second disk 50Mi"):
+        create_and_check("configs/test-021-rescale-volume-add-disk.yaml", 
                             {"pod_count": 1,
                             "pod_volumes": {"/var/lib/clickhouse","/var/lib/clickhouse2"}, 
                             "do_not_delete": 1})
-
-    with When("alter table test_disks move partition tuple() to disk 'disk2'"):
-        clickhouse_query(chi, "alter table test_disks move partition tuple() to disk 'disk2'")
         
-        with Then("Data should be placed on disk2"):
-            out = clickhouse_query(chi, "select disk_name from system.parts where table='test_disks'")
-            assert out == 'disk2'
+        with Then("There should be two PVC"):
+            size = kube_get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            assert size == "200Mi"
+            size = kube_get_pvc_size("disk2-chi-test-021-rescale-volume-simple-0-0-0")
+            assert size == "50Mi"
+        
+        with And("There should be two disks recognized by ClickHouse"):
+            out = clickhouse_query(chi, "select count() from system.disks")
+            assert out == "2"
 
     
     kube_delete_chi(chi) 

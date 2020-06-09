@@ -3,8 +3,27 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "test-007-custom-ports"
 spec:
-  useTemplates:
-    - name: clickhouse-custom-ports
+  defaults:
+    templates:
+      podTemplate: default    
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:19.16
+              ports:
+                - name: http
+                  containerPort: 8124
+                - name: tcp
+                  containerPort: 9001
+                - name: interserver
+                  containerPort: 9010
   configuration:
     clusters:
       - name: single
+    settings:
+      http_port: 8124
+      tcp_port: 9001
+      interserver_http_port: 9010
