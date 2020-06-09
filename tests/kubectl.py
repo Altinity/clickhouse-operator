@@ -212,6 +212,9 @@ def kube_check_pod_volumes(chi_name, volumes, ns="test"):
                     break
             assert found == 1
 
+def kube_get_pvc_size(pvc_name, ns="test"):
+    return kube_get_field("pvc", pvc_name, ".spec.resources.requests.storage", ns)
+
 def kube_check_pod_antiaffinity(chi_name, ns):
     pod_spec = kube_get_pod_spec(chi_name, ns)
     expected = {"requiredDuringSchedulingIgnoredDuringExecution": [
