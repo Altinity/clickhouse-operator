@@ -110,6 +110,7 @@ func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 	statefulSet.Spec.Replicas = &zero
 	statefulSet, _ = c.kubeClient.AppsV1().StatefulSets(namespace).Update(statefulSet)
 	_ = c.waitStatefulSetGeneration(namespace, statefulSet.Name, statefulSet.Generation)
+	host.StatefulSet = statefulSet
 
 	// And now delete empty StatefulSet
 	if err := c.kubeClient.AppsV1().StatefulSets(namespace).Delete(name, newDeleteOptions()); err == nil {
@@ -140,17 +141,19 @@ func (c *Controller) syncStatefulSet(host *chop.ChiHost) {
 
 // deletePVC deletes PersistentVolumeClaim
 func (c *Controller) deletePVC(host *chop.ChiHost) error {
+	log.V(2).Info("deletePVC() - start")
+	defer log.V(2).Info("deletePVC() - end")
 
 	namespace := host.Address.Namespace
 	labeler := chopmodel.NewLabeler(c.chop, host.CHI)
 
 	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newListOptions(labeler.GetSelectorHostScope(host)))
 	if err != nil {
-		log.V(1).Infof("FAIL get list of PVC for host %s/%s %v", namespace, host.Name, err)
+		log.Errorf("FAIL get list of PVC for host %s/%s %v", namespace, host.Name, err)
 		return err
 	}
 
-	log.V(1).Infof("OK get list of PVC for host %s/%s", namespace, host.Name)
+	log.V(2).Infof("PVC for host %s/%s listed", namespace, host.Name)
 	for i := range pvcList.Items {
 		// Convenience wrapper
 		pvc := &pvcList.Items[i]
@@ -163,9 +166,9 @@ func (c *Controller) deletePVC(host *chop.ChiHost) error {
 
 		// Actually delete PVC
 		if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, newDeleteOptions()); err == nil {
-			log.V(1).Infof("OK delete PVC %s/%s", namespace, pvc.Name)
+			log.V(1).Infof("PVC %s/%s deleted", namespace, pvc.Name)
 		} else {
-			log.V(1).Infof("FAIL delete PVC %s/%s %v", namespace, pvc.Name, err)
+			log.Errorf("FAIL to delete PVC %s/%s %v", namespace, pvc.Name, err)
 		}
 	}
 

@@ -27,7 +27,7 @@ spec:
       default/max_query_size: 41943040
       default/max_ast_elements: 100000
     clusters:
-      - name: replicas-only
+      - name: test-009
         templates:
           podTemplate: clickhouse-template
           volumeClaimTemplate: aws-ebs-volume-claim

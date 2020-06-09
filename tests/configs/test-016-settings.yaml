@@ -17,6 +17,12 @@ spec:
       macros/layer: "01"
       query_log: _removed_
     files:
+      custom.xml: |
+         <yandex>
+            <macros>
+              <test>test</test>
+            </macros>
+         </yandex>
       dict_one.dict: |
         <yandex>
           <dictionary>

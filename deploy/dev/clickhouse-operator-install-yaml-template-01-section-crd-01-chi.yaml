@@ -69,6 +69,7 @@ spec:
   #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
+      type: object
       properties:
         spec:
           type: object
@@ -180,40 +181,12 @@ spec:
                       type: string
                 users:
                   type: object
-                  additionalProperties:
-                    oneOf:
-                      - type: string
-                      - type: integer
-                      - type: array
-                        items:
-                          type: string
                 profiles:
                   type: object
-                  additionalProperties:
-                    oneOf:
-                      - type: string
-                      - type: integer
-                      - type: array
-                        items:
-                          type: string
                 quotas:
                   type: object
-                  additionalProperties:
-                    oneOf:
-                      - type: string
-                      - type: integer
-                      - type: array
-                        items:
-                          type: string
                 settings:
                   type: object
-                  additionalProperties:
-                    oneOf:
-                      - type: string
-                      - type: integer
-                      - type: array
-                        items:
-                          type: string
                 files:
                   type: object
                   additionalProperties:
