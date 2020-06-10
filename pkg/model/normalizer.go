@@ -135,26 +135,27 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 	if ok {
 		// Host references known HostTemplate
 		log.V(2).Infof("getHostTemplate() statefulSet %s use custom host template %s", statefulSetName, hostTemplate.Name)
-	} else {
-		// Host references UNKNOWN HostTemplate, will use default one
-		// However, with default template there is a nuance - hostNetwork requires different default host template
-
-		// Check hostNetwork case at first
-		podTemplate, ok := host.GetPodTemplate()
-		if ok {
-			if podTemplate.Spec.HostNetwork {
-				// HostNetwork
-				hostTemplate = newDefaultHostTemplateForHostNetwork(statefulSetName)
-			}
-		}
-
-		// In case hostTemplate still is not assigned - use default one
-		if hostTemplate == nil {
-			hostTemplate = newDefaultHostTemplate(statefulSetName)
-		}
-
-		log.V(3).Infof("getHostTemplate() statefulSet %s use default host template", statefulSetName)
+		return hostTemplate
 	}
+
+	// Host references UNKNOWN HostTemplate, will use default one
+	// However, with default template there is a nuance - hostNetwork requires different default host template
+
+	// Check hostNetwork case at first
+	podTemplate, ok := host.GetPodTemplate()
+	if ok {
+		if podTemplate.Spec.HostNetwork {
+			// HostNetwork
+			hostTemplate = newDefaultHostTemplateForHostNetwork(statefulSetName)
+		}
+	}
+
+	// In case hostTemplate still is not assigned - use default one
+	if hostTemplate == nil {
+		hostTemplate = newDefaultHostTemplate(statefulSetName)
+	}
+
+	log.V(3).Infof("getHostTemplate() statefulSet %s use default host template", statefulSetName)
 
 	return hostTemplate
 }
@@ -201,34 +202,34 @@ func hostApplyHostTemplate(host *chiv1.ChiHost, template *chiv1.ChiHostTemplate)
 		}
 	}
 
-	settings := host.GetSettings()
-	settingsTCPPort := settings.GetTCPPort()
-	settingsHTTPPort := settings.GetHTTPPort()
-	settingsInterserverHTTPPort := settings.GetInterserverHTTPPort()
-
-	if host.TCPPort == chPortNumberMustBeAssignedLater {
-		if settingsTCPPort == chPortNumberMustBeAssignedLater {
-			host.TCPPort = chDefaultTCPPortNumber
-		} else {
-			host.TCPPort = settingsTCPPort
-		}
-	}
-	if host.HTTPPort == chPortNumberMustBeAssignedLater {
-		if settingsHTTPPort == chPortNumberMustBeAssignedLater {
-			host.HTTPPort = chDefaultHTTPPortNumber
-		} else {
-			host.HTTPPort = settingsHTTPPort
-		}
-	}
-	if host.InterserverHTTPPort == chPortNumberMustBeAssignedLater {
-		if settingsInterserverHTTPPort == chPortNumberMustBeAssignedLater {
-			host.InterserverHTTPPort = chDefaultInterserverHTTPPortNumber
-		} else {
-			host.InterserverHTTPPort = settingsInterserverHTTPPort
-		}
-	}
+	hostApplyPortsFromSettings(host)
 
 	host.InheritTemplatesFrom(nil, nil, template)
+}
+
+func hostApplyPortsFromSettings(host *chiv1.ChiHost) {
+	settings := host.GetSettings()
+	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), chDefaultTCPPortNumber)
+	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), chDefaultHTTPPortNumber)
+	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), chDefaultInterserverHTTPPortNumber)
+}
+
+func ensurePortValue(port *int32, settings, _default int32 ) {
+	if *port != chPortNumberMustBeAssignedLater {
+		// Port has a value already
+		return
+	}
+
+	// Port has no value, let's assign value from settings
+
+	if settings != chPortNumberMustBeAssignedLater {
+		// Settings gas a value, use it
+		*port = settings
+		return
+	}
+
+	// Port has no value, settings has no value, fallback to default value
+	*port = _default
 }
 
 // fillStatus fills .status section of a CHI with values based on current CHI

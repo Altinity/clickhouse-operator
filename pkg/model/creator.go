@@ -673,7 +673,9 @@ func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 	return &chiv1.ChiHostTemplate{
 		Name: name,
 		PortDistribution: []chiv1.ChiPortDistribution{
-			{Type: chiv1.PortDistributionUnspecified},
+			{
+				Type: chiv1.PortDistributionUnspecified,
+			},
 		},
 		Spec: chiv1.ChiHost{
 			Name:                "",
@@ -689,7 +691,9 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 	return &chiv1.ChiHostTemplate{
 		Name: name,
 		PortDistribution: []chiv1.ChiPortDistribution{
-			{Type: chiv1.PortDistributionClusterScopeIndex},
+			{
+				Type: chiv1.PortDistributionClusterScopeIndex,
+			},
 		},
 		Spec: chiv1.ChiHost{
 			Name:                "",
