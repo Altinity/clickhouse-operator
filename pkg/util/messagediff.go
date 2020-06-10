@@ -50,11 +50,22 @@ func MessageDiffItemString(banner string, items map[*messagediff.Path]interface{
 	var str string
 	str += fmt.Sprintf("%s: %d\n", banner, len(items))
 	for pathPtr := range items {
-		str += fmt.Sprintf("----- ap item path  -----\n")
+		str += fmt.Sprintf("ap item path:")
 		for _, pathNode := range *pathPtr {
-			str += fmt.Sprintf("%s\n", pathNode.String())
+			// Format
+			//	.Template
+			//	.Spec
+			//	.Containers
+			//	[0]
+			//	.Ports
+			//	[1]
+			//	.Protocol
+			// as
+			//	.Template.Spec.Containers[0].Ports[1].Protocol
+			str += fmt.Sprintf("%v", pathNode)
 		}
-		str += fmt.Sprintf("----- ap item value -----\n")
+		str += fmt.Sprintf("\n")
+		str += fmt.Sprintf("ap item value:")
 		str += fmt.Sprintf("%v\n", items[pathPtr])
 	}
 	str += fmt.Sprintf("-------------------------\n")
