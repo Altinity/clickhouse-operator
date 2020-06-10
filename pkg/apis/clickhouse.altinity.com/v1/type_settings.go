@@ -17,10 +17,14 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 )
 
 // Settings value can be one of:
@@ -126,15 +130,20 @@ func (settings Settings) MarshalJSON() ([]byte, error) {
 }
 
 func unmarshalScalar(untyped interface{}) (string, bool) {
+	typeOf := reflect.TypeOf(untyped)
+	str := typeOf.String()
+	log.V(3).Infof("%v", str)
+
 	switch untyped.(type) {
 	case // scalar
-		string,
 		int, uint,
 		int8, uint8,
 		int16, uint16,
 		int32, uint32,
 		int64, uint64,
-		bool:
+		float32, float64,
+		bool,
+		string:
 		return fmt.Sprintf("%v", untyped), true
 	}
 
@@ -142,6 +151,10 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 }
 
 func unmarshalVector(untyped interface{}) ([]string, bool) {
+	typeOf := reflect.TypeOf(untyped)
+	str := typeOf.String()
+	log.V(3).Infof("%v", str)
+
 	var res []string
 	switch untyped.(type) {
 	case // vector
