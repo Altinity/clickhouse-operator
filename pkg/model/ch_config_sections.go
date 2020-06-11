@@ -75,3 +75,7 @@ func (c *configSections) CreateConfigsHost(host *chi.ChiHost) map[string]string 
 
 	return hostConfigSections
 }
+
+func createConfigSectionFilename(section string) string {
+	return "chop-generated-" + section + ".xml"
+}
