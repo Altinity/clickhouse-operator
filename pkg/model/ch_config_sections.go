@@ -19,6 +19,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// configSections
 type configSections struct {
 	// commonConfigSections maps section name to section XML config string
 	commonConfigSections map[string]string
@@ -31,6 +32,7 @@ type configSections struct {
 	chopConfig *chi.OperatorConfig
 }
 
+// NewConfigSections
 func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig *chi.OperatorConfig) *configSections {
 	return &configSections{
 		commonConfigSections:      make(map[string]string),
@@ -40,6 +42,7 @@ func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig 
 	}
 }
 
+// CreateConfigsCommon
 func (c *configSections) CreateConfigsCommon() {
 	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. remote servers
@@ -52,6 +55,7 @@ func (c *configSections) CreateConfigsCommon() {
 	util.MergeStringMaps(c.commonConfigSections, c.chopConfig.CHCommonConfigs)
 }
 
+// CreateConfigsUsers
 func (c *configSections) CreateConfigsUsers() {
 	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. users
@@ -64,6 +68,7 @@ func (c *configSections) CreateConfigsUsers() {
 	util.MergeStringMaps(c.commonUsersConfigSections, c.chopConfig.CHUsersConfigs)
 }
 
+// CreateConfigsHost
 func (c *configSections) CreateConfigsHost(host *chi.ChiHost) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	hostConfigSections := make(map[string]string)
@@ -76,6 +81,7 @@ func (c *configSections) CreateConfigsHost(host *chi.ChiHost) map[string]string 
 	return hostConfigSections
 }
 
+// createConfigSectionFilename
 func createConfigSectionFilename(section string) string {
 	return "chop-generated-" + section + ".xml"
 }
