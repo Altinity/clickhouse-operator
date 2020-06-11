@@ -10,6 +10,8 @@ spec:
     - name: clickhouse-latest-version
     - name: persistent-volume
   configuration:
+    settings:
+      mysql_port: 3306
     zookeeper:
       nodes:
         - host: zookeeper

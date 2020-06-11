@@ -25,8 +25,8 @@ def get_chi_name(path):
 def kubectl(command, ok_to_fail=False, ns="test", timeout=60):
     cmd = shell(f"{kubectlcmd} -n {ns} {command}", timeout=timeout)
     code = cmd.exitcode
-    if ok_to_fail == False:
-        assert(code) == 0, error()
+    if not ok_to_fail:
+        assert code == 0, error()
     return cmd.output
 
 def kube_delete_chi(chi, ns = namespace):

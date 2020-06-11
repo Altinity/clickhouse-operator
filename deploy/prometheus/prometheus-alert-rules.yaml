@@ -225,14 +225,14 @@ spec:
 
 
         - alert: TooMuchRunningQueries
-          expr: chi_clickhouse_metric_Query > 90
+          expr: chi_clickhouse_metric_Query > 80
           labels:
             severity: warning
           annotations:
             identifier: "{{ $labels.hostname }}"
             summary: "Too much running queries"
             description: |-
-              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` possible have too much running queries.
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have {{ with printf "chi_clickhouse_metric_Query{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }}{{ end }} running queries.
               Please analyze your workload.
               Each concurrent SELECT query use memory in JOINs use CPU for running aggregation function and can read lot of data from disk when scan parts in partitions and utilize disk I/O.
               Each concurrent INSERT query, allocate around 1MB per each column in an inserted table and utilize disk I/O.
