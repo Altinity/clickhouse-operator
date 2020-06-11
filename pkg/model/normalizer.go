@@ -214,7 +214,7 @@ func hostApplyPortsFromSettings(host *chiv1.ChiHost) {
 	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), chDefaultInterserverHTTPPortNumber)
 }
 
-func ensurePortValue(port *int32, settings, _default int32 ) {
+func ensurePortValue(port *int32, settings, _default int32) {
 	if *port != chPortNumberMustBeAssignedLater {
 		// Port has a value already
 		return
