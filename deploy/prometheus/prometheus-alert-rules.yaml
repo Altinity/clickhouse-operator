@@ -243,21 +243,6 @@ spec:
               - https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-concurrent-queries
               - https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-query_log
 
-        - alert: TooMuchDistributedFilesToInsert
-          expr: chi_clickhouse_metric_DistributedFilesToInsert > 100
-          labels:
-            severity: warning
-          annotations:
-            identifier: "{{ $labels.hostname }}"
-            summary: "Too much DistributedFilesToInsert"
-            description: |-
-              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have temporary delayed distibuted files > 100.
-
-              - Please check replication status
-              - Check connections between `clickhouse-server` kubernetes pods
-              - Check connections between `clickhouse-server` and `zookeeper`
-              https://clickhouse.tech/docs/en/operations/table_engines/distributed/
-
         - alert: SystemSettingsChanged
           expr: delta(chi_clickhouse_metric_ChangedSettingsHash[5m]) != 0
           labels:
@@ -281,13 +266,13 @@ spec:
         - alert: ZooKeeperSession
           expr: chi_clickhouse_metric_ZooKeeperSession > 1
           labels:
-            severity: warning
+            severity: critical
           annotations:
             identifier: "{{ $labels.hostname }}"
             summary: "ZooKeeperSession > 1"
             description: |-
               `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
-              Number of sessions (connections) to ZooKeeper should be no more than one, because using more than one
+              Number of sessions (connections) to ZooKeeper shall be no more than one, because using more than one
               connection to ZooKeeper may lead to bugs due to lack of linearizability (stale reads)
               that ZooKeeper consistency model allows.
 

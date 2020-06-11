@@ -417,7 +417,7 @@ def test_read_only_replica():
                                ns=kubectl.namespace)
     clickhouse.clickhouse_query_with_error(
         chi_name, "SYSTEM RESTART REPLICAS; SYSTEM SYNC REPLICA default.test_repl",
-        host=read_only_svc, timeout=180
+        host=read_only_svc, timeout=240
     )
     drop_replicated_table_on_cluster()
 
@@ -448,7 +448,7 @@ def test_replicas_max_abosulute_delay():
 
     clickhouse.clickhouse_query(
         chi["metadata"]["name"],
-        "SYSTEM START FETCHES; SYSTEM RESTART REPLICAS; SYSTEM SYNC REPLICA default.test_repl", timeout=180
+        "SYSTEM START FETCHES; SYSTEM RESTART REPLICAS; SYSTEM SYNC REPLICA default.test_repl", timeout=240
     )
     with Then("check ReplicasMaxAbsoluteDelay gone away"):
         resolved = wait_alert_state("ReplicasMaxAbsoluteDelay", "firing", False, labels={"hostname": stop_replica_svc})
@@ -543,6 +543,90 @@ def test_too_much_running_queries():
         assert resolved, error("can't check TooManyConnections alert is gone away")
 
 
+@TestScenario
+@Name("Check SystemSettingsChanged")
+def test_system_settings_changed():
+    changed_pod, changed_svc, _, _ = random_pod_choice_for_callbacks()
+
+    with When("apply changed settings"):
+        create_and_check(
+            "configs/test-cluster-for-alerts-changed-settings.yaml",
+            {
+                "apply_templates": [
+                    "templates/tpl-clickhouse-latest.yaml",
+                    "templates/tpl-persistent-volume-100Mi.yaml"
+                ],
+                "object_counts": [2, 2, 3],
+                "do_not_delete": 1
+            }
+        )
+
+    with Then("check SystemSettingsChanged firing"):
+        fired = wait_alert_state("SystemSettingsChanged", "firing", True, labels={"hostname": changed_svc},
+                                 time_range="30s", sleep_time=5)
+        assert fired, error("can't get TooManyConnections alert in firing state")
+
+    with When("rollback changed settings"):
+        create_and_check(
+            "configs/test-cluster-for-alerts.yaml",
+            {
+                "apply_templates": [
+                    "templates/tpl-clickhouse-latest.yaml",
+                    "templates/tpl-persistent-volume-100Mi.yaml"
+                ],
+                "object_counts": [2, 2, 3],
+                "do_not_delete": 1
+            }
+        )
+
+    with Then("check SystemSettingsChanged gone away"):
+        resolved = wait_alert_state("SystemSettingsChanged", "firing", False, labels={"hostname": changed_svc}, sleep_time=30)
+        assert resolved, error("can't check TooManyConnections alert is gone away")
+
+@TestScenario
+@Name("Check VersionChanged")
+def test_version_changed():
+    changed_pod, changed_svc, _, _ = random_pod_choice_for_callbacks()
+
+    with When("apply changed settings"):
+        create_and_check(
+            "configs/test-cluster-for-alerts-changed-settings.yaml",
+            {
+                "apply_templates": [
+                    "templates/tpl-clickhouse-20.3.yaml",
+                    "templates/tpl-persistent-volume-100Mi.yaml"
+                ],
+                "object_counts": [2, 2, 3],
+                "do_not_delete": 1
+            }
+        )
+        prometheus_scrape_interval = 30
+        with And(f"wait prometheus_scrape_interval={prometheus_scrape_interval}*2 sec"):
+            time.sleep(prometheus_scrape_interval * 2)
+
+    with Then("check VersionChanged firing"):
+        fired = wait_alert_state("VersionChanged", "firing", True, labels={"hostname": changed_svc},
+                                 time_range="30s", sleep_time=5)
+        assert fired, error("can't get VersionChanged alert in firing state")
+
+    with When("rollback changed settings"):
+        create_and_check(
+            "configs/test-cluster-for-alerts.yaml",
+            {
+                "apply_templates": [
+                    "templates/tpl-clickhouse-latest.yaml",
+                    "templates/tpl-persistent-volume-100Mi.yaml"
+                ],
+                "object_counts": [2, 2, 3],
+                "do_not_delete": 1
+            }
+        )
+
+    with Then("check VersionChanged gone away"):
+        resolved = wait_alert_state("VersionChanged", "firing", False, labels={"hostname": changed_svc}, sleep_time=30)
+        assert resolved, error("can't check VersionChanged alert is gone away")
+
+
 if main():
     with Module("metrics_alerts"):
         with Given("get information about prometheus installation"):
@@ -592,6 +676,8 @@ if main():
             test_too_many_connections,
             test_too_much_running_queries,
             test_longest_running_query,
+            test_system_settings_changed,
+            test_version_changed,
             # @TODO uncomment it when  https://github.com/ClickHouse/ClickHouse/pull/11220 will merged to docker latest image
             # test_distributed_files_to_insert,
         ]
