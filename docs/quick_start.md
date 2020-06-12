@@ -30,7 +30,7 @@ kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/
 
 such as namespace where to install operator or operator's image, use the special installer script.
 ```bash
-curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-web-installer/clickhouse-operator-install.sh | OPERATOR_NAMESPACE=test-clickhouse-operator sh
+curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-web-installer/clickhouse-operator-install.sh | OPERATOR_NAMESPACE=test-clickhouse-operator bash
 ```
 Take into account explicitly specified namespace
 ```bash
