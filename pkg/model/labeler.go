@@ -76,42 +76,49 @@ func NewLabeler(chop *chop.CHOp, chi *chi.ClickHouseInstallation) *Labeler {
 	}
 }
 
+// getLabelsConfigMapCHICommon
 func (l *Labeler) getLabelsConfigMapCHICommon() map[string]string {
 	return util.MergeStringMaps(l.getLabelsCHIScope(), map[string]string{
 		LabelConfigMap: labelConfigMapValueCHICommon,
 	})
 }
 
+// getLabelsConfigMapCHICommonUsers
 func (l *Labeler) getLabelsConfigMapCHICommonUsers() map[string]string {
 	return util.MergeStringMaps(l.getLabelsCHIScope(), map[string]string{
 		LabelConfigMap: labelConfigMapValueCHICommonUsers,
 	})
 }
 
+// getLabelsConfigMapHost
 func (l *Labeler) getLabelsConfigMapHost(host *chi.ChiHost) map[string]string {
 	return util.MergeStringMaps(l.getLabelsHostScope(host, false), map[string]string{
 		LabelConfigMap: labelConfigMapValueHost,
 	})
 }
 
+// getLabelsServiceCHI
 func (l *Labeler) getLabelsServiceCHI() map[string]string {
 	return util.MergeStringMaps(l.getLabelsCHIScope(), map[string]string{
 		LabelService: labelServiceValueCHI,
 	})
 }
 
+// getLabelsServiceCluster
 func (l *Labeler) getLabelsServiceCluster(cluster *chi.ChiCluster) map[string]string {
 	return util.MergeStringMaps(l.getLabelsClusterScope(cluster), map[string]string{
 		LabelService: labelServiceValueCluster,
 	})
 }
 
+// getLabelsServiceShard
 func (l *Labeler) getLabelsServiceShard(shard *chi.ChiShard) map[string]string {
 	return util.MergeStringMaps(l.getLabelsShardScope(shard), map[string]string{
 		LabelService: labelServiceValueShard,
 	})
 }
 
+// getLabelsServiceHost
 func (l *Labeler) getLabelsServiceHost(host *chi.ChiHost) map[string]string {
 	return util.MergeStringMaps(l.getLabelsHostScope(host, false), map[string]string{
 		LabelService: labelServiceValueHost,
@@ -248,6 +255,7 @@ func (l *Labeler) getAnnotationsHostScope(host *chi.ChiHost) map[string]string {
 	return host.GetAnnotations()
 }
 
+// prepareAffinity
 func (l *Labeler) prepareAffinity(podTemplate *chi.ChiPodTemplate, host *chi.ChiHost) {
 	if podTemplate.Spec.Affinity == nil {
 		return
@@ -271,6 +279,7 @@ func (l *Labeler) prepareAffinity(podTemplate *chi.ChiPodTemplate, host *chi.Chi
 	}
 }
 
+// processNodeSelector
 func (l *Labeler) processNodeSelector(nodeSelector *v1.NodeSelector, host *chi.ChiHost) {
 	if nodeSelector == nil {
 		return
@@ -281,6 +290,7 @@ func (l *Labeler) processNodeSelector(nodeSelector *v1.NodeSelector, host *chi.C
 	}
 }
 
+// processPreferredSchedulingTerms
 func (l *Labeler) processPreferredSchedulingTerms(preferredSchedulingTerms []v1.PreferredSchedulingTerm, host *chi.ChiHost) {
 	for i := range preferredSchedulingTerms {
 		nodeSelectorTerm := &preferredSchedulingTerms[i].Preference
@@ -288,6 +298,7 @@ func (l *Labeler) processPreferredSchedulingTerms(preferredSchedulingTerms []v1.
 	}
 }
 
+// processNodeSelectorTerm
 func (l *Labeler) processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm, host *chi.ChiHost) {
 	for i := range nodeSelectorTerm.MatchExpressions {
 		nodeSelectorRequirement := &nodeSelectorTerm.MatchExpressions[i]
@@ -300,6 +311,7 @@ func (l *Labeler) processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm,
 	}
 }
 
+// processNodeSelectorRequirement
 func (l *Labeler) processNodeSelectorRequirement(nodeSelectorRequirement *v1.NodeSelectorRequirement, host *chi.ChiHost) {
 	nodeSelectorRequirement.Key = newNameMacroReplacerHost(host).Replace(nodeSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
@@ -308,6 +320,7 @@ func (l *Labeler) processNodeSelectorRequirement(nodeSelectorRequirement *v1.Nod
 	}
 }
 
+// processPodAffinityTerms
 func (l *Labeler) processPodAffinityTerms(podAffinityTerms []v1.PodAffinityTerm, host *chi.ChiHost) {
 	for i := range podAffinityTerms {
 		podAffinityTerm := &podAffinityTerms[i]
@@ -315,6 +328,7 @@ func (l *Labeler) processPodAffinityTerms(podAffinityTerms []v1.PodAffinityTerm,
 	}
 }
 
+// processWeightedPodAffinityTerms
 func (l *Labeler) processWeightedPodAffinityTerms(weightedPodAffinityTerms []v1.WeightedPodAffinityTerm, host *chi.ChiHost) {
 	for i := range weightedPodAffinityTerms {
 		podAffinityTerm := &weightedPodAffinityTerms[i].PodAffinityTerm
@@ -322,11 +336,13 @@ func (l *Labeler) processWeightedPodAffinityTerms(weightedPodAffinityTerms []v1.
 	}
 }
 
+// processPodAffinityTerm
 func (l *Labeler) processPodAffinityTerm(podAffinityTerm *v1.PodAffinityTerm, host *chi.ChiHost) {
 	l.processLabelSelector(podAffinityTerm.LabelSelector, host)
 	podAffinityTerm.TopologyKey = newNameMacroReplacerHost(host).Replace(podAffinityTerm.TopologyKey)
 }
 
+// processLabelSelector
 func (l *Labeler) processLabelSelector(labelSelector *meta.LabelSelector, host *chi.ChiHost) {
 	if labelSelector == nil {
 		return
@@ -341,6 +357,7 @@ func (l *Labeler) processLabelSelector(labelSelector *meta.LabelSelector, host *
 	}
 }
 
+// processLabelSelectorRequirement
 func (l *Labeler) processLabelSelectorRequirement(labelSelectorRequirement *meta.LabelSelectorRequirement, host *chi.ChiHost) {
 	labelSelectorRequirement.Key = newNameMacroReplacerHost(host).Replace(labelSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
