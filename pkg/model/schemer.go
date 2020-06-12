@@ -30,7 +30,7 @@ import (
 
 const (
 	// Comma-separated ''-enclosed list of database names to be ignored
-	ignoredDBs = "'system'"
+	// ignoredDBs = "'system'"
 
 	// Max number of tries for SQL queries
 	defaultMaxTries = 10
@@ -129,7 +129,8 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 				t.create_table_query,
 				1 AS order
 			FROM cluster('all-sharded', system.tables) tables
-			LEFT JOIN system.tables t USING (database, name)
+			LEFT JOIN (SELECT distinct database, name, create_table_query 
+			             FROM cluster('all-sharded', system.tables) SETTINGS skip_unavailable_shards = 1)  t USING (database, name)
 			WHERE engine = 'Distributed' AND t.create_table_query != ''
 			SETTINGS skip_unavailable_shards = 1
 		) tables
@@ -204,15 +205,12 @@ func (s *Schemer) getCreateReplicaObjects(host *chop.ChiHost) ([]string, []strin
 func (s *Schemer) hostGetDropTables(host *chop.ChiHost) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
-	sql := heredoc.Docf(`
+	sql := heredoc.Doc(`
 		SELECT
 			distinct name, 
-			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"')
+			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_db_query
 		FROM system.tables
-		WHERE database not in (%s) 
-			AND engine like 'Replicated%%'
-		`,
-		ignoredDBs,
+		WHERE engine like 'Replicated%'`,
 	)
 
 	names, sqlStatements, _ := s.getObjectListFromClickHouse([]string{CreatePodFQDN(host)}, sql)
