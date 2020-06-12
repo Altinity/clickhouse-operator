@@ -133,8 +133,9 @@ func (l *Labeler) getLabelsCHIScope() map[string]string {
 func (l *Labeler) getSelectorCHIScope() map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelAppName: LabelAppValue,
-		// Skip chop
+		LabelNamespace: l.namer.getNamePartNamespace(l.chi),
+		LabelAppName:   LabelAppValue,
+		// Skip chop version
 		LabelCHIName: l.namer.getNamePartCHIName(l.chi),
 	}
 }
@@ -155,8 +156,9 @@ func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]stri
 func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelAppName: LabelAppValue,
-		// Skip chop
+		LabelNamespace: l.namer.getNamePartNamespace(cluster),
+		LabelAppName:   LabelAppValue,
+		// Skip chop version
 		LabelCHIName:     l.namer.getNamePartCHIName(cluster),
 		LabelClusterName: l.namer.getNamePartClusterName(cluster),
 	}
@@ -179,8 +181,9 @@ func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
 func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelAppName: LabelAppValue,
-		// Skip chop
+		LabelNamespace: l.namer.getNamePartNamespace(shard),
+		LabelAppName:   LabelAppValue,
+		// Skip chop version
 		LabelCHIName:     l.namer.getNamePartCHIName(shard),
 		LabelClusterName: l.namer.getNamePartClusterName(shard),
 		LabelShardName:   l.namer.getNamePartShardName(shard),
@@ -218,6 +221,22 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 	return l.appendCHILabels(labels)
 }
 
+// getSelectorShardScope gets labels to select a Host-scoped object
+func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
+	// Do not include CHI-provided labels
+	return map[string]string{
+		LabelNamespace: l.namer.getNamePartNamespace(host),
+		LabelAppName:   LabelAppValue,
+		// Skip chop version
+		LabelCHIName:     l.namer.getNamePartCHIName(host),
+		LabelClusterName: l.namer.getNamePartClusterName(host),
+		LabelShardName:   l.namer.getNamePartShardName(host),
+		LabelReplicaName: l.namer.getNamePartReplicaName(host),
+		// skip StatefulSet
+		// skip Zookeeper
+	}
+}
+
 // appendCHILabels appends CHI-provided labels to labels set
 func (l *Labeler) appendCHILabels(dst map[string]string) map[string]string {
 	return util.MergeStringMaps(dst, l.chi.Labels)
@@ -227,21 +246,6 @@ func (l *Labeler) appendCHILabels(dst map[string]string) map[string]string {
 func (l *Labeler) getAnnotationsHostScope(host *chi.ChiHost) map[string]string {
 	// We may want to append some annotations in here
 	return host.GetAnnotations()
-}
-
-// getSelectorShardScope gets labels to select a Host-scoped object
-func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
-	// Do not include CHI-provided labels
-	return map[string]string{
-		LabelAppName: LabelAppValue,
-		// skip chop
-		LabelCHIName:     l.namer.getNamePartCHIName(host),
-		LabelClusterName: l.namer.getNamePartClusterName(host),
-		LabelShardName:   l.namer.getNamePartShardName(host),
-		LabelReplicaName: l.namer.getNamePartReplicaName(host),
-		// skip StatefulSet
-		// skip Zookeeper
-	}
 }
 
 func (l *Labeler) prepareAffinity(podTemplate *chi.ChiPodTemplate, host *chi.ChiHost) {
@@ -347,20 +351,22 @@ func (l *Labeler) processLabelSelectorRequirement(labelSelectorRequirement *meta
 
 // TODO review usage
 func GetSetFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Set, error) {
-	labelApp, ok1 := objMeta.Labels[LabelAppName]
-	// skip chop
-	labelCHI, ok2 := objMeta.Labels[LabelCHIName]
+	labelNamespace, ok1 := objMeta.Labels[LabelNamespace]
+	labelApp, ok2 := objMeta.Labels[LabelAppName]
+	// Skip chop version
+	labelCHI, ok3 := objMeta.Labels[LabelCHIName]
 
-	if (!ok1) || (!ok2) {
+	if !ok1 || !ok2 || !ok3 {
 		return nil, fmt.Errorf(
-			"unable to make set from object. Need to have at least labels '%s' and '%s'. Available Labels: %v",
-			LabelAppName, LabelCHIName, objMeta.Labels,
+			"unable to make set from object. Need to have at least labels '%s', '%s' and '%s'. Available Labels: %v",
+			LabelNamespace, LabelAppName, LabelCHIName, objMeta.Labels,
 		)
 	}
 
 	set := kublabels.Set{
-		LabelAppName: labelApp,
-		// skip chop
+		LabelNamespace: labelNamespace,
+		LabelAppName:   labelApp,
+		// Skip chop version
 		LabelCHIName: labelCHI,
 	}
 
