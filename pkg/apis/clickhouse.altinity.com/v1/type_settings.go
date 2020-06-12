@@ -17,6 +17,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
 	"sort"
@@ -26,6 +27,8 @@ import (
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
 )
+
+const ignoreThreshold = 0.001
 
 // Settings value can be one of:
 // 1. scalar value (string, int, bool, etc).
@@ -141,10 +144,29 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 		int16, uint16,
 		int32, uint32,
 		int64, uint64,
-		float32, float64,
 		bool,
 		string:
 		return fmt.Sprintf("%v", untyped), true
+	case // scalar
+		float32:
+		floatVal := untyped.(float32)
+		_, frac := math.Modf(float64(floatVal))
+		if frac < ignoreThreshold {
+			// consider it int
+			intVal := int64(floatVal)
+			return fmt.Sprintf("%v", intVal), true
+		}
+		return fmt.Sprintf("%f", untyped), true
+	case // scalar
+		float64:
+		floatVal := untyped.(float64)
+		_, frac := math.Modf(floatVal)
+		if frac < ignoreThreshold {
+			// consider it int
+			intVal := int64(floatVal)
+			return fmt.Sprintf("%v", intVal), true
+		}
+		return fmt.Sprintf("%f", untyped), true
 	}
 
 	return "", false
