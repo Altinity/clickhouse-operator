@@ -76,42 +76,49 @@ func NewLabeler(chop *chop.CHOp, chi *chi.ClickHouseInstallation) *Labeler {
 	}
 }
 
+// getLabelsConfigMapCHICommon
 func (l *Labeler) getLabelsConfigMapCHICommon() map[string]string {
 	return util.MergeStringMaps(l.getLabelsCHIScope(), map[string]string{
 		LabelConfigMap: labelConfigMapValueCHICommon,
 	})
 }
 
+// getLabelsConfigMapCHICommonUsers
 func (l *Labeler) getLabelsConfigMapCHICommonUsers() map[string]string {
 	return util.MergeStringMaps(l.getLabelsCHIScope(), map[string]string{
 		LabelConfigMap: labelConfigMapValueCHICommonUsers,
 	})
 }
 
+// getLabelsConfigMapHost
 func (l *Labeler) getLabelsConfigMapHost(host *chi.ChiHost) map[string]string {
 	return util.MergeStringMaps(l.getLabelsHostScope(host, false), map[string]string{
 		LabelConfigMap: labelConfigMapValueHost,
 	})
 }
 
+// getLabelsServiceCHI
 func (l *Labeler) getLabelsServiceCHI() map[string]string {
 	return util.MergeStringMaps(l.getLabelsCHIScope(), map[string]string{
 		LabelService: labelServiceValueCHI,
 	})
 }
 
+// getLabelsServiceCluster
 func (l *Labeler) getLabelsServiceCluster(cluster *chi.ChiCluster) map[string]string {
 	return util.MergeStringMaps(l.getLabelsClusterScope(cluster), map[string]string{
 		LabelService: labelServiceValueCluster,
 	})
 }
 
+// getLabelsServiceShard
 func (l *Labeler) getLabelsServiceShard(shard *chi.ChiShard) map[string]string {
 	return util.MergeStringMaps(l.getLabelsShardScope(shard), map[string]string{
 		LabelService: labelServiceValueShard,
 	})
 }
 
+// getLabelsServiceHost
 func (l *Labeler) getLabelsServiceHost(host *chi.ChiHost) map[string]string {
 	return util.MergeStringMaps(l.getLabelsHostScope(host, false), map[string]string{
 		LabelService: labelServiceValueHost,
@@ -133,8 +140,9 @@ func (l *Labeler) getLabelsCHIScope() map[string]string {
 func (l *Labeler) getSelectorCHIScope() map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelAppName: LabelAppValue,
-		// Skip chop
+		LabelNamespace: l.namer.getNamePartNamespace(l.chi),
+		LabelAppName:   LabelAppValue,
+		// Skip chop version
 		LabelCHIName: l.namer.getNamePartCHIName(l.chi),
 	}
 }
@@ -155,8 +163,9 @@ func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]stri
 func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelAppName: LabelAppValue,
-		// Skip chop
+		LabelNamespace: l.namer.getNamePartNamespace(cluster),
+		LabelAppName:   LabelAppValue,
+		// Skip chop version
 		LabelCHIName:     l.namer.getNamePartCHIName(cluster),
 		LabelClusterName: l.namer.getNamePartClusterName(cluster),
 	}
@@ -179,8 +188,9 @@ func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
 func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelAppName: LabelAppValue,
-		// Skip chop
+		LabelNamespace: l.namer.getNamePartNamespace(shard),
+		LabelAppName:   LabelAppValue,
+		// Skip chop version
 		LabelCHIName:     l.namer.getNamePartCHIName(shard),
 		LabelClusterName: l.namer.getNamePartClusterName(shard),
 		LabelShardName:   l.namer.getNamePartShardName(shard),
@@ -218,6 +228,22 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 	return l.appendCHILabels(labels)
 }
 
+// getSelectorShardScope gets labels to select a Host-scoped object
+func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
+	// Do not include CHI-provided labels
+	return map[string]string{
+		LabelNamespace: l.namer.getNamePartNamespace(host),
+		LabelAppName:   LabelAppValue,
+		// Skip chop version
+		LabelCHIName:     l.namer.getNamePartCHIName(host),
+		LabelClusterName: l.namer.getNamePartClusterName(host),
+		LabelShardName:   l.namer.getNamePartShardName(host),
+		LabelReplicaName: l.namer.getNamePartReplicaName(host),
+		// skip StatefulSet
+		// skip Zookeeper
+	}
+}
+
 // appendCHILabels appends CHI-provided labels to labels set
 func (l *Labeler) appendCHILabels(dst map[string]string) map[string]string {
 	return util.MergeStringMaps(dst, l.chi.Labels)
@@ -229,21 +255,7 @@ func (l *Labeler) getAnnotationsHostScope(host *chi.ChiHost) map[string]string {
 	return host.GetAnnotations()
 }
 
-// getSelectorShardScope gets labels to select a Host-scoped object
-func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
-	// Do not include CHI-provided labels
-	return map[string]string{
-		LabelAppName: LabelAppValue,
-		// skip chop
-		LabelCHIName:     l.namer.getNamePartCHIName(host),
-		LabelClusterName: l.namer.getNamePartClusterName(host),
-		LabelShardName:   l.namer.getNamePartShardName(host),
-		LabelReplicaName: l.namer.getNamePartReplicaName(host),
-		// skip StatefulSet
-		// skip Zookeeper
-	}
-}
-
+// prepareAffinity
 func (l *Labeler) prepareAffinity(podTemplate *chi.ChiPodTemplate, host *chi.ChiHost) {
 	if podTemplate.Spec.Affinity == nil {
 		return
@@ -267,6 +279,7 @@ func (l *Labeler) prepareAffinity(podTemplate *chi.ChiPodTemplate, host *chi.Chi
 	}
 }
 
+// processNodeSelector
 func (l *Labeler) processNodeSelector(nodeSelector *v1.NodeSelector, host *chi.ChiHost) {
 	if nodeSelector == nil {
 		return
@@ -277,6 +290,7 @@ func (l *Labeler) processNodeSelector(nodeSelector *v1.NodeSelector, host *chi.C
 	}
 }
 
+// processPreferredSchedulingTerms
 func (l *Labeler) processPreferredSchedulingTerms(preferredSchedulingTerms []v1.PreferredSchedulingTerm, host *chi.ChiHost) {
 	for i := range preferredSchedulingTerms {
 		nodeSelectorTerm := &preferredSchedulingTerms[i].Preference
@@ -284,6 +298,7 @@ func (l *Labeler) processPreferredSchedulingTerms(preferredSchedulingTerms []v1.
 	}
 }
 
+// processNodeSelectorTerm
 func (l *Labeler) processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm, host *chi.ChiHost) {
 	for i := range nodeSelectorTerm.MatchExpressions {
 		nodeSelectorRequirement := &nodeSelectorTerm.MatchExpressions[i]
@@ -296,6 +311,7 @@ func (l *Labeler) processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm,
 	}
 }
 
+// processNodeSelectorRequirement
 func (l *Labeler) processNodeSelectorRequirement(nodeSelectorRequirement *v1.NodeSelectorRequirement, host *chi.ChiHost) {
 	nodeSelectorRequirement.Key = newNameMacroReplacerHost(host).Replace(nodeSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
@@ -304,6 +320,7 @@ func (l *Labeler) processNodeSelectorRequirement(nodeSelectorRequirement *v1.Nod
 	}
 }
 
+// processPodAffinityTerms
 func (l *Labeler) processPodAffinityTerms(podAffinityTerms []v1.PodAffinityTerm, host *chi.ChiHost) {
 	for i := range podAffinityTerms {
 		podAffinityTerm := &podAffinityTerms[i]
@@ -311,6 +328,7 @@ func (l *Labeler) processPodAffinityTerms(podAffinityTerms []v1.PodAffinityTerm,
 	}
 }
 
+// processWeightedPodAffinityTerms
 func (l *Labeler) processWeightedPodAffinityTerms(weightedPodAffinityTerms []v1.WeightedPodAffinityTerm, host *chi.ChiHost) {
 	for i := range weightedPodAffinityTerms {
 		podAffinityTerm := &weightedPodAffinityTerms[i].PodAffinityTerm
@@ -318,11 +336,13 @@ func (l *Labeler) processWeightedPodAffinityTerms(weightedPodAffinityTerms []v1.
 	}
 }
 
+// processPodAffinityTerm
 func (l *Labeler) processPodAffinityTerm(podAffinityTerm *v1.PodAffinityTerm, host *chi.ChiHost) {
 	l.processLabelSelector(podAffinityTerm.LabelSelector, host)
 	podAffinityTerm.TopologyKey = newNameMacroReplacerHost(host).Replace(podAffinityTerm.TopologyKey)
 }
 
+// processLabelSelector
 func (l *Labeler) processLabelSelector(labelSelector *meta.LabelSelector, host *chi.ChiHost) {
 	if labelSelector == nil {
 		return
@@ -337,6 +357,7 @@ func (l *Labeler) processLabelSelector(labelSelector *meta.LabelSelector, host *
 	}
 }
 
+// processLabelSelectorRequirement
 func (l *Labeler) processLabelSelectorRequirement(labelSelectorRequirement *meta.LabelSelectorRequirement, host *chi.ChiHost) {
 	labelSelectorRequirement.Key = newNameMacroReplacerHost(host).Replace(labelSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
@@ -347,20 +368,22 @@ func (l *Labeler) processLabelSelectorRequirement(labelSelectorRequirement *meta
 
 // TODO review usage
 func GetSetFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Set, error) {
-	labelApp, ok1 := objMeta.Labels[LabelAppName]
-	// skip chop
-	labelCHI, ok2 := objMeta.Labels[LabelCHIName]
+	labelNamespace, ok1 := objMeta.Labels[LabelNamespace]
+	labelApp, ok2 := objMeta.Labels[LabelAppName]
+	// Skip chop version
+	labelCHI, ok3 := objMeta.Labels[LabelCHIName]
 
-	if (!ok1) || (!ok2) {
+	if !ok1 || !ok2 || !ok3 {
 		return nil, fmt.Errorf(
-			"unable to make set from object. Need to have at least labels '%s' and '%s'. Available Labels: %v",
-			LabelAppName, LabelCHIName, objMeta.Labels,
+			"unable to make set from object. Need to have at least labels '%s', '%s' and '%s'. Available Labels: %v",
+			LabelNamespace, LabelAppName, LabelCHIName, objMeta.Labels,
 		)
 	}
 
 	set := kublabels.Set{
-		LabelAppName: labelApp,
-		// skip chop
+		LabelNamespace: labelNamespace,
+		LabelAppName:   labelApp,
+		// Skip chop version
 		LabelCHIName: labelCHI,
 	}
 
