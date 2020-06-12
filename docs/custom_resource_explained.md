@@ -61,15 +61,13 @@ clickhouse-installation-max   23h
 ```
 `.spec.configuration.zookeeper` refers to [&lt;yandex&gt;&lt;zookeeper&gt;&lt;/zookeeper&gt;&lt;/yandex&gt;][server-settings_zookeeper] config section
 
-## .spec.configuration.users
+## .spec.configuration.profiles
+`.spec.configuration.profiles` refers to [&lt;yandex&gt;&lt;profiles&gt;&lt;/profiles&gt;&lt;/yandex&gt;][settings] settings sections.
 ```yaml
-    users:
-      readonly/profile: readonly
+    profiles:
+      readonly/readonly: 1
 ```
-`.spec.configuration.users` refers to [&lt;yandex&gt;&lt;profiles&gt;&lt;/profiles&gt;&lt;users&gt;&lt;/users&gt;&lt;/yandex&gt;][settings] settings sections.
-```yaml
-      profiles/readonly/readonly: "1"
-```
+
 expands into
 ```xml
       <profiles>
@@ -78,11 +76,16 @@ expands into
         </readonly>
       </profiles>
 ```
+
+## .spec.configuration.users
+`.spec.configuration.users` refers to [&lt;yandex&gt;&lt;users&gt;&lt;/users&gt;&lt;/yandex&gt;][settings] settings sections.
 ```yaml
-      test/networks/ip:
+  users:
+    test/networks/ip:
         - "127.0.0.1"
         - "::/0"
 ```
+
 expands into
 ```xml
      <users>
