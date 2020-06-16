@@ -32,6 +32,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// Normalizer
 type Normalizer struct {
 	chop *chop.CHOp
 	chi  *chiv1.ClickHouseInstallation
@@ -39,6 +40,7 @@ type Normalizer struct {
 	withDefaultCluster bool
 }
 
+// NewNormalizer
 func NewNormalizer(chop *chop.CHOp) *Normalizer {
 	return &Normalizer{
 		chop: chop,
@@ -160,6 +162,7 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 	return hostTemplate
 }
 
+// hostApplyHostTemplate
 func hostApplyHostTemplate(host *chiv1.ChiHost, template *chiv1.ChiHostTemplate) {
 	if host.Name == "" {
 		host.Name = template.Spec.Name
@@ -207,6 +210,7 @@ func hostApplyHostTemplate(host *chiv1.ChiHost, template *chiv1.ChiHostTemplate)
 	host.InheritTemplatesFrom(nil, nil, template)
 }
 
+// hostApplyPortsFromSettings
 func hostApplyPortsFromSettings(host *chiv1.ChiHost) {
 	settings := host.GetSettings()
 	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), chDefaultTCPPortNumber)
@@ -214,6 +218,7 @@ func hostApplyPortsFromSettings(host *chiv1.ChiHost) {
 	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), chDefaultInterserverHTTPPortNumber)
 }
 
+// ensurePortValue
 func ensurePortValue(port *int32, settings, _default int32) {
 	if *port != chPortNumberMustBeAssignedLater {
 		// Port has a value already
@@ -461,6 +466,7 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 	n.chi.Spec.Templates.PodTemplatesIndex[template.Name] = template
 }
 
+// newAffinity
 func (n *Normalizer) newAffinity(template *chiv1.ChiPodTemplate) *v1.Affinity {
 	nodeAffinity := n.newNodeAffinity(template)
 	podAffinity := n.newPodAffinity(template)
@@ -478,6 +484,7 @@ func (n *Normalizer) newAffinity(template *chiv1.ChiPodTemplate) *v1.Affinity {
 	}
 }
 
+// mergeAffinity
 func (n *Normalizer) mergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affinity {
 	if src == nil {
 		// Nothing to merge from
@@ -496,6 +503,7 @@ func (n *Normalizer) mergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affin
 	return dst
 }
 
+// newNodeAffinity
 func (n *Normalizer) newNodeAffinity(template *chiv1.ChiPodTemplate) *v1.NodeAffinity {
 	if template.Zone.Key == "" {
 		return nil
@@ -525,6 +533,7 @@ func (n *Normalizer) newNodeAffinity(template *chiv1.ChiPodTemplate) *v1.NodeAff
 	}
 }
 
+// mergeNodeAffinity
 func (n *Normalizer) mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinity) *v1.NodeAffinity {
 	if src == nil {
 		// Nothing to merge from
@@ -580,6 +589,7 @@ func (n *Normalizer) mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinit
 	return dst
 }
 
+// newPodAffinity
 func (n *Normalizer) newPodAffinity(template *chiv1.ChiPodTemplate) *v1.PodAffinity {
 	podAffinity := &v1.PodAffinity{}
 
@@ -652,6 +662,7 @@ func (n *Normalizer) newPodAffinity(template *chiv1.ChiPodTemplate) *v1.PodAffin
 	return nil
 }
 
+// mergePodAffinity
 func (n *Normalizer) mergePodAffinity(dst *v1.PodAffinity, src *v1.PodAffinity) *v1.PodAffinity {
 	if src == nil {
 		// Nothing to merge from
@@ -705,6 +716,7 @@ func (n *Normalizer) mergePodAffinity(dst *v1.PodAffinity, src *v1.PodAffinity) 
 	return dst
 }
 
+// newMatchLabels
 func (n *Normalizer) newMatchLabels(
 	podDistribution *chiv1.ChiPodDistribution,
 	matchLabels map[string]string,
@@ -748,6 +760,7 @@ func (n *Normalizer) newMatchLabels(
 	return util.MergeStringMaps(matchLabels, scopeLabels)
 }
 
+// newPodAntiAffinity
 func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodAntiAffinity {
 	podAntiAffinity := &v1.PodAntiAffinity{}
 
@@ -856,6 +869,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 	return nil
 }
 
+// mergePodAntiAffinity
 func (n *Normalizer) mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.PodAntiAffinity {
 	if src == nil {
 		// Nothing to merge from
@@ -909,6 +923,7 @@ func (n *Normalizer) mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAn
 	return dst
 }
 
+// addPodAffinityTermWithMatchLabels
 func (n *Normalizer) addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTerm, matchLabels map[string]string) []v1.PodAffinityTerm {
 	return append(terms,
 		v1.PodAffinityTerm{
@@ -934,6 +949,7 @@ func (n *Normalizer) addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTer
 	)
 }
 
+// addPodAffinityTermWithMatchExpressions
 func (n *Normalizer) addPodAffinityTermWithMatchExpressions(terms []v1.PodAffinityTerm, matchExpressions []v12.LabelSelectorRequirement) []v1.PodAffinityTerm {
 	return append(terms,
 		v1.PodAffinityTerm{
@@ -958,6 +974,7 @@ func (n *Normalizer) addPodAffinityTermWithMatchExpressions(terms []v1.PodAffini
 	)
 }
 
+// addWeightedPodAffinityTermWithMatchLabels
 func (n *Normalizer) addWeightedPodAffinityTermWithMatchLabels(
 	terms []v1.WeightedPodAffinityTerm,
 	weight int32,
@@ -1061,6 +1078,7 @@ func (n *Normalizer) normalizeClusters() {
 	})
 }
 
+// ensureCluster
 func (n *Normalizer) ensureCluster() {
 	// Introduce default cluster in case it is required
 	if len(n.chi.Spec.Configuration.Clusters) == 0 {
@@ -1277,6 +1295,7 @@ func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 	return nil
 }
 
+// createHostsField
 func (n *Normalizer) createHostsField(cluster *chiv1.ChiCluster) {
 	cluster.Layout.HostsField = chiv1.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
 
