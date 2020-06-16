@@ -1386,12 +1386,13 @@ func (n *Normalizer) ensureClusterLayoutReplicas(layout *chiv1.ChiClusterLayout)
 func (n *Normalizer) normalizeShard(shard *chiv1.ChiShard, cluster *chiv1.ChiCluster, shardIndex int) {
 	n.normalizeShardName(shard, shardIndex)
 	n.normalizeShardWeight(shard)
-	n.normalizeShardInternalReplication(shard)
 	// For each shard of this normalized cluster inherit cluster's PodTemplate
 	shard.InheritTemplatesFrom(cluster)
 	// Normalize Replicas
 	n.normalizeShardReplicasCount(shard, cluster.Layout.ReplicasCount)
 	n.normalizeShardHosts(shard, cluster, shardIndex)
+	// Internal replication uses ReplicasCount thus it has to be normalized after shard ReplicaCount normalized
+	n.normalizeShardInternalReplication(shard)
 }
 
 // normalizeReplica normalizes a replica - walks over all fields
@@ -1558,6 +1559,7 @@ func (n *Normalizer) normalizeHostPorts(host *chiv1.ChiHost) {
 // normalizeShardInternalReplication ensures reasonable values in
 // .spec.configuration.clusters.layout.shards.internalReplication
 func (n *Normalizer) normalizeShardInternalReplication(shard *chiv1.ChiShard) {
+	// Shards with replicas are expected to have internal replication on by default
 	defaultInternalReplication := false
 	if shard.ReplicasCount > 1 {
 		defaultInternalReplication = true
