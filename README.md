@@ -8,7 +8,7 @@ ClickHouse Operator creates, configures and manages ClickHouse clusters running 
 [![tags](https://img.shields.io/github/tag/altinity/clickhouse-operator.svg)](https://github.com/altinity/clickhouse-operator/tags)
 [![Go Report Card](https://goreportcard.com/badge/github.com/altinity/clickhouse-operator)](https://goreportcard.com/report/github.com/altinity/clickhouse-operator)
 [![Docker Pulls](https://img.shields.io/docker/pulls/altinity/clickhouse-operator.svg)](https://hub.docker.com/r/altinity/clickhouse-operator)
-[![CircleCI](https://circleci.com/gh/altinity/clickhouse-operator.svg?style=svg)](https://circleci.com/gh/altinity/clickhouse-operator)
+[![CircleCI](https://circleci.com/gh/Altinity/clickhouse-operator.svg?style=svg)](https://circleci.com/gh/Altinity/clickhouse-operator)
 
 
 ## Features
