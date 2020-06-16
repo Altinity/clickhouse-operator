@@ -30,7 +30,7 @@ import (
 
 const (
 	// Comma-separated ''-enclosed list of database names to be ignored
-	ignoredDBs = "'system'"
+	// ignoredDBs = "'system'"
 
 	// Max number of tries for SQL queries
 	defaultMaxTries = 10
@@ -88,11 +88,29 @@ func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]
 	return names, sqlStatements, nil
 }
 
-// clusterGetCreateDistributedObjects returns a list of objects that needs to be created on a shard in a cluster
+// getCreateDistributedObjects returns a list of objects that needs to be created on a shard in a cluster
 // That includes all Distributed tables, corresponding local tables, and databases, if necessary
-func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) ([]string, []string, error) {
-	// cluster_tables := fmt.Sprintf("cluster('%s', system, tables)", cluster.Name)
-	hosts := CreatePodFQDNsOfCluster(cluster)
+func (s *Schemer) getCreateDistributedObjects(host *chop.ChiHost) ([]string, []string, error) {
+	hosts := CreatePodFQDNsOfCluster(host.GetCluster())
+	nHosts := len(hosts)
+	if nHosts <=1 {
+		log.V(1).Info("Single host in a cluster. Nothing to create a schema from.")
+		return nil, nil, nil
+	}
+	
+	var hostIndex int
+	for i,h := range hosts {
+		if h == CreatePodFQDN(host) {
+			hostIndex = i
+			break
+		}
+	}
+
+	// remove new host from the list. See https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
+	hosts[hostIndex] = hosts[nHosts-1]
+	hosts = hosts[:nHosts-1]
+	log.V(1).Infof("Extracting distributed table definitions from %v", hosts)
+	
 	cluster_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
 
 	sqlDBs := heredoc.Doc(strings.ReplaceAll(`
@@ -129,7 +147,8 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 				t.create_table_query,
 				1 AS order
 			FROM cluster('all-sharded', system.tables) tables
-			LEFT JOIN system.tables t USING (database, name)
+			LEFT JOIN (SELECT distinct database, name, create_table_query 
+			             FROM cluster('all-sharded', system.tables) SETTINGS skip_unavailable_shards = 1)  t USING (database, name)
 			WHERE engine = 'Distributed' AND t.create_table_query != ''
 			SETTINGS skip_unavailable_shards = 1
 		) tables
@@ -139,8 +158,8 @@ func (s *Schemer) clusterGetCreateDistributedObjects(cluster *chop.ChiCluster) (
 		cluster_tables,
 	))
 
-	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sqlDBs)
-	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(cluster.GetCHI()), sqlTables)
+	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(host.GetCHI()), sqlDBs)
+	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfChi(host.GetCHI()), sqlTables)
 	return append(names1, names2...), append(sqlStatements1, sqlStatements2...) , nil
 }
 
@@ -165,13 +184,13 @@ func (s *Schemer) getCreateReplicaObjects(host *chop.ChiHost) ([]string, []strin
 	replicas := CreatePodFQDNsOfShard(shard)
 	nReplicas := len(replicas)
 	if nReplicas <=1 {
-		log.V(1).Info("Single replica in a shard. Nothing to create from")
+		log.V(1).Info("Single replica in a shard. Nothing to create a schema from.")
 		return nil, nil, nil
 	}
 	// remove new replica from the list. See https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
 	replicas[replicaIndex] = replicas[nReplicas-1]
 	replicas = replicas[:nReplicas-1]
-	log.V(1).Infof("Extracting table definitions from %v", replicas)
+	log.V(1).Infof("Extracting replicated table definitions from %v", replicas)
 	
 	system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(replicas, ","))
 	
@@ -204,15 +223,12 @@ func (s *Schemer) getCreateReplicaObjects(host *chop.ChiHost) ([]string, []strin
 func (s *Schemer) hostGetDropTables(host *chop.ChiHost) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
-	sql := heredoc.Docf(`
+	sql := heredoc.Doc(`
 		SELECT
 			distinct name, 
-			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"')
+			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_db_query
 		FROM system.tables
-		WHERE database not in (%s) 
-			AND engine like 'Replicated%%'
-		`,
-		ignoredDBs,
+		WHERE engine like 'Replicated%'`,
 	)
 
 	names, sqlStatements, _ := s.getObjectListFromClickHouse([]string{CreatePodFQDN(host)}, sql)
@@ -234,7 +250,7 @@ func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
 	log.V(1).Infof("Creating replica objects %v at %s", names, host.Address.HostName)
 	_ = s.hostApplySQLs(host, createSQLs, true)
 
-	names, createSQLs, _ = s.clusterGetCreateDistributedObjects(host.GetCluster())
+	names, createSQLs, _ = s.getCreateDistributedObjects(host)
 	log.V(1).Infof("Creating distributed objects %v at %s", names, host.Address.HostName)
 	return s.hostApplySQLs(host, createSQLs, true)
 }
