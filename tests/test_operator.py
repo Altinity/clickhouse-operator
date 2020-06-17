@@ -78,7 +78,8 @@ def test_operator_upgrade(config, version_from, version_to = settings.operator_v
 
         with When(f"upgrade operator to {version_to}"):
             set_operator_version(version_to, timeout=120)
-            kube_wait_chi_status(chi, "Completed", retries = 5)
+            time.sleep(5)
+            kube_wait_chi_status(chi, "Completed", retries = 6)
             kube_wait_objects(chi, [1,1,2])
             new_start_time = kube_get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
             # TODO: assert
@@ -99,6 +100,7 @@ def test_operator_restart(config, version = settings.operator_version):
 
         with When("Restart operator"):
             restart_operator()
+            time.sleep(5)
             kube_wait_chi_status(chi, "Completed")
             kube_wait_objects(chi, [1,1,2])
             new_start_time = kube_get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
@@ -136,7 +138,6 @@ def restart_operator(ns = settings.operator_namespace, timeout=60):
     kube_wait_object("pod", name="", ns = ns, label="-l app=clickhouse-operator")
     pod_name = kube_get("pod", name="", ns = ns, label="-l app=clickhouse-operator")["items"][0]["metadata"]["name"]
     kube_wait_pod_status(pod_name, "Running", ns = ns)
-    time.sleep(5)
 
 def require_zookeeper():
     with Given("Install Zookeeper if missing"):
@@ -203,7 +204,7 @@ def test_011():
 
         with And("Password should be encrypted"):
             cfm = kube_get("configmap", "chi-test-011-secured-cluster-common-usersd")
-            users_xml = cfm["data"]["users.xml"]
+            users_xml = cfm["data"]["chop-generated-users.xml"]
             assert "<password>" not in users_xml
             assert "<password_sha256_hex>" in users_xml
 
@@ -289,17 +290,19 @@ def test_013():
         clickhouse_query("test-013-add-shards", 
                          "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events ENGINE = Distributed('all-sharded', system, events)")
 
-    with Then("Add one more shard"):
-        create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [2, 2, 3], "do_not_delete": 1})
+    with Then("Add shards"):
+        create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [3, 3, 4], "do_not_delete": 1})
         
-    with And("Schema objects should be migrated to the new shard"):
+    with And("Schema objects should be migrated to new shards"):
         for obj in schema_objects:
             out = clickhouse_query("test-013-add-shards", f"select count() from system.tables where name = '{obj}'",
                                host="chi-test-013-add-shards-default-1-0")
             assert out == "1"
+            out = clickhouse_query("test-013-add-shards", f"select count() from system.tables where name = '{obj}'",
+                               host="chi-test-013-add-shards-default-2-0")
+            assert out == "1"
 
-    with Then("Remove shard"):
-        create_and_check("configs/test-013-add-shards-1.yaml", {"object_counts": [1,1,2]})
+    kube_delete_chi("test-013-add-shards")
 
 @TestScenario
 @Name("test_014. Test that replication works")
@@ -414,6 +417,10 @@ def test_016():
         clickhouse_query("test-016-settings", query = "system flush logs")
         out = clickhouse_query_with_error("test-016-settings", query = "select count() from system.query_log")
         assert "doesn't exist" in out
+
+    with And("max_memory_usage should be 7000000000"):
+        out = clickhouse_query("test-016-settings", query = "select value from system.settings where name='max_memory_usage'")
+        assert out == "7000000000"
 
     kube_delete_chi("test-016-settings")
 
