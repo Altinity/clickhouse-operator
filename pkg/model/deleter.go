@@ -15,16 +15,32 @@
 package model
 
 import (
+	"k8s.io/api/core/v1"
+
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 func HostCanDeletePVC(host *chiv1.ChiHost, pvcName string) bool {
-	policy := chiv1.PVCReclaimPolicyRetain
-	host.WalkVolumeClaimTemplates(func(template *chiv1.ChiVolumeClaimTemplate) {
-		if pvcName == CreatePVCName(template, host) {
-			policy = template.PVCReclaimPolicy
+	// In any unknown cases just delete PVC with unclear bindings
+	policy := chiv1.PVCReclaimPolicyDelete
+
+	// What host, VolumeMount and VolumeClaimTemplate this PVC is made from?
+	host.WalkVolumeMounts(func(volumeMount *v1.VolumeMount) {
+		volumeClaimTemplateName := volumeMount.Name
+		volumeClaimTemplate, ok := host.CHI.GetVolumeClaimTemplate(volumeClaimTemplateName)
+		if !ok {
+			// No this is not a reference to VolumeClaimTemplate
+			return
+		}
+
+		if pvcName == CreatePVCName(host, volumeMount, volumeClaimTemplate) {
+			// This PVC is made from these host, VolumeMount and VolumeClaimTemplate
+			// So, what policy does this VolumeClaimTemplate have?
+			policy = volumeClaimTemplate.PVCReclaimPolicy
+			return
 		}
 	})
 
+	// Delete all explicitly specified as deletable PVCs and all PVCs of un-templated or unclear origin
 	return policy == chiv1.PVCReclaimPolicyDelete
 }

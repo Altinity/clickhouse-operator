@@ -20,12 +20,14 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 type xmlNode struct {
 	children []*xmlNode
 	tag      string
-	value    interface{}
+	value    *chiv1.Setting
 }
 
 const (
@@ -34,24 +36,24 @@ const (
 )
 
 // GenerateXML creates XML representation from the provided input
-func GenerateXML(w io.Writer, input map[string]interface{}, prefix string) {
+func GenerateXML(w io.Writer, settings chiv1.Settings, prefix string) {
 	// paths is sorted set of normalized paths (maps keys) from 'input'
-	paths := make([]string, 0, len(input))
+	paths := make([]string, 0, len(settings))
 
 	// data is copy of 'input' with:
 	// 1. paths (map keys) are normalized in terms of trimmed '/'
 	// 2. all map keys listed in 'excludes' are excluded
-	data := make(map[string]interface{})
+	data := make(map[string]string)
 	// Skip excluded paths
-	for key, value := range input {
+	for name := range settings {
 		// 'key' may be non-normalized, and may have starting or trailing '/'
 		// 'path' is normalized path without starting and trailing '/', ex.: 'test/quotas'
-		path := normalizePath(prefix, key)
+		path := normalizePath(prefix, name)
 		if path == "" {
 			continue
 		}
 		paths = append(paths, path)
-		data[path] = value
+		data[path] = name
 	}
 	sort.Strings(paths)
 
@@ -66,7 +68,8 @@ func GenerateXML(w io.Writer, input map[string]interface{}, prefix string) {
 			// Empty path? Should not be, but double check
 			continue
 		}
-		xmlTreeRoot.addBranch(tags, data[path])
+		name := data[path]
+		xmlTreeRoot.addBranch(tags, settings[name])
 	}
 
 	// return XML
@@ -89,12 +92,12 @@ func normalizePath(prefix, path string) string {
 }
 
 // addBranch ensures branch esists and assign value to the last tagged node
-func (n *xmlNode) addBranch(tags []string, value interface{}) {
+func (n *xmlNode) addBranch(tags []string, setting *chiv1.Setting) {
 	node := n
 	for _, tag := range tags {
 		node = node.addChild(tag)
 	}
-	node.value = value
+	node.value = setting
 }
 
 // addChild add new or return existing child with matching tag
@@ -122,39 +125,22 @@ func (n *xmlNode) addChild(tag string) *xmlNode {
 
 // buildXML generates XML from xmlNode type linked list
 func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) {
-	switch n.value.(type) {
-	case []interface{}:
-		// Value is an array of "what would be a string"
-		// Repeat tag with each value, like:
-		// <yandex>
-		//    ...
-		//    <networks>
-		//        <ip>::/64</ip>
-		//        <ip>203.0.113.0/24</ip>
-		//        <ip>2001:DB8::/32</ip>
-		for _, value := range n.value.([]interface{}) {
-			stringValue := value.(string)
-			n.writeTagWithValue(w, stringValue, indent, tabsize)
-		}
-	case []string:
-		// Value is an array of strings
-		// Repeat tag with each value, like:
-		// <yandex>
-		//    ...
-		//    <networks>
-		//        <ip>::/64</ip>
-		//        <ip>203.0.113.0/24</ip>
-		//        <ip>2001:DB8::/32</ip>
-		for _, value := range n.value.([]string) {
-			n.writeTagWithValue(w, value, indent, tabsize)
-		}
-	case string, int, int8, int16, int32, int64, uint, uint8, uint32, uint64, float32, float64:
-		// value must be casted to a string
-		stringValue := fmt.Sprint(n.value)
-		n.writeTagWithValue(w, stringValue, indent, tabsize)
-	default:
-		// no value node, may have nested tags
+	if n.value == nil {
+		// No value node, may have nested tags
 		n.writeTagNoValue(w, indent, tabsize)
+		return
+	}
+
+	if n.value.IsScalar() {
+		// Scalar node
+		n.writeTagWithValue(w, n.value.Scalar(), indent, tabsize)
+		return
+	}
+
+	// Vector node
+
+	for _, value := range n.value.Vector() {
+		n.writeTagWithValue(w, value, indent, tabsize)
 	}
 }
 

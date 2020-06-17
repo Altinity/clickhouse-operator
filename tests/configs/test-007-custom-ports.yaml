@@ -13,13 +13,6 @@ spec:
           containers:
             - name: clickhouse
               image: yandex/clickhouse-server:19.16
-              ports:
-                - name: http
-                  containerPort: 8124
-                - name: tcp
-                  containerPort: 9001
-                - name: interserver
-                  containerPort: 9010
   configuration:
     clusters:
       - name: single

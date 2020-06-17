@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -34,7 +35,7 @@ const (
 type ClickHouseInstallation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" yaml:"metadata"`
-	Spec              ChiSpec   `json:"spec"     yaml:"spec"`
+	Spec              ChiSpec   `json:"spec"               yaml:"spec"`
 	Status            ChiStatus `json:"status"`
 }
 
@@ -57,11 +58,12 @@ type ClickHouseOperatorConfiguration struct {
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
-	Stop          string           `json:"stop,omitempty"         yaml:"stop"`
-	Defaults      ChiDefaults      `json:"defaults,omitempty"     yaml:"defaults"`
-	Configuration ChiConfiguration `json:"configuration"          yaml:"configuration"`
-	Templates     ChiTemplates     `json:"templates,omitempty"    yaml:"templates"`
-	UseTemplates  []ChiUseTemplate `json:"useTemplates,omitempty" yaml:"useTemplates"`
+	Stop                   string           `json:"stop,omitempty"                   yaml:"stop"`
+	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern"`
+	Defaults               ChiDefaults      `json:"defaults,omitempty"               yaml:"defaults"`
+	Configuration          ChiConfiguration `json:"configuration"                    yaml:"configuration"`
+	Templates              ChiTemplates     `json:"templates,omitempty"              yaml:"templates"`
+	UseTemplates           []ChiUseTemplate `json:"useTemplates,omitempty"           yaml:"useTemplates"`
 }
 
 // ChiUseTemplates defines UseTemplates section of ClickHouseInstallation resource
@@ -201,9 +203,10 @@ type ChiHost struct {
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data
-	Address ChiHostAddress          `json:"-"`
-	Config  ChiHostConfig           `json:"-"`
-	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+	Address     ChiHostAddress          `json:"-"`
+	Config      ChiHostConfig           `json:"-"`
+	StatefulSet *v1.StatefulSet         `json:"-" testdiff:"ignore"`
+	CHI         *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiHostTemplate defines full Host Template
@@ -264,8 +267,9 @@ type ChiTemplates struct {
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet
 type ChiPodTemplate struct {
-	Name string             `json:"name"            yaml:"name"`
-	Zone ChiPodTemplateZone `json:"zone"            yaml:"zone""`
+	Name         string             `json:"name"                    yaml:"name"`
+	GenerateName string             `json:"generateName,omitempty"  yaml:"generateName"`
+	Zone         ChiPodTemplateZone `json:"zone"                    yaml:"zone"`
 	// DEPRECATED - to be removed soon
 	Distribution    string               `json:"distribution"    yaml:"distribution"`
 	PodDistribution []ChiPodDistribution `json:"podDistribution" yaml:"podDistribution"`
@@ -427,7 +431,7 @@ type OperatorConfig struct {
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
 	CHUsername string `json:"chUsername" yaml:"chUsername"`
 	CHPassword string `json:"chPassword" yaml:"chPassword"`
-	CHPort     int    `json:"chPort"     yaml:"chPort""`
+	CHPort     int    `json:"chPort"     yaml:"chPort"`
 
 	Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
 	Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`

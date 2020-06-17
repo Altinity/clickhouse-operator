@@ -69,9 +69,11 @@ spec:
   #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
+      type: object
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             # Need to be StringBool
             stop:
@@ -97,6 +99,8 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
+            namespaceDomainPattern:
+              type: string
             defaults:
               type: object
               properties:
@@ -185,6 +189,8 @@ spec:
                   type: object
                 files:
                   type: object
+                  additionalProperties:
+                    type: string
                 clusters:
                   type: array
                   items:
@@ -508,6 +514,8 @@ spec:
                       - name
                     properies:
                       name:
+                        type: string
+                      generateName:
                         type: string
                       zone:
                         type: object
@@ -698,9 +706,11 @@ spec:
   #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
+      type: object
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             # Need to be StringBool
             stop:
@@ -726,6 +736,8 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
+            namespaceDomainPattern:
+              type: string
             defaults:
               type: object
               properties:
@@ -814,6 +826,8 @@ spec:
                   type: object
                 files:
                   type: object
+                  additionalProperties:
+                    type: string
                 clusters:
                   type: array
                   items:
@@ -1138,6 +1152,8 @@ spec:
                     properies:
                       name:
                         type: string
+                      generateName:
+                        type: string
                       zone:
                         type: object
                         required:
@@ -1282,9 +1298,11 @@ spec:
   #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
+      type: object
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             watchNamespaces:
               type: array
@@ -1371,7 +1389,7 @@ subjects:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.10.0
 # etc-clickhouse-operator-files
 #
 apiVersion: v1
@@ -1463,7 +1481,7 @@ data:
     chConfigUserDefaultPassword: "default"
     
     # Default host_regexp to limit network connectivity from outside
-    ChConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+    chConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
     
     ################################################
     ##
@@ -1507,7 +1525,7 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.10.0
 # etc-clickhouse-operator-confd-files
 #
 apiVersion: v1
@@ -1522,7 +1540,7 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.10.0
 # etc-clickhouse-operator-configd-files
 #
 apiVersion: v1
@@ -1569,7 +1587,7 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.10.0
 # etc-clickhouse-operator-templatesd-files
 #
 apiVersion: v1
@@ -1668,7 +1686,7 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.10.0
 # etc-clickhouse-operator-usersd-files
 #
 apiVersion: v1
@@ -1717,8 +1735,8 @@ data:
 # Possible Template Parameters:
 #
 # dev
-# altinity/clickhouse-operator:0.9.9
-# altinity/metrics-exporter:0.9.9
+# altinity/clickhouse-operator:0.10.0
+# altinity/metrics-exporter:0.10.0
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -1761,7 +1779,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.9.9
+          image: altinity/clickhouse-operator:0.10.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -1826,7 +1844,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.9.9
+          image: altinity/metrics-exporter:0.10.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder

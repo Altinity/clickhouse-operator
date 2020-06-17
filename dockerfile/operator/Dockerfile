@@ -2,7 +2,7 @@
 # ===== Builder =====
 # ===================
 
-FROM golang:1.12.7 AS builder-operator
+FROM golang:1.13 AS builder
 
 # Install required packages
 RUN apt-get update && apt-get install -y apt-utils gettext-base
@@ -39,11 +39,11 @@ ADD config/templates.d/* /etc/clickhouse-operator/templates.d/
 ADD config/users.d/*     /etc/clickhouse-operator/users.d/
 
 # Copy clickhouse-operator binary into operator image from builder
-COPY --from=builder-operator /tmp/clickhouse-operator .
+COPY --from=builder /tmp/clickhouse-operator .
 
 # Run /clickhouse-operator -alsologtostderr=true -v=1
 # We can specify additional options, such as:
-#   --config=/path/to/config
+#   --config=/path/to/confi g
 #   --kube-config=/path/to/kubeconf
 ENTRYPOINT ["/clickhouse-operator"]
 CMD ["-logtostderr=true", "-v=1"]

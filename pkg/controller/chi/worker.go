@@ -16,16 +16,19 @@ package chi
 
 import (
 	"fmt"
-
+	"github.com/juliangruber/go-intersect"
+	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type worker struct {
@@ -37,6 +40,7 @@ type worker struct {
 	creator    *chopmodel.Creator
 }
 
+// newWorker
 func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
 	return &worker{
 		c:          c,
@@ -52,13 +56,16 @@ func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
 	}
 }
 
-// run is an endless work loop, expected to be runin a thread
+// run is an endless work loop, expected to be run in a thread
 func (w *worker) run() {
+	w.a.V(2).Info("run() - start")
+	defer w.a.V(2).Info("run() - end")
+
 	for {
 		// Get() blocks until it can return an item
 		item, shutdown := w.queue.Get()
 		if shutdown {
-			w.a.Info("runWorker(): shutdown request")
+			w.a.Info("shutdown request")
 			return
 		}
 
@@ -80,6 +87,9 @@ func (w *worker) run() {
 
 // processWorkItem processes one work item according to its type
 func (w *worker) processItem(item interface{}) error {
+	w.a.V(3).Info("processItem() - start")
+	defer w.a.V(3).Info("processItem() - end")
+
 	switch item.(type) {
 
 	case *ReconcileChi:
@@ -147,7 +157,11 @@ func (w *worker) processItem(item interface{}) error {
 	return nil
 }
 
+// normalize
 func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseInstallation {
+	w.a.V(3).Info("normalize() - start")
+	defer w.a.V(3).Info("normalize() - end")
+
 	var withDefaultCluster bool
 
 	if chi == nil {
@@ -169,9 +183,11 @@ func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseIns
 
 // updateCHI sync CHI which was already created earlier
 func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
+	w.a.V(3).Info("updateCHI() - start")
+	defer w.a.V(3).Info("updateCHI() - end")
 
 	if (old != nil) && (new != nil) && (old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion) {
-		w.a.V(2).Info("updateCHI(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
+		w.a.V(3).Info("updateCHI(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
 		// No need to react
 		return nil
 	}
@@ -183,7 +199,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 
 	if !actionPlan.HasActionsToDo() {
 		// Nothing to do - no changes found - no need to react
-		w.a.V(2).Info("updateCHI(%s/%s) - no changes found", new.Namespace, new.Name)
+		w.a.V(3).Info("updateCHI(%s/%s) - ResourceVersion changed, but no actual changes found", new.Namespace, new.Name)
 		return nil
 	}
 
@@ -207,7 +223,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
-    w.a.V(1).
+	w.a.V(1).
 		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
 		WithStatusAction(new).
 		Info("updateCHI(%s/%s) remove scheduled for deletion items", new.Namespace, new.Name)
@@ -230,7 +246,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		WithStatusAction(new).
 		Info("updateCHI(%s/%s) update monitoring list", new.Namespace, new.Name)
 
-	w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfChi(new))
+	w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfCHI(new))
 
 	// Update CHI object
 	(&new.Status).ReconcileComplete()
@@ -246,6 +262,9 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 
 // reconcile reconciles ClickHouseInstallation
 func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
+	w.a.V(2).Info("reconcile() - start")
+	defer w.a.V(2).Info("reconcile() - end")
+
 	w.creator = chopmodel.NewCreator(w.c.chop, chi)
 	return chi.WalkTillError(
 		w.reconcileCHI,
@@ -257,6 +276,9 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 
 // reconcileCHI reconciles CHI global objects
 func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
+	w.a.V(2).Info("reconcileCHI() - start")
+	defer w.a.V(2).Info("reconcileCHI() - end")
+
 	// 1. CHI Service
 	service := w.creator.CreateServiceCHI()
 	if err := w.reconcileService(chi, service); err != nil {
@@ -298,6 +320,9 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 
 // reconcileCluster reconciles Cluster, excluding nested shards
 func (w *worker) reconcileCluster(cluster *chop.ChiCluster) error {
+	w.a.V(2).Info("reconcileCluster() - start")
+	defer w.a.V(2).Info("reconcileCluster() - end")
+
 	// Add Cluster's Service
 	service := w.creator.CreateServiceCluster(cluster)
 	if service == nil {
@@ -310,6 +335,9 @@ func (w *worker) reconcileCluster(cluster *chop.ChiCluster) error {
 
 // reconcileShard reconciles Shard, excluding nested replicas
 func (w *worker) reconcileShard(shard *chop.ChiShard) error {
+	w.a.V(2).Info("reconcileShard() - start")
+	defer w.a.V(2).Info("reconcileShard() - end")
+
 	// Add Shard's Service
 	service := w.creator.CreateServiceShard(shard)
 	if service == nil {
@@ -322,6 +350,8 @@ func (w *worker) reconcileShard(shard *chop.ChiShard) error {
 
 // reconcileHost reconciles ClickHouse host
 func (w *worker) reconcileHost(host *chop.ChiHost) error {
+	w.a.V(2).Info("reconcileHost() - start")
+	defer w.a.V(2).Info("reconcileHost() - end")
 
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileStarted).
@@ -372,7 +402,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 				WithEvent(host.CHI, eventActionCreate, eventReasonCreateCompleted).
 				WithStatusAction(host.CHI).
 				Info("Created schema objects on host %s replica %d to shard %d in cluster %s",
-							host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+					host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		} else {
 			w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
 				WithStatusError(host.CHI).
@@ -385,6 +415,9 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 // deleteCHI deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
 func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
+	w.a.V(2).Info("deleteCHI() - start")
+	defer w.a.V(2).Info("deleteCHI() - end")
+
 	var err error
 
 	w.a.V(1).
@@ -422,8 +455,33 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 	return nil
 }
 
+// deleteTables
+func (w *worker) deleteTables(host *chop.ChiHost) error {
+	if !host.CanDeleteAllPVCs() {
+		return nil
+	}
+	err := w.schemer.HostDeleteTables(host)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(host.CHI).
+			Info("Deleted tables on host %s replica %d to shard %d in cluster %s",
+				host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+	} else {
+		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(host.CHI).
+			Error("FAILED to delete tables on host %s with error %v", host.Name, err)
+	}
+
+	return err
+}
+
 // deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
 func (w *worker) deleteHost(host *chop.ChiHost) error {
+	w.a.V(2).Info("deleteHost() - start")
+	defer w.a.V(2).Info("deleteHost() - end")
+
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionDelete, eventReasonDeleteStarted).
 		WithStatusAction(host.CHI).
@@ -438,30 +496,15 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 	}
 
 	// Each host consists of
-	// 1. Tables on host - we need to delete tables on the host in order to clean Zookeeper data
-	// 2. StatefulSet
-	// 3. PersistentVolumeClaim
-	// 4. ConfigMap
-	// 5. Service
-	// Need to delete all these item
+	// 1. User-level objects - tables on the host
+	//    We need to delete tables on the host in order to clean Zookeeper data.
+	//    If just delete tables, Zookeeper will still keep track of non-existent tables
+	// 2. Kubernetes-level objects - such as StatefulSet, PVC(s), ConfigMap(s), Service(s)
+	// Need to delete all these items
 
-	if host.CanDeleteAllPVCs() {
-		err := w.schemer.HostDeleteTables(host)
-
-		if err == nil {
-			w.a.V(1).
-				WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
-				WithStatusAction(host.CHI).
-				Info("Deleted tables on host %s replica %d to shard %d in cluster %s",
-					host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-		} else {
-			w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
-				WithStatusError(host.CHI).
-				Error("FAILED to delete tables on host %s with error %v", host.Name, err)
-		}
-	}
-
-	err := w.c.deleteHost(host)
+	var err error
+	err = w.deleteTables(host)
+	err = w.c.deleteHost(host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
 	host.CHI.Status.DeletedHostsCount++
@@ -483,6 +526,9 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 
 // deleteShard deletes all kubernetes resources related to shard *chop.ChiShard
 func (w *worker) deleteShard(shard *chop.ChiShard) error {
+	w.a.V(2).Info("deleteShard() - start")
+	defer w.a.V(2).Info("deleteShard() - end")
+
 	w.a.V(1).
 		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteStarted).
 		WithStatusAction(shard.CHI).
@@ -504,6 +550,9 @@ func (w *worker) deleteShard(shard *chop.ChiShard) error {
 
 // deleteCluster deletes all kubernetes resources related to cluster *chop.ChiCluster
 func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
+	w.a.V(2).Info("deleteCluster() - start")
+	defer w.a.V(2).Info("deleteCluster() - end")
+
 	w.a.V(1).
 		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteStarted).
 		WithStatusAction(cluster.CHI).
@@ -525,7 +574,11 @@ func (w *worker) deleteCluster(cluster *chop.ChiCluster) error {
 	return nil
 }
 
+// createCHIFromObjectMeta
 func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.ClickHouseInstallation, error) {
+	w.a.V(3).Info("createCHIFromObjectMeta() - start")
+	defer w.a.V(3).Info("createCHIFromObjectMeta() - end")
+
 	chi, err := w.c.GetCHIByObjectMeta(objectMeta)
 	if err != nil {
 		return nil, err
@@ -539,7 +592,11 @@ func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.Cli
 	return chi, nil
 }
 
+// createClusterFromObjectMeta
 func (w *worker) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.ChiCluster, error) {
+	w.a.V(3).Info("createClusterFromObjectMeta() - start")
+	defer w.a.V(3).Info("createClusterFromObjectMeta() - end")
+
 	clusterName, err := chopmodel.GetClusterNameFromObjectMeta(objectMeta)
 	if err != nil {
 		return nil, fmt.Errorf("ObjectMeta %s does not generated by CHI %v", objectMeta.Name, err)
@@ -558,47 +615,117 @@ func (w *worker) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop
 	return cluster, nil
 }
 
+// updateConfigMap
+func (w *worker) updateConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
+	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
+			WithStatusAction(chi).
+			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+	} else {
+		w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("Update ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
+	}
+
+	return err
+}
+
+// createConfigMap
+func (w *worker) createConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
+	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(chi).
+			Info("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+	} else {
+		w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("Create ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
+	}
+
+	return err
+}
+
 // reconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
 func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
+	w.a.V(2).Info("reconcileConfigMap() - start")
+	defer w.a.V(2).Info("reconcileConfigMap() - end")
+
 	// Check whether this object already exists in k8s
 	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, false)
 
 	if curConfigMap != nil {
-		// Object found - update it
-		_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
-
-		if err == nil {
-			w.a.V(1).
-				WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
-				WithStatusAction(chi).
-				Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
-		} else {
-			w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
-				WithStatusAction(chi).
-				WithStatusError(chi).
-				Error("Update ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
-		}
-
-		return err
+		return w.updateConfigMap(chi, configMap)
 	}
 
 	if apierrors.IsNotFound(err) {
-		// Object not found - create it
-		_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
+		return w.createConfigMap(chi, configMap)
+	}
 
-		if err == nil {
-			w.a.V(1).
-				WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
-				WithStatusAction(chi).
-				Info("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
-		} else {
-			w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
-				WithStatusAction(chi).
-				WithStatusError(chi).
-				Error("Create ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
-		}
+	return err
+}
 
-		return err
+// updateService
+func (w *worker) updateService(chi *chop.ClickHouseInstallation, curService, newService *core.Service) error {
+	// Updating a Service is a complicated business
+
+	// spec.resourceVersion is required in order to update object
+	newService.ResourceVersion = curService.ResourceVersion
+
+	// spec.clusterIP field is immutable, need to use already assigned value
+	// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+	// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
+	// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+	// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
+	newService.Spec.ClusterIP = curService.Spec.ClusterIP
+
+	// spec.healthCheckNodePort field is used with ExternalTrafficPolicy=Local only and is immutable within ExternalTrafficPolicy=Local
+	// In case ExternalTrafficPolicy is changed it seems to be irrelevant
+	// https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
+	if (curService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) &&
+		(newService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) {
+		newService.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
+	}
+
+	// And only now we are ready to actually update the service with new version of the service
+	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(newService)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
+			WithStatusAction(chi).
+			Info("Update Service %s/%s", newService.Namespace, newService.Name)
+	} else {
+		w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("Update Service %s/%s failed with error %v", newService.Namespace, newService.Name, err)
+	}
+
+	return err
+}
+
+// createService
+func (w *worker) createService(chi *chop.ClickHouseInstallation, service *core.Service) error {
+	_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(chi).
+			Info("Create Service %s/%s", service.Namespace, service.Name)
+	} else {
+		w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("Create Service %s/%s failed with error %v", service.Namespace, service.Name, err)
 	}
 
 	return err
@@ -606,67 +733,18 @@ func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap 
 
 // reconcileService reconciles core.Service
 func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *core.Service) error {
-	// Check whether this object already exists in k8s
+	w.a.V(2).Info("reconcileService() - start")
+	defer w.a.V(2).Info("reconcileService() - end")
+
+	// Check whether this object already exists
 	curService, err := w.c.getService(&service.ObjectMeta, false)
 
 	if curService != nil {
-		// Object found - update it
-
-		// Updating Service is a complicated business
-
-		// spec.resourceVersion is required in order to update object
-		service.ResourceVersion = curService.ResourceVersion
-
-		// spec.clusterIP field is immutable, need to use already assigned value
-		// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
-		// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
-		// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
-		// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
-		service.Spec.ClusterIP = curService.Spec.ClusterIP
-
-		// spec.healthCheckNodePort field is used with ExternalTrafficPolicy=Local only and is immutable within ExternalTrafficPolicy=Local
-		// In case ExternalTrafficPolicy is changed it seems to be irrelevant
-		// https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
-		if (curService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) &&
-			(service.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) {
-			service.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
-		}
-
-		// And only now we are ready to actually update the service with new version of the service
-		_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Update(service)
-
-		if err == nil {
-			w.a.V(1).
-				WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
-				WithStatusAction(chi).
-				Info("Update Service %s/%s", service.Namespace, service.Name)
-		} else {
-			w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
-				WithStatusAction(chi).
-				WithStatusError(chi).
-				Error("Update Service %s/%s failed with error %v", service.Namespace, service.Name, err)
-		}
-
-		return err
+		return w.updateService(chi, curService, service)
 	}
 
 	if apierrors.IsNotFound(err) {
-		// Object not found - create it
-		_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
-
-		if err == nil {
-			w.a.V(1).
-				WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
-				WithStatusAction(chi).
-				Info("Create Service %s/%s", service.Namespace, service.Name)
-		} else {
-			w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
-				WithStatusAction(chi).
-				WithStatusError(chi).
-				Error("Create Service %s/%s failed with error %v", service.Namespace, service.Name, err)
-		}
-
-		return err
+		return w.createService(chi, service)
 	}
 
 	return err
@@ -674,62 +752,21 @@ func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *cor
 
 // reconcileStatefulSet reconciles apps.StatefulSet
 func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+	w.a.V(2).Info("reconcileStatefulSet() - start")
+	defer w.a.V(2).Info("reconcileStatefulSet() - end")
+
 	// Check whether this object already exists in k8s
 	curStatefulSet, err := w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
 	if curStatefulSet != nil {
-		// Object found - update it
-		w.a.V(1).
-			WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
-			WithStatusAction(host.CHI).
-			Info("Update StatefulSet %s/%s - started", newStatefulSet.Namespace, newStatefulSet.Name)
-
-		err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet)
-
-		host.CHI.Status.UpdatedHostsCount++
-		_ = w.c.updateCHIObjectStatus(host.CHI, false)
-
-		if err == nil {
-			w.a.V(1).
-				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
-				WithStatusAction(host.CHI).
-				Info("Update StatefulSet %s/%s - completed", newStatefulSet.Namespace, newStatefulSet.Name)
-		} else {
-			w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
-				WithStatusAction(host.CHI).
-				WithStatusError(host.CHI).
-				Error("Update StatefulSet %s/%s - failed with error %v", newStatefulSet.Namespace, newStatefulSet.Name, err)
-		}
-
-		return err
+		return w.updateStatefulSet(curStatefulSet, newStatefulSet, host)
 	}
 
 	if apierrors.IsNotFound(err) {
-		// Object not found - create it
-		w.a.V(1).
-			WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
-			WithStatusAction(host.CHI).
-			Info("Create StatefulSet %s/%s - started", newStatefulSet.Namespace, newStatefulSet.Name)
-
-		err := w.c.createStatefulSet(newStatefulSet, host)
-
-		host.CHI.Status.AddedHostsCount++
-		_ = w.c.updateCHIObjectStatus(host.CHI, false)
-
-		if err == nil {
-			w.a.V(1).
-				WithEvent(host.CHI, eventActionCreate, eventReasonCreateCompleted).
-				WithStatusAction(host.CHI).
-				Info("Create StatefulSet %s/%s - completed", newStatefulSet.Namespace, newStatefulSet.Name)
-		} else {
-			w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
-				WithStatusAction(host.CHI).
-				WithStatusError(host.CHI).
-				Error("Create StatefulSet %s/%s - failed with error %v", newStatefulSet.Namespace, newStatefulSet.Name, err)
-		}
-
-		return err
+		return w.createStatefulSet(newStatefulSet, host)
 	}
+
+	// Not create, not update - weird thing
 
 	w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
 		WithStatusAction(host.CHI).
@@ -737,4 +774,166 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 		Error("Create or Update StatefulSet %s/%s - UNEXPECTED FLOW", newStatefulSet.Namespace, newStatefulSet.Name)
 
 	return err
+}
+
+// createStatefulSet
+func (w *worker) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+	w.a.V(2).Info("createStatefulSet() - start")
+	defer w.a.V(2).Info("createStatefulSet() - end")
+
+	w.a.V(1).
+		WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
+		WithStatusAction(host.CHI).
+		Info("Create StatefulSet %s/%s - started", statefulSet.Namespace, statefulSet.Name)
+
+	err := w.c.createStatefulSet(statefulSet, host)
+
+	host.CHI.Status.AddedHostsCount++
+	_ = w.c.updateCHIObjectStatus(host.CHI, false)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(host.CHI).
+			Info("Create StatefulSet %s/%s - completed", statefulSet.Namespace, statefulSet.Name)
+	} else {
+		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(host.CHI).
+			WithStatusError(host.CHI).
+			Error("Create StatefulSet %s/%s - failed with error %v", statefulSet.Namespace, statefulSet.Name, err)
+	}
+
+	return err
+}
+
+// updateStatefulSet
+func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+	w.a.V(2).Info("updateStatefulSet() - start")
+	defer w.a.V(2).Info("updateStatefulSet() - end")
+
+	namespace := newStatefulSet.Namespace
+	name := newStatefulSet.Name
+
+	w.a.V(1).
+		WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
+		WithStatusAction(host.CHI).
+		Info("Update StatefulSet(%s/%s) - started", namespace, name)
+
+	err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet)
+	if err == nil {
+		host.CHI.Status.UpdatedHostsCount++
+		_ = w.c.updateCHIObjectStatus(host.CHI, false)
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
+			WithStatusAction(host.CHI).
+			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
+		return nil
+	}
+
+	w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
+		WithStatusAction(host.CHI).
+		WithStatusError(host.CHI).
+		Error("Update StatefulSet(%s/%s) - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
+
+	diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, newStatefulSet.Spec)
+	w.a.Info("StatefulSet.Spec diff:")
+	w.a.Info(util.MessageDiffString(diff, equal))
+
+	err = w.c.deleteStatefulSet(host)
+	err = w.reconcilePVCs(host)
+	return w.createStatefulSet(newStatefulSet, host)
+}
+
+// reconcilePVCs
+func (w *worker) reconcilePVCs(host *chop.ChiHost) error {
+	namespace := host.Address.Namespace
+	w.a.V(2).Info("reconcilePVCs for host %s/%s - start", namespace, host.Name)
+	defer w.a.V(2).Info("reconcilePVCs for host %s/%s - end", namespace, host.Name)
+
+	host.WalkVolumeMounts(func(volumeMount *core.VolumeMount) {
+		volumeClaimTemplateName := volumeMount.Name
+		volumeClaimTemplate, ok := host.CHI.GetVolumeClaimTemplate(volumeClaimTemplateName)
+		if !ok {
+			// No this is not a reference to VolumeClaimTemplate
+			return
+		}
+
+		pvcName := chopmodel.CreatePVCName(host, volumeMount, volumeClaimTemplate)
+		w.a.V(2).Info("reconcile volumeMount (%s/%s/%s/%s) - start", namespace, host.Name, volumeMount.Name, pvcName)
+		defer w.a.V(2).Info("reconcile volumeMount (%s/%s/%s/%s) - end", namespace, host.Name, volumeMount.Name, pvcName)
+
+		pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(pvcName, newGetOptions())
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				// This is not an error per se, means PVC is not created (yet)?
+			} else {
+				w.a.Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
+			}
+			return
+		}
+		w.reconcileResources(pvc, volumeClaimTemplate)
+	})
+
+	return nil
+}
+
+// reconcileResources
+func (w *worker) reconcileResources(pvc *core.PersistentVolumeClaim, template *chop.ChiVolumeClaimTemplate) {
+	w.reconcileResourcesList(pvc, pvc.Spec.Resources.Requests, template.Spec.Resources.Requests)
+}
+
+// reconcileResourcesList
+func (w *worker) reconcileResourcesList(pvc *core.PersistentVolumeClaim, pvcResourceList, desiredResourceList core.ResourceList) {
+	var pvcResourceNames []core.ResourceName
+	for resourceName := range pvcResourceList {
+		pvcResourceNames = append(pvcResourceNames, resourceName)
+	}
+	var desiredResourceNames []core.ResourceName
+	for resourceName := range desiredResourceList {
+		desiredResourceNames = append(desiredResourceNames, resourceName)
+	}
+
+	//diff, equal := messagediff.DeepDiff(pvcResourceNames, desiredResourceNames)
+
+	resourceNames := intersect.Simple(pvcResourceNames, desiredResourceNames)
+	for _, resourceName := range resourceNames.([]interface{}) {
+		w.reconcileResource(pvc, pvcResourceList, desiredResourceList, resourceName.(core.ResourceName))
+	}
+}
+
+// reconcileResourcesList
+func (w *worker) reconcileResource(
+	pvc *core.PersistentVolumeClaim,
+	pvcResourceList core.ResourceList,
+	desiredResourceList core.ResourceList,
+	resourceName core.ResourceName,
+) {
+	w.a.V(2).Info("reconcileResource(%s/%s/%s) - start", pvc.Namespace, pvc.Name, resourceName)
+	defer w.a.V(2).Info("reconcileResource(%s/%s/%s) - end", pvc.Namespace, pvc.Name, resourceName)
+
+	var ok bool
+	if (pvcResourceList == nil) || (desiredResourceList == nil) {
+		return
+	}
+
+	var pvcResourceQuantity resource.Quantity
+	var desiredResourceQuantity resource.Quantity
+	if pvcResourceQuantity, ok = pvcResourceList[resourceName]; !ok {
+		return
+	}
+	if desiredResourceQuantity, ok = desiredResourceList[resourceName]; !ok {
+		return
+	}
+
+	if pvcResourceQuantity.Equal(desiredResourceQuantity) {
+		return
+	}
+
+	w.a.V(2).Info("reconcileResource(%s/%s/%s) - unequal requests, want to update", pvc.Namespace, pvc.Name, resourceName)
+	pvcResourceList[resourceName] = desiredResourceList[resourceName]
+	_, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(pvc)
+	if err != nil {
+		w.a.Error("unable to reconcileResource(%s/%s/%s) err: %v", pvc.Namespace, pvc.Name, resourceName, err)
+		return
+	}
 }
