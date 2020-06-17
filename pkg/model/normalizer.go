@@ -28,7 +28,7 @@ import (
 	// log "k8s.io/klog"
 
 	"gopkg.in/d4l3k/messagediff.v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -1557,8 +1557,11 @@ func (n *Normalizer) normalizeHostPorts(host *chiv1.ChiHost) {
 // normalizeShardInternalReplication ensures reasonable values in
 // .spec.configuration.clusters.layout.shards.internalReplication
 func (n *Normalizer) normalizeShardInternalReplication(shard *chiv1.ChiShard) {
-	// Default value set to true
-	shard.InternalReplication = util.CastStringBoolToStringTrueFalse(shard.InternalReplication, true)
+	defaultInternalReplication := false
+	if shard.ReplicasCount > 1 {
+		defaultInternalReplication = true
+	}
+	shard.InternalReplication = util.CastStringBoolToStringTrueFalse(shard.InternalReplication, defaultInternalReplication)
 }
 
 // normalizeDefaultsReplicasUseFQDN ensures chiv1.ChiDefaults.ReplicasUseFQDN section has proper values
