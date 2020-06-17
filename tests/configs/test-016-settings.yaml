@@ -12,6 +12,8 @@ spec:
       - name: default
         layout:
           shardsCount: 1
+    profiles:
+      default/max_memory_usage: 7000000000 # test for big value      
     settings:
       dictionaries_config: config.d/*.dict
       macros/layer: "01"
