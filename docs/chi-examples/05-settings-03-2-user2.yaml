@@ -6,11 +6,11 @@ spec:
   configuration:
     users:
 #      user1/networks/ip: "::/0"
-#      user1/password: "qwerty"
-#      user1/profile: "default"
+#      user1/password: qwerty
+#      user1/profile: default
       user2/networks/ip: "::/0"
-      user2/password: "qwerty"
-      user2/profile: "default"
+      user2/password: qwerty
+      user2/profile: default
     clusters:
     - name: cls1
       layout:

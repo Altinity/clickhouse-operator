@@ -26,11 +26,11 @@ spec:
       readonly/profile: readonly
       readonly/quota: default
     profiles:
-      test_profile/max_memory_usage: "1000000000"
-      test_profile/readonly: "1"
-      readonly/readonly: "1"
+      test_profile/max_memory_usage: 1000000000
+      test_profile/readonly: 1
+      readonly/readonly: 1
     quotas:
-      test_quota/interval/duration: "3600"
+      test_quota/interval/duration: 3600
     settings:
       compression/case/method: zstd
       disable_internal_dns_cache: 1

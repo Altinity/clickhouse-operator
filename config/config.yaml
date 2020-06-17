@@ -78,7 +78,7 @@ chConfigUserDefaultNetworksIP:
 chConfigUserDefaultPassword: "default"
 
 # Default host_regexp to limit network connectivity from outside
-ChConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+chConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
 
 ################################################
 ##
