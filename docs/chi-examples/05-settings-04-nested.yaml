@@ -17,3 +17,12 @@ spec:
         layout:
           shardsCount: 1
           replicasCount: 1
+      - name: "shard-level"
+        settings:
+          disable_internal_dns_cache: 0
+        layout:
+          shards:
+            - replicasCount: 1
+              settings:
+                disable_internal_dns_cache: 0
+
