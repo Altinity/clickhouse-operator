@@ -89,7 +89,12 @@ func (host *ChiHost) GetReplicasNum() int32 {
 }
 
 func (host *ChiHost) GetSettings() Settings {
-	return host.CHI.Spec.Configuration.Settings
+	return host.Settings
+}
+
+func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
+	cluster := host.GetCluster()
+	return &cluster.Zookeeper
 }
 
 func (host *ChiHost) GetCHI() *ClickHouseInstallation {
@@ -108,11 +113,6 @@ func (host *ChiHost) GetCluster() *ChiCluster {
 	// This should not happen, actually
 
 	return nil
-}
-
-func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
-	cluster := host.GetCluster()
-	return &cluster.Zookeeper
 }
 
 func (host *ChiHost) CanDeleteAllPVCs() bool {
