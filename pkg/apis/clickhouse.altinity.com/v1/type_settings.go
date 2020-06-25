@@ -28,7 +28,10 @@ import (
 	// log "k8s.io/klog"
 )
 
-const ignoreThreshold = 0.001
+const(
+	// Floats with fractional part less than ignoreThreshold are considered to be ints and are casted to ints
+	ignoreThreshold = 0.001
+)
 
 // Settings value can be one of:
 // 1. scalar value (string, int, bool, etc).
