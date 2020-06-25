@@ -28,7 +28,7 @@ import (
 	// log "k8s.io/klog"
 )
 
-const(
+const (
 	// Floats with fractional part less than ignoreThreshold are considered to be ints and are casted to ints
 	ignoreThreshold = 0.001
 )

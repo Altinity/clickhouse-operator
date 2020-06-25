@@ -57,7 +57,7 @@ func (c *configSections) CreateConfigsCommon() {
 
 // CreateConfigsUsers
 func (c *configSections) CreateConfigsUsers() {
-	// commonConfigSections maps section name to section XML chopConfig of the following sections:
+	// commonUsersConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. users
 	// 2. quotas
 	// 3. profiles
