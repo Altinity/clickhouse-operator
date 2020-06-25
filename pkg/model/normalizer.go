@@ -1262,10 +1262,10 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chiv1.Settings) {
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
-	// Use PodTemplate from .spec.defaults
-	cluster.InheritTemplatesFrom(n.chi)
 	// Use ChiZookeeperConfig from .spec.configuration.zookeeper
 	cluster.InheritZookeeperFrom(n.chi)
+	// Use PodTemplate from .spec.defaults
+	cluster.InheritTemplatesFrom(n.chi)
 
 	n.normalizeConfigurationZookeeper(&cluster.Zookeeper)
 
