@@ -7,7 +7,13 @@ spec:
     settings:
       disable_internal_dns_cache: 1
     clusters:
-      - name: "standard"
+      - name: "top-level"
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+      - name: "cluster-level"
+        settings:
+          disable_internal_dns_cache: 0
         layout:
           shardsCount: 1
           replicasCount: 1
