@@ -35,13 +35,13 @@ const(
 
 // Settings value can be one of:
 // 1. scalar value (string, int, bool, etc).
-//    Ex.:
-//    user1/networks/ip: "::/0"
+//		Ex.:
+//			user1/networks/ip: "::/0"
 // 2. vector of scalars
-//    Ex.:
-//    user1/networks/ip:
-//      - "127.0.0.1"
-//      - "192.168.1.2"
+//		Ex.:
+//			user1/networks/ip:
+//				- "127.0.0.1"
+//				- "192.168.1.2"
 // We do not know types of these scalars in advance also
 
 // Setting
