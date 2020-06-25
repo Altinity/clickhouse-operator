@@ -25,4 +25,13 @@ spec:
             - replicasCount: 1
               settings:
                 disable_internal_dns_cache: 0
+      - name: "replica-level"
+        settings:
+          disable_internal_dns_cache: 0
+        layout:
+          replicas:
+            - shardsCount: 1
+              settings:
+                disable_internal_dns_cache: 0
+
 
