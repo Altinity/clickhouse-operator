@@ -20,6 +20,10 @@ func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 	}
 }
 
+func (cluster *ChiCluster) InheritSettingsFrom(chi *ClickHouseInstallation) {
+	(&cluster.Settings).MergeFrom(chi.Spec.Configuration.Settings)
+}
+
 func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
 	(&cluster.Templates).MergeFrom(&chi.Spec.Defaults.Templates, MergeTypeFillEmptyValues)
 	(&cluster.Templates).HandleDeprecatedFields()

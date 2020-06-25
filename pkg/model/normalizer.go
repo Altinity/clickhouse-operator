@@ -1262,12 +1262,15 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chiv1.Settings) {
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
-	// Use ChiZookeeperConfig from .spec.configuration.zookeeper
+	// Inherit from .spec.configuration.zookeeper
 	cluster.InheritZookeeperFrom(n.chi)
-	// Use PodTemplate from .spec.defaults
+	// Inherit from .spec.configuration.settings
+	cluster.InheritSettingsFrom(n.chi)
+	// Inherit from .spec.defaults
 	cluster.InheritTemplatesFrom(n.chi)
 
 	n.normalizeConfigurationZookeeper(&cluster.Zookeeper)
+	n.normalizeConfigurationSettings(&cluster.Settings)
 
 	n.normalizeClusterLayoutShardsCountAndReplicasCount(&cluster.Layout)
 
@@ -1405,7 +1408,9 @@ func (n *Normalizer) ensureClusterLayoutReplicas(layout *chiv1.ChiClusterLayout)
 func (n *Normalizer) normalizeShard(shard *chiv1.ChiShard, cluster *chiv1.ChiCluster, shardIndex int) {
 	n.normalizeShardName(shard, shardIndex)
 	n.normalizeShardWeight(shard)
-	// For each shard of this normalized cluster inherit cluster's PodTemplate
+	// For each shard of this normalized cluster inherit from cluster
+	shard.InheritSettingsFrom(cluster)
+	n.normalizeConfigurationSettings(&shard.Settings)
 	shard.InheritTemplatesFrom(cluster)
 	// Normalize Replicas
 	n.normalizeShardReplicasCount(shard, cluster.Layout.ReplicasCount)
@@ -1417,7 +1422,9 @@ func (n *Normalizer) normalizeShard(shard *chiv1.ChiShard, cluster *chiv1.ChiClu
 // normalizeReplica normalizes a replica - walks over all fields
 func (n *Normalizer) normalizeReplica(replica *chiv1.ChiReplica, cluster *chiv1.ChiCluster, replicaIndex int) {
 	n.normalizeReplicaName(replica, replicaIndex)
-	// For each replica of this normalized cluster inherit cluster's PodTemplate
+	// For each replica of this normalized cluster inherit from cluster
+	replica.InheritSettingsFrom(cluster)
+	n.normalizeConfigurationSettings(&replica.Settings)
 	replica.InheritTemplatesFrom(cluster)
 	// Normalize Shards
 	n.normalizeReplicaShardsCount(replica, cluster.Layout.ShardsCount)
@@ -1531,6 +1538,8 @@ func (n *Normalizer) normalizeHost(
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
 	n.normalizeHostPorts(host)
 	// Use PodTemplate from parent shard
+	host.InheritSettingsFrom(shard, replica)
+	n.normalizeConfigurationSettings(&host.Settings)
 	host.InheritTemplatesFrom(shard, replica, nil)
 }
 

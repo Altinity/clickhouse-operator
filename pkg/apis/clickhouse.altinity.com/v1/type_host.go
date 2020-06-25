@@ -19,6 +19,15 @@ import (
 	"k8s.io/api/core/v1"
 )
 
+func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
+	if shard != nil {
+		(&host.Settings).MergeFrom(shard.Settings)
+	}
+	if replica != nil {
+		(&host.Settings).MergeFrom(replica.Settings)
+	}
+}
+
 func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *ChiHostTemplate) {
 	if shard != nil {
 		(&host.Templates).MergeFrom(&shard.Templates, MergeTypeFillEmptyValues)
