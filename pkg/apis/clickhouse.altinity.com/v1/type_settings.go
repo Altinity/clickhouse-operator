@@ -44,12 +44,14 @@ const(
 //      - "192.168.1.2"
 // We do not know types of these scalars in advance also
 
+// Setting
 type Setting struct {
 	isScalar bool
 	scalar   string
 	vector   []string
 }
 
+// NewScalarSetting
 func NewScalarSetting(scalar string) *Setting {
 	return &Setting{
 		isScalar: true,
@@ -57,6 +59,7 @@ func NewScalarSetting(scalar string) *Setting {
 	}
 }
 
+// NewVectorSetting
 func NewVectorSetting(vector []string) *Setting {
 	return &Setting{
 		isScalar: false,
@@ -64,25 +67,37 @@ func NewVectorSetting(vector []string) *Setting {
 	}
 }
 
+// IsScalar
 func (s *Setting) IsScalar() bool {
 	return s.isScalar
 }
 
+// IsVector
+func (s *Setting) IsVector() bool {
+	return !s.isScalar
+}
+
+// Scalar
 func (s *Setting) Scalar() string {
 	return s.scalar
 }
 
+// Vector
 func (s *Setting) Vector() []string {
 	return s.vector
 }
 
+// AsVector
 func (s *Setting) AsVector() []string {
 	if s.isScalar {
-		return []string{s.scalar}
+		return []string{
+			s.scalar,
+		}
 	}
 	return s.vector
 }
 
+// String
 func (s *Setting) String() string {
 	if s.isScalar {
 		return s.scalar
@@ -91,12 +106,15 @@ func (s *Setting) String() string {
 	return strings.Join(s.vector, ",")
 }
 
+// Settings
 type Settings map[string]*Setting
 
+// NewSettings
 func NewSettings() Settings {
 	return make(Settings)
 }
 
+// UnmarshalJSON
 func (settings *Settings) UnmarshalJSON(data []byte) error {
 	type rawType map[string]interface{}
 	var raw rawType
@@ -121,6 +139,7 @@ func (settings *Settings) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MarshalJSON
 func (settings Settings) MarshalJSON() ([]byte, error) {
 	raw := make(map[string]interface{})
 
@@ -135,6 +154,7 @@ func (settings Settings) MarshalJSON() ([]byte, error) {
 	return json.Marshal(raw)
 }
 
+// unmarshalScalar
 func unmarshalScalar(untyped interface{}) (string, bool) {
 	typeOf := reflect.TypeOf(untyped)
 	str := typeOf.String()
@@ -175,6 +195,7 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 	return "", false
 }
 
+// unmarshalVector
 func unmarshalVector(untyped interface{}) ([]string, bool) {
 	typeOf := reflect.TypeOf(untyped)
 	str := typeOf.String()
@@ -195,6 +216,7 @@ func unmarshalVector(untyped interface{}) ([]string, bool) {
 	return nil, false
 }
 
+// getValueAsScalar
 func (settings Settings) getValueAsScalar(name string) (string, bool) {
 	setting, ok := settings[name]
 	if !ok {
@@ -206,6 +228,7 @@ func (settings Settings) getValueAsScalar(name string) (string, bool) {
 	return "", false
 }
 
+// getValueAsVector
 func (settings Settings) getValueAsVector(name string) ([]string, bool) {
 	setting, ok := settings[name]
 	if !ok {
@@ -217,6 +240,7 @@ func (settings Settings) getValueAsVector(name string) ([]string, bool) {
 	return setting.vector, true
 }
 
+// getValueAsInt
 func (settings Settings) getValueAsInt(name string) int {
 	value, ok := settings.getValueAsScalar(name)
 	if !ok {
@@ -231,23 +255,27 @@ func (settings Settings) getValueAsInt(name string) int {
 	return i
 }
 
+// fetchPort
 func (settings Settings) fetchPort(name string) int32 {
 	return int32(settings.getValueAsInt(name))
 }
 
+// GetTCPPort
 func (settings Settings) GetTCPPort() int32 {
 	return settings.fetchPort("tcp_port")
 }
 
+// GetHTTPPort
 func (settings Settings) GetHTTPPort() int32 {
 	return settings.fetchPort("http_port")
 }
 
+// GetInterserverHTTPPort
 func (settings Settings) GetInterserverHTTPPort() int32 {
 	return settings.fetchPort("interserver_http_port")
 }
 
-// mapStringInterfaceMergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`
+// MergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`
 func (settings *Settings) MergeFrom(src Settings) {
 	if src == nil {
 		return
@@ -268,6 +296,7 @@ func (settings *Settings) MergeFrom(src Settings) {
 	}
 }
 
+// GetStringMap
 func (settings Settings) GetStringMap() map[string]string {
 	m := make(map[string]string)
 
@@ -282,6 +311,7 @@ func (settings Settings) GetStringMap() map[string]string {
 	return m
 }
 
+// AsSortedSliceOfStrings
 func (settings Settings) AsSortedSliceOfStrings() []string {
 	// Sort keys
 	var keys []string
@@ -301,11 +331,12 @@ func (settings Settings) AsSortedSliceOfStrings() []string {
 	return s
 }
 
+// Normalize
 func (settings Settings) Normalize() {
 	settings.normalizePaths()
 }
 
-// NormalizePaths normalizes paths in settings
+// normalizePaths normalizes paths in settings
 func (settings Settings) normalizePaths() {
 	pathsToNormalize := make([]string, 0, 0)
 
