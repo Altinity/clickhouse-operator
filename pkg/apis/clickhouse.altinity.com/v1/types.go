@@ -107,40 +107,6 @@ type ChiConfiguration struct {
 	Clusters []ChiCluster `json:"clusters,omitempty"`
 }
 
-// ChiCluster defines item of a clusters section of .configuration
-type ChiCluster struct {
-	Name      string             `json:"name"`
-	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty"`
-	Settings  Settings           `json:"settings,omitempty"`
-	Templates ChiTemplateNames   `json:"templates,omitempty"`
-	Layout    ChiClusterLayout   `json:"layout"`
-
-	// Internal data
-	Address ChiClusterAddress       `json:"address,omitempty"`
-	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
-}
-
-// ChiClusterAddress defines address of a cluster within ClickHouseInstallation
-type ChiClusterAddress struct {
-	Namespace    string `json:"namespace,omitempty"`
-	CHIName      string `json:"chiName,omitempty"`
-	ClusterName  string `json:"clusterName,omitempty"`
-	ClusterIndex int    `json:"clusterIndex,omitempty"`
-}
-
-// ChiClusterLayout defines layout section of .spec.configuration.clusters
-type ChiClusterLayout struct {
-	// DEPRECATED - to be removed soon
-	Type          string `json:"type,omitempty"`
-	ShardsCount   int    `json:"shardsCount,omitempty"`
-	ReplicasCount int    `json:"replicasCount,omitempty"`
-	// TODO refactor into map[string]ChiShard
-	Shards   []ChiShard   `json:"shards,omitempty"`
-	Replicas []ChiReplica `json:"replicas,omitempty"`
-
-	HostsField *HostsField `json:"-" testdiff:"ignore"`
-}
-
 // ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
 // TODO unify with ChiReplica based on HostsSet
 type ChiShard struct {
