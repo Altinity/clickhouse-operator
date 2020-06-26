@@ -33,7 +33,7 @@ spec:
             - settings:
                 disable_internal_dns_cache: 6
 
-      - name: "host-level"
+      - name: "host-level-via-shards"
         settings:
           disable_internal_dns_cache: 7
         layout:
@@ -43,3 +43,14 @@ spec:
               replicas:
                 - settings:
                     disable_internal_dns_cache: 9
+
+      - name: "host-level-via-replicas"
+        settings:
+          disable_internal_dns_cache: 10
+        layout:
+          replicas:
+            - settings:
+                disable_internal_dns_cache: 11
+              shards:
+                - settings:
+                    disable_internal_dns_cache: 12
