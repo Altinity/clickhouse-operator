@@ -32,7 +32,7 @@ spec:
           replicas:
             - shardsCount: 1
               settings:
-                disable_internal_dns_cache: 3
+                disable_internal_dns_cache: 4
       - name: "host-level"
         settings:
           disable_internal_dns_cache: 2
@@ -42,4 +42,4 @@ spec:
                 disable_internal_dns_cache: 3
               replicas:
                 - settings:
-                    disable_internal_dns_cache: 4
+                    disable_internal_dns_cache: 5
