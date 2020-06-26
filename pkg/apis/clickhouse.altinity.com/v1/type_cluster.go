@@ -59,11 +59,11 @@ func (cluster *ChiCluster) FillShardReplicaSpecified() {
 	}
 }
 
-func (cluster *ChiCluster) IsShardSpecified() bool {
+func (cluster *ChiCluster) isShardSpecified() bool {
 	return cluster.Layout.ShardsSpecified == true
 }
 
-func (cluster *ChiCluster) IsReplicaSpecified() bool {
+func (cluster *ChiCluster) isReplicaSpecified() bool {
 	return (cluster.Layout.ShardsSpecified == false) && (cluster.Layout.ReplicasSpecified == true)
 }
 

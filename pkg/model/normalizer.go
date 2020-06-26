@@ -1262,6 +1262,8 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chiv1.Settings) {
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
+	cluster.FillShardReplicaSpecified()
+
 	// Inherit from .spec.configuration.zookeeper
 	cluster.InheritZookeeperFrom(n.chi)
 	// Inherit from .spec.configuration.settings
@@ -1291,7 +1293,7 @@ func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 	})
 
 	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *chiv1.ChiHost) error {
-		n.normalizeHost(host, cluster.GetShard(shard), cluster.GetReplica(replica), shard, replica)
+		n.normalizeHost(host, cluster.GetShard(shard), cluster.GetReplica(replica), cluster, shard, replica)
 		return nil
 	})
 
@@ -1532,6 +1534,7 @@ func (n *Normalizer) normalizeHost(
 	host *chiv1.ChiHost,
 	shard *chiv1.ChiShard,
 	replica *chiv1.ChiReplica,
+	cluster *chiv1.ChiCluster,
 	shardIndex int,
 	replicaIndex int,
 ) {

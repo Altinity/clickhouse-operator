@@ -20,6 +20,7 @@ import (
 )
 
 func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
+
 	if shard != nil {
 		(&host.Settings).MergeFrom(shard.Settings)
 	}
