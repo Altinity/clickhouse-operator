@@ -33,7 +33,7 @@ spec:
             - settings:
                 disable_internal_dns_cache: 6
 
-      - name: "host-level-via-shards"
+      - name: "host-level-sh"
         settings:
           disable_internal_dns_cache: 7
         layout:
@@ -44,7 +44,7 @@ spec:
                 - settings:
                     disable_internal_dns_cache: 9
 
-      - name: "host-level-via-replicas"
+      - name: "host-level-rep"
         settings:
           disable_internal_dns_cache: 10
         layout:
