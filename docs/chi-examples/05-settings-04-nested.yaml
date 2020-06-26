@@ -7,39 +7,39 @@ spec:
     settings:
       disable_internal_dns_cache: 1
     clusters:
+
       - name: "top-level"
         layout:
           shardsCount: 1
           replicasCount: 1
+
       - name: "cluster-level"
         settings:
           disable_internal_dns_cache: 2
-        layout:
-          shardsCount: 1
-          replicasCount: 1
+
       - name: "shard-level"
         settings:
-          disable_internal_dns_cache: 2
-        layout:
-          shards:
-            - replicasCount: 1
-              settings:
-                disable_internal_dns_cache: 3
-      - name: "replica-level"
-        settings:
-          disable_internal_dns_cache: 2
-        layout:
-          replicas:
-            - shardsCount: 1
-              settings:
-                disable_internal_dns_cache: 4
-      - name: "host-level"
-        settings:
-          disable_internal_dns_cache: 2
+          disable_internal_dns_cache: 3
         layout:
           shards:
             - settings:
-                disable_internal_dns_cache: 3
+                disable_internal_dns_cache: 4
+
+      - name: "replica-level"
+        settings:
+          disable_internal_dns_cache: 5
+        layout:
+          replicas:
+            - settings:
+                disable_internal_dns_cache: 6
+
+      - name: "host-level"
+        settings:
+          disable_internal_dns_cache: 7
+        layout:
+          shards:
+            - settings:
+                disable_internal_dns_cache: 8
               replicas:
                 - settings:
-                    disable_internal_dns_cache: 5
+                    disable_internal_dns_cache: 9
