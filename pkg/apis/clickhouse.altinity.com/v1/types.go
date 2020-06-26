@@ -102,41 +102,9 @@ type ChiConfiguration struct {
 	Quotas    Settings           `json:"quotas,omitempty"    yaml:"quotas"`
 	Settings  Settings           `json:"settings,omitempty"  yaml:"settings"`
 	Files     Settings           `json:"files,omitempty"     yaml:"files"`
+
 	// TODO refactor into map[string]ChiCluster
 	Clusters []ChiCluster `json:"clusters,omitempty"`
-}
-
-// ChiCluster defines item of a clusters section of .configuration
-type ChiCluster struct {
-	Name      string             `json:"name"`
-	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper"`
-	Layout    ChiClusterLayout   `json:"layout"`
-	Templates ChiTemplateNames   `json:"templates,omitempty"`
-
-	// Internal data
-	Address ChiClusterAddress       `json:"address,omitempty"`
-	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
-}
-
-// ChiClusterAddress defines address of a cluster within ClickHouseInstallation
-type ChiClusterAddress struct {
-	Namespace    string `json:"namespace,omitempty"`
-	CHIName      string `json:"chiName,omitempty"`
-	ClusterName  string `json:"clusterName,omitempty"`
-	ClusterIndex int    `json:"clusterIndex,omitempty"`
-}
-
-// ChiClusterLayout defines layout section of .spec.configuration.clusters
-type ChiClusterLayout struct {
-	// DEPRECATED - to be removed soon
-	Type          string `json:"type,omitempty"`
-	ShardsCount   int    `json:"shardsCount,omitempty"`
-	ReplicasCount int    `json:"replicasCount,omitempty"`
-	// TODO refactor into map[string]ChiShard
-	Shards   []ChiShard   `json:"shards,omitempty"`
-	Replicas []ChiReplica `json:"replicas,omitempty"`
-
-	HostsField *HostsField `json:"-" testdiff:"ignore"`
 }
 
 // ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
@@ -148,6 +116,7 @@ type ChiShard struct {
 	Name                string           `json:"name,omitempty"`
 	Weight              int              `json:"weight,omitempty"`
 	InternalReplication string           `json:"internalReplication,omitempty"`
+	Settings            Settings         `json:"settings,omitempty"`
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 	ReplicasCount       int              `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiHost
@@ -162,6 +131,7 @@ type ChiShard struct {
 // TODO unify with ChiShard based on HostsSet
 type ChiReplica struct {
 	Name        string           `json:"name,omitempty"`
+	Settings    Settings         `json:"settings,omitempty"`
 	Templates   ChiTemplateNames `json:"templates,omitempty"`
 	ShardsCount int              `json:"shardsCount,omitempty"`
 	// TODO refactor into map[string]ChiHost
@@ -200,6 +170,7 @@ type ChiHost struct {
 	TCPPort             int32            `json:"tcpPort,omitempty"`
 	HTTPPort            int32            `json:"httpPort,omitempty"`
 	InterserverHTTPPort int32            `json:"interserverHTTPPort,omitempty"`
+	Settings            Settings         `json:"settings,omitempty"`
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data

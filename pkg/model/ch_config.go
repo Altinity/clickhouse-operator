@@ -60,8 +60,8 @@ func (c *ClickHouseConfigGenerator) GetQuotas() string {
 }
 
 // GetSettings creates data for "settings.xml"
-func (c *ClickHouseConfigGenerator) GetSettings() string {
-	return c.generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
+func (c *ClickHouseConfigGenerator) GetSettings(host *chiv1.ChiHost) string {
+	return c.generateXMLConfig(host.Settings, "")
 }
 
 // GetFiles creates data for custom common config files specified by user in .spec.configuration.files section
