@@ -42,10 +42,29 @@ type ChiClusterLayout struct {
 	ShardsCount   int    `json:"shardsCount,omitempty"`
 	ReplicasCount int    `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiShard
-	Shards   []ChiShard   `json:"shards,omitempty"`
-	Replicas []ChiReplica `json:"replicas,omitempty"`
+	Shards            []ChiShard   `json:"shards,omitempty"`
+	Replicas          []ChiReplica `json:"replicas,omitempty"`
+	ShardsSpecified   bool         `json:"-" testdiff:"ignore"`
+	ReplicasSpecified bool         `json:"-" testdiff:"ignore"`
 
 	HostsField *HostsField `json:"-" testdiff:"ignore"`
+}
+
+func (cluster *ChiCluster) FillShardReplicaSpecified() {
+	if len(cluster.Layout.Shards) > 0 {
+		cluster.Layout.ShardsSpecified = true
+	}
+	if len(cluster.Layout.Replicas) > 0 {
+		cluster.Layout.ReplicasSpecified = true
+	}
+}
+
+func (cluster *ChiCluster) IsShardSpecified() bool {
+	return cluster.Layout.ShardsSpecified == true
+}
+
+func (cluster *ChiCluster) IsReplicaSpecified() bool {
+	return (cluster.Layout.ShardsSpecified == false) && (cluster.Layout.ReplicasSpecified == true)
 }
 
 func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
