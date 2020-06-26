@@ -67,6 +67,14 @@ func (cluster *ChiCluster) isReplicaSpecified() bool {
 	return (cluster.Layout.ShardsSpecified == false) && (cluster.Layout.ReplicasSpecified == true)
 }
 
+func (cluster *ChiCluster) IsShardSpecified() bool {
+	if !cluster.isShardSpecified() && !cluster.isReplicaSpecified() {
+		return true
+	}
+
+	return cluster.isShardSpecified()
+}
+
 func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 	if cluster.Zookeeper.IsEmpty() {
 		(&cluster.Zookeeper).MergeFrom(&chi.Spec.Configuration.Zookeeper, MergeTypeFillEmptyValues)

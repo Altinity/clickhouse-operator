@@ -20,10 +20,10 @@ import (
 )
 
 func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
-
 	if shard != nil {
 		(&host.Settings).MergeFrom(shard.Settings)
 	}
+
 	if replica != nil {
 		(&host.Settings).MergeFrom(replica.Settings)
 	}
@@ -33,9 +33,11 @@ func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, 
 	if shard != nil {
 		(&host.Templates).MergeFrom(&shard.Templates, MergeTypeFillEmptyValues)
 	}
+
 	if replica != nil {
 		(&host.Templates).MergeFrom(&replica.Templates, MergeTypeFillEmptyValues)
 	}
+
 	if template != nil {
 		(&host.Templates).MergeFrom(&template.Spec.Templates, MergeTypeFillEmptyValues)
 	}

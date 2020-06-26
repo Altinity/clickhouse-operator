@@ -1540,10 +1540,17 @@ func (n *Normalizer) normalizeHost(
 ) {
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
 	n.normalizeHostPorts(host)
-	// Use PodTemplate from parent shard
-	host.InheritSettingsFrom(shard, replica)
+	// Inherit from either Shard or Replica
+	var s *chiv1.ChiShard
+	var r *chiv1.ChiReplica
+	if cluster.IsShardSpecified() {
+		s = shard
+	} else {
+		r = replica
+	}
+	host.InheritSettingsFrom(s, r)
 	n.normalizeConfigurationSettings(&host.Settings)
-	host.InheritTemplatesFrom(shard, replica, nil)
+	host.InheritTemplatesFrom(s, r, nil)
 }
 
 // normalizeHostTemplateSpec is the same as normalizeHost but for a template
