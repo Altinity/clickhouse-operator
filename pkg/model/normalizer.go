@@ -1258,6 +1258,8 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chiv1.Settings) {
 	if *files == nil {
 		*files = chiv1.NewSettings()
 	}
+
+	(*files).Normalize()
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
