@@ -449,19 +449,25 @@ def test_017():
 @Name("test-018-configmap. Test that configuration is properly updated")
 def test_018():
     create_and_check("configs/test-018-configmap.yaml", {"pod_count": 1, "do_not_delete": 1})
+    chi_name = "test-018-configmap"
     
     with Then("user1/networks/ip should be in config"):
-        chi = kube_get("chi", "test-018-configmap")
+        chi = kube_get("chi", chi_name)
         assert "user1/networks/ip" in chi["spec"]["configuration"]["users"]
+    
+    start_time = kube_get_field("pod", f"chi-{chi_name}-default-0-0-0", ".status.startTime")
     
     create_and_check("configs/test-018-configmap-2.yaml", {"pod_count": 1, "do_not_delete": 1})
     with Then("user2/networks should be in config"):
-        chi = kube_get("chi", "test-018-configmap")
+        chi = kube_get("chi", chi_name)
         assert "user2/networks/ip" in chi["spec"]["configuration"]["users"]
         with And("user1/networks/ip should NOT be in config"):
             assert "user1/networks/ip" not in chi["spec"]["configuration"]["users"]
+        with And("Pod should not be restarted"):
+            new_start_time = kube_get_field("pod", f"chi-{chi_name}-default-0-0-0", ".status.startTime")
+            assert start_time == new_start_time
     
-    kube_delete_chi("test-018-configmap")
+    kube_delete_chi(chi_name)
 
 @TestScenario
 @Name("test-019-retain-volume. Test that volume is correctly retained and can be re-attached")
