@@ -353,10 +353,6 @@ type OperatorConfig struct {
 	WatchNamespaces []string `json:"watchNamespaces" yaml:"watchNamespaces"`
 
 	// Paths where to look for additional ClickHouse config .xml files to be mounted into Pod
-	// config.d
-	// conf.d
-	// users.d
-	// respectively
 	CHCommonConfigsPath string `json:"chCommonConfigsPath" yaml:"chCommonConfigsPath"`
 	CHHostConfigsPath   string `json:"chHostConfigsPath"   yaml:"chHostConfigsPath"`
 	CHUsersConfigsPath  string `json:"chUsersConfigsPath"  yaml:"chUsersConfigsPath"`
