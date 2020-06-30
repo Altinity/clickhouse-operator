@@ -15,14 +15,17 @@
 package v1
 
 const(
-	// dirCommonConfig specifies folder's name, where generated common XML files for ClickHouse would be placed
+	// CommonConfigDir specifies folder's name, where generated common XML files for ClickHouse would be placed
 	CommonConfigDir = "config.d"
 
-	// dirUsersConfig specifies folder's name, where generated users XML files for ClickHouse would be placed
+	// UsersConfigDir specifies folder's name, where generated users XML files for ClickHouse would be placed
 	UsersConfigDir = "users.d"
 
-	// dirHostConfig specifies folder's name, where generated host XML files for ClickHouse would be placed
+	// HostConfigDir specifies folder's name, where generated host XML files for ClickHouse would be placed
 	HostConfigDir = "conf.d"
+
+	// TemplatesDir specifies folder's name where ClickHouseInstallationTemplates are located
+	TemplatesDir = "templates.d"
 )
 
 func (configuration *ChiConfiguration) MergeFrom(from *ChiConfiguration, _type MergeType) {
