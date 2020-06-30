@@ -341,27 +341,27 @@ func (settings Settings) normalizePaths() {
 	pathsToNormalize := make([]string, 0, 0)
 
 	// Find entries with paths to normalize
-	for key := range settings {
-		path := normalizeSettingsKeyAsPath(key)
-		if len(path) != len(key) {
-			// Normalization worked. These paths have to be normalized
-			pathsToNormalize = append(pathsToNormalize, key)
+	for unNormalizedPath := range settings {
+		normalizedPath := normalizeSettingsKeyAsPath(unNormalizedPath)
+		if len(normalizedPath) != len(unNormalizedPath) {
+			// Normalization changed something. This path has to be normalized
+			pathsToNormalize = append(pathsToNormalize, unNormalizedPath)
 		}
 	}
 
 	// Add entries with normalized paths
-	for _, key := range pathsToNormalize {
-		normalizedPath := normalizeSettingsKeyAsPath(key)
-		settings[normalizedPath] = settings[key]
+	for _, unNormalizedPath := range pathsToNormalize {
+		normalizedPath := normalizeSettingsKeyAsPath(unNormalizedPath)
+		settings[normalizedPath] = settings[unNormalizedPath]
 	}
 
 	// Delete entries with un-normalized paths
-	for _, key := range pathsToNormalize {
-		delete(settings, key)
+	for _, unNormalizedPath := range pathsToNormalize {
+		delete(settings, unNormalizedPath)
 	}
 }
 
-// normalizeSettingsKeyAsPath normalizes path in .spec.configuration.{users, profiles, quotas, settings} section
+// normalizeSettingsKeyAsPath normalizes path in .spec.configuration.{users, profiles, quotas, settings, files} section
 // Normalized path looks like 'a/b/c'
 func normalizeSettingsKeyAsPath(path string) string {
 	// Normalize multi-'/' values (like '//') to single-'/'
