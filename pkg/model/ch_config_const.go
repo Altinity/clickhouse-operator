@@ -35,9 +35,7 @@ const (
 	// dirPathConfigd specifies full path to folder, where generated XML chopConfig files for ClickHouse would be placed
 	// for the following sections:
 	// 1. remote servers
-	// 2. zookeeper
-	// 3. settings
-	// 4. listen
+	// 2. operator-provided additional config files
 	dirPathConfigd = "/etc/clickhouse-server/config.d/"
 
 	// dirPathUsersd specifies full path to folder, where generated XML chopConfig files for ClickHouse would be placed
@@ -45,11 +43,16 @@ const (
 	// 1. users
 	// 2. quotas
 	// 3. profiles
+	// 4. operator-provided additional config files
 	dirPathUsersd = "/etc/clickhouse-server/users.d/"
 
 	// dirPathConfd specifies full path to folder, where generated XML chopConfig files for ClickHouse would be placed
 	// for the following sections:
 	// 1. macros
+	// 2. zookeeper
+	// 3. settings
+	// 4. files
+	// 5. operator-provided additional config files
 	dirPathConfd = "/etc/clickhouse-server/conf.d/"
 
 	// dirPathClickHouseData specifies full path of data folder where ClickHouse would place its data storage
