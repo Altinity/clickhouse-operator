@@ -435,9 +435,9 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 		// Append to each Container current VolumeMount's to VolumeMount's declared in template
 		container.VolumeMounts = append(
 			container.VolumeMounts,
-			newVolumeMount(configMapCommonName, dirPathConfigd),
-			newVolumeMount(configMapCommonUsersName, dirPathUsersd),
-			newVolumeMount(configMapMacrosName, dirPathConfd),
+			newVolumeMount(configMapCommonName, dirPathCommonConfig),
+			newVolumeMount(configMapCommonUsersName, dirPathUsersConfig),
+			newVolumeMount(configMapMacrosName, dirPathHostConfig),
 		)
 	}
 }
