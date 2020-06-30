@@ -14,7 +14,7 @@
 
 package v1
 
-const(
+const (
 	// CommonConfigDir specifies folder's name, where generated common XML files for ClickHouse would be placed
 	CommonConfigDir = "config.d"
 
