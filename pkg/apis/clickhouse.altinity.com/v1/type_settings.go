@@ -42,6 +42,7 @@ var (
 	SectionHost   SettingsSection = "HOST"
 
 	errorNoSectionSpecified = fmt.Errorf("no section specified")
+	errorNoFilenameSpecified = fmt.Errorf("no filename specified")
 )
 
 // Settings value can be one of:
@@ -340,8 +341,14 @@ func (settings Settings) GetSectionStringMap(section SettingsSection, includeUns
 			continue // for
 		}
 
+		filename, err := getFilenameFromPath(path)
+		if err != nil {
+			// We need to have filename specified
+			continue // for
+		}
+
 		if scalar, ok := settings.getValueAsScalar(path); ok {
-			m[path] = scalar
+			m[filename] = scalar
 		} else {
 			// Skip vector for now
 		}
@@ -432,4 +439,20 @@ func getSectionFromPath(path string) (SettingsSection, error) {
 	log.V(1).Infof("unknown section specified %v", section)
 
 	return SectionEmpty, fmt.Errorf("unknown section specified %v", section)
+}
+
+func getFilenameFromPath(path string) (string, error) {
+	parts := strings.Split(path, "/")
+	if len(parts) < 1 {
+		// We need to have path to be at least 'file.name'
+		return "", errorNoFilenameSpecified
+	}
+
+	filename := parts[len(parts)-1]
+	if filename == "" {
+		// We need to have path to be at least 'file.name'
+		return "", errorNoFilenameSpecified
+	}
+
+	return filename, nil
 }
