@@ -1097,8 +1097,14 @@ func (n *Normalizer) ensureCluster() {
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
 func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
 	host.Config.ZookeeperFingerprint = util.Fingerprint(*host.GetZookeeper())
-	host.Config.SettingsFingerprint = util.Fingerprint(n.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings())
-	host.Config.FilesFingerprint = util.Fingerprint(n.chi.Spec.Configuration.Files.AsSortedSliceOfStrings())
+	host.Config.SettingsFingerprint = util.Fingerprint(
+		util.Fingerprint(n.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()) +
+			util.Fingerprint(host.Settings.AsSortedSliceOfStrings()),
+	)
+	host.Config.FilesFingerprint = util.Fingerprint(
+		util.Fingerprint(n.chi.Spec.Configuration.Files.AsSortedSliceOfStrings()) +
+			util.Fingerprint(host.Files.AsSortedSliceOfStrings()),
+	)
 
 	return nil
 }
@@ -1275,6 +1281,7 @@ func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 
 	n.normalizeConfigurationZookeeper(&cluster.Zookeeper)
 	n.normalizeConfigurationSettings(&cluster.Settings)
+	n.normalizeConfigurationFiles(&cluster.Files)
 
 	n.normalizeClusterLayoutShardsCountAndReplicasCount(&cluster.Layout)
 
@@ -1415,6 +1422,8 @@ func (n *Normalizer) normalizeShard(shard *chiv1.ChiShard, cluster *chiv1.ChiClu
 	// For each shard of this normalized cluster inherit from cluster
 	shard.InheritSettingsFrom(cluster)
 	n.normalizeConfigurationSettings(&shard.Settings)
+	shard.InheritFilesFrom(cluster)
+	n.normalizeConfigurationSettings(&shard.Files)
 	shard.InheritTemplatesFrom(cluster)
 	// Normalize Replicas
 	n.normalizeShardReplicasCount(shard, cluster.Layout.ReplicasCount)
@@ -1429,6 +1438,8 @@ func (n *Normalizer) normalizeReplica(replica *chiv1.ChiReplica, cluster *chiv1.
 	// For each replica of this normalized cluster inherit from cluster
 	replica.InheritSettingsFrom(cluster)
 	n.normalizeConfigurationSettings(&replica.Settings)
+	replica.InheritFilesFrom(cluster)
+	n.normalizeConfigurationSettings(&replica.Files)
 	replica.InheritTemplatesFrom(cluster)
 	// Normalize Shards
 	n.normalizeReplicaShardsCount(replica, cluster.Layout.ShardsCount)
@@ -1552,6 +1563,8 @@ func (n *Normalizer) normalizeHost(
 	}
 	host.InheritSettingsFrom(s, r)
 	n.normalizeConfigurationSettings(&host.Settings)
+	host.InheritFilesFrom(s, r)
+	n.normalizeConfigurationSettings(&host.Files)
 	host.InheritTemplatesFrom(s, r, nil)
 }
 
