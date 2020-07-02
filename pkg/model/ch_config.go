@@ -65,7 +65,7 @@ func (c *ClickHouseConfigGenerator) GetSettings(host *chiv1.ChiHost) string {
 }
 
 // GetFiles creates data for custom common config files
-func (c *ClickHouseConfigGenerator) GetFiles(section chiv1.SettingsSection, host *chiv1.ChiHost) map[string]string {
+func (c *ClickHouseConfigGenerator) GetFiles(section chiv1.SettingsSection, includeUnspecified bool, host *chiv1.ChiHost) map[string]string {
 	var files chiv1.Settings
 	if host == nil {
 		// We are looking into Common files
@@ -76,7 +76,7 @@ func (c *ClickHouseConfigGenerator) GetFiles(section chiv1.SettingsSection, host
 
 	// Extract particular section from cm
 
-	return files.GetStringMap()
+	return files.GetSectionStringMap(section, includeUnspecified)
 }
 
 // GetHostZookeeper creates data for "zookeeper.xml"

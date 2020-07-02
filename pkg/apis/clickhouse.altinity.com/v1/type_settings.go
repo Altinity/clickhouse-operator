@@ -41,7 +41,7 @@ var (
 	SectionUsers  SettingsSection = "USERS"
 	SectionHost   SettingsSection = "HOST"
 
-	errorNoSectionSpecified = fmt.Errorf("no section specified")
+	errorNoSectionSpecified  = fmt.Errorf("no section specified")
 	errorNoFilenameSpecified = fmt.Errorf("no filename specified")
 )
 
@@ -308,21 +308,7 @@ func (settings *Settings) MergeFrom(src Settings) {
 	}
 }
 
-// GetStringMap
-func (settings Settings) GetStringMap() map[string]string {
-	m := make(map[string]string)
-
-	for key := range settings {
-		if scalar, ok := settings.getValueAsScalar(key); ok {
-			m[key] = scalar
-		} else {
-			// Skip vector for now
-		}
-	}
-
-	return m
-}
-
+// GetSectionStringMap
 func (settings Settings) GetSectionStringMap(section SettingsSection, includeUnspecified bool) map[string]string {
 	m := make(map[string]string)
 
