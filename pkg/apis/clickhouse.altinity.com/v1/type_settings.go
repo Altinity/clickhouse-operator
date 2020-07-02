@@ -412,6 +412,10 @@ func getSectionFromPath(path string) (SettingsSection, error) {
 	}
 
 	section := parts[0]
+	return string2Section(section)
+}
+
+func string2Section(section string) (SettingsSection, error) {
 	if strings.EqualFold(section, string(SectionCommon)) || strings.EqualFold(section, CommonConfigDir) {
 		return SectionCommon, nil
 	}
