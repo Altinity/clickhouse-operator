@@ -308,6 +308,23 @@ func (settings *Settings) MergeFrom(src Settings) {
 	}
 }
 
+func (settings *Settings) MergeFromCB(src Settings, filter func(path string, setting *Setting) bool) {
+	if src == nil {
+		return
+	}
+
+	if *settings == nil {
+		*settings = NewSettings()
+	}
+
+	for key, value := range src {
+		if filter(key, value) {
+			// Accept
+			(*settings)[key] = value
+		}
+	}
+}
+
 // GetSectionStringMap
 func (settings Settings) GetSectionStringMap(section SettingsSection, includeUnspecified bool) map[string]string {
 	m := make(map[string]string)
