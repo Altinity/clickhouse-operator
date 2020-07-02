@@ -36,9 +36,12 @@ const (
 type SettingsSection string
 
 var (
-	SectionCommon SettingsSection = "SectionCommon"
-	SectionUsers  SettingsSection = "SectionUsers"
-	SectionHost   SettingsSection = "SectionHost"
+	SectionEmpty  SettingsSection = ""
+	SectionCommon SettingsSection = "COMMON"
+	SectionUsers  SettingsSection = "USERS"
+	SectionHost   SettingsSection = "HOST"
+
+	errorNoSectionSpecified = fmt.Errorf("no section specified")
 )
 
 // Settings value can be one of:
@@ -319,6 +322,34 @@ func (settings Settings) GetStringMap() map[string]string {
 	return m
 }
 
+func (settings Settings) GetSectionStringMap(section SettingsSection, includeUnspecified bool) map[string]string {
+	m := make(map[string]string)
+
+	for path := range settings {
+		_section, err := getSectionFromPath(path)
+		if (err == nil) && (_section != section) {
+			// This is not the section we are looking for, skip to next
+			continue // for
+		}
+		if (err != nil) && (err != errorNoSectionSpecified) {
+			// We have an complex error, skip to next
+			continue // for
+		}
+		if (err == errorNoSectionSpecified) && !includeUnspecified {
+			// We are not ready to include unspecified section, skip to next
+			continue // for
+		}
+
+		if scalar, ok := settings.getValueAsScalar(path); ok {
+			m[path] = scalar
+		} else {
+			// Skip vector for now
+		}
+	}
+
+	return m
+}
+
 // AsSortedSliceOfStrings
 func (settings Settings) AsSortedSliceOfStrings() []string {
 	// Sort keys
@@ -378,4 +409,27 @@ func normalizeSettingsKeyAsPath(path string) string {
 
 	// Cut all leading and trailing '/', so the result would be 'a/b/c'
 	return strings.Trim(path, "/")
+}
+
+func getSectionFromPath(path string) (SettingsSection, error) {
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 {
+		// We need to have path to be at least section/file.name
+		return SectionEmpty, errorNoSectionSpecified
+	}
+
+	section := parts[0]
+	if strings.EqualFold(section, string(SectionCommon)) || strings.EqualFold(section, CommonConfigDir) {
+		return SectionCommon, nil
+	}
+	if strings.EqualFold(section, string(SectionUsers)) || strings.EqualFold(section, UsersConfigDir) {
+		return SectionUsers, nil
+	}
+	if strings.EqualFold(section, string(SectionHost)) || strings.EqualFold(section, HostConfigDir) {
+		return SectionHost, nil
+	}
+
+	log.V(1).Infof("unknown section specified %v", section)
+
+	return SectionEmpty, fmt.Errorf("unknown section specified %v", section)
 }
