@@ -87,7 +87,15 @@ func (cluster *ChiCluster) InheritSettingsFrom(chi *ClickHouseInstallation) {
 }
 
 func (cluster *ChiCluster) InheritFilesFrom(chi *ClickHouseInstallation) {
-	(&cluster.Files).MergeFrom(chi.Spec.Configuration.Files)
+	(&cluster.Files).MergeFromCB(chi.Spec.Configuration.Files, func(path string, _*Setting) bool {
+		if section, err := getSectionFromPath(path); err == nil {
+			if section == SectionHost {
+				return true
+			}
+		}
+
+		return false
+	})
 }
 
 func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
