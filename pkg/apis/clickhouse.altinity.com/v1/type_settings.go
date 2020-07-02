@@ -33,6 +33,14 @@ const (
 	ignoreThreshold = 0.001
 )
 
+type SettingsSection string
+
+var (
+	SectionCommon SettingsSection = "SectionCommon"
+	SectionUsers  SettingsSection = "SectionUsers"
+	SectionHost   SettingsSection = "SectionHost"
+)
+
 // Settings value can be one of:
 // 1. scalar value (string, int, bool, etc).
 //		Ex.:

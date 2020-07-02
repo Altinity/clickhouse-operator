@@ -18,6 +18,10 @@ func (shard *ChiShard) InheritSettingsFrom(cluster *ChiCluster) {
 	(&shard.Settings).MergeFrom(cluster.Settings)
 }
 
+func (shard *ChiShard) InheritFilesFrom(cluster *ChiCluster) {
+	(&shard.Files).MergeFrom(cluster.Files)
+}
+
 func (shard *ChiShard) InheritTemplatesFrom(cluster *ChiCluster) {
 	(&shard.Templates).MergeFrom(&cluster.Templates, MergeTypeFillEmptyValues)
 	(&shard.Templates).HandleDeprecatedFields()
