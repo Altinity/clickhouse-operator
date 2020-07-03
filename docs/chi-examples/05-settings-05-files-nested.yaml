@@ -56,3 +56,33 @@ spec:
             <yandex>
               <!-- conf_d_prefixed_2.file -->
             </yandex>
+
+      - name: "shard-level"
+        files:
+          simple_3.file: |
+            <yandex>
+              <!-- simple_3.file goes to HOST -->
+            </yandex>
+          HOST/host_prefixed_3.file: |
+            <yandex>
+              <!-- host_prefixed_3.file -->
+            </yandex>
+          conf.d/conf_d_prefixed_3.file: |
+            <yandex>
+              <!-- conf_d_prefixed_3.file -->
+            </yandex>
+        layout:
+          shards:
+            - files:
+                simple_4.file: |
+                  <yandex>
+                    <!-- simple_4.file goes to HOST -->
+                  </yandex>
+                HOST/host_prefixed_4.file: |
+                  <yandex>
+                    <!-- host_prefixed_4.file -->
+                  </yandex>
+                conf.d/conf_d_prefixed_4.file: |
+                  <yandex>
+                    <!-- conf_d_prefixed_4.file -->
+                  </yandex>
