@@ -76,7 +76,7 @@ func (c *configSections) CreateConfigsHost(host *chi.ChiHost) map[string]string 
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configPorts), c.chConfigGenerator.GetHostPorts(host))
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configZookeeper), c.chConfigGenerator.GetHostZookeeper(host))
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings(host))
-	util.MergeStringMaps(c.commonConfigSections, c.chConfigGenerator.GetFiles(chi.SectionHost, true, host))
+	util.MergeStringMaps(hostConfigSections, c.chConfigGenerator.GetFiles(chi.SectionHost, true, host))
 	// Extra user-specified config files
 	util.MergeStringMaps(hostConfigSections, c.chopConfig.CHHostConfigs)
 
