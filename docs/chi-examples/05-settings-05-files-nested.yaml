@@ -1,0 +1,41 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: "settings-02"
+
+spec:
+  configuration:
+    files:
+      simple_1.file: |
+        <yandex>
+          <!-- simple_1.file goes to COMMON -->
+        </yandex>
+      COMMON/common_prefixed_1.file: |
+        <yandex>
+          <!-- common_prefixed_1.file -->
+        </yandex>
+      USERS/users_prefixed_1.file: |
+        <yandex>
+          <!-- users_prefixed_1.file -->
+        </yandex>
+      HOST/host_prefixed_1.file: |
+        <yandex>
+          <!-- host_prefixed_1.file -->
+        </yandex>
+      config.d/config_d_prefixed_1.file: |
+        <yandex>
+          <!-- config_d_prefixed_1.file -->
+        </yandex>
+      users.d/users_d_prefixed_1.file: |
+        <yandex>
+          <!-- users_d_prefixed_users_1.file -->
+        </yandex>
+      conf.d/conf_d_prefixed_1.file: |
+        <yandex>
+          <!-- conf_d_prefixed_1.file -->
+        </yandex>
+    clusters:
+      - name: standard
+        layout:
+          shardsCount: 1
