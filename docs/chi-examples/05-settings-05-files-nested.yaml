@@ -86,3 +86,33 @@ spec:
                   <yandex>
                     <!-- conf_d_prefixed_4.file -->
                   </yandex>
+
+      - name: "replica-level"
+        files:
+          simple_5.file: |
+            <yandex>
+              <!-- simple_5.file goes to HOST -->
+            </yandex>
+          HOST/host_prefixed_5.file: |
+            <yandex>
+              <!-- host_prefixed_5.file -->
+            </yandex>
+          conf.d/conf_d_prefixed_5.file: |
+            <yandex>
+              <!-- conf_d_prefixed_5.file -->
+            </yandex>
+        layout:
+          replicas:
+            - files:
+                simple_6.file: |
+                  <yandex>
+                    <!-- simple_6.file goes to HOST -->
+                  </yandex>
+                HOST/host_prefixed_6.file: |
+                  <yandex>
+                    <!-- host_prefixed_6.file -->
+                  </yandex>
+                conf.d/conf_d_prefixed_6.file: |
+                  <yandex>
+                    <!-- conf_d_prefixed_6.file -->
+                  </yandex>
