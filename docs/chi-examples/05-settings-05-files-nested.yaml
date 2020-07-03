@@ -160,3 +160,47 @@ spec:
                       <yandex>
                         <!-- conf_d_prefixed_9.file -->
                       </yandex>
+
+      - name: "host-level-rep"
+        files:
+          simple_10.file: |
+            <yandex>
+              <!-- simple_10.file goes to HOST -->
+            </yandex>
+          HOST/host_prefixed_10.file: |
+            <yandex>
+              <!-- host_prefixed_10.file -->
+            </yandex>
+          conf.d/conf_d_prefixed_10.file: |
+            <yandex>
+              <!-- conf_d_prefixed_10.file -->
+            </yandex>
+        layout:
+          replicas:
+            - files:
+                simple_11.file: |
+                  <yandex>
+                    <!-- simple_11.file goes to HOST -->
+                  </yandex>
+                HOST/host_prefixed_11.file: |
+                  <yandex>
+                    <!-- host_prefixed_11.file -->
+                  </yandex>
+                conf.d/conf_d_prefixed_11.file: |
+                  <yandex>
+                    <!-- conf_d_prefixed_11.file -->
+                  </yandex>
+              shards:
+                - files:
+                    simple_12.file: |
+                      <yandex>
+                        <!-- simple_12.file goes to HOST -->
+                      </yandex>
+                    HOST/host_prefixed_12.file: |
+                      <yandex>
+                        <!-- host_prefixed_12.file -->
+                      </yandex>
+                    conf.d/conf_d_prefixed_12.file: |
+                      <yandex>
+                        <!-- conf_d_prefixed_12.file -->
+                      </yandex>
