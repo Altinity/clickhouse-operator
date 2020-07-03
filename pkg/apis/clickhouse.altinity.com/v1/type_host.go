@@ -15,8 +15,9 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	"k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
@@ -26,6 +27,16 @@ func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
 
 	if replica != nil {
 		(&host.Settings).MergeFrom(replica.Settings)
+	}
+}
+
+func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
+	if shard != nil {
+		(&host.Files).MergeFrom(shard.Files)
+	}
+
+	if replica != nil {
+		(&host.Files).MergeFrom(replica.Files)
 	}
 }
 

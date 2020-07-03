@@ -19,6 +19,7 @@ type ChiCluster struct {
 	Name      string             `json:"name"`
 	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty"`
 	Settings  Settings           `json:"settings,omitempty"`
+	Files     Settings           `json:"files,omitempty"`
 	Templates ChiTemplateNames   `json:"templates,omitempty"`
 	Layout    ChiClusterLayout   `json:"layout"`
 
@@ -83,6 +84,18 @@ func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 
 func (cluster *ChiCluster) InheritSettingsFrom(chi *ClickHouseInstallation) {
 	(&cluster.Settings).MergeFrom(chi.Spec.Configuration.Settings)
+}
+
+func (cluster *ChiCluster) InheritFilesFrom(chi *ClickHouseInstallation) {
+	(&cluster.Files).MergeFromCB(chi.Spec.Configuration.Files, func(path string, _ *Setting) bool {
+		if section, err := getSectionFromPath(path); err == nil {
+			if section == SectionHost {
+				return true
+			}
+		}
+
+		return false
+	})
 }
 
 func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {

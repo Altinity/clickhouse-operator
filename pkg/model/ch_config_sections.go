@@ -46,9 +46,9 @@ func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig 
 func (c *configSections) CreateConfigsCommon() {
 	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. remote servers
-	// 2. files
+	// 2. common files
 	util.IncludeNonEmpty(c.commonConfigSections, createConfigSectionFilename(configRemoteServers), c.chConfigGenerator.GetRemoteServers())
-	util.MergeStringMaps(c.commonConfigSections, c.chConfigGenerator.GetFiles())
+	util.MergeStringMaps(c.commonConfigSections, c.chConfigGenerator.GetFiles(chi.SectionCommon, true, nil))
 	// Extra user-specified config files
 	util.MergeStringMaps(c.commonConfigSections, c.chopConfig.CHCommonConfigs)
 }
@@ -59,9 +59,11 @@ func (c *configSections) CreateConfigsUsers() {
 	// 1. users
 	// 2. quotas
 	// 3. profiles
+	// 4. user files
 	util.IncludeNonEmpty(c.commonUsersConfigSections, createConfigSectionFilename(configUsers), c.chConfigGenerator.GetUsers())
 	util.IncludeNonEmpty(c.commonUsersConfigSections, createConfigSectionFilename(configQuotas), c.chConfigGenerator.GetQuotas())
 	util.IncludeNonEmpty(c.commonUsersConfigSections, createConfigSectionFilename(configProfiles), c.chConfigGenerator.GetProfiles())
+	util.MergeStringMaps(c.commonUsersConfigSections, c.chConfigGenerator.GetFiles(chi.SectionUsers, false, nil))
 	// Extra user-specified config files
 	util.MergeStringMaps(c.commonUsersConfigSections, c.chopConfig.CHUsersConfigs)
 }
@@ -74,6 +76,7 @@ func (c *configSections) CreateConfigsHost(host *chi.ChiHost) map[string]string 
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configPorts), c.chConfigGenerator.GetHostPorts(host))
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configZookeeper), c.chConfigGenerator.GetHostZookeeper(host))
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings(host))
+	util.MergeStringMaps(hostConfigSections, c.chConfigGenerator.GetFiles(chi.SectionHost, true, host))
 	// Extra user-specified config files
 	util.MergeStringMaps(hostConfigSections, c.chopConfig.CHHostConfigs)
 

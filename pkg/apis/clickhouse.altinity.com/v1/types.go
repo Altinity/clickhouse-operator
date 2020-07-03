@@ -117,6 +117,7 @@ type ChiShard struct {
 	Weight              int              `json:"weight,omitempty"`
 	InternalReplication string           `json:"internalReplication,omitempty"`
 	Settings            Settings         `json:"settings,omitempty"`
+	Files               Settings         `json:"files,omitempty"`
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 	ReplicasCount       int              `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiHost
@@ -132,6 +133,7 @@ type ChiShard struct {
 type ChiReplica struct {
 	Name        string           `json:"name,omitempty"`
 	Settings    Settings         `json:"settings,omitempty"`
+	Files       Settings         `json:"files,omitempty"`
 	Templates   ChiTemplateNames `json:"templates,omitempty"`
 	ShardsCount int              `json:"shardsCount,omitempty"`
 	// TODO refactor into map[string]ChiHost
@@ -171,6 +173,7 @@ type ChiHost struct {
 	HTTPPort            int32            `json:"httpPort,omitempty"`
 	InterserverHTTPPort int32            `json:"interserverHTTPPort,omitempty"`
 	Settings            Settings         `json:"settings,omitempty"`
+	Files               Settings         `json:"files,omitempty"`
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data
@@ -353,10 +356,6 @@ type OperatorConfig struct {
 	WatchNamespaces []string `json:"watchNamespaces" yaml:"watchNamespaces"`
 
 	// Paths where to look for additional ClickHouse config .xml files to be mounted into Pod
-	// config.d
-	// conf.d
-	// users.d
-	// respectively
 	CHCommonConfigsPath string `json:"chCommonConfigsPath" yaml:"chCommonConfigsPath"`
 	CHHostConfigsPath   string `json:"chHostConfigsPath"   yaml:"chHostConfigsPath"`
 	CHUsersConfigsPath  string `json:"chUsersConfigsPath"  yaml:"chUsersConfigsPath"`

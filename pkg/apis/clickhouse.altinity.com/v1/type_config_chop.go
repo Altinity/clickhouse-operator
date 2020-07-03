@@ -223,12 +223,12 @@ func (config *OperatorConfig) normalize() {
 
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
-	config.prepareConfigPath(&config.CHCommonConfigsPath, "config.d")
-	config.prepareConfigPath(&config.CHHostConfigsPath, "conf.d")
-	config.prepareConfigPath(&config.CHUsersConfigsPath, "users.d")
+	config.prepareConfigPath(&config.CHCommonConfigsPath, CommonConfigDir)
+	config.prepareConfigPath(&config.CHHostConfigsPath, HostConfigDir)
+	config.prepareConfigPath(&config.CHUsersConfigsPath, UsersConfigDir)
 
 	// Process ClickHouseInstallation templates section
-	config.prepareConfigPath(&config.CHITemplatesPath, "templates.d")
+	config.prepareConfigPath(&config.CHITemplatesPath, TemplatesDir)
 
 	// Process Create/Update section
 

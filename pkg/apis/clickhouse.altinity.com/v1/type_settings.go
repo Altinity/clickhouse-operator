@@ -33,6 +33,18 @@ const (
 	ignoreThreshold = 0.001
 )
 
+type SettingsSection string
+
+var (
+	SectionEmpty  SettingsSection = ""
+	SectionCommon SettingsSection = "COMMON"
+	SectionUsers  SettingsSection = "USERS"
+	SectionHost   SettingsSection = "HOST"
+
+	errorNoSectionSpecified  = fmt.Errorf("no section specified")
+	errorNoFilenameSpecified = fmt.Errorf("no filename specified")
+)
+
 // Settings value can be one of:
 // 1. scalar value (string, int, bool, etc).
 //		Ex.:
@@ -296,13 +308,50 @@ func (settings *Settings) MergeFrom(src Settings) {
 	}
 }
 
-// GetStringMap
-func (settings Settings) GetStringMap() map[string]string {
+func (settings *Settings) MergeFromCB(src Settings, filter func(path string, setting *Setting) bool) {
+	if src == nil {
+		return
+	}
+
+	if *settings == nil {
+		*settings = NewSettings()
+	}
+
+	for key, value := range src {
+		if filter(key, value) {
+			// Accept
+			(*settings)[key] = value
+		}
+	}
+}
+
+// GetSectionStringMap
+func (settings Settings) GetSectionStringMap(section SettingsSection, includeUnspecified bool) map[string]string {
 	m := make(map[string]string)
 
-	for key := range settings {
-		if scalar, ok := settings.getValueAsScalar(key); ok {
-			m[key] = scalar
+	for path := range settings {
+		_section, err := getSectionFromPath(path)
+		if (err == nil) && (_section != section) {
+			// This is not the section we are looking for, skip to next
+			continue // for
+		}
+		if (err != nil) && (err != errorNoSectionSpecified) {
+			// We have an complex error, skip to next
+			continue // for
+		}
+		if (err == errorNoSectionSpecified) && !includeUnspecified {
+			// We are not ready to include unspecified section, skip to next
+			continue // for
+		}
+
+		filename, err := getFilenameFromPath(path)
+		if err != nil {
+			// We need to have filename specified
+			continue // for
+		}
+
+		if scalar, ok := settings.getValueAsScalar(path); ok {
+			m[filename] = scalar
 		} else {
 			// Skip vector for now
 		}
@@ -341,27 +390,27 @@ func (settings Settings) normalizePaths() {
 	pathsToNormalize := make([]string, 0, 0)
 
 	// Find entries with paths to normalize
-	for key := range settings {
-		path := normalizeSettingsKeyAsPath(key)
-		if len(path) != len(key) {
-			// Normalization worked. These paths have to be normalized
-			pathsToNormalize = append(pathsToNormalize, key)
+	for unNormalizedPath := range settings {
+		normalizedPath := normalizeSettingsKeyAsPath(unNormalizedPath)
+		if len(normalizedPath) != len(unNormalizedPath) {
+			// Normalization changed something. This path has to be normalized
+			pathsToNormalize = append(pathsToNormalize, unNormalizedPath)
 		}
 	}
 
 	// Add entries with normalized paths
-	for _, key := range pathsToNormalize {
-		normalizedPath := normalizeSettingsKeyAsPath(key)
-		settings[normalizedPath] = settings[key]
+	for _, unNormalizedPath := range pathsToNormalize {
+		normalizedPath := normalizeSettingsKeyAsPath(unNormalizedPath)
+		settings[normalizedPath] = settings[unNormalizedPath]
 	}
 
 	// Delete entries with un-normalized paths
-	for _, key := range pathsToNormalize {
-		delete(settings, key)
+	for _, unNormalizedPath := range pathsToNormalize {
+		delete(settings, unNormalizedPath)
 	}
 }
 
-// normalizeSettingsKeyAsPath normalizes path in .spec.configuration.{users, profiles, quotas, settings} section
+// normalizeSettingsKeyAsPath normalizes path in .spec.configuration.{users, profiles, quotas, settings, files} section
 // Normalized path looks like 'a/b/c'
 func normalizeSettingsKeyAsPath(path string) string {
 	// Normalize multi-'/' values (like '//') to single-'/'
@@ -370,4 +419,47 @@ func normalizeSettingsKeyAsPath(path string) string {
 
 	// Cut all leading and trailing '/', so the result would be 'a/b/c'
 	return strings.Trim(path, "/")
+}
+
+func getSectionFromPath(path string) (SettingsSection, error) {
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 {
+		// We need to have path to be at least section/file.name
+		return SectionEmpty, errorNoSectionSpecified
+	}
+
+	section := parts[0]
+	return string2Section(section)
+}
+
+func string2Section(section string) (SettingsSection, error) {
+	if strings.EqualFold(section, string(SectionCommon)) || strings.EqualFold(section, CommonConfigDir) {
+		return SectionCommon, nil
+	}
+	if strings.EqualFold(section, string(SectionUsers)) || strings.EqualFold(section, UsersConfigDir) {
+		return SectionUsers, nil
+	}
+	if strings.EqualFold(section, string(SectionHost)) || strings.EqualFold(section, HostConfigDir) {
+		return SectionHost, nil
+	}
+
+	log.V(1).Infof("unknown section specified %v", section)
+
+	return SectionEmpty, fmt.Errorf("unknown section specified %v", section)
+}
+
+func getFilenameFromPath(path string) (string, error) {
+	parts := strings.Split(path, "/")
+	if len(parts) < 1 {
+		// We need to have path to be at least 'file.name'
+		return "", errorNoFilenameSpecified
+	}
+
+	filename := parts[len(parts)-1]
+	if filename == "" {
+		// We need to have path to be at least 'file.name'
+		return "", errorNoFilenameSpecified
+	}
+
+	return filename, nil
 }
