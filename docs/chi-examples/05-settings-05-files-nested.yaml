@@ -2,7 +2,7 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 
 metadata:
-  name: "settings-02"
+  name: "files-nested"
 
 spec:
   configuration:
