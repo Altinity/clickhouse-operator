@@ -35,7 +35,24 @@ spec:
         <yandex>
           <!-- conf_d_prefixed_1.file -->
         </yandex>
+
     clusters:
-      - name: standard
+      - name: "top-level"
         layout:
           shardsCount: 1
+          replicasCount: 1
+
+      - name: "cluster-level"
+        files:
+          simple_2.file: |
+            <yandex>
+              <!-- simple_2.file goes to HOST -->
+            </yandex>
+          HOST/host_prefixed_2.file: |
+            <yandex>
+              <!-- host_prefixed_2.file -->
+            </yandex>
+          conf.d/conf_d_prefixed_2.file: |
+            <yandex>
+              <!-- conf_d_prefixed_2.file -->
+            </yandex>
