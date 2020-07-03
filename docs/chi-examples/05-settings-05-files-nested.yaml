@@ -116,3 +116,47 @@ spec:
                   <yandex>
                     <!-- conf_d_prefixed_6.file -->
                   </yandex>
+
+      - name: "host-level-sh"
+        files:
+          simple_7.file: |
+            <yandex>
+              <!-- simple_7.file goes to HOST -->
+            </yandex>
+          HOST/host_prefixed_7.file: |
+            <yandex>
+              <!-- host_prefixed_7.file -->
+            </yandex>
+          conf.d/conf_d_prefixed_7.file: |
+            <yandex>
+              <!-- conf_d_prefixed_7.file -->
+            </yandex>
+        layout:
+          shards:
+            - files:
+                simple_8.file: |
+                  <yandex>
+                    <!-- simple_8.file goes to HOST -->
+                  </yandex>
+                HOST/host_prefixed_8.file: |
+                  <yandex>
+                    <!-- host_prefixed_8.file -->
+                  </yandex>
+                conf.d/conf_d_prefixed_8.file: |
+                  <yandex>
+                    <!-- conf_d_prefixed_8.file -->
+                  </yandex>
+              replicas:
+                - files:
+                    simple_9.file: |
+                      <yandex>
+                        <!-- simple_9.file goes to HOST -->
+                      </yandex>
+                    HOST/host_prefixed_9.file: |
+                      <yandex>
+                        <!-- host_prefixed_9.file -->
+                      </yandex>
+                    conf.d/conf_d_prefixed_9.file: |
+                      <yandex>
+                        <!-- conf_d_prefixed_9.file -->
+                      </yandex>
