@@ -454,17 +454,7 @@ func (config *OperatorConfig) prepareConfigPath(path *string, defaultRelativePat
 
 // relativeToConfigFolderPath returns absolute path relative to ConfigFolderPath
 func (config *OperatorConfig) relativeToConfigFolderPath(relativePath string) string {
-	if config.ConfigFolderPath == "" {
-		// Relative base is not set, do nothing
-		return relativePath
-	}
-
-	// Relative base is set - try to be relative to it
-	if absPath, err := filepath.Abs(config.ConfigFolderPath + "/" + relativePath); err == nil {
-		return absPath
-	} else {
-		return ""
-	}
+	return util.RelativeToBasePath(config.ConfigFolderPath, relativePath)
 }
 
 // readClickHouseCustomConfigFiles reads all extra user-specified ClickHouse config files
