@@ -504,7 +504,7 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 	util.Fprintf(b, "ConfigFilePath: %s\n", config.ConfigFilePath)
 	util.Fprintf(b, "ConfigFolderPath: %s\n", config.ConfigFolderPath)
 
-	util.Fprintf(b, "%s", config.stringSlice("WatchNamespaces", config.WatchNamespaces))
+	util.Fprintf(b, "%s", util.Slice2String("WatchNamespaces", config.WatchNamespaces))
 
 	util.Fprintf(b, "CHCommonConfigsPath: %s\n", config.CHCommonConfigsPath)
 	util.Fprintf(b, "CHHostConfigsPath: %s\n", config.CHHostConfigsPath)
@@ -525,7 +525,7 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 
 	util.Fprintf(b, "CHConfigUserDefaultProfile: %s\n", config.CHConfigUserDefaultProfile)
 	util.Fprintf(b, "CHConfigUserDefaultQuota: %s\n", config.CHConfigUserDefaultQuota)
-	util.Fprintf(b, "%s", config.stringSlice("CHConfigUserDefaultNetworksIP", config.CHConfigUserDefaultNetworksIP))
+	util.Fprintf(b, "%s", util.Slice2String("CHConfigUserDefaultNetworksIP", config.CHConfigUserDefaultNetworksIP))
 	password = config.CHConfigUserDefaultPassword
 	if hideCredentials {
 		password = PasswordReplacer
@@ -558,17 +558,6 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 // WriteToLog writes OperatorConfig into log
 func (config *OperatorConfig) WriteToLog() {
 	log.V(1).Infof("OperatorConfig:\n%s", config.String(true))
-}
-
-// stringSlice returns string of named []string OperatorConfig param
-func (config *OperatorConfig) stringSlice(name string, sl []string) string {
-	b := &bytes.Buffer{}
-	util.Fprintf(b, "%s (%d):\n", name, len(sl))
-	for i := range sl {
-		util.Fprintf(b, "  - %s\n", sl[i])
-	}
-
-	return b.String()
 }
 
 // TODO unify with GetInformerNamespace
