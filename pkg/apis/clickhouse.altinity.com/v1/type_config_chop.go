@@ -311,12 +311,12 @@ func (config *OperatorConfig) normalize() {
 
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
-	config.prepareConfigPath(&config.CHCommonConfigsPath, CommonConfigDir)
-	config.prepareConfigPath(&config.CHHostConfigsPath, HostConfigDir)
-	config.prepareConfigPath(&config.CHUsersConfigsPath, UsersConfigDir)
+	util.PreparePath(&config.CHCommonConfigsPath, config.ConfigFolderPath, CommonConfigDir)
+	util.PreparePath(&config.CHHostConfigsPath, config.ConfigFolderPath, HostConfigDir)
+	util.PreparePath(&config.CHUsersConfigsPath, config.ConfigFolderPath, UsersConfigDir)
 
 	// Process ClickHouseInstallation templates section
-	config.prepareConfigPath(&config.CHITemplatesPath, TemplatesDir)
+	util.PreparePath(&config.CHITemplatesPath, config.ConfigFolderPath, TemplatesDir)
 
 	// Process Create/Update section
 
