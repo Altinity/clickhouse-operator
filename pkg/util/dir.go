@@ -30,3 +30,21 @@ func RelativeToBasePath(basePath, relativePath string) string {
 		return ""
 	}
 }
+
+// PreparePath - prepares path absolute/relative with default relative value
+func PreparePath(path *string, basePath, defaultRelativePath string) {
+	if *path == "" {
+		// Path is not specified, try to build it relative to specified base
+		*path = RelativeToBasePath(basePath, defaultRelativePath)
+	} else if filepath.IsAbs(*path) {
+		// Absolute path explicitly specified - nothing to do here
+	} else {
+		// Relative path is specified - make relative path relative to base path
+		*path = RelativeToBasePath(basePath, *path)
+	}
+
+	// In case of incorrect/unavailable path - make it empty
+	if (*path != "") && IsDirOk(*path) {
+		*path = ""
+	}
+}

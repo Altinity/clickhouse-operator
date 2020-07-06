@@ -23,7 +23,6 @@ import (
 	"github.com/imdario/mergo"
 	"github.com/kubernetes-sigs/yaml"
 	"os"
-	"path/filepath"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -436,20 +435,7 @@ func (config *OperatorConfig) applyDefaultWatchNamespace() {
 
 // prepareConfigPath - prepares config path absolute/relative with default relative value
 func (config *OperatorConfig) prepareConfigPath(path *string, defaultRelativePath string) {
-	if *path == "" {
-		// Path not specified, try to build it relative to config file
-		*path = config.relativeToConfigFolderPath(defaultRelativePath)
-	} else if filepath.IsAbs(*path) {
-		// Absolute path explicitly specified - nothing to do here
-	} else {
-		// Relative path specified - make relative path relative to config file itself
-		*path = config.relativeToConfigFolderPath(*path)
-	}
-
-	// In case of incorrect/unavailable path - make it empty
-	if (*path != "") && !util.IsDirOk(*path) {
-		*path = ""
-	}
+	util.PreparePath(path, config.ConfigFolderPath, defaultRelativePath)
 }
 
 // relativeToConfigFolderPath returns absolute path relative to ConfigFolderPath
