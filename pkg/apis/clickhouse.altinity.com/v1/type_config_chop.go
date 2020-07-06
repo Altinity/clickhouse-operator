@@ -438,11 +438,6 @@ func (config *OperatorConfig) prepareConfigPath(path *string, defaultRelativePat
 	util.PreparePath(path, config.ConfigFolderPath, defaultRelativePath)
 }
 
-// relativeToConfigFolderPath returns absolute path relative to ConfigFolderPath
-func (config *OperatorConfig) relativeToConfigFolderPath(relativePath string) string {
-	return util.RelativeToBasePath(config.ConfigFolderPath, relativePath)
-}
-
 // readClickHouseCustomConfigFiles reads all extra user-specified ClickHouse config files
 func (config *OperatorConfig) readClickHouseCustomConfigFiles() {
 	config.CHCommonConfigs = util.ReadFilesIntoMap(config.CHCommonConfigsPath, config.isCHConfigExt)
