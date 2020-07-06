@@ -159,7 +159,7 @@ func (config *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) {
 // readCHITemplates build OperatorConfig.CHITemplate from template files content
 func (config *OperatorConfig) readCHITemplates() {
 	// Read CHI template files
-	config.CHITemplateFiles = readConfigFiles(config.CHITemplatesPath, config.isCHITemplateExt)
+	config.CHITemplateFiles = util.ReadFilesIntoMap(config.CHITemplatesPath, config.isCHITemplateExt)
 
 	// Produce map of CHI templates out of CHI template files
 	for filename := range config.CHITemplateFiles {
@@ -470,9 +470,9 @@ func (config *OperatorConfig) relativeToConfigFolderPath(relativePath string) st
 
 // readClickHouseCustomConfigFiles reads all extra user-specified ClickHouse config files
 func (config *OperatorConfig) readClickHouseCustomConfigFiles() {
-	config.CHCommonConfigs = readConfigFiles(config.CHCommonConfigsPath, config.isCHConfigExt)
-	config.CHHostConfigs = readConfigFiles(config.CHHostConfigsPath, config.isCHConfigExt)
-	config.CHUsersConfigs = readConfigFiles(config.CHUsersConfigsPath, config.isCHConfigExt)
+	config.CHCommonConfigs = util.ReadFilesIntoMap(config.CHCommonConfigsPath, config.isCHConfigExt)
+	config.CHHostConfigs = util.ReadFilesIntoMap(config.CHHostConfigsPath, config.isCHConfigExt)
+	config.CHUsersConfigs = util.ReadFilesIntoMap(config.CHUsersConfigsPath, config.isCHConfigExt)
 }
 
 // isCHConfigExt returns true in case specified file has proper extension for a ClickHouse config file
@@ -628,11 +628,4 @@ func (config *OperatorConfig) GetInformerNamespace() string {
 	}
 
 	return namespace
-}
-
-// readConfigFiles reads config files from specified path into "file name->file content" map
-// path - folder where to look for files
-// isCHConfigExt - accepts path to file return bool whether this file has config extension
-func readConfigFiles(path string, isConfigExt func(string) bool) map[string]string {
-	return util.ReadFilesIntoMap(path, isConfigExt)
 }
