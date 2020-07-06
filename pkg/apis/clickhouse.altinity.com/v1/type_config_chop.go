@@ -16,16 +16,17 @@ package v1
 
 import (
 	"bytes"
-	"github.com/altinity/clickhouse-operator/pkg/util"
+	"os"
+	"strings"
+
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
 
 	"github.com/imdario/mergo"
 	"github.com/kubernetes-sigs/yaml"
-	"os"
-	"strings"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 const (
