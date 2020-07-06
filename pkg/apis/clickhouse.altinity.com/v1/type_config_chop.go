@@ -203,6 +203,7 @@ func (config *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation
 	// TODO compact the slice
 }
 
+// FindTemplate
 func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *ClickHouseInstallation {
 	// Try to find direct match
 	for _, _template := range config.CHITemplates {
@@ -279,21 +280,25 @@ func (config *OperatorConfig) buildUnifiedCHITemplate() {
 	*/
 }
 
+// AddCHITemplate
 func (config *OperatorConfig) AddCHITemplate(template *ClickHouseInstallation) {
 	config.enlistCHITemplate(template)
 	config.buildUnifiedCHITemplate()
 }
 
+// UpdateCHITemplate
 func (config *OperatorConfig) UpdateCHITemplate(template *ClickHouseInstallation) {
 	config.enlistCHITemplate(template)
 	config.buildUnifiedCHITemplate()
 }
 
+// DeleteCHITemplate
 func (config *OperatorConfig) DeleteCHITemplate(template *ClickHouseInstallation) {
 	config.unlistCHITemplate(template)
 	config.buildUnifiedCHITemplate()
 }
 
+// Postprocess
 func (config *OperatorConfig) Postprocess() {
 	config.normalize()
 	config.readClickHouseCustomConfigFiles()

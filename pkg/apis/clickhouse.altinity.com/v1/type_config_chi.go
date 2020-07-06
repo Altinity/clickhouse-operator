@@ -41,6 +41,7 @@ type Configuration struct {
 	Clusters []ChiCluster `json:"clusters,omitempty"`
 }
 
+// MergeFrom merges from specified source
 func (configuration *Configuration) MergeFrom(from *Configuration, _type MergeType) {
 	if from == nil {
 		return
