@@ -28,7 +28,20 @@ const (
 	TemplatesDir = "templates.d"
 )
 
-func (configuration *ChiConfiguration) MergeFrom(from *ChiConfiguration, _type MergeType) {
+// Configuration defines configuration section of .spec
+type Configuration struct {
+	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper"`
+	Users     Settings           `json:"users,omitempty"     yaml:"users"`
+	Profiles  Settings           `json:"profiles,omitempty"  yaml:"profiles"`
+	Quotas    Settings           `json:"quotas,omitempty"    yaml:"quotas"`
+	Settings  Settings           `json:"settings,omitempty"  yaml:"settings"`
+	Files     Settings           `json:"files,omitempty"     yaml:"files"`
+
+	// TODO refactor into map[string]ChiCluster
+	Clusters []ChiCluster `json:"clusters,omitempty"`
+}
+
+func (configuration *Configuration) MergeFrom(from *Configuration, _type MergeType) {
 	if from == nil {
 		return
 	}
