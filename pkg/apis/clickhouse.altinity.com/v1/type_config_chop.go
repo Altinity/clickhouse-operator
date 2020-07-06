@@ -459,7 +459,7 @@ func (config *OperatorConfig) relativeToConfigFolderPath(relativePath string) st
 		return relativePath
 	}
 
-	// Relative base is set - try to be ralative to it
+	// Relative base is set - try to be relative to it
 	if absPath, err := filepath.Abs(config.ConfigFolderPath + "/" + relativePath); err == nil {
 		return absPath
 	} else {
