@@ -267,7 +267,7 @@ func (n *Normalizer) normalizeDefaults(defaults *chiv1.ChiDefaults) {
 }
 
 // normalizeConfiguration normalizes .spec.configuration
-func (n *Normalizer) normalizeConfiguration(conf *chiv1.ChiConfiguration) {
+func (n *Normalizer) normalizeConfiguration(conf *chiv1.Configuration) {
 	n.normalizeConfigurationZookeeper(&conf.Zookeeper)
 
 	n.normalizeConfigurationUsers(&conf.Users)
@@ -276,7 +276,7 @@ func (n *Normalizer) normalizeConfiguration(conf *chiv1.ChiConfiguration) {
 	n.normalizeConfigurationSettings(&conf.Settings)
 	n.normalizeConfigurationFiles(&conf.Files)
 
-	// ChiConfiguration.Clusters
+	// Configuration.Clusters
 	n.normalizeClusters()
 }
 
