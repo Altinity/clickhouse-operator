@@ -24,7 +24,6 @@ import (
 	"github.com/kubernetes-sigs/yaml"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -511,12 +510,12 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 	util.Fprintf(b, "CHHostConfigsPath: %s\n", config.CHHostConfigsPath)
 	util.Fprintf(b, "CHUsersConfigsPath: %s\n", config.CHUsersConfigsPath)
 
-	util.Fprintf(b, "%s", config.stringMap("CHCommonConfigs", config.CHCommonConfigs))
-	util.Fprintf(b, "%s", config.stringMap("CHHostConfigs", config.CHHostConfigs))
-	util.Fprintf(b, "%s", config.stringMap("CHUsersConfigs", config.CHUsersConfigs))
+	util.Fprintf(b, "%s", util.Map2String("CHCommonConfigs", config.CHCommonConfigs))
+	util.Fprintf(b, "%s", util.Map2String("CHHostConfigs", config.CHHostConfigs))
+	util.Fprintf(b, "%s", util.Map2String("CHUsersConfigs", config.CHUsersConfigs))
 
 	util.Fprintf(b, "CHITemplatesPath: %s\n", config.CHITemplatesPath)
-	util.Fprintf(b, "%s", config.stringMap("CHITemplateFiles", config.CHITemplateFiles))
+	util.Fprintf(b, "%s", util.Map2String("CHITemplateFiles", config.CHITemplateFiles))
 
 	util.Fprintf(b, "StatefulSetUpdateTimeout: %d\n", config.StatefulSetUpdateTimeout)
 	util.Fprintf(b, "StatefulSetUpdatePollPeriod: %d\n", config.StatefulSetUpdatePollPeriod)
@@ -567,29 +566,6 @@ func (config *OperatorConfig) stringSlice(name string, sl []string) string {
 	util.Fprintf(b, "%s (%d):\n", name, len(sl))
 	for i := range sl {
 		util.Fprintf(b, "  - %s\n", sl[i])
-	}
-
-	return b.String()
-}
-
-// stringMap returns string of named map[string]string OperatorConfig param
-func (config *OperatorConfig) stringMap(name string, m map[string]string) string {
-	// Write params according to sorted names
-	// So we need to
-	// 1. Extract and sort names aka keys
-	// 2. Walk over keys and log params
-	// Sort names aka keys
-	var keys []string
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	// Walk over sorted names aka keys
-	b := &bytes.Buffer{}
-	util.Fprintf(b, "%s (%d):\n", name, len(m))
-	for _, k := range keys {
-		util.Fprintf(b, "  - [%s]=%s\n", k, m[k])
 	}
 
 	return b.String()

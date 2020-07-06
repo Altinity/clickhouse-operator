@@ -14,6 +14,11 @@
 
 package util
 
+import (
+	"bytes"
+	"sort"
+)
+
 // IncludeNonEmpty inserts (and overwrites) data into map object using specified key, if not empty value provided
 func IncludeNonEmpty(dst map[string]string, key, src string) {
 	// Do not include empty value
@@ -44,4 +49,28 @@ func MergeStringMaps(dst, src map[string]string) map[string]string {
 	}
 
 	return dst
+}
+
+// Map2String returns named map[string]string mas as a string
+func Map2String(name string, m map[string]string) string {
+	// Write map entries according to sorted keys
+	// So we need to
+	// 1. Extract and sort all keys
+	// 2. Walk over keys and write map entries
+
+	// 1. Sort keys
+	var keys []string
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	// Walk over sorted keys
+	b := &bytes.Buffer{}
+	Fprintf(b, "%s (%d):\n", name, len(m))
+	for _, key := range keys {
+		Fprintf(b, "  - [%s]=%s\n", key, m[key])
+	}
+
+	return b.String()
 }
