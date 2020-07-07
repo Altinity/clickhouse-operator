@@ -61,7 +61,7 @@ type ChiSpec struct {
 	Stop                   string           `json:"stop,omitempty"                   yaml:"stop"`
 	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern"`
 	Defaults               ChiDefaults      `json:"defaults,omitempty"               yaml:"defaults"`
-	Configuration          ChiConfiguration `json:"configuration"                    yaml:"configuration"`
+	Configuration          Configuration    `json:"configuration"                    yaml:"configuration"`
 	Templates              ChiTemplates     `json:"templates,omitempty"              yaml:"templates"`
 	UseTemplates           []ChiUseTemplate `json:"useTemplates,omitempty"           yaml:"useTemplates"`
 }
@@ -92,19 +92,6 @@ type ChiTemplateNames struct {
 	ClusterServiceTemplate string `json:"clusterServiceTemplate,omitempty"  yaml:"clusterServiceTemplate"`
 	ShardServiceTemplate   string `json:"shardServiceTemplate,omitempty"    yaml:"shardServiceTemplate"`
 	ReplicaServiceTemplate string `json:"replicaServiceTemplate,omitempty"  yaml:"replicaServiceTemplate"`
-}
-
-// ChiConfiguration defines configuration section of .spec
-type ChiConfiguration struct {
-	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper"`
-	Users     Settings           `json:"users,omitempty"     yaml:"users"`
-	Profiles  Settings           `json:"profiles,omitempty"  yaml:"profiles"`
-	Quotas    Settings           `json:"quotas,omitempty"    yaml:"quotas"`
-	Settings  Settings           `json:"settings,omitempty"  yaml:"settings"`
-	Files     Settings           `json:"files,omitempty"     yaml:"files"`
-
-	// TODO refactor into map[string]ChiCluster
-	Clusters []ChiCluster `json:"clusters,omitempty"`
 }
 
 // ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
@@ -338,89 +325,4 @@ type ClickHouseOperatorConfigurationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
 	Items           []ClickHouseOperatorConfiguration `json:"items"`
-}
-
-// !!! IMPORTANT !!!
-// !!! IMPORTANT !!!
-// !!! IMPORTANT !!!
-// !!! IMPORTANT !!!
-// !!! IMPORTANT !!!
-// Do not forget to update func (config *OperatorConfig) String()
-// Do not forget to update CRD spec
-type OperatorConfig struct {
-	// Full path to the config file and folder where this OperatorConfig originates from
-	ConfigFilePath   string
-	ConfigFolderPath string
-
-	// WatchNamespaces where operator watches for events
-	WatchNamespaces []string `json:"watchNamespaces" yaml:"watchNamespaces"`
-
-	// Paths where to look for additional ClickHouse config .xml files to be mounted into Pod
-	CHCommonConfigsPath string `json:"chCommonConfigsPath" yaml:"chCommonConfigsPath"`
-	CHHostConfigsPath   string `json:"chHostConfigsPath"   yaml:"chHostConfigsPath"`
-	CHUsersConfigsPath  string `json:"chUsersConfigsPath"  yaml:"chUsersConfigsPath"`
-	// OperatorConfig files fetched from these paths. Maps "file name->file content"
-	CHCommonConfigs map[string]string
-	CHHostConfigs   map[string]string
-	CHUsersConfigs  map[string]string
-
-	// Path where to look for ClickHouseInstallation templates .yaml files
-	CHITemplatesPath string `json:"chiTemplatesPath" yaml:"chiTemplatesPath"`
-	// CHI template files fetched from this path. Maps "file name->file content"
-	CHITemplateFiles map[string]string
-	// CHI template objects unmarshalled from CHITemplateFiles. Maps "metadata.name->object"
-	CHITemplates []*ClickHouseInstallation
-	// ClickHouseInstallation template
-	CHITemplate *ClickHouseInstallation
-
-	// Create/Update StatefulSet behavior - for how long to wait for StatefulSet to reach new Generation
-	StatefulSetUpdateTimeout uint64 `json:"statefulSetUpdateTimeout" yaml:"statefulSetUpdateTimeout"`
-	// Create/Update StatefulSet behavior - for how long to sleep while polling StatefulSet to reach new Generation
-	StatefulSetUpdatePollPeriod uint64 `json:"statefulSetUpdatePollPeriod" yaml:"statefulSetUpdatePollPeriod"`
-
-	// Rolling Create/Update behavior
-	// StatefulSet create behavior - what to do in case StatefulSet can't reach new Generation
-	OnStatefulSetCreateFailureAction string `json:"onStatefulSetCreateFailureAction" yaml:"onStatefulSetCreateFailureAction"`
-	// StatefulSet update behavior - what to do in case StatefulSet can't reach new Generation
-	OnStatefulSetUpdateFailureAction string `json:"onStatefulSetUpdateFailureAction" yaml:"onStatefulSetUpdateFailureAction"`
-
-	// Default values for ClickHouse user configuration
-	// 1. user/profile - string
-	// 2. user/quota - string
-	// 3. user/networks/ip - multiple strings
-	// 4. user/password - string
-	CHConfigUserDefaultProfile    string   `json:"chConfigUserDefaultProfile"    yaml:"chConfigUserDefaultProfile"`
-	CHConfigUserDefaultQuota      string   `json:"chConfigUserDefaultQuota"      yaml:"chConfigUserDefaultQuota"`
-	CHConfigUserDefaultNetworksIP []string `json:"chConfigUserDefaultNetworksIP" yaml:"chConfigUserDefaultNetworksIP"`
-	CHConfigUserDefaultPassword   string   `json:"chConfigUserDefaultPassword"   yaml:"chConfigUserDefaultPassword"`
-
-	CHConfigNetworksHostRegexpTemplate string `json:"chConfigNetworksHostRegexpTemplate" yaml:"chConfigNetworksHostRegexpTemplate"`
-	// Username and Password to be used by operator to connect to ClickHouse instances for
-	// 1. Metrics requests
-	// 2. Schema maintenance
-	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
-	CHUsername string `json:"chUsername" yaml:"chUsername"`
-	CHPassword string `json:"chPassword" yaml:"chPassword"`
-	CHPort     int    `json:"chPort"     yaml:"chPort"`
-
-	Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
-	Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`
-	V                string `json:"v"                yaml:"v"`
-	Stderrthreshold  string `json:"stderrthreshold"  yaml:"stderrthreshold"`
-	Vmodule          string `json:"vmodule"          yaml:"vmodule"`
-	Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
-
-	// Max number of concurrent reconciles in progress
-	ReconcileThreadsNumber int `json:"reconcileThreadsNumber" yaml:"reconcileThreadsNumber"`
-
-	//
-	// The end of OperatorConfig
-	//
-	// !!! IMPORTANT !!!
-	// !!! IMPORTANT !!!
-	// !!! IMPORTANT !!!
-	// !!! IMPORTANT !!!
-	// !!! IMPORTANT !!!
-	// Do not forget to update func (config *OperatorConfig) String()
-	// Do not forget to update CRD spec
 }

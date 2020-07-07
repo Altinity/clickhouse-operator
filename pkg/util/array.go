@@ -15,6 +15,7 @@
 package util
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 )
@@ -69,4 +70,15 @@ func CastToSliceOfStrings(m map[string]interface{}) []string {
 	}
 
 	return res
+}
+
+// Slice2String returns named slice as a string
+func Slice2String(name string, slice []string) string {
+	b := &bytes.Buffer{}
+	Fprintf(b, "%s (%d):\n", name, len(slice))
+	for i := range slice {
+		Fprintf(b, "  - %s\n", slice[i])
+	}
+
+	return b.String()
 }
