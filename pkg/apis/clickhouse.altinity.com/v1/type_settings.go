@@ -168,9 +168,14 @@ func (settings Settings) MarshalJSON() ([]byte, error) {
 
 // unmarshalScalar
 func unmarshalScalar(untyped interface{}) (string, bool) {
+	var res string
+	var ok bool
+
 	typeOf := reflect.TypeOf(untyped)
-	str := typeOf.String()
-	log.V(3).Infof("%v", str)
+	if typeOf == nil {
+		log.V(3).Infof("unmarshalScalar() typeOf==nil")
+		return "", false
+	}
 
 	switch untyped.(type) {
 	case // scalar
@@ -181,39 +186,57 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 		int64, uint64,
 		bool,
 		string:
-		return fmt.Sprintf("%v", untyped), true
+		res = fmt.Sprintf("%v", untyped)
+		ok = true
 	case // scalar
 		float32:
 		floatVal := untyped.(float32)
 		_, frac := math.Modf(float64(floatVal))
-		if frac < ignoreThreshold {
-			// consider it int
+		if frac > ignoreThreshold {
+			// Consider it float
+			res = fmt.Sprintf("%f", untyped)
+		} else {
+			// Consider it int
 			intVal := int64(floatVal)
-			return fmt.Sprintf("%v", intVal), true
+			res = fmt.Sprintf("%v", intVal)
 		}
-		return fmt.Sprintf("%f", untyped), true
+		ok = true
 	case // scalar
 		float64:
 		floatVal := untyped.(float64)
 		_, frac := math.Modf(floatVal)
-		if frac < ignoreThreshold {
-			// consider it int
+		if frac > ignoreThreshold {
+			// Consider it float
+			res = fmt.Sprintf("%f", untyped)
+		} else {
+			// Consider it int
 			intVal := int64(floatVal)
-			return fmt.Sprintf("%v", intVal), true
+			res = fmt.Sprintf("%v", intVal)
 		}
-		return fmt.Sprintf("%f", untyped), true
+		ok = true
 	}
 
-	return "", false
+	str := typeOf.String()
+	if ok {
+		log.V(3).Infof("unmarshalScalar() type=%v value=%s", str, res)
+		return res, true
+	} else {
+		log.V(3).Infof("unmarshalScalar() type=%v - UNABLE to unmarshal", str)
+		return "", false
+	}
 }
 
 // unmarshalVector
 func unmarshalVector(untyped interface{}) ([]string, bool) {
-	typeOf := reflect.TypeOf(untyped)
-	str := typeOf.String()
-	log.V(3).Infof("%v", str)
-
 	var res []string
+	var ok bool
+
+	typeOf := reflect.TypeOf(untyped)
+	if typeOf == nil {
+		log.V(3).Infof("unmarshalVector() typeOf==nil")
+		return nil, false
+	}
+
 	switch untyped.(type) {
 	case // vector
 		[]interface{}:
@@ -222,10 +245,17 @@ func unmarshalVector(untyped interface{}) ([]string, bool) {
 				res = append(res, scalar)
 			}
 		}
-		return res, true
+		ok = true
 	}
 
-	return nil, false
+	str := typeOf.String()
+	if ok {
+		log.V(3).Infof("unmarshalVector() type=%v value=%s", str, res)
+		return res, true
+	} else {
+		log.V(3).Infof("unmarshalVector type=%v - UNABLE to unmarshal", str)
+		return nil, false
+	}
 }
 
 // getValueAsScalar
