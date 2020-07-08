@@ -19,14 +19,16 @@ import "path/filepath"
 // RelativeToBasePath returns absolute path relative to base
 func RelativeToBasePath(basePath, relativePath string) string {
 	if basePath == "" {
-		// Relative base is not set, consider relative to be absolute
+		// Relative base is not set, no base to be relative to, consider relative path to be absolute
 		return relativePath
 	}
 
 	// Relative base is set - try to be relative to it
 	if absPath, err := filepath.Abs(basePath + "/" + relativePath); err == nil {
+		// Absolute path is fine
 		return absPath
 	} else {
+		// Absolute path is not fine
 		return ""
 	}
 }
@@ -44,7 +46,7 @@ func PreparePath(path *string, basePath, defaultRelativePath string) {
 	}
 
 	// In case of incorrect/unavailable path - make it empty
-	if (*path != "") && IsDirOk(*path) {
+	if (*path != "") && !IsDirOk(*path) {
 		*path = ""
 	}
 }

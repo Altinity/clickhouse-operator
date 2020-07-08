@@ -1,7 +1,9 @@
 from kubectl import *
 
+from settings import test_namespace
 
-def clickhouse_query(chi_name, query, with_error=False, host="127.0.0.1", port="9000", user="default", pwd="", ns="test"):
+
+def clickhouse_query(chi_name, query, with_error=False, host="127.0.0.1", port="9000", user="default", pwd="", ns=test_namespace):
     pod_names = kube_get_pod_names(chi_name, ns)
     pod_name = pod_names[0]
     for p in pod_names:
@@ -19,5 +21,5 @@ def clickhouse_query(chi_name, query, with_error=False, host="127.0.0.1", port="
         return kubectl(f"exec {pod_name} -n {ns} -- clickhouse-client -mn -h {host} --port={port} -u {user} {pwd_str} --query=\"{query}\"")
 
 
-def clickhouse_query_with_error(chi_name, query, host="127.0.0.1", port="9000", user="default", pwd="", ns="test"):
+def clickhouse_query_with_error(chi_name, query, host="127.0.0.1", port="9000", user="default", pwd="", ns=test_namespace):
     return clickhouse_query(chi_name, query, True, host, port, user, pwd, ns)
