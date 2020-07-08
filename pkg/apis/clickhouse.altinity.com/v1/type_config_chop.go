@@ -434,11 +434,6 @@ func (config *OperatorConfig) applyDefaultWatchNamespace() {
 	}
 }
 
-// prepareConfigPath - prepares config path absolute/relative with default relative value
-func (config *OperatorConfig) prepareConfigPath(path *string, defaultRelativePath string) {
-	util.PreparePath(path, config.ConfigFolderPath, defaultRelativePath)
-}
-
 // readClickHouseCustomConfigFiles reads all extra user-specified ClickHouse config files
 func (config *OperatorConfig) readClickHouseCustomConfigFiles() {
 	log.V(0).Infof("Read Common Config files from folder: %s", config.CHCommonConfigsPath)
