@@ -4,6 +4,7 @@ import time
 import yaml
 
 from settings import kubectlcmd
+from settings import test_namespace
 
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module
 from testflows.asserts import error
@@ -13,7 +14,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 max_retries=10
 
 shell = Shell()
-namespace = "test"
+namespace = test_namespace
 
 
 def get_full_path(test_file):
@@ -194,7 +195,7 @@ def kube_get_pod_ports(chi_name, ns="test"):
 def kube_check_pod_ports(chi_name, ports, ns="test"):
     pod_ports = kube_get_pod_ports(chi_name, ns)
     with Then(f"Expect pod ports {pod_ports} to match {ports}"):
-        assert pod_ports == ports
+        assert pod_ports.sort() == ports.sort()
 
 def kube_check_pod_image(chi_name, image, ns="test"):
     pod_image = kube_get_pod_image(chi_name, ns)
