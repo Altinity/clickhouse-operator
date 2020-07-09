@@ -67,14 +67,14 @@ spec:
           <https_port>8443</https_port>
           <tcp_port_secure>9440</tcp_port_secure>
         </yandex>
-      node.csr:
-      - '**** HIDDEN ****'
-      node.key:
-      - '**** HIDDEN ****'
-      node.crt:
-      - '**** HIDDEN ****'
-      dhparam.pem:
-      - '**** HIDDEN ****'
+      node.csr: |
+        **** HIDDEN ****
+      node.key: |
+        **** HIDDEN ****
+      node.crt: |
+        **** HIDDEN ****
+      dhparam.pem: |
+        **** HIDDEN ****
     clusters:
     - name: t1
       layout:
