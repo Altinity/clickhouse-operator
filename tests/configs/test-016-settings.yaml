@@ -24,7 +24,6 @@ spec:
             <macros>
               <test>test</test>
             </macros>
-            <query_log remove="1"></query_log>
          </yandex>
       users.d/my_users.xml:
         <yandex>
