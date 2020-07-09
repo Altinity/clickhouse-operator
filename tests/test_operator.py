@@ -9,7 +9,7 @@ from testflows.asserts import error
 @TestScenario
 @Name("test_001. 1 node")
 def test_001():
-    create_and_check("configs/test-001.yaml", {"object_counts": [1, 1, 2]})
+    create_and_check("configs/test-001.yaml", {"object_counts": [1, 1, 2], "configmaps": 1})
     
 @TestScenario
 @Name("test_002. useTemplates for pod, volume templates, and distribution")
@@ -150,6 +150,7 @@ def require_zookeeper():
 @TestScenario
 @Name("test_010. Test zookeeper initialization")
 def test_010():
+    set_operator_version(settings.operator_version)
     require_zookeeper()
 
     create_and_check("configs/test-010-zkroot.yaml", 
@@ -421,6 +422,9 @@ def test_016():
     with And("max_memory_usage should be 7000000000"):
         out = clickhouse_query("test-016-settings", query = "select value from system.settings where name='max_memory_usage'")
         assert out == "7000000000"
+        
+    with And("test_usersd user should be available"):
+        clickhouse_query("test-016-settings", query = "select version()", user = "test_usersd")
 
     kube_delete_chi("test-016-settings")
 
