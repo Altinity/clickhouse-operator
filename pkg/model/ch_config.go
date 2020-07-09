@@ -61,7 +61,11 @@ func (c *ClickHouseConfigGenerator) GetQuotas() string {
 
 // GetSettings creates data for "settings.xml"
 func (c *ClickHouseConfigGenerator) GetSettings(host *chiv1.ChiHost) string {
-	return c.generateXMLConfig(host.Settings, "")
+	if host == nil {
+		return c.generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
+	} else {
+		return c.generateXMLConfig(host.Settings, "")
+	}
 }
 
 // GetFiles creates data for custom common config files

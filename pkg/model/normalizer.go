@@ -1274,8 +1274,6 @@ func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 
 	// Inherit from .spec.configuration.zookeeper
 	cluster.InheritZookeeperFrom(n.chi)
-	// Inherit from .spec.configuration.settings
-	cluster.InheritSettingsFrom(n.chi)
 	// Inherit from .spec.configuration.files
 	cluster.InheritFilesFrom(n.chi)
 	// Inherit from .spec.defaults

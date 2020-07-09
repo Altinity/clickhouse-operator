@@ -40,7 +40,7 @@ if main():
                 test_006,
                 test_007,
                 test_008,
-                (test_009, {"version_from": "0.9.9"}),
+                (test_009, {"version_from": "0.9.10"}),
                 test_010,
                 test_011,
                 test_011_1,
@@ -58,7 +58,8 @@ if main():
             run_tests = all_tests
             
             # placeholder for selective test running
-            # run_tests = [test_008]
+            # run_tests = [(test_009, {"version_from": "0.9.9"})]
+            # run_tests = [test_001]
 
             for t in run_tests:
                 if callable(t):
@@ -70,12 +71,13 @@ if main():
         with Module("clickhouse", flags=TE):
             all_tests = [
                 test_ch_001,
+                test_ch_002,
             ]
         
             run_test = all_tests
             
             # placeholder for selective test running
-            # run_test = [test_009]
+            run_test = [test_ch_002]
 
             for t in run_test:
                 run(test=t, flags=TE)
