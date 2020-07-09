@@ -185,8 +185,8 @@ spec:
             description: |-
               `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have ReplicatedMergeTree tables that are currently in readonly state due to re-initialization after ZooKeeper session loss or due to startup without ZooKeeper configured.
               Please check following things:
-              - kubenetes nodes have free enough RAM and Disk
-              - status of clickhouse-server pods `kubectl describe -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1)
+              - kubenetes nodes have free enough RAM and Disk via `kubectl top node`
+              - status of clickhouse-server pods `kubectl describe -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1)`
               - connection between clickhouse-server pods via kubernetes services
               - connection between clickhouse-server pods and zookeeper
               - status of PersistentVolumeClaims for pods
@@ -262,6 +262,18 @@ spec:
             summary: "ClickHouse version changed"
             description: |-
               `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+
+        - alert: ZooKeeperHardwareExceptions
+          expr: delta(chi_clickhouse_event_ZooKeeperHardwareExceptions[3m]) != 0 > 1
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "ZooKeeperHardwareExceptions > 1"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+              We have unexpected Network errors and similar with communitation with Zookeeper.
+              Clickhouse should reinitialize ZooKeeper session in case of these errors.
 
         - alert: ZooKeeperSession
           expr: chi_clickhouse_metric_ZooKeeperSession > 1

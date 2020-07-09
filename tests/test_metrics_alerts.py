@@ -198,13 +198,13 @@ def test_clickhouse_dns_errors():
             ok_to_fail=False,
         )
         kubectl.kubectl(
-            f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse -- clickhouse-client -q \"SYSTEM DROP DNS CACHE\"",
-            ok_to_fail=False,
+            f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse -- clickhouse-client --echo -mn -q \"SYSTEM DROP DNS CACHE; SELECT count() FROM cluster('all-sharded',system,metrics)\"",
+            ok_to_fail=True,
         )
 
     with When("rewrite /etc/resolv.conf in clickhouse-server pod"):
-        rewrite_dns_on_clickhouse_server(write_new=True)
-        fired = wait_alert_state("ClickHouseDNSErrors", "firing", True, labels={"hostname": clickhouse_svc})
+        fired = wait_alert_state("ClickHouseDNSErrors", "firing", True, labels={"hostname": clickhouse_svc},
+                                 time_range='20s', callback=rewrite_dns_on_clickhouse_server, sleep_time=5)
         assert fired, error("can't get ClickHouseDNSErrors alert in firing state")
 
     with Then("check ClickHouseDNSErrors gone away"):
@@ -397,6 +397,7 @@ def test_read_only_replica():
     read_only_pod, read_only_svc, max_absolute_delay_pod, max_absolute_delay_svc = random_pod_choice_for_callbacks()
     chi_name = chi["metadata"]["name"]
     create_replicated_table_on_cluster()
+
     def restart_zookeeper():
         kubectl.kubectl(
             f"exec -n {kubectl.namespace} zookeeper-0 -- sh -c \"kill 1\"",
@@ -626,6 +627,35 @@ def test_version_changed():
         resolved = wait_alert_state("VersionChanged", "firing", False, labels={"hostname": changed_svc}, sleep_time=30)
         assert resolved, error("can't check VersionChanged alert is gone away")
 
+@TestScenario
+@Name("Check ZooKeeperHardwareExceptions")
+def test_zookeeper_hardware_exceptions():
+    pod1, svc1, pod2, svc2 = random_pod_choice_for_callbacks()
+    chi_name = chi["metadata"]["name"]
+
+    def restart_zookeeper():
+        kubectl.kubectl(
+            f"exec -n {kubectl.namespace} zookeeper-0 -- sh -c \"kill 1\"",
+            ok_to_fail=True,
+        )
+        clickhouse.clickhouse_query_with_error(chi_name, "SELECT name, path FROM system.zookeeper WHERE path='/'", host=svc1)
+        clickhouse.clickhouse_query_with_error(chi_name, "SELECT name, path FROM system.zookeeper WHERE path='/'", host=svc2)
+
+    with Then("check ZooKeeperHardwareExceptions firing"):
+        for svc in (svc1, svc2):
+            fired = wait_alert_state("ZooKeeperHardwareExceptions", "firing", True, labels={"hostname": svc},
+                                     time_range='30s', sleep_time=5, callback=restart_zookeeper)
+            assert fired, error("can't get ZooKeeperHardwareExceptions alert in firing state")
+
+    kubectl.kube_wait_pod_status("zookeeper-0", "Running", ns=kubectl.namespace)
+    kubectl.kube_wait_jsonpath("pod", "zookeeper-0", "{.status.containerStatuses[0].ready}", "true",
+                               ns=kubectl.namespace)
+
+    with Then("check ZooKeeperHardwareExceptions gone away"):
+        for svc in (svc1, svc2):
+            resolved = wait_alert_state("ZooKeeperHardwareExceptions", "firing", False, labels={"hostname": svc})
+            assert resolved, error("can't check ZooKeeperHardwareExceptions alert is gone away")
+
 
 if main():
     with Module("metrics_alerts"):
@@ -665,19 +695,20 @@ if main():
             chi = kubectl.kube_get("chi", ns=kubectl.namespace, name="test-cluster-for-alerts")
 
         test_cases = [
+            test_read_only_replica,
             test_prometheus_setup,
             test_metrics_exporter_down,
             test_clickhouse_server_reboot,
             test_clickhouse_dns_errors,
+            test_replicas_max_abosulute_delay,
             test_distributed_connection_exceptions,
             test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_inserted_rows_per_query,
-            test_read_only_replica,
-            test_replicas_max_abosulute_delay,
             test_too_many_connections,
             test_too_much_running_queries,
             test_longest_running_query,
             test_system_settings_changed,
             test_version_changed,
+            test_zookeeper_hardware_exceptions,
             # @TODO uncomment it when  https://github.com/ClickHouse/ClickHouse/pull/11220 will merged to docker latest image
             # test_distributed_files_to_insert,
         ]
