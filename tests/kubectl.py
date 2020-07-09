@@ -107,9 +107,10 @@ def kube_count_resources(label="", ns = namespace):
     service = kube_get_count("service", ns=ns, label=label)
     return [sts, pod, service]
 
-def kube_apply(config, ns=namespace):
+def kube_apply(config, ns=namespace, validate=True):
     with When(f"{config} is applied"):
-        cmd = shell(f"{kubectlcmd} apply -n {ns} -f {config}")
+        cmd = f"{kubectlcmd} apply --validate={validate} -n {ns} -f {config}"
+        cmd = shell(cmd)
     with Then("exitcode should be 0"):
         assert cmd.exitcode == 0, error()
 

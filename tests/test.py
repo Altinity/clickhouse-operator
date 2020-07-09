@@ -21,7 +21,7 @@ if main():
                            f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
                            f"METRICS_EXPORTER_IMAGE=\"altinity/metrics-exporter:{settings.operator_version}\" "
                            f"METRICS_EXPORTER_NAMESPACE=\"{settings.operator_namespace}\" "
-                           f"envsubst)", ns=settings.operator_namespace)
+                           f"envsubst)", ns=settings.operator_namespace, validate=False)
             set_operator_version(settings.operator_version)
 
         with Given(f"Install ClickHouse template {settings.clickhouse_template}"):
