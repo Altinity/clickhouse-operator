@@ -14,6 +14,7 @@
     <profiles>
         <clickhouse_operator>
             <log_queries>0</log_queries>
+            <skip_unavailable_shards>1</skip_unavailable_shards>
         </clickhouse_operator>
     </profiles>
 </yandex>
