@@ -46,8 +46,10 @@ func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig 
 func (c *configSections) CreateConfigsCommon() {
 	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. remote servers
-	// 2. common files
+	// 2. common settings
+	// 3. common files
 	util.IncludeNonEmpty(c.commonConfigSections, createConfigSectionFilename(configRemoteServers), c.chConfigGenerator.GetRemoteServers())
+	util.IncludeNonEmpty(c.commonConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings(nil))
 	util.MergeStringMaps(c.commonConfigSections, c.chConfigGenerator.GetFiles(chi.SectionCommon, true, nil))
 	// Extra user-specified config files
 	util.MergeStringMaps(c.commonConfigSections, c.chopConfig.CHCommonConfigs)
