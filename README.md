@@ -25,7 +25,7 @@ The ClickHouse Operator for Kubernetes currently provides the following:
 
 ## Requirements
 
- * Kubernetes 1.12.6+
+ * Kubernetes 1.15.11+
  
 ## Documentation
 
