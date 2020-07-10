@@ -9,15 +9,18 @@ spec:
     clusters:
 
       - name: "top-level"
+        # Expecting value: 1
         layout:
           shardsCount: 1
           replicasCount: 1
 
       - name: "cluster-level"
+        # Expecting values: 1, 2
         settings:
           disable_internal_dns_cache: 2
 
       - name: "shard-level"
+        # Expecting values: 1, 4
         settings:
           disable_internal_dns_cache: 3
         layout:
@@ -26,6 +29,7 @@ spec:
                 disable_internal_dns_cache: 4
 
       - name: "replica-level"
+        # Expecting values: 1, 6
         settings:
           disable_internal_dns_cache: 5
         layout:
@@ -34,6 +38,7 @@ spec:
                 disable_internal_dns_cache: 6
 
       - name: "host-level-sh"
+        # Expecting values: 1, 9
         settings:
           disable_internal_dns_cache: 7
         layout:
@@ -45,6 +50,7 @@ spec:
                     disable_internal_dns_cache: 9
 
       - name: "host-level-rep"
+        # Expecting values: 1, 12
         settings:
           disable_internal_dns_cache: 10
         layout:
