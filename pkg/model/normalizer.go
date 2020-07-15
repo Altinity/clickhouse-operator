@@ -1105,16 +1105,20 @@ func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
 	)
 	host.Config.FilesFingerprint = util.Fingerprint(
 		fmt.Sprintf("%s%s",
-			util.Fingerprint(n.chi.Spec.Configuration.Files.Filter(
-				nil,
-				[]chiv1.SettingsSection{chiv1.SectionUsers},
-				true,
-			).AsSortedSliceOfStrings()),
-			util.Fingerprint(host.Files.Filter(
-				nil,
-				[]chiv1.SettingsSection{chiv1.SectionUsers},
-				true,
-			).AsSortedSliceOfStrings()),
+			util.Fingerprint(
+				n.chi.Spec.Configuration.Files.Filter(
+					nil,
+					[]chiv1.SettingsSection{chiv1.SectionUsers},
+					true,
+				).AsSortedSliceOfStrings(),
+			),
+			util.Fingerprint(
+				host.Files.Filter(
+					nil,
+					[]chiv1.SettingsSection{chiv1.SectionUsers},
+					true,
+				).AsSortedSliceOfStrings(),
+			),
 		),
 	)
 
