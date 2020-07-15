@@ -390,6 +390,50 @@ func (settings Settings) GetSectionStringMap(section SettingsSection, includeUns
 	return m
 }
 
+func inSlice(slice []SettingsSection, val SettingsSection) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		}
+	}
+	return false
+}
+
+func (settings Settings) Filter(includeSections []SettingsSection, excludeSections []SettingsSection, includeUnspecified bool) Settings {
+	res := make(Settings)
+
+	for path := range settings {
+		_section, err := getSectionFromPath(path)
+
+		var include bool
+		var exclude bool
+
+		if err == nil {
+			include = (includeSections == nil) || inSlice(includeSections, _section)
+			exclude = (excludeSections != nil) && inSlice(excludeSections, _section)
+		}
+
+		include = include && !exclude
+
+		if (err == nil) && !include {
+			// This is not the section we are looking for, skip to next
+			continue // for
+		}
+		if (err != nil) && (err != errorNoSectionSpecified) {
+			// We have an complex error, skip to next
+			continue // for
+		}
+		if (err == errorNoSectionSpecified) && !includeUnspecified {
+			// We are not ready to include unspecified section, skip to next
+			continue // for
+		}
+
+		res[path] = settings[path]
+	}
+
+	return res
+}
+
 // AsSortedSliceOfStrings
 func (settings Settings) AsSortedSliceOfStrings() []string {
 	// Sort keys
