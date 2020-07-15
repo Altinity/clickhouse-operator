@@ -338,6 +338,7 @@ func (settings *Settings) MergeFrom(src Settings) {
 	}
 }
 
+// MergeFromCB merges settings from src approved by callback
 func (settings *Settings) MergeFromCB(src Settings, filter func(path string, setting *Setting) bool) {
 	if src == nil {
 		return
