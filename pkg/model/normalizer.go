@@ -1098,12 +1098,16 @@ func (n *Normalizer) ensureCluster() {
 func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
 	host.Config.ZookeeperFingerprint = util.Fingerprint(*host.GetZookeeper())
 	host.Config.SettingsFingerprint = util.Fingerprint(
-		util.Fingerprint(n.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()) +
+		fmt.Sprintf("%s%s",
+			util.Fingerprint(n.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()),
 			util.Fingerprint(host.Settings.AsSortedSliceOfStrings()),
+		),
 	)
 	host.Config.FilesFingerprint = util.Fingerprint(
-		util.Fingerprint(n.chi.Spec.Configuration.Files.AsSortedSliceOfStrings()) +
+		fmt.Sprintf("%s%s",
+			util.Fingerprint(n.chi.Spec.Configuration.Files.AsSortedSliceOfStrings()),
 			util.Fingerprint(host.Files.AsSortedSliceOfStrings()),
+		),
 	)
 
 	return nil
