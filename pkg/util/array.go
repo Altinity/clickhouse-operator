@@ -22,8 +22,8 @@ import (
 
 // InArray checks whether needle is in haystack
 func InArray(needle string, haystack []string) bool {
-	for _, b := range haystack {
-		if b == needle {
+	for _, item := range haystack {
+		if item == needle {
 			return true
 		}
 	}

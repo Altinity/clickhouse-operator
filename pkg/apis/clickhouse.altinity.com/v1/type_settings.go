@@ -367,7 +367,7 @@ func (settings Settings) GetSectionStringMap(section SettingsSection, includeUns
 			continue // for
 		}
 		if (err != nil) && (err != errorNoSectionSpecified) {
-			// We have an complex error, skip to next
+			// We have a complex error, skip to next
 			continue // for
 		}
 		if (err == errorNoSectionSpecified) && !includeUnspecified {
@@ -391,9 +391,10 @@ func (settings Settings) GetSectionStringMap(section SettingsSection, includeUns
 	return m
 }
 
-func inSlice(slice []SettingsSection, val SettingsSection) bool {
-	for _, item := range slice {
-		if item == val {
+// inArray checks whether needle is in haystack
+func inArray(needle SettingsSection, haystack []SettingsSection) bool {
+	for _, item := range haystack {
+		if item == needle {
 			return true
 		}
 	}
@@ -410,8 +411,8 @@ func (settings Settings) Filter(includeSections []SettingsSection, excludeSectio
 		var exclude bool
 
 		if err == nil {
-			include = (includeSections == nil) || inSlice(includeSections, _section)
-			exclude = (excludeSections != nil) && inSlice(excludeSections, _section)
+			include = (includeSections == nil) || inArray(_section, includeSections)
+			exclude = (excludeSections != nil) && inArray(_section, excludeSections)
 		}
 
 		include = include && !exclude
@@ -421,7 +422,7 @@ func (settings Settings) Filter(includeSections []SettingsSection, excludeSectio
 			continue // for
 		}
 		if (err != nil) && (err != errorNoSectionSpecified) {
-			// We have an complex error, skip to next
+			// We have a complex error, skip to next
 			continue // for
 		}
 		if (err == errorNoSectionSpecified) && !includeUnspecified {
