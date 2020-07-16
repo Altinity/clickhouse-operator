@@ -30,6 +30,20 @@ func InArray(needle string, haystack []string) bool {
 	return false
 }
 
+// RemoveFromArray removes needle from array
+func RemoveFromArray(needle string, haystack []string) []string {
+	result := []string{}
+
+	for _, item := range haystack {
+		if item == needle {
+			continue
+		}
+		result = append(result, item)
+	}
+
+	return result
+}
+
 // Unzip makes two 1-value columns (slices) out of one 2-value column (slice)
 func Unzip(slice [][]string) ([]string, []string) {
 	col1 := make([]string, len(slice))
