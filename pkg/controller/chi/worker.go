@@ -211,7 +211,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		// The object is being deleted
 		if util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
 			// Delete CHI
-			(&new.Status).ReconcileStart(0)
+			(&new.Status).DeleteStart()
 			if err := w.c.updateCHIObjectStatus(new, true); err != nil {
 				w.a.V(1).Info("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
 				return nil
@@ -221,9 +221,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 
 			// Uninstall finalizer
 			w.a.V(2).Info("updateCHI(%s/%s): uninstall finalizer", new.Namespace, new.Name)
-
-			new.ObjectMeta.Finalizers = util.RemoveFromArray(FinalizerName, new.ObjectMeta.Finalizers)
-			if err := w.c.updateCHIObject(new); err != nil {
+			if err := w.c.uninstallFinalizer(new); err != nil {
 				w.a.V(1).Info("updateCHI(%s/%s): unable to uninstall finalizer: %v", new.Namespace, new.Name, err)
 			}
 		}
