@@ -31,6 +31,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+const FinalizerName = "finalizer.clickhouseinstallation.altinity.com"
+
 type worker struct {
 	c          *Controller
 	a          Announcer
@@ -189,6 +191,40 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	if (old != nil) && (new != nil) && (old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion) {
 		w.a.V(3).Info("updateCHI(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
 		// No need to react
+		return nil
+	}
+
+	// Check DeletionTimestamp in order to understanbd, whether the object is being deleted
+	if new.ObjectMeta.DeletionTimestamp.IsZero() {
+		// The object is not being deleted
+		if !util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
+			// Install finalizer
+			w.a.V(2).Info("updateCHI(%s/%s): install finalizer", new.Namespace, new.Name)
+
+			new.ObjectMeta.Finalizers = append(new.ObjectMeta.Finalizers, FinalizerName)
+			if err := w.c.updateCHIObject(new); err != nil {
+				w.a.V(1).Info("updateCHI(%s/%s): unable to install finalizer: %v", new.Namespace, new.Name, err)
+			}
+		}
+
+		w.a.V(3).Info("updateCHI(%s/%s): finalizer installed", new.Namespace, new.Name)
+	} else {
+		// The object is being deleted
+		if util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
+			// Delete CHI
+
+			// Uninstall finalizer
+			w.a.V(2).Info("updateCHI(%s/%s): uninstall finalizer", new.Namespace, new.Name)
+
+			new.ObjectMeta.Finalizers = util.RemoveFromArray(FinalizerName, new.ObjectMeta.Finalizers)
+			if err := w.c.updateCHIObject(new); err != nil {
+				w.a.V(1).Info("updateCHI(%s/%s): unable to uninstall finalizer: %v", new.Namespace, new.Name, err)
+			}
+		}
+
+		// Object can now be deleted by Kubernetes
+		w.a.V(3).Info("updateCHI(%s/%s): finalizer uninstalled, object can be deleted", new.Namespace, new.Name)
+
 		return nil
 	}
 
