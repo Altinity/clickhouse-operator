@@ -401,7 +401,12 @@ func inArray(needle SettingsSection, haystack []SettingsSection) bool {
 	return false
 }
 
-func (settings Settings) Filter(includeSections []SettingsSection, excludeSections []SettingsSection, includeUnspecified bool) Settings {
+// Filter filters settings according to include and exclude lists
+func (settings Settings) Filter(
+	includeSections []SettingsSection,
+	excludeSections []SettingsSection,
+	includeUnspecified bool,
+) Settings {
 	res := make(Settings)
 
 	for path := range settings {
