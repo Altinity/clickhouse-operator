@@ -172,10 +172,11 @@ func (settings Settings) MarshalJSON() ([]byte, error) {
 // unmarshalScalar
 func unmarshalScalar(untyped interface{}) (string, bool) {
 	var res string
-	var ok bool
+	var knownType bool
 
 	typeOf := reflect.TypeOf(untyped)
 	if typeOf == nil {
+		// Unable to determine type of the value
 		log.V(3).Infof("unmarshalScalar() typeOf==nil")
 		return "", false
 	}
@@ -190,7 +191,7 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 		bool,
 		string:
 		res = fmt.Sprintf("%v", untyped)
-		ok = true
+		knownType = true
 	case // scalar
 		float32:
 		floatVal := untyped.(float32)
@@ -203,7 +204,7 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 			intVal := int64(floatVal)
 			res = fmt.Sprintf("%v", intVal)
 		}
-		ok = true
+		knownType = true
 	case // scalar
 		float64:
 		floatVal := untyped.(float64)
@@ -216,11 +217,11 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 			intVal := int64(floatVal)
 			res = fmt.Sprintf("%v", intVal)
 		}
-		ok = true
+		knownType = true
 	}
 
 	str := typeOf.String()
-	if ok {
+	if knownType {
 		log.V(3).Infof("unmarshalScalar() type=%v value=%s", str, res)
 		return res, true
 	} else {
@@ -232,10 +233,11 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 // unmarshalVector
 func unmarshalVector(untyped interface{}) ([]string, bool) {
 	var res []string
-	var ok bool
+	var knownType bool
 
 	typeOf := reflect.TypeOf(untyped)
 	if typeOf == nil {
+		// Unable to determine type of the value
 		log.V(3).Infof("unmarshalVector() typeOf==nil")
 		return nil, false
 	}
@@ -248,11 +250,11 @@ func unmarshalVector(untyped interface{}) ([]string, bool) {
 				res = append(res, scalar)
 			}
 		}
-		ok = true
+		knownType = true
 	}
 
 	str := typeOf.String()
-	if ok {
+	if knownType {
 		log.V(3).Infof("unmarshalVector() type=%v value=%s", str, res)
 		return res, true
 	} else {
