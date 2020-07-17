@@ -59,14 +59,14 @@ var (
 //				- "192.168.1.2"
 // We do not know types of these scalars in advance also
 
-// Setting
+// Setting represents one settings, which can be either a sting or a vector of strings
 type Setting struct {
 	isScalar bool
 	scalar   string
 	vector   []string
 }
 
-// NewScalarSetting
+// NewScalarSetting makes new scalar Setting
 func NewScalarSetting(scalar string) *Setting {
 	return &Setting{
 		isScalar: true,
@@ -74,7 +74,7 @@ func NewScalarSetting(scalar string) *Setting {
 	}
 }
 
-// NewVectorSetting
+// NewVectorSetting makles new vector Setting
 func NewVectorSetting(vector []string) *Setting {
 	return &Setting{
 		isScalar: false,
@@ -82,27 +82,27 @@ func NewVectorSetting(vector []string) *Setting {
 	}
 }
 
-// IsScalar
+// IsScalar checks whether setting is a scalar value
 func (s *Setting) IsScalar() bool {
 	return s.isScalar
 }
 
-// IsVector
+// IsVector checks whether setting is a vector value
 func (s *Setting) IsVector() bool {
 	return !s.isScalar
 }
 
-// Scalar
+// Scalar gets scalar value of a setting
 func (s *Setting) Scalar() string {
 	return s.scalar
 }
 
-// Vector
+// Vector gets vector values of a setting
 func (s *Setting) Vector() []string {
 	return s.vector
 }
 
-// AsVector
+// AsVector gets value of a setting as vector. Scalar value is casted to vector
 func (s *Setting) AsVector() []string {
 	if s.isScalar {
 		return []string{
@@ -112,7 +112,7 @@ func (s *Setting) AsVector() []string {
 	return s.vector
 }
 
-// String
+// String gets string value of a setting. Vector is combined into one string
 func (s *Setting) String() string {
 	if s.isScalar {
 		return s.scalar
