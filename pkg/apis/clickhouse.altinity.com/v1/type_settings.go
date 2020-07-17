@@ -267,10 +267,11 @@ func unmarshalVector(untyped interface{}) ([]string, bool) {
 func (settings Settings) getValueAsScalar(name string) (string, bool) {
 	setting, ok := settings[name]
 	if !ok {
+		// Unknown setting
 		return "", false
 	}
-	if setting.isScalar {
-		return setting.scalar, true
+	if setting.IsScalar() {
+		return setting.Scalar(), true
 	}
 	return "", false
 }
@@ -279,12 +280,13 @@ func (settings Settings) getValueAsScalar(name string) (string, bool) {
 func (settings Settings) getValueAsVector(name string) ([]string, bool) {
 	setting, ok := settings[name]
 	if !ok {
+		// Unknown setting
 		return nil, false
 	}
-	if setting.isScalar {
+	if setting.IsScalar() {
 		return nil, false
 	}
-	return setting.vector, true
+	return setting.Vector(), true
 }
 
 // getValueAsInt
@@ -343,7 +345,7 @@ func (settings *Settings) MergeFrom(src Settings) {
 	}
 }
 
-// MergeFromCB merges settings from src approved by callback
+// MergeFromCB merges settings from src approved by filtering callback function
 func (settings *Settings) MergeFromCB(src Settings, filter func(path string, setting *Setting) bool) {
 	if src == nil {
 		return
@@ -379,6 +381,8 @@ func (settings Settings) GetSectionStringMap(section SettingsSection, includeUns
 			// We are not ready to include unspecified section, skip to next
 			continue // for
 		}
+
+		// We'd like to get this section
 
 		filename, err := getFilenameFromPath(path)
 		if err != nil {
@@ -440,6 +444,8 @@ func (settings Settings) Filter(
 			continue // for
 		}
 
+		// We'd like to get this section
+
 		res[path] = settings[path]
 	}
 
@@ -455,15 +461,15 @@ func (settings Settings) AsSortedSliceOfStrings() []string {
 	}
 	sort.Strings(keys)
 
-	var s []string
+	var res []string
 
 	// Walk over sorted keys
 	for _, key := range keys {
-		s = append(s, key)
-		s = append(s, settings[key].String())
+		res = append(res, key)
+		res = append(res, settings[key].String())
 	}
 
-	return s
+	return res
 }
 
 // Normalize
@@ -537,13 +543,14 @@ func string2Section(section string) (SettingsSection, error) {
 func getFilenameFromPath(path string) (string, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 1 {
-		// We need to have path to be at least 'file.name'
+		// We need to have path to be at least one entry - which will be 'filename'
 		return "", errorNoFilenameSpecified
 	}
 
+	// Extract last component from path
 	filename := parts[len(parts)-1]
 	if filename == "" {
-		// We need to have path to be at least 'file.name'
+		// We need to have path to be at least one entry - which will be 'filename'
 		return "", errorNoFilenameSpecified
 	}
 
