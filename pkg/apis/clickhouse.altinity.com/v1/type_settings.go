@@ -36,6 +36,8 @@ const (
 type SettingsSection string
 
 var (
+	// Configuration sections
+	// Each section translates into separate ConfigMap mapped into Pod
 	SectionEmpty  SettingsSection = ""
 	SectionCommon SettingsSection = "COMMON"
 	SectionUsers  SettingsSection = "USERS"
