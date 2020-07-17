@@ -43,6 +43,7 @@ var (
 	SectionUsers  SettingsSection = "USERS"
 	SectionHost   SettingsSection = "HOST"
 
+	// Specify returned errors for being re-used
 	errorNoSectionSpecified  = fmt.Errorf("no section specified")
 	errorNoFilenameSpecified = fmt.Errorf("no filename specified")
 )
