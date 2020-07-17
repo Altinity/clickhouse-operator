@@ -20,6 +20,7 @@ import (
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
 	apps "k8s.io/api/apps/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
@@ -64,15 +65,21 @@ func (c *Controller) deleteConfigMapsCHI(chi *chop.ClickHouseInstallation) error
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommon, newDeleteOptions())
 	if err == nil {
 		log.V(1).Infof("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommon)
+	} else if apierrors.IsNotFound(err) {
+		log.V(1).Infof("NEUTRAL not found ConfigMap %s/%s", chi.Namespace, configMapCommon)
+		err = nil
 	} else {
-		log.V(1).Infof("FAIL delete ConfigMap %s/%s %v", chi.Namespace, configMapCommon, err)
+		log.V(1).Infof("FAIL delete ConfigMap %s/%s err:%v", chi.Namespace, configMapCommon, err)
 	}
 
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(configMapCommonUsersName, newDeleteOptions())
 	if err == nil {
 		log.V(1).Infof("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommonUsersName)
+	} else if apierrors.IsNotFound(err) {
+		log.V(1).Infof("NEUTRAL not found ConfigMap %s/%s", chi.Namespace, configMapCommonUsersName)
+		err = nil
 	} else {
-		log.V(1).Infof("FAIL delete ConfigMap %s/%s %v", chi.Namespace, configMapCommonUsersName, err)
+		log.V(1).Infof("FAIL delete ConfigMap %s/%s err:%v", chi.Namespace, configMapCommonUsersName, err)
 	}
 
 	return err
@@ -82,7 +89,17 @@ func (c *Controller) deleteConfigMapsCHI(chi *chop.ClickHouseInstallation) error
 func (c *Controller) statefulSetDeletePod(statefulSet *apps.StatefulSet) error {
 	name := chopmodel.CreatePodName(statefulSet)
 	log.V(1).Infof("Delete Pod %s/%s", statefulSet.Namespace, name)
-	return c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(name, newDeleteOptions())
+	err := c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(name, newDeleteOptions())
+	if err == nil {
+		log.V(1).Infof("OK delete Pod %s/%s", statefulSet.Namespace, name)
+	} else if apierrors.IsNotFound(err) {
+		log.V(1).Infof("NEUTRAL not found Pod %s/%s", statefulSet.Namespace, name)
+		err = nil
+	} else {
+		log.V(1).Infof("FAIL delete ConfigMap %s/%s err:%v", statefulSet.Namespace, name, err)
+	}
+
+	return err
 }
 
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
@@ -100,7 +117,11 @@ func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 
 	statefulSet, err := c.getStatefulSetByHost(host)
 	if err != nil {
-		log.V(1).Infof("error get StatefulSet %s/%s", namespace, name)
+		if apierrors.IsNotFound(err) {
+			log.V(1).Infof("NEUTRAL not found StatefulSet %s/%s", namespace, name)
+		} else {
+			log.V(1).Infof("error get StatefulSet %s/%s err:%v", namespace, name, err)
+		}
 		return nil
 	}
 
@@ -114,10 +135,13 @@ func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 
 	// And now delete empty StatefulSet
 	if err := c.kubeClient.AppsV1().StatefulSets(namespace).Delete(name, newDeleteOptions()); err == nil {
-		log.V(1).Infof("StatefulSet %s/%s deleted", namespace, name)
+		log.V(1).Infof("OK delete StatefulSet %s/%s", namespace, name)
 		c.syncStatefulSet(host)
+	} else if apierrors.IsNotFound(err) {
+		log.V(1).Infof("NEUTRAL not found StatefulSet %s/%s", namespace, name)
+		err = nil
 	} else {
-		log.V(1).Infof("StatefulSet %s/%s FAILED TO DELETE %v", namespace, name, err)
+		log.V(1).Infof("FAIL delete StatefulSet %s/%s err: %v", namespace, name, err)
 		return nil
 	}
 
@@ -149,7 +173,7 @@ func (c *Controller) deletePVC(host *chop.ChiHost) error {
 
 	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newListOptions(labeler.GetSelectorHostScope(host)))
 	if err != nil {
-		log.Errorf("FAIL get list of PVC for host %s/%s %v", namespace, host.Name, err)
+		log.Errorf("FAIL get list of PVC for host %s/%s err:v", namespace, host.Name, err)
 		return err
 	}
 
@@ -166,9 +190,12 @@ func (c *Controller) deletePVC(host *chop.ChiHost) error {
 
 		// Actually delete PVC
 		if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(pvc.Name, newDeleteOptions()); err == nil {
-			log.V(1).Infof("PVC %s/%s deleted", namespace, pvc.Name)
+			log.V(1).Infof("OK delete PVC %s/%s", namespace, pvc.Name)
+		} else if apierrors.IsNotFound(err) {
+			log.V(1).Infof("NEUTRAL not found PVC %s/%s", namespace, pvc.Name)
+			err = nil
 		} else {
-			log.Errorf("FAIL to delete PVC %s/%s %v", namespace, pvc.Name, err)
+			log.Errorf("FAIL to delete PVC %s/%s err:%v", namespace, pvc.Name, err)
 		}
 	}
 
@@ -183,9 +210,12 @@ func (c *Controller) deleteConfigMap(host *chop.ChiHost) error {
 	log.V(1).Infof("deleteConfigMap(%s/%s)", namespace, name)
 
 	if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(name, newDeleteOptions()); err == nil {
-		log.V(1).Infof("ConfigMap %s/%s deleted", namespace, name)
+		log.V(1).Infof("OK delete ConfigMap %s/%s", namespace, name)
+	} else if apierrors.IsNotFound(err) {
+		log.V(1).Infof("NEUTRAL not found ConfigMap %s/%s", namespace, name)
+		err = nil
 	} else {
-		log.V(1).Infof("ConfigMap %s/%s delete FAILED %v", namespace, name, err)
+		log.V(1).Infof("FAIL delete ConfigMap %s/%s err:%v", namespace, name, err)
 	}
 
 	return nil
@@ -240,7 +270,7 @@ func (c *Controller) deleteServiceIfExists(namespace, name string) error {
 	if err == nil {
 		log.V(1).Infof("OK delete Service %s/%s", namespace, name)
 	} else {
-		log.V(1).Infof("FAIL delete Service %s/%s %v", namespace, name, err)
+		log.V(1).Infof("FAIL delete Service %s/%s err:%v", namespace, name, err)
 	}
 
 	return err

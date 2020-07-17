@@ -22,12 +22,26 @@ import (
 
 // InArray checks whether needle is in haystack
 func InArray(needle string, haystack []string) bool {
-	for _, b := range haystack {
-		if b == needle {
+	for _, item := range haystack {
+		if item == needle {
 			return true
 		}
 	}
 	return false
+}
+
+// RemoveFromArray removes needle from array
+func RemoveFromArray(needle string, haystack []string) []string {
+	result := []string{}
+
+	for _, item := range haystack {
+		if item == needle {
+			continue
+		}
+		result = append(result, item)
+	}
+
+	return result
 }
 
 // Unzip makes two 1-value columns (slices) out of one 2-value column (slice)

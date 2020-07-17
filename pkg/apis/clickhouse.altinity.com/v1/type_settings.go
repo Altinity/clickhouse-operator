@@ -36,11 +36,14 @@ const (
 type SettingsSection string
 
 var (
+	// Configuration sections
+	// Each section translates into separate ConfigMap mapped into Pod
 	SectionEmpty  SettingsSection = ""
 	SectionCommon SettingsSection = "COMMON"
 	SectionUsers  SettingsSection = "USERS"
 	SectionHost   SettingsSection = "HOST"
 
+	// Specify returned errors for being re-used
 	errorNoSectionSpecified  = fmt.Errorf("no section specified")
 	errorNoFilenameSpecified = fmt.Errorf("no filename specified")
 )
@@ -56,14 +59,14 @@ var (
 //				- "192.168.1.2"
 // We do not know types of these scalars in advance also
 
-// Setting
+// Setting represents one settings, which can be either a sting or a vector of strings
 type Setting struct {
 	isScalar bool
 	scalar   string
 	vector   []string
 }
 
-// NewScalarSetting
+// NewScalarSetting makes new scalar Setting
 func NewScalarSetting(scalar string) *Setting {
 	return &Setting{
 		isScalar: true,
@@ -71,7 +74,7 @@ func NewScalarSetting(scalar string) *Setting {
 	}
 }
 
-// NewVectorSetting
+// NewVectorSetting makles new vector Setting
 func NewVectorSetting(vector []string) *Setting {
 	return &Setting{
 		isScalar: false,
@@ -79,27 +82,27 @@ func NewVectorSetting(vector []string) *Setting {
 	}
 }
 
-// IsScalar
+// IsScalar checks whether setting is a scalar value
 func (s *Setting) IsScalar() bool {
 	return s.isScalar
 }
 
-// IsVector
+// IsVector checks whether setting is a vector value
 func (s *Setting) IsVector() bool {
 	return !s.isScalar
 }
 
-// Scalar
+// Scalar gets scalar value of a setting
 func (s *Setting) Scalar() string {
 	return s.scalar
 }
 
-// Vector
+// Vector gets vector values of a setting
 func (s *Setting) Vector() []string {
 	return s.vector
 }
 
-// AsVector
+// AsVector gets value of a setting as vector. Scalar value is casted to vector
 func (s *Setting) AsVector() []string {
 	if s.isScalar {
 		return []string{
@@ -109,7 +112,7 @@ func (s *Setting) AsVector() []string {
 	return s.vector
 }
 
-// String
+// String gets string value of a setting. Vector is combined into one string
 func (s *Setting) String() string {
 	if s.isScalar {
 		return s.scalar
@@ -169,10 +172,11 @@ func (settings Settings) MarshalJSON() ([]byte, error) {
 // unmarshalScalar
 func unmarshalScalar(untyped interface{}) (string, bool) {
 	var res string
-	var ok bool
+	var knownType bool
 
 	typeOf := reflect.TypeOf(untyped)
 	if typeOf == nil {
+		// Unable to determine type of the value
 		log.V(3).Infof("unmarshalScalar() typeOf==nil")
 		return "", false
 	}
@@ -187,7 +191,7 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 		bool,
 		string:
 		res = fmt.Sprintf("%v", untyped)
-		ok = true
+		knownType = true
 	case // scalar
 		float32:
 		floatVal := untyped.(float32)
@@ -200,7 +204,7 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 			intVal := int64(floatVal)
 			res = fmt.Sprintf("%v", intVal)
 		}
-		ok = true
+		knownType = true
 	case // scalar
 		float64:
 		floatVal := untyped.(float64)
@@ -213,11 +217,11 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 			intVal := int64(floatVal)
 			res = fmt.Sprintf("%v", intVal)
 		}
-		ok = true
+		knownType = true
 	}
 
 	str := typeOf.String()
-	if ok {
+	if knownType {
 		log.V(3).Infof("unmarshalScalar() type=%v value=%s", str, res)
 		return res, true
 	} else {
@@ -229,10 +233,11 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 // unmarshalVector
 func unmarshalVector(untyped interface{}) ([]string, bool) {
 	var res []string
-	var ok bool
+	var knownType bool
 
 	typeOf := reflect.TypeOf(untyped)
 	if typeOf == nil {
+		// Unable to determine type of the value
 		log.V(3).Infof("unmarshalVector() typeOf==nil")
 		return nil, false
 	}
@@ -245,11 +250,11 @@ func unmarshalVector(untyped interface{}) ([]string, bool) {
 				res = append(res, scalar)
 			}
 		}
-		ok = true
+		knownType = true
 	}
 
 	str := typeOf.String()
-	if ok {
+	if knownType {
 		log.V(3).Infof("unmarshalVector() type=%v value=%s", str, res)
 		return res, true
 	} else {
@@ -262,10 +267,11 @@ func unmarshalVector(untyped interface{}) ([]string, bool) {
 func (settings Settings) getValueAsScalar(name string) (string, bool) {
 	setting, ok := settings[name]
 	if !ok {
+		// Unknown setting
 		return "", false
 	}
-	if setting.isScalar {
-		return setting.scalar, true
+	if setting.IsScalar() {
+		return setting.Scalar(), true
 	}
 	return "", false
 }
@@ -274,12 +280,13 @@ func (settings Settings) getValueAsScalar(name string) (string, bool) {
 func (settings Settings) getValueAsVector(name string) ([]string, bool) {
 	setting, ok := settings[name]
 	if !ok {
+		// Unknown setting
 		return nil, false
 	}
-	if setting.isScalar {
+	if setting.IsScalar() {
 		return nil, false
 	}
-	return setting.vector, true
+	return setting.Vector(), true
 }
 
 // getValueAsInt
@@ -338,7 +345,7 @@ func (settings *Settings) MergeFrom(src Settings) {
 	}
 }
 
-// MergeFromCB merges settings from src approved by callback
+// MergeFromCB merges settings from src approved by filtering callback function
 func (settings *Settings) MergeFromCB(src Settings, filter func(path string, setting *Setting) bool) {
 	if src == nil {
 		return
@@ -367,13 +374,15 @@ func (settings Settings) GetSectionStringMap(section SettingsSection, includeUns
 			continue // for
 		}
 		if (err != nil) && (err != errorNoSectionSpecified) {
-			// We have an complex error, skip to next
+			// We have a complex error, skip to next
 			continue // for
 		}
 		if (err == errorNoSectionSpecified) && !includeUnspecified {
 			// We are not ready to include unspecified section, skip to next
 			continue // for
 		}
+
+		// We'd like to get this section
 
 		filename, err := getFilenameFromPath(path)
 		if err != nil {
@@ -391,16 +400,22 @@ func (settings Settings) GetSectionStringMap(section SettingsSection, includeUns
 	return m
 }
 
-func inSlice(slice []SettingsSection, val SettingsSection) bool {
-	for _, item := range slice {
-		if item == val {
+// inArray checks whether needle is in haystack
+func inArray(needle SettingsSection, haystack []SettingsSection) bool {
+	for _, item := range haystack {
+		if item == needle {
 			return true
 		}
 	}
 	return false
 }
 
-func (settings Settings) Filter(includeSections []SettingsSection, excludeSections []SettingsSection, includeUnspecified bool) Settings {
+// Filter filters settings according to include and exclude lists
+func (settings Settings) Filter(
+	includeSections []SettingsSection,
+	excludeSections []SettingsSection,
+	includeUnspecified bool,
+) Settings {
 	res := make(Settings)
 
 	for path := range settings {
@@ -410,8 +425,8 @@ func (settings Settings) Filter(includeSections []SettingsSection, excludeSectio
 		var exclude bool
 
 		if err == nil {
-			include = (includeSections == nil) || inSlice(includeSections, _section)
-			exclude = (excludeSections != nil) && inSlice(excludeSections, _section)
+			include = (includeSections == nil) || inArray(_section, includeSections)
+			exclude = (excludeSections != nil) && inArray(_section, excludeSections)
 		}
 
 		include = include && !exclude
@@ -421,13 +436,15 @@ func (settings Settings) Filter(includeSections []SettingsSection, excludeSectio
 			continue // for
 		}
 		if (err != nil) && (err != errorNoSectionSpecified) {
-			// We have an complex error, skip to next
+			// We have a complex error, skip to next
 			continue // for
 		}
 		if (err == errorNoSectionSpecified) && !includeUnspecified {
 			// We are not ready to include unspecified section, skip to next
 			continue // for
 		}
+
+		// We'd like to get this section
 
 		res[path] = settings[path]
 	}
@@ -444,15 +461,15 @@ func (settings Settings) AsSortedSliceOfStrings() []string {
 	}
 	sort.Strings(keys)
 
-	var s []string
+	var res []string
 
 	// Walk over sorted keys
 	for _, key := range keys {
-		s = append(s, key)
-		s = append(s, settings[key].String())
+		res = append(res, key)
+		res = append(res, settings[key].String())
 	}
 
-	return s
+	return res
 }
 
 // Normalize
@@ -526,13 +543,14 @@ func string2Section(section string) (SettingsSection, error) {
 func getFilenameFromPath(path string) (string, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 1 {
-		// We need to have path to be at least 'file.name'
+		// We need to have path to be at least one entry - which will be 'filename'
 		return "", errorNoFilenameSpecified
 	}
 
+	// Extract last component from path
 	filename := parts[len(parts)-1]
 	if filename == "" {
-		// We need to have path to be at least 'file.name'
+		// We need to have path to be at least one entry - which will be 'filename'
 		return "", errorNoFilenameSpecified
 	}
 
