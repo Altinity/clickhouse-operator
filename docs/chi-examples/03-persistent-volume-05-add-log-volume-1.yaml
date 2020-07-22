@@ -1,0 +1,23 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "pv-add-log"
+spec:
+  defaults:
+    templates:
+      dataVolumeClaimTemplate: data-volume-template
+  configuration:
+    clusters:
+      - name: "pv-add-log"
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  templates:
+    volumeClaimTemplates:
+      - name: data-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

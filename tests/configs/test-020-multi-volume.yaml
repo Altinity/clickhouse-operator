@@ -3,8 +3,6 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "test-020-multi-volume"
 spec:
-  useTemplates:
-    - name: clickhouse-version
   configuration:
     clusters:
     - name: simple

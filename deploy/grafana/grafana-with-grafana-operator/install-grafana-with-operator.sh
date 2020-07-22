@@ -77,7 +77,7 @@ kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
     envsubst \
 )
 
-echo "Waiting to apply GraganaDatasource custom resource $GRAFANA_PROMETHEUS_DATASOURCE_NAME"
+echo "Waiting to apply Grafana Datasource custom resource $GRAFANA_PROMETHEUS_DATASOURCE_NAME"
 while [[ "0" = $(kubectl get grafanadatasources --namespace="${GRAFANA_NAMESPACE}" -o=custom-columns=NAME:.metadata.name,STATUS:.status.message ${GRAFANA_PROMETHEUS_DATASOURCE_NAME} | grep -i "success" | wc -l) ]]; do
     printf "."
     sleep 1

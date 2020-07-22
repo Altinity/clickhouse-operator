@@ -337,8 +337,8 @@ func (c *ClickHouseConfigGenerator) GetHostPorts(host *chiv1.ChiHost) string {
 }
 
 // generateXMLConfig creates XML using map[string]string definitions
-func (c *ClickHouseConfigGenerator) generateXMLConfig(data map[string]interface{}, prefix string) string {
-	if len(data) == 0 {
+func (c *ClickHouseConfigGenerator) generateXMLConfig(settings chiv1.Settings, prefix string) string {
+	if len(settings) == 0 {
 		return ""
 	}
 
@@ -347,7 +347,7 @@ func (c *ClickHouseConfigGenerator) generateXMLConfig(data map[string]interface{
 	// XML code
 	// </yandex>
 	util.Iline(b, 0, "<"+xmlTagYandex+">")
-	xmlbuilder.GenerateXML(b, data, prefix)
+	xmlbuilder.GenerateXML(b, settings, prefix)
 	util.Iline(b, 0, "</"+xmlTagYandex+">")
 
 	return b.String()

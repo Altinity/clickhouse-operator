@@ -69,9 +69,11 @@ spec:
   #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
+      type: object
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             # Need to be StringBool
             stop:
@@ -97,6 +99,8 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
+            namespaceDomainPattern:
+              type: string
             defaults:
               type: object
               properties:
@@ -185,6 +189,8 @@ spec:
                   type: object
                 files:
                   type: object
+                  additionalProperties:
+                    type: string
                 clusters:
                   type: array
                   items:
@@ -508,6 +514,8 @@ spec:
                       - name
                     properies:
                       name:
+                        type: string
+                      generateName:
                         type: string
                       zone:
                         type: object

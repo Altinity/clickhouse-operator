@@ -119,7 +119,7 @@ func (c *FakeClickHouseOperatorConfigurations) DeleteCollection(options *v1.Dele
 // Patch applies the patch and returns the patched clickHouseOperatorConfiguration.
 func (c *FakeClickHouseOperatorConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *clickhousealtinitycomv1.ClickHouseOperatorConfiguration, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(clickhouseoperatorconfigurationsResource, c.ns, name, data, subresources...), &clickhousealtinitycomv1.ClickHouseOperatorConfiguration{})
+		Invokes(testing.NewPatchSubresourceAction(clickhouseoperatorconfigurationsResource, c.ns, name, pt, data, subresources...), &clickhousealtinitycomv1.ClickHouseOperatorConfiguration{})
 
 	if obj == nil {
 		return nil, err

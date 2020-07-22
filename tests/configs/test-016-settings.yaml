@@ -12,11 +12,29 @@ spec:
       - name: default
         layout:
           shardsCount: 1
+    profiles:
+      default/max_memory_usage: 7000000000 # test for big value      
     settings:
       dictionaries_config: config.d/*.dict
       macros/layer: "01"
       query_log: _removed_
     files:
+      custom.xml: |
+         <yandex>
+            <macros>
+              <test>test</test>
+            </macros>
+         </yandex>
+      users.d/my_users.xml:
+        <yandex>
+          <users>
+             <test_usersd>
+               <password></password>
+               <profile>default</profile>
+               <quota>default</quota>
+             </test_usersd>
+          </users>
+        </yandex> 
       dict_one.dict: |
         <yandex>
           <dictionary>

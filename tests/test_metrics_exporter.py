@@ -1,6 +1,6 @@
 import time
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
 from testflows.asserts import error
 import re
 import json
@@ -131,4 +131,4 @@ if main():
             test_metrics_exporter_with_multiple_clickhouse_version,
         ]
         for t in test_cases:
-            run(test=t, flags=TE)
+            Scenario(test=t, flags=TE)

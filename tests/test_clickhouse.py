@@ -3,7 +3,7 @@ from kubectl import *
 import settings
 from test_operator import require_zookeeper 
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
 from testflows.asserts import error
 
 @TestScenario
@@ -104,6 +104,32 @@ def test_ch_001(self):
                 
         # cat /var/log/clickhouse-server/clickhouse-server.log | grep t2 | grep -E "all_1_1_0|START|STOP"
 
-
+@TestScenario
+@Name("test_ch_002. Row-level security")
+def test_ch_002(self):
+    create_and_check("configs/test-ch-002-row-level.yaml", 
+                     {"apply_templates": {"templates/tpl-clickhouse-20.3.yaml"},
+                      "do_not_delete": 1})
+    
+    chi = "test-ch-002-row-level"
+    create_table = """create table test (d Date default today(), team LowCardinality(String), user String) Engine = MergeTree() PARTITION BY d ORDER BY d;"""
+    
+    with When("Create test table"):
+        clickhouse_query(chi, create_table)
         
+    with And("Insert some data"):
+        clickhouse_query(chi, "INSERT INTO test(team, user) values('team1', 'user1'),('team2', 'user2'),('team3', 'user3'),('team4', 'user4')")
+    
+    with Then("Make another query for different users. It should be restricted to corresponding team by row-level security"):
+        for user in ['user1','user2','user3','user4']:
+            out = clickhouse_query(chi, "select user from test", user = user)
+            assert out == user    
+    
+    with Then("Make a count() query for different users. It should be restricted to corresponding team by row-level security"):
+        for user in ['user1','user2','user3','user4']:
+            out = clickhouse_query(chi, "select count() from test", user = user)
+            assert out == "1"
+    
+    kube_delete_chi(chi)
+
  

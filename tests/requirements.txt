@@ -1,2 +1,2 @@
-testflows==1.4.6
+testflows==1.6.39
 PyYAML

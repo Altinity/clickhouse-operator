@@ -95,14 +95,18 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 	start := time.Now()
 	for {
 		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err == nil {
+			// Object is found
 			if hasStatefulSetReachedGeneration(statefulSet, targetGeneration) {
 				// StatefulSet is available and generation reached
 				// All is good, job done, exit
 				log.V(1).Infof("waitStatefulSetGeneration(%s/%s)-OK  :%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 				return nil
-			} else if time.Since(start) >= (time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second) {
+			}
+
+			// Object is found, target generation not reached yet
+			if time.Since(start) >= (time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second) {
 				// Generation not yet reached
-				// Start bothering with messages after some time only
+				// Start bothering with log messages after some time only
 				log.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
 			}
 		} else if apierrors.IsNotFound(err) {
@@ -116,7 +120,7 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 			log.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT: object not yet created, need to wait", namespace, name)
 		} else {
 			// Some kind of total error
-			log.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
+			log.Errorf("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
 			return err
 		}
 

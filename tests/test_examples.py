@@ -1,4 +1,4 @@
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
 from testflows.asserts import error
 
 from kubectl import create_and_check
@@ -33,4 +33,4 @@ if main():
     with Module("examples"):
         examples = [test_examples01_1, test_examples01_2, test_examples02_1, test_examples02_2]
         for t in examples:
-            run(test=t, flags=TE)
+            Scenario(test=t, flags=TE)

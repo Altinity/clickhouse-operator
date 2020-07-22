@@ -24,7 +24,7 @@ spec:
       spec:
         containers:
         - name: clickhouse
-          image: yandex/clickhouse-server:20.3
+          image: yandex/clickhouse-server:20.3.13.127
   configuration:
     clusters:
     - name: default

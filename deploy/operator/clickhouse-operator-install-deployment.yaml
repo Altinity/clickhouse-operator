@@ -1,7 +1,7 @@
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.10.0
 # etc-clickhouse-operator-files
 #
 apiVersion: v1
@@ -92,7 +92,7 @@ data:
     chConfigUserDefaultPassword: "default"
     
     # Default host_regexp to limit network connectivity from outside
-    ChConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+    chConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
     
     ################################################
     ##
@@ -136,7 +136,7 @@ data:
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.10.0
 # etc-clickhouse-operator-confd-files
 #
 apiVersion: v1
@@ -150,7 +150,7 @@ data:
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.10.0
 # etc-clickhouse-operator-configd-files
 #
 apiVersion: v1
@@ -184,19 +184,28 @@ data:
 
   03-clickhouse-querylog.xml: |
     <yandex>
-    <query_log>
+    <query_log replace="1">
         <database>system</database>
         <table>query_log</table>
-        <partition_by>toMonday(event_date)</partition_by>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
         <flush_interval_milliseconds>7500</flush_interval_milliseconds>
     </query_log>
     <query_thread_log remove="1"/>
+    </yandex>
+  04-clickhouse-partlog.xml: |
+    <yandex>
+    <part_log replace="1">
+        <database>system</database>
+        <table>part_log</table>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </part_log>
     </yandex>
 ---
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.10.0
 # etc-clickhouse-operator-templatesd-files
 #
 apiVersion: v1
@@ -294,7 +303,7 @@ data:
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.9.9
+# altinity/clickhouse-operator:0.10.0
 # etc-clickhouse-operator-usersd-files
 #
 apiVersion: v1
@@ -321,6 +330,7 @@ data:
         <profiles>
             <clickhouse_operator>
                 <log_queries>0</log_queries>
+                <skip_unavailable_shards>1</skip_unavailable_shards>
             </clickhouse_operator>
         </profiles>
     </yandex>
@@ -342,8 +352,8 @@ data:
 # Possible Template Parameters:
 #
 # -
-# altinity/clickhouse-operator:0.9.9
-# altinity/metrics-exporter:0.9.9
+# altinity/clickhouse-operator:0.10.0
+# altinity/metrics-exporter:0.10.0
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -385,7 +395,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.9.9
+          image: altinity/clickhouse-operator:0.10.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -450,7 +460,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.9.9
+          image: altinity/metrics-exporter:0.10.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
