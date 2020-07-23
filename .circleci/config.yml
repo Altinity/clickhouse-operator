@@ -65,9 +65,9 @@ jobs:
 #      TODO upgrade to paid plan
 #      docker_layer_caching: true
     environment:
-      K8S_VERSION: v1.18.2
+      K8S_VERSION: v1.18.6
       KUBECONFIG: /home/circleci/.kube/config
-      MINIKUBE_VERSION: v1.9.2
+      MINIKUBE_VERSION: v1.12.1
       MINIKUBE_WANTUPDATENOTIFICATION: false
       MINIKUBE_WANTREPORTERRORPROMPT: false
       MINIKUBE_HOME: /home/circleci
@@ -151,7 +151,7 @@ jobs:
           command: |
             echo 'export OPERATOR_VERSION=$(cat release)' >> $BASH_ENV
             echo 'export BRANCH=${BRANCH:-$git_branch}' >> $BASH_ENV
-            echo 'export OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-kube-system}' >> $BASH_ENV
+            echo 'export OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-test}' >> $BASH_ENV
             echo 'export OPERATOR_IMAGE=${COMPANY_REPO}/clickhouse-operator:${OPERATOR_VERSION}' >> $BASH_ENV
             echo 'export METRICS_EXPORTER_IMAGE=${COMPANY_REPO}/metrics-exporter:${OPERATOR_VERSION}' >> $BASH_ENV
       - run:

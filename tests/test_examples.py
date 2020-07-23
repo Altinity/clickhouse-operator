@@ -33,4 +33,4 @@ if main():
     with Module("examples"):
         examples = [test_examples01_1, test_examples01_2, test_examples02_1, test_examples02_2]
         for t in examples:
-            Scenario(test=t, flags=TE)
+            Scenario(run=t, flags=TE)

@@ -59,13 +59,13 @@ if main():
             
             # placeholder for selective test running
             # run_tests = [(test_009, {"version_from": "0.9.9"})]
-            # run_tests = [test_002]
+            # run_tests = [test_011]
 
             for t in run_tests:
                 if callable(t):
-                    t()
+                    Scenario(test=t)()
                 else:
-                    t[0](kwargs=t[1])
+                    Scenario(test=t[0], args=t[1])()
 
         # python3 tests/test.py --only clickhouse*
         with Module("clickhouse", flags=TE):
@@ -80,4 +80,4 @@ if main():
             run_test = [test_ch_002]
 
             for t in run_test:
-                t()
+                Scenario(test=t)()

@@ -196,8 +196,8 @@ def test_011(self):
         with And("Connection from insecured to secured host should fail for user with no password"):
             # TODO FIXME
             dns_timeout = 30
-            with And(f"hmm, service created but DNS still not updated? wait {dns_timeout} sec"):
-                time.sleep(dns_timeout)
+        with And(f"hmm, service created but DNS still not updated? wait {dns_timeout} sec"):
+            time.sleep(dns_timeout)
             out = clickhouse_query_with_error("test-011-insecured-cluster", "select 'OK'",
                                               host="chi-test-011-secured-cluster-default-1-0", user="user1")
             assert "Password" in out or "password" in out 

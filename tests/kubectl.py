@@ -228,7 +228,7 @@ def kube_check_pod_antiaffinity(chi_name, ns = namespace):
                     }
                     ]
                 }
-    with Then(f"Expect podAntiAffinity to exist and match {expected}"):
+    with Then("Expect podAntiAffinity to exist and match"):
         assert "affinity" in pod_spec
         assert "podAntiAffinity" in pod_spec["affinity"]
         assert pod_spec["affinity"]["podAntiAffinity"] == expected
