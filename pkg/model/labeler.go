@@ -382,10 +382,11 @@ func (l *Labeler) processLabelSelectorRequirement(labelSelectorRequirement *meta
 
 // TODO review usage
 func GetSetFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Set, error) {
-	labelNamespace, ok1 := objMeta.Labels[LabelNamespace]
-	labelApp, ok2 := objMeta.Labels[LabelAppName]
+	// Mandatory labels
+	namespace, ok1 := objMeta.Labels[LabelNamespace]
+	appName, ok2 := objMeta.Labels[LabelAppName]
 	// Skip chop version
-	labelCHI, ok3 := objMeta.Labels[LabelCHIName]
+	chiName, ok3 := objMeta.Labels[LabelCHIName]
 
 	if !ok1 || !ok2 || !ok3 {
 		return nil, fmt.Errorf(
@@ -395,29 +396,14 @@ func GetSetFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Set, error) {
 	}
 
 	set := kublabels.Set{
-		LabelNamespace: labelNamespace,
-		LabelAppName:   labelApp,
+		LabelNamespace: namespace,
+		LabelAppName:   appName,
 		// Skip chop version
-		LabelCHIName: labelCHI,
+		LabelCHIName: chiName,
 	}
 
-	// Add optional labels
-
-	if labelClusterValue, ok := objMeta.Labels[LabelClusterName]; ok {
-		set[LabelClusterName] = labelClusterValue
-	}
-	if labelShardValue, ok := objMeta.Labels[LabelShardName]; ok {
-		set[LabelShardName] = labelShardValue
-	}
-	if labelReplicaValue, ok := objMeta.Labels[LabelReplicaName]; ok {
-		set[LabelReplicaName] = labelReplicaValue
-	}
-	if labelConfigMapValue, ok := objMeta.Labels[LabelConfigMap]; ok {
-		set[LabelConfigMap] = labelConfigMapValue
-	}
-	if labelServiceValue, ok := objMeta.Labels[LabelService]; ok {
-		set[LabelService] = labelServiceValue
-	}
+	// Optional labels
+	util.MergeStringMaps(set, objMeta.Labels, LabelClusterName, LabelShardName, LabelReplicaName, LabelConfigMap, LabelService)
 
 	// skip StatefulSet
 	// skip Zookeeper
