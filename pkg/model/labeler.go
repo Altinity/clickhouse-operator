@@ -382,28 +382,31 @@ func (l *Labeler) processLabelSelectorRequirement(labelSelectorRequirement *meta
 
 // TODO review usage
 func GetSetFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Set, error) {
-	// Mandatory labels
-	namespace, ok1 := objMeta.Labels[LabelNamespace]
-	appName, ok2 := objMeta.Labels[LabelAppName]
-	// Skip chop version
-	chiName, ok3 := objMeta.Labels[LabelCHIName]
-
-	if !ok1 || !ok2 || !ok3 {
+	// Check mandatory labels are in place
+	if !util.HasKeys(objMeta.Labels, LabelNamespace, LabelAppName, LabelCHIName) {
 		return nil, fmt.Errorf(
-			"unable to make set from object. Need to have at least labels '%s', '%s' and '%s'. Available Labels: %v",
+			"UNABLE to make set from object. Need to have at least labels '%s', '%s' and '%s'. Available Labels: %v",
 			LabelNamespace, LabelAppName, LabelCHIName, objMeta.Labels,
 		)
 	}
 
-	set := kublabels.Set{
-		LabelNamespace: namespace,
-		LabelAppName:   appName,
+	labels := []string{
+		// Mandatory labels
+		LabelNamespace,
+		LabelAppName,
 		// Skip chop version
-		LabelCHIName: chiName,
+		LabelCHIName,
+
+		// Optional labels
+		LabelClusterName,
+		LabelShardName,
+		LabelReplicaName,
+		LabelConfigMap,
+		LabelService,
 	}
 
-	// Optional labels
-	util.MergeStringMaps(set, objMeta.Labels, LabelClusterName, LabelShardName, LabelReplicaName, LabelConfigMap, LabelService)
+	set := kublabels.Set{}
+	util.MergeStringMaps(set, objMeta.Labels, labels...)
 
 	// skip StatefulSet
 	// skip Zookeeper
