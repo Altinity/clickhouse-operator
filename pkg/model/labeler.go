@@ -431,22 +431,16 @@ func IsCHOPGeneratedObject(objectMeta *meta.ObjectMeta) bool {
 
 // GetCHINameFromObjectMeta extracts CHI name from ObjectMeta by labels
 func GetCHINameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
-	// ObjectMeta must have LabelCHIName:  chi.Name label
-	name, ok := meta.Labels[LabelCHIName]
-	if ok {
-		return name, nil
-	} else {
+	if !util.MapHasKeys(meta.Labels, LabelCHIName) {
 		return "", fmt.Errorf("can not find %s label in meta", LabelCHIName)
 	}
+	return meta.Labels[LabelCHIName], nil
 }
 
 // GetClusterNameFromObjectMeta extracts cluster name from ObjectMeta by labels
 func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
-	// ObjectMeta must have LabelClusterName
-	name, ok := meta.Labels[LabelClusterName]
-	if ok {
-		return name, nil
-	} else {
-		return "", fmt.Errorf("can not find %s label in meta", LabelCHIName)
+	if !util.MapHasKeys(meta.Labels, LabelClusterName) {
+		return "", fmt.Errorf("can not find %s label in meta", LabelClusterName)
 	}
+	return meta.Labels[LabelClusterName], nil
 }
