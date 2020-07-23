@@ -62,6 +62,25 @@ func MergeStringMaps(dst, src map[string]string, keys ...string) map[string]stri
 	return dst
 }
 
+// HasKeys checks whether all keys are presented in m
+func HasKeys(m map[string]string, keys ...string) bool {
+	for _, needle := range keys {
+		// Have we found this needle
+		found := false
+		for key := range m {
+			if key == needle {
+				found = true
+				break // for
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return true
+}
+
 // Map2String returns named map[string]string mas as a string
 func Map2String(name string, m map[string]string) string {
 	// Write map entries according to sorted keys
