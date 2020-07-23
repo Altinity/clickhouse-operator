@@ -78,51 +78,65 @@ func NewLabeler(chop *chop.CHOp, chi *chi.ClickHouseInstallation) *Labeler {
 
 // getLabelsConfigMapCHICommon
 func (l *Labeler) getLabelsConfigMapCHICommon() map[string]string {
-	return util.MergeStringMaps(l.getLabelsCHIScope(), map[string]string{
-		LabelConfigMap: labelConfigMapValueCHICommon,
-	})
+	return util.MergeStringMaps(
+		l.getLabelsCHIScope(),
+		map[string]string{
+			LabelConfigMap: labelConfigMapValueCHICommon,
+		})
 }
 
 // getLabelsConfigMapCHICommonUsers
 func (l *Labeler) getLabelsConfigMapCHICommonUsers() map[string]string {
-	return util.MergeStringMaps(l.getLabelsCHIScope(), map[string]string{
-		LabelConfigMap: labelConfigMapValueCHICommonUsers,
-	})
+	return util.MergeStringMaps(
+		l.getLabelsCHIScope(),
+		map[string]string{
+			LabelConfigMap: labelConfigMapValueCHICommonUsers,
+		})
 }
 
 // getLabelsConfigMapHost
 func (l *Labeler) getLabelsConfigMapHost(host *chi.ChiHost) map[string]string {
-	return util.MergeStringMaps(l.getLabelsHostScope(host, false), map[string]string{
-		LabelConfigMap: labelConfigMapValueHost,
-	})
+	return util.MergeStringMaps(
+		l.getLabelsHostScope(host, false),
+		map[string]string{
+			LabelConfigMap: labelConfigMapValueHost,
+		})
 }
 
 // getLabelsServiceCHI
 func (l *Labeler) getLabelsServiceCHI() map[string]string {
-	return util.MergeStringMaps(l.getLabelsCHIScope(), map[string]string{
-		LabelService: labelServiceValueCHI,
-	})
+	return util.MergeStringMaps(
+		l.getLabelsCHIScope(),
+		map[string]string{
+			LabelService: labelServiceValueCHI,
+		})
 }
 
 // getLabelsServiceCluster
 func (l *Labeler) getLabelsServiceCluster(cluster *chi.ChiCluster) map[string]string {
-	return util.MergeStringMaps(l.getLabelsClusterScope(cluster), map[string]string{
-		LabelService: labelServiceValueCluster,
-	})
+	return util.MergeStringMaps(
+		l.getLabelsClusterScope(cluster),
+		map[string]string{
+			LabelService: labelServiceValueCluster,
+		})
 }
 
 // getLabelsServiceShard
 func (l *Labeler) getLabelsServiceShard(shard *chi.ChiShard) map[string]string {
-	return util.MergeStringMaps(l.getLabelsShardScope(shard), map[string]string{
-		LabelService: labelServiceValueShard,
-	})
+	return util.MergeStringMaps(
+		l.getLabelsShardScope(shard),
+		map[string]string{
+			LabelService: labelServiceValueShard,
+		})
 }
 
 // getLabelsServiceHost
 func (l *Labeler) getLabelsServiceHost(host *chi.ChiHost) map[string]string {
-	return util.MergeStringMaps(l.getLabelsHostScope(host, false), map[string]string{
-		LabelService: labelServiceValueHost,
-	})
+	return util.MergeStringMaps(
+		l.getLabelsHostScope(host, false),
+		map[string]string{
+			LabelService: labelServiceValueHost,
+		})
 }
 
 // getLabelsCHIScope gets labels for CHI-scoped object
