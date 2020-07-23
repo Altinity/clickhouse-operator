@@ -383,7 +383,7 @@ func (l *Labeler) processLabelSelectorRequirement(labelSelectorRequirement *meta
 // TODO review usage
 func GetSetFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Set, error) {
 	// Check mandatory labels are in place
-	if !util.HasKeys(objMeta.Labels, LabelNamespace, LabelAppName, LabelCHIName) {
+	if !util.MapHasKeys(objMeta.Labels, LabelNamespace, LabelAppName, LabelCHIName) {
 		return nil, fmt.Errorf(
 			"UNABLE to make set from object. Need to have at least labels '%s', '%s' and '%s'. Available Labels: %v",
 			LabelNamespace, LabelAppName, LabelCHIName, objMeta.Labels,

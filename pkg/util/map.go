@@ -62,8 +62,8 @@ func MergeStringMaps(dst, src map[string]string, keys ...string) map[string]stri
 	return dst
 }
 
-// HasKeys checks whether all keys are presented in m
-func HasKeys(m map[string]string, keys ...string) bool {
+// MapHasKeys checks whether map has all keys from specified list
+func MapHasKeys(m map[string]string, keys ...string) bool {
 	for _, needle := range keys {
 		// Have we found this needle
 		found := false
