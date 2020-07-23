@@ -102,7 +102,7 @@ func (w *worker) processItem(item interface{}) error {
 		case reconcileUpdate:
 			return w.updateCHI(reconcile.old, reconcile.new)
 		case reconcileDelete:
-			return w.deleteCHI(reconcile.old)
+			return nil
 		}
 
 		// Unknown item type, don't know what to do with it
