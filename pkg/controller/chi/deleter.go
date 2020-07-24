@@ -224,7 +224,7 @@ func (c *Controller) walkActualPVCs(host *chop.ChiHost, f func(pvc *v1.Persisten
 
 	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newListOptions(labeler.GetSelectorHostScope(host)))
 	if err != nil {
-		log.Errorf("FAIL get list of PVC for host %s/%s err:v", namespace, host.Name, err)
+		log.Errorf("FAIL get list of PVC for host %s/%s err:%v", namespace, host.Name, err)
 		return
 	}
 
