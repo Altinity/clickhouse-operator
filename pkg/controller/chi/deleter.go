@@ -171,7 +171,7 @@ func (c *Controller) deletePVC(host *chop.ChiHost) error {
 
 	namespace := host.Address.Namespace
 
-	c.walkPVCs(host, func(pvc *v1.PersistentVolumeClaim) {
+	c.walkActualPVCs(host, func(pvc *v1.PersistentVolumeClaim) {
 		if !chopmodel.HostCanDeletePVC(host, pvc.Name) {
 			log.V(1).Infof("PVC %s/%s should not be deleted, leave it intact", namespace, pvc.Name)
 			// Move to the next PVC
@@ -213,6 +213,24 @@ func (c *Controller) walkPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolum
 			log.Errorf("FAIL get PVC %s/%s err:%v", namespace, pvcName, err)
 			continue
 		}
+
+		f(pvc)
+	}
+}
+
+func (c *Controller) walkActualPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolumeClaim)) {
+	namespace := host.Address.Namespace
+	labeler := chopmodel.NewLabeler(c.chop, host.CHI)
+
+	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newListOptions(labeler.GetSelectorHostScope(host)))
+	if err != nil {
+		log.Errorf("FAIL get list of PVC for host %s/%s err:v", namespace, host.Name, err)
+		return
+	}
+
+	for i := range pvcList.Items {
+		// Convenience wrapper
+		pvc := &pvcList.Items[i]
 
 		f(pvc)
 	}
