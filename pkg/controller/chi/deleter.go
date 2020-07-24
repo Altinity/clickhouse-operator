@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"k8s.io/api/core/v1"
 	"time"
 
 	log "github.com/golang/glog"
@@ -169,23 +170,12 @@ func (c *Controller) deletePVC(host *chop.ChiHost) error {
 	defer log.V(2).Info("deletePVC() - end")
 
 	namespace := host.Address.Namespace
-	labeler := chopmodel.NewLabeler(c.chop, host.CHI)
 
-	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newListOptions(labeler.GetSelectorHostScope(host)))
-	if err != nil {
-		log.Errorf("FAIL get list of PVC for host %s/%s err:v", namespace, host.Name, err)
-		return err
-	}
-
-	log.V(2).Infof("PVC for host %s/%s listed", namespace, host.Name)
-	for i := range pvcList.Items {
-		// Convenience wrapper
-		pvc := &pvcList.Items[i]
-
+	c.walkActualPVCs(host, func(pvc *v1.PersistentVolumeClaim) {
 		if !chopmodel.HostCanDeletePVC(host, pvc.Name) {
 			log.V(1).Infof("PVC %s/%s should not be deleted, leave it intact", namespace, pvc.Name)
 			// Move to the next PVC
-			continue
+			return
 		}
 
 		// Actually delete PVC
@@ -197,7 +187,7 @@ func (c *Controller) deletePVC(host *chop.ChiHost) error {
 		} else {
 			log.Errorf("FAIL to delete PVC %s/%s err:%v", namespace, pvc.Name, err)
 		}
-	}
+	})
 
 	return nil
 }

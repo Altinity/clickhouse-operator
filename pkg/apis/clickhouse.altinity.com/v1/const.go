@@ -19,9 +19,9 @@
 package v1
 
 const (
-	StatusInProgress = "InProgress"
-	StatusCompleted  = "Completed"
-	StatusDeletion   = "Deletion"
+	StatusInProgress  = "InProgress"
+	StatusCompleted   = "Completed"
+	StatusTerminating = "Terminating"
 )
 
 const (

@@ -55,7 +55,7 @@ func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*c
 	}
 
 	var selector kublabels.Selector
-	if selector, err = chopmodel.GetSelectorFromObjectMeta(objMeta); err != nil {
+	if selector, err = chopmodel.MakeSelectorFromObjectMeta(objMeta); err != nil {
 		return nil, err
 	}
 
@@ -103,7 +103,7 @@ func (c *Controller) getService(objMeta *meta.ObjectMeta, byNameOnly bool) (*cor
 	}
 
 	var selector kublabels.Selector
-	if selector, err = chopmodel.GetSelectorFromObjectMeta(objMeta); err != nil {
+	if selector, err = chopmodel.MakeSelectorFromObjectMeta(objMeta); err != nil {
 		return nil, err
 	}
 
@@ -151,7 +151,7 @@ func (c *Controller) getStatefulSet(objMeta *meta.ObjectMeta, byNameOnly bool) (
 	}
 
 	var selector kublabels.Selector
-	if selector, err = chopmodel.GetSelectorFromObjectMeta(objMeta); err != nil {
+	if selector, err = chopmodel.MakeSelectorFromObjectMeta(objMeta); err != nil {
 		return nil, err
 	}
 

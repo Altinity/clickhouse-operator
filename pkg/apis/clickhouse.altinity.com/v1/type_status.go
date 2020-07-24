@@ -70,7 +70,7 @@ func (s *ChiStatus) ReconcileComplete() {
 }
 
 func (s *ChiStatus) DeleteStart() {
-	s.Status = StatusDeletion
+	s.Status = StatusTerminating
 	s.UpdatedHostsCount = 0
 	s.AddedHostsCount = 0
 	s.DeletedHostsCount = 0
