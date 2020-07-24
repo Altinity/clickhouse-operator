@@ -419,6 +419,8 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		return err
 	}
 
+	w.reconcilePersistentVolumes(host)
+
 	// Add host's Service
 	service := w.creator.CreateServiceHost(host)
 	if err := w.reconcileService(host.CHI, service); err != nil {
@@ -814,6 +816,13 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 		Error("Create or Update StatefulSet %s/%s - UNEXPECTED FLOW", newStatefulSet.Namespace, newStatefulSet.Name)
 
 	return err
+}
+
+func (w *worker) reconcilePersistentVolumes(host *chop.ChiHost) {
+	w.c.walkPVs(host, func(pv *core.PersistentVolume) {
+		pv = w.creator.PreparePersistentVolume(pv, host)
+		_ = w.c.updatePersistentVolume(pv)
+	})
 }
 
 // createStatefulSet
