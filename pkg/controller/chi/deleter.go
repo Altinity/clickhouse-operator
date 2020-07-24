@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"k8s.io/api/core/v1"
 	"time"
 
 	log "github.com/golang/glog"
@@ -200,6 +201,32 @@ func (c *Controller) deletePVC(host *chop.ChiHost) error {
 	}
 
 	return nil
+}
+
+func (c *Controller) walkPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolumeClaim)) {
+	namespace := host.Address.Namespace
+	name := chopmodel.CreatePodName(host)
+	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(name, newGetOptions())
+	if err != nil {
+		log.Errorf("FAIL get pod for host %s/%s err:v", namespace, host.Name, err)
+		return
+	}
+
+	for i := range pod.Spec.Volumes {
+		volume := &pod.Spec.Volumes[i]
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
+
+		claimName := volume.PersistentVolumeClaim.ClaimName
+		pvc, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(claimName, newGetOptions())
+		if err != nil {
+			log.Errorf("FAIL get PVC %s/%s err:v", namespace, claimName, err)
+			continue
+		}
+
+		f(pvc)
+	}
 }
 
 // deleteConfigMap deletes ConfigMap
