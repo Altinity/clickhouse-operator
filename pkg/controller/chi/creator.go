@@ -20,6 +20,8 @@ import (
 	"fmt"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	log "github.com/golang/glog"
+	"k8s.io/api/core/v1"
+
 	// log "k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
@@ -61,6 +63,7 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(newStatefulSet)
 	if err != nil {
 		// Update failed
+		log.V(1).Infof("updateStatefulSet(%s/%s) - git err: %v", namespace, name, err)
 		return err
 	}
 
@@ -85,6 +88,24 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 	}
 
 	return fmt.Errorf("unexpected flow")
+}
+
+// updateStatefulSet is an internal function, used in reconcileStatefulSet only
+func (c *Controller) updatePersistentVolume(pv *v1.PersistentVolume) error {
+	// Convenience shortcuts
+	namespace := pv.Namespace
+	name := pv.Name
+	log.V(2).Infof("updatePersistentVolume(%s/%s)", namespace, name)
+
+	// Apply newStatefulSet and wait for Generation to change
+	_, err := c.kubeClient.CoreV1().PersistentVolumes().Update(pv)
+	if err != nil {
+		// Update failed
+		log.V(1).Infof("updatePersistentVolume(%s/%s) - git err: %v", namespace, name, err)
+		return err
+	}
+
+	return nil
 }
 
 // waitStatefulSetGeneration polls StatefulSet for reaching target generation.
