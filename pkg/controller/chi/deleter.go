@@ -229,6 +229,17 @@ func (c *Controller) walkPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolum
 	}
 }
 
+func (c *Controller) walkPVs(host *chop.ChiHost, f func(pv *v1.PersistentVolume)) {
+	c.walkPVCs(host, func(pvc *v1.PersistentVolumeClaim) {
+		pv, err := c.kubeClient.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, newGetOptions())
+		if err != nil {
+			log.Errorf("FAIL get PV %s err:v", pvc.Spec.VolumeName, err)
+			return
+		}
+		f(pv)
+	})
+}
+
 // deleteConfigMap deletes ConfigMap
 func (c *Controller) deleteConfigMap(host *chop.ChiHost) error {
 	name := chopmodel.CreateConfigMapPodName(host)
