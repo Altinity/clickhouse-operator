@@ -59,7 +59,7 @@ if main():
             
             # placeholder for selective test running
             # run_tests = [(test_009, {"version_from": "0.9.9"})]
-            run_tests = [test_002]
+            # run_tests = [test_002]
 
             for t in run_tests:
                 if callable(t):
