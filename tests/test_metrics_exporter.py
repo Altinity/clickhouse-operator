@@ -28,7 +28,7 @@ def test_metrics_exporter_reboot():
         with And(f"metrics-exporter /chi enpoint result should return {expect_result}"):
             for i in range(1, max_retries):
                 out = kubectl.kubectl(
-                    f"exec {operator_pod} -c metrics-exporter wget -- -O- -q http://127.0.0.1:8888/chi",
+                    f"exec {operator_pod} -c metrics-exporter -- wget -O- -q http://127.0.0.1:8888/chi",
                     ns=operator_namespace
                 )
                 out = json.loads(out)
@@ -75,7 +75,7 @@ def test_metrics_exporter_with_multiple_clickhouse_version():
         with And(f"metrics-exporter /metrics enpoint result should match with {expect_result}"):
             for i in range(1, max_retries):
                 out = kubectl.kubectl(
-                    f"exec {operator_pod} -c metrics-exporter wget -- -O- -q http://127.0.0.1:8888/metrics",
+                    f"exec {operator_pod} -c metrics-exporter -- wget -O- -q http://127.0.0.1:8888/metrics",
                     ns=operator_namespace
                 )
                 all_strings_expected_done = True
