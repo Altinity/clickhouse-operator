@@ -194,7 +194,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		return nil
 	}
 
-	// Check DeletionTimestamp in order to understanbd, whether the object is being deleted
+	// Check DeletionTimestamp in order to understand, whether the object is being deleted
 	if new.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted
 		if !util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
@@ -209,25 +209,28 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		w.a.V(3).Info("updateCHI(%s/%s): finalizer installed", new.Namespace, new.Name)
 	} else {
 		// The object is being deleted
-		if util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
-			// Delete CHI
-			(&new.Status).DeleteStart()
-			if err := w.c.updateCHIObjectStatus(new, true); err != nil {
-				w.a.V(1).Info("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
-				return nil
+		cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(new.Name, newGetOptions())
+		if (err == nil) && (cur != nil) {
+			if util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
+				// Delete CHI
+				(&new.Status).DeleteStart()
+				if err := w.c.updateCHIObjectStatus(new, true); err != nil {
+					w.a.V(1).Info("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
+					return nil
+				}
+
+				_ = w.deleteCHI(new)
+
+				// Uninstall finalizer
+				w.a.V(2).Info("updateCHI(%s/%s): uninstall finalizer", new.Namespace, new.Name)
+				if err := w.c.uninstallFinalizer(new); err != nil {
+					w.a.V(1).Info("updateCHI(%s/%s): unable to uninstall finalizer: %v", new.Namespace, new.Name, err)
+				}
 			}
 
-			_ = w.deleteCHI(new)
-
-			// Uninstall finalizer
-			w.a.V(2).Info("updateCHI(%s/%s): uninstall finalizer", new.Namespace, new.Name)
-			if err := w.c.uninstallFinalizer(new); err != nil {
-				w.a.V(1).Info("updateCHI(%s/%s): unable to uninstall finalizer: %v", new.Namespace, new.Name, err)
-			}
+			// Object can now be deleted by Kubernetes
+			w.a.V(3).Info("updateCHI(%s/%s): finalizer uninstalled, object can be deleted", new.Namespace, new.Name)
 		}
-
-		// Object can now be deleted by Kubernetes
-		w.a.V(3).Info("updateCHI(%s/%s): finalizer uninstalled, object can be deleted", new.Namespace, new.Name)
 
 		return nil
 	}
