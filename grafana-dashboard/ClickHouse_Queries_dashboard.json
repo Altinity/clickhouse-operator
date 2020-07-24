@@ -50,7 +50,7 @@
   "gnetId": 2515,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1586237656338,
+  "iteration": 1595576835448,
   "links": [],
   "panels": [
     {
@@ -486,7 +486,7 @@
       "type": "table"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "datasource": "$chi",
       "gridPos": {
         "h": 1,
@@ -495,351 +495,366 @@
         "y": 18
       },
       "id": 23,
-      "panels": [
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "$chi",
-          "fill": 1,
-          "fillGradient": 0,
-          "gridPos": {
-            "h": 7,
-            "w": 12,
-            "x": 0,
-            "y": 19
-          },
-          "hiddenSeries": false,
-          "id": 14,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "links": [],
-          "nullPointMode": "null",
-          "options": {
-            "dataLinks": []
-          },
-          "percentage": false,
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "database": "",
-              "dateColDataType": "event_date",
-              "dateLoading": false,
-              "dateTimeColDataType": "event_time",
-              "dateTimeType": "DATETIME",
-              "datetimeLoading": false,
-              "expr": "",
-              "format": "time_series",
-              "formattedQuery": "<font color=\"darkcyan\">$rate</font>(<font color=\"navajowhite\">count</font>() c)<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">where</font>  <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$type</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))",
-              "intervalFactor": 2,
-              "query": "$rate(count() c)\nFROM $table\nwhere  type in ($type)\n    and initial_user in ($user)\n    and('$query_type' = 'all' or(positionCaseInsensitive(query,  '$query_type') = 1))",
-              "rawQuery": "SELECT t, c/runningDifference(t/1000) cRate FROM ( SELECT (intDiv(toUInt32(event_time), 120) * 120) * 1000 AS t, count() c FROM cluster('all-sharded',system.query_log) WHERE event_date >= toDate(1586192459) AND event_time >= toDateTime(1586192459) AND  type in (1,2,3,4)     and initial_user in ('default')     and('all' = 'all' or(positionCaseInsensitive(query,  'all') = 1)) GROUP BY t ORDER BY t)",
-              "refId": "A",
-              "resultFormat": "time_series",
-              "round": "0s",
-              "table": "cluster('all-sharded',system.query_log)",
-              "tableLoading": false
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeRegions": [],
-          "timeShift": null,
-          "title": "Reqs/s by type: $type; user: $user; query type: $query_type",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            },
-            {
-              "format": "short",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false,
-            "alignLevel": null
-          }
-        },
-        {
-          "aliasColors": {},
-          "bars": false,
-          "dashLength": 10,
-          "dashes": false,
-          "datasource": "$chi",
-          "fill": 1,
-          "fillGradient": 0,
-          "gridPos": {
-            "h": 7,
-            "w": 12,
-            "x": 12,
-            "y": 19
-          },
-          "hiddenSeries": false,
-          "id": 16,
-          "legend": {
-            "avg": false,
-            "current": false,
-            "max": false,
-            "min": false,
-            "show": true,
-            "total": false,
-            "values": false
-          },
-          "lines": true,
-          "linewidth": 1,
-          "links": [],
-          "nullPointMode": "null",
-          "options": {
-            "dataLinks": []
-          },
-          "percentage": false,
-          "pointradius": 5,
-          "points": false,
-          "renderer": "flot",
-          "seriesOverrides": [
-            {
-              "alias": "insert_duration",
-              "yaxis": 2
-            }
-          ],
-          "spaceLength": 10,
-          "stack": false,
-          "steppedLine": false,
-          "targets": [
-            {
-              "database": "",
-              "dateColDataType": "event_date",
-              "dateLoading": false,
-              "dateTimeColDataType": "event_time",
-              "dateTimeType": "DATETIME",
-              "datetimeLoading": false,
-              "expr": "",
-              "format": "time_series",
-              "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"darkcyan\">$timeSeries</font> <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">avg</font>(query_duration_ms)  select_duration<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">2</font><br />    <font color=\"yellow\">and</font> positionCaseInsensitive(query,  <font color=\"lightgreen\">'select'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font><br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br /><font color=\"darkorange\">GROUP BY</font> t<br /><font color=\"darkorange\">ORDER BY</font> t",
-              "intervalFactor": 2,
-              "query": "SELECT\n    $timeSeries as t,\n    avg(query_duration_ms)  select_duration\nFROM $table\nWHERE\n    $timeFilter\n    AND type = 2\n    and positionCaseInsensitive(query,  'select') = 1\n    and initial_user in ($user)\nGROUP BY t\nORDER BY t",
-              "rawQuery": "SELECT     (intDiv(toUInt32(event_time), 120) * 120) * 1000 as t,     avg(query_duration_ms)  select_duration FROM cluster('all-sharded',system.query_log) WHERE     event_date >= toDate(1586192489) AND event_time >= toDateTime(1586192489)     AND type = 2     and positionCaseInsensitive(query,  'select') = 1     and initial_user in ('default') GROUP BY t ORDER BY t",
-              "refId": "A",
-              "resultFormat": "time_series",
-              "round": "0s",
-              "table": "cluster('all-sharded',system.query_log)",
-              "tableLoading": false
-            },
-            {
-              "database": "",
-              "dateColDataType": "event_date",
-              "dateLoading": false,
-              "dateTimeColDataType": "event_time",
-              "dateTimeType": "DATETIME",
-              "datetimeLoading": false,
-              "expr": "",
-              "format": "time_series",
-              "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"darkcyan\">$timeSeries</font> <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">avg</font>(query_duration_ms) insert_duration<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">2</font><br /><font color=\"yellow\">and</font> positionCaseInsensitive(query,  <font color=\"lightgreen\">'insert into'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font><br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br /><font color=\"darkorange\">GROUP BY</font> t<br /><font color=\"darkorange\">ORDER BY</font> t",
-              "intervalFactor": 2,
-              "query": "SELECT\n    $timeSeries as t,\n    avg(query_duration_ms) insert_duration\nFROM $table\nWHERE\n    $timeFilter\n    AND type = 2\nand positionCaseInsensitive(query,  'insert into') = 1\n    and initial_user in ($user)\nGROUP BY t\nORDER BY t",
-              "rawQuery": "SELECT     (intDiv(toUInt32(event_time), 10) * 10) * 1000 as t,     avg(query_duration_ms) insert_duration FROM cluster('all-sharded',system.query_log) WHERE     event_date >= toDate(1586232299) AND event_time >= toDateTime(1586232299)     AND type = 2 and positionCaseInsensitive(query,  'insert into') = 1     and initial_user in ('default') GROUP BY t ORDER BY t",
-              "refId": "B",
-              "resultFormat": "time_series",
-              "round": "0s",
-              "table": "cluster('all-sharded',system.query_log)",
-              "tableLoading": false
-            }
-          ],
-          "thresholds": [],
-          "timeFrom": null,
-          "timeRegions": [],
-          "timeShift": null,
-          "title": "Query duration by type: $type; user: $user",
-          "tooltip": {
-            "shared": true,
-            "sort": 0,
-            "value_type": "individual"
-          },
-          "type": "graph",
-          "xaxis": {
-            "buckets": null,
-            "mode": "time",
-            "name": null,
-            "show": true,
-            "values": []
-          },
-          "yaxes": [
-            {
-              "format": "ms",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            },
-            {
-              "format": "ms",
-              "label": null,
-              "logBase": 1,
-              "max": null,
-              "min": null,
-              "show": true
-            }
-          ],
-          "yaxis": {
-            "align": false,
-            "alignLevel": null
-          }
-        }
-      ],
+      "panels": [],
       "repeat": null,
       "title": "Request charts",
       "type": "row"
     },
     {
-      "collapsed": true,
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$chi",
+      "fill": 1,
+      "fillGradient": 0,
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "hiddenSeries": false,
+      "id": 14,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": false,
+      "targets": [
+        {
+          "database": "",
+          "dateColDataType": "event_date",
+          "dateLoading": false,
+          "dateTimeColDataType": "event_time",
+          "dateTimeType": "DATETIME",
+          "datetimeLoading": false,
+          "expr": "",
+          "format": "time_series",
+          "formattedQuery": "<font color=\"darkcyan\">$rate</font>(<font color=\"navajowhite\">count</font>() c)<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">where</font>  <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$type</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))",
+          "interval": "",
+          "intervalFactor": 2,
+          "query": "$rate(count() c)\nFROM $table\nWHERE  type IN($type)\n    AND initial_user IN ($user)\n    AND ('$query_type' = 'all' OR (positionCaseInsensitive(query,  '$query_type') = 1))",
+          "rawQuery": "SELECT t, c/runningDifference(t/1000) cRate FROM ( SELECT (intDiv(toUInt32(event_time), 120) * 120) * 1000 AS t, count() c FROM cluster('all-sharded',system.query_log) WHERE event_date >= toDate(1586192459) AND event_time >= toDateTime(1586192459) AND  type IN (1,2,3,4)     AND initial_user IN ('default')     AND ('all' = 'all' OR (positionCaseInsensitive(query,  'all') = 1)) GROUP BY t ORDER BY t)",
+          "refId": "A",
+          "resultFormat": "time_series",
+          "round": "0s",
+          "table": "cluster('all-sharded',system.query_log)",
+          "tableLoading": false
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Reqs/s by type: $type; user: $user; query type: $query_type",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "short",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "aliasColors": {},
+      "bars": false,
+      "dashLength": 10,
+      "dashes": false,
+      "datasource": "$chi",
+      "fill": 1,
+      "fillGradient": 1,
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "hiddenSeries": false,
+      "id": 16,
+      "legend": {
+        "avg": false,
+        "current": false,
+        "max": false,
+        "min": false,
+        "show": true,
+        "total": false,
+        "values": false
+      },
+      "lines": true,
+      "linewidth": 1,
+      "links": [],
+      "nullPointMode": "null as zero",
+      "options": {
+        "dataLinks": []
+      },
+      "percentage": false,
+      "pointradius": 5,
+      "points": false,
+      "renderer": "flot",
+      "seriesOverrides": [
+        {
+          "alias": "/insert.+/",
+          "yaxis": 2
+        },
+        {
+          "alias": "select_quantile_50",
+          "color": "#FADE2A"
+        },
+        {
+          "alias": "select_quantile_90",
+          "color": "#73BF69"
+        },
+        {
+          "alias": "insert_quantile_50",
+          "color": "#FA6400"
+        },
+        {
+          "alias": "insert_quantile_90",
+          "color": "#C4162A"
+        }
+      ],
+      "spaceLength": 10,
+      "stack": false,
+      "steppedLine": true,
+      "targets": [
+        {
+          "database": "",
+          "dateColDataType": "event_date",
+          "dateLoading": false,
+          "dateTimeColDataType": "event_time",
+          "dateTimeType": "DATETIME",
+          "datetimeLoading": false,
+          "expr": "",
+          "format": "time_series",
+          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"darkcyan\">$timeSeries</font> <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">avg</font>(query_duration_ms)  select_duration<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">2</font><br />    <font color=\"yellow\">and</font> positionCaseInsensitive(query,  <font color=\"lightgreen\">'select'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font><br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br /><font color=\"darkorange\">GROUP BY</font> t<br /><font color=\"darkorange\">ORDER BY</font> t",
+          "intervalFactor": 2,
+          "query": "SELECT\n    $timeSeries as t,\n    quantile(0.5)(query_duration_ms)  select_quantile_50,\n    quantile(0.9)(query_duration_ms)  select_quantile_90\nFROM $table\nWHERE\n    $timeFilter\n    AND type = 2\n    AND positionCaseInsensitive(query,  'select') = 1\n    AND initial_user IN ($user)\nGROUP BY t\nORDER BY t",
+          "rawQuery": "SELECT     (intDiv(toUInt32(event_time), 10) * 10) * 1000 as t,     quantile(0.5)(query_duration_ms)  select_quantile_50,     quantile(0.9)(query_duration_ms)  select_quantile_90 FROM cluster('all-sharded',system.query_log) WHERE     event_date >= toDate(1595573984) AND event_time >= toDateTime(1595573984)     AND type = 2     AND positionCaseInsensitive(query,  'select') = 1     AND initial_user IN ('default') GROUP BY t ORDER BY t",
+          "refId": "A",
+          "resultFormat": "time_series",
+          "round": "0s",
+          "table": "cluster('all-sharded',system.query_log)",
+          "tableLoading": false
+        },
+        {
+          "database": "",
+          "dateColDataType": "event_date",
+          "dateLoading": false,
+          "dateTimeColDataType": "event_time",
+          "dateTimeType": "DATETIME",
+          "datetimeLoading": false,
+          "expr": "",
+          "format": "time_series",
+          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"darkcyan\">$timeSeries</font> <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">avg</font>(query_duration_ms) insert_duration<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">2</font><br /><font color=\"yellow\">and</font> positionCaseInsensitive(query,  <font color=\"lightgreen\">'insert into'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font><br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br /><font color=\"darkorange\">GROUP BY</font> t<br /><font color=\"darkorange\">ORDER BY</font> t",
+          "intervalFactor": 2,
+          "query": "SELECT\n    $timeSeries as t,\n    quantile(0.5)(query_duration_ms) insert_quantile_50,\n    quantile(0.9)(query_duration_ms) insert_quantile_90\nFROM $table\nWHERE\n    $timeFilter\n    AND type = 2\nand positionCaseInsensitive(query,  'insert into') = 1\n    and initial_user in ($user)\nGROUP BY t\nORDER BY t",
+          "rawQuery": "SELECT     (intDiv(toUInt32(event_time), 10) * 10) * 1000 as t,     quantile(0.5)(query_duration_ms) insert_quantile_50,     quantile(0.9)(query_duration_ms) insert_quantile_90 FROM cluster('all-sharded',system.query_log) WHERE     event_date >= toDate(1595573984) AND event_time >= toDateTime(1595573984)     AND type = 2 and positionCaseInsensitive(query,  'insert into') = 1     and initial_user in ('default') GROUP BY t ORDER BY t",
+          "refId": "B",
+          "resultFormat": "time_series",
+          "round": "0s",
+          "table": "cluster('all-sharded',system.query_log)",
+          "tableLoading": false
+        }
+      ],
+      "thresholds": [],
+      "timeFrom": null,
+      "timeRegions": [],
+      "timeShift": null,
+      "title": "Query duration by type: $type; user: $user",
+      "tooltip": {
+        "shared": true,
+        "sort": 0,
+        "value_type": "individual"
+      },
+      "type": "graph",
+      "xaxis": {
+        "buckets": null,
+        "mode": "time",
+        "name": null,
+        "show": true,
+        "values": []
+      },
+      "yaxes": [
+        {
+          "format": "ms",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        },
+        {
+          "format": "ms",
+          "label": null,
+          "logBase": 1,
+          "max": null,
+          "min": null,
+          "show": true
+        }
+      ],
+      "yaxis": {
+        "align": false,
+        "alignLevel": null
+      }
+    },
+    {
+      "collapsed": false,
       "datasource": "$chi",
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 19
+        "y": 26
       },
       "id": 24,
-      "panels": [
-        {
-          "columns": [],
-          "datasource": "$chi",
-          "fontSize": "100%",
-          "gridPos": {
-            "h": 7,
-            "w": 24,
-            "x": 0,
-            "y": 27
-          },
-          "id": 21,
-          "links": [],
-          "options": {},
-          "pageSize": null,
-          "scroll": true,
-          "showHeader": true,
-          "sort": {
-            "col": 2,
-            "desc": true
-          },
-          "styles": [
-            {
-              "alias": "Time",
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "pattern": "Time",
-              "type": "date"
-            },
-            {
-              "alias": "",
-              "colorMode": null,
-              "colors": [
-                "rgba(245, 54, 54, 0.9)",
-                "rgba(237, 129, 40, 0.89)",
-                "rgba(50, 172, 45, 0.97)"
-              ],
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": null,
-              "pattern": "duration",
-              "thresholds": [],
-              "type": "number",
-              "unit": "ms"
-            },
-            {
-              "alias": "",
-              "colorMode": null,
-              "colors": [
-                "rgba(245, 54, 54, 0.9)",
-                "rgba(237, 129, 40, 0.89)",
-                "rgba(50, 172, 45, 0.97)"
-              ],
-              "dateFormat": "YYYY-MM-DD HH:mm:ss",
-              "decimals": 2,
-              "pattern": "memory",
-              "thresholds": [],
-              "type": "number",
-              "unit": "bytes"
-            },
-            {
-              "alias": "",
-              "colorMode": null,
-              "colors": [
-                "rgba(245, 54, 54, 0.9)",
-                "rgba(237, 129, 40, 0.89)",
-                "rgba(50, 172, 45, 0.97)"
-              ],
-              "decimals": 2,
-              "pattern": "/.*/",
-              "thresholds": [],
-              "type": "number",
-              "unit": "short"
-            }
-          ],
-          "targets": [
-            {
-              "database": "",
-              "dateColDataType": "event_date",
-              "dateLoading": false,
-              "dateTimeColDataType": "event_time",
-              "dateTimeType": "DATETIME",
-              "datetimeLoading": false,
-              "format": "time_series",
-              "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    event_time,<br />    user,<br />    query_duration_ms duration,<br />    memory_usage memory,<br />    if(exception<font color=\"yellow\">!=</font><font color=\"lightgreen\">''</font>, <font color=\"lightgreen\">'fail'</font>, <font color=\"lightgreen\">'success'</font>) result,<br />    <font color=\"navajowhite\">concat</font>(<font color=\"navajowhite\">substring</font>(query,<font color=\"cornflowerblue\">1</font>,<font color=\"cornflowerblue\">120</font>), <font color=\"lightgreen\">'...'</font>) query<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">WHERE</font> <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$type</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))<br /><font color=\"darkorange\">ORDER BY</font> event_time <font color=\"darkorange\">DESC</font><br /><font color=\"darkorange\">LIMIT</font> <font color=\"cornflowerblue\">1000</font>",
-              "intervalFactor": 1,
-              "query": "SELECT\n    event_time,\n    hostName() host,\n    user,\n    query_duration_ms duration,\n    memory_usage memory,\n    if(exception!='', 'fail', 'success') result,\n    concat(substring(query,1,120), '...') query\nFROM $table\nWHERE $timeFilter\n    AND type in ($type)\n    and initial_user in ($user)\n    and('$query_type' = 'all' OR (positionCaseInsensitive(query,  '$query_type') = 1))\nORDER BY event_time DESC\nLIMIT 1000",
-              "rawQuery": "SELECT     (intDiv(toUInt32(event_time), 10) * 10) * 1000 as t,     avg(query_duration_ms)  select_duration FROM cluster('all-sharded',system.query_log) WHERE     event_date >= toDate(1586232299) AND event_time >= toDateTime(1586232299)     AND type = 2     and positionCaseInsensitive(query,  'select') = 1     and initial_user in ('default') GROUP BY t ORDER BY t",
-              "refId": "A",
-              "resultFormat": "time_series",
-              "round": "0s",
-              "table": "cluster('all-sharded',system.query_log)",
-              "tableLoading": false
-            }
-          ],
-          "title": "Query log by type: $type; user: $user; query type: $query_type",
-          "transform": "timeseries_to_columns",
-          "type": "table"
-        }
-      ],
+      "panels": [],
       "repeat": null,
       "title": "Query log table",
       "type": "row"
+    },
+    {
+      "columns": [],
+      "datasource": "$chi",
+      "fontSize": "100%",
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "id": 21,
+      "links": [],
+      "options": {},
+      "pageSize": null,
+      "scroll": true,
+      "showHeader": true,
+      "sort": {
+        "col": 2,
+        "desc": true
+      },
+      "styles": [
+        {
+          "alias": "Time",
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "pattern": "Time",
+          "type": "date"
+        },
+        {
+          "alias": "",
+          "colorMode": null,
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": null,
+          "pattern": "duration",
+          "thresholds": [],
+          "type": "number",
+          "unit": "ms"
+        },
+        {
+          "alias": "",
+          "colorMode": null,
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "dateFormat": "YYYY-MM-DD HH:mm:ss",
+          "decimals": 2,
+          "pattern": "memory",
+          "thresholds": [],
+          "type": "number",
+          "unit": "bytes"
+        },
+        {
+          "alias": "",
+          "colorMode": null,
+          "colors": [
+            "rgba(245, 54, 54, 0.9)",
+            "rgba(237, 129, 40, 0.89)",
+            "rgba(50, 172, 45, 0.97)"
+          ],
+          "decimals": 2,
+          "pattern": "/.*/",
+          "thresholds": [],
+          "type": "number",
+          "unit": "short"
+        }
+      ],
+      "targets": [
+        {
+          "database": "",
+          "dateColDataType": "event_date",
+          "dateLoading": false,
+          "dateTimeColDataType": "event_time",
+          "dateTimeType": "DATETIME",
+          "datetimeLoading": false,
+          "format": "time_series",
+          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    event_time,<br />    user,<br />    query_duration_ms duration,<br />    memory_usage memory,<br />    if(exception<font color=\"yellow\">!=</font><font color=\"lightgreen\">''</font>, <font color=\"lightgreen\">'fail'</font>, <font color=\"lightgreen\">'success'</font>) result,<br />    <font color=\"navajowhite\">concat</font>(<font color=\"navajowhite\">substring</font>(query,<font color=\"cornflowerblue\">1</font>,<font color=\"cornflowerblue\">120</font>), <font color=\"lightgreen\">'...'</font>) query<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">WHERE</font> <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$type</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))<br /><font color=\"darkorange\">ORDER BY</font> event_time <font color=\"darkorange\">DESC</font><br /><font color=\"darkorange\">LIMIT</font> <font color=\"cornflowerblue\">1000</font>",
+          "intervalFactor": 1,
+          "query": "SELECT\n    event_time,\n    hostName() host,\n    user,\n    query_duration_ms duration,\n    memory_usage memory,\n    if(exception!='', 'fail', 'success') result,\n    concat(substring(query,1,120), '...') query\nFROM $table\nWHERE $timeFilter\n    AND type in ($type)\n    and initial_user in ($user)\n    and('$query_type' = 'all' OR (positionCaseInsensitive(query,  '$query_type') = 1))\nORDER BY event_time DESC\nLIMIT 1000",
+          "rawQuery": "SELECT     (intDiv(toUInt32(event_time), 10) * 10) * 1000 as t,     avg(query_duration_ms)  select_duration FROM cluster('all-sharded',system.query_log) WHERE     event_date >= toDate(1586232299) AND event_time >= toDateTime(1586232299)     AND type = 2     and positionCaseInsensitive(query,  'select') = 1     and initial_user in ('default') GROUP BY t ORDER BY t",
+          "refId": "A",
+          "resultFormat": "time_series",
+          "round": "0s",
+          "table": "cluster('all-sharded',system.query_log)",
+          "tableLoading": false
+        }
+      ],
+      "title": "Query log by type: $type; user: $user; query type: $query_type",
+      "transform": "timeseries_to_columns",
+      "type": "table"
     }
   ],
   "refresh": "5s",
@@ -855,9 +870,8 @@
     "list": [
       {
         "current": {
-          "tags": [],
-          "text": "k8s-clickhouse-repl-05",
-          "value": "k8s-clickhouse-repl-05"
+          "text": "k8s-test-test-001",
+          "value": "k8s-test-test-001"
         },
         "hide": 0,
         "includeAll": false,
@@ -1084,5 +1098,5 @@
   "timezone": "browser",
   "title": "ClickHouse in Kubernetes Queries",
   "uid": "_Z--MKCZz",
-  "version": 6
+  "version": 7
 }
