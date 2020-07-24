@@ -192,61 +192,6 @@ func (c *Controller) deletePVC(host *chop.ChiHost) error {
 	return nil
 }
 
-func (c *Controller) walkPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolumeClaim)) {
-	namespace := host.Address.Namespace
-	name := chopmodel.CreatePodName(host)
-	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(name, newGetOptions())
-	if err != nil {
-		log.Errorf("FAIL get pod for host %s/%s err:%v", namespace, host.Name, err)
-		return
-	}
-
-	for i := range pod.Spec.Volumes {
-		volume := &pod.Spec.Volumes[i]
-		if volume.PersistentVolumeClaim == nil {
-			continue
-		}
-
-		pvcName := volume.PersistentVolumeClaim.ClaimName
-		pvc, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(pvcName, newGetOptions())
-		if err != nil {
-			log.Errorf("FAIL get PVC %s/%s err:%v", namespace, pvcName, err)
-			continue
-		}
-
-		f(pvc)
-	}
-}
-
-func (c *Controller) walkActualPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolumeClaim)) {
-	namespace := host.Address.Namespace
-	labeler := chopmodel.NewLabeler(c.chop, host.CHI)
-
-	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newListOptions(labeler.GetSelectorHostScope(host)))
-	if err != nil {
-		log.Errorf("FAIL get list of PVC for host %s/%s err:%v", namespace, host.Name, err)
-		return
-	}
-
-	for i := range pvcList.Items {
-		// Convenience wrapper
-		pvc := &pvcList.Items[i]
-
-		f(pvc)
-	}
-}
-
-func (c *Controller) walkPVs(host *chop.ChiHost, f func(pv *v1.PersistentVolume)) {
-	c.walkPVCs(host, func(pvc *v1.PersistentVolumeClaim) {
-		pv, err := c.kubeClient.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, newGetOptions())
-		if err != nil {
-			log.Errorf("FAIL get PV %s err:%v", pvc.Spec.VolumeName, err)
-			return
-		}
-		f(pv)
-	})
-}
-
 // deleteConfigMap deletes ConfigMap
 func (c *Controller) deleteConfigMap(host *chop.ChiHost) error {
 	name := chopmodel.CreateConfigMapPodName(host)
