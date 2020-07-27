@@ -13,4 +13,5 @@ spec:
   # TODO remove this plugin definition after resolve https://github.com/integr8ly/grafana-operator/issues/155
   plugins:
     - name: "vertamedia-clickhouse-datasource"
+      # update to 2.0.4 when resolve https://github.com/grafana/grafana-plugin-repository/pull/690
       version: "1.9.5"

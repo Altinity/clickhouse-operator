@@ -31,8 +31,9 @@ def kubectl(command, ok_to_fail=False, ns = namespace, timeout=60):
     return cmd.output
 
 def kube_delete_chi(chi, ns = namespace):
-    shell(f"{kubectlcmd} delete chi {chi} -n {ns}")
-    kube_wait_objects(chi, [0,0,0], ns)
+    with When(f"Delete chi {chi}"):
+        shell(f"{kubectlcmd} delete chi {chi} -n {ns}", timeout=120)
+        kube_wait_objects(chi, [0,0,0], ns)
 
 def create_and_check(test_file, checks, ns = namespace):
     config=get_full_path(test_file)

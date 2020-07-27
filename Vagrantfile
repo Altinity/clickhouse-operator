@@ -12,7 +12,6 @@ Vagrant.configure(2) do |config|
   config.vm.box_check_update = false
   config.vm.synced_folder ".", "/vagrant", type: "nfs"
 
-
   if Vagrant.has_plugin?("vagrant-vbguest")
     config.vbguest.auto_update = false
   end
@@ -95,12 +94,14 @@ Vagrant.configure(2) do |config|
     # required for k8s 1.18+
     apt-get install -y conntrack
 
-    K8S_VERSION=${K8S_VERSION:-1.14.10}
-    export VALIDATE_YAML=false # only for 1.14
+#    K8S_VERSION=${K8S_VERSION:-1.14.10}
+#    export VALIDATE_YAML=false # only for 1.14
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
-#    K8S_VERSION=${K8S_VERSION:-1.16.9}
-#    K8S_VERSION=${K8S_VERSION:-1.17.5}
-#    K8S_VERSION=${K8S_VERSION:-1.18.2}
+#    K8S_VERSION=${K8S_VERSION:-1.16.13}
+#    K8S_VERSION=${K8S_VERSION:-1.17.9}
+    K8S_VERSION=${K8S_VERSION:-1.18.6}
+    export VALIDATE_YAML=true
+
     minikube config set vm-driver none
     minikube config set kubernetes-version ${K8S_VERSION}
     minikube start
@@ -145,18 +146,16 @@ Vagrant.configure(2) do |config|
     echo "...DONE"
 
     # open http://localhost:9090/targets and check clickhouse-monitor is exists
-    kubectl --namespace="${PROMETHEUS_NAMESPACE}" port-forward service/prometheus 9090 </dev/null &>/dev/null &
+    kubectl --namespace="${PROMETHEUS_NAMESPACE}" port-forward --address 0.0.0.0 service/prometheus 9090 </dev/null &>/dev/null &
 
     # open http://localhost:9093/alerts and check which alerts is exists
-    kubectl --namespace="${PROMETHEUS_NAMESPACE}" port-forward service/alertmanager 9093 </dev/null &>/dev/null &
+    kubectl --namespace="${PROMETHEUS_NAMESPACE}" port-forward --address 0.0.0.0 service/alertmanager 9093 </dev/null &>/dev/null &
 
     # open http://localhost:3000/ and check prometheus datasource exists and grafana dashboard exists
-    kubectl --namespace="${GRAFANA_NAMESPACE}" port-forward service/grafana-service 3000 </dev/null &>/dev/null &
+    kubectl --namespace="${GRAFANA_NAMESPACE}" port-forward --address 0.0.0.0 service/grafana-service 3000 </dev/null &>/dev/null &
 
     # open http://localhost:8888/chi and check exists clickhouse installations
-    kubectl --namespace="${OPERATOR_NAMESPACE}" port-forward service/clickhouse-operator-metrics 8888 </dev/null &>/dev/null &
-
-
+    kubectl --namespace="${OPERATOR_NAMESPACE}" port-forward --address 0.0.0.0 service/clickhouse-operator-metrics 8888 </dev/null &>/dev/null &
 
     for image in $(cat ./tests/configs/test-017-multi-version.yaml | yq r - "spec.templates.podTemplates[*].spec.containers[*].image"); do
         docker pull ${image}

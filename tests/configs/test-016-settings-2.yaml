@@ -33,6 +33,11 @@ spec:
                <profile>default</profile>
                <quota>default</quota>
              </test_usersd>
+             <test_norestart>
+               <password></password>
+               <profile>default</profile>
+               <quota>default</quota>
+             </test_norestart>
           </users>
         </yandex> 
       dict_one.dict: |

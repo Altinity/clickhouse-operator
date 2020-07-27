@@ -4,6 +4,7 @@ import settings
 
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
 from testflows.asserts import error
+from ssl import cert_time_to_seconds
 
 
 @TestScenario
@@ -397,34 +398,47 @@ def test_015():
 @TestScenario
 @Name("test_016. Test advanced settings options")
 def test_016():
+    chi = "test-016-settings"
     create_and_check("configs/test-016-settings.yaml",
                      {"apply_templates": {settings.clickhouse_template},
                       "pod_count": 1,
                       "do_not_delete": 1})
 
     with Then("Custom macro 'layer' should be available"):
-        out = clickhouse_query("test-016-settings", query = "select substitution from system.macros where macro='layer'")
+        out = clickhouse_query(chi, query = "select substitution from system.macros where macro='layer'")
         assert out == "01"
         
     with And("Custom macro 'test' should be available"):
-        out = clickhouse_query("test-016-settings", query = "select substitution from system.macros where macro='test'")
+        out = clickhouse_query(chi, query = "select substitution from system.macros where macro='test'")
         assert out == "test"
         
     with And("dictGet() should work"):
-        out = clickhouse_query("test-016-settings", query = "select dictGet('one', 'one', toUInt64(0))")
+        out = clickhouse_query(chi, query = "select dictGet('one', 'one', toUInt64(0))")
         assert out == "0"
     
     with And("query_log should be disabled"):
-        clickhouse_query("test-016-settings", query = "system flush logs")
-        out = clickhouse_query_with_error("test-016-settings", query = "select count() from system.query_log")
+        clickhouse_query(chi, query = "system flush logs")
+        out = clickhouse_query_with_error(chi, query = "select count() from system.query_log")
         assert "doesn't exist" in out
 
     with And("max_memory_usage should be 7000000000"):
-        out = clickhouse_query("test-016-settings", query = "select value from system.settings where name='max_memory_usage'")
+        out = clickhouse_query(chi, query = "select value from system.settings where name='max_memory_usage'")
         assert out == "7000000000"
         
     with And("test_usersd user should be available"):
-        clickhouse_query("test-016-settings", query = "select version()", user = "test_usersd")
+        clickhouse_query(chi, query = "select version()", user = "test_usersd")
+        
+    with When("Update usersd settings"):
+        start_time = kube_get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        create_and_check("configs/test-016-settings-2.yaml", {"do_not_delete": 1})
+        with Then("Wait 60 seconds for configmap changes to apply"):
+            time.sleep(60)
+        with Then("test_norestart user should be available"):
+            clickhouse_query(chi, query = "select version()", user = "test_norestart")
+        with And("ClickHouse should not be restarted"):
+            new_start_time = kube_get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            assert start_time == new_start_time
+        
 
     kube_delete_chi("test-016-settings")
 
@@ -433,19 +447,26 @@ def test_016():
 def test_017():
     create_and_check("configs/test-017-multi-version.yaml", {"pod_count": 4, "do_not_delete": 1})
     chi = "test-017-multi-version"
-
-    test_query = "select 1 /* comment */ settings log_queries=1"
+    queries = [
+        "CREATE TABLE test_max (epoch Int32, offset SimpleAggregateFunction(max, Int64)) ENGINE = AggregatingMergeTree() ORDER BY epoch",
+        "insert into test_max select 0, 3650487030+number from numbers(5) settings max_block_size=1",
+        "insert into test_max select 0, 5898217176+number from numbers(5)",
+        "insert into test_max select 0, 5898217176+number from numbers(10) settings max_block_size=1",
+        "OPTIMIZE TABLE test_max FINAL"]
+    
+    for q in queries:
+        print(f"{q}")
+    test_query = "select min(offset), max(offset) from test_max"
+    print(f"{test_query}")
+    
     for shard in range(4):
         host = f"chi-{chi}-default-{shard}-0"
-        clickhouse_query(chi, host=host, query=test_query)
-        clickhouse_query(chi, host=host, query="SYSTEM FLUSH LOGS")
-        out = clickhouse_query(chi, host=host,
-                               query="select query from system.query_log order by event_time desc limit 1")
+        for q in queries:
+            clickhouse_query(chi, host=host, query=q)
+        out = clickhouse_query(chi, host=host, query=test_query)
         ver = clickhouse_query(chi, host=host, query="select version()")
 
-        print(f"version: {ver}")
-        print(f"queried: {test_query}")
-        print(f"logged: {out}")
+        print(f"version: {ver}, result: {out}")
 
     kube_delete_chi(chi)
     
