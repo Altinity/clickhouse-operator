@@ -149,6 +149,7 @@ sleep 10
 
 kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <(
     cat ${CUR_DIR}/grafana-dashboard-queries-cr-template.yaml | \
-    GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME" \
+    GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME"
+    GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME"\
     envsubst \
 )
