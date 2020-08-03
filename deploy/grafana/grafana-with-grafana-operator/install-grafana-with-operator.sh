@@ -129,7 +129,7 @@ wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 OPERATOR_CH_USER=$(grep chUsername ${CUR_DIR}/../../../config/config.yaml | cut -d " " -f 2-)
 OPERATOR_CH_PASS=$(grep chPassword ${CUR_DIR}/../../../config/config.yaml | cut -d " " -f 2-)
 
-# Install ClickHouse DataSource for each CHI
+echo "Create ClickHouse DataSource for each ClickHouseInstallation"
 IFS=$'\n'
 for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,ENDPOINT:.status.endpoint | tail -n +2); do
     ITEMS=( $(grep -Eo '([^[:space:]]+)' <<<"$LINE") )
@@ -138,14 +138,18 @@ for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.meta
     ENDPOINT=${ITEMS[2]}
     PORT=$(kubectl --namespace="${NAMESPACE}" get service -l "clickhouse.altinity.com/app=chop,clickhouse.altinity.com/Service=chi,clickhouse.altinity.com/chi=${CHI}" -o='custom-columns=PORT:.spec.ports[?(@.name=="http")].port' | tail -n 1)
 
+    echo "Create ClickHouse DataSource for ClickHouseInstallation ${CHI}"
+
     GRAFANA_CLICKHOUSE_DATASOURCE_NAME="k8s-${NAMESPACE}-${CHI}"
     CLICKHOUSE_URL="http://${ENDPOINT}:${PORT}"
 
-    # Create system.query_log in each pod on CHI
-    for POD in $(kubectl get --namespace="${NAMESPACE}" pods -l "clickhouse.altinity.com/app=chop,clickhouse.altinity.com/chi=${CHI}" -o='custom-columns=NAME:.metadata.name' | tail -n +2); do
-        kubectl exec --namespace="${NAMESPACE}" ${POD} -- clickhouse-client --echo -mn -q 'SELECT hostName(), dummy FROM system.one SETTINGS log_queries=1; SYSTEM FLUSH LOGS'
+    echo "Create system.query_log on each pod on ClickHouseInstallation ${CHI}"
+    for POD in $(kubectl --namespace="${NAMESPACE}" get pods -l "clickhouse.altinity.com/app=chop,clickhouse.altinity.com/chi=${CHI}" -o='custom-columns=NAME:.metadata.name' | tail -n +2); do
+        echo "Create system.query_log on ${POD}"
+        kubectl --namespace="${NAMESPACE}" exec ${POD} -- clickhouse-client --echo -mn -q 'SELECT hostName(), dummy FROM system.one SETTINGS log_queries=1; SYSTEM FLUSH LOGS'
     done
 
+    echo "Create ClickHouse DataSource for ClickHouseInstallation ${CHI}"
     kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <(
         cat ${CUR_DIR}/grafana-data-source-clickhouse-cr-template.yaml | \
         GRAFANA_CLICKHOUSE_DATASOURCE_NAME="$GRAFANA_CLICKHOUSE_DATASOURCE_NAME" \
