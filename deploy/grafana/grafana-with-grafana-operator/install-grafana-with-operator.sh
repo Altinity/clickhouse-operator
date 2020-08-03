@@ -163,7 +163,8 @@ sleep 10
 # Install Queries dashboard
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <(
     cat ${CUR_DIR}/grafana-dashboard-queries-cr-template.yaml | \
-    GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME" \
+    GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME"
+    GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME"\
     envsubst \
 )
 wait_ch_datasource_plugin_to_start "${GRAFANA_NAMESPACE}"
