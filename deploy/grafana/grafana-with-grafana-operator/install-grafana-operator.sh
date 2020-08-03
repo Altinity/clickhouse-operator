@@ -31,23 +31,28 @@ function clean_dir() {
 ##                          ##
 ##############################
 
+# Download grafana-operator sources into temp dir and run all installation scripts from there
+
+# Ensure temp dir in place
 TMP_DIR=$(mktemp -d)
 trap "clean_dir ${TMP_DIR}" SIGHUP SIGINT SIGQUIT SIGFPE SIGKILL SIGALRM SIGTERM
 
 GRAFANA_OPERATOR_DIR="${TMP_DIR}/grafana-operator"
 mkdir -p "${GRAFANA_OPERATOR_DIR}"
 
+# Temp dir must not contain any data
 if [[ ! -z "$(ls -A "${GRAFANA_OPERATOR_DIR}")" ]]; then
      echo "${GRAFANA_OPERATOR_DIR} is not empty. Abort"
      exit 1
 fi
 
-
+# Download sources
 git clone "https://github.com/integr8ly/grafana-operator" "${GRAFANA_OPERATOR_DIR}"
 
 echo "Setup Grafana operator into ${GRAFANA_NAMESPACE} namespace"
 
-# Let's setup all grafana-related stuff into dedicated namespace called "grafana"
+# Let's setup all grafana-related stuff into dedicated namespace
+
 kubectl create namespace "${GRAFANA_NAMESPACE}"
 
 # Setup grafana-operator into dedicated namespace
@@ -58,8 +63,10 @@ kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f "${GRAFANA_OPERATOR_DIR}/dep
 kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f "${GRAFANA_OPERATOR_DIR}/deploy/roles"
 # 3. If you want to scan for dashboards in other namespaces you also need the cluster roles:
 kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f "${GRAFANA_OPERATOR_DIR}/deploy/cluster_roles"
-# 4. Deploy operator itself
+# 4. Deploy the operator of explicitly specified version
 kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <(\
     cat "${GRAFANA_OPERATOR_DIR}/deploy/operator.yaml" | sed -e "s/:latest/:${GRAFANA_OPERATOR_VERSION}/g"
 )
+
+# Remove downloaded sources
 clean_dir "${TMP_DIR}"

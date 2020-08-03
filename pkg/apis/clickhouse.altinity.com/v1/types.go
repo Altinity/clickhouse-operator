@@ -238,7 +238,7 @@ type ChiPodTemplate struct {
 }
 
 type ChiPodTemplateZone struct {
-	Key    string   `json:"key" yaml:"key"`
+	Key    string   `json:"key"    yaml:"key"`
 	Values []string `json:"values" yaml:"values"`
 }
 
