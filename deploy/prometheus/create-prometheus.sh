@@ -25,42 +25,46 @@ echo "Apply options now..."
 # Let's setup all prometheus-related stuff into dedicated namespace called "prometheus"
 kubectl create namespace "${PROMETHEUS_NAMESPACE}" || true
 
-# Create prometheus-operator's CRDs
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/prometheus-operator-crd/monitoring.coreos.com_alertmanagers.yaml
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/prometheus-operator-crd/monitoring.coreos.com_prometheuses.yaml
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/prometheus-operator-crd/monitoring.coreos.com_thanosrulers.yaml
+BASE_PATH="https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}"
 
-# Setup prometheus-operator into specified namespace. Would manage prometheus instances
+echo "Create prometheus-operator's CRDs"
+CRD_PATH="${BASE_PATH}/example/prometheus-operator-crd"
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    "${CRD_PATH}"/monitoring.coreos.com_alertmanagers.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    "${CRD_PATH}"/monitoring.coreos.com_podmonitors.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    "${CRD_PATH}"/monitoring.coreos.com_prometheuses.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    "${CRD_PATH}"/monitoring.coreos.com_prometheusrules.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    "${CRD_PATH}"/monitoring.coreos.com_servicemonitors.yaml
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+    "${CRD_PATH}"/monitoring.coreos.com_thanosrulers.yaml
+
+echo "Setup prometheus-operator into '${PROMETHEUS_NAMESPACE}' namespace."
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f  <( \
-    wget -qO- https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/bundle.yaml | \
+    wget -qO- "${BASE_PATH}"/bundle.yaml | \
     PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
 )
 
-# Setup RBAC
+echo "Setup RBAC"
+RBAC_PATH="${BASE_PATH}/example/rbac/prometheus"
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
-    wget -qO- https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/rbac/prometheus/prometheus-cluster-role-binding.yaml | \
+    wget -qO- "${RBAC_PATH}"/prometheus-cluster-role-binding.yaml | \
     PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
 )
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/rbac/prometheus/prometheus-cluster-role.yaml
+    "${RBAC_PATH}"/prometheus-cluster-role.yaml
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}/example/rbac/prometheus/prometheus-service-account.yaml
+    "${RBAC_PATH}"/prometheus-service-account.yaml
 
-# Setup Prometheus instance via prometheus-operator into dedicated namespace
+echo "Setup Prometheus instance via prometheus-operator into '${PROMETHEUS_NAMESPACE}' namespace"
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
     cat prometheus-template.yaml | PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} envsubst \
 )
 
-# Setup "Prometheus <-> clickhouse-operator" integration.
+echo "Setup Prometheus <-> clickhouse-operator integration."
 # Specify endpoint, where Prometheus can gather data from clickhouse-operator
 # IMPORTANT: clickhouse-operator should be installed and running prior to this step,
 # otherwise Prometheus would not be able to setup integration with clickhouse-operator
@@ -81,17 +85,23 @@ else
     exit 1
 fi
 
-# Setup "Prometheus -> alertmanager -> Slack" integration
+echo "Setup Prometheus -> AlertManager -> Slack integration"
 if [[ ! -f ./prometheus-sensitive-data.sh ]]; then
-    echo "Please copy ./prometheus-sensitive-data.example.sh to ./prometheus-sensitive-data.sh"
-    echo "and edit this follow with Slack documentation https://api.slack.com/incoming-webhooks"
-    exit 1
+    echo "!!! IMPORTANT !!!"
+    echo "There is no ./prometheus-sensitive-data.sh file found "
+    echo "This means that there will be no Prometheus -> AlertManager -> Slack integration"
+    echo "If you do not agree with specified options and would like to have this integration, press ctrl-c now and"
+    echo "please copy ./prometheus-sensitive-data.example.sh to ./prometheus-sensitive-data.sh"
+    echo "and edit it according to Slack documentation https://api.slack.com/incoming-webhooks"
+    sleep 10
+    echo "Skip Prometheus -> alertmanager -> Slack integration"
+else
+    source ./prometheus-sensitive-data.sh
+    kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
+        cat ./prometheus-alertmanager-template.yaml | \
+        envsubst \
+    )
+
+    kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f ./prometheus-alert-rules.yaml
 fi
-
-source ./prometheus-sensitive-data.sh
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
-    cat ./prometheus-alertmanager-template.yaml | \
-    envsubst \
-)
-
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f ./prometheus-alert-rules.yaml
+echo "Add is done"
