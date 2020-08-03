@@ -53,7 +53,7 @@ function wait_grafana_to_start() {
     local namespace=$1
     local name=$2
 
-    echo "Waiting Grafana $namespace/$name to start"
+    echo -n "Waiting Grafana $namespace/$name to start"
     # Check grafana deployment have all pods ready
     while [[ $(kubectl --namespace="${namespace}" get deployments | grep "${name}-deployment" | grep "1/1" | wc -l) == "0" ]]; do
         printf "."
@@ -69,7 +69,7 @@ function wait_ch_datasource_plugin_to_start() {
     # Fetch namespace from params
     local namespace=$1
 
-    echo "Waiting vertamedia-clickhouse-datasource plugin to start in $namespace"
+    echo -n "Waiting vertamedia-clickhouse-datasource plugin to start in $namespace"
     while [[ $(kubectl --namespace="${namespace}" get deployments -o='custom-columns=PLUGINS:.spec.template.spec.initContainers[*].env[?(@.name=="GRAFANA_PLUGINS")].value' | grep "vertamedia" | wc -l) == "0" ]]; do
         printf "."
         sleep 1
@@ -103,7 +103,7 @@ kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
     PROMETHEUS_URL="$PROMETHEUS_URL" \
     envsubst \
 )
-echo "Waiting to apply Grafana Datasource custom resource $GRAFANA_PROMETHEUS_DATASOURCE_NAME"
+echo -n "Waiting for Grafana DataSource custom resource $GRAFANA_PROMETHEUS_DATASOURCE_NAME"
 while [[ "0" = $(kubectl --namespace="${GRAFANA_NAMESPACE}" get grafanadatasources "${GRAFANA_PROMETHEUS_DATASOURCE_NAME}" -o'=custom-columns=NAME:.metadata.name,STATUS:.status.message' | grep -i "success" | wc -l) ]]; do
     printf "."
     sleep 1
