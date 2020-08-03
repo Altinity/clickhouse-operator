@@ -172,7 +172,7 @@ for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.meta
     echo "Create ClickHouse DataSource for ClickHouseInstallation ${CHI}"
     GRAFANA_CLICKHOUSE_DATASOURCE_NAME="k8s-${NAMESPACE}-${CHI}"
     CLICKHOUSE_URL="http://${ENDPOINT}:${PORT}"
-    kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <(
+    kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
         cat ${CUR_DIR}/grafana-data-source-clickhouse-cr-template.yaml | \
         GRAFANA_CLICKHOUSE_DATASOURCE_NAME="$GRAFANA_CLICKHOUSE_DATASOURCE_NAME" \
         CLICKHOUSE_URL="$CLICKHOUSE_URL" \

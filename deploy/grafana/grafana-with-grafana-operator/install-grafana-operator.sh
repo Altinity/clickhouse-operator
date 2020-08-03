@@ -59,7 +59,7 @@ echo "Setup Grafana operator into ${GRAFANA_NAMESPACE} namespace"
 
 # Let's setup all grafana-related stuff into dedicated namespace
 
-kubectl create namespace "${GRAFANA_NAMESPACE}"
+kubectl create namespace "${GRAFANA_NAMESPACE}" || true
 
 # Setup grafana-operator into dedicated namespace
 
