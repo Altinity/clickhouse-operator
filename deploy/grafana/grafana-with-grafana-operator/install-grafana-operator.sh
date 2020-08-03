@@ -70,8 +70,8 @@ kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/dep
 # 3. If you want to scan for dashboards in other namespaces you also need the cluster roles:
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/deploy/cluster_roles"
 # 4. Deploy the operator of explicitly specified version
-kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <(\
-    cat "${GRAFANA_OPERATOR_DIR}/deploy/operator.yaml" | sed -e "s/:latest/:${GRAFANA_OPERATOR_VERSION}/g"
+kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
+    cat "${GRAFANA_OPERATOR_DIR}/deploy/operator.yaml" | sed -e "s/:latest/:${GRAFANA_OPERATOR_VERSION}/g" \
 )
 
 # Remove downloaded sources

@@ -186,11 +186,11 @@ done
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 
 echo "Install Queries dashboard"
-kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <(
-    cat ${CUR_DIR}/grafana-dashboard-queries-cr-template.yaml |
-    GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME"
-    GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME"
-    envsubst
+kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
+    cat ${CUR_DIR}/grafana-dashboard-queries-cr-template.yaml | \
+    GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME" \
+    GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
+    envsubst \
 )
 wait_grafana_plugin_ch_datasource_to_start "${GRAFANA_NAMESPACE}"
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
