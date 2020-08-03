@@ -45,6 +45,12 @@ echo "If you do not agree with specified options, press ctrl-c now"
 sleep 10
 echo "Apply options now..."
 
+###########################
+##                       ##
+##   Functions Section   ##
+##                       ##
+###########################
+
 ##
 ##
 ##
@@ -53,7 +59,7 @@ function wait_grafana_to_start() {
     local namespace=$1
     local name=$2
 
-    echo -n "Waiting Grafana $namespace/$name to start"
+    echo -n "Waiting Grafana '${namespace}/${name}' to start"
     # Check grafana deployment have all pods ready
     while [[ $(kubectl --namespace="${namespace}" get deployments | grep "${name}-deployment" | grep "1/1" | wc -l) == "0" ]]; do
         printf "."
@@ -65,11 +71,11 @@ function wait_grafana_to_start() {
 ##
 ##
 ##
-function wait_ch_datasource_plugin_to_start() {
+function wait_grafana_plugin_ch_datasource_to_start() {
     # Fetch namespace from params
     local namespace=$1
 
-    echo -n "Waiting vertamedia-clickhouse-datasource plugin to start in $namespace"
+    echo -n "Waiting vertamedia-clickhouse-datasource plugin to start in '${namespace}' namespace"
     while [[ $(kubectl --namespace="${namespace}" get deployments -o='custom-columns=PLUGINS:.spec.template.spec.initContainers[*].env[?(@.name=="GRAFANA_PLUGINS")].value' | grep "vertamedia" | wc -l) == "0" ]]; do
         printf "."
         sleep 1
@@ -77,10 +83,30 @@ function wait_ch_datasource_plugin_to_start() {
     echo "...DONE"
 }
 
-########################################
-## Install Grafana as Custom Resource ##
-########################################
+##
+##
+##
+function wait_grafana_datasource_to_start() {
+    # Fetch namespace from params
+    local namespace=$1
+    # Fetch datasource name from params
+    local datasource=$2
 
+    echo -n "Waiting for Grafana DataSource custom resource '${namespace}/${datasource}'"
+    while [[ $(kubectl --namespace="${namespace}" get grafanadatasources "${datasource}" -o'=custom-columns=NAME:.metadata.name,STATUS:.status.message' | grep -i "success" | wc -l) == "0" ]]; do
+        printf "."
+        sleep 1
+    done
+    echo "...DONE"
+}
+
+###########################
+##                       ##
+##      Main Section     ##
+##                       ##
+###########################
+
+echo "Install Grafana as Custom Resource"
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
     cat ${CUR_DIR}/grafana-cr-template.yaml | \
     GRAFANA_NAME="$GRAFANA_NAME" \
@@ -92,34 +118,31 @@ kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
 )
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 
-#########################
-## Install DataSources ##
-#########################
+#
+# Install DataSources and Dashboards
+#
 
-# Install Prometheus DataSource
+echo "Install Prometheus DataSource"
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
     cat ${CUR_DIR}/grafana-data-source-prometheus-cr-template.yaml | \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
     PROMETHEUS_URL="$PROMETHEUS_URL" \
     envsubst \
 )
-echo -n "Waiting for Grafana DataSource custom resource $GRAFANA_PROMETHEUS_DATASOURCE_NAME"
-while [[ "0" = $(kubectl --namespace="${GRAFANA_NAMESPACE}" get grafanadatasources "${GRAFANA_PROMETHEUS_DATASOURCE_NAME}" -o'=custom-columns=NAME:.metadata.name,STATUS:.status.message' | grep -i "success" | wc -l) ]]; do
-    printf "."
-    sleep 1
-done
-echo "...DONE"
+wait_grafana_datasource_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_PROMETHEUS_DATASOURCE_NAME}"
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 
-# Install Operator dashboard
+echo "Install Operator dashboard"
 kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-operator-cr-template.yaml | \
     GRAFANA_DASHBOARD_NAME="$GRAFANA_OPERATOR_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
     envsubst \
 )
-wait_ch_datasource_plugin_to_start "${GRAFANA_NAMESPACE}"
+wait_grafana_plugin_ch_datasource_to_start "${GRAFANA_NAMESPACE}"
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
+
+# Install CLickHouse DataSource(s)
 
 # TODO get clickhouse password from Vault-k8s secrets ?
 # more precise but required yq
@@ -140,9 +163,6 @@ for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.meta
 
     echo "Create ClickHouse DataSource for ClickHouseInstallation ${CHI}"
 
-    GRAFANA_CLICKHOUSE_DATASOURCE_NAME="k8s-${NAMESPACE}-${CHI}"
-    CLICKHOUSE_URL="http://${ENDPOINT}:${PORT}"
-
     echo "Create system.query_log on each pod on ClickHouseInstallation ${CHI}"
     for POD in $(kubectl --namespace="${NAMESPACE}" get pods -l "clickhouse.altinity.com/app=chop,clickhouse.altinity.com/chi=${CHI}" -o='custom-columns=NAME:.metadata.name' | tail -n +2); do
         echo "Create system.query_log on ${POD}"
@@ -150,6 +170,8 @@ for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.meta
     done
 
     echo "Create ClickHouse DataSource for ClickHouseInstallation ${CHI}"
+    GRAFANA_CLICKHOUSE_DATASOURCE_NAME="k8s-${NAMESPACE}-${CHI}"
+    CLICKHOUSE_URL="http://${ENDPOINT}:${PORT}"
     kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <(
         cat ${CUR_DIR}/grafana-data-source-clickhouse-cr-template.yaml | \
         GRAFANA_CLICKHOUSE_DATASOURCE_NAME="$GRAFANA_CLICKHOUSE_DATASOURCE_NAME" \
@@ -159,17 +181,18 @@ for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.meta
         OPERATOR_CH_PASS="$OPERATOR_CH_PASS" \
         envsubst \
     )
+    wait_grafana_datasource_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_CLICKHOUSE_DATASOURCE_NAME}"
 done
-
-echo "Waiting to apply all grafana clickhouse datasources"
-sleep 10
-
-# Install Queries dashboard
-kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <(
-    cat ${CUR_DIR}/grafana-dashboard-queries-cr-template.yaml | \
-    GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME"
-    GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME"\
-    envsubst \
-)
-wait_ch_datasource_plugin_to_start "${GRAFANA_NAMESPACE}"
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
+
+echo "Install Queries dashboard"
+kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <(
+    cat ${CUR_DIR}/grafana-dashboard-queries-cr-template.yaml |
+    GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME"
+    GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME"
+    envsubst
+)
+wait_grafana_plugin_ch_datasource_to_start "${GRAFANA_NAMESPACE}"
+wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
+
+echo "All is done"
