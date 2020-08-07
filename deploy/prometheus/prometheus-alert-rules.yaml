@@ -304,3 +304,124 @@ spec:
               - https://github.com/Altinity/clickhouse-operator/blob/master/docs/storage.md
               - https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#table_engine-mergetree-multiple-volumes
               - https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#mergetree-table-ttl
+
+# not well tested alerts which can't be triggered on e2e tests
+        - alert: ReplicatedPartChecksFailed
+          expr: increase(chi_clickhouse_event_ReplicatedPartChecksFailed[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased ReplicatedPartCheckFailed"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` increase ReplicatedPartCheckFailed in `system.events` table.
+              Please check following things:
+              - logs on clickhouse-server pods `kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) cat /var/log/clickhouse-server/*.err.log | less`
+
+        - alert: ReplicatedPartFailedFetches
+          expr: increase(chi_clickhouse_event_ReplicatedPartFailedFetches[1m]) > 0 and increase(chi_clickhouse_event_ReplicatedPartFetches[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased ReplicatedPartFailedFetches"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` increase ReplicatedPartFailedFetches in `system.events` table.
+              It mean server was failed to download data part from replica of a ReplicatedMergeTree table.
+              Please check following things:
+              - logs on clickhouse-server pods `kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) cat /var/log/clickhouse-server/*.err.log | less`
+              - connections between clickhouse-server pod and his replicas (see remote_server section in /etc/clickhouse-server/)
+
+        - alert: ReplicatedDataLoss
+          expr: increase(chi_clickhouse_event_ReplicatedDataLoss[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased ReplicatedDataLoss"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` increase ReplicatedDataLoss in `system.events` table.
+              It mean data part that server wanted doesn't exist on any replica (even on replicas that are offline right now).
+              That data parts are definitely lost. This is normal due to asynchronous replication (if quorum inserts were not enabled),
+              when the replica on which the data part was written was failed and when it became online after fail
+              it doesn't contain that data part.
+
+              Please check following things:
+              - logs on clickhouse-server pods `kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) cat /var/log/clickhouse-server/*.err.log | less`
+
+        - alert: StorageBufferErrorOnFlush
+          expr: increase(chi_clickhouse_event_StorageBufferErrorOnFlush[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased StorageBufferErrorOnFlush"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` increase StorageBufferErrorOnFlush in `system.events` table.
+              It mean something went wrong when clickhouse-server try to flush memory buffers to disk.
+
+              Please check following things:
+              - logs on clickhouse-server pods `kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) cat /var/log/clickhouse-server/*.err.log | less`
+              - check disks free space and hardware failures
+
+        - alert: DataAfterMergeDiffersFromReplica
+          expr: increase(chi_clickhouse_event_DataAfterMergeDiffersFromReplica[1m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased DataAfterMergeDiffersFromReplica"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` increase DataAfterMergeDiffersFromReplica in `system.events` table.
+              It mean Data after merge is not byte-identical to data on another replicas.
+              There could be several reasons:
+              - Using newer version of compression library after server update.
+              - Using another compression method.
+              - Non-deterministic compression algorithm (highly unlikely).
+              - Non-deterministic merge algorithm due to logical error in code.
+              - Data corruption in memory due to bug in code.
+              - Data corruption in memory due to hardware issue.
+              - Manual modification of source data after server startup.
+              - Manual modification of checksums stored in ZooKeeper.
+              - Part format related settings like 'enable_mixed_granularity_parts' are different on different replicas.
+
+              Server will download merged part from replica to force byte-identical result.
+
+        - alert: DistributedSyncInsertionTimeoutExceeded
+          expr: increase(chi_clickhouse_event_DistributedSyncInsertionTimeoutExceeded[1m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased DistributedSyncInsertionTimeoutExceeded"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` increase DistributedSyncInsertionTimeoutExceeded in `system.events` table.
+              It mean Synchronous distributed insert timeout exceeded.
+              Please check documentation https://clickhouse.tech/docs/en/operations/settings/settings/#insert_distributed_sync
+              And check connection between `{{ $labels.hostname }}` and all nodes in shards from remote_servers config section
+
+        - alert: FileDescriptorBufferReadOrWriteFailed
+          expr: increase(chi_clickhouse_event_ReadBufferFromFileDescriptorReadFailed[1m]) > 0 or increase(chi_clickhouse_event_WriteBufferFromFileDescriptorWriteFailed[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased ReadBufferFromFileDescriptorReadFailed or WriteBufferFromFileDescriptorWriteFailed"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` increase ReadBufferFromFileDescriptorReadFailed or ReadBufferFromFileDescriptorReadFailed in `system.events` table.
+              It mean the read (read/pread) or writes (write/pwrite) to a file descriptor. Does not include sockets.
+              System can't read or write to some files.
+              - logs on clickhouse-server pods `kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) cat /var/log/clickhouse-server/*.err.log | grep -E "Cannot write to file|Cannot read from file"`
+
+        - alert: SlowRead
+          expr: increase(chi_clickhouse_event_SlowRead[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased SlowRead"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` increase SlowRead in `system.events` table.
+              It mean reads from a files that were slow. This indicate system overload. Thresholds are controlled by `SELECT * FROM system.settings WHERE name LIKE 'read_backoff_%'`.
+              System will reduce the number of threads which used for processing queries.
+              Check you disks utilization and hardware failures.

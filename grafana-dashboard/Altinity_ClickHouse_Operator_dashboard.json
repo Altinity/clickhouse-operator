@@ -847,7 +847,7 @@
         {
           "expr": "rate(chi_clickhouse_event_SelectQuery{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
-          "legendFormat": "{{hostname}}",
+          "legendFormat": "select {{hostname}}",
           "refId": "B",
           "step": 10
         },
