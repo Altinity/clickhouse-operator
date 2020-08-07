@@ -9,7 +9,7 @@ spec:
       type: vertamedia-clickhouse-datasource
       access: proxy
       url: "${CLICKHOUSE_URL}"
-      basicAuth: true
+      basicAuth: false
       basicAuthUser: "${OPERATOR_CH_USER}"
       basicAuthPassword: "${OPERATOR_CH_PASS}"
       isDefault: false
