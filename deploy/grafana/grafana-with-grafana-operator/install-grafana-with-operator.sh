@@ -163,7 +163,8 @@ for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.meta
     echo "Ensure system.query_log is in place on each pod in ClickHouseInstallation ${NAMESPACE}/${CHI}"
     for POD in $(kubectl --namespace="${NAMESPACE}" get pods -l "clickhouse.altinity.com/app=chop,clickhouse.altinity.com/chi=${CHI}" -o='custom-columns=NAME:.metadata.name' | tail -n +2); do
         echo "Ensure system.query_log on pod ${NAMESPACE}/${POD}"
-        kubectl --namespace="${NAMESPACE}" exec ${POD} -- clickhouse-client --echo -mn -q 'SELECT hostName(), dummy FROM system.one SETTINGS log_queries=1; SYSTEM FLUSH LOGS'
+        kubectl --namespace="${NAMESPACE}" exec "${POD}" -- \
+            clickhouse-client --echo -mn -q 'SELECT hostName(), dummy FROM system.one SETTINGS log_queries=1; SYSTEM FLUSH LOGS'
     done
 
     GRAFANA_CLICKHOUSE_DATASOURCE_NAME="k8s-${NAMESPACE}-${CHI}"
