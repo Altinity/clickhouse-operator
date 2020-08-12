@@ -248,11 +248,20 @@ func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
 
 	names, createSQLs, _ := s.getCreateReplicaObjects(host)
 	log.V(1).Infof("Creating replica objects %v at %s", names, host.Address.HostName)
-	_ = s.hostApplySQLs(host, createSQLs, true)
+	err1 := s.hostApplySQLs(host, createSQLs, true)
 
 	names, createSQLs, _ = s.getCreateDistributedObjects(host)
 	log.V(1).Infof("Creating distributed objects %v at %s", names, host.Address.HostName)
-	return s.hostApplySQLs(host, createSQLs, true)
+	err2 := s.hostApplySQLs(host, createSQLs, true)
+
+	if err2 != nil {
+		return err2
+	}
+	if err1 != nil {
+		return err1
+	}
+
+	return nil
 }
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
