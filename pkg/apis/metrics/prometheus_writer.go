@@ -145,8 +145,6 @@ func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, de
 	select {
 	case out <- m:
 
-	default:
-		glog.Infof("Error sending metric to the channel %s", name)
 	}
 }
 
