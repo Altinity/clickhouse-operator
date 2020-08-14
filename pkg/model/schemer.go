@@ -62,7 +62,7 @@ func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]
 	var rows *sqlmodule.Rows = nil
 	var err error
 	for _, service := range services {
-		log.V(2).Infof("Trying %s", service)
+		log.V(1).Infof("Run query on: %s", service)
 		conn := s.getCHConnection(service)
 
 		rows, err = conn.Query(sql)
@@ -159,20 +159,26 @@ func (s *Schemer) getCreateDistributedObjects(host *chop.ChiHost) ([]string, []s
 	))
 
 
+	log.V(1).Infof("fetch dbs list")
 	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
 	log.V(1).Infof("dbs sql\n%v", sqlDBs)
+	log.V(1).Infof("names1:", sqlDBs)
 	for _, v := range names1 {
 		log.V(1).Infof("names1: %s", v)
 	}
+	log.V(1).Infof("sql1:", sqlDBs)
 	for _, v := range sqlStatements1 {
 		log.V(1).Infof("sql1: %s", v)
 	}
 
+	log.V(1).Infof("fetch table list")
 	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
 	log.V(1).Infof("tbl sql\n%v", sqlTables)
+	log.V(1).Infof("names2:", sqlDBs)
 	for _, v := range names2 {
 		log.V(1).Infof("names2: %s", v)
 	}
+	log.V(1).Infof("sql2:", sqlDBs)
 	for _, v := range sqlStatements2 {
 		log.V(1).Infof("sql2: %s", v)
 	}
