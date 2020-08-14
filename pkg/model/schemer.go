@@ -109,7 +109,7 @@ func (s *Schemer) getCreateDistributedObjects(host *chop.ChiHost) ([]string, []s
 	// remove new host from the list. See https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
 	hosts[hostIndex] = hosts[nHosts-1]
 	hosts = hosts[:nHosts-1]
-	log.V(1).Infof("Extracting distributed table definitions from %v", hosts)
+	log.V(1).Infof("Extracting distributed table definitions from hosts: %v", hosts)
 
 	cluster_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
 
@@ -157,6 +157,9 @@ func (s *Schemer) getCreateDistributedObjects(host *chop.ChiHost) ([]string, []s
 		"cluster('all-sharded', system.tables)",
 		cluster_tables,
 	))
+
+	log.V(1).Infof("dbs\n%v", sqlDBs)
+	log.V(1).Infof("tbl\n%v", sqlTables)
 
 	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
 	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
@@ -247,11 +250,13 @@ func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
 	log.V(1).Infof("Migrating schema objects to host %s", host.Address.HostName)
 
 	names, createSQLs, _ := s.getCreateReplicaObjects(host)
-	log.V(1).Infof("Creating replica objects %v at %s", names, host.Address.HostName)
+	log.V(1).Infof("Creating replica objects at %s: %v", host.Address.HostName, names)
+	log.V(1).Infof("\n%v", createSQLs)
 	err1 := s.hostApplySQLs(host, createSQLs, true)
 
 	names, createSQLs, _ = s.getCreateDistributedObjects(host)
-	log.V(1).Infof("Creating distributed objects %v at %s", names, host.Address.HostName)
+	log.V(1).Infof("Creating distributed objects at %s: %v", host.Address.HostName, names)
+	log.V(1).Infof("\n%v", createSQLs)
 	err2 := s.hostApplySQLs(host, createSQLs, true)
 
 	if err2 != nil {

@@ -283,7 +283,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 				w.a.V(1).
 					WithEvent(new, eventActionCreate, eventReasonCreateStarted).
 					WithStatusAction(new).
-					Info("Adding tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+					Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
 				if err := w.schemer.HostCreateTables(host); err != nil {
 					w.a.Error("ERROR create tables on host %s. err: %v", host.Name, err)
 				}
