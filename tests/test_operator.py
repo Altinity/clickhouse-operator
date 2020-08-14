@@ -303,7 +303,6 @@ def test_013():
                          "CREATE DATABASE \\\"test-db\\\"")
         clickhouse_query("test-013-add-shards", 
                          "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events ENGINE = Distributed('all-sharded', system, events)")
-    time.sleep(30)
     with Then("Add shards"):
         create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [3, 3, 4], "do_not_delete": 1})
         

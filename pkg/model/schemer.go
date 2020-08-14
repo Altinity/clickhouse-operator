@@ -84,12 +84,12 @@ func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]
 
 	// Some data fetched
 	for rows.Next() {
-		var name, sqlStatement string
-		if err := rows.Scan(&name, &sqlStatement); err == nil {
+		var name, statement string
+		if err := rows.Scan(&name, &statement); err == nil {
 			names = append(names, name)
-			statements = append(statements, sqlStatement)
+			statements = append(statements, statement)
 		} else {
-			log.V(1).Infof("UNABLE to scan row")
+			log.V(1).Infof("UNABLE to scan row err: %v", err)
 		}
 	}
 
