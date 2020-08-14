@@ -158,11 +158,25 @@ func (s *Schemer) getCreateDistributedObjects(host *chop.ChiHost) ([]string, []s
 		cluster_tables,
 	))
 
-	log.V(1).Infof("dbs\n%v", sqlDBs)
-	log.V(1).Infof("tbl\n%v", sqlTables)
 
 	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
+	log.V(1).Infof("dbs sql\n%v", sqlDBs)
+	for _, v := range names1 {
+		log.V(1).Infof("names1: %s", v)
+	}
+	for _, v := range sqlStatements1 {
+		log.V(1).Infof("sql1: %s", v)
+	}
+
 	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
+	log.V(1).Infof("tbl sql\n%v", sqlTables)
+	for _, v := range names2 {
+		log.V(1).Infof("names2: %s", v)
+	}
+	for _, v := range sqlStatements2 {
+		log.V(1).Infof("sql2: %s", v)
+	}
+
 	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
 }
 
