@@ -55,37 +55,45 @@ func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
 }
 
 func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]string, []string, error) {
-	// Results
-	names := make([]string, 0)
-	sqlStatements := make([]string, 0)
+	if len(services) == 0 {
+		return nil, nil, nil
+	}
 
+	// Results
+	var names []string
+	var statements []string
 	var rows *sqlmodule.Rows = nil
 	var err error
 	for _, service := range services {
-		log.V(1).Infof("Run query on: %s", service)
+		log.V(1).Infof("Run query on: %s of %v", service, services)
 		conn := s.getCHConnection(service)
 
 		rows, err = conn.Query(sql)
 		if err == nil {
-			defer rows.Close()
 			break
+		} else {
+			log.V(1).Infof("Run query on: %s of %v FAILED err: %v", service, services, err)
 		}
 	}
 	if err != nil {
+		log.V(1).Infof("Run query FAILED, all services %v reported errors", services)
 		return nil, nil, err
 	}
+
+	defer rows.Close()
 
 	// Some data fetched
 	for rows.Next() {
 		var name, sqlStatement string
 		if err := rows.Scan(&name, &sqlStatement); err == nil {
 			names = append(names, name)
-			sqlStatements = append(sqlStatements, sqlStatement)
+			statements = append(statements, sqlStatement)
 		} else {
-			// Skip erroneous line
+			log.V(1).Infof("UNABLE to scan row")
 		}
 	}
-	return names, sqlStatements, nil
+
+	return names, statements, nil
 }
 
 // getCreateDistributedObjects returns a list of objects that needs to be created on a shard in a cluster
@@ -157,7 +165,6 @@ func (s *Schemer) getCreateDistributedObjects(host *chop.ChiHost) ([]string, []s
 		"cluster('all-sharded', system.tables)",
 		cluster_tables,
 	))
-
 
 	log.V(1).Infof("fetch dbs list")
 	log.V(1).Infof("dbs sql\n%v", sqlDBs)
