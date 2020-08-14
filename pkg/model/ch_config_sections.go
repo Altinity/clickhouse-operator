@@ -19,6 +19,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// configSections
 type configSections struct {
 	// commonConfigSections maps section name to section XML config string
 	commonConfigSections map[string]string
@@ -31,6 +32,7 @@ type configSections struct {
 	chopConfig *chi.OperatorConfig
 }
 
+// NewConfigSections
 func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig *chi.OperatorConfig) *configSections {
 	return &configSections{
 		commonConfigSections:      make(map[string]string),
@@ -40,39 +42,46 @@ func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig 
 	}
 }
 
+// CreateConfigsCommon
 func (c *configSections) CreateConfigsCommon() {
 	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. remote servers
-	// 2. zookeeper
-	// 3. settings
-	// 4. files
-	util.IncludeNonEmpty(c.commonConfigSections, filenameRemoteServersXML, c.chConfigGenerator.GetRemoteServers())
-	util.IncludeNonEmpty(c.commonConfigSections, filenameZookeeperXML, c.chConfigGenerator.GetZookeeper())
-	util.IncludeNonEmpty(c.commonConfigSections, filenameSettingsXML, c.chConfigGenerator.GetSettings())
+	// 2. settings
+	// 3. files
+	util.IncludeNonEmpty(c.commonConfigSections, createConfigSectionFilename(configRemoteServers), c.chConfigGenerator.GetRemoteServers())
+	util.IncludeNonEmpty(c.commonConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings())
 	util.MergeStringMaps(c.commonConfigSections, c.chConfigGenerator.GetFiles())
 	// Extra user-specified config files
 	util.MergeStringMaps(c.commonConfigSections, c.chopConfig.CHCommonConfigs)
 }
 
+// CreateConfigsUsers
 func (c *configSections) CreateConfigsUsers() {
 	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. users
 	// 2. quotas
 	// 3. profiles
-	util.IncludeNonEmpty(c.commonUsersConfigSections, filenameUsersXML, c.chConfigGenerator.GetUsers())
-	util.IncludeNonEmpty(c.commonUsersConfigSections, filenameQuotasXML, c.chConfigGenerator.GetQuotas())
-	util.IncludeNonEmpty(c.commonUsersConfigSections, filenameProfilesXML, c.chConfigGenerator.GetProfiles())
+	util.IncludeNonEmpty(c.commonUsersConfigSections, createConfigSectionFilename(configUsers), c.chConfigGenerator.GetUsers())
+	util.IncludeNonEmpty(c.commonUsersConfigSections, createConfigSectionFilename(configQuotas), c.chConfigGenerator.GetQuotas())
+	util.IncludeNonEmpty(c.commonUsersConfigSections, createConfigSectionFilename(configProfiles), c.chConfigGenerator.GetProfiles())
 	// Extra user-specified config files
 	util.MergeStringMaps(c.commonUsersConfigSections, c.chopConfig.CHUsersConfigs)
 }
 
+// CreateConfigsHost
 func (c *configSections) CreateConfigsHost(host *chi.ChiHost) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	hostConfigSections := make(map[string]string)
-	util.IncludeNonEmpty(hostConfigSections, filenameMacrosXML, c.chConfigGenerator.GetHostMacros(host))
-	util.IncludeNonEmpty(hostConfigSections, filenamePortsXML, c.chConfigGenerator.GetHostPorts(host))
+	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configMacros), c.chConfigGenerator.GetHostMacros(host))
+	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configPorts), c.chConfigGenerator.GetHostPorts(host))
+	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configZookeeper), c.chConfigGenerator.GetHostZookeeper(host))
 	// Extra user-specified config files
 	util.MergeStringMaps(hostConfigSections, c.chopConfig.CHHostConfigs)
 
 	return hostConfigSections
+}
+
+// createConfigSectionFilename
+func createConfigSectionFilename(section string) string {
+	return "chop-generated-" + section + ".xml"
 }

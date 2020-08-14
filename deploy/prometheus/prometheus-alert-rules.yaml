@@ -1,0 +1,310 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: prometheus
+    role: alert-rules
+  name: prometheus-clickhouse-operator-rules
+spec:
+  groups:
+    - name: ./clickhouse-operator.rules
+      rules:
+        - alert: MetricsExporterDown
+          expr: absent(up{job='clickhouse-operator-metrics'})
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.pod }}"
+            summary: "metrics-exporter possible down"
+            description: "`{{ $labels.pod }}` in namespace `{{ $labels.namespace }}` not sent data more than 1 minutes. Please check instance status via ```kubectl logs -f -n {{ $labels.namespace }} {{ $labels.pod }} -c metrics-exporter```"
+
+        - alert: ClickHouseServerDown
+          expr: chi_clickhouse_metric_fetch_errors > 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "clickhouse-server possible down"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` failed metrics fetch `{{ $labels.fetch_type }}`.
+              Please check instance status
+              ```kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1)```
+
+        - alert: ClickHouseServerRestartRecently
+          expr: chi_clickhouse_metric_Uptime > 1 < 180
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "clickhouse-server started recently"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` has been start less than 3 minutes ago.
+
+        - alert: ClickHouseDNSErrors
+          expr: increase(chi_clickhouse_event_DNSError[1m]) > 0 or increase(chi_clickhouse_event_NetworkErrors[1m]) > 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "DNS errors occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+              Please check DNS settings and remote_servers part of /etc/clickhouse-server/
+              See documentation:
+              - https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
+              - https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-disable-internal-dns-cache
+              - https://clickhouse.tech/docs/en/query_language/system/#query_language-system-drop-dns-cache
+
+        - alert: DistributedFilesToInsertHigh
+          expr: chi_clickhouse_metric_DistributedFilesToInsert > 50
+          for: 1m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "clickhouse-server have Distributed Files to Insert > 50"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have too much files which not insert to `*MergeTree` tables via `Distributed` table engine
+              https://clickhouse.tech/docs/en/operations/table_engines/distributed/
+              When you insert data to `Distributed` table.
+              Data is written to target `*MergreTree` tables asynchronously.
+              When inserted in the table, the data block is just written to the local file system.
+              The data is sent to the remote servers in the background as soon as possible.
+              The period for sending data is managed by the `distributed_directory_monitor_sleep_time_ms` and `distributed_directory_monitor_max_sleep_time_ms` settings.
+              The Distributed engine sends each file with inserted data separately, but you can enable batch sending of files with the `distributed_directory_monitor_batch_inserts` setting
+
+              Also, you can manage distributed tables
+              https://clickhouse.tech/docs/en/sql-reference/statements/system/#query-language-system-distributed
+
+        - alert: DistributedConnectionExpections
+          expr: increase(chi_clickhouse_event_DistributedConnectionFailTry[1m]) > 0 or increase(chi_clickhouse_event_DistributedConnectionFailAtAll[1m]) > 0
+          for: 1m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Distributed connections fails occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+              please check communications between clickhouse server and host `remote_servers` in `/etc/clickhouse-server/`
+              https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
+              also, you can check logs:
+              ```kubectl logs -n {{ $labels.exported_namespace }} $( echo {{ $labels.hostname }} | cut -d '.' -f 1)-0```
+
+        - alert: RejectedInsert
+          expr: increase(chi_clickhouse_event_RejectedInserts[1m]) > 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Rejected INSERT queries occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have INSERT queries that are rejected due to high number of active data parts for partition in a MergeTree, please decrease INSERT frequency
+              MergeTreeArchitecture
+              https://clickhouse.tech/docs/en/development/architecture/#merge-tree
+              system.parts_log
+              https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log
+              system.merge_tree_settings
+              https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings
+
+
+        - alert: DelayedInsertThrottling
+          expr: increase(chi_clickhouse_event_DelayedInserts[1m]) > 0
+          for: 1m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Delayed INSERT queries occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have INSERT queries that are throttled due to high number of active data parts for partition in a MergeTree, please decrease INSERT frequency
+              https://clickhouse.tech/docs/en/development/architecture/#merge-tree
+
+        - alert: LongestRunningQuery
+          expr: chi_clickhouse_metric_LongestRunningQuery > 600
+          for: 1m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Long running queries occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have queries that running more than 10 minutes
+              try look to system.processes
+              https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-processes
+
+        - alert: QueryPreempted
+          expr: chi_clickhouse_metric_QueryPreempted > 0
+          for: 1m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Preempted queries occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have queries that are stopped and waiting due to 'priority' setting.
+              try look to system.processes
+              https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-processes
+
+        - alert: ReadonlyReplica
+          expr: chi_clickhouse_metric_ReadonlyReplica > 0
+          for: 1m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "ReadOnly replica occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have ReplicatedMergeTree tables that are currently in readonly state due to re-initialization after ZooKeeper session loss or due to startup without ZooKeeper configured.
+              Please check following things:
+              - kubenetes nodes have free enough RAM and Disk
+              - status of clickhouse-server pods `kubectl describe -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1)
+              - connection between clickhouse-server pods via kubernetes services
+              - connection between clickhouse-server pods and zookeeper
+              - status of PersistentVolumeClaims for pods
+              Also read documentation:
+              https://clickhouse.tech/docs/en/operations/table_engines/replication/#recovery-after-failures
+
+        - alert: ReplicasMaxAbsoluteDelay
+          expr: chi_clickhouse_metric_ReplicasMaxAbsoluteDelay > 300
+          for: 1m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Replication Lag more 300s occurred"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have replication lag.
+              When replica have too much lag, it can be skipped from Distributed SELECT Queries without errors and you will have wrong query results.
+              Check free disk space disks and network connection between clickhouse pod and zookeeper on monitored clickhouse-server pods
+
+              Also read documentation:
+              - https://clickhouse.tech/docs/en/operations/table_engines/replication/#recovery-after-failures
+              - https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries
+
+        - alert: TooManyConnections
+          expr: chi_clickhouse_metric_HTTPConnection + chi_clickhouse_metric_TCPConnection + chi_clickhouse_metric_MySQLConnection > 100
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Total connections > 100"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have many open connections.
+              The ClickHouse is adapted to run not a very large number of parallel SQL requests, not every HTTP/TCP(Native)/MySQL protocol connection means a running SQL request, but a large number of open connections can cause a spike in sudden SQL requests, resulting in performance degradation.
+
+              Also read documentation:
+              - https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-concurrent-queries
+
+        - alert: MaxPartCountForPartition
+          expr: chi_clickhouse_metric_MaxPartCountForPartition > 100
+          for: 1m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Max parts per partition > 100"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have too many parts in one partition.
+              Clickhouse MergeTree table engine split each INSERT query to partitions (PARTITION BY expression)
+              and add one or more PARTS per INSERT inside each partition, after that background merge process run,
+              and when you have too much unmerged parts inside partition,
+              SELECT queries performance can significate degrade, so clickhouse try delay or reject INSERT
+
+        - alert: LowInsertRowsPerQuery
+          expr: increase(chi_clickhouse_event_InsertQuery[1m]) > 0 and increase(chi_clickhouse_event_InsertRows[1m]) / increase(chi_clickhouse_event_InsertQuery[1m]) <= 1000
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "please increase inserted rows per INSERT query"
+            description: |-
+              https://clickhouse.tech/docs/en/introduction/performance/#performance-when-inserting-data
+              Clickhouse team recommends inserting data in packets of at least 1000 rows or no more than a single request per second.
+
+              Please use Buffer table
+              https://clickhouse.tech/docs/en/operations/table_engines/buffer/&#13;
+              or
+              https://github.com/nikepan/clickhouse-bulk
+              or
+              https://github.com/VKCOM/kittenhouse
+
+        - alert: TooMuchRunningQueries
+          expr: chi_clickhouse_metric_Query > 90
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Too much running queries"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` possible have too much running queries.
+              Please analyze your workload.
+              Each concurrent SELECT query use memory in JOINs use CPU for running aggregation function and can read lot of data from disk when scan parts in partitions and utilize disk I/O.
+              Each concurrent INSERT query, allocate around 1MB per each column in an inserted table and utilize disk I/O.
+
+              Look at following documentation parts:
+              - https://clickhouse.tech/docs/en/operations/settings/query_complexity/
+              - https://clickhouse.tech/docs/en/operations/quotas/
+              - https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-concurrent-queries
+              - https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-query_log
+
+        - alert: TooMuchDistributedFilesToInsert
+          expr: chi_clickhouse_metric_DistributedFilesToInsert > 100
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Too much DistributedFilesToInsert"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}` have temporary delayed distibuted files > 100.
+
+              - Please check replication status
+              - Check connections between `clickhouse-server` kubernetes pods
+              - Check connections between `clickhouse-server` and `zookeeper`
+              https://clickhouse.tech/docs/en/operations/table_engines/distributed/
+
+        - alert: SystemSettingsChanged
+          expr: delta(chi_clickhouse_metric_ChangedSettingsHash[5m]) != 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "`system.settings` changed"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+
+        - alert: VersionChanged
+          expr: delta(chi_clickhouse_metric_VersionInteger[5m]) != 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "ClickHouse version changed"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+
+        - alert: ZooKeeperSession
+          expr: chi_clickhouse_metric_ZooKeeperSession > 1
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "ZooKeeperSession > 1"
+            description: |-
+              `{{ $labels.hostname }}` in namespace `{{ $labels.exported_namespace }}`
+              Number of sessions (connections) to ZooKeeper should be no more than one, because using more than one
+              connection to ZooKeeper may lead to bugs due to lack of linearizability (stale reads)
+              that ZooKeeper consistency model allows.

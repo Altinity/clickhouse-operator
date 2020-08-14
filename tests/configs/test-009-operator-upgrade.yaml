@@ -1,0 +1,27 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-009"
+  labels:
+    test: test
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+    - name: test-009
+      layout:
+        shardsCount: 1
+  defaults:
+    templates:
+      volumeClaimTemplate: default
+      podTemplate: default
+  templates:
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Mi

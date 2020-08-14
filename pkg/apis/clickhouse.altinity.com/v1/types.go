@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -34,7 +35,7 @@ const (
 type ClickHouseInstallation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" yaml:"metadata"`
-	Spec              ChiSpec   `json:"spec"     yaml:"spec"`
+	Spec              ChiSpec   `json:"spec"               yaml:"spec"`
 	Status            ChiStatus `json:"status"`
 }
 
@@ -57,11 +58,12 @@ type ClickHouseOperatorConfiguration struct {
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
-	Stop          string           `json:"stop,omitempty"         yaml:"stop"`
-	Defaults      ChiDefaults      `json:"defaults,omitempty"     yaml:"defaults"`
-	Configuration ChiConfiguration `json:"configuration"          yaml:"configuration"`
-	Templates     ChiTemplates     `json:"templates,omitempty"    yaml:"templates"`
-	UseTemplates  []ChiUseTemplate `json:"useTemplates,omitempty" yaml:"useTemplates"`
+	Stop                   string           `json:"stop,omitempty"                   yaml:"stop"`
+	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern"`
+	Defaults               ChiDefaults      `json:"defaults,omitempty"               yaml:"defaults"`
+	Configuration          ChiConfiguration `json:"configuration"                    yaml:"configuration"`
+	Templates              ChiTemplates     `json:"templates,omitempty"              yaml:"templates"`
+	UseTemplates           []ChiUseTemplate `json:"useTemplates,omitempty"           yaml:"useTemplates"`
 }
 
 // ChiUseTemplates defines UseTemplates section of ClickHouseInstallation resource
@@ -69,22 +71,6 @@ type ChiUseTemplate struct {
 	Name      string `json:"name"      yaml:"name"`
 	Namespace string `json:"namespace" yaml:"namespace"`
 	UseType   string `json:"useType"   yaml:"useType"`
-}
-
-// ChiStatus defines status section of ClickHouseInstallation resource
-type ChiStatus struct {
-	Version           string   `json:"version"`
-	ClustersCount     int      `json:"clusters"`
-	ShardsCount       int      `json:"shards"`
-	HostsCount        int      `json:"hosts"`
-	Status            string   `json:"status"`
-	UpdatedHostsCount int      `json:"updated"`
-	AddedHostsCount   int      `json:"added"`
-	DeletedHostsCount int      `json:"deleted"`
-	DeleteHostsCount  int      `json:"delete"`
-	Pods              []string `json:"pods"`
-	FQDNs             []string `json:"fqdns"`
-	Endpoint          string   `json:"endpoint"`
 }
 
 // ChiDefaults defines defaults section of .spec
@@ -122,27 +108,28 @@ type ChiConfiguration struct {
 
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
-	Name      string           `json:"name"`
-	Layout    ChiClusterLayout `json:"layout"`
-	Templates ChiTemplateNames `json:"templates,omitempty"`
+	Name      string             `json:"name"`
+	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper"`
+	Layout    ChiClusterLayout   `json:"layout"`
+	Templates ChiTemplateNames   `json:"templates,omitempty"`
 
 	// Internal data
-	Address ChiClusterAddress       `json:"address"`
+	Address ChiClusterAddress       `json:"address,omitempty"`
 	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiClusterAddress defines address of a cluster within ClickHouseInstallation
 type ChiClusterAddress struct {
-	Namespace    string `json:"namespace"`
-	CHIName      string `json:"chiName"`
-	ClusterName  string `json:"clusterName"`
-	ClusterIndex int    `json:"clusterIndex"`
+	Namespace    string `json:"namespace,omitempty"`
+	CHIName      string `json:"chiName,omitempty"`
+	ClusterName  string `json:"clusterName,omitempty"`
+	ClusterIndex int    `json:"clusterIndex,omitempty"`
 }
 
 // ChiClusterLayout defines layout section of .spec.configuration.clusters
 type ChiClusterLayout struct {
 	// DEPRECATED - to be removed soon
-	Type          string `json:"type"`
+	Type          string `json:"type,omitempty"`
 	ShardsCount   int    `json:"shardsCount,omitempty"`
 	ReplicasCount int    `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiShard
@@ -216,20 +203,21 @@ type ChiHost struct {
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data
-	Address ChiHostAddress          `json:"address"`
-	Config  ChiHostConfig           `json:"config"`
-	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+	Address     ChiHostAddress          `json:"-"`
+	Config      ChiHostConfig           `json:"-"`
+	StatefulSet *v1.StatefulSet         `json:"-" testdiff:"ignore"`
+	CHI         *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiHostTemplate defines full Host Template
 type ChiHostTemplate struct {
-	Name             string                `json:"name"            yaml:"name"`
-	PortDistribution []ChiPortDistribution `json:"portDistribution" yaml:"portDistribution"`
-	Spec             ChiHost               `json:"spec"            yaml:"spec"`
+	Name             string                `json:"name"                       yaml:"name"`
+	PortDistribution []ChiPortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution"`
+	Spec             ChiHost               `json:"spec,omitempty"             yaml:"spec"`
 }
 
 type ChiPortDistribution struct {
-	Type string `json:"type"   yaml:"type"`
+	Type string `json:"type,omitempty"   yaml:"type"`
 }
 
 // ChiHostAddress defines address of a host within ClickHouseInstallation
@@ -259,6 +247,7 @@ type ChiHostAddress struct {
 type ChiHostConfig struct {
 	ZookeeperFingerprint string `json:"zookeeperfingerprint"`
 	SettingsFingerprint  string `json:"settingsfingerprint"`
+	FilesFingerprint     string `json:"filesfingerprint"`
 }
 
 // CHITemplates defines templates section of .spec
@@ -270,16 +259,17 @@ type ChiTemplates struct {
 	ServiceTemplates     []ChiServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates"`
 
 	// Index maps template name to template itself
-	HostTemplatesIndex        map[string]*ChiHostTemplate        `testdiff:"ignore"`
-	PodTemplatesIndex         map[string]*ChiPodTemplate         `testdiff:"ignore"`
-	VolumeClaimTemplatesIndex map[string]*ChiVolumeClaimTemplate `testdiff:"ignore"`
-	ServiceTemplatesIndex     map[string]*ChiServiceTemplate     `testdiff:"ignore"`
+	HostTemplatesIndex        map[string]*ChiHostTemplate        `json:",omitempty" testdiff:"ignore"`
+	PodTemplatesIndex         map[string]*ChiPodTemplate         `json:",omitempty" testdiff:"ignore"`
+	VolumeClaimTemplatesIndex map[string]*ChiVolumeClaimTemplate `json:",omitempty" testdiff:"ignore"`
+	ServiceTemplatesIndex     map[string]*ChiServiceTemplate     `json:",omitempty" testdiff:"ignore"`
 }
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet
 type ChiPodTemplate struct {
-	Name string             `json:"name"            yaml:"name"`
-	Zone ChiPodTemplateZone `json:"zone"            yaml:"zone""`
+	Name         string             `json:"name"                    yaml:"name"`
+	GenerateName string             `json:"generateName,omitempty"  yaml:"generateName"`
+	Zone         ChiPodTemplateZone `json:"zone"                    yaml:"zone"`
 	// DEPRECATED - to be removed soon
 	Distribution    string               `json:"distribution"    yaml:"distribution"`
 	PodDistribution []ChiPodDistribution `json:"podDistribution" yaml:"podDistribution"`
@@ -292,8 +282,9 @@ type ChiPodTemplateZone struct {
 }
 
 type ChiPodDistribution struct {
-	Type   string `json:"type"   yaml:"type"`
-	Number int    `json:"number" yaml:"number"`
+	Type   string `json:"type,omitempty"   yaml:"type"`
+	Scope  string `json:"scope,omitempty"  yaml:"scope"`
+	Number int    `json:"number,omitempty" yaml:"number"`
 }
 
 // ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
@@ -346,8 +337,8 @@ type ChiZookeeperConfig struct {
 
 // ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
 type ChiZookeeperNode struct {
-	Host string `json:"host" yaml:"host"`
-	Port int32  `json:"port" yaml:"port"`
+	Host string `json:"host,omitempty" yaml:"host"`
+	Port int32  `json:"port,omitempty" yaml:"port"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -440,5 +431,26 @@ type OperatorConfig struct {
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
 	CHUsername string `json:"chUsername" yaml:"chUsername"`
 	CHPassword string `json:"chPassword" yaml:"chPassword"`
-	CHPort     int    `json:"chPort"     yaml:"chPort""`
+	CHPort     int    `json:"chPort"     yaml:"chPort"`
+
+	Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
+	Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`
+	V                string `json:"v"                yaml:"v"`
+	Stderrthreshold  string `json:"stderrthreshold"  yaml:"stderrthreshold"`
+	Vmodule          string `json:"vmodule"          yaml:"vmodule"`
+	Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
+
+	// Max number of concurrent reconciles in progress
+	ReconcileThreadsNumber int `json:"reconcileThreadsNumber" yaml:"reconcileThreadsNumber"`
+
+	//
+	// The end of OperatorConfig
+	//
+	// !!! IMPORTANT !!!
+	// !!! IMPORTANT !!!
+	// !!! IMPORTANT !!!
+	// !!! IMPORTANT !!!
+	// !!! IMPORTANT !!!
+	// Do not forget to update func (config *OperatorConfig) String()
+	// Do not forget to update CRD spec
 }

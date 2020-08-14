@@ -15,39 +15,221 @@
 package v1
 
 import (
+	"encoding/json"
+	"fmt"
+	"math"
+	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
+
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
 )
 
-type Settings map[string]interface{}
+const ignoreThreshold = 0.001
 
-func NewSettings() Settings {
-	return make(map[string]interface{})
+// Settings value can be one of:
+// 1. scalar value (string, int, bool, etc).
+//    Ex.:
+//    user1/networks/ip: "::/0"
+// 2. vector of scalars
+//    Ex.:
+//    user1/networks/ip:
+//      - "127.0.0.1"
+//      - "192.168.1.2"
+// We do not know types of these scalars in advance also
+
+type Setting struct {
+	isScalar bool
+	scalar   string
+	vector   []string
 }
 
-func (settings Settings) fetchPort(name string) int32 {
-	port, ok := settings[name]
-	if ok {
-		switch port.(type) {
-		case string:
-			intValue, err := strconv.Atoi(port.(string))
-			if err == nil {
-				return int32(intValue)
+func NewScalarSetting(scalar string) *Setting {
+	return &Setting{
+		isScalar: true,
+		scalar:   scalar,
+	}
+}
+
+func NewVectorSetting(vector []string) *Setting {
+	return &Setting{
+		isScalar: false,
+		vector:   vector,
+	}
+}
+
+func (s *Setting) IsScalar() bool {
+	return s.isScalar
+}
+
+func (s *Setting) Scalar() string {
+	return s.scalar
+}
+
+func (s *Setting) Vector() []string {
+	return s.vector
+}
+
+func (s *Setting) AsVector() []string {
+	if s.isScalar {
+		return []string{s.scalar}
+	}
+	return s.vector
+}
+
+func (s *Setting) String() string {
+	if s.isScalar {
+		return s.scalar
+	}
+
+	return strings.Join(s.vector, ",")
+}
+
+type Settings map[string]*Setting
+
+func NewSettings() Settings {
+	return make(Settings)
+}
+
+func (settings *Settings) UnmarshalJSON(data []byte) error {
+	type rawType map[string]interface{}
+	var raw rawType
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	if *settings == nil {
+		*settings = NewSettings()
+	}
+
+	for name, untyped := range raw {
+		if scalar, ok := unmarshalScalar(untyped); ok {
+			(*settings)[name] = NewScalarSetting(scalar)
+		} else if vector, ok := unmarshalVector(untyped); ok {
+			if len(vector) > 0 {
+				(*settings)[name] = NewVectorSetting(vector)
 			}
-
-		case int, int8, int16, int32, uint, uint8, uint32:
-			return port.(int32)
-
-		case int64:
-			return int32(port.(int64))
-
-		case uint64:
-			return int32(port.(uint64))
 		}
 	}
 
-	return 0
+	return nil
+}
+
+func (settings Settings) MarshalJSON() ([]byte, error) {
+	raw := make(map[string]interface{})
+
+	for name, setting := range settings {
+		if setting.isScalar {
+			raw[name] = setting.scalar
+		} else {
+			raw[name] = setting.vector
+		}
+	}
+
+	return json.Marshal(raw)
+}
+
+func unmarshalScalar(untyped interface{}) (string, bool) {
+	typeOf := reflect.TypeOf(untyped)
+	str := typeOf.String()
+	log.V(3).Infof("%v", str)
+
+	switch untyped.(type) {
+	case // scalar
+		int, uint,
+		int8, uint8,
+		int16, uint16,
+		int32, uint32,
+		int64, uint64,
+		bool,
+		string:
+		return fmt.Sprintf("%v", untyped), true
+	case // scalar
+		float32:
+		floatVal := untyped.(float32)
+		_, frac := math.Modf(float64(floatVal))
+		if frac < ignoreThreshold {
+			// consider it int
+			intVal := int64(floatVal)
+			return fmt.Sprintf("%v", intVal), true
+		}
+		return fmt.Sprintf("%f", untyped), true
+	case // scalar
+		float64:
+		floatVal := untyped.(float64)
+		_, frac := math.Modf(floatVal)
+		if frac < ignoreThreshold {
+			// consider it int
+			intVal := int64(floatVal)
+			return fmt.Sprintf("%v", intVal), true
+		}
+		return fmt.Sprintf("%f", untyped), true
+	}
+
+	return "", false
+}
+
+func unmarshalVector(untyped interface{}) ([]string, bool) {
+	typeOf := reflect.TypeOf(untyped)
+	str := typeOf.String()
+	log.V(3).Infof("%v", str)
+
+	var res []string
+	switch untyped.(type) {
+	case // vector
+		[]interface{}:
+		for _, _untyped := range untyped.([]interface{}) {
+			if scalar, ok := unmarshalScalar(_untyped); ok {
+				res = append(res, scalar)
+			}
+		}
+		return res, true
+	}
+
+	return nil, false
+}
+
+func (settings Settings) getValueAsScalar(name string) (string, bool) {
+	setting, ok := settings[name]
+	if !ok {
+		return "", false
+	}
+	if setting.isScalar {
+		return setting.scalar, true
+	}
+	return "", false
+}
+
+func (settings Settings) getValueAsVector(name string) ([]string, bool) {
+	setting, ok := settings[name]
+	if !ok {
+		return nil, false
+	}
+	if setting.isScalar {
+		return nil, false
+	}
+	return setting.vector, true
+}
+
+func (settings Settings) getValueAsInt(name string) int {
+	value, ok := settings.getValueAsScalar(name)
+	if !ok {
+		return 0
+	}
+
+	i, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+
+	return i
+}
+
+func (settings Settings) fetchPort(name string) int32 {
+	return int32(settings.getValueAsInt(name))
 }
 
 func (settings Settings) GetTCPPort() int32 {
@@ -87,21 +269,46 @@ func (settings Settings) GetStringMap() map[string]string {
 	m := make(map[string]string)
 
 	for key := range settings {
-		if stringValue, ok := settings[key].(string); ok {
-			m[key] = stringValue
+		if scalar, ok := settings.getValueAsScalar(key); ok {
+			m[key] = scalar
+		} else {
+			// Skip vector for now
 		}
 	}
 
 	return m
 }
 
+func (settings Settings) AsSortedSliceOfStrings() []string {
+	// Sort keys
+	var keys []string
+	for key := range settings {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var s []string
+
+	// Walk over sorted keys
+	for _, key := range keys {
+		s = append(s, key)
+		s = append(s, settings[key].String())
+	}
+
+	return s
+}
+
+func (settings Settings) Normalize() {
+	settings.normalizePaths()
+}
+
 // NormalizePaths normalizes paths in settings
-func (settings Settings) NormalizePaths() {
+func (settings Settings) normalizePaths() {
 	pathsToNormalize := make([]string, 0, 0)
 
 	// Find entries with paths to normalize
 	for key := range settings {
-		path := normalizePath(key)
+		path := normalizeSettingsKeyAsPath(key)
 		if len(path) != len(key) {
 			// Normalization worked. These paths have to be normalized
 			pathsToNormalize = append(pathsToNormalize, key)
@@ -110,8 +317,8 @@ func (settings Settings) NormalizePaths() {
 
 	// Add entries with normalized paths
 	for _, key := range pathsToNormalize {
-		path := normalizePath(key)
-		settings[path] = settings[key]
+		normalizedPath := normalizeSettingsKeyAsPath(key)
+		settings[normalizedPath] = settings[key]
 	}
 
 	// Delete entries with un-normalized paths
@@ -120,9 +327,9 @@ func (settings Settings) NormalizePaths() {
 	}
 }
 
-// normalizePath normalizes path in .spec.configuration.{users, profiles, quotas, settings} section
+// normalizeSettingsKeyAsPath normalizes path in .spec.configuration.{users, profiles, quotas, settings} section
 // Normalized path looks like 'a/b/c'
-func normalizePath(path string) string {
+func normalizeSettingsKeyAsPath(path string) string {
 	// Normalize multi-'/' values (like '//') to single-'/'
 	re := regexp.MustCompile("//+")
 	path = re.ReplaceAllString(path, "/")

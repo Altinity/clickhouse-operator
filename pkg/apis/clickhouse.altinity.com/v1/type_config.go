@@ -17,7 +17,9 @@ package v1
 import (
 	"bytes"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
+
 	"github.com/imdario/mergo"
 	"github.com/kubernetes-sigs/yaml"
 	"os"
@@ -50,6 +52,9 @@ const (
 	defaultChUsername = ""
 	defaultChPassword = ""
 	defaultChPort     = 8123
+
+	// Default number of controller threads running concurrently (used in case no other specified in config)
+	defaultReconcileThreadsNumber = 1
 )
 
 // MergeFrom merges
@@ -57,11 +62,11 @@ func (config *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) {
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if err := mergo.Merge(config, *from); err != nil {
-			glog.V(1).Infof("FAIL merge config Error: %q", err)
+			log.V(1).Infof("FAIL merge config Error: %q", err)
 		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if err := mergo.Merge(config, *from, mergo.WithOverride); err != nil {
-			glog.V(1).Infof("FAIL merge config Error: %q", err)
+			log.V(1).Infof("FAIL merge config Error: %q", err)
 		}
 	}
 }
@@ -76,7 +81,7 @@ func (config *OperatorConfig) readCHITemplates() {
 		template := new(ClickHouseInstallation)
 		if err := yaml.Unmarshal([]byte(config.CHITemplateFiles[filename]), template); err != nil {
 			// Unable to unmarshal - skip incorrect template
-			glog.V(1).Infof("FAIL readCHITemplates() unable to unmarshal file %s Error: %q", filename, err)
+			log.V(1).Infof("FAIL readCHITemplates() unable to unmarshal file %s Error: %q", filename, err)
 			continue
 		}
 		config.enlistCHITemplate(template)
@@ -89,7 +94,7 @@ func (config *OperatorConfig) enlistCHITemplate(template *ClickHouseInstallation
 		config.CHITemplates = make([]*ClickHouseInstallation, 0)
 	}
 	config.CHITemplates = append(config.CHITemplates, template)
-	glog.V(1).Infof("enlistCHITemplate(%s/%s)", template.Namespace, template.Name)
+	log.V(1).Infof("enlistCHITemplate(%s/%s)", template.Namespace, template.Name)
 }
 
 // unlistCHITemplate removes template from templates catalog
@@ -98,11 +103,11 @@ func (config *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation
 		return
 	}
 
-	glog.V(1).Infof("unlistCHITemplate(%s/%s)", template.Namespace, template.Name)
+	log.V(1).Infof("unlistCHITemplate(%s/%s)", template.Namespace, template.Name)
 	// Nullify found template entry
 	for _, _template := range config.CHITemplates {
 		if (_template.Name == template.Name) && (_template.Namespace == template.Namespace) {
-			glog.V(1).Infof("unlistCHITemplate(%s/%s) - found, unlisting", template.Namespace, template.Name)
+			log.V(1).Infof("unlistCHITemplate(%s/%s) - found, unlisting", template.Namespace, template.Name)
 			// TODO normalize
 			//config.CHITemplates[i] = nil
 			_template.Name = ""
@@ -129,7 +134,7 @@ func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string
 	if use.Namespace != "" {
 		// With fully-specified use template direct (full name) only match is applicable, and it is not possible
 		// This is strange situation, however
-		glog.V(1).Infof("STRANGE FindTemplate(%s/%s) - unexpected position", use.Namespace, use.Name)
+		log.V(1).Infof("STRANGE FindTemplate(%s/%s) - unexpected position", use.Namespace, use.Name)
 		return nil
 	}
 
@@ -182,9 +187,9 @@ func (config *OperatorConfig) buildUnifiedCHITemplate() {
 		// Log final CHI template obtained
 		// Marshaling is done just to print nice yaml
 		if bytes, err := yaml.Marshal(config.CHITemplate); err == nil {
-			glog.V(1).Infof("Unified CHITemplate:\n%s\n", string(bytes))
+			log.V(1).Infof("Unified CHITemplate:\n%s\n", string(bytes))
 		} else {
-			glog.V(1).Infof("FAIL unable to Marshal Unified CHITemplate")
+			log.V(1).Infof("FAIL unable to Marshal Unified CHITemplate")
 		}
 	*/
 }
@@ -280,6 +285,17 @@ func (config *OperatorConfig) normalize() {
 	}
 	if config.CHPort == 0 {
 		config.CHPort = defaultChPort
+	}
+
+	// Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
+	// Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`
+	// V                string `json:"v"                yaml:"v"`
+	// Stderrthreshold  string `json:"stderrthreshold"  yaml:"stderrthreshold"`
+	// Vmodule          string `json:"vmodule"          yaml:"vmodule"`
+	// Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
+
+	if config.ReconcileThreadsNumber == 0 {
+		config.ReconcileThreadsNumber = defaultReconcileThreadsNumber
 	}
 }
 
@@ -390,7 +406,10 @@ func (config *OperatorConfig) isCHITemplateExt(file string) bool {
 }
 
 // String returns string representation of a OperatorConfig
-func (config *OperatorConfig) String() string {
+func (config *OperatorConfig) String(hideCredentials bool) string {
+	var username string
+	var password string
+
 	b := &bytes.Buffer{}
 
 	util.Fprintf(b, "ConfigFilePath: %s\n", config.ConfigFilePath)
@@ -418,19 +437,38 @@ func (config *OperatorConfig) String() string {
 	util.Fprintf(b, "CHConfigUserDefaultProfile: %s\n", config.CHConfigUserDefaultProfile)
 	util.Fprintf(b, "CHConfigUserDefaultQuota: %s\n", config.CHConfigUserDefaultQuota)
 	util.Fprintf(b, "%s", config.stringSlice("CHConfigUserDefaultNetworksIP", config.CHConfigUserDefaultNetworksIP))
-	util.Fprintf(b, "CHConfigUserDefaultPassword: %s\n", config.CHConfigUserDefaultPassword)
+	password = config.CHConfigUserDefaultPassword
+	if hideCredentials {
+		password = PasswordReplacer
+	}
+	util.Fprintf(b, "CHConfigUserDefaultPassword: %s\n", password)
 	util.Fprintf(b, "CHConfigNetworksHostRegexpTemplate: %s\n", config.CHConfigNetworksHostRegexpTemplate)
 
-	util.Fprintf(b, "CHUsername: %s\n", config.CHUsername)
-	util.Fprintf(b, "CHPassword: %s\n", config.CHPassword)
+	username = config.CHUsername
+	password = config.CHPassword
+	if hideCredentials {
+		username = UsernameReplacer
+		password = PasswordReplacer
+	}
+	util.Fprintf(b, "CHUsername: %s\n", username)
+	util.Fprintf(b, "CHPassword: %s\n", password)
 	util.Fprintf(b, "CHPort: %d\n", config.CHPort)
+
+	util.Fprintf(b, "Logtostderr: %s\n", config.Logtostderr)
+	util.Fprintf(b, "Alsologtostderr: %s\n", config.Alsologtostderr)
+	util.Fprintf(b, "V: %s\n", config.V)
+	util.Fprintf(b, "Stderrthreshold: %s\n", config.Stderrthreshold)
+	util.Fprintf(b, "Vmodule: %s\n", config.Vmodule)
+	util.Fprintf(b, "Log_backtrace_at string: %s\n", config.Log_backtrace_at)
+
+	util.Fprintf(b, "ReconcileThreadsNumber: %d\n", config.ReconcileThreadsNumber)
 
 	return b.String()
 }
 
 // WriteToLog writes OperatorConfig into log
 func (config *OperatorConfig) WriteToLog() {
-	glog.V(1).Infof("OperatorConfig:\n%s", config.String())
+	log.V(1).Infof("OperatorConfig:\n%s", config.String(true))
 }
 
 // stringSlice returns string of named []string OperatorConfig param

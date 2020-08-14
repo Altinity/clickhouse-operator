@@ -1,10 +1,10 @@
 # Storage
 
-Examples are available in [examples](./chi-examples) folder:
-1. [Simple Default Persistent Volume](./chi-examples/03-persistent-volume-01-default-volume.yaml)
-1. [Pod Template with Persistent Volume](./chi-examples/03-persistent-volume-02-pod-template.yaml)
-1. AWS-based cluster with data replication and Persistent Volumes [minimal](./chi-examples/04-replication-zookeeper-03-minimal-AWS-persistent-volume.yaml) 
-and [medium](./chi-examples/04-replication-zookeeper-04-medium-AWS-persistent-volume.yaml) Zookeeper installations
+Examples are available in [examples][chi-examples] folder:
+1. [Simple Default Persistent Volume][03-persistent-volume-01-default-volume.yaml]
+1. [Pod Template with Persistent Volume][03-persistent-volume-02-pod-template.yaml]
+1. AWS-based cluster with data replication and Persistent Volumes [minimal][04-replication-zookeeper-03-minimal-AWS-persistent-volume.yaml] 
+and [medium][04-replication-zookeeper-04-medium-AWS-persistent-volume.yaml] Zookeeper installations
 
 ## Persistent Volumes
 k8s cluster administrator provision storage to applications (users) via `PersistentVolume` objects. 
@@ -164,9 +164,9 @@ spec:
 ```
 Pay attention, that there is no `storageClassName` specified - meaning this `PersistentVolumeClaim` will claim `PersistentVolume` of explicitly specified **default** `StorageClass`.
 
-More details on [storageClassName][storageClassName]
+More details on [storageClassName][persistent-volumes-class-1]
 
-More details on [PersistentVolumeClaim][PersistentVolumeClaim]
+More details on [PersistentVolumeClaim][persistentvolumeclaims]
 
 Example on how this `persistentVolumeClaim` named `my-pvc` can be used in Pod spec:
 ```yaml
@@ -193,7 +193,7 @@ spec:
 ## StatefulSet
 `StatefulSet` shortcuts the way, jumping from `volumeMounts` directly to `volumeClaimTemplates`, skipping `volume`.
 
-More details in [StatefulSet description][StatefulSet]
+More details in [StatefulSet description][creating-a-statefulset]
 
 StatefulSet example:
 ```yaml
@@ -264,7 +264,7 @@ refers directly to:
 
 ## AWS encrypted volumes
 
-As we have discussed in [AWS-specific](AWS-specific) section, AWS provides **gp2** volumes as default media.
+As we have discussed in [AWS-specific](#AWS-specific) section, AWS provides **gp2** volumes as default media.
 Let's create **encrypted** volume based on the same **gp2** volume.
 Specify special `StorageClass`
 ```yaml
@@ -296,7 +296,11 @@ spec:
       storage: 1Gi
 ```
 
-[PersistentVolumeClaim]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
-[storageClassName]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1
-[StatefulSet]: https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/#creating-a-statefulset
-[example_aws_pv]: ./chi-examples/chi-example-03-zk-replication-aws-PV.yaml
+[chi-examples]: ./chi-examples
+[03-persistent-volume-01-default-volume.yaml]: ./chi-examples/03-persistent-volume-01-default-volume.yaml
+[03-persistent-volume-02-pod-template.yaml]: ./chi-examples/03-persistent-volume-02-pod-template.yaml
+[04-replication-zookeeper-03-minimal-AWS-persistent-volume.yaml]: ./chi-examples/04-replication-zookeeper-03-minimal-AWS-persistent-volume.yaml
+[04-replication-zookeeper-04-medium-AWS-persistent-volume.yaml]: ./chi-examples/04-replication-zookeeper-04-medium-AWS-persistent-volume.yaml
+[persistentvolumeclaims]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
+[persistent-volumes-class-1]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1
+[creating-a-statefulset]: https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/#creating-a-statefulset

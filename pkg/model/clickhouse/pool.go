@@ -15,7 +15,9 @@
 package clickhouse
 
 import (
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
+
 	"sync"
 )
 
@@ -28,7 +30,7 @@ func GetPooledDBConnection(params *CHConnectionParams) *CHConnection {
 	key := makePoolKey(params)
 
 	if connection, existed := dbConnectionPool.Load(key); existed {
-		glog.V(1).Infof("Found pooled connection: %s", params.makeDSN())
+		log.V(2).Infof("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
 		return connection.(*CHConnection)
 	}
 
@@ -39,16 +41,16 @@ func GetPooledDBConnection(params *CHConnectionParams) *CHConnection {
 
 	// Double check for race condition
 	if connection, existed := dbConnectionPool.Load(key); existed {
-		glog.V(1).Infof("Found pooled connection: %s", params.makeDSN())
+		log.V(2).Infof("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
 		return connection.(*CHConnection)
 	}
 
-	glog.V(1).Infof("Add connection to the pool: %s", params.makeDSN())
+	log.V(2).Infof("Add connection to the pool: %s", params.GetDSNWithHiddenCredentials())
 	dbConnectionPool.Store(key, NewConnection(params))
 
 	// Fetch from the pool
 	if connection, existed := dbConnectionPool.Load(key); existed {
-		glog.V(1).Infof("Found pooled connection: %s", params.makeDSN())
+		log.V(2).Infof("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
 		return connection.(*CHConnection)
 	}
 
@@ -61,5 +63,5 @@ func DropHost(host string) {
 }
 
 func makePoolKey(params *CHConnectionParams) string {
-	return params.makeDSN()
+	return params.GetDSN()
 }

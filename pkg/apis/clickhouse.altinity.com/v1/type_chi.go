@@ -15,8 +15,9 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/version"
 	"math"
+
+	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 // fillStatus fills .Status
@@ -31,6 +32,7 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.Status.Pods = pods
 	chi.Status.FQDNs = fqdns
 	chi.Status.Endpoint = endpoint
+	chi.Status.NormalizedCHI = chi.Spec
 }
 
 func (chi *ClickHouseInstallation) FillAddressInfo() {
@@ -447,10 +449,16 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		if spec.Stop == "" {
 			spec.Stop = from.Stop
 		}
+		if spec.NamespaceDomainPattern == "" {
+			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
+		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if from.Stop != "" {
 			// Override by non-empty values only
 			spec.Stop = from.Stop
+		}
+		if from.NamespaceDomainPattern != "" {
+			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
 		}
 	}
 
@@ -564,7 +572,7 @@ func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceT
 }
 
 // GetServiceTemplate gets ChiServiceTemplate of a CHI
-func (chi *ClickHouseInstallation) GetChiServiceTemplate() (*ChiServiceTemplate, bool) {
+func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ChiServiceTemplate, bool) {
 	name := chi.Spec.Defaults.Templates.ServiceTemplate
 	template, ok := chi.GetServiceTemplate(name)
 	return template, ok

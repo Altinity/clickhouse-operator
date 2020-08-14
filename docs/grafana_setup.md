@@ -21,7 +21,7 @@ bash install-grafana-with-operator.sh
 ```
 Run port forward for access to Grafana instance as `localhost`:
 ```bash
-kubectl --namespace=grafana port-forward service/grafana 3000
+kubectl --namespace=grafana port-forward service/grafana-service 3000
 ```
 and navigate browser to `http://localhost:3000` Grafana should appear.
 Login credentials:
@@ -50,7 +50,7 @@ At this point Grafana is up and running. Let's check it out.
 Grafana is running in k8s cluster and is available via Service of type ClusterIP and named as `grafana`.
 It is located in the same namespace as Grafana:
 ```bash
-kubectl --namespace=grafana get service grafana 
+kubectl --namespace=grafana get service grafana-service
 ```
 ```text
 NAME      TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
@@ -58,7 +58,7 @@ grafana   ClusterIP   10.98.42.192   <none>        3000/TCP   14h
 ```
 Let's get access to Grafana. Port-forward Grafana to `localhost` as:
 ```bash
-kubectl --namespace=grafana port-forward service/grafana 3000
+kubectl --namespace=grafana port-forward service/grafana-service 3000
 ```
 and navigate browser to `http://localhost:3000` Grafana should appear.
 Login credentials:
@@ -104,7 +104,7 @@ In order to install dashboard:
  
 By now Altinity recommended dashboard should be available for use.  
 
-More Grafana [docs](http://docs.grafana.org/)
+More [Grafana docs][grafana-docs]
 
 [grafana_manifest_folder]: ../deploy/grafana/grafana-manually
 [grafana_manifest_yaml]: ../deploy/grafana/grafana-manually/grafana.yaml
@@ -114,3 +114,4 @@ More Grafana [docs](http://docs.grafana.org/)
 [altinity_recommended_dashboard]: ../grafana-dashboard/Altinity_ClickHouse_Operator_dashboard.json 
 [install_grafana_operator_script]: ../deploy/grafana/grafana-with-grafana-operator/install-grafana-operator.sh
 [install_grafana_dashboard_script]: ../deploy/grafana/grafana-with-grafana-operator/install-grafana-with-operator.sh
+[grafana-docs]: http://docs.grafana.org/

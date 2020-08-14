@@ -1,8 +1,8 @@
 # ClickHouse Installation Custom Resource explained
 
-Let's describe in details ClickHouse [Custom Resource](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/) \
-Full example is available in [99-clickhouseinstallation-max.yaml][chi_max_manifest] file. \
-The best way to work with this doc is to open [99-clickhouseinstallation-max.yaml][chi_max_manifest] in separate tab
+Let's describe in details ClickHouse [Custom Resource][custom-resource] \
+Full example is available in [99-clickhouseinstallation-max.yaml][99-clickhouseinstallation-max.yaml] file. \
+The best way to work with this doc is to open [99-clickhouseinstallation-max.yaml][99-clickhouseinstallation-max.yaml] in separate tab
 and look into it along with reading this explanation.  
 
 ```yaml
@@ -59,17 +59,15 @@ clickhouse-installation-max   23h
       root: /path/to/zookeeper/node
       identity: user:password
 ```
-`.spec.configuration.zookeeper` refers to [&lt;yandex&gt;&lt;zookeeper&gt;&lt;/zookeeper&gt;&lt;/yandex&gt;](https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper) config section
+`.spec.configuration.zookeeper` refers to [&lt;yandex&gt;&lt;zookeeper&gt;&lt;/zookeeper&gt;&lt;/yandex&gt;][server-settings_zookeeper] config section
 
-## .spec.configuration.users
+## .spec.configuration.profiles
+`.spec.configuration.profiles` refers to [&lt;yandex&gt;&lt;profiles&gt;&lt;/profiles&gt;&lt;/yandex&gt;][settings] settings sections.
 ```yaml
-    users:
-      readonly/profile: readonly
+    profiles:
+      readonly/readonly: 1
 ```
-`.spec.configuration.users` refers to [&lt;yandex&gt;&lt;profiles&gt;&lt;/profiles&gt;&lt;users&gt;&lt;/users&gt;&lt;/yandex&gt;](https://clickhouse.yandex/docs/en/operations/settings/settings/) settings sections.
-```yaml
-      profiles/readonly/readonly: "1"
-```
+
 expands into
 ```xml
       <profiles>
@@ -78,11 +76,16 @@ expands into
         </readonly>
       </profiles>
 ```
+
+## .spec.configuration.users
+`.spec.configuration.users` refers to [&lt;yandex&gt;&lt;users&gt;&lt;/users&gt;&lt;/yandex&gt;][settings] settings sections.
 ```yaml
-      test/networks/ip:
+  users:
+    test/networks/ip:
         - "127.0.0.1"
         - "::/0"
 ```
+
 expands into
 ```xml
      <users>
@@ -104,7 +107,7 @@ expands into
 #      </case>
 #      </compression>
 ``` 
-`.spec.configuration.settings` refers to [&lt;yandex&gt;&lt;profiles&gt;&lt;/profiles&gt;&lt;users&gt;&lt;/users&gt;&lt;/yandex&gt;](https://clickhouse.yandex/docs/en/operations/settings/settings/) settings sections.
+`.spec.configuration.settings` refers to [&lt;yandex&gt;&lt;profiles&gt;&lt;/profiles&gt;&lt;users&gt;&lt;/users&gt;&lt;/yandex&gt;][settings] settings sections.
 
 ## .spec.configuration.files
 ```yaml
@@ -118,7 +121,7 @@ expands into
         a2,b2,c2,d2
 ```
 `.spec.configuration.files` allows to introduce custom files to ClickHouse via YAML manifest. 
-This can be used in order to create complex custom configurations. One possible usage example is [external dictionary](https://clickhouse.yandex/docs/en/query_language/dicts/external_dicts_dict/)
+This can be used in order to create complex custom configurations. One possible usage example is [external dictionary][external_dicts_dict]
 ```yaml
 spec:
   configuration:
@@ -471,7 +474,7 @@ Another example with selectively described replicas. Note - `replicasCount` spec
               port: 9000
           type: LoadBalancer
 ```
-`.spec.templates.serviceTemplates` represents [Service](https://kubernetes.io/docs/concepts/services-networking/service/) templates
+`.spec.templates.serviceTemplates` represents [Service][service] templates
 with additional sections, such as:
 1. `generateName`
 
@@ -507,7 +510,7 @@ with additional sections, such as:
             requests:
               storage: 1Gi
 ```
-`.spec.templates.volumeClaimTemplates` represents [PersistentVolumeClaim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims) templates
+`.spec.templates.volumeClaimTemplates` represents [PersistentVolumeClaim][persistentvolumeclaims] templates
 
 ## .spec.templates.podTemplates
 ```yaml              
@@ -548,7 +551,7 @@ with additional sections, such as:
                   memory: "64Mi"
                   cpu: "100m"
 ```
-`.spec.templates.podTemplates` represents [Pod Templates](https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#pod-templates) 
+`.spec.templates.podTemplates` represents [Pod Templates][pod-templates] 
 with additional sections, such as:
 1. `zone`
 1. `distribution`
@@ -571,4 +574,12 @@ Example - how to place ClickHouse instances on nodes labeled as `clickhouse=allo
         distribution: "OnePerHost"
 ```
 
-[chi_max_manifest]: ./chi-examples/99-clickhouseinstallation-max.yaml
+[custom-resource]: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
+[99-clickhouseinstallation-max.yaml]: ./chi-examples/99-clickhouseinstallation-max.yaml
+[server-settings_zookeeper]: https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper
+[settings]: https://clickhouse.yandex/docs/en/operations/settings/settings/
+[settings]: https://clickhouse.yandex/docs/en/operations/settings/settings/
+[external_dicts_dict]: https://clickhouse.yandex/docs/en/query_language/dicts/external_dicts_dict/
+[service]: https://kubernetes.io/docs/concepts/services-networking/service/
+[persistentvolumeclaims]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
+[pod-templates]: https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#pod-templates 

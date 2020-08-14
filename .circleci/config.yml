@@ -8,6 +8,8 @@ jobs:
       - run:
           name: Building Docker images
           command: |
+            echo "Building Docker images"
+
             docker build -f dockerfile/operator/Dockerfile -t clickhouse-operator:latest .
             docker build -f dockerfile/metrics-exporter/Dockerfile -t metrics-exporter:latest .
       - run:
@@ -30,6 +32,8 @@ jobs:
       - run:
           name: Building Docker images
           command: |
+            echo "Building Docker images"
+
             docker build -f dockerfile/operator/Dockerfile -t clickhouse-operator:dev .
             docker build -f dockerfile/metrics-exporter/Dockerfile -t metrics-exporter:dev .
       - run:

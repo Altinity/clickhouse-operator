@@ -69,15 +69,18 @@ spec:
   #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
+      type: object
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             # Need to be StringBool
             stop:
               type: string
               enum:
                 # List StringBoolXXX constants from model
+                - ""
                 - "0"
                 - "1"
                 - "False"
@@ -96,22 +99,8 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
-            useTemplates:
-              type: array
-              items:
-                type: object
-                required:
-                  - name
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                  useType:
-                    type: string
-                    enum:
-                      # List useTypeXXX constants from model
-                      - "merge"
+            namespaceDomainPattern:
+              type: string
             defaults:
               type: object
               properties:
@@ -120,6 +109,7 @@ spec:
                   type: string
                   enum:
                     # List StringBoolXXX constants from model
+                    - ""
                     - "0"
                     - "1"
                     - "False"
@@ -179,7 +169,7 @@ spec:
                             type: string
                           port:
                             type: integer
-                            minimum: 1
+                            minimum: 0
                             maximum: 65535
                     session_timeout_ms:
                       type: integer
@@ -199,6 +189,8 @@ spec:
                   type: object
                 files:
                   type: object
+                  additionalProperties:
+                    type: string
                 clusters:
                   type: array
                   items:
@@ -212,30 +204,29 @@ spec:
                         # See namePartClusterMaxLen const
                         maxLength: 15
                         pattern: "^[a-zA-Z0-9-]{0,15}$"
-                      shardsCount:
-                        type: integer
-                        minimum: 1
-                      replicasCount:
-                        type: integer
-                        minimum: 1
-                      templates:
+                      zookeeper:
                         type: object
                         properties:
-                          hostTemplate:
+                          nodes:
+                            type: array
+                            items:
+                              type: object
+                              required:
+                                - host
+                              properties:
+                                host:
+                                  type: string
+                                port:
+                                  type: integer
+                                  minimum: 0
+                                  maximum: 65535
+                          session_timeout_ms:
+                            type: integer
+                          operation_timeout_ms:
+                            type: integer
+                          root:
                             type: string
-                          podTemplate:
-                            type: string
-                          dataVolumeClaimTemplate:
-                            type: string
-                          logVolumeClaimTemplate:
-                            type: string
-                          serviceTemplate:
-                            type: string
-                          clusterServiceTemplate:
-                            type: string
-                          shardServiceTemplate:
-                            type: string
-                          replicaServiceTemplate:
+                          identity:
                             type: string
                       layout:
                         type: object
@@ -271,6 +262,7 @@ spec:
                                   type: string
                                   enum:
                                     # List StringBoolXXX constants from model
+                                    - ""
                                     - "0"
                                     - "1"
                                     - "False"
@@ -427,6 +419,25 @@ spec:
                                             type: string
                                           replicaServiceTemplate:
                                             type: string
+                      templates:
+                        type: object
+                        properties:
+                          hostTemplate:
+                            type: string
+                          podTemplate:
+                            type: string
+                          dataVolumeClaimTemplate:
+                            type: string
+                          logVolumeClaimTemplate:
+                            type: string
+                          serviceTemplate:
+                            type: string
+                          clusterServiceTemplate:
+                            type: string
+                          shardServiceTemplate:
+                            type: string
+                          replicaServiceTemplate:
+                            type: string
             templates:
               type: object
               properties:
@@ -450,6 +461,7 @@ spec:
                               type: string
                               enum:
                                 # List PortDistributionXXX constants
+                                - ""
                                 - "Unspecified"
                                 - "ClusterScopeIndex"
                       spec:
@@ -503,6 +515,8 @@ spec:
                     properies:
                       name:
                         type: string
+                      generateName:
+                        type: string
                       zone:
                         type: object
                         required:
@@ -518,6 +532,7 @@ spec:
                         # DEPRECATED
                         type: string
                         enum:
+                          - ""
                           - "Unspecified"
                           - "OnePerHost"
                       podDistribution:
@@ -530,7 +545,8 @@ spec:
                             type:
                               type: string
                               enum:
-                                # List podDistributionXXX constants
+                                # List PodDistributionXXX constants
+                                - ""
                                 - "Unspecified"
                                 - "ClickHouseAntiAffinity"
                                 - "ShardAntiAffinity"
@@ -546,6 +562,17 @@ spec:
                                 - "ReplicaAffinity"
                                 - "PreviousTailAffinity"
                                 - "CircularReplication"
+                            scope:
+                              type: string
+                              enum:
+                                # list PodDistributionScopeXXX constants
+                                - ""
+                                - "Unspecified"
+                                - "Shard"
+                                - "Replica"
+                                - "Cluster"
+                                - "ClickHouseInstallation"
+                                - "Namespace"
                             number:
                               type: integer
                               minimum: 0
@@ -566,6 +593,7 @@ spec:
                       reclaimPolicy:
                         type: string
                         enum:
+                          - ""
                           - "Retain"
                           - "Delete"
                       spec:
@@ -589,6 +617,23 @@ spec:
                       spec:
                         # TODO specify ServiceSpec
                         type: object
+            useTemplates:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  useType:
+                    type: string
+                    enum:
+                      # List useTypeXXX constants from model
+                      - ""
+                      - "merge"
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -661,15 +706,18 @@ spec:
   #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
+      type: object
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             # Need to be StringBool
             stop:
               type: string
               enum:
                 # List StringBoolXXX constants from model
+                - ""
                 - "0"
                 - "1"
                 - "False"
@@ -688,22 +736,8 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
-            useTemplates:
-              type: array
-              items:
-                type: object
-                required:
-                  - name
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                  useType:
-                    type: string
-                    enum:
-                      # List useTypeXXX constants from model
-                      - "merge"
+            namespaceDomainPattern:
+              type: string
             defaults:
               type: object
               properties:
@@ -712,6 +746,7 @@ spec:
                   type: string
                   enum:
                     # List StringBoolXXX constants from model
+                    - ""
                     - "0"
                     - "1"
                     - "False"
@@ -771,7 +806,7 @@ spec:
                             type: string
                           port:
                             type: integer
-                            minimum: 1
+                            minimum: 0
                             maximum: 65535
                     session_timeout_ms:
                       type: integer
@@ -791,6 +826,8 @@ spec:
                   type: object
                 files:
                   type: object
+                  additionalProperties:
+                    type: string
                 clusters:
                   type: array
                   items:
@@ -804,30 +841,29 @@ spec:
                         # See namePartClusterMaxLen const
                         maxLength: 15
                         pattern: "^[a-zA-Z0-9-]{0,15}$"
-                      shardsCount:
-                        type: integer
-                        minimum: 1
-                      replicasCount:
-                        type: integer
-                        minimum: 1
-                      templates:
+                      zookeeper:
                         type: object
                         properties:
-                          hostTemplate:
+                          nodes:
+                            type: array
+                            items:
+                              type: object
+                              required:
+                                - host
+                              properties:
+                                host:
+                                  type: string
+                                port:
+                                  type: integer
+                                  minimum: 0
+                                  maximum: 65535
+                          session_timeout_ms:
+                            type: integer
+                          operation_timeout_ms:
+                            type: integer
+                          root:
                             type: string
-                          podTemplate:
-                            type: string
-                          dataVolumeClaimTemplate:
-                            type: string
-                          logVolumeClaimTemplate:
-                            type: string
-                          serviceTemplate:
-                            type: string
-                          clusterServiceTemplate:
-                            type: string
-                          shardServiceTemplate:
-                            type: string
-                          replicaServiceTemplate:
+                          identity:
                             type: string
                       layout:
                         type: object
@@ -863,6 +899,7 @@ spec:
                                   type: string
                                   enum:
                                     # List StringBoolXXX constants from model
+                                    - ""
                                     - "0"
                                     - "1"
                                     - "False"
@@ -1019,6 +1056,25 @@ spec:
                                             type: string
                                           replicaServiceTemplate:
                                             type: string
+                      templates:
+                        type: object
+                        properties:
+                          hostTemplate:
+                            type: string
+                          podTemplate:
+                            type: string
+                          dataVolumeClaimTemplate:
+                            type: string
+                          logVolumeClaimTemplate:
+                            type: string
+                          serviceTemplate:
+                            type: string
+                          clusterServiceTemplate:
+                            type: string
+                          shardServiceTemplate:
+                            type: string
+                          replicaServiceTemplate:
+                            type: string
             templates:
               type: object
               properties:
@@ -1042,6 +1098,7 @@ spec:
                               type: string
                               enum:
                                 # List PortDistributionXXX constants
+                                - ""
                                 - "Unspecified"
                                 - "ClusterScopeIndex"
                       spec:
@@ -1095,6 +1152,8 @@ spec:
                     properies:
                       name:
                         type: string
+                      generateName:
+                        type: string
                       zone:
                         type: object
                         required:
@@ -1110,6 +1169,7 @@ spec:
                         # DEPRECATED
                         type: string
                         enum:
+                          - ""
                           - "Unspecified"
                           - "OnePerHost"
                       podDistribution:
@@ -1122,7 +1182,8 @@ spec:
                             type:
                               type: string
                               enum:
-                                # List podDistributionXXX constants
+                                # List PodDistributionXXX constants
+                                - ""
                                 - "Unspecified"
                                 - "ClickHouseAntiAffinity"
                                 - "ShardAntiAffinity"
@@ -1138,6 +1199,17 @@ spec:
                                 - "ReplicaAffinity"
                                 - "PreviousTailAffinity"
                                 - "CircularReplication"
+                            scope:
+                              type: string
+                              enum:
+                                # list PodDistributionScopeXXX constants
+                                - ""
+                                - "Unspecified"
+                                - "Shard"
+                                - "Replica"
+                                - "Cluster"
+                                - "ClickHouseInstallation"
+                                - "Namespace"
                             number:
                               type: integer
                               minimum: 0
@@ -1158,6 +1230,7 @@ spec:
                       reclaimPolicy:
                         type: string
                         enum:
+                          - ""
                           - "Retain"
                           - "Delete"
                       spec:
@@ -1181,6 +1254,23 @@ spec:
                       spec:
                         # TODO specify ServiceSpec
                         type: object
+            useTemplates:
+              type: array
+              items:
+                type: object
+                required:
+                  - name
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                  useType:
+                    type: string
+                    enum:
+                      # List useTypeXXX constants from model
+                      - ""
+                      - "merge"
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -1208,9 +1298,11 @@ spec:
   #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
+      type: object
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             watchNamespaces:
               type: array
@@ -1250,6 +1342,22 @@ spec:
               type: integer
               minimum: 1
               maximum: 65535
+            logtostderr:
+              type: string
+            alsologtostderr:
+              type: string
+            v:
+              type: string
+            stderrthreshold:
+              type: string
+            vmodule:
+              type: string
+            log_backtrace_at:
+              type: string
+            reconcileThreadsNumber:
+              type: integer
+              minimum: 1
+              maximum: 65535
 ---
 # Possible Template Parameters:
 #
@@ -1268,7 +1376,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: clickhouse-operator
+  name: clickhouse-operator-$OPERATOR_NAMESPACE
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -1373,11 +1481,11 @@ data:
     chConfigUserDefaultPassword: "default"
     
     # Default host_regexp to limit network connectivity from outside
-    ChConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+    chConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
     
     ################################################
     ##
-    ## Operator's access to ClickHouse instances
+    ## Access to ClickHouse instances
     ##
     ################################################
     
@@ -1390,6 +1498,28 @@ data:
     chUsername: clickhouse_operator
     chPassword: clickhouse_operator_password
     chPort: 8123
+    
+    ################################################
+    ##
+    ## Log parameters
+    ##
+    ################################################
+    
+    logtostderr: "true"
+    alsologtostderr: "false"
+    v: "1"
+    stderrthreshold: ""
+    vmodule: ""
+    log_backtrace_at: ""
+    
+    ################################################
+    ##
+    ## Runtime parameters
+    ##
+    ################################################
+    
+    # Max number of concurrent reconciles in progress
+    reconcileThreadsNumber: 10
 
 ---
 # Possible Template Parameters:
@@ -1445,12 +1575,22 @@ data:
 
   03-clickhouse-querylog.xml: |
     <yandex>
-    <query_log>
+    <query_log replace="1">
         <database>system</database>
         <table>query_log</table>
-        <partition_by>toMonday(event_date)</partition_by>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
         <flush_interval_milliseconds>7500</flush_interval_milliseconds>
     </query_log>
+    <query_thread_log remove="1"/>
+    </yandex>
+  04-clickhouse-partlog.xml: |
+    <yandex>
+    <part_log replace="1">
+        <database>system</database>
+        <table>part_log</table>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </part_log>
     </yandex>
 ---
 # Possible Template Parameters:
@@ -1583,6 +1723,7 @@ data:
         <profiles>
             <clickhouse_operator>
                 <log_queries>0</log_queries>
+                <skip_unavailable_shards>1</skip_unavailable_shards>
             </clickhouse_operator>
         </profiles>
     </yandex>
@@ -1625,6 +1766,9 @@ spec:
     metadata:
       labels:
         app: clickhouse-operator
+      annotations:
+        prometheus.io/port: '8888'
+        prometheus.io/scrape: 'true'
     spec:
       serviceAccountName: clickhouse-operator
       volumes:

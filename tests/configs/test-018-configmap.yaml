@@ -1,0 +1,17 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-018-configmap
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    settings:
+      timezone: "Europe/Moscow"
+    users:
+      user1/networks/ip: "::/0"
+    clusters:
+    - name: default
+      layout:
+        shardsCount: 1
+        replicasCount: 1

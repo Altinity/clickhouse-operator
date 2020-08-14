@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -13,6 +15,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 type key int
@@ -27,6 +31,13 @@ const (
 	queryIDParamName  = "query_id"
 )
 
+// errors
+var (
+	errEmptyQueryID = errors.New("query id is empty")
+)
+
+var defaultKillQueryTimeout = time.Duration(time.Second)
+
 // conn implements an interface sql.Conn
 type conn struct {
 	url                *url.URL
@@ -40,6 +51,8 @@ type conn struct {
 	stmts              []*stmt
 	logger             *log.Logger
 	closed             int32
+	killQueryOnErr     bool
+	killQueryTimeout   time.Duration
 }
 
 func newConn(cfg *Config) *conn {
@@ -52,6 +65,8 @@ func newConn(cfg *Config) *conn {
 		location:           cfg.Location,
 		useDBLocation:      cfg.UseDBLocation,
 		useGzipCompression: cfg.GzipCompression,
+		killQueryOnErr:     cfg.KillQueryOnErr,
+		killQueryTimeout:   cfg.KillQueryTimeout,
 		transport: &http.Transport{
 			DialContext: (&net.Dialer{
 				Timeout:   cfg.Timeout,
@@ -172,6 +187,35 @@ func (c *conn) beginTx(ctx context.Context) (driver.Tx, error) {
 	return c, nil
 }
 
+func (c *conn) killQuery(req *http.Request, args []driver.Value) error {
+	if !c.killQueryOnErr {
+		return nil
+	}
+	queryID := req.URL.Query().Get(queryIDParamName)
+	if queryID == "" {
+		return errEmptyQueryID
+	}
+	query := fmt.Sprintf("KILL QUERY WHERE query_id='%s'", queryID)
+	timeout := c.killQueryTimeout
+	if timeout == 0 {
+		timeout = defaultKillQueryTimeout
+	}
+	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
+	defer cancelFunc()
+	req, err := c.buildRequest(ctx, query, args, false)
+	if err != nil {
+		return err
+	}
+	body, err := c.doRequest(ctx, req)
+	if err != nil {
+		return err
+	}
+	if body != nil {
+		body.Close()
+	}
+	return nil
+}
+
 func (c *conn) query(ctx context.Context, query string, args []driver.Value) (driver.Rows, error) {
 	if atomic.LoadInt32(&c.closed) != 0 {
 		return nil, driver.ErrBadConn
@@ -182,6 +226,12 @@ func (c *conn) query(ctx context.Context, query string, args []driver.Value) (dr
 	}
 	body, err := c.doRequest(ctx, req)
 	if err != nil {
+		if _, ok := err.(*Error); !ok && err != driver.ErrBadConn {
+			killErr := c.killQuery(req, args)
+			if killErr != nil {
+				c.log("error from killQuery", killErr)
+			}
+		}
 		return nil, err
 	}
 
@@ -248,26 +298,34 @@ func (c *conn) buildRequest(ctx context.Context, query string, params []driver.V
 	}
 	c.log("query: ", query)
 	req, err := http.NewRequest(method, c.url.String(), strings.NewReader(query))
+	if err != nil {
+		return nil, err
+	}
 	// http.Transport ignores url.User argument, handle it here
-	if err == nil && c.user != nil {
+	if c.user != nil {
 		p, _ := c.user.Password()
 		req.SetBasicAuth(c.user.Username(), p)
 	}
+	var queryID, quotaKey string
 	if ctx != nil {
-		quotaKey, quotaOk := ctx.Value(QuotaKey).(string)
-		queryID, queryOk := ctx.Value(QueryID).(string)
-		if quotaOk || queryOk {
-			reqQuery := req.URL.Query()
-			if quotaOk {
-				reqQuery.Add(quotaKeyParamName, quotaKey)
-			}
-			if queryOk && len(queryID) > 0 {
-				reqQuery.Add(queryIDParamName, queryID)
-			}
-			req.URL.RawQuery = reqQuery.Encode()
-		}
+		quotaKey, _ = ctx.Value(QuotaKey).(string)
+		queryID, _ = ctx.Value(QueryID).(string)
 	}
-	return req, err
+
+	if c.killQueryOnErr && queryID == "" {
+		queryID = uuid.NewV4().String()
+	}
+
+	reqQuery := req.URL.Query()
+	if quotaKey != "" {
+		reqQuery.Add(quotaKeyParamName, quotaKey)
+	}
+	if queryID != "" {
+		reqQuery.Add(queryIDParamName, queryID)
+	}
+	req.URL.RawQuery = reqQuery.Encode()
+
+	return req, nil
 }
 
 func (c *conn) prepare(query string) (*stmt, error) {

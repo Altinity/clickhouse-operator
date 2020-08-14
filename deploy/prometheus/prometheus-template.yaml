@@ -1,0 +1,45 @@
+---
+# Setup Prometheus
+# Prometheus would be created in kubectl-specified namespace
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus
+  labels:
+    prometheus: prometheus
+spec:
+  replicas: 2
+  serviceAccountName: prometheus
+  # which ServiceMonitors to be used
+  serviceMonitorSelector:
+    matchLabels:
+      service: clickhouse-operator
+  ruleSelector:
+    matchLabels:
+      role: alert-rules
+      prometheus: prometheus
+  enableAdminAPI: false
+  alerting:
+    alertmanagers:
+    - namespace: ${PROMETHEUS_NAMESPACE}
+      name: alertmanager
+      port: web
+---
+# Setup ClusterIP Service
+# Service would be created in kubectl-specified namespace
+# In order to get access outside of k8s it should be exposed as:
+# kubectl --namespace prometheus port-forward service/prometheus 9090
+# and point browser to localhost:9090
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+spec:
+  type: ClusterIP
+  ports:
+  - name: web
+    port: 9090
+    protocol: TCP
+    targetPort: web
+  selector:
+    prometheus: prometheus

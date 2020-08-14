@@ -129,8 +129,8 @@ func CastStringBoolTo01(str string, defaultValue bool) string {
 	}
 }
 
-// CastStringBoolToTrueFalse casts string-bool into string "true/false"
-func CastStringBoolToTrueFalse(str string, defaultValue bool) string {
+// CastStringBoolToStringTrueFalse casts string-bool into string "true/false"
+func CastStringBoolToStringTrueFalse(str string, defaultValue bool) string {
 	// True and False values
 	_true := StringBoolTrueLowercase
 	_false := StringBoolFalseLowercase

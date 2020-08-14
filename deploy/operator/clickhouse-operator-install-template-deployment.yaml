@@ -93,11 +93,11 @@ data:
     chConfigUserDefaultPassword: "default"
     
     # Default host_regexp to limit network connectivity from outside
-    ChConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+    chConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
     
     ################################################
     ##
-    ## Operator's access to ClickHouse instances
+    ## Access to ClickHouse instances
     ##
     ################################################
     
@@ -110,6 +110,28 @@ data:
     chUsername: clickhouse_operator
     chPassword: clickhouse_operator_password
     chPort: 8123
+    
+    ################################################
+    ##
+    ## Log parameters
+    ##
+    ################################################
+    
+    logtostderr: "true"
+    alsologtostderr: "false"
+    v: "1"
+    stderrthreshold: ""
+    vmodule: ""
+    log_backtrace_at: ""
+    
+    ################################################
+    ##
+    ## Runtime parameters
+    ##
+    ################################################
+    
+    # Max number of concurrent reconciles in progress
+    reconcileThreadsNumber: 10
 
 ---
 # Possible Template Parameters:
@@ -165,12 +187,22 @@ data:
 
   03-clickhouse-querylog.xml: |
     <yandex>
-    <query_log>
+    <query_log replace="1">
         <database>system</database>
         <table>query_log</table>
-        <partition_by>toMonday(event_date)</partition_by>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
         <flush_interval_milliseconds>7500</flush_interval_milliseconds>
     </query_log>
+    <query_thread_log remove="1"/>
+    </yandex>
+  04-clickhouse-partlog.xml: |
+    <yandex>
+    <part_log replace="1">
+        <database>system</database>
+        <table>part_log</table>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </part_log>
     </yandex>
 ---
 # Possible Template Parameters:
@@ -303,6 +335,7 @@ data:
         <profiles>
             <clickhouse_operator>
                 <log_queries>0</log_queries>
+                <skip_unavailable_shards>1</skip_unavailable_shards>
             </clickhouse_operator>
         </profiles>
     </yandex>
@@ -345,6 +378,9 @@ spec:
     metadata:
       labels:
         app: clickhouse-operator
+      annotations:
+        prometheus.io/port: '8888'
+        prometheus.io/scrape: 'true'
     spec:
       serviceAccountName: clickhouse-operator
       volumes:

@@ -6,6 +6,7 @@ spec:
   useTemplates:
     - name: clickhouse-version
     - name: clickhouse-log-volume-mount
+    - name: one-per-host-distribution
   configuration:
     clusters:
       - name: single

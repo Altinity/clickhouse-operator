@@ -15,7 +15,9 @@
 package util
 
 import (
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
+
 	"time"
 )
 
@@ -28,7 +30,7 @@ func Retry(tries int, desc string, f func() error) error {
 			// All ok, no need to retry more
 			if try > 1 {
 				// Done, but after some retries, this is not 'clean'
-				glog.V(1).Infof("DONE attempt %d of %d: %s", try, tries, desc)
+				log.V(1).Infof("DONE attempt %d of %d: %s", try, tries, desc)
 			}
 			return nil
 		}
@@ -36,16 +38,16 @@ func Retry(tries int, desc string, f func() error) error {
 		if try < tries {
 			// Try failed, need to sleep and retry
 			seconds := try * 5
-			glog.V(1).Infof("FAILED attempt %d of %d, sleep %d sec and retry: %s", try, tries, seconds, desc)
+			log.V(1).Infof("FAILED attempt %d of %d, sleep %d sec and retry: %s", try, tries, seconds, desc)
 			select {
 			case <-time.After(time.Duration(seconds) * time.Second):
 			}
 		} else if tries == 1 {
 			// On single try do not put so much emotion. It just failed and user is not intended to retry
-			glog.V(1).Infof("FAILED single try. No retries will be made for %s", desc)
+			log.V(1).Infof("FAILED single try. No retries will be made for %s", desc)
 		} else {
 			// On last try no need to wait more
-			glog.V(1).Infof("FAILED AND ABORT. All %d attempts: %s", tries, desc)
+			log.V(1).Infof("FAILED AND ABORT. All %d attempts: %s", tries, desc)
 		}
 	}
 

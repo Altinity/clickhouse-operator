@@ -9,6 +9,7 @@ echo "Setup ClickHouse Operator into ${OPERATOR_NAMESPACE} namespace"
 echo "1. Build manifest"
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" ${CUR_DIR}/build-clickhouse-operator-install-yaml.sh
 
+VALIDATE_YAML=${VALIDATE_YAML:-true}
 # Let's setup all clickhouse-operator-related stuff into dedicated namespace
 if [[ "${OPERATOR_NAMESPACE}" == "kube-system" ]]; then
     echo "2. No need to create kube-system namespace"
@@ -21,4 +22,4 @@ fi
 
 # Setup into dedicated namespace
 echo "3. Install operator into ${OPERATOR_NAMESPACE} namespace"
-kubectl apply --namespace="${OPERATOR_NAMESPACE}" -f clickhouse-operator-install.yaml
+kubectl apply --validate=${VALIDATE_YAML} --namespace="${OPERATOR_NAMESPACE}" -f "${CUR_DIR}/clickhouse-operator-install.yaml"

@@ -32,46 +32,91 @@ http://<service/clickhouse-operator-metrics>:8888/metrics
 ## Setup Prometheus and integrate it with clickhouse-operator
 In case we do not have Prometheus available, we can setup it directly into k8s and integrate with `clickhouse-operator` 
 
-We are going to setup and manage Prometheus with [Prometheus Operator](https://coreos.com/operators/prometheus/docs/latest/)
+We are going to setup and manage Prometheus with [Prometheus Operator][prometheus-operator]
 
-We already have [manifests available](../deploy/prometheus/). 
-We can either run [create-prometheus.sh](../deploy/prometheus/create-prometheus.sh) or setup the whole process by hands, in case we need to edit configuration.
+We already have [manifests available][deploy-prometheus]. 
+We can either run [create-prometheus.sh][create-prometheus.sh] or setup the whole process by hands, in case we need to edit configuration.
 
   - We'd like to setup all Prometheus-related components into dedicated `namespace`. Let's create it
   ```bash
   kubectl create namespace prometheus
   ```
   
-  - Create CRD for kind:Prometheus and kind:PrometheusRule
+  - Create CRD for prometheus-operator like kind:Prometheus, kind:PrometheusRule etc.
   ```bash
-  kubectl apply --namespace=prometheus -f prometheus.crd.yaml
-  kubectl apply --namespace=prometheus -f prometheusrule.crd.yaml
+  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_prometheuses.yaml
+  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
+  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_alertmanagers.yaml
+  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
+  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
+  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_thanosrulers.yaml
   ```
-     
+
+  - Create RBAC settings for `prometheus-operator`
+  ```bash
+  kubectl --namespace=prometheus apply -f <( \
+    wget -qO- https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/rbac/prometheus/prometheus-cluster-role-binding.yaml | \
+    sed "s/namespace: default/namespace: prometheus/" \
+  )
+  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/rbac/prometheus/prometheus-cluster-role.yaml
+  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/coreos/prometheus-operator/master/example/rbac/prometheus/prometheus-service-account.yaml
+  ```
+
   - Setup `prometheus-operator` into dedicated namespace
   ```bash
-  kubectl apply --namespace=prometheus -f prometheus-operator.yaml
+    kubectl --namespace=prometheus apply -f  <( \
+        wget -qO- https://raw.githubusercontent.com/coreos/prometheus-operator/master/bundle.yaml | \
+        sed "s/namespace: default/namespace: prometheus/" \
+    )
   ```
     
   - Setup `prometheus` into dedicated namespace. `prometheus-operator` would be used to create `prometheus` instance
   ```bash
-  kubectl apply --namespace=prometheus -f prometheus.yaml
+  kubectl apply --namespace=prometheus -f <(wget -qO- https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/prometheus/prometheus-template.yaml | PROMETHEUS_NAMESPACE=prometheus envsubst)
   ```
 
-At this point Prometheus is up and running. What we need to do - setup integration with `clickhouse-operator`
+  - Setup `alertmanager` slack webhook, look at https://api.slack.com/incoming-webhooks how to enable external webhooks in Slack API
+  ```bash
+  export SLACK_WEBHOOK_URL=https://hooks.slack.com/services/XXXX/YYYYY/ZZZZZ
+  export SLACK_CHANNEL="#alerts-channel-name"
+  export PROMETHEUS_NAMESPACE=prometheus
+  export ALERT_MANAGER_EXTERNAL_URL=https://your.external-domain.for-alertmanger/    
+  kubectl apply --namespace=prometheus -f <( \
+    wget -qO- https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/prometheus/prometheus-alertmanager-template.yaml | \
+    envsubst \
+  )
+  ```
+
+  - Setup `clickhouse-operator` alert rules for `prometheus`
+  ```bash
+  kubectl apply --namespace=prometheus -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/prometheus/prometheus-alert-rules.yaml
+  ```
+    
+At this point Prometheus and AlertManager is up and running. What we need to do - setup integration with `clickhouse-operator`
   
   - Point `prometheus` to gather metrics from `clickhouse-operator`
   ```bash
-  kubectl apply --namespace=prometheus -f prometheus-clickhouse-operator-service-monitor.yaml
+  kubectl apply --namespace=prometheus -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/prometheus/prometheus-clickhouse-operator-service-monitor.yaml
   ```
 
 Now we should have Prometheus gathering metrics from `clickhouse-operator`. Let's check it out.
-Let's get access to Prometheus. Port-forward Prometheus to `localhost` as:
+To get access to Prometheus. Port-forward Prometheus to `localhost` as:
 ```bash
 kubectl --namespace=prometheus port-forward service/prometheus 9090
 ```
 and navigate browser to `http://localhost:9090` Prometheus should appear.
 
+To get access to Alert Manager. Port-forward Prometheus to `localhost` as:
+```bash
+kubectl --namespace=prometheus port-forward service/alertmanager 9093
+```
+and navigate browser to `http://localhost:9093/alerts` Alert Manager should appear.
+
 We can check whether `clickhouse-operator` is available at `http://localhost:9090/targets`
 
-More Prometheus [docs](https://prometheus.io/docs/introduction/overview/)
+More Prometheus [docs][prometheus-docs]
+
+[prometheus-operator]: https://coreos.com/operators/prometheus/docs/latest/
+[deploy-prometheus]: ../deploy/prometheus/
+[create-prometheus.sh]: ../deploy/prometheus/create-prometheus.sh
+[prometheus-docs]: https://prometheus.io/docs/introduction/overview/

@@ -1,23 +1,28 @@
 #!/bin/bash
 
 echo "External value for \$GRAFANA_NAMESPACE=$GRAFANA_NAMESPACE"
+echo "External value for \$GRAFANA_OPERATOR_VERSION=$GRAFANA_OPERATOR_VERSION"
 
 GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-grafana}"
+GRAFANA_OPERATOR_VERSION="${GRAFANA_OPERATOR_VERSION:-v3.5.0}"
 
+echo "Setup Grafana"
 echo "OPTIONS"
-echo "Setup Grafana into \$GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE} namespace"
+echo "\$GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE}"
+echo "\$GRAFANA_OPERATOR_VERSION=${GRAFANA_OPERATOR_VERSION}"
 echo ""
 echo "!!! IMPORTANT !!!"
 echo "If you do not agree with specified options, press ctrl-c now"
-sleep 30
+sleep 10
 echo "Apply options now..."
 
 function clean_dir() {
     DIR="$1"
 
     echo "##############################"
-    echo "Clean dir $DIR"
-    rm -rfv $DIR
+    echo "Clean dir $DIR ..."
+    rm -rf $DIR
+    echo "...DONE"
 }
 
 ##############################
@@ -54,6 +59,7 @@ kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f "${GRAFANA_OPERATOR_DIR}/dep
 # 3. If you want to scan for dashboards in other namespaces you also need the cluster roles:
 kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f "${GRAFANA_OPERATOR_DIR}/deploy/cluster_roles"
 # 4. Deploy operator itself
-kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f "${GRAFANA_OPERATOR_DIR}/deploy/operator.yaml"
-
+kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
+    cat "${GRAFANA_OPERATOR_DIR}/deploy/operator.yaml" | sed -e "s/:latest/:${GRAFANA_OPERATOR_VERSION}/g" \
+)
 clean_dir "${TMP_DIR}"

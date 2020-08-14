@@ -1,0 +1,47 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "dist-simple-a"
+spec:
+  defaults:
+    templates:
+      podTemplate: dist-template
+  configuration:
+    clusters:
+      - name: "dc1"
+        layout:
+          shardsCount: 3
+          replicasCount: 3
+  templates:
+    podTemplates:
+      - name: dist-template
+        podDistribution:
+          - type: CircularReplication
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:19.16
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "dist-simple-b"
+spec:
+  defaults:
+    templates:
+      podTemplate: dist-template
+  configuration:
+    clusters:
+      - name: "dc1"
+        layout:
+          shardsCount: 3
+          replicasCount: 3
+  templates:
+    podTemplates:
+      - name: dist-template
+        podDistribution:
+          - type: CircularReplication
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:19.16

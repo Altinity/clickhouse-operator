@@ -1,6 +1,8 @@
-# === Builder ===
+# ===================
+# ===== Builder =====
+# ====================
 
-FROM golang:1.12.7 AS builder-metrics-exporter
+FROM golang:1.13 AS builder
 
 # Install required packages
 RUN apt-get update && apt-get install -y apt-utils gettext-base
@@ -19,7 +21,9 @@ RUN GO111MODULE=on go mod vendor
 # Build operator binary with explicitly specified output
 RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter ./dev/go_build_metrics_exporter.sh
 
-# === Metrics exporter ===
+# ============================
+# ===== Metrics exporter =====
+# ============================
 
 FROM alpine:3.10 AS metrics-exporter
 
@@ -35,11 +39,12 @@ ADD config/templates.d/* /etc/clickhouse-operator/templates.d/
 ADD config/users.d/*     /etc/clickhouse-operator/users.d/
 
 # Copy clickhouse-operator binary into operator image from builder
-COPY --from=builder-metrics-exporter /tmp/metrics-exporter .
+COPY --from=builder /tmp/metrics-exporter .
 
 # Run /metrics-exporter -alsologtostderr=true -v=1
 # We can specify additional options, such as:
 #   --config=/path/to/config
 #   --kube-config=/path/to/kubeconf
 ENTRYPOINT ["/metrics-exporter"]
-CMD ["-alsologtostderr=true", "-v=1"]
+CMD ["-logtostderr=true", "-v=1"]
+#CMD ["-alsologtostderr=true", "-v=1"]

@@ -30,7 +30,7 @@ In case of local test, you'd may prefer to go with [deploy/zookeeper/quick-start
 
 ### Script-based Installation 
 In this example we'll go with simple 1-node Zookeeper cluster on AWS and pick [deploy/zookeeper/quick-start-persistent-volume][quickstart_persistent].
-Both [create](../deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node-create.sh) and [delete](../deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node-delete.sh)
+Both [create][zookeeper-1-node-create.sh] and [delete][zookeeper-1-node-delete.sh]
 shell scripts are available for simplification.  
 
 ### Manual Installation
@@ -54,7 +54,7 @@ Now Zookeeper should be up and running. Let's [explore Zookeeper cluster](#explo
 For fine-tuned Zookeeper setup please refer to [advanced setup](#advanced-setup) options.  
 
 ## Advanced setup
-Advanced files are are located in [deploy/zookeeper/advanced](../deploy/zookeeper/advanced) folder. 
+Advanced files are are located in [deploy/zookeeper/advanced][zookeeper-advanced] folder. 
 All resources are separated into different files so it is easy to modify them and setup required options.  
 
 Advanced setup is available in two options:
@@ -62,8 +62,8 @@ Advanced setup is available in two options:
 1. With [emptyDir volume][k8sdoc_emptydir]
 
 Each of these options have both `create` and `delete` scripts provided
-1. Persistent volume  [create](../deploy/zookeeper/advanced/zookeeper-persistent-volume-create.sh) and [delete](../deploy/zookeeper/advanced/zookeeper-persistent-volume-delete.sh) scripts
-1. EmptyDir volume  [create](../deploy/zookeeper/advanced/zookeeper-volume-emptyDir-create.sh) and [delete](../deploy/zookeeper/advanced/zookeeper-volume-emptyDir-delete.sh) scripts
+1. Persistent volume  [create][zookeeper-persistent-volume-create.sh] and [delete][zookeeper-persistent-volume-delete.sh] scripts
+1. EmptyDir volume  [create][zookeeper-volume-emptyDir-create.sh] and [delete][zookeeper-volume-emptyDir-delete.sh] scripts
 
 Step-by-step explanations:
 
@@ -106,11 +106,15 @@ poddisruptionbudget.policy/zookeeper-pod-distribution-budget created
 ### Storage Class
 This part is not that straightforward and may require communication with k8s instance administrator.
 
-First of all, we need to decide, whether Zookeeper would use [Persistent Volume][k8sdoc_persistent_volume] as a storage or just stick to more simple [Volume][k8sdoc_volume] (In doc [emptyDir][k8sdoc_emptydir] type is used)
+First of all, we need to decide, whether Zookeeper would use [Persistent Volume][k8sdoc_persistent_volume] 
+as a storage or just stick to more simple [Volume][k8sdoc_volume] (In doc [emptyDir][k8sdoc_emptydir] type is used)
 
-In case we'd prefer to stick with simpler solution and go with [Volume of type emptyDir][k8sdoc_emptydir], we need to go with **emptyDir StatefulSet config** [05-stateful-set-volume-emptyDir.yaml](../deploy/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) as described in next [Stateful Set unit](#stateful-set). Just move to [it](#stateful-set).
+In case we'd prefer to stick with simpler solution and go with [Volume of type emptyDir][k8sdoc_emptydir], 
+we need to go with **emptyDir StatefulSet config** [05-stateful-set-volume-emptyDir.yaml][05-stateful-set-volume-emptyDir.yaml] 
+as described in next [Stateful Set unit](#stateful-set). Just move to [it](#stateful-set).
 
-In case we'd prefer to go with [Persistent Volume][k8sdoc_persistent_volume] storage, we need to go with **Persistent Volume StatefulSet config** [05-stateful-set-persistent-volume.yaml](../deploy/zookeeper/advanced/05-stateful-set-persistent-volume.yaml)
+In case we'd prefer to go with [Persistent Volume][k8sdoc_persistent_volume] storage, we need to go 
+with **Persistent Volume StatefulSet config** [05-stateful-set-persistent-volume.yaml][05-stateful-set-persistent-volume.yaml]
 
 Shortly, [Storage Class][k8sdoc_storage_class] is used to bind together [Persistent Volumes][k8sdoc_persistent_volume],
 which are created either by k8s admin manually or automatically by [Provisioner][k8sdocs_dynamic_provisioning]. In any case, Persistent Volumes are provided externally to an application to be deployed into k8s. 
@@ -118,9 +122,12 @@ So, this application has to know **Storage Class Name** to ask for from the k8s 
 This **Storage Class Name** should be asked from k8s admin and written as application's **Persistent Volume Claim** `.spec.volumeClaimTemplates.storageClassName` parameter in `StatefulSet` configuration. **StatefulSet manifest with emptyDir** [05-stateful-set-volume-emptyDir.yaml](../deploy/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) and/or **StatefulSet manifest with Persistent Volume** [05-stateful-set-persistent-volume.yaml](../deploy/zookeeper/advanced/05-stateful-set-persistent-volume.yaml). 
 
 ### Stateful Set
-Edit **StatefulSet manifest with emptyDir** [05-stateful-set-volume-emptyDir.yaml](../deploy/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml) and/or **StatefulSet manifest with Persistent Volume** [05-stateful-set-persistent-volume.yaml](../deploy/zookeeper/advanced/05-stateful-set-persistent-volume.yaml) according to your Storage Preferences.
+Edit **StatefulSet manifest with emptyDir** [05-stateful-set-volume-emptyDir.yaml][05-stateful-set-volume-emptyDir.yaml] 
+and/or **StatefulSet manifest with Persistent Volume** [05-stateful-set-persistent-volume.yaml][05-stateful-set-persistent-volume.yaml] 
+according to your Storage Preferences.
 
-In case we'd go with [Volume of type emptyDir][k8sdoc_emptydir], ensure `.spec.template.spec.containers.volumes` is in place and look like the following:
+In case we'd go with [Volume of type emptyDir][k8sdoc_emptydir], ensure `.spec.template.spec.containers.volumes` is in place 
+and look like the following:
 ```yaml
       volumes:
       - name: datadir-volume
@@ -130,7 +137,8 @@ In case we'd go with [Volume of type emptyDir][k8sdoc_emptydir], ensure `.spec.t
 ```
 and ensure `.spec.volumeClaimTemplates` is commented.
 
-In case we'd go with **Persistent Volume** storage, ensure `.spec.template.spec.containers.volumes` is commented and ensure `.spec.volumeClaimTemplates` is uncommented.
+In case we'd go with **Persistent Volume** storage, ensure `.spec.template.spec.containers.volumes` is commented 
+and ensure `.spec.volumeClaimTemplates` is uncommented.
 ```yaml
   volumeClaimTemplates:
   - metadata:
@@ -144,7 +152,8 @@ In case we'd go with **Persistent Volume** storage, ensure `.spec.template.spec.
 ## storageClassName has to be coordinated with k8s admin and has to be created as a `kind: StorageClass` resource
       storageClassName: storageclass-zookeeper
 ```
-and ensure **storageClassName** (`storageclass-zookeeper` in this example) is specified correctly, as described in [Storage Class](#storage-class) section
+and ensure **storageClassName** (`storageclass-zookeeper` in this example) is specified correctly, as described 
+in [Storage Class](#storage-class) section
 
 As `.yaml` file is ready, just apply it with `kubectl`
 ```bash
@@ -238,3 +247,13 @@ In case all looks fine Zookeeper cluster is up and running
 
 [quickstart_persistent]: ../deploy/zookeeper/quick-start-persistent-volume
 [quickstart_emptydir]: ../deploy/zookeeper/quick-start-volume-emptyDir
+
+[zookeeper-1-node-create.sh]: ../deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node-create.sh
+[zookeeper-1-node-delete.sh]: ../deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node-delete.sh
+[zookeeper-advanced]: ../deploy/zookeeper/advanced
+[zookeeper-persistent-volume-create.sh]: ../deploy/zookeeper/advanced/zookeeper-persistent-volume-create.sh
+[zookeeper-persistent-volume-delete.sh]: ../deploy/zookeeper/advanced/zookeeper-persistent-volume-delete.sh
+[zookeeper-volume-emptyDir-create.sh]: ../deploy/zookeeper/advanced/zookeeper-volume-emptyDir-create.sh
+[zookeeper-volume-emptyDir-delete.sh]: ../deploy/zookeeper/advanced/zookeeper-volume-emptyDir-delete.sh
+[05-stateful-set-volume-emptyDir.yaml]: ../deploy/zookeeper/advanced/05-stateful-set-volume-emptyDir.yaml
+[05-stateful-set-persistent-volume.yaml]: ../deploy/zookeeper/advanced/05-stateful-set-persistent-volume.yaml

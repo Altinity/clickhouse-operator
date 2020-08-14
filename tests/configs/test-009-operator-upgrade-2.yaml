@@ -1,0 +1,78 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-009"
+spec:
+  defaults:
+    replicasUseFQDN: "0"
+    distributedDDL:
+      profile: default
+    templates:
+      podTemplate: clickhouse-template
+      volumeClaimTemplate: aws-ebs-volume-claim
+      serviceTemplate: chi-service-template
+
+  configuration:
+    settings:
+      logger/level: information
+      compression/case/method: zstd
+      merge_tree/index_granularity_bytes: 0
+    users:
+      user1/password: "@@CH_PASSWORD_REPLACE_ME@@"
+      user1/networks/ip: "::/0"
+      user1/profile: "default"
+      user1/allow_databases/database:
+        - "test"
+    profiles:
+      default/max_query_size: 41943040
+      default/max_ast_elements: 100000
+    clusters:
+      - name: test-009
+        templates:
+          podTemplate: clickhouse-template
+          volumeClaimTemplate: aws-ebs-volume-claim
+        layout:
+          replicasCount: 1
+  templates:
+    serviceTemplates:
+      - name: chi-service-template
+        generateName: "service-{chi}"
+        spec:
+          ports:
+            - name: http
+              port: 8443
+              targetPort: 8123
+            - name: client
+              port: 9440
+              targetPort: 9000
+          type: LoadBalancer
+    volumeClaimTemplates:
+      - name: aws-ebs-volume-claim
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Mi
+    podTemplates:
+      - name: clickhouse-template
+        metadata:
+          labels:
+            app: clickhouse
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:19.16
+              ports:
+                - name: http
+                  containerPort: 8123
+                - name: client
+                  containerPort: 9000
+              volumeMounts:
+                - name: aws-ebs-volume-claim
+                  mountPath: /var/lib/clickhouse
+              lifecycle:
+                preStop:
+                  exec:
+                    command: ["/bin/sh", "-c", "pkill -SIGTERM clickhouse-server"]
+          terminationGracePeriodSeconds: 360

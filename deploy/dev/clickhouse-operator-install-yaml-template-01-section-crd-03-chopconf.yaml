@@ -24,9 +24,11 @@ spec:
   #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
+      type: object
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             watchNamespaces:
               type: array
@@ -63,6 +65,22 @@ spec:
             chPassword:
               type: string
             chPort:
+              type: integer
+              minimum: 1
+              maximum: 65535
+            logtostderr:
+              type: string
+            alsologtostderr:
+              type: string
+            v:
+              type: string
+            stderrthreshold:
+              type: string
+            vmodule:
+              type: string
+            log_backtrace_at:
+              type: string
+            reconcileThreadsNumber:
               type: integer
               minimum: 1
               maximum: 65535

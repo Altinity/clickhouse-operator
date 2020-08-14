@@ -14,6 +14,12 @@
 
 package v1
 
+func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
+	if cluster.Zookeeper.IsEmpty() {
+		(&cluster.Zookeeper).MergeFrom(&chi.Spec.Configuration.Zookeeper, MergeTypeFillEmptyValues)
+	}
+}
+
 func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
 	(&cluster.Templates).MergeFrom(&chi.Spec.Defaults.Templates, MergeTypeFillEmptyValues)
 	(&cluster.Templates).HandleDeprecatedFields()
@@ -23,6 +29,10 @@ func (cluster *ChiCluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	name := cluster.Templates.ClusterServiceTemplate
 	template, ok := cluster.CHI.GetServiceTemplate(name)
 	return template, ok
+}
+
+func (cluster *ChiCluster) GetCHI() *ClickHouseInstallation {
+	return cluster.CHI
 }
 
 func (cluster *ChiCluster) GetShard(shard int) *ChiShard {

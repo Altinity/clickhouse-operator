@@ -30,7 +30,9 @@ import (
 
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 
-	"github.com/golang/glog"
+	log "github.com/golang/glog"
+	// log "k8s.io/klog"
+
 	kubeinformers "k8s.io/client-go/informers"
 )
 
@@ -40,12 +42,6 @@ const (
 	metricsPath                             = "/metrics"
 	defaultInformerFactoryResyncPeriod      = 60 * time.Second
 	defaultInformerFactoryResyncDebugPeriod = 60 * time.Second
-)
-
-const (
-	// TODO probably this should be added as a CLI/Config param
-	// Default number of controller threads running concurrently (used in case no other specified in config)
-	defaultControllerThreadsNum = 1
 )
 
 // CLI parameter variables
@@ -74,10 +70,6 @@ var (
 	chopInformerFactoryResyncPeriod = defaultInformerFactoryResyncPeriod
 )
 
-var (
-	controllerThreadsNum = defaultControllerThreadsNum
-)
-
 func init() {
 	flag.BoolVar(&versionRequest, "version", false, "Display clickhouse-operator version and exit")
 	flag.BoolVar(&debugRequest, "debug", false, "Debug run")
@@ -100,13 +92,17 @@ func Run() {
 		chopInformerFactoryResyncPeriod = defaultInformerFactoryResyncDebugPeriod
 	}
 
-	glog.V(1).Infof("Starting clickhouse-operator. Version:%s GitSHA:%s\n", version.Version, version.GitSHA)
+	log.Infof("Starting clickhouse-operator. Version:%s GitSHA:%s BuiltAt:%s\n", version.Version, version.GitSHA, version.BuiltAt)
 
 	// Initialize k8s API clients
 	kubeClient, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
 
 	// Create operator instance
 	chop := chop.GetCHOp(chopClient, chopConfigFile)
+	chop.SetupLog()
+	chop.Config().WriteToLog()
+
+	log.V(1).Infof("Log options parsed\n")
 
 	// Create Informers
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
@@ -149,12 +145,12 @@ func Run() {
 	//
 	// Start Controller
 	//
-	glog.V(1).Info("Starting CHI controller\n")
+	log.V(1).Info("Starting CHI controller\n")
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		chiController.Run(ctx, controllerThreadsNum)
+		chiController.Run(ctx)
 	}()
 	<-ctx.Done()
 	wg.Wait()

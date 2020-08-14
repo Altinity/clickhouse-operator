@@ -15,19 +15,20 @@
 package chi
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 
-	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-	choplisters "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	choplisters "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 )
 
 // Controller defines CRO controller
@@ -69,8 +70,8 @@ type Controller struct {
 	// podListerSynced used in waitForCacheSync()
 	podListerSynced cache.InformerSynced
 
-	// queue used to organize events queue processed by operator
-	queue workqueue.RateLimitingInterface
+	// queues used to organize events queue processed by operator
+	queues []workqueue.RateLimitingInterface
 	// not used explicitly
 	recorder record.EventRecorder
 }

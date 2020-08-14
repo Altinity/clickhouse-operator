@@ -17,6 +17,8 @@ schema://user:password@host[:port]/database?param1=value1&...&paramN=valueN
 * read_timeout - specifies the amount of time to wait for a server's response
 * location - timezone to parse Date and DateTime
 * debug - enables debug logging
+* kill_query - enables killing query on the server side if we have error from transport
+* kill_query_timeout - timeout to kill query (default value is 1 second)
 * other clickhouse options can be specified as well (except default_format)
 
 example:

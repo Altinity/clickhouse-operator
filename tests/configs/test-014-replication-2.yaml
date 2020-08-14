@@ -8,11 +8,14 @@ metadata:
 spec:
   useTemplates:
     - name: clickhouse-version
+    - name: persistent-volume
   configuration:
     zookeeper:
       nodes:
         - host: zookeeper
           port: 2181
+      session_timeout_ms: 5000
+      operation_timeout_ms: 5000
     clusters:
       - name: default
         layout:

@@ -87,8 +87,8 @@ spec:
           image: "docker.io/zookeeper:3.5.6"
           resources:
             requests:
-              memory: "1Gi"
-              cpu: "0.5"
+              memory: "4Gi"
+              cpu: "1"
           ports:
             - containerPort: 2181
               name: client
@@ -110,6 +110,8 @@ spec:
               CLIENT_PORT=2181 &&
               SERVER_PORT=2888 &&
               ELECTION_PORT=3888 &&
+              ZOO_DATA_DIR=/var/lib/zookeeper/data &&
+              ZOO_DATA_LOG_DIR=/var/lib/zookeeper/datalog &&
               {
                 echo "clientPort=${CLIENT_PORT}"
                 echo 'tickTime=2000'
@@ -117,8 +119,8 @@ spec:
                 echo 'syncLimit=10'
                 echo 'maxClientCnxns=2000'
                 echo 'maxSessionTimeout=60000000'
-                echo 'dataDir=/data'
-                echo 'dataLogDir=/datalog'
+                echo "dataDir=${ZOO_DATA_DIR}"
+                echo "dataLogDir=${ZOO_DATA_LOG_DIR}"
                 echo 'autopurge.snapRetainCount=10'
                 echo 'autopurge.purgeInterval=1'
                 echo 'preAllocSize=131072'
@@ -141,9 +143,11 @@ spec:
                   NAME=${BASH_REMATCH[1]}
                   ORD=${BASH_REMATCH[2]}
               else
-                  echo "Fialed to parse name and ordinal of Pod"
+                  echo "Failed to parse name and ordinal of Pod"
                   exit 1
               fi &&
+              mkdir -p ${ZOO_DATA_DIR} &&
+              mkdir -p ${ZOO_DATA_LOG_DIR} &&
               export MY_ID=$((ORD+1)) &&
               echo $MY_ID > $ZOO_DATA_DIR/myid &&
               if [[ $SERVERS -gt 1 ]]; then
@@ -184,4 +188,4 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 1Gi
+            storage: 50Gi

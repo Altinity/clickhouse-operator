@@ -1,0 +1,23 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: "repl-06"
+
+spec:
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper-0.zookeepers.zoo1ns
+    clusters:
+      - name: replcluster1
+        layout:
+          replicasCount: 2
+      - name: replcluster2
+        zookeeper:
+          nodes:
+            - host: zookeeper-0.zookeepers.zoo3ns
+            - host: zookeeper-1.zookeepers.zoo3ns
+            - host: zookeeper-2.zookeepers.zoo3ns
+        layout:
+          replicasCount: 2
