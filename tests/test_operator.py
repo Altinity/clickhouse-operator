@@ -601,4 +601,13 @@ def test_021(config = "configs/test-021-rescale-volume.yaml"):
 
     
     kube_delete_chi(chi) 
-    
+
+@TestScenario
+@Name("test-022-broken-image. Test broken image")
+def test_022(config = "configs/test-022-broken-image.yaml"):
+    chi = get_chi_name(get_full_path(config))
+    create_and_check(config, {"pod_count": 1,"do_not_delete": 1, "chi_status": "InProgress"})
+    with When("ClickHouse image can not be retrieved"):
+        kube_wait_field("pod", "chi-test-022-broken-image-default-0-0-0", ".status.containerStatuses[0].state.waiting.reason", "ErrImagePull")
+        kube_delete_chi(chi) 
+

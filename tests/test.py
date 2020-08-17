@@ -10,6 +10,7 @@ from testflows.asserts import error
 if main():
     with Module("main", flags=TE):
         with Given(f"Clean namespace {settings.test_namespace}"):
+            kube_delete_all_chi(settings.test_namespace)
             kube_deletens(settings.test_namespace)
             kube_createns(settings.test_namespace)
 
@@ -54,11 +55,12 @@ if main():
                 test_019,
                 test_020,
                 test_021,
+                # test_022,
             ]
             run_tests = all_tests
             
             # placeholder for selective test running
-            # run_tests = [(test_009, {"version_from": "0.9.9"})]
+            # run_tests = [test_008, (test_009, {"version_from": "0.9.10"})]
             # run_tests = [test_002]
 
             for t in run_tests:
