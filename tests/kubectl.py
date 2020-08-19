@@ -35,6 +35,14 @@ def kube_delete_chi(chi, ns = namespace):
         shell(f"{kubectlcmd} delete chi {chi} -n {ns}", timeout=120)
         kube_wait_objects(chi, [0,0,0], ns)
 
+def kube_delete_all_chi(ns = namespace):
+    crds = kubectl("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
+    if "clickhouseinstallations.clickhouse.altinity.com" in crds:
+        chis = kube_get("chi", "", ns = ns)["items"]
+        for chi in chis:
+            # kubectl(f"patch chi {chi} --type=merge -p '\{\"metadata\":\{\"finalizers\": [null]\}\}'", ns = ns)
+            kube_delete_chi(chi["metadata"]["name"], ns)
+
 def create_and_check(test_file, checks, ns = namespace):
     config=get_full_path(test_file)
     chi_name=get_chi_name(config)

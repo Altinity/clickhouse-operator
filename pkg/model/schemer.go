@@ -15,7 +15,6 @@
 package model
 
 import (
-	sqlmodule "database/sql"
 	"fmt"
 	"strings"
 
@@ -36,12 +35,14 @@ const (
 	defaultMaxTries = 10
 )
 
+// Schemer
 type Schemer struct {
 	Username string
 	Password string
 	Port     int
 }
 
+// NewSchemer
 func NewSchemer(username, password string, port int) *Schemer {
 	return &Schemer{
 		Username: username,
@@ -50,42 +51,47 @@ func NewSchemer(username, password string, port int) *Schemer {
 	}
 }
 
+// getCHConnection
 func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
 	return clickhouse.GetPooledDBConnection(clickhouse.NewCHConnectionParams(hostname, s.Username, s.Password, s.Port))
 }
 
-func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]string, []string, error) {
-	if len(services) == 0 {
+// getObjectListFromClickHouse
+func (s *Schemer) getObjectListFromClickHouse(endpoints []string, sql string) ([]string, []string, error) {
+	if len(endpoints) == 0 {
+		// Nowhere to fetch data from
 		return nil, nil, nil
 	}
 
 	// Results
 	var names []string
 	var statements []string
-	var rows *sqlmodule.Rows = nil
 	var err error
-	for _, service := range services {
-		log.V(1).Infof("Run query on: %s of %v", service, services)
-		conn := s.getCHConnection(service)
 
-		rows, err = conn.Query(sql)
+	// Fetch data from any of specified services
+	var query *clickhouse.Query = nil
+	for _, endpoint := range endpoints {
+		log.V(1).Infof("Run query on: %s of %v", endpoint, endpoints)
+
+		query, err = s.getCHConnection(endpoint).Query(sql)
 		if err == nil {
+			// One of specified services returned result, no need to iterate more
 			break
 		} else {
-			log.V(1).Infof("Run query on: %s of %v FAILED err: %v", service, services, err)
+			log.V(1).Infof("Run query on: %s of %v FAILED skip to next. err: %v", endpoint, endpoints, err)
 		}
 	}
 	if err != nil {
-		log.V(1).Infof("Run query FAILED, all services %v reported errors", services)
+		log.V(1).Infof("Run query FAILED on all %v", endpoints)
 		return nil, nil, err
 	}
 
-	defer rows.Close()
+	// Some data available, let's fetch it
+	defer query.Close()
 
-	// Some data fetched
-	for rows.Next() {
+	for query.Rows.Next() {
 		var name, statement string
-		if err := rows.Scan(&name, &statement); err == nil {
+		if err := query.Rows.Scan(&name, &statement); err == nil {
 			names = append(names, name)
 			statements = append(statements, statement)
 		} else {
