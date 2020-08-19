@@ -18,11 +18,12 @@ import (
 	"context"
 	sqlmodule "database/sql"
 	"fmt"
+	"time"
+
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
 
 	_ "github.com/mailru/go-clickhouse"
-	"time"
 )
 
 type CHConnection struct {
@@ -101,18 +102,14 @@ func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*sqlmodule
 	return rows, nil
 }
 
-func (c *CHConnection) Exec(sql string) error {
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
-	defer cancel()
-
-	return c.ExecContext(ctx, sql)
-}
-
 // Exec runs given sql query
-func (c *CHConnection) ExecContext(ctx context.Context, sql string) error {
+func (c *CHConnection) Exec(sql string) error {
 	if len(sql) == 0 {
 		return nil
 	}
+
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
+	defer cancel()
 
 	if !c.ensureConnected() {
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
@@ -127,7 +124,7 @@ func (c *CHConnection) ExecContext(ctx context.Context, sql string) error {
 		return err
 	}
 
-	log.V(2).Infof("clickhouse.ExecContext():'%s'", sql)
+	log.V(2).Infof("clickhouse.Exec():\n", sql)
 
 	return nil
 }
