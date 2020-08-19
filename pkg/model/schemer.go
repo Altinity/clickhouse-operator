@@ -15,7 +15,6 @@
 package model
 
 import (
-	sqlmodule "database/sql"
 	"fmt"
 	"strings"
 
@@ -70,12 +69,11 @@ func (s *Schemer) getObjectListFromClickHouse(endpoints []string, sql string) ([
 	var err error
 
 	// Fetch data from any of specified services
-	var rows *sqlmodule.Rows = nil
+	var query *clickhouse.Query = nil
 	for _, endpoint := range endpoints {
 		log.V(1).Infof("Run query on: %s of %v", endpoint, endpoints)
-		conn := s.getCHConnection(endpoint)
 
-		rows, err = conn.Query(sql)
+		query, err = s.getCHConnection(endpoint).Query(sql)
 		if err == nil {
 			// One of specified services returned result, no need to iterate more
 			break
@@ -88,12 +86,12 @@ func (s *Schemer) getObjectListFromClickHouse(endpoints []string, sql string) ([
 		return nil, nil, err
 	}
 
-	// Some data available, fetch it!
-	defer rows.Close()
+	// Some data available, let's fetch it
+	defer query.Close()
 
-	for rows.Next() {
+	for query.Rows.Next() {
 		var name, statement string
-		if err := rows.Scan(&name, &statement); err == nil {
+		if err := query.Rows.Scan(&name, &statement); err == nil {
 			names = append(names, name)
 			statements = append(statements, statement)
 		} else {
