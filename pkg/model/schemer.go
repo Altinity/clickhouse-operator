@@ -36,12 +36,14 @@ const (
 	defaultMaxTries = 10
 )
 
+// Schemer
 type Schemer struct {
 	Username string
 	Password string
 	Port     int
 }
 
+// NewSchemer
 func NewSchemer(username, password string, port int) *Schemer {
 	return &Schemer{
 		Username: username,
@@ -50,12 +52,15 @@ func NewSchemer(username, password string, port int) *Schemer {
 	}
 }
 
+// getCHConnection
 func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
 	return clickhouse.GetPooledDBConnection(clickhouse.NewCHConnectionParams(hostname, s.Username, s.Password, s.Port))
 }
 
+// getObjectListFromClickHouse
 func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]string, []string, error) {
 	if len(services) == 0 {
+		// Nowhere to fetch data from
 		return nil, nil, nil
 	}
 
