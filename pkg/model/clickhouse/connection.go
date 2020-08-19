@@ -71,20 +71,40 @@ func (c *CHConnection) ensureConnected() bool {
 	return c.conn != nil
 }
 
-// Query runs given sql query
-func (c *CHConnection) Query(sql string) (*sqlmodule.Rows, error) {
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
-	defer cancel()
+// Query
+type Query struct {
+	Ctx        context.Context
+	CancelFunc context.CancelFunc
 
-	return c.QueryContext(ctx, sql)
+	Rows *sqlmodule.Rows
 }
 
-func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*sqlmodule.Rows, error) {
+// Close
+func (q *Query) Close() {
+	if q.Rows != nil {
+		err := q.Rows.Close()
+		q.Rows = nil
+		if err != nil {
+			log.V(1).Infof("UNABLE to close rows. err: %v", err)
+		}
+	}
+
+	if q.CancelFunc != nil {
+		q.CancelFunc()
+		q.CancelFunc = nil
+	}
+}
+
+// Query runs given sql query
+func (c *CHConnection) Query(sql string) (*Query, error) {
 	if len(sql) == 0 {
 		return nil, nil
 	}
 
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
+
 	if !c.ensureConnected() {
+		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
 		log.V(1).Info(s)
 		return nil, fmt.Errorf(s)
@@ -92,6 +112,7 @@ func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*sqlmodule
 
 	rows, err := c.conn.QueryContext(ctx, sql)
 	if err != nil {
+		cancel()
 		s := fmt.Sprintf("FAILED Query(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
 		log.V(1).Info(s)
 		return nil, err
@@ -99,7 +120,11 @@ func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*sqlmodule
 
 	log.V(2).Infof("clickhouse.QueryContext():'%s'", sql)
 
-	return rows, nil
+	return &Query{
+		Ctx:        ctx,
+		CancelFunc: cancel,
+		Rows:       rows,
+	}, nil
 }
 
 // Exec runs given sql query
