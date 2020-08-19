@@ -427,7 +427,11 @@ def test_016():
         
     with And("test_usersd user should be available"):
         clickhouse_query(chi, query = "select version()", user = "test_usersd")
-        
+    
+    with And("system.clusters should be empty due to remote_servers override"):
+        out = clickhouse_query(chi, query = "select count() from system.clusters")
+        assert out == "0"
+
     with When("Update usersd settings"):
         start_time = kube_get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         create_and_check("configs/test-016-settings-2.yaml", {"do_not_delete": 1})
