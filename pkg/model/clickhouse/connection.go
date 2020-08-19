@@ -81,6 +81,10 @@ type Query struct {
 
 // Close
 func (q *Query) Close() {
+	if q == nil {
+		return
+	}
+
 	if q.Rows != nil {
 		err := q.Rows.Close()
 		q.Rows = nil
