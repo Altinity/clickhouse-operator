@@ -73,8 +73,8 @@ func (c *CHConnection) ensureConnected() bool {
 
 // Query
 type Query struct {
-	Ctx        context.Context
-	CancelFunc context.CancelFunc
+	ctx        context.Context
+	cancelFunc context.CancelFunc
 
 	Rows *sqlmodule.Rows
 }
@@ -89,9 +89,9 @@ func (q *Query) Close() {
 		}
 	}
 
-	if q.CancelFunc != nil {
-		q.CancelFunc()
-		q.CancelFunc = nil
+	if q.cancelFunc != nil {
+		q.cancelFunc()
+		q.cancelFunc = nil
 	}
 }
 
@@ -121,8 +121,8 @@ func (c *CHConnection) Query(sql string) (*Query, error) {
 	log.V(2).Infof("clickhouse.QueryContext():'%s'", sql)
 
 	return &Query{
-		Ctx:        ctx,
-		CancelFunc: cancel,
+		ctx:        ctx,
+		cancelFunc: cancel,
 		Rows:       rows,
 	}, nil
 }
