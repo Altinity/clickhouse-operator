@@ -58,8 +58,8 @@ func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
 }
 
 // getObjectListFromClickHouse
-func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]string, []string, error) {
-	if len(services) == 0 {
+func (s *Schemer) getObjectListFromClickHouse(endpoints []string, sql string) ([]string, []string, error) {
+	if len(endpoints) == 0 {
 		// Nowhere to fetch data from
 		return nil, nil, nil
 	}
@@ -67,27 +67,30 @@ func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]
 	// Results
 	var names []string
 	var statements []string
-	var rows *sqlmodule.Rows = nil
 	var err error
-	for _, service := range services {
-		log.V(1).Infof("Run query on: %s of %v", service, services)
-		conn := s.getCHConnection(service)
+
+	// Fetch data from any of specified services
+	var rows *sqlmodule.Rows = nil
+	for _, endpoint := range endpoints {
+		log.V(1).Infof("Run query on: %s of %v", endpoint, endpoints)
+		conn := s.getCHConnection(endpoint)
 
 		rows, err = conn.Query(sql)
 		if err == nil {
+			// One of specified services returned result, no need to iterate more
 			break
 		} else {
-			log.V(1).Infof("Run query on: %s of %v FAILED err: %v", service, services, err)
+			log.V(1).Infof("Run query on: %s of %v FAILED skip to next. err: %v", endpoint, endpoints, err)
 		}
 	}
 	if err != nil {
-		log.V(1).Infof("Run query FAILED, all services %v reported errors", services)
+		log.V(1).Infof("Run query FAILED on all %v", endpoints)
 		return nil, nil, err
 	}
 
+	// Some data available, fetch it!
 	defer rows.Close()
 
-	// Some data fetched
 	for rows.Next() {
 		var name, statement string
 		if err := rows.Scan(&name, &statement); err == nil {
