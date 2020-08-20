@@ -551,12 +551,6 @@ def test_020(config = "configs/test-020-multi-volume.yaml"):
                               "pod_volumes": {"/var/lib/clickhouse","/var/lib/clickhouse2"}, 
                               "do_not_delete": 1})
 
-    # WARNING
-    # drwxr-xr-x 11 clickhouse clickhouse 4096 Aug 20 09:35 clickhouse
-    # drwxr-xr-x  3 root       root       4096 Aug 20 09:46 clickhouse2
-    # Ends up with the following error:
-    # Code: 481. DB::Exception: Received from 127.0.0.1:9000. DB::Exception: There is no RW access to disk disk2 (/var/lib/clickhouse2/).
-
     with When("Create a table and insert 1 row"):
         clickhouse_query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
         clickhouse_query(chi, "insert into test_disks values (1)")
