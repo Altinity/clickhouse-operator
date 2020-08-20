@@ -42,3 +42,7 @@ spec:
                   mountPath: /var/lib/clickhouse
                 - name: disk2
                   mountPath: /var/lib/clickhouse2
+              command:
+                - /bin/bash
+                - '-c'
+                - chown clickhouse /var/lib/clickhouse2 && /entrypoint.sh
