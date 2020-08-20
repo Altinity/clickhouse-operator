@@ -357,19 +357,19 @@ def test_014():
             assert out == "1" 
     
     with When("Restart Zookeeper pod"):
-        kubectl("delete pod zookeeper-0")
-        kube_wait_object("pod", "zookeeper-0")
-        kube_wait_pod_status("zookeeper-0", "Running")
+        with Then("Delete Zookeeper pod"):
+            kubectl("delete pod zookeeper-0")
+            time.sleep(1)
 
-        # WARNING
-        # Race condition here
-        # ClickHouse can establish connection at this moment already
-
-        with Then("Insert into the table -- table should be in readonly mode"):
+        with Then("Insert into the table while there is no Zookeeper -- table should be in readonly mode"):
             out = clickhouse_query_with_error("test-014-replication", "insert into test_local values(2)")
             assert "Table is in readonly mode" in out
 
-        with Then("Wait 30 seconds for ClickHouse to reconnect"):
+        with Then("Wait for Zookeeper pod to come back"):
+            kube_wait_object("pod", "zookeeper-0")
+            kube_wait_pod_status("zookeeper-0", "Running")
+
+        with Then("Wait for ClickHouse to reconnect to Zookeeper and switch to read-write mode"):
             time.sleep(30)
         # with Then("Restart clickhouse pods"):
         #    kubectl("delete pod chi-test-014-replication-default-0-0-0")
@@ -571,12 +571,12 @@ def test_020(config = "configs/test-020-multi-volume.yaml"):
 @TestScenario
 @Name("test-021-rescale-volume. Test rescaling storage")
 def test_021(config = "configs/test-021-rescale-volume.yaml"):
-    # WARNING
-    # Hard-coding "standard" as storageclass is not a good way. It may not exist.
     with Given("Default storage class is expandable"):
-        allowVolumeExpansion = kube_get_field("storageclass", "standard", ".allowVolumeExpansion")
+        default_storage_class = kube_get_default_storage_class()
+        assert len(default_storage_class) > 0
+        allowVolumeExpansion = kube_get_field("storageclass", default_storage_class, ".allowVolumeExpansion")
         if allowVolumeExpansion != "true":
-            kubectl("patch storageclass standard -p '{\"allowVolumeExpansion\":true}'")
+            kubectl("patch storageclass {default_storage_class} -p '{\"allowVolumeExpansion\":true}'")
 
     chi = get_chi_name(get_full_path(config))
     create_and_check(config, {"pod_count": 1,"do_not_delete": 1})
