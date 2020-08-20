@@ -535,6 +535,40 @@ func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tole
 	return c.updateCHIObject(cur)
 }
 
+func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
+	namespace, name := NamespaceName(chi.ObjectMeta)
+	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
+
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
+	if err != nil {
+		return err
+	}
+	if cur == nil {
+		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
+	}
+
+	cur.ObjectMeta.Finalizers = append(cur.ObjectMeta.Finalizers, FinalizerName)
+
+	return c.updateCHIObject(cur)
+}
+
+func (c *Controller) uninstallFinalizer(chi *chi.ClickHouseInstallation) error {
+	namespace, name := NamespaceName(chi.ObjectMeta)
+	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
+
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
+	if err != nil {
+		return err
+	}
+	if cur == nil {
+		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
+	}
+
+	cur.ObjectMeta.Finalizers = util.RemoveFromArray(FinalizerName, cur.ObjectMeta.Finalizers)
+
+	return c.updateCHIObject(cur)
+}
+
 // handleObject enqueues CHI which is owner of `obj` into reconcile loop
 func (c *Controller) handleObject(obj interface{}) {
 	// TODO review

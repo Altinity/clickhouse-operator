@@ -74,7 +74,7 @@ func ex2() (ChiSpec, ChiSpec) {
 			},
 		},
 
-		Configuration: ChiConfiguration{
+		Configuration: Configuration{
 
 			Zookeeper: ChiZookeeperConfig{
 				Nodes: []ChiZookeeperNode{
@@ -192,7 +192,7 @@ func ex2() (ChiSpec, ChiSpec) {
 			},
 		},
 
-		Configuration: ChiConfiguration{
+		Configuration: Configuration{
 
 			Zookeeper: ChiZookeeperConfig{
 				Nodes: []ChiZookeeperNode{

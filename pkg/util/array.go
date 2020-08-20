@@ -15,18 +15,33 @@
 package util
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 )
 
 // InArray checks whether needle is in haystack
 func InArray(needle string, haystack []string) bool {
-	for _, b := range haystack {
-		if b == needle {
+	for _, item := range haystack {
+		if item == needle {
 			return true
 		}
 	}
 	return false
+}
+
+// RemoveFromArray removes needle from array
+func RemoveFromArray(needle string, haystack []string) []string {
+	result := []string{}
+
+	for _, item := range haystack {
+		if item == needle {
+			continue
+		}
+		result = append(result, item)
+	}
+
+	return result
 }
 
 // Unzip makes two 1-value columns (slices) out of one 2-value column (slice)
@@ -69,4 +84,15 @@ func CastToSliceOfStrings(m map[string]interface{}) []string {
 	}
 
 	return res
+}
+
+// Slice2String returns named slice as a string
+func Slice2String(name string, slice []string) string {
+	b := &bytes.Buffer{}
+	Fprintf(b, "%s (%d):\n", name, len(slice))
+	for i := range slice {
+		Fprintf(b, "  - %s\n", slice[i])
+	}
+
+	return b.String()
 }
