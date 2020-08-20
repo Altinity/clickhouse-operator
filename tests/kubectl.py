@@ -172,7 +172,7 @@ def kube_get_field(object, name, field, ns = namespace):
     return out[1]
 
 def kube_get_default_storage_class(ns = namespace):
-    out = kubectl(f"get storageclass -o=custom-columns=DEFAULT:'.metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class',NAME:.metadata.name", ns=ns).splitlines()
+    out = kubectl(f"get storageclass -o=custom-columns=DEFAULT:\".metadata.annotations.storageclass\.kubernetes\.io/is-default-class\",NAME:.metadata.name", ns=ns).splitlines()
     for line in out[1:]:
         if line.startswith("true"):
             parts = line.split(maxsplit=1)
