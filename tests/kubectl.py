@@ -35,6 +35,14 @@ def kube_delete_chi(chi, ns = namespace):
         shell(f"{kubectlcmd} delete chi {chi} -n {ns}", timeout=120)
         kube_wait_objects(chi, [0,0,0], ns)
 
+def kube_delete_all_chi(ns = namespace):
+    crds = kubectl("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
+    if "clickhouseinstallations.clickhouse.altinity.com" in crds:
+        chis = kube_get("chi", "", ns = ns)["items"]
+        for chi in chis:
+            # kubectl(f"patch chi {chi} --type=merge -p '\{\"metadata\":\{\"finalizers\": [null]\}\}'", ns = ns)
+            kube_delete_chi(chi["metadata"]["name"], ns)
+
 def create_and_check(test_file, checks, ns = namespace):
     config=get_full_path(test_file)
     chi_name=get_chi_name(config)
@@ -173,6 +181,13 @@ def kube_wait_jsonpath(object, name, field, value, ns=namespace, retries = max_r
 def kube_get_field(object, name, field, ns = namespace):
     out = kubectl(f"get {object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
     return out[1]
+
+def kube_get_default_storage_class(ns = namespace):
+    out = kubectl(f"get storageclass -o=custom-columns=DEFAULT:'.metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class',NAME:.metadata.name", ns=ns).splitlines()
+    for line in out[1:]:
+        if line.startswith("true"):
+            parts = line.split(maxsplit=1)
+            return parts[1].strip()
 
 def kube_get_pod_spec(chi_name, ns = namespace):
     pod = kube_get("pod", "", ns = ns, label = f"-l clickhouse.altinity.com/chi={chi_name}")["items"][0]

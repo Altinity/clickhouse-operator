@@ -15,7 +15,6 @@
 package model
 
 import (
-	sqlmodule "database/sql"
 	"fmt"
 	"strings"
 
@@ -36,12 +35,14 @@ const (
 	defaultMaxTries = 10
 )
 
+// Schemer
 type Schemer struct {
 	Username string
 	Password string
 	Port     int
 }
 
+// NewSchemer
 func NewSchemer(username, password string, port int) *Schemer {
 	return &Schemer{
 		Username: username,
@@ -50,42 +51,55 @@ func NewSchemer(username, password string, port int) *Schemer {
 	}
 }
 
+// getCHConnection
 func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
 	return clickhouse.GetPooledDBConnection(clickhouse.NewCHConnectionParams(hostname, s.Username, s.Password, s.Port))
 }
 
-func (s *Schemer) getObjectListFromClickHouse(services []string, sql string) ([]string, []string, error) {
+// getObjectListFromClickHouse
+func (s *Schemer) getObjectListFromClickHouse(endpoints []string, sql string) ([]string, []string, error) {
+	if len(endpoints) == 0 {
+		// Nowhere to fetch data from
+		return nil, nil, nil
+	}
+
 	// Results
-	names := make([]string, 0)
-	sqlStatements := make([]string, 0)
-
-	var rows *sqlmodule.Rows = nil
+	var names []string
+	var statements []string
 	var err error
-	for _, service := range services {
-		log.V(2).Infof("Trying %s", service)
-		conn := s.getCHConnection(service)
 
-		rows, err = conn.Query(sql)
+	// Fetch data from any of specified services
+	var query *clickhouse.Query = nil
+	for _, endpoint := range endpoints {
+		log.V(1).Infof("Run query on: %s of %v", endpoint, endpoints)
+
+		query, err = s.getCHConnection(endpoint).Query(sql)
 		if err == nil {
-			defer rows.Close()
+			// One of specified services returned result, no need to iterate more
 			break
+		} else {
+			log.V(1).Infof("Run query on: %s of %v FAILED skip to next. err: %v", endpoint, endpoints, err)
 		}
 	}
 	if err != nil {
+		log.V(1).Infof("Run query FAILED on all %v", endpoints)
 		return nil, nil, err
 	}
 
-	// Some data fetched
-	for rows.Next() {
-		var name, sqlStatement string
-		if err := rows.Scan(&name, &sqlStatement); err == nil {
+	// Some data available, let's fetch it
+	defer query.Close()
+
+	for query.Rows.Next() {
+		var name, statement string
+		if err := query.Rows.Scan(&name, &statement); err == nil {
 			names = append(names, name)
-			sqlStatements = append(sqlStatements, sqlStatement)
+			statements = append(statements, statement)
 		} else {
-			// Skip erroneous line
+			log.V(1).Infof("UNABLE to scan row err: %v", err)
 		}
 	}
-	return names, sqlStatements, nil
+
+	return names, statements, nil
 }
 
 // getCreateDistributedObjects returns a list of objects that needs to be created on a shard in a cluster
@@ -109,7 +123,7 @@ func (s *Schemer) getCreateDistributedObjects(host *chop.ChiHost) ([]string, []s
 	// remove new host from the list. See https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
 	hosts[hostIndex] = hosts[nHosts-1]
 	hosts = hosts[:nHosts-1]
-	log.V(1).Infof("Extracting distributed table definitions from %v", hosts)
+	log.V(1).Infof("Extracting distributed table definitions from hosts: %v", hosts)
 
 	cluster_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
 
@@ -158,8 +172,30 @@ func (s *Schemer) getCreateDistributedObjects(host *chop.ChiHost) ([]string, []s
 		cluster_tables,
 	))
 
+	log.V(1).Infof("fetch dbs list")
+	log.V(1).Infof("dbs sql\n%v", sqlDBs)
 	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
+	log.V(1).Infof("names1:")
+	for _, v := range names1 {
+		log.V(1).Infof("names1: %s", v)
+	}
+	log.V(1).Infof("sql1:")
+	for _, v := range sqlStatements1 {
+		log.V(1).Infof("sql1: %s", v)
+	}
+
+	log.V(1).Infof("fetch table list")
+	log.V(1).Infof("tbl sql\n%v", sqlTables)
 	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
+	log.V(1).Infof("names2:")
+	for _, v := range names2 {
+		log.V(1).Infof("names2: %s", v)
+	}
+	log.V(1).Infof("sql2:")
+	for _, v := range sqlStatements2 {
+		log.V(1).Infof("sql2: %s", v)
+	}
+
 	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
 }
 
@@ -247,12 +283,23 @@ func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
 	log.V(1).Infof("Migrating schema objects to host %s", host.Address.HostName)
 
 	names, createSQLs, _ := s.getCreateReplicaObjects(host)
-	log.V(1).Infof("Creating replica objects %v at %s", names, host.Address.HostName)
-	_ = s.hostApplySQLs(host, createSQLs, true)
+	log.V(1).Infof("Creating replica objects at %s: %v", host.Address.HostName, names)
+	log.V(1).Infof("\n%v", createSQLs)
+	err1 := s.hostApplySQLs(host, createSQLs, true)
 
 	names, createSQLs, _ = s.getCreateDistributedObjects(host)
-	log.V(1).Infof("Creating distributed objects %v at %s", names, host.Address.HostName)
-	return s.hostApplySQLs(host, createSQLs, true)
+	log.V(1).Infof("Creating distributed objects at %s: %v", host.Address.HostName, names)
+	log.V(1).Infof("\n%v", createSQLs)
+	err2 := s.hostApplySQLs(host, createSQLs, true)
+
+	if err2 != nil {
+		return err2
+	}
+	if err1 != nil {
+		return err1
+	}
+
+	return nil
 }
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI

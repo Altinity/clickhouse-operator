@@ -27,15 +27,17 @@ if [[ ! -x "${OPERATOR_BIN}" ]]; then
     exit 2
 fi
 
-    echo "Starting ${OPERATOR_BIN}..."
+VERBOSITY="${VERBOSITY:-1}"
 
-    mkdir -p "${LOG_DIR}"
-    rm -f "${LOG_DIR}"/clickhouse-operator.*.log.*
-    "${OPERATOR_BIN}" \
-    	-config="${SRC_ROOT}/config/config-dev.yaml" \
-    	-alsologtostderr=true \
-    	-log_dir=log \
-    	-v=1
+echo "Starting ${OPERATOR_BIN}..."
+
+mkdir -p "${LOG_DIR}"
+rm -f "${LOG_DIR}"/clickhouse-operator.*.log.*
+"${OPERATOR_BIN}" \
+    -config="${SRC_ROOT}/config/config-dev.yaml" \
+    -alsologtostderr=true \
+    -log_dir=log \
+    -v=${VERBOSITY}
 #	-logtostderr=true \
 #	-stderrthreshold=FATAL \
 
@@ -50,7 +52,8 @@ else
     # And clean binary after run. It'll be rebuilt next time
     "${CUR_DIR}/go_build_operator_clean.sh"
 fi
-    echo "======================"
-    echo "=== Logs available ==="
-    echo "======================"
-    ls "${LOG_DIR}"/*
+
+echo "======================"
+echo "=== Logs available ==="
+echo "======================"
+ls "${LOG_DIR}"/*

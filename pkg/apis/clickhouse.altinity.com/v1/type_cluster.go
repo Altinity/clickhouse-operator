@@ -14,10 +14,88 @@
 
 package v1
 
+// ChiCluster defines item of a clusters section of .configuration
+type ChiCluster struct {
+	Name      string             `json:"name"`
+	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty"`
+	Settings  Settings           `json:"settings,omitempty"`
+	Files     Settings           `json:"files,omitempty"`
+	Templates ChiTemplateNames   `json:"templates,omitempty"`
+	Layout    ChiClusterLayout   `json:"layout"`
+
+	// Internal data
+	Address ChiClusterAddress       `json:"address,omitempty"`
+	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+}
+
+// ChiClusterAddress defines address of a cluster within ClickHouseInstallation
+type ChiClusterAddress struct {
+	Namespace    string `json:"namespace,omitempty"`
+	CHIName      string `json:"chiName,omitempty"`
+	ClusterName  string `json:"clusterName,omitempty"`
+	ClusterIndex int    `json:"clusterIndex,omitempty"`
+}
+
+// ChiClusterLayout defines layout section of .spec.configuration.clusters
+type ChiClusterLayout struct {
+	// DEPRECATED - to be removed soon
+	Type          string `json:"type,omitempty"`
+	ShardsCount   int    `json:"shardsCount,omitempty"`
+	ReplicasCount int    `json:"replicasCount,omitempty"`
+	// TODO refactor into map[string]ChiShard
+	Shards            []ChiShard   `json:"shards,omitempty"`
+	Replicas          []ChiReplica `json:"replicas,omitempty"`
+	ShardsSpecified   bool         `json:"-" testdiff:"ignore"`
+	ReplicasSpecified bool         `json:"-" testdiff:"ignore"`
+
+	HostsField *HostsField `json:"-" testdiff:"ignore"`
+}
+
+func (cluster *ChiCluster) FillShardReplicaSpecified() {
+	if len(cluster.Layout.Shards) > 0 {
+		cluster.Layout.ShardsSpecified = true
+	}
+	if len(cluster.Layout.Replicas) > 0 {
+		cluster.Layout.ReplicasSpecified = true
+	}
+}
+
+func (cluster *ChiCluster) isShardSpecified() bool {
+	return cluster.Layout.ShardsSpecified == true
+}
+
+func (cluster *ChiCluster) isReplicaSpecified() bool {
+	return (cluster.Layout.ShardsSpecified == false) && (cluster.Layout.ReplicasSpecified == true)
+}
+
+func (cluster *ChiCluster) IsShardSpecified() bool {
+	if !cluster.isShardSpecified() && !cluster.isReplicaSpecified() {
+		return true
+	}
+
+	return cluster.isShardSpecified()
+}
+
 func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 	if cluster.Zookeeper.IsEmpty() {
 		(&cluster.Zookeeper).MergeFrom(&chi.Spec.Configuration.Zookeeper, MergeTypeFillEmptyValues)
 	}
+}
+
+func (cluster *ChiCluster) InheritSettingsFrom(chi *ClickHouseInstallation) {
+	(&cluster.Settings).MergeFrom(chi.Spec.Configuration.Settings)
+}
+
+func (cluster *ChiCluster) InheritFilesFrom(chi *ClickHouseInstallation) {
+	(&cluster.Files).MergeFromCB(chi.Spec.Configuration.Files, func(path string, _ *Setting) bool {
+		if section, err := getSectionFromPath(path); err == nil {
+			if section == SectionHost {
+				return true
+			}
+		}
+
+		return false
+	})
 }
 
 func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {

@@ -14,6 +14,14 @@
 
 package v1
 
+func (replica *ChiReplica) InheritSettingsFrom(cluster *ChiCluster) {
+	(&replica.Settings).MergeFrom(cluster.Settings)
+}
+
+func (replica *ChiReplica) InheritFilesFrom(cluster *ChiCluster) {
+	(&replica.Files).MergeFrom(cluster.Files)
+}
+
 func (replica *ChiReplica) InheritTemplatesFrom(cluster *ChiCluster) {
 	(&replica.Templates).MergeFrom(&cluster.Templates, MergeTypeFillEmptyValues)
 	(&replica.Templates).HandleDeprecatedFields()

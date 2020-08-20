@@ -26,7 +26,7 @@ kubectl -n "${OPERATOR_NAMESPACE}" apply -f <( \
     METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
     MANIFEST_PRINT_DEPLOYMENT="no" \
     "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" \
-    )
+)
 
 #
 # Deploy operator's deployment
@@ -42,5 +42,10 @@ if [[ "${DEPLOY_OPERATOR}" == "yes" ]]; then
         MANIFEST_PRINT_CRD="no" \
         MANIFEST_PRINT_RBAC="no" \
         "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" \
-        )
+    )
+else
+    echo "------------------------------"
+    echo "      !!! IMPORTANT !!!       "
+    echo "No Operator would be installed"
+    echo "------------------------------"
 fi

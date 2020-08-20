@@ -18,11 +18,12 @@ import (
 	"context"
 	sqlmodule "database/sql"
 	"fmt"
+	"time"
+
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
 
 	_ "github.com/mailru/go-clickhouse"
-	"time"
 )
 
 type CHConnection struct {
@@ -70,20 +71,44 @@ func (c *CHConnection) ensureConnected() bool {
 	return c.conn != nil
 }
 
-// Query runs given sql query
-func (c *CHConnection) Query(sql string) (*sqlmodule.Rows, error) {
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
-	defer cancel()
+// Query
+type Query struct {
+	ctx        context.Context
+	cancelFunc context.CancelFunc
 
-	return c.QueryContext(ctx, sql)
+	Rows *sqlmodule.Rows
 }
 
-func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*sqlmodule.Rows, error) {
+// Close
+func (q *Query) Close() {
+	if q == nil {
+		return
+	}
+
+	if q.Rows != nil {
+		err := q.Rows.Close()
+		q.Rows = nil
+		if err != nil {
+			log.V(1).Infof("UNABLE to close rows. err: %v", err)
+		}
+	}
+
+	if q.cancelFunc != nil {
+		q.cancelFunc()
+		q.cancelFunc = nil
+	}
+}
+
+// Query runs given sql query
+func (c *CHConnection) Query(sql string) (*Query, error) {
 	if len(sql) == 0 {
 		return nil, nil
 	}
 
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
+
 	if !c.ensureConnected() {
+		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
 		log.V(1).Info(s)
 		return nil, fmt.Errorf(s)
@@ -91,6 +116,7 @@ func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*sqlmodule
 
 	rows, err := c.conn.QueryContext(ctx, sql)
 	if err != nil {
+		cancel()
 		s := fmt.Sprintf("FAILED Query(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
 		log.V(1).Info(s)
 		return nil, err
@@ -98,21 +124,21 @@ func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*sqlmodule
 
 	log.V(2).Infof("clickhouse.QueryContext():'%s'", sql)
 
-	return rows, nil
-}
-
-func (c *CHConnection) Exec(sql string) error {
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
-	defer cancel()
-
-	return c.ExecContext(ctx, sql)
+	return &Query{
+		ctx:        ctx,
+		cancelFunc: cancel,
+		Rows:       rows,
+	}, nil
 }
 
 // Exec runs given sql query
-func (c *CHConnection) ExecContext(ctx context.Context, sql string) error {
+func (c *CHConnection) Exec(sql string) error {
 	if len(sql) == 0 {
 		return nil
 	}
+
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
+	defer cancel()
 
 	if !c.ensureConnected() {
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
@@ -127,7 +153,7 @@ func (c *CHConnection) ExecContext(ctx context.Context, sql string) error {
 		return err
 	}
 
-	log.V(2).Infof("clickhouse.ExecContext():'%s'", sql)
+	log.V(2).Infof("clickhouse.Exec():\n", sql)
 
 	return nil
 }
