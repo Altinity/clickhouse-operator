@@ -97,16 +97,16 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.14.10}
 #    export VALIDATE_YAML=false # only for 1.14
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
-#    K8S_VERSION=${K8S_VERSION:-1.16.13}
-#    K8S_VERSION=${K8S_VERSION:-1.17.9}
-    K8S_VERSION=${K8S_VERSION:-1.18.6}
+#    K8S_VERSION=${K8S_VERSION:-1.16.14}
+#    K8S_VERSION=${K8S_VERSION:-1.17.11}
+    K8S_VERSION=${K8S_VERSION:-1.18.8}
     export VALIDATE_YAML=true
 
     minikube config set vm-driver none
     minikube config set kubernetes-version ${K8S_VERSION}
     minikube start
-    minikube addons enable ingress
-    minikube addons enable ingress-dns
+#    minikube addons enable ingress
+#    minikube addons enable ingress-dns
     minikube addons enable metrics-server
     ln -svf $(find /var/lib/minikube/binaries/ -type f -name kubectl) /bin/kubectl
 

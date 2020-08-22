@@ -50,6 +50,7 @@ def create_and_check(test_file, checks, ns = namespace):
     if "apply_templates" in checks:
         for t in checks["apply_templates"]:
             kube_apply(get_full_path(t), ns)
+        time.sleep(1)
 
     kube_apply(config, ns)
     
