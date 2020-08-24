@@ -16,9 +16,9 @@ def clickhouse_query(chi_name, query, with_error=False, host="127.0.0.1", port="
         pwd_str = ""
 
     if with_error:
-        return kubectl(f"exec {pod_name} -n {ns} -- clickhouse-client -mn --echo -h {host} --port={port} -u {user} {pwd_str} --query=\"{query}\" 2>&1", ok_to_fail=True, timeout=timeout)
+        return kubectl(f"exec {pod_name} -n {ns} -- clickhouse-client -mn -h {host} --port={port} -u {user} {pwd_str} --query=\"{query}\" 2>&1", ok_to_fail=True, timeout=timeout)
     else:
-        return kubectl(f"exec {pod_name} -n {ns} -- clickhouse-client -mn --echo -h {host} --port={port} -u {user} {pwd_str} --query=\"{query}\"", timeout=timeout)
+        return kubectl(f"exec {pod_name} -n {ns} -- clickhouse-client -mn -h {host} --port={port} -u {user} {pwd_str} --query=\"{query}\"", timeout=timeout)
 
 
 def clickhouse_query_with_error(chi_name, query, host="127.0.0.1", port="9000", user="default", pwd="", ns=test_namespace, timeout=60):

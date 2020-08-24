@@ -32,7 +32,7 @@ def kubectl(command, ok_to_fail=False, ns = namespace, timeout=60):
 
 def kube_delete_chi(chi, ns = namespace):
     with When(f"Delete chi {chi}"):
-        shell(f"{kubectlcmd} delete chi {chi} -n {ns}", timeout=120)
+        shell(f"{kubectlcmd} delete chi {chi} -n {ns}", timeout=900)
         kube_wait_objects(chi, [0,0,0], ns)
 
 def kube_delete_all_chi(ns = namespace):
@@ -117,16 +117,16 @@ def kube_count_resources(label="", ns = namespace):
     service = kube_get_count("service", ns=ns, label=label)
     return [sts, pod, service]
 
-def kube_apply(config, ns=namespace, validate=True):
+def kube_apply(config, ns=namespace, validate=True, timeout=30):
     with When(f"{config} is applied"):
         cmd = f"{kubectlcmd} apply --validate={validate} -n {ns} -f {config}"
-        cmd = shell(cmd)
+        cmd = shell(cmd, timeout=timeout)
     with Then("exitcode should be 0"):
         assert cmd.exitcode == 0, error()
 
-def kube_delete(config, ns=namespace):
+def kube_delete(config, ns=namespace, timeout=30):
     with When(f"{config} is deleted"):
-        cmd = shell(f"{kubectlcmd} delete -n {ns} -f {config}")
+        cmd = shell(f"{kubectlcmd} delete -n {ns} -f {config}", timeout=timeout)
     with Then("exitcode should be 0"):
         assert cmd.exitcode == 0, error()
 

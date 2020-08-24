@@ -27,6 +27,12 @@ def test_metrics_exporter_reboot():
     def check_monitoring_chi(operator_namespace, operator_pod, expect_result, max_retries=10):
         with And(f"metrics-exporter /chi enpoint result should return {expect_result}"):
             for i in range(1, max_retries):
+                # check /metrics for try to refresh monitored instances
+                kubectl.kubectl(
+                    f"exec {operator_pod} -c metrics-exporter -- wget -O- -q http://127.0.0.1:8888/metrics",
+                    ns=operator_namespace
+                )
+                # check /chi after refresh monitored instances
                 out = kubectl.kubectl(
                     f"exec {operator_pod} -c metrics-exporter -- wget -O- -q http://127.0.0.1:8888/chi",
                     ns=operator_namespace
@@ -58,7 +64,7 @@ def test_metrics_exporter_reboot():
             }]
             check_monitoring_chi(operator_namespace, operator_pod, expected_chi)
             with When("reboot metrics exporter"):
-                kubectl.kubectl(f"exec -n {operator_namespace} {operator_pod} -c metrics-exporter reboot")
+                kubectl.kubectl(f"exec -n {operator_namespace} {operator_pod} -c metrics-exporter -- reboot")
                 time.sleep(15)
                 kubectl.kube_wait_field("pods", "-l app=clickhouse-operator",
                                         ".status.containerStatuses[*].ready", "true,true",

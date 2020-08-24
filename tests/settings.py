@@ -23,4 +23,4 @@ clickhouse_template = "templates/tpl-clickhouse-stable.yaml"
 clickhouse_version = get_ch_version(clickhouse_template)
 
 prometheus_namespace = "prometheus"
-prometheus_operator_version = "0.38"
+prometheus_operator_version = "0.41"

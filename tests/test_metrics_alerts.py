@@ -120,8 +120,7 @@ def test_prometheus_setup():
                                       label="-l app=alertmanager,alertmanager=alertmanager") > 0, error(
             "please run deploy/promehteus/create_prometheus.sh before test run")
         prometheus_operator_exptected_version = f"quay.io/coreos/prometheus-operator:v{settings.prometheus_operator_version}"
-        assert prometheus_operator_exptected_version in prometheus_operator_spec["items"][0]["spec"]["containers"][0][
-            "image"], error(f"require {prometheus_operator_exptected_version} image")
+        assert prometheus_operator_exptected_version in prometheus_operator_spec["items"][0]["spec"]["containers"][0]["image"], error(f"require {prometheus_operator_exptected_version} image")
 
 
 @TestScenario
@@ -130,7 +129,7 @@ def test_metrics_exporter_down():
     def reboot_metrics_exporter():
         clickhouse_operator_pod = clickhouse_operator_spec["items"][0]["metadata"]["name"]
         kubectl.kubectl(
-            f"exec -n {settings.operator_namespace} {clickhouse_operator_pod} -c metrics-exporter reboot",
+            f"exec -n {settings.operator_namespace} {clickhouse_operator_pod} -c metrics-exporter -- reboot",
             ok_to_fail=True,
         )
 
@@ -221,12 +220,30 @@ def test_distributed_files_to_insert():
 
     # we need 70 delayed files for catch
     insert_sql = 'INSERT INTO default.test_distr(event_time, test) SELECT now(), number FROM system.numbers LIMIT 10000'
-    for i in range(120):
+    # clickhouse.clickhouse_query(
+    #     chi["metadata"]["name"], 'SYSTEM STOP DISTRIBUTED SENDS default.test_distr',
+    #     host=delayed_svc, ns=kubectl.namespace
+    # )
+
+    files_to_insert_from_metrics = 0
+    files_to_insert_from_disk = 0
+    tries = 0
+    while files_to_insert_from_disk < 50 and tries < 500:
         kubectl.kubectl(
             f"exec -n {kubectl.namespace} {restarted_pod} -c clickhouse -- kill 1",
             ok_to_fail=True,
         )
-        clickhouse.clickhouse_query(chi["metadata"]["name"], insert_sql, host=delayed_pod, ns=kubectl.namespace)
+        clickhouse.clickhouse_query(chi["metadata"]["name"], insert_sql, host=delayed_svc, ns=kubectl.namespace)
+        files_to_insert_from_metrics = clickhouse.clickhouse_query(
+            chi["metadata"]["name"], "SELECT value FROM system.metrics WHERE metric='DistributedFilesToInsert'",
+            host=delayed_svc, ns=kubectl.namespace
+        )
+        files_to_insert_from_metrics = int(files_to_insert_from_metrics)
+
+        files_to_insert_from_disk = int(kubectl.kubectl(
+            f"exec -n {kubectl.namespace} {delayed_pod} -c clickhouse -- bash -c 'ls -la /var/lib/clickhouse/data/default/test_distr/*/*.bin 2>/dev/null | wc -l'",
+            ok_to_fail=False,
+        ))
 
     with When("reboot clickhouse-server pod"):
         fired = wait_alert_state("DistributedFilesToInsertHigh", "firing", True,
@@ -394,7 +411,7 @@ def test_query_preempted():
 @TestScenario
 @Name("Check ReadonlyReplica")
 def test_read_only_replica():
-    read_only_pod, read_only_svc, max_absolute_delay_pod, max_absolute_delay_svc = random_pod_choice_for_callbacks()
+    read_only_pod, read_only_svc, other_pod, other_svc = random_pod_choice_for_callbacks()
     chi_name = chi["metadata"]["name"]
     create_replicated_table_on_cluster()
 
@@ -416,10 +433,16 @@ def test_read_only_replica():
     kubectl.kube_wait_pod_status("zookeeper-0", "Running", ns=kubectl.namespace)
     kubectl.kube_wait_jsonpath("pod", "zookeeper-0", "{.status.containerStatuses[0].ready}", "true",
                                ns=kubectl.namespace)
+
     clickhouse.clickhouse_query_with_error(
         chi_name, "SYSTEM RESTART REPLICAS; SYSTEM SYNC REPLICA default.test_repl",
         host=read_only_svc, timeout=240
     )
+    clickhouse.clickhouse_query_with_error(
+        chi_name, "SYSTEM RESTART REPLICAS; SYSTEM SYNC REPLICA default.test_repl",
+        host=other_svc, timeout=240
+    )
+
     drop_replicated_table_on_cluster()
 
 @TestScenario
@@ -473,10 +496,12 @@ def test_too_many_connections():
             port = random.choice(["8123", "3306", "9000"])
             if port == "8123":
                 # @TODO HTTPConnection metric increase after full parsing of HTTP Request, we can't provide pause between CONNECT and QUERY running
-                # long_cmd += f"printf \"POST / HTTP/1.1\\r\\nHost: 127.0.0.1:8123\\r\\nContent-Length: 34\\r\\n\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\" | nc -q 5 -i 10 -vv -k 127.0.0.1 {port};"
+                # long_cmd += f"printf \"POST / HTTP/1.1\\r\\nHost: 127.0.0.1:8123\\r\\nContent-Length: 34\\r\\n\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\" | nc -q 5 -i 10 -vv 127.0.0.1 {port};"
                 long_cmd += 'wget -qO- "http://127.0.0.1:8123?query=SELECT sleepEachRow(1),now() FROM numbers(60)";'
+            elif port == "9000":
+                long_cmd += 'clickhouse-client -q "SELECT sleepEachRow(1),now() FROM numbers(60)";'
             else:
-                long_cmd += f"printf \"1\\n1\" | nc -q 5 -i 30 -vv -k 127.0.0.1 {port};"
+                long_cmd += f"printf \"1\\n1\" | nc -q 5 -i 30 -vv 127.0.0.1 {port};"
 
         nc_cmd = f"echo '{long_cmd} exit 0' | xargs --verbose -i'{{}}' --no-run-if-empty -d ';' -P 120 bash -c '{{}}' 1>/dev/null"
         with open("/tmp/nc_cmd.sh", "w") as f:
@@ -658,7 +683,7 @@ def test_zookeeper_hardware_exceptions():
 
 
 if main():
-    with Module("metrics_alerts"):
+    with Module("main"):
         with Given("get information about prometheus installation"):
             prometheus_operator_spec = kubectl.kube_get(
                 "pod", ns=settings.prometheus_namespace, name="",
@@ -674,6 +699,8 @@ if main():
                 "pod", ns=settings.prometheus_namespace, name="",
                 label="-l app=prometheus,prometheus=prometheus"
             )
+            assert "items" in prometheus_spec and len(prometheus_spec["items"]) > 0 and "metadata" in prometheus_spec["items"][0], "invalid prometheus_spec"
+
         with Given("install zookeeper+clickhouse"):
             kubectl.kube_deletens(kubectl.namespace)
             kubectl.kube_createns(kubectl.namespace)
@@ -694,23 +721,24 @@ if main():
             )
             chi = kubectl.kube_get("chi", ns=kubectl.namespace, name="test-cluster-for-alerts")
 
-        test_cases = [
-            test_read_only_replica,
-            test_prometheus_setup,
-            test_metrics_exporter_down,
-            test_clickhouse_server_reboot,
-            test_clickhouse_dns_errors,
-            test_replicas_max_abosulute_delay,
-            test_distributed_connection_exceptions,
-            test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_inserted_rows_per_query,
-            test_too_many_connections,
-            test_too_much_running_queries,
-            test_longest_running_query,
-            test_system_settings_changed,
-            test_version_changed,
-            test_zookeeper_hardware_exceptions,
-            # @TODO uncomment it when  https://github.com/ClickHouse/ClickHouse/pull/11220 will merged to docker latest image
-            # test_distributed_files_to_insert,
-        ]
-        for t in test_cases:
-            run(test=t)
+        with Module("metrics_alerts"):
+            test_cases = [
+                test_prometheus_setup,
+                test_read_only_replica,
+                test_metrics_exporter_down,
+                test_clickhouse_server_reboot,
+                test_clickhouse_dns_errors,
+                test_replicas_max_abosulute_delay,
+                test_distributed_connection_exceptions,
+                test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_inserted_rows_per_query,
+                test_too_many_connections,
+                test_too_much_running_queries,
+                test_longest_running_query,
+                test_system_settings_changed,
+                test_version_changed,
+                test_zookeeper_hardware_exceptions,
+                # @TODO remove it when  https://github.com/ClickHouse/ClickHouse/pull/11220 will merged to docker latest image
+                # test_distributed_files_to_insert,
+            ]
+            for t in test_cases:
+                run(test=t)
