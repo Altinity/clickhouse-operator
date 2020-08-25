@@ -189,8 +189,6 @@ spec:
                   type: object
                 files:
                   type: object
-                  additionalProperties:
-                    type: string
                 clusters:
                   type: array
                   items:
@@ -252,9 +250,6 @@ spec:
                                 # DEPRECATED - to be removed soon
                                 definitionType:
                                   type: string
-                                replicasCount:
-                                  type: integer
-                                  minimum: 1
                                 weight:
                                   type: integer
                                 # Need to be StringBool
@@ -281,6 +276,10 @@ spec:
                                     - "disabled"
                                     - "Enabled"
                                     - "enabled"
+                                settings:
+                                  type: object
+                                files:
+                                  type: object
                                 templates:
                                   type: object
                                   properties:
@@ -300,6 +299,9 @@ spec:
                                       type: string
                                     replicaServiceTemplate:
                                       type: string
+                                replicasCount:
+                                  type: integer
+                                  minimum: 1
                                 replicas:
                                   type: array
                                   items:
@@ -324,6 +326,10 @@ spec:
                                         type: integer
                                         minimum: 1
                                         maximum: 65535
+                                      settings:
+                                        type: object
+                                      files:
+                                        type: object
                                       templates:
                                         type: object
                                         properties:
@@ -354,9 +360,10 @@ spec:
                                   # See namePartShardMaxLen const
                                   maxLength: 15
                                   pattern: "^[a-zA-Z0-9-]{0,15}$"
-                                shardsCount:
-                                  type: integer
-                                  minimum: 1
+                                settings:
+                                  type: object
+                                files:
+                                  type: object
                                 templates:
                                   type: object
                                   properties:
@@ -376,6 +383,9 @@ spec:
                                       type: string
                                     replicaServiceTemplate:
                                       type: string
+                                shardsCount:
+                                  type: integer
+                                  minimum: 1
                                 shards:
                                   type: array
                                   items:
@@ -400,6 +410,10 @@ spec:
                                         type: integer
                                         minimum: 1
                                         maximum: 65535
+                                      settings:
+                                        type: object
+                                      files:
+                                        type: object
                                       templates:
                                         type: object
                                         properties:
@@ -634,3 +648,4 @@ spec:
                       # List useTypeXXX constants from model
                       - ""
                       - "merge"
+

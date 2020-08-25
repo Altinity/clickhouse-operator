@@ -16,18 +16,17 @@ package v1
 
 import (
 	"bytes"
-	"github.com/altinity/clickhouse-operator/pkg/util"
+	"os"
+	"strings"
+
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
 
 	"github.com/imdario/mergo"
 	"github.com/kubernetes-sigs/yaml"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 const (
@@ -57,6 +56,91 @@ const (
 	defaultReconcileThreadsNumber = 1
 )
 
+// !!! IMPORTANT !!!
+// !!! IMPORTANT !!!
+// !!! IMPORTANT !!!
+// !!! IMPORTANT !!!
+// !!! IMPORTANT !!!
+// Do not forget to update func (config *OperatorConfig) String()
+// Do not forget to update CRD spec
+type OperatorConfig struct {
+	// Full path to the config file and folder where this OperatorConfig originates from
+	ConfigFilePath   string
+	ConfigFolderPath string
+
+	// WatchNamespaces where operator watches for events
+	WatchNamespaces []string `json:"watchNamespaces" yaml:"watchNamespaces"`
+
+	// Paths where to look for additional ClickHouse config .xml files to be mounted into Pod
+	CHCommonConfigsPath string `json:"chCommonConfigsPath" yaml:"chCommonConfigsPath"`
+	CHHostConfigsPath   string `json:"chHostConfigsPath"   yaml:"chHostConfigsPath"`
+	CHUsersConfigsPath  string `json:"chUsersConfigsPath"  yaml:"chUsersConfigsPath"`
+	// OperatorConfig files fetched from these paths. Maps "file name->file content"
+	CHCommonConfigs map[string]string
+	CHHostConfigs   map[string]string
+	CHUsersConfigs  map[string]string
+
+	// Path where to look for ClickHouseInstallation templates .yaml files
+	CHITemplatesPath string `json:"chiTemplatesPath" yaml:"chiTemplatesPath"`
+	// CHI template files fetched from this path. Maps "file name->file content"
+	CHITemplateFiles map[string]string
+	// CHI template objects unmarshalled from CHITemplateFiles. Maps "metadata.name->object"
+	CHITemplates []*ClickHouseInstallation
+	// ClickHouseInstallation template
+	CHITemplate *ClickHouseInstallation
+
+	// Create/Update StatefulSet behavior - for how long to wait for StatefulSet to reach new Generation
+	StatefulSetUpdateTimeout uint64 `json:"statefulSetUpdateTimeout" yaml:"statefulSetUpdateTimeout"`
+	// Create/Update StatefulSet behavior - for how long to sleep while polling StatefulSet to reach new Generation
+	StatefulSetUpdatePollPeriod uint64 `json:"statefulSetUpdatePollPeriod" yaml:"statefulSetUpdatePollPeriod"`
+
+	// Rolling Create/Update behavior
+	// StatefulSet create behavior - what to do in case StatefulSet can't reach new Generation
+	OnStatefulSetCreateFailureAction string `json:"onStatefulSetCreateFailureAction" yaml:"onStatefulSetCreateFailureAction"`
+	// StatefulSet update behavior - what to do in case StatefulSet can't reach new Generation
+	OnStatefulSetUpdateFailureAction string `json:"onStatefulSetUpdateFailureAction" yaml:"onStatefulSetUpdateFailureAction"`
+
+	// Default values for ClickHouse user configuration
+	// 1. user/profile - string
+	// 2. user/quota - string
+	// 3. user/networks/ip - multiple strings
+	// 4. user/password - string
+	CHConfigUserDefaultProfile    string   `json:"chConfigUserDefaultProfile"    yaml:"chConfigUserDefaultProfile"`
+	CHConfigUserDefaultQuota      string   `json:"chConfigUserDefaultQuota"      yaml:"chConfigUserDefaultQuota"`
+	CHConfigUserDefaultNetworksIP []string `json:"chConfigUserDefaultNetworksIP" yaml:"chConfigUserDefaultNetworksIP"`
+	CHConfigUserDefaultPassword   string   `json:"chConfigUserDefaultPassword"   yaml:"chConfigUserDefaultPassword"`
+
+	CHConfigNetworksHostRegexpTemplate string `json:"chConfigNetworksHostRegexpTemplate" yaml:"chConfigNetworksHostRegexpTemplate"`
+	// Username and Password to be used by operator to connect to ClickHouse instances for
+	// 1. Metrics requests
+	// 2. Schema maintenance
+	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
+	CHUsername string `json:"chUsername" yaml:"chUsername"`
+	CHPassword string `json:"chPassword" yaml:"chPassword"`
+	CHPort     int    `json:"chPort"     yaml:"chPort"`
+
+	Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
+	Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`
+	V                string `json:"v"                yaml:"v"`
+	Stderrthreshold  string `json:"stderrthreshold"  yaml:"stderrthreshold"`
+	Vmodule          string `json:"vmodule"          yaml:"vmodule"`
+	Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
+
+	// Max number of concurrent reconciles in progress
+	ReconcileThreadsNumber int `json:"reconcileThreadsNumber" yaml:"reconcileThreadsNumber"`
+
+	//
+	// The end of OperatorConfig
+	//
+	// !!! IMPORTANT !!!
+	// !!! IMPORTANT !!!
+	// !!! IMPORTANT !!!
+	// !!! IMPORTANT !!!
+	// !!! IMPORTANT !!!
+	// Do not forget to update func (config *OperatorConfig) String()
+	// Do not forget to update CRD spec
+}
+
 // MergeFrom merges
 func (config *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) {
 	switch _type {
@@ -74,7 +158,7 @@ func (config *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) {
 // readCHITemplates build OperatorConfig.CHITemplate from template files content
 func (config *OperatorConfig) readCHITemplates() {
 	// Read CHI template files
-	config.CHITemplateFiles = readConfigFiles(config.CHITemplatesPath, config.isCHITemplateExt)
+	config.CHITemplateFiles = util.ReadFilesIntoMap(config.CHITemplatesPath, config.isCHITemplateExt)
 
 	// Produce map of CHI templates out of CHI template files
 	for filename := range config.CHITemplateFiles {
@@ -118,6 +202,7 @@ func (config *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation
 	// TODO compact the slice
 }
 
+// FindTemplate
 func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *ClickHouseInstallation {
 	// Try to find direct match
 	for _, _template := range config.CHITemplates {
@@ -194,21 +279,25 @@ func (config *OperatorConfig) buildUnifiedCHITemplate() {
 	*/
 }
 
+// AddCHITemplate
 func (config *OperatorConfig) AddCHITemplate(template *ClickHouseInstallation) {
 	config.enlistCHITemplate(template)
 	config.buildUnifiedCHITemplate()
 }
 
+// UpdateCHITemplate
 func (config *OperatorConfig) UpdateCHITemplate(template *ClickHouseInstallation) {
 	config.enlistCHITemplate(template)
 	config.buildUnifiedCHITemplate()
 }
 
+// DeleteCHITemplate
 func (config *OperatorConfig) DeleteCHITemplate(template *ClickHouseInstallation) {
 	config.unlistCHITemplate(template)
 	config.buildUnifiedCHITemplate()
 }
 
+// Postprocess
 func (config *OperatorConfig) Postprocess() {
 	config.normalize()
 	config.readClickHouseCustomConfigFiles()
@@ -223,12 +312,12 @@ func (config *OperatorConfig) normalize() {
 
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
-	config.prepareConfigPath(&config.CHCommonConfigsPath, "config.d")
-	config.prepareConfigPath(&config.CHHostConfigsPath, "conf.d")
-	config.prepareConfigPath(&config.CHUsersConfigsPath, "users.d")
+	util.PreparePath(&config.CHCommonConfigsPath, config.ConfigFolderPath, CommonConfigDir)
+	util.PreparePath(&config.CHHostConfigsPath, config.ConfigFolderPath, HostConfigDir)
+	util.PreparePath(&config.CHUsersConfigsPath, config.ConfigFolderPath, UsersConfigDir)
 
 	// Process ClickHouseInstallation templates section
-	config.prepareConfigPath(&config.CHITemplatesPath, "templates.d")
+	util.PreparePath(&config.CHITemplatesPath, config.ConfigFolderPath, TemplatesDir)
 
 	// Process Create/Update section
 
@@ -345,44 +434,15 @@ func (config *OperatorConfig) applyDefaultWatchNamespace() {
 	}
 }
 
-// prepareConfigPath - prepares config path absolute/relative with default relative value
-func (config *OperatorConfig) prepareConfigPath(path *string, defaultRelativePath string) {
-	if *path == "" {
-		// Path not specified, try to build it relative to config file
-		*path = config.relativeToConfigFolderPath(defaultRelativePath)
-	} else if filepath.IsAbs(*path) {
-		// Absolute path explicitly specified - nothing to do here
-	} else {
-		// Relative path specified - make relative path relative to config file itself
-		*path = config.relativeToConfigFolderPath(*path)
-	}
-
-	// In case of incorrect/unavailable path - make it empty
-	if (*path != "") && !util.IsDirOk(*path) {
-		*path = ""
-	}
-}
-
-// relativeToConfigFolderPath returns absolute path relative to ConfigFolderPath
-func (config *OperatorConfig) relativeToConfigFolderPath(relativePath string) string {
-	if config.ConfigFolderPath == "" {
-		// Relative base is not set, do nothing
-		return relativePath
-	}
-
-	// Relative base is set - try to be ralative to it
-	if absPath, err := filepath.Abs(config.ConfigFolderPath + "/" + relativePath); err == nil {
-		return absPath
-	} else {
-		return ""
-	}
-}
-
 // readClickHouseCustomConfigFiles reads all extra user-specified ClickHouse config files
 func (config *OperatorConfig) readClickHouseCustomConfigFiles() {
-	config.CHCommonConfigs = readConfigFiles(config.CHCommonConfigsPath, config.isCHConfigExt)
-	config.CHHostConfigs = readConfigFiles(config.CHHostConfigsPath, config.isCHConfigExt)
-	config.CHUsersConfigs = readConfigFiles(config.CHUsersConfigsPath, config.isCHConfigExt)
+	log.V(0).Infof("Read Common Config files from folder: %s", config.CHCommonConfigsPath)
+	log.V(0).Infof("Read Host Config files from folder: %s", config.CHHostConfigsPath)
+	log.V(0).Infof("Read Users Config files from folder: %s", config.CHUsersConfigsPath)
+
+	config.CHCommonConfigs = util.ReadFilesIntoMap(config.CHCommonConfigsPath, config.isCHConfigExt)
+	config.CHHostConfigs = util.ReadFilesIntoMap(config.CHHostConfigsPath, config.isCHConfigExt)
+	config.CHUsersConfigs = util.ReadFilesIntoMap(config.CHUsersConfigsPath, config.isCHConfigExt)
 }
 
 // isCHConfigExt returns true in case specified file has proper extension for a ClickHouse config file
@@ -415,18 +475,18 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 	util.Fprintf(b, "ConfigFilePath: %s\n", config.ConfigFilePath)
 	util.Fprintf(b, "ConfigFolderPath: %s\n", config.ConfigFolderPath)
 
-	util.Fprintf(b, "%s", config.stringSlice("WatchNamespaces", config.WatchNamespaces))
+	util.Fprintf(b, "%s", util.Slice2String("WatchNamespaces", config.WatchNamespaces))
 
 	util.Fprintf(b, "CHCommonConfigsPath: %s\n", config.CHCommonConfigsPath)
 	util.Fprintf(b, "CHHostConfigsPath: %s\n", config.CHHostConfigsPath)
 	util.Fprintf(b, "CHUsersConfigsPath: %s\n", config.CHUsersConfigsPath)
 
-	util.Fprintf(b, "%s", config.stringMap("CHCommonConfigs", config.CHCommonConfigs))
-	util.Fprintf(b, "%s", config.stringMap("CHHostConfigs", config.CHHostConfigs))
-	util.Fprintf(b, "%s", config.stringMap("CHUsersConfigs", config.CHUsersConfigs))
+	util.Fprintf(b, "%s", util.Map2String("CHCommonConfigs", config.CHCommonConfigs))
+	util.Fprintf(b, "%s", util.Map2String("CHHostConfigs", config.CHHostConfigs))
+	util.Fprintf(b, "%s", util.Map2String("CHUsersConfigs", config.CHUsersConfigs))
 
 	util.Fprintf(b, "CHITemplatesPath: %s\n", config.CHITemplatesPath)
-	util.Fprintf(b, "%s", config.stringMap("CHITemplateFiles", config.CHITemplateFiles))
+	util.Fprintf(b, "%s", util.Map2String("CHITemplateFiles", config.CHITemplateFiles))
 
 	util.Fprintf(b, "StatefulSetUpdateTimeout: %d\n", config.StatefulSetUpdateTimeout)
 	util.Fprintf(b, "StatefulSetUpdatePollPeriod: %d\n", config.StatefulSetUpdatePollPeriod)
@@ -436,7 +496,7 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 
 	util.Fprintf(b, "CHConfigUserDefaultProfile: %s\n", config.CHConfigUserDefaultProfile)
 	util.Fprintf(b, "CHConfigUserDefaultQuota: %s\n", config.CHConfigUserDefaultQuota)
-	util.Fprintf(b, "%s", config.stringSlice("CHConfigUserDefaultNetworksIP", config.CHConfigUserDefaultNetworksIP))
+	util.Fprintf(b, "%s", util.Slice2String("CHConfigUserDefaultNetworksIP", config.CHConfigUserDefaultNetworksIP))
 	password = config.CHConfigUserDefaultPassword
 	if hideCredentials {
 		password = PasswordReplacer
@@ -469,40 +529,6 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 // WriteToLog writes OperatorConfig into log
 func (config *OperatorConfig) WriteToLog() {
 	log.V(1).Infof("OperatorConfig:\n%s", config.String(true))
-}
-
-// stringSlice returns string of named []string OperatorConfig param
-func (config *OperatorConfig) stringSlice(name string, sl []string) string {
-	b := &bytes.Buffer{}
-	util.Fprintf(b, "%s (%d):\n", name, len(sl))
-	for i := range sl {
-		util.Fprintf(b, "  - %s\n", sl[i])
-	}
-
-	return b.String()
-}
-
-// stringMap returns string of named map[string]string OperatorConfig param
-func (config *OperatorConfig) stringMap(name string, m map[string]string) string {
-	// Write params according to sorted names
-	// So we need to
-	// 1. Extract and sort names aka keys
-	// 2. Walk over keys and log params
-	// Sort names aka keys
-	var keys []string
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	// Walk over sorted names aka keys
-	b := &bytes.Buffer{}
-	util.Fprintf(b, "%s (%d):\n", name, len(m))
-	for _, k := range keys {
-		util.Fprintf(b, "  - [%s]=%s\n", k, m[k])
-	}
-
-	return b.String()
 }
 
 // TODO unify with GetInformerNamespace
@@ -538,11 +564,4 @@ func (config *OperatorConfig) GetInformerNamespace() string {
 	}
 
 	return namespace
-}
-
-// readConfigFiles reads config files from specified path into "file name->file content" map
-// path - folder where to look for files
-// isCHConfigExt - accepts path to file return bool whether this file has config extension
-func readConfigFiles(path string, isConfigExt func(string) bool) map[string]string {
-	return util.ReadFilesIntoMap(path, isConfigExt)
 }

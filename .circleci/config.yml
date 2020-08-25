@@ -65,9 +65,9 @@ jobs:
 #      TODO upgrade to paid plan
 #      docker_layer_caching: true
     environment:
-      K8S_VERSION: v1.18.6
+      K8S_VERSION: v1.18.8
       KUBECONFIG: /home/circleci/.kube/config
-      MINIKUBE_VERSION: v1.12.1
+      MINIKUBE_VERSION: v1.12.3
       MINIKUBE_WANTUPDATENOTIFICATION: false
       MINIKUBE_WANTREPORTERRORPROMPT: false
       MINIKUBE_HOME: /home/circleci
@@ -111,12 +111,14 @@ jobs:
             ~/clickhouse-operator/venv/bin/pip3 --version
             ~/clickhouse-operator/venv/bin/pip3 install -U -r ./tests/requirements.txt
       - run:
-          name: Setup minikube
+          name: Setup minikube and kubectl
           command: |
             mkdir -p /home/circleci/.minikube/cache/
-            wget -c --progress=bar:force:noscroll -O /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64
+            wget --progress=bar:force:noscroll -O /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64
             sudo chmod +x /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION}
             sudo ln -svf /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} /usr/local/bin/minikube
+            sudo wget --progress=bar:force:noscroll -O /usr/local/bin/kubectl "https://storage.googleapis.com/kubernetes-release/release/${K8S_VERSION}/bin/linux/amd64/kubectl"
+            sudo chmod +x /usr/local/bin/kubectl
       - run:
           name: Start minikube
           command: |
@@ -124,7 +126,6 @@ jobs:
             touch ${HOME}/.kube/config
             sudo apt-get install conntrack
             minikube start --driver=docker --cpus $(nproc) --kubernetes-version=${K8S_VERSION} -v=9 --addons=ingress,ingress-dns
-            sudo ln -svf $(find /home/circleci/.minikube/cache/ -type f -name kubectl) /usr/local/bin/kubectl
             kubectl get nodes
       - run:
           name: Building Docker image for Integration test
@@ -162,8 +163,11 @@ jobs:
       - run:
           name: Run integration tests
           command: |
-            ~/clickhouse-operator/venv/bin/python3 ./tests/test.py --only=operator/* --no-colors
-            ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_exporter.py --only=metrics_exporter/* --no-colors
+            ~/clickhouse-operator/venv/bin/python3 ./tests/test.py --no-colors
+            ~/clickhouse-operator/venv/bin/python3 ./tests/test_examples.py --no-colors
+            ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_exporter.py --no-colors
+            ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_alerts.py --no-colors
+
 
 workflows:
   version: 2
