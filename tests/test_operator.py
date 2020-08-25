@@ -588,6 +588,7 @@ def test_020(config = "configs/test-020-multi-volume.yaml"):
 def test_021(config = "configs/test-021-rescale-volume.yaml"):
     with Given("Default storage class is expandable"):
         default_storage_class = kube_get_default_storage_class()
+        assert default_storage_class is not None
         assert len(default_storage_class) > 0
         allowVolumeExpansion = kube_get_field("storageclass", default_storage_class, ".allowVolumeExpansion")
         if allowVolumeExpansion != "true":
