@@ -181,7 +181,7 @@ def test_011():
 
         with Then("Connection to localhost should succeed with default user"):
             out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'")
-            assert out == 'OK'
+            assert out == 'OK', f"out={out} should be 'OK'"
 
         with And("Connection from secured to secured host should succeed"):
             out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'",
@@ -386,7 +386,9 @@ def test_015():
     create_and_check("configs/test-015-host-network.yaml",
                      {"pod_count": 2,
                       "do_not_delete": 1})
-    
+
+    time.sleep(30)
+
     with Then("Query from one server to another one should work"):
         clickhouse_query("test-015-host-network", host="chi-test-015-host-network-default-0-0", port="10000",
                          query="select * from remote('chi-test-015-host-network-default-0-1', system.one)")
@@ -438,10 +440,23 @@ def test_016():
     with When("Update usersd settings"):
         start_time = kube_get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         create_and_check("configs/test-016-settings-2.yaml", {"do_not_delete": 1})
-        with Then("Wait 60 seconds for configmap changes to apply"):
-            time.sleep(60)
+        with Then("Wait for configmap changes to apply"):
+            config_map_applied = "0"
+            i = 1
+            while config_map_applied == "0" and i < 10:
+                config_map_applied = kubectl(
+                    f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep test_norestart /etc/clickhouse-server/users.d/my_users.xml | wc -l\""
+                )
+                if config_map_applied != "0":
+                    break
+                with And(f"not applied, wait {15 * i}s"):
+                    time.sleep(15 * i)
+                    i += 1
+
+            assert config_map_applied != "0", "ConfigMap should be applied"
+
         with Then("test_norestart user should be available"):
-            clickhouse_query(chi, query = "select version()", user = "test_norestart")
+            clickhouse_query(chi, query="select version()", user="test_norestart")
         with And("ClickHouse should not be restarted"):
             new_start_time = kube_get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time == new_start_time
@@ -576,7 +591,7 @@ def test_021(config = "configs/test-021-rescale-volume.yaml"):
         assert len(default_storage_class) > 0
         allowVolumeExpansion = kube_get_field("storageclass", default_storage_class, ".allowVolumeExpansion")
         if allowVolumeExpansion != "true":
-            kubectl("patch storageclass {default_storage_class} -p '{\"allowVolumeExpansion\":true}'")
+            kubectl(f"patch storageclass {default_storage_class} -p '{{\"allowVolumeExpansion\":true}}'")
 
     chi = get_chi_name(get_full_path(config))
     create_and_check(config, {"pod_count": 1,"do_not_delete": 1})

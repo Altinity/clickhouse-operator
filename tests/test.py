@@ -8,7 +8,7 @@ from testflows.core import TestScenario, Name, When, Then, Given, And, main, run
 from testflows.asserts import error
 
 if main():
-    with Module("main", flags=TE):
+    with Module("main"):
         with Given(f"Clean namespace {settings.test_namespace}"):
             kube_delete_all_chi(settings.test_namespace)
             kube_deletens(settings.test_namespace)
@@ -22,7 +22,7 @@ if main():
                            f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
                            f"METRICS_EXPORTER_IMAGE=\"altinity/metrics-exporter:{settings.operator_version}\" "
                            f"METRICS_EXPORTER_NAMESPACE=\"{settings.operator_namespace}\" "
-                           f"envsubst)", ns=settings.operator_namespace)
+                           f"envsubst)", ns=settings.operator_namespace, validate=False)
             set_operator_version(settings.operator_version)
 
         with Given(f"Install ClickHouse template {settings.clickhouse_template}"):
@@ -32,7 +32,7 @@ if main():
             pass
 
         # python3 tests/test.py --only operator*
-        with Module("operator", flags=TE):
+        with Module("operator"):
             all_tests = [
                 test_001,
                 test_002,
@@ -50,12 +50,12 @@ if main():
                 test_014,
                 test_015,
                 test_016,
-                # test_017,
+                test_017,
                 test_018,
                 test_019,
                 test_020,
                 test_021,
-                # test_022,
+                test_022,
             ]
             run_tests = all_tests
             
@@ -65,12 +65,12 @@ if main():
 
             for t in run_tests:
                 if callable(t):
-                    run(test=t, flags=TE)
+                    run(test=t)
                 else:
-                    run(test = t[0], args = t[1], flags=TE)
+                    run(test=t[0], args=t[1])
 
         # python3 tests/test.py --only clickhouse*
-        with Module("clickhouse", flags=TE):
+        with Module("clickhouse"):
             all_tests = [
                 test_ch_001,
                 test_ch_002,
@@ -79,7 +79,7 @@ if main():
             run_test = all_tests
             
             # placeholder for selective test running
-            run_test = [test_ch_002]
+            # run_test = [test_ch_002]
 
             for t in run_test:
-                run(test=t, flags=TE)
+                run(test=t)

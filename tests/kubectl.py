@@ -26,13 +26,13 @@ def get_chi_name(path):
 def kubectl(command, ok_to_fail=False, ns = namespace, timeout=60):
     cmd = shell(f"{kubectlcmd} -n {ns} {command}", timeout=timeout)
     code = cmd.exitcode
-    if ok_to_fail == False:
-        assert(code) == 0, error()
+    if not ok_to_fail:
+        assert code == 0, error()
     return cmd.output
 
 def kube_delete_chi(chi, ns = namespace):
     with When(f"Delete chi {chi}"):
-        shell(f"{kubectlcmd} delete chi {chi} -n {ns}", timeout=120)
+        shell(f"{kubectlcmd} delete chi {chi} -n {ns}", timeout=900)
         kube_wait_objects(chi, [0,0,0], ns)
 
 def kube_delete_all_chi(ns = namespace):
@@ -50,6 +50,7 @@ def create_and_check(test_file, checks, ns = namespace):
     if "apply_templates" in checks:
         for t in checks["apply_templates"]:
             kube_apply(get_full_path(t), ns)
+        time.sleep(1)
 
     kube_apply(config, ns)
     
@@ -78,7 +79,7 @@ def create_and_check(test_file, checks, ns = namespace):
 
     if "service" in checks:
         kube_check_service(checks["service"][0], checks["service"][1], ns)
-    
+
     if "configmaps" in checks:
         kube_check_configmaps(chi_name, ns)
 
@@ -116,15 +117,16 @@ def kube_count_resources(label="", ns = namespace):
     service = kube_get_count("service", ns=ns, label=label)
     return [sts, pod, service]
 
-def kube_apply(config, ns=namespace):
+def kube_apply(config, ns=namespace, validate=True, timeout=30):
     with When(f"{config} is applied"):
-        cmd = shell(f"{kubectlcmd} apply -n {ns} -f {config}")
+        cmd = f"{kubectlcmd} apply --validate={validate} -n {ns} -f {config}"
+        cmd = shell(cmd, timeout=timeout)
     with Then("exitcode should be 0"):
         assert cmd.exitcode == 0, error()
 
-def kube_delete(config, ns=namespace):
+def kube_delete(config, ns=namespace, timeout=30):
     with When(f"{config} is deleted"):
-        cmd = shell(f"{kubectlcmd} delete -n {ns} -f {config}")
+        cmd = shell(f"{kubectlcmd} delete -n {ns} -f {config}", timeout=timeout)
     with Then("exitcode should be 0"):
         assert cmd.exitcode == 0, error()
 
@@ -166,6 +168,16 @@ def kube_wait_field(object, name, field, value, ns = namespace, retries = max_re
             with Then("Not ready. Wait for " + str(i*5) + " seconds"):
                 time.sleep(i*5)
         assert obj_status[1] == value, error()
+
+def kube_wait_jsonpath(object, name, field, value, ns=namespace, retries = max_retries):
+    with Then(f"{object} {name} -o jsonpath={field} should be {value}"):
+        for i in range(1,retries):
+            obj_status = kubectl(f"get {object} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
+            if obj_status[0] == value:
+                break
+            with Then("Not ready. Wait for " + str(i*5) + " seconds"):
+                time.sleep(i*5)
+        assert obj_status[0] == value, error()
 
 def kube_get_field(object, name, field, ns = namespace):
     out = kubectl(f"get {object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
@@ -250,16 +262,16 @@ def kube_check_service(service_name, service_type, ns = namespace):
         service = kube_get("service", service_name, ns = ns)
         with Then(f"Service type is {service_type}"):
             assert service["spec"]["type"] == service_type
-            
+
 def kube_check_configmaps(chi_name, ns = namespace):
-    kube_check_configmap(f"chi-{chi_name}-common-configd", 
-                         ["01-clickhouse-listen.xml", 
-                          "02-clickhouse-logger.xml", 
+    kube_check_configmap(f"chi-{chi_name}-common-configd",
+                         ["01-clickhouse-listen.xml",
+                          "02-clickhouse-logger.xml",
                           "03-clickhouse-querylog.xml"], ns = ns)
-    
+
     kube_check_configmap(f"chi-{chi_name}-common-usersd",
-                         ["01-clickhouse-user.xml", 
-                          "02-clickhouse-default-profile.xml"], 
+                         ["01-clickhouse-user.xml",
+                          "02-clickhouse-default-profile.xml"],
                          ns = ns)
 
 def kube_check_configmap(cfg_name, values, ns = namespace):
