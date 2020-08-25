@@ -189,6 +189,11 @@ def kube_get_default_storage_class(ns = namespace):
         if line.startswith("true"):
             parts = line.split(maxsplit=1)
             return parts[1].strip()
+    out = kubectl(f"get storageclass -o=custom-columns=DEFAULT:\".metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class\",NAME:.metadata.name", ns=ns).splitlines()
+    for line in out[1:]:
+        if line.startswith("true"):
+            parts = line.split(maxsplit=1)
+            return parts[1].strip()
 
 def kube_get_pod_spec(chi_name, ns = namespace):
     pod = kube_get("pod", "", ns = ns, label = f"-l clickhouse.altinity.com/chi={chi_name}")["items"][0]
