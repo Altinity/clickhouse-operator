@@ -15,17 +15,40 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	"k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
+	if shard != nil {
+		(&host.Settings).MergeFrom(shard.Settings)
+	}
+
+	if replica != nil {
+		(&host.Settings).MergeFrom(replica.Settings)
+	}
+}
+
+func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
+	if shard != nil {
+		(&host.Files).MergeFrom(shard.Files)
+	}
+
+	if replica != nil {
+		(&host.Files).MergeFrom(replica.Files)
+	}
+}
 
 func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *ChiHostTemplate) {
 	if shard != nil {
 		(&host.Templates).MergeFrom(&shard.Templates, MergeTypeFillEmptyValues)
 	}
+
 	if replica != nil {
 		(&host.Templates).MergeFrom(&replica.Templates, MergeTypeFillEmptyValues)
 	}
+
 	if template != nil {
 		(&host.Templates).MergeFrom(&template.Spec.Templates, MergeTypeFillEmptyValues)
 	}
@@ -80,7 +103,12 @@ func (host *ChiHost) GetReplicasNum() int32 {
 }
 
 func (host *ChiHost) GetSettings() Settings {
-	return host.CHI.Spec.Configuration.Settings
+	return host.Settings
+}
+
+func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
+	cluster := host.GetCluster()
+	return &cluster.Zookeeper
 }
 
 func (host *ChiHost) GetCHI() *ClickHouseInstallation {
@@ -99,11 +127,6 @@ func (host *ChiHost) GetCluster() *ChiCluster {
 	// This should not happen, actually
 
 	return nil
-}
-
-func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
-	cluster := host.GetCluster()
-	return &cluster.Zookeeper
 }
 
 func (host *ChiHost) CanDeleteAllPVCs() bool {

@@ -35,6 +35,11 @@ spec:
              </test_usersd>
           </users>
         </yandex> 
+      config.d/remote_servers.xml:
+        <yandex>
+           <remote_servers replace="1">
+           </remote_servers>
+        </yandex>
       dict_one.dict: |
         <yandex>
           <dictionary>

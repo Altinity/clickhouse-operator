@@ -323,6 +323,12 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	return statefulSet
 }
 
+// PreparePersistentVolume
+func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chiv1.ChiHost) *corev1.PersistentVolume {
+	pv.Labels = util.MergeStringMaps(pv.Labels, c.labeler.getLabelsHostScope(host, false))
+	return pv
+}
+
 // setupStatefulSetPodTemplate performs PodTemplate setup of StatefulSet
 func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 
@@ -435,9 +441,9 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 		// Append to each Container current VolumeMount's to VolumeMount's declared in template
 		container.VolumeMounts = append(
 			container.VolumeMounts,
-			newVolumeMount(configMapCommonName, dirPathConfigd),
-			newVolumeMount(configMapCommonUsersName, dirPathUsersd),
-			newVolumeMount(configMapMacrosName, dirPathConfd),
+			newVolumeMount(configMapCommonName, dirPathCommonConfig),
+			newVolumeMount(configMapCommonUsersName, dirPathUsersConfig),
+			newVolumeMount(configMapMacrosName, dirPathHostConfig),
 		)
 	}
 }

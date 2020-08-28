@@ -1,0 +1,62 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "settings-nested"
+spec:
+  configuration:
+    settings:
+      disable_internal_dns_cache: 1
+    clusters:
+
+      - name: "top-level"
+        # Expecting value: 1
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+
+      - name: "cluster-level"
+        # Expecting values: 1, 2
+        settings:
+          disable_internal_dns_cache: 2
+
+      - name: "shard-level"
+        # Expecting values: 1, 4
+        settings:
+          disable_internal_dns_cache: 3
+        layout:
+          shards:
+            - settings:
+                disable_internal_dns_cache: 4
+
+      - name: "replica-level"
+        # Expecting values: 1, 6
+        settings:
+          disable_internal_dns_cache: 5
+        layout:
+          replicas:
+            - settings:
+                disable_internal_dns_cache: 6
+
+      - name: "host-level-sh"
+        # Expecting values: 1, 9
+        settings:
+          disable_internal_dns_cache: 7
+        layout:
+          shards:
+            - settings:
+                disable_internal_dns_cache: 8
+              replicas:
+                - settings:
+                    disable_internal_dns_cache: 9
+
+      - name: "host-level-rep"
+        # Expecting values: 1, 12
+        settings:
+          disable_internal_dns_cache: 10
+        layout:
+          replicas:
+            - settings:
+                disable_internal_dns_cache: 11
+              shards:
+                - settings:
+                    disable_internal_dns_cache: 12

@@ -1,0 +1,28 @@
+apiVersion: "clickhouse.altinity.com/v1"
+
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-cluster-for-alerts
+
+spec:
+  useTemplates:
+    - name: clickhouse-version
+    - name: persistent-volume
+  configuration:
+    settings:
+      mysql_port: 3307
+    profiles:
+      clickhouse_operator/use_uncompressed_cache: 1
+      default/use_uncompressed_cache: 1
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+      session_timeout_ms: 5000
+      operation_timeout_ms: 5000
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 2

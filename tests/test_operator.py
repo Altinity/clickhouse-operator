@@ -1,6 +1,7 @@
 from clickhouse import * 
 from kubectl import * 
-import settings 
+import settings
+import time
 
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
 from testflows.asserts import error
@@ -15,7 +16,7 @@ def test_001():
 @TestScenario
 @Name("test_002. useTemplates for pod, volume templates, and distribution")
 def test_002():
-    create_and_check("configs/test-002-tpl.yaml", 
+    create_and_check("configs/test-002-tpl.yaml",
                      {"pod_count": 1,
                       "apply_templates": {settings.clickhouse_template, 
                                           "templates/tpl-log-volume.yaml",
@@ -32,21 +33,21 @@ def test_003():
 @TestScenario
 @Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
 def test_004():
-    create_and_check("configs/test-004-tpl.yaml", 
+    create_and_check("configs/test-004-tpl.yaml",
                      {"pod_count": 1,
                       "pod_volumes": {"/var/lib/clickhouse"}})
 
 @TestScenario
 @Name("test_005. Test manifest created by ACM")
 def test_005():
-    create_and_check("configs/test-005-acm.yaml", 
+    create_and_check("configs/test-005-acm.yaml",
                      {"pod_count": 1,
                       "pod_volumes": {"/var/lib/clickhouse"}})
 
 @TestScenario
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
 def test_006():
-    create_and_check("configs/test-006-ch-upgrade-1.yaml", 
+    create_and_check("configs/test-006-ch-upgrade-1.yaml",
                      {"pod_count": 2,
                       "pod_image": "yandex/clickhouse-server:19.11",
                       "do_not_delete": 1})
@@ -63,7 +64,7 @@ def test_006():
 @TestScenario
 @Name("test_007. Test template with custom clickhouse ports")
 def test_007():
-    create_and_check("configs/test-007-custom-ports.yaml", 
+    create_and_check("configs/test-007-custom-ports.yaml",
                      {"pod_count": 1,
                       "pod_ports": [8124,9001,9010]})
 
@@ -167,7 +168,6 @@ def test_010():
 @TestScenario
 @Name("test_011. Test user security and network isolation")    
 def test_011():
-    
     with Given("test-011-secured-cluster.yaml and test-011-insecured-cluster.yaml"):
         create_and_check("configs/test-011-secured-cluster.yaml", 
                          {"pod_count": 2,
@@ -181,7 +181,7 @@ def test_011():
 
         with Then("Connection to localhost should succeed with default user"):
             out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'")
-            assert out == 'OK'
+            assert out == 'OK', f"out={out} should be 'OK'"
 
         with And("Connection from secured to secured host should succeed"):
             out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'",
@@ -227,7 +227,7 @@ def test_011():
 
 @TestScenario
 @Name("test_011_1. Test default user security")    
-def test_011_1():    
+def test_011_1():
     with Given("test-011-secured-default.yaml with password_sha256_hex for default user"):
         create_and_check("configs/test-011-secured-default.yaml", 
                          {"pod_count": 1,
@@ -261,7 +261,7 @@ def test_011_1():
 @TestScenario
 @Name("test_012. Test service templates")
 def test_012():
-    create_and_check("configs/test-012-service-template.yaml", 
+    create_and_check("configs/test-012-service-template.yaml",
                      {"object_counts": [2,2,4],
                       "service": ["service-test-012","ClusterIP"],
                       "do_not_delete": 1})
@@ -291,7 +291,6 @@ def test_013():
                          "CREATE DATABASE \\\"test-db\\\"")
         clickhouse_query("test-013-add-shards", 
                          "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events ENGINE = Distributed('all-sharded', system, events)")
-
     with Then("Add shards"):
         create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [3, 3, 4], "do_not_delete": 1})
         
@@ -358,32 +357,38 @@ def test_014():
             assert out == "1" 
     
     with When("Restart Zookeeper pod"):
-        kubectl("delete pod zookeeper-0")
-        kube_wait_object("pod", "zookeeper-0")
-        kube_wait_pod_status("zookeeper-0", "Running")
-        
-        with Then("Insert into the table -- table should be in readonly mode"):
+        with Then("Delete Zookeeper pod"):
+            kubectl("delete pod zookeeper-0")
+            time.sleep(1)
+
+        with Then("Insert into the table while there is no Zookeeper -- table should be in readonly mode"):
             out = clickhouse_query_with_error("test-014-replication", "insert into test_local values(2)")
             assert "Table is in readonly mode" in out
 
-        with Then("Wait 30 seconds for ClickHouse to reconnect"):
+        with Then("Wait for Zookeeper pod to come back"):
+            kube_wait_object("pod", "zookeeper-0")
+            kube_wait_pod_status("zookeeper-0", "Running")
+
+        with Then("Wait for ClickHouse to reconnect to Zookeeper and switch to read-write mode"):
             time.sleep(30)
         # with Then("Restart clickhouse pods"):
         #    kubectl("delete pod chi-test-014-replication-default-0-0-0")
         #    kubectl("delete pod chi-test-014-replication-default-0-1-0")
 
         with Then("Table should be back to normal"):
-            clickhouse_query("test-014-replication", "insert into test_local values(2)")
+            clickhouse_query("test-014-replication", "insert into test_local values(3)")
 
     kube_delete_chi("test-014-replication")
 
 @TestScenario
 @Name("test_015. Test circular replication with hostNetwork")
 def test_015():
-    create_and_check("configs/test-015-host-network.yaml", 
+    create_and_check("configs/test-015-host-network.yaml",
                      {"pod_count": 2,
                       "do_not_delete": 1})
-    
+
+    time.sleep(30)
+
     with Then("Query from one server to another one should work"):
         clickhouse_query("test-015-host-network", host="chi-test-015-host-network-default-0-0", port="10000",
                          query="select * from remote('chi-test-015-host-network-default-0-1', system.one)")
@@ -427,14 +432,31 @@ def test_016():
         
     with And("test_usersd user should be available"):
         clickhouse_query(chi, query = "select version()", user = "test_usersd")
-        
+    
+    with And("system.clusters should be empty due to remote_servers override"):
+        out = clickhouse_query(chi, query = "select count() from system.clusters")
+        assert out == "0"
+
     with When("Update usersd settings"):
         start_time = kube_get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         create_and_check("configs/test-016-settings-2.yaml", {"do_not_delete": 1})
-        with Then("Wait 60 seconds for configmap changes to apply"):
-            time.sleep(60)
+        with Then("Wait for configmap changes to apply"):
+            config_map_applied = "0"
+            i = 1
+            while config_map_applied == "0" and i < 10:
+                config_map_applied = kubectl(
+                    f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep test_norestart /etc/clickhouse-server/users.d/my_users.xml | wc -l\""
+                )
+                if config_map_applied != "0":
+                    break
+                with And(f"not applied, wait {15 * i}s"):
+                    time.sleep(15 * i)
+                    i += 1
+
+            assert config_map_applied != "0", "ConfigMap should be applied"
+
         with Then("test_norestart user should be available"):
-            clickhouse_query(chi, query = "select version()", user = "test_norestart")
+            clickhouse_query(chi, query="select version()", user="test_norestart")
         with And("ClickHouse should not be restarted"):
             new_start_time = kube_get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time == new_start_time
@@ -543,7 +565,7 @@ def test_020(config = "configs/test-020-multi-volume.yaml"):
     create_and_check(config, {"pod_count": 1,
                               "pod_volumes": {"/var/lib/clickhouse","/var/lib/clickhouse2"}, 
                               "do_not_delete": 1})
-    
+
     with When("Create a table and insert 1 row"):
         clickhouse_query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
         clickhouse_query(chi, "insert into test_disks values (1)")
@@ -565,9 +587,11 @@ def test_020(config = "configs/test-020-multi-volume.yaml"):
 @Name("test-021-rescale-volume. Test rescaling storage")
 def test_021(config = "configs/test-021-rescale-volume.yaml"):
     with Given("Default storage class is expandable"):
-        allowVolumeExpansion = kube_get_field("storageclass", "standard", ".allowVolumeExpansion")
+        default_storage_class = kube_get_default_storage_class()
+        assert len(default_storage_class) > 0
+        allowVolumeExpansion = kube_get_field("storageclass", default_storage_class, ".allowVolumeExpansion")
         if allowVolumeExpansion != "true":
-            kubectl("patch storageclass standard -p '{\"allowVolumeExpansion\":true}'")
+            kubectl(f"patch storageclass {default_storage_class} -p '{{\"allowVolumeExpansion\":true}}'")
 
     chi = get_chi_name(get_full_path(config))
     create_and_check(config, {"pod_count": 1,"do_not_delete": 1})
@@ -601,4 +625,12 @@ def test_021(config = "configs/test-021-rescale-volume.yaml"):
 
     
     kube_delete_chi(chi) 
-    
+
+@TestScenario
+@Name("test-022-broken-image. Test broken image")
+def test_022(config = "configs/test-022-broken-image.yaml"):
+    chi = get_chi_name(get_full_path(config))
+    create_and_check(config, {"pod_count": 1,"do_not_delete": 1, "chi_status": "InProgress"})
+    with When("ClickHouse image can not be retrieved"):
+        kube_wait_field("pod", "chi-test-022-broken-image-default-0-0-0", ".status.containerStatuses[0].state.waiting.reason", "ErrImagePull")
+        kube_delete_chi(chi) 

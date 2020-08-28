@@ -34,6 +34,7 @@ const (
 	dsnUsernamePasswordPairUsernameOnlyPattern = "%s@"
 )
 
+// CHConnectionParams
 type CHConnectionParams struct {
 	hostname string
 	username string
@@ -46,6 +47,7 @@ type CHConnectionParams struct {
 	timeout time.Duration
 }
 
+// NewCHConnectionParams
 func NewCHConnectionParams(hostname, username, password string, port int) *CHConnectionParams {
 	params := &CHConnectionParams{
 		hostname: hostname,
@@ -94,10 +96,12 @@ func (c *CHConnectionParams) makeDSN(hideCredentials bool) string {
 	)
 }
 
+// GetDSN
 func (c *CHConnectionParams) GetDSN() string {
 	return c.dsn
 }
 
+// GetDSNWithHiddenCredentials
 func (c *CHConnectionParams) GetDSNWithHiddenCredentials() string {
 	return c.dsnHiddenCredentials
 }

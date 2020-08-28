@@ -17,7 +17,6 @@ package metrics
 import (
 	sqlmodule "database/sql"
 
-	"context"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"time"
@@ -203,18 +202,14 @@ func (f *ClickHouseFetcher) clickHouseQueryScanRows(
 		data *[][]string,
 	) error,
 ) ([][]string, error) {
-	// Query should be deadlined
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
-	defer cancel()
-
-	rows, err := f.getCHConnection().QueryContext(ctx, heredoc.Doc(sql))
+	query, err := f.getCHConnection().Query(heredoc.Doc(sql))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer query.Close()
 	data := make([][]string, 0)
-	for rows.Next() {
-		_ = scan(rows, &data)
+	for query.Rows.Next() {
+		_ = scan(query.Rows, &data)
 	}
 	return data, nil
 }

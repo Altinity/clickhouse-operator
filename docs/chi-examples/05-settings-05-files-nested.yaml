@@ -1,0 +1,206 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: "files-nested"
+
+spec:
+  configuration:
+    files:
+      simple_1.file: |
+        <yandex>
+          <!-- simple_1.file goes to COMMON -->
+        </yandex>
+      COMMON/common_prefixed_1.file: |
+        <yandex>
+          <!-- common_prefixed_1.file -->
+        </yandex>
+      USERS/users_prefixed_1.file: |
+        <yandex>
+          <!-- users_prefixed_1.file -->
+        </yandex>
+      HOST/host_prefixed_1.file: |
+        <yandex>
+          <!-- host_prefixed_1.file -->
+        </yandex>
+      config.d/config_d_prefixed_1.file: |
+        <yandex>
+          <!-- config_d_prefixed_1.file -->
+        </yandex>
+      users.d/users_d_prefixed_1.file: |
+        <yandex>
+          <!-- users_d_prefixed_users_1.file -->
+        </yandex>
+      conf.d/conf_d_prefixed_1.file: |
+        <yandex>
+          <!-- conf_d_prefixed_1.file -->
+        </yandex>
+
+    clusters:
+      - name: "top-level"
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+
+      - name: "cluster-level"
+        files:
+          simple_2.file: |
+            <yandex>
+              <!-- simple_2.file goes to HOST -->
+            </yandex>
+          HOST/host_prefixed_2.file: |
+            <yandex>
+              <!-- host_prefixed_2.file -->
+            </yandex>
+          conf.d/conf_d_prefixed_2.file: |
+            <yandex>
+              <!-- conf_d_prefixed_2.file -->
+            </yandex>
+
+      - name: "shard-level"
+        files:
+          simple_3.file: |
+            <yandex>
+              <!-- simple_3.file goes to HOST -->
+            </yandex>
+          HOST/host_prefixed_3.file: |
+            <yandex>
+              <!-- host_prefixed_3.file -->
+            </yandex>
+          conf.d/conf_d_prefixed_3.file: |
+            <yandex>
+              <!-- conf_d_prefixed_3.file -->
+            </yandex>
+        layout:
+          shards:
+            - files:
+                simple_4.file: |
+                  <yandex>
+                    <!-- simple_4.file goes to HOST -->
+                  </yandex>
+                HOST/host_prefixed_4.file: |
+                  <yandex>
+                    <!-- host_prefixed_4.file -->
+                  </yandex>
+                conf.d/conf_d_prefixed_4.file: |
+                  <yandex>
+                    <!-- conf_d_prefixed_4.file -->
+                  </yandex>
+
+      - name: "replica-level"
+        files:
+          simple_5.file: |
+            <yandex>
+              <!-- simple_5.file goes to HOST -->
+            </yandex>
+          HOST/host_prefixed_5.file: |
+            <yandex>
+              <!-- host_prefixed_5.file -->
+            </yandex>
+          conf.d/conf_d_prefixed_5.file: |
+            <yandex>
+              <!-- conf_d_prefixed_5.file -->
+            </yandex>
+        layout:
+          replicas:
+            - files:
+                simple_6.file: |
+                  <yandex>
+                    <!-- simple_6.file goes to HOST -->
+                  </yandex>
+                HOST/host_prefixed_6.file: |
+                  <yandex>
+                    <!-- host_prefixed_6.file -->
+                  </yandex>
+                conf.d/conf_d_prefixed_6.file: |
+                  <yandex>
+                    <!-- conf_d_prefixed_6.file -->
+                  </yandex>
+
+      - name: "host-level-sh"
+        files:
+          simple_7.file: |
+            <yandex>
+              <!-- simple_7.file goes to HOST -->
+            </yandex>
+          HOST/host_prefixed_7.file: |
+            <yandex>
+              <!-- host_prefixed_7.file -->
+            </yandex>
+          conf.d/conf_d_prefixed_7.file: |
+            <yandex>
+              <!-- conf_d_prefixed_7.file -->
+            </yandex>
+        layout:
+          shards:
+            - files:
+                simple_8.file: |
+                  <yandex>
+                    <!-- simple_8.file goes to HOST -->
+                  </yandex>
+                HOST/host_prefixed_8.file: |
+                  <yandex>
+                    <!-- host_prefixed_8.file -->
+                  </yandex>
+                conf.d/conf_d_prefixed_8.file: |
+                  <yandex>
+                    <!-- conf_d_prefixed_8.file -->
+                  </yandex>
+              replicas:
+                - files:
+                    simple_9.file: |
+                      <yandex>
+                        <!-- simple_9.file goes to HOST -->
+                      </yandex>
+                    HOST/host_prefixed_9.file: |
+                      <yandex>
+                        <!-- host_prefixed_9.file -->
+                      </yandex>
+                    conf.d/conf_d_prefixed_9.file: |
+                      <yandex>
+                        <!-- conf_d_prefixed_9.file -->
+                      </yandex>
+
+      - name: "host-level-rep"
+        files:
+          simple_10.file: |
+            <yandex>
+              <!-- simple_10.file goes to HOST -->
+            </yandex>
+          HOST/host_prefixed_10.file: |
+            <yandex>
+              <!-- host_prefixed_10.file -->
+            </yandex>
+          conf.d/conf_d_prefixed_10.file: |
+            <yandex>
+              <!-- conf_d_prefixed_10.file -->
+            </yandex>
+        layout:
+          replicas:
+            - files:
+                simple_11.file: |
+                  <yandex>
+                    <!-- simple_11.file goes to HOST -->
+                  </yandex>
+                HOST/host_prefixed_11.file: |
+                  <yandex>
+                    <!-- host_prefixed_11.file -->
+                  </yandex>
+                conf.d/conf_d_prefixed_11.file: |
+                  <yandex>
+                    <!-- conf_d_prefixed_11.file -->
+                  </yandex>
+              shards:
+                - files:
+                    simple_12.file: |
+                      <yandex>
+                        <!-- simple_12.file goes to HOST -->
+                      </yandex>
+                    HOST/host_prefixed_12.file: |
+                      <yandex>
+                        <!-- host_prefixed_12.file -->
+                      </yandex>
+                    conf.d/conf_d_prefixed_12.file: |
+                      <yandex>
+                        <!-- conf_d_prefixed_12.file -->
+                      </yandex>
