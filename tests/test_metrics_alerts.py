@@ -396,7 +396,7 @@ def test_query_preempted():
         kubectl.kubectl(f"exec {priority_pod} -- bash -c \"{cmd}\"", timeout=120)
         clickhouse.clickhouse_query(
             chi["metadata"]["name"],
-            "SELECT event_time, CurrentMetric_ClickHouseQueryPreempted FROM system.metric_log WHERE CurrentMetric_ClickHouseQueryPreempted > 0",
+            "SELECT event_time, CurrentMetric_QueryPreempted FROM system.metric_log WHERE CurrentMetric_QueryPreempted > 0",
             host=priority_svc,
         )
 
