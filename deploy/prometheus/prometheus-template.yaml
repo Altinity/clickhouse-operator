@@ -8,7 +8,7 @@ metadata:
   labels:
     prometheus: prometheus
 spec:
-  replicas: 2
+  replicas: 1
   retention: 1w
   serviceAccountName: prometheus
   # which ServiceMonitors to be used

@@ -99,7 +99,8 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.14}
 #    K8S_VERSION=${K8S_VERSION:-1.17.11}
-    K8S_VERSION=${K8S_VERSION:-1.18.8}
+#    K8S_VERSION=${K8S_VERSION:-1.18.8}
+    K8S_VERSION=${K8S_VERSION:-1.19.0}
     export VALIDATE_YAML=true
 
     minikube config set vm-driver none
@@ -109,6 +110,20 @@ Vagrant.configure(2) do |config|
 #    minikube addons enable ingress-dns
     minikube addons enable metrics-server
     ln -svf $(find /var/lib/minikube/binaries/ -type f -name kubectl) /bin/kubectl
+
+    #krew
+    (
+        curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/krew.tar.gz" &&
+        tar zxvf krew.tar.gz &&
+        KREW=./krew-"$(uname | tr '[:upper:]' '[:lower:]')_amd64" &&
+        "$KREW" install krew
+    )
+    echo export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH" | tee $HOME/.bashrc
+    source $HOME/.bashrc
+    kubectl krew install tap
+    kubectl krew install debug
+    kubectl krew install sniff
+    kubectl krew install flame
 
     cd /vagrant/
 
