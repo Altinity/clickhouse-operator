@@ -12,7 +12,6 @@ spec:
       rules:
         - alert: MetricsExporterDown
           expr: up{job='clickhouse-operator-metrics'} == 0
-          for: 30s
           labels:
             severity: critical
           annotations:
@@ -25,7 +24,6 @@ spec:
 
         - alert: ClickHouseServerDown
           expr: chi_clickhouse_metric_fetch_errors > 0
-          for: 30s
           labels:
             severity: critical
           annotations:
@@ -38,7 +36,6 @@ spec:
 
         - alert: ClickHouseServerRestartRecently
           expr: chi_clickhouse_metric_Uptime > 1 < 180
-          for: 30s
           labels:
             severity: warning
           annotations:
@@ -50,7 +47,6 @@ spec:
 
         - alert: ClickHouseDNSErrors
           expr: increase(chi_clickhouse_event_DNSError[1m]) > 0 or increase(chi_clickhouse_event_NetworkErrors[1m]) > 0
-          for: 30s
           labels:
             severity: warning
           annotations:
@@ -66,7 +62,6 @@ spec:
 
         - alert: DistributedFilesToInsertHigh
           expr: chi_clickhouse_metric_DistributedFilesToInsert > 50
-          for: 30s
           labels:
             severity: high
           annotations:
@@ -91,7 +86,6 @@ spec:
 
         - alert: DistributedConnectionExceptions
           expr: increase(chi_clickhouse_event_DistributedConnectionFailTry[1m]) > 0 or increase(chi_clickhouse_event_DistributedConnectionFailAtAll[1m]) > 0
-          for: 30s
           labels:
             severity: high
           annotations:
@@ -109,7 +103,6 @@ spec:
 
         - alert: RejectedInsert
           expr: increase(chi_clickhouse_event_RejectedInserts[1m]) > 0
-          for: 30s
           labels:
             severity: critical
           annotations:
@@ -128,7 +121,6 @@ spec:
 
         - alert: DelayedInsertThrottling
           expr: increase(chi_clickhouse_event_DelayedInserts[1m]) > 0
-          for: 30s
           labels:
             severity: high
           annotations:
@@ -141,7 +133,6 @@ spec:
 
         - alert: MaxPartCountForPartition
           expr: chi_clickhouse_metric_MaxPartCountForPartition > 100
-          for: 30s
           labels:
             severity: high
           annotations:
@@ -157,7 +148,6 @@ spec:
 
         - alert: LowInsertedRowsPerQuery
           expr: increase(chi_clickhouse_event_InsertQuery[1m]) > 0 and (increase(chi_clickhouse_event_InsertedRows[1m]) / increase(chi_clickhouse_event_InsertQuery[1m]) <= 1000)
-          for: 30s
           labels:
             severity: warning
           annotations:
@@ -178,7 +168,6 @@ spec:
 
         - alert: LongestRunningQuery
           expr: chi_clickhouse_metric_LongestRunningQuery > 600
-          for: 30s
           labels:
             severity: high
           annotations:
@@ -192,7 +181,6 @@ spec:
 
         - alert: QueryPreempted
           expr: chi_clickhouse_metric_QueryPreempted > 0
-          for: 30s
           labels:
             severity: warning
           annotations:
@@ -208,7 +196,6 @@ spec:
 
         - alert: ReadonlyReplica
           expr: chi_clickhouse_metric_ReadonlyReplica > 0
-          for: 30s
           labels:
             severity: high
           annotations:
@@ -228,7 +215,6 @@ spec:
 
         - alert: ReplicasMaxAbsoluteDelay
           expr: chi_clickhouse_metric_ReplicasMaxAbsoluteDelay > 300
-          for: 30s
           labels:
             severity: high
           annotations:
@@ -245,7 +231,6 @@ spec:
 
         - alert: TooManyConnections
           expr: chi_clickhouse_metric_HTTPConnection + chi_clickhouse_metric_TCPConnection + chi_clickhouse_metric_MySQLConnection > 100
-          for: 30s
           labels:
             severity: warning
           annotations:
@@ -265,7 +250,6 @@ spec:
 
         - alert: TooMuchRunningQueries
           expr: chi_clickhouse_metric_Query > 80
-          for: 30s
           labels:
             severity: warning
           annotations:
@@ -285,7 +269,6 @@ spec:
 
         - alert: SystemSettingsChanged
           expr: delta(chi_clickhouse_metric_ChangedSettingsHash[5m]) != 0
-          for: 30s
           labels:
             severity: warning
           annotations:
