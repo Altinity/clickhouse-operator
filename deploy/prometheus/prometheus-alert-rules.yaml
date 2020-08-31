@@ -413,6 +413,20 @@ spec:
 
               Server will download merged part from replica to force byte-identical result.
 
+        - alert: ClickHouseDistributedSyncInsertionTimeoutExceeded
+          expr: increase(chi_clickhouse_event_DistributedSyncInsertionTimeoutExceeded[1m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased DistributedSyncInsertionTimeoutExceeded"
+            description: |-
+              `increase(chi_clickhouse_event_DistributedSyncInsertionTimeoutExceeded[1m])` = {{ with printf "increase(chi_clickhouse_event_DistributedSyncInsertionTimeoutExceeded{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse-server` increase DistributedSyncInsertionTimeoutExceeded in `system.events` table.
+              It mean Synchronous distributed insert timeout exceeded after successfull distributed connection.
+              Please check documentation https://clickhouse.tech/docs/en/operations/settings/settings/#insert_distributed_sync
+              And check connection between `{{ $labels.hostname }}` and all nodes in shards from remote_servers config section
+
         - alert: ClickHouseFileDescriptorBufferReadOrWriteFailed
           expr: increase(chi_clickhouse_event_ReadBufferFromFileDescriptorReadFailed[1m]) > 0 or increase(chi_clickhouse_event_WriteBufferFromFileDescriptorWriteFailed[1m]) > 0
           labels:

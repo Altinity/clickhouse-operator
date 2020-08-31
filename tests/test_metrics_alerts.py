@@ -682,6 +682,38 @@ def test_zookeeper_hardware_exceptions():
             assert resolved, error("can't check ClickHouseZooKeeperHardwareExceptions alert is gone away")
 
 
+@TestScenario
+@Name("Check ClickHouseDistributedSyncInsertionTimeoutExceeded")
+def test_distributed_sync_insertion_timeout():
+    sync_pod, sync_svc, restarted_pod, restarted_svc = random_pod_choice_for_callbacks()
+    create_distributed_table_on_cluster()
+
+    def insert_distributed_sync():
+        with When("Insert to distributed table SYNC"):
+            insert_sql = 'INSERT INTO default.test_distr(event_time, test) SELECT now(), number FROM system.numbers LIMIT 10000'
+            insert_params = '--insert_distributed_timeout=1 --insert_distributed_sync=1'
+            kubectl.kubectl(
+                f"exec -n {kubectl.namespace} {restarted_pod} -c clickhouse -- clickhouse-client -q \"SYSTEM SHUTDOWN\"",
+                ok_to_fail=True,
+            )
+            clickhouse.clickhouse_query_with_error(
+                chi["metadata"]["name"], insert_sql,
+                host=sync_pod, ns=kubectl.namespace, advanced_params=insert_params
+            )
+
+    with When("check ClickHouseDistributedSyncInsertionTimeoutExceeded firing"):
+        fired = wait_alert_state("ClickHouseDistributedSyncInsertionTimeoutExceeded", "firing", True,
+                                 labels={"hostname": sync_svc, "chi": chi["metadata"]["name"]}, time_range='30s',
+                                 callback=insert_distributed_sync)
+        assert fired, error("can't get ClickHouseDistributedSyncInsertionTimeoutExceeded alert in firing state")
+
+    with Then("check ClickHouseDistributedSyncInsertionTimeoutExceeded gone away"):
+        resolved = wait_alert_state("ClickHouseDistributedSyncInsertionTimeoutExceeded", "firing", False,
+                                    labels={"hostname": sync_svc})
+        assert resolved, error("can't check ClickHouseDistributedSyncInsertionTimeoutExceeded alert is gone away")
+
+    drop_distributed_table_on_cluster()
+
 
 if main():
     with Module("main"):
@@ -738,6 +770,8 @@ if main():
                 test_system_settings_changed,
                 test_version_changed,
                 test_zookeeper_hardware_exceptions,
+                # @TODO uncomment after test refactoring, need connection + drop packets
+                # test_distributed_sync_insertion_timeout,
                 # @TODO uncomment when  https://github.com/ClickHouse/ClickHouse/pull/14095 will merged to docker latest image
                 # test_distributed_files_to_insert,
             ]
