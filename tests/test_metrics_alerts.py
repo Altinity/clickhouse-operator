@@ -702,14 +702,9 @@ def test_distributed_sync_insertion_timeout():
 
     def insert_distributed_sync():
         with When("Insert to distributed table SYNC"):
-            # insert_sql = 'INSERT INTO default.test_distr SELECT now(), number FROM numbers(toUInt64(5e9))'
             # look to https://github.com/ClickHouse/ClickHouse/pull/14260#issuecomment-683616862
-            insert_sql = 'INSERT INTO FUNCTION remote(\'127.0.0.1\', default, test) SELECT now(), number FROM numbers(toUInt64(5e9))'
+            insert_sql = 'INSERT INTO default.test_distr SELECT now(), number FROM numbers(toUInt64(5e9))'
             insert_params = '--insert_distributed_timeout=1 --insert_distributed_sync=1'
-            kubectl.kubectl(
-                f"exec -n {kubectl.namespace} {restarted_pod} -c clickhouse -- clickhouse-client -q \"SYSTEM SHUTDOWN\"",
-                ok_to_fail=True,
-            )
             error = clickhouse.clickhouse_query_with_error(
                 chi["metadata"]["name"], insert_sql,
                 host=sync_pod, ns=kubectl.namespace, advanced_params=insert_params
