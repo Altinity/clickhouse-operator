@@ -10,14 +10,14 @@ from testflows.asserts import error
 if main():
     with Module("main"):
         with Given(f"Clean namespace {settings.test_namespace}"):
-            kubectl.kube_delete_all_chi(settings.test_namespace)
-            kubectl.kube_delete_ns(settings.test_namespace)
-            kubectl.kube_create_ns(settings.test_namespace)
+            kubectl.delete_all_chi(settings.test_namespace)
+            kubectl.delete_ns(settings.test_namespace)
+            kubectl.create_ns(settings.test_namespace)
 
         with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
-            if kubectl.kube_get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
+            if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
                 config = util.get_full_path('../deploy/operator/clickhouse-operator-install-template.yaml')
-                kubectl.kube_apply(
+                kubectl.apply(
                     ns=settings.operator_namespace,
                     config=f"<(cat {config} | "
                     f"OPERATOR_IMAGE=\"altinity/clickhouse-operator:{settings.operator_version}\" "
@@ -30,7 +30,7 @@ if main():
             test_operator.set_operator_version(settings.operator_version)
 
         with Given(f"Install ClickHouse template {settings.clickhouse_template}"):
-            kubectl.kube_apply(util.get_full_path(settings.clickhouse_template), settings.test_namespace)
+            kubectl.apply(util.get_full_path(settings.clickhouse_template), settings.test_namespace)
 
         with Given(f"ClickHouse version {settings.clickhouse_version}"):
             pass

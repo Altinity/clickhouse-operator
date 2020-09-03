@@ -103,21 +103,21 @@ def create_replicated_table_on_cluster(cluster_name='all-replicated'):
 @Name("Check clickhouse-operator/prometheus/alertmanager setup")
 def test_prometheus_setup():
     with Given("clickhouse-operator is installed"):
-        assert kubectl.kube_get_count("pod", ns=settings.operator_namespace,
-                                      label="-l app=clickhouse-operator") > 0, error(
+        assert kubectl.get_count("pod", ns=settings.operator_namespace,
+                                 label="-l app=clickhouse-operator") > 0, error(
             "please run deploy/operator/clickhouse-operator-install.sh before run test")
         set_operator_version(settings.operator_version)
         set_metrics_exporter_version(settings.operator_version)
 
     with Given("prometheus-operator is installed"):
-        assert kubectl.kube_get_count("pod", ns=settings.prometheus_namespace,
-                                      label="-l app.kubernetes.io/component=controller,app.kubernetes.io/name=prometheus-operator") > 0, error(
+        assert kubectl.get_count("pod", ns=settings.prometheus_namespace,
+                                 label="-l app.kubernetes.io/component=controller,app.kubernetes.io/name=prometheus-operator") > 0, error(
             "please run deploy/promehteus/create_prometheus.sh before test run")
-        assert kubectl.kube_get_count("pod", ns=settings.prometheus_namespace,
-                                      label="-l app=prometheus,prometheus=prometheus") > 0, error(
+        assert kubectl.get_count("pod", ns=settings.prometheus_namespace,
+                                 label="-l app=prometheus,prometheus=prometheus") > 0, error(
             "please run deploy/promehteus/create_prometheus.sh before test run")
-        assert kubectl.kube_get_count("pod", ns=settings.prometheus_namespace,
-                                      label="-l app=alertmanager,alertmanager=alertmanager") > 0, error(
+        assert kubectl.get_count("pod", ns=settings.prometheus_namespace,
+                                 label="-l app=alertmanager,alertmanager=alertmanager") > 0, error(
             "please run deploy/promehteus/create_prometheus.sh before test run")
         prometheus_operator_exptected_version = f"quay.io/coreos/prometheus-operator:v{settings.prometheus_operator_version}"
         assert prometheus_operator_exptected_version in prometheus_operator_spec["items"][0]["spec"]["containers"][0]["image"], error(f"require {prometheus_operator_exptected_version} image")
@@ -250,7 +250,7 @@ def test_distributed_files_to_insert():
                                  labels={"hostname": delayed_svc, "chi": chi["metadata"]["name"]})
         assert fired, error("can't get ClickHouseDistributedFilesToInsertHigh alert in firing state")
     # @TODO remove it when  https://github.com/ClickHouse/ClickHouse/pull/11220 will merged to docker latest image
-    kubectl.kube_wait_pod_status(restarted_pod, "Running", ns=kubectl.namespace)
+    kubectl.wait_pod_status(restarted_pod, "Running", ns=kubectl.namespace)
 
     with Then("check ClickHouseClickHouseDistributedFilesToInsertHigh gone away"):
         resolved = wait_alert_state("ClickHouseDistributedFilesToInsertHigh", "firing", False, labels={"hostname": delayed_svc})
@@ -291,9 +291,9 @@ def test_distributed_connection_exceptions():
         resolved = wait_alert_state("ClickHouseDistributedConnectionExceptions", "firing", False,
                                     labels={"hostname": delayed_svc})
         assert resolved, error("can't check ClickHouseDistributedConnectionExceptions alert is gone away")
-    kubectl.kube_wait_pod_status(restarted_pod, "Running", ns=kubectl.namespace)
-    kubectl.kube_wait_jsonpath("pod", restarted_pod, "{.status.containerStatuses[0].ready}", "true",
-                               ns=kubectl.namespace)
+    kubectl.wait_pod_status(restarted_pod, "Running", ns=kubectl.namespace)
+    kubectl.wait_jsonpath("pod", restarted_pod, "{.status.containerStatuses[0].ready}", "true",
+                          ns=kubectl.namespace)
     drop_distributed_table_on_cluster()
 
 
@@ -430,9 +430,9 @@ def test_read_only_replica():
         resolved = wait_alert_state("ClickHouseReadonlyReplica", "firing", False, labels={"hostname": read_only_svc})
         assert resolved, error("can't check ClickHouseReadonlyReplica alert is gone away")
 
-    kubectl.kube_wait_pod_status("zookeeper-0", "Running", ns=kubectl.namespace)
-    kubectl.kube_wait_jsonpath("pod", "zookeeper-0", "{.status.containerStatuses[0].ready}", "true",
-                               ns=kubectl.namespace)
+    kubectl.wait_pod_status("zookeeper-0", "Running", ns=kubectl.namespace)
+    kubectl.wait_jsonpath("pod", "zookeeper-0", "{.status.containerStatuses[0].ready}", "true",
+                          ns=kubectl.namespace)
 
     clickhouse.clickhouse_query_with_error(
         chi_name, "SYSTEM RESTART REPLICAS; SYSTEM SYNC REPLICA default.test_repl",
@@ -672,9 +672,9 @@ def test_zookeeper_hardware_exceptions():
                                      time_range='30s', sleep_time=5, callback=restart_zookeeper)
             assert fired, error("can't get ZooKeeperHardwareExceptions alert in firing state")
 
-    kubectl.kube_wait_pod_status("zookeeper-0", "Running", ns=kubectl.namespace)
-    kubectl.kube_wait_jsonpath("pod", "zookeeper-0", "{.status.containerStatuses[0].ready}", "true",
-                               ns=kubectl.namespace)
+    kubectl.wait_pod_status("zookeeper-0", "Running", ns=kubectl.namespace)
+    kubectl.wait_jsonpath("pod", "zookeeper-0", "{.status.containerStatuses[0].ready}", "true",
+                          ns=kubectl.namespace)
 
     with Then("check ZooKeeperHardwareExceptions gone away"):
         for svc in (svc1, svc2):
@@ -685,25 +685,25 @@ def test_zookeeper_hardware_exceptions():
 if main():
     with Module("main"):
         with Given("get information about prometheus installation"):
-            prometheus_operator_spec = kubectl.kube_get(
+            prometheus_operator_spec = kubectl.get(
                 "pod", ns=settings.prometheus_namespace, name="",
                 label="-l app.kubernetes.io/component=controller,app.kubernetes.io/name=prometheus-operator"
             )
 
-            alertmanager_spec = kubectl.kube_get(
+            alertmanager_spec = kubectl.get(
                 "pod", ns=settings.prometheus_namespace, name="",
                 label="-l app=alertmanager,alertmanager=alertmanager"
             )
 
-            prometheus_spec = kubectl.kube_get(
+            prometheus_spec = kubectl.get(
                 "pod", ns=settings.prometheus_namespace, name="",
                 label="-l app=prometheus,prometheus=prometheus"
             )
             assert "items" in prometheus_spec and len(prometheus_spec["items"]) > 0 and "metadata" in prometheus_spec["items"][0], "invalid prometheus_spec"
 
         with Given("install zookeeper+clickhouse"):
-            kubectl.kube_delete_ns(kubectl.namespace)
-            kubectl.kube_create_ns(kubectl.namespace)
+            kubectl.delete_ns(kubectl.namespace)
+            kubectl.create_ns(kubectl.namespace)
             require_zookeeper()
             create_and_check(
                 "configs/test-cluster-for-alerts.yaml",
@@ -716,10 +716,10 @@ if main():
                     "do_not_delete": 1
                 }
             )
-            clickhouse_operator_spec = kubectl.kube_get(
+            clickhouse_operator_spec = kubectl.get(
                 "pod", name="", ns=settings.operator_namespace, label="-l app=clickhouse-operator"
             )
-            chi = kubectl.kube_get("chi", ns=kubectl.namespace, name="test-cluster-for-alerts")
+            chi = kubectl.get("chi", ns=kubectl.namespace, name="test-cluster-for-alerts")
 
         with Module("metrics_alerts"):
             test_cases = [

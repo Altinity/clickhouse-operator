@@ -130,6 +130,6 @@ def test_ch_002():
             out = clickhouse_query(chi, "select count() from test", user = user)
             assert out == "1"
     
-    kube_delete_chi(chi)
+    delete_chi(chi)
 
  
