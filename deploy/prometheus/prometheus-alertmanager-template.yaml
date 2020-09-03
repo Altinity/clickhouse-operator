@@ -8,37 +8,27 @@ type: Opaque
 stringData:
   notifications.tmpl: |-
     {{ define "__single_message_title" }}{{ range .Alerts.Firing }}{{ .Labels.alertname }} @ {{ .Annotations.identifier }}{{ end }}{{ range .Alerts.Resolved }}{{ .Labels.alertname }} @ {{ .Annotations.identifier }}{{ end }}{{ end }}
-    {{ define "custom_title" }}[ {{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }} ] {{ if or (and (eq (len .Alerts.Firing) 1) (eq (len .Alerts.Resolved) 0)) (and (eq (len .Alerts.Firing) 0) (eq (len .Alerts.Resolved) 1)) }}{{ template "__single_message_title" . }}{{ end }}{{ end }}
+    {{ define "custom_title" }}[ {{ .Status | toUpper }}:{{ if eq .Status "firing" }} :fire: {{ .Alerts.Firing | len }}{{ else }} :ok_hand: {{ .Alerts.Resolved | len }}{{ end }} ] {{ if or (and (eq (len .Alerts.Firing) 1) (eq (len .Alerts.Resolved) 0)) (and (eq (len .Alerts.Firing) 0) (eq (len .Alerts.Resolved) 1)) }}{{ template "__single_message_title" . }}{{ end }}{{ end }}
     {{ define "custom_slack_message" }}
-      {{ if or (and (eq (len .Alerts.Firing) 1) (eq (len .Alerts.Resolved) 0)) (and (eq (len .Alerts.Firing) 0) (eq (len .Alerts.Resolved) 1)) }}
-        {{ range .Alerts.Firing }}{{ .Annotations.summary }}: {{ .Annotations.description }}{{ end }}{{ range .Alerts.Resolved }}{{ .Annotations.summary }}: {{ .Annotations.description }}{{ end }}
-      {{ else }}
-        {{ if gt (len .Alerts.Firing) 0 }}
-    *Alerts Firing:*
-
     {{ range .Alerts.Firing }}
-    - {{ .Annotations.summary }}: {{ .Annotations.description }}
+    *:fire: fired {{ .Labels.severity | toUpper }} {{ .Annotations.summary }}*
+    {{ .Annotations.description }}
     {{ end }}
-        {{ end }}
-        {{ if gt (len .Alerts.Resolved) 0 }}
-    *Alerts Resolved:*
-
     {{ range .Alerts.Resolved }}
-    - {{ .Annotations.summary }}: {{ .Annotations.description }}
+    *:ok: resolved {{ .Labels.severity | toUpper }} {{ .Annotations.summary }}*
+    {{ .Annotations.description }}
     {{ end }}
-        {{ end }}
-      {{ end }}
     {{ end }}
   alertmanager.yaml: |-
     global:
-      resolve_timeout: 5m
+      resolve_timeout: 1m
     templates:
       - /etc/alertmanager/config/notifications.tmpl
     route:
       group_by: ['job']
       group_wait: 30s
-      group_interval: 5m
-      repeat_interval: 12h
+      group_interval: 1m
+      repeat_interval: 6h
       receiver: "slack"
     receivers:
     - name: "slack"
