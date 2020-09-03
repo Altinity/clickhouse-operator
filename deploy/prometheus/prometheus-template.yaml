@@ -9,6 +9,7 @@ metadata:
     prometheus: prometheus
 spec:
   replicas: 2
+  retention: 1w
   serviceAccountName: prometheus
   # which ServiceMonitors to be used
   serviceMonitorSelector:
