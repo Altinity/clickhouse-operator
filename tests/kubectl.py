@@ -15,7 +15,7 @@ max_retries = 10
 
 shell = Shell()
 namespace = settings.test_namespace
-kubectl_cmd = settings.kubectlcmd
+kubectl_cmd = settings.kubectl_cmd
 
 
 def kubectl(command, ok_to_fail=False, ns=namespace, timeout=60):
