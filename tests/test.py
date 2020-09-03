@@ -11,8 +11,8 @@ if main():
     with Module("main"):
         with Given(f"Clean namespace {settings.test_namespace}"):
             kubectl.kube_delete_all_chi(settings.test_namespace)
-            kubectl.kube_deletens(settings.test_namespace)
-            kubectl.kube_createns(settings.test_namespace)
+            kubectl.kube_delete_ns(settings.test_namespace)
+            kubectl.kube_create_ns(settings.test_namespace)
 
         with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
             if kubectl.kube_get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:

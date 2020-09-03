@@ -52,8 +52,8 @@ def test_metrics_exporter_reboot():
         out = kubectl.kubectl("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
         operator_namespace = settings.operator_namespace
-        kubectl.kube_deletens(kubectl.namespace)
-        kubectl.kube_createns(kubectl.namespace)
+        kubectl.kube_delete_ns(kubectl.namespace)
+        kubectl.kube_create_ns(kubectl.namespace)
         check_monitoring_chi(operator_namespace, operator_pod, [])
         with And("created simple clickhouse installation"):
             config = kubectl.get_full_path("../docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml")
@@ -102,8 +102,8 @@ def test_metrics_exporter_with_multiple_clickhouse_version():
         operator_namespace = "kube-system"
 
         with Then("check empty /metrics"):
-            kubectl.kube_deletens(kubectl.namespace)
-            kubectl.kube_createns(kubectl.namespace)
+            kubectl.kube_delete_ns(kubectl.namespace)
+            kubectl.kube_create_ns(kubectl.namespace)
             check_monitoring_metrics(operator_namespace, operator_pod, expect_result={
                 'chi_clickhouse_metric_VersionInteger': False,
             })
@@ -123,7 +123,7 @@ def test_metrics_exporter_with_multiple_clickhouse_version():
                 })
 
         with Then("check empty /metrics after delete namespace"):
-            kubectl.kube_deletens(kubectl.namespace)
+            kubectl.kube_delete_ns(kubectl.namespace)
             check_monitoring_metrics(operator_namespace, operator_pod, expect_result={
                 'chi_clickhouse_metric_VersionInteger': False,
             })

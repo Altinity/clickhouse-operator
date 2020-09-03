@@ -15,10 +15,11 @@ max_retries = 10
 
 shell = Shell()
 namespace = settings.test_namespace
+kubectl_cmd = settings.kubectlcmd
 
 
 def kubectl(command, ok_to_fail=False, ns=namespace, timeout=60):
-    cmd = shell(f"{settings.kubectlcmd} -n {ns} {command}", timeout=timeout)
+    cmd = shell(f"{kubectl_cmd} -n {ns} {command}", timeout=timeout)
     code = cmd.exitcode
     if not ok_to_fail:
         assert code == 0, error()
@@ -27,7 +28,7 @@ def kubectl(command, ok_to_fail=False, ns=namespace, timeout=60):
 
 def kube_delete_chi(chi, ns=namespace):
     with When(f"Delete chi {chi}"):
-        shell(f"{settings.kubectlcmd} delete chi {chi} -n {ns}", timeout=900)
+        shell(f"{kubectl_cmd} delete chi {chi} -n {ns}", timeout=900)
         kube_wait_objects(chi, [0,0,0], ns)
 
 
@@ -85,20 +86,20 @@ def create_and_check(test_file, checks, ns=namespace):
 
 
 def kube_get(_type, name, label="", ns=namespace):
-    cmd = shell(f"{settings.kubectlcmd} get {_type} {name} {label} -o json -n {ns}")
+    cmd = shell(f"{kubectl_cmd} get {_type} {name} {label} -o json -n {ns}")
     assert cmd.exitcode == 0, error()
     return json.loads(cmd.output.strip())
 
 
-def kube_createns(ns):
-    cmd = shell(f"{settings.kubectlcmd} create ns {ns}")
+def kube_create_ns(ns):
+    cmd = shell(f"{kubectl_cmd} create ns {ns}")
     assert cmd.exitcode == 0, error()
-    cmd = shell(f"{settings.kubectlcmd} get ns {ns}")
+    cmd = shell(f"{kubectl_cmd} get ns {ns}")
     assert cmd.exitcode == 0, error()
 
 
-def kube_deletens(ns):
-    shell(f"{settings.kubectlcmd} delete ns {ns}", timeout=60)
+def kube_delete_ns(ns):
+    shell(f"{kubectl_cmd} delete ns {ns}", timeout=60)
 
 
 def kube_get_count(_type, name="", label="", ns=namespace):
@@ -106,7 +107,7 @@ def kube_get_count(_type, name="", label="", ns=namespace):
         ns = '--all-namespaces'
     elif '-n' not in ns and '--namespace' not in ns:
         ns = f"-n {ns}"
-    cmd = shell(f"{settings.kubectlcmd} get {_type} {name} {ns} -o=custom-columns=kind:kind,name:.metadata.name {label}")
+    cmd = shell(f"{kubectl_cmd} get {_type} {name} {ns} -o=custom-columns=kind:kind,name:.metadata.name {label}")
     if cmd.exitcode == 0:
         return len(cmd.output.splitlines())-1
     else:
@@ -122,7 +123,7 @@ def kube_count_resources(label="", ns=namespace):
 
 def kube_apply(config, ns=namespace, validate=True, timeout=30):
     with When(f"{config} is applied"):
-        cmd = f"{settings.kubectlcmd} apply --validate={validate} -n {ns} -f {config}"
+        cmd = f"{kubectl_cmd} apply --validate={validate} -n {ns} -f {config}"
         cmd = shell(cmd, timeout=timeout)
     with Then("exitcode should be 0"):
         assert cmd.exitcode == 0, error()
@@ -130,7 +131,7 @@ def kube_apply(config, ns=namespace, validate=True, timeout=30):
 
 def kube_delete(config, ns=namespace, timeout=30):
     with When(f"{config} is deleted"):
-        cmd = shell(f"{settings.kubectlcmd} delete -n {ns} -f {config}", timeout=timeout)
+        cmd = shell(f"{kubectl_cmd} delete -n {ns} -f {config}", timeout=timeout)
     with Then("exitcode should be 0"):
         assert cmd.exitcode == 0, error()
 
@@ -306,7 +307,7 @@ def kube_check_configmaps(chi_name, ns=namespace):
 
 
 def kube_check_configmap(cfg_name, values, ns=namespace):
-    cfm =  kube_get("configmap", cfg_name, ns=ns)
+    cfm = kube_get("configmap", cfg_name, ns=ns)
     for v in values:
         with Then(f"{cfg_name} should contain {v}"):
             assert v in cfm["data"]

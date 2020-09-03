@@ -702,8 +702,8 @@ if main():
             assert "items" in prometheus_spec and len(prometheus_spec["items"]) > 0 and "metadata" in prometheus_spec["items"][0], "invalid prometheus_spec"
 
         with Given("install zookeeper+clickhouse"):
-            kubectl.kube_deletens(kubectl.namespace)
-            kubectl.kube_createns(kubectl.namespace)
+            kubectl.kube_delete_ns(kubectl.namespace)
+            kubectl.kube_create_ns(kubectl.namespace)
             require_zookeeper()
             create_and_check(
                 "configs/test-cluster-for-alerts.yaml",
