@@ -2,6 +2,7 @@ import kubectl
 import settings
 import test_operator
 import test_clickhouse
+import util
 
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE, args
 from testflows.asserts import error
@@ -15,17 +16,21 @@ if main():
 
         with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
             if kubectl.kube_get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
-                config = kubectl.get_full_path('../deploy/operator/clickhouse-operator-install-template.yaml')
-                kubectl.kube_apply(f"<(cat {config} | "
-                                   f"OPERATOR_IMAGE=\"altinity/clickhouse-operator:{settings.operator_version}\" "
-                                   f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
-                                   f"METRICS_EXPORTER_IMAGE=\"altinity/metrics-exporter:{settings.operator_version}\" "
-                                   f"METRICS_EXPORTER_NAMESPACE=\"{settings.operator_namespace}\" "
-                                   f"envsubst)", ns=settings.operator_namespace, validate=False)
+                config = util.get_full_path('../deploy/operator/clickhouse-operator-install-template.yaml')
+                kubectl.kube_apply(
+                    ns=settings.operator_namespace,
+                    config=f"<(cat {config} | "
+                    f"OPERATOR_IMAGE=\"altinity/clickhouse-operator:{settings.operator_version}\" "
+                    f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
+                    f"METRICS_EXPORTER_IMAGE=\"altinity/metrics-exporter:{settings.operator_version}\" "
+                    f"METRICS_EXPORTER_NAMESPACE=\"{settings.operator_namespace}\" "
+                    f"envsubst)",
+                    validate=False
+                )
             test_operator.set_operator_version(settings.operator_version)
 
         with Given(f"Install ClickHouse template {settings.clickhouse_template}"):
-            kubectl.kube_apply(kubectl.get_full_path(settings.clickhouse_template), settings.test_namespace)
+            kubectl.kube_apply(util.get_full_path(settings.clickhouse_template), settings.test_namespace)
 
         with Given(f"ClickHouse version {settings.clickhouse_version}"):
             pass

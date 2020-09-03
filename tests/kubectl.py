@@ -1,7 +1,8 @@
 import json
 import os
 import time
-import yaml
+import manifest
+import util
 
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module
 from testflows.asserts import error
@@ -14,14 +15,6 @@ max_retries = 10
 
 shell = Shell()
 namespace = settings.test_namespace
-
-
-def get_full_path(test_file):
-    return os.path.join(current_dir, f"{test_file}")
-
-
-def get_chi_name(path):
-    return yaml.safe_load(open(path, "r"))["metadata"]["name"]
 
 
 def kubectl(command, ok_to_fail=False, ns=namespace, timeout=60):
@@ -48,12 +41,12 @@ def kube_delete_all_chi(ns=namespace):
 
 
 def create_and_check(test_file, checks, ns=namespace):
-    config=get_full_path(test_file)
-    chi_name=get_chi_name(config)
+    config = util.get_full_path(test_file)
+    chi_name = manifest.get_chi_name(config)
     
     if "apply_templates" in checks:
         for t in checks["apply_templates"]:
-            kube_apply(get_full_path(t), ns)
+            kube_apply(util.get_full_path(t), ns)
         time.sleep(1)
 
     kube_apply(config, ns)
