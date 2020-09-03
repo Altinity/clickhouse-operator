@@ -160,7 +160,7 @@ def test_010():
                       "pod_count": 1,
                       "do_not_delete": 1})
     with And("ClickHouse should complain regarding zookeeper path"):
-        out = clickhouse_query_with_error("test-010-zkroot", "select * from system.zookeeper where path = '/'")
+        out = query_with_error("test-010-zkroot", "select * from system.zookeeper where path = '/'")
         assert "You should create root node /clickhouse/test-010-zkroot before start" in out, error()
     
     delete_chi("test-010-zkroot")
@@ -180,28 +180,28 @@ def test_011():
                           "do_not_delete": 1})
 
         with Then("Connection to localhost should succeed with default user"):
-            out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'")
+            out = query_with_error("test-011-secured-cluster", "select 'OK'")
             assert out == 'OK', f"out={out} should be 'OK'"
 
         with And("Connection from secured to secured host should succeed"):
-            out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'",
-                                              host="chi-test-011-secured-cluster-default-1-0")
+            out = query_with_error("test-011-secured-cluster", "select 'OK'",
+                                   host="chi-test-011-secured-cluster-default-1-0")
             assert out == 'OK'
 
         with And("Connection from insecured to secured host should fail for default"):
-            out = clickhouse_query_with_error("test-011-insecured-cluster", "select 'OK'",
-                                              host="chi-test-011-secured-cluster-default-1-0")
+            out = query_with_error("test-011-insecured-cluster", "select 'OK'",
+                                   host="chi-test-011-secured-cluster-default-1-0")
             assert out != 'OK'
 
         with And("Connection from insecured to secured host should fail for user with no password"):
             time.sleep(10) # FIXME
-            out = clickhouse_query_with_error("test-011-insecured-cluster", "select 'OK'",
-                                              host="chi-test-011-secured-cluster-default-1-0", user="user1")
+            out = query_with_error("test-011-insecured-cluster", "select 'OK'",
+                                   host="chi-test-011-secured-cluster-default-1-0", user="user1")
             assert "Password" in out or "password" in out 
     
         with And("Connection from insecured to secured host should work for user with password"):
-            out = clickhouse_query_with_error("test-011-insecured-cluster","select 'OK'", 
-                                              host = "chi-test-011-secured-cluster-default-1-0", user = "user1", pwd = "topsecret")
+            out = query_with_error("test-011-insecured-cluster", "select 'OK'",
+                                   host = "chi-test-011-secured-cluster-default-1-0", user = "user1", pwd = "topsecret")
             assert out == 'OK'
 
         with And("Password should be encrypted"):
@@ -211,15 +211,15 @@ def test_011():
             assert "<password_sha256_hex>" in users_xml
 
         with And("User with no password should get default automatically"):
-            out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'", user = "user2", pwd = "default")
+            out = query_with_error("test-011-secured-cluster", "select 'OK'", user ="user2", pwd ="default")
             assert out == 'OK'
 
         with And("User with both plain and sha256 password should get the latter one"):
-            out = clickhouse_query_with_error("test-011-secured-cluster", "select 'OK'", user = "user3", pwd = "clickhouse_operator_password")
+            out = query_with_error("test-011-secured-cluster", "select 'OK'", user ="user3", pwd ="clickhouse_operator_password")
             assert out == 'OK'
         
         with And("User with row-level security should have it applied"):
-            out = clickhouse_query_with_error("test-011-secured-cluster", "select * from system.numbers limit 1", user = "restricted", pwd = "secret")
+            out = query_with_error("test-011-secured-cluster", "select * from system.numbers limit 1", user ="restricted", pwd ="secret")
             assert out == '1000'
 
         delete_chi("test-011-secured-cluster")
@@ -239,7 +239,7 @@ def test_011_1():
             assert chi["status"]["normalized"]["configuration"]["users"]["default/password"] == "_removed_"
     
         with And("Connection to localhost should succeed with default user"):
-            out = clickhouse_query_with_error("test-011-secured-default", "select 'OK'", pwd = "clickhouse_operator_password")
+            out = query_with_error("test-011-secured-default", "select 'OK'", pwd ="clickhouse_operator_password")
             assert out == 'OK'
     
         with When("Trigger installation update"):
@@ -252,7 +252,7 @@ def test_011_1():
         with When("Default user is assigned the different profile"):
             create_and_check("configs/test-011-secured-default-3.yaml", {"do_not_delete": 1})
             with Then("Connection to localhost should succeed with default user"):
-                out = clickhouse_query_with_error("test-011-secured-default", "select 'OK'")
+                out = query_with_error("test-011-secured-default", "select 'OK'")
                 assert out == 'OK'
     
         delete_chi("test-011-secured-default")
@@ -283,24 +283,24 @@ def test_013():
     
     schema_objects = ['test_local', 'test_distr', 'events-distr']
     with Then("Create local and distributed tables"):
-        clickhouse_query("test-013-add-shards", 
+        query("test-013-add-shards",
                          "CREATE TABLE test_local Engine = Log as select * from system.one")
-        clickhouse_query("test-013-add-shards", 
+        query("test-013-add-shards",
                          "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
-        clickhouse_query("test-013-add-shards", 
+        query("test-013-add-shards",
                          "CREATE DATABASE \\\"test-db\\\"")
-        clickhouse_query("test-013-add-shards", 
+        query("test-013-add-shards",
                          "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events ENGINE = Distributed('all-sharded', system, events)")
     with Then("Add shards"):
         create_and_check("configs/test-013-add-shards-2.yaml", {"object_counts": [3, 3, 4], "do_not_delete": 1})
         
     with And("Schema objects should be migrated to new shards"):
         for obj in schema_objects:
-            out = clickhouse_query("test-013-add-shards", f"select count() from system.tables where name = '{obj}'",
-                               host="chi-test-013-add-shards-default-1-0")
+            out = query("test-013-add-shards", f"select count() from system.tables where name = '{obj}'",
+                        host="chi-test-013-add-shards-default-1-0")
             assert out == "1"
-            out = clickhouse_query("test-013-add-shards", f"select count() from system.tables where name = '{obj}'",
-                               host="chi-test-013-add-shards-default-2-0")
+            out = query("test-013-add-shards", f"select count() from system.tables where name = '{obj}'",
+                        host="chi-test-013-add-shards-default-2-0")
             assert out == "1"
 
     delete_chi("test-013-add-shards")
@@ -321,18 +321,18 @@ def test_014():
 
     schema_objects = ['test_local', 'test_view', 'test_mv', 'a_view']
     with Given("Create schema objects"):
-        clickhouse_query("test-014-replication", create_table, host="chi-test-014-replication-default-0-0")
-        clickhouse_query("test-014-replication", "CREATE VIEW test_view as SELECT * from test_local", host="chi-test-014-replication-default-0-0")
-        clickhouse_query("test-014-replication", "CREATE VIEW a_view as SELECT * from test_view", host="chi-test-014-replication-default-0-0")
-        clickhouse_query("test-014-replication", 
+        query("test-014-replication", create_table, host="chi-test-014-replication-default-0-0")
+        query("test-014-replication", "CREATE VIEW test_view as SELECT * from test_local", host="chi-test-014-replication-default-0-0")
+        query("test-014-replication", "CREATE VIEW a_view as SELECT * from test_view", host="chi-test-014-replication-default-0-0")
+        query("test-014-replication",
                          "CREATE MATERIALIZED VIEW test_mv Engine = Log as SELECT * from test_local", host="chi-test-014-replication-default-0-0")
 
     with Given("Replicated table is created on a first replica and data is inserted"):
-        clickhouse_query("test-014-replication", "insert into test_local values(1)", host="chi-test-014-replication-default-0-0")
+        query("test-014-replication", "insert into test_local values(1)", host="chi-test-014-replication-default-0-0")
         with When("Table is created on the second replica"):
-            clickhouse_query("test-014-replication", create_table, host="chi-test-014-replication-default-0-1")
+            query("test-014-replication", create_table, host="chi-test-014-replication-default-0-1")
             with Then("Data should be replicated"):
-                out = clickhouse_query("test-014-replication", "select a from test_local", host="chi-test-014-replication-default-0-1")
+                out = query("test-014-replication", "select a from test_local", host="chi-test-014-replication-default-0-1")
                 assert out == "1"
     
     with When("Add one more replica"):
@@ -342,18 +342,18 @@ def test_014():
         # kubectl patch chi test-014-replication -n test --type=json -p '[{"op":"add", "path": "/spec/configuration/clusters/0/layout/shards/0/replicasCount", "value": 3}]'
         with Then("Schema objects should be migrated to the new replica"):
             for obj in schema_objects:
-                out = clickhouse_query("test-014-replication", f"select count() from system.tables where name = '{obj}'",
-                                       host="chi-test-014-replication-default-0-2")
+                out = query("test-014-replication", f"select count() from system.tables where name = '{obj}'",
+                            host="chi-test-014-replication-default-0-2")
                 assert out == "1"
         
         with And("Replicated table should have the data"):
-            out = clickhouse_query("test-014-replication", "select a from test_local", host="chi-test-014-replication-default-0-2")
+            out = query("test-014-replication", "select a from test_local", host="chi-test-014-replication-default-0-2")
             assert out == "1"
 
     with When("Remove replica"):
         create_and_check("configs/test-014-replication.yaml", {"pod_count": 1, "do_not_delete": 1})
         with Then("Replica needs to be removed from the Zookeeper as well"):
-            out = clickhouse_query("test-014-replication", "select count() from system.replicas where table='test_local'")
+            out = query("test-014-replication", "select count() from system.replicas where table='test_local'")
             assert out == "1" 
     
     with When("Restart Zookeeper pod"):
@@ -362,7 +362,7 @@ def test_014():
             time.sleep(1)
 
         with Then("Insert into the table while there is no Zookeeper -- table should be in readonly mode"):
-            out = clickhouse_query_with_error("test-014-replication", "insert into test_local values(2)")
+            out = query_with_error("test-014-replication", "insert into test_local values(2)")
             assert "Table is in readonly mode" in out
 
         with Then("Wait for Zookeeper pod to come back"):
@@ -376,7 +376,7 @@ def test_014():
         #    kubectl("delete pod chi-test-014-replication-default-0-1-0")
 
         with Then("Table should be back to normal"):
-            clickhouse_query("test-014-replication", "insert into test_local values(3)")
+            query("test-014-replication", "insert into test_local values(3)")
 
     delete_chi("test-014-replication")
 
@@ -390,12 +390,12 @@ def test_015():
     time.sleep(30)
 
     with Then("Query from one server to another one should work"):
-        clickhouse_query("test-015-host-network", host="chi-test-015-host-network-default-0-0", port="10000",
-                         query="select * from remote('chi-test-015-host-network-default-0-1', system.one)")
+        query("test-015-host-network", host="chi-test-015-host-network-default-0-0", port="10000",
+              query="select * from remote('chi-test-015-host-network-default-0-1', system.one)")
     
     with Then("Distributed query should work"):
-        out = clickhouse_query("test-015-host-network", host="chi-test-015-host-network-default-0-0", port="10000",
-                               query="select count() from cluster('all-sharded', system.one) settings receive_timeout=10")
+        out = query("test-015-host-network", host="chi-test-015-host-network-default-0-0", port="10000",
+                    query="select count() from cluster('all-sharded', system.one) settings receive_timeout=10")
         assert out == "2"
     
     delete_chi("test-015-host-network")
@@ -410,31 +410,31 @@ def test_016():
                       "do_not_delete": 1})
 
     with Then("Custom macro 'layer' should be available"):
-        out = clickhouse_query(chi, query = "select substitution from system.macros where macro='layer'")
+        out = query(chi, query ="select substitution from system.macros where macro='layer'")
         assert out == "01"
         
     with And("Custom macro 'test' should be available"):
-        out = clickhouse_query(chi, query = "select substitution from system.macros where macro='test'")
+        out = query(chi, query ="select substitution from system.macros where macro='test'")
         assert out == "test"
         
     with And("dictGet() should work"):
-        out = clickhouse_query(chi, query = "select dictGet('one', 'one', toUInt64(0))")
+        out = query(chi, query ="select dictGet('one', 'one', toUInt64(0))")
         assert out == "0"
     
     with And("query_log should be disabled"):
-        clickhouse_query(chi, query = "system flush logs")
-        out = clickhouse_query_with_error(chi, query = "select count() from system.query_log")
+        query(chi, query ="system flush logs")
+        out = query_with_error(chi, query ="select count() from system.query_log")
         assert "doesn't exist" in out
 
     with And("max_memory_usage should be 7000000000"):
-        out = clickhouse_query(chi, query = "select value from system.settings where name='max_memory_usage'")
+        out = query(chi, query ="select value from system.settings where name='max_memory_usage'")
         assert out == "7000000000"
         
     with And("test_usersd user should be available"):
-        clickhouse_query(chi, query = "select version()", user = "test_usersd")
+        query(chi, query ="select version()", user ="test_usersd")
     
     with And("system.clusters should be empty due to remote_servers override"):
-        out = clickhouse_query(chi, query = "select count() from system.clusters")
+        out = query(chi, query ="select count() from system.clusters")
         assert out == "0"
 
     with When("Update usersd settings"):
@@ -456,7 +456,7 @@ def test_016():
             assert config_map_applied != "0", "ConfigMap should be applied"
 
         with Then("test_norestart user should be available"):
-            clickhouse_query(chi, query="select version()", user="test_norestart")
+            query(chi, query="select version()", user="test_norestart")
         with And("ClickHouse should not be restarted"):
             new_start_time = get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time == new_start_time
@@ -484,9 +484,9 @@ def test_017():
     for shard in range(4):
         host = f"chi-{chi}-default-{shard}-0"
         for q in queries:
-            clickhouse_query(chi, host=host, query=q)
-        out = clickhouse_query(chi, host=host, query=test_query)
-        ver = clickhouse_query(chi, host=host, query="select version()")
+            query(chi, host=host, query=q)
+        out = query(chi, host=host, query=test_query)
+        ver = query(chi, host=host, query="select version()")
 
         print(f"version: {ver}, result: {out}")
 
@@ -532,8 +532,8 @@ def test_019(config = "configs/test-019-retain-volume.yaml"):
     as select 1 as a""".replace('\r', '').replace('\n', '')
 
     with Given("ClickHouse has some data in place"):
-        clickhouse_query(chi, query = create_nonreplicated_table)
-        clickhouse_query(chi, query = create_replicated_table)
+        query(chi, query = create_nonreplicated_table)
+        query(chi, query = create_replicated_table)
 
     with When("CHI with retained volume is deleted"):
         pvc_count = get_count("pvc")
@@ -550,10 +550,10 @@ def test_019(config = "configs/test-019-retain-volume.yaml"):
     
     with Then("PVC should be re-mounted"):
         with And("Non-replicated table should have data"):
-            out = clickhouse_query(chi, query = "select a from t1")
+            out = query(chi, query ="select a from t1")
             assert out == "1"
         with And("Replicated table should have data"):
-            out = clickhouse_query(chi, query = "select a from t2")
+            out = query(chi, query ="select a from t2")
             assert out == "1"
 
     delete_chi(chi)
@@ -567,18 +567,18 @@ def test_020(config = "configs/test-020-multi-volume.yaml"):
                               "do_not_delete": 1})
 
     with When("Create a table and insert 1 row"):
-        clickhouse_query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
-        clickhouse_query(chi, "insert into test_disks values (1)")
+        query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
+        query(chi, "insert into test_disks values (1)")
         
         with Then("Data should be placed on default disk"):
-            out = clickhouse_query(chi, "select disk_name from system.parts where table='test_disks'")
+            out = query(chi, "select disk_name from system.parts where table='test_disks'")
             assert out == 'default'
     
     with When("alter table test_disks move partition tuple() to disk 'disk2'"):
-        clickhouse_query(chi, "alter table test_disks move partition tuple() to disk 'disk2'")
+        query(chi, "alter table test_disks move partition tuple() to disk 'disk2'")
         
         with Then("Data should be placed on disk2"):
-            out = clickhouse_query(chi, "select disk_name from system.parts where table='test_disks'")
+            out = query(chi, "select disk_name from system.parts where table='test_disks'")
             assert out == 'disk2'
     
     delete_chi(chi)
@@ -621,7 +621,7 @@ def test_021(config = "configs/test-021-rescale-volume.yaml"):
             assert size == "50Mi"
         
         with And("There should be two disks recognized by ClickHouse"):
-            out = clickhouse_query(chi, "select count() from system.disks")
+            out = query(chi, "select count() from system.disks")
             assert out == "2"
 
     
