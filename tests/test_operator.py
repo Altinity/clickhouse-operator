@@ -15,7 +15,14 @@ from testflows.asserts import error
 def test_001():
     kubectl.create_and_check(
         config="configs/test-001.yaml",
-        check={"object_counts": [1, 1, 2], "configmaps": 1}
+        check={
+            "object_counts": {
+                "statefulset": 1,
+                "pod": 1,
+                "service": 2,
+            },
+            "configmaps": 1,
+        }
     )
 
 
@@ -32,7 +39,9 @@ def test_002():
                 "templates/tpl-one-per-host.yaml",
             },
             "pod_image": settings.clickhouse_version,
-            "pod_volumes": {"/var/log/clickhouse-server"},
+            "pod_volumes": {
+                "/var/log/clickhouse-server",
+            },
             "pod_podAntiAffinity": 1
         }
     )
@@ -43,7 +52,13 @@ def test_002():
 def test_003():
     kubectl.create_and_check(
         config="configs/test-003-complex-layout.yaml",
-        check={"object_counts": [4, 4, 5]}
+        check={
+            "object_counts": {
+                "statefulset": 4,
+                "pod": 4,
+                "service": 5,
+            },
+        },
     )
 
 
@@ -54,7 +69,9 @@ def test_004():
         config="configs/test-004-tpl.yaml",
         check={
             "pod_count": 1,
-            "pod_volumes": {"/var/lib/clickhouse"},
+            "pod_volumes": {
+                "/var/lib/clickhouse",
+            },
         }
     )
 
@@ -66,8 +83,10 @@ def test_005():
         config="configs/test-005-acm.yaml",
         check={
             "pod_count": 1,
-            "pod_volumes": {"/var/lib/clickhouse"},
-        }
+            "pod_volumes": {
+                "/var/lib/clickhouse",
+            },
+        },
     )
 
 
@@ -123,7 +142,11 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
         kubectl.create_and_check(
             config=config,
             check={
-                "object_counts": [1, 1, 2],
+                "object_counts": {
+                    "statefulset": 1,
+                    "pod": 1,
+                    "service": 2,
+                },
                 "do_not_delete": 1,
             }
         )
@@ -133,7 +156,7 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
             set_operator_version(version_to, timeout=120)
             time.sleep(5)
             kubectl.wait_chi_status(chi, "Completed", retries=6)
-            kubectl.wait_objects(chi, [1, 1, 2])
+            kubectl.wait_objects(chi, {"statefulset": 1, "pod": 1, "service": 2})
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
             # TODO: assert
             if start_time != new_start_time:
@@ -148,14 +171,23 @@ def test_operator_restart(config, version=settings.operator_version):
         config = util.get_full_path(config)
         chi = manifest.get_chi_name(config)
 
-        kubectl.create_and_check(config, {"object_counts": [1, 1, 2], "do_not_delete": 1})
+        kubectl.create_and_check(
+            config=config,
+            check={
+                "object_counts": {
+                    "statefulset": 1,
+                    "pod": 1,
+                    "service": 2,
+                },
+                "do_not_delete": 1,
+            })
         start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
 
         with When("Restart operator"):
             restart_operator()
             time.sleep(5)
             kubectl.wait_chi_status(chi, "Completed")
-            kubectl.wait_objects(chi, [1, 1, 2])
+            kubectl.wait_objects(chi, {"statefulset": 1, "pod": 1, "service": 2})
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
             # TODO: assert
             if start_time != new_start_time:
@@ -220,7 +252,9 @@ def test_010():
     kubectl.create_and_check(
         config="configs/test-010-zkroot.yaml",
         check={
-            "apply_templates": {settings.clickhouse_template},
+            "apply_templates": {
+                settings.clickhouse_template,
+            },
             "pod_count": 1,
             "do_not_delete": 1,
         }
@@ -240,8 +274,14 @@ def test_011():
             config="configs/test-011-secured-cluster.yaml",
             check={
                 "pod_count": 2,
-                "service": ["chi-test-011-secured-cluster-default-1-0", "ClusterIP"],
-                "apply_templates": {settings.clickhouse_template, "templates/tpl-log-volume.yaml"},
+                "service": [
+                    "chi-test-011-secured-cluster-default-1-0",
+                    "ClusterIP",
+                ],
+                "apply_templates": {
+                    settings.clickhouse_template,
+                    "templates/tpl-log-volume.yaml",
+                },
                 "do_not_delete": 1,
             }
         )
@@ -359,7 +399,9 @@ def test_011_1():
         with When("Trigger installation update"):
             kubectl.create_and_check(
                 config="configs/test-011-secured-default-2.yaml",
-                check={"do_not_delete": 1}
+                check={
+                    "do_not_delete": 1,
+                }
             )
             with Then("Default user password should be '_removed_'"):
                 chi = kubectl.get("chi", "test-011-secured-default")
@@ -369,7 +411,9 @@ def test_011_1():
         with When("Default user is assigned the different profile"):
             kubectl.create_and_check(
                 config="configs/test-011-secured-default-3.yaml",
-                check={"do_not_delete": 1}
+                check={
+                    "do_not_delete": 1,
+                }
             )
             with Then("Connection to localhost should succeed with default user"):
                 out = clickhouse.query_with_error(
@@ -387,8 +431,15 @@ def test_012():
     kubectl.create_and_check(
         config="configs/test-012-service-template.yaml",
         check={
-            "object_counts": [2, 2, 4],
-            "service": ["service-test-012", "ClusterIP"],
+            "object_counts": {
+                "statefulset": 2,
+                "pod": 2,
+                "service": 4,
+            },
+            "service": [
+                "service-test-012",
+                "ClusterIP",
+            ],
             "do_not_delete": 1,
         }
     )
@@ -408,8 +459,14 @@ def test_013():
     kubectl.create_and_check(
         config="configs/test-013-add-shards-1.yaml",
         check={
-            "apply_templates": {settings.clickhouse_template},
-            "object_counts": [1, 1, 2],
+            "apply_templates": {
+                settings.clickhouse_template,
+            },
+            "object_counts": {
+                "statefulset": 1,
+                "pod": 1,
+                "service": 2,
+            },
             "do_not_delete": 1,
         }
     )
@@ -428,7 +485,11 @@ def test_013():
         kubectl.create_and_check(
             config="configs/test-013-add-shards-2.yaml",
             check={
-                "object_counts": [3, 3, 4],
+                "object_counts": {
+                    "statefulset": 3,
+                    "pod": 3,
+                    "service": 4,
+                },
                 "do_not_delete": 1,
             }
         )
@@ -468,7 +529,11 @@ def test_014():
                 settings.clickhouse_template,
                 "templates/tpl-persistent-volume-100Mi.yaml",
             },
-            "object_counts": [2, 2, 3],
+            "object_counts": {
+                "statefulset": 2,
+                "pod": 2,
+                "service": 3,
+            },
             "do_not_delete": 1,
         }
     )
@@ -610,7 +675,9 @@ def test_016():
     kubectl.create_and_check(
         config="configs/test-016-settings.yaml",
         check={
-            "apply_templates": {settings.clickhouse_template},
+            "apply_templates": {
+                settings.clickhouse_template,
+            },
             "pod_count": 1,
             "do_not_delete": 1,
         })
@@ -645,7 +712,11 @@ def test_016():
 
     with When("Update usersd settings"):
         start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
-        kubectl.create_and_check(config="configs/test-016-settings-2.yaml", check={"do_not_delete": 1})
+        kubectl.create_and_check(
+            config="configs/test-016-settings-2.yaml",
+            check={
+                "do_not_delete": 1,
+            })
         with Then("Wait for configmap changes to apply"):
             config_map_applied_num = "0"
             i = 1

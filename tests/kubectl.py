@@ -32,7 +32,7 @@ def run(command, ok_to_fail=False, ns=namespace, timeout=60):
 def delete_chi(chi, ns=namespace):
     with When(f"Delete chi {chi}"):
         shell(f"{kubectl_cmd} delete chi {chi} -n {ns}", timeout=900)
-        wait_objects(chi, [0, 0, 0], ns)
+        wait_objects(chi, {"statefulset": 0, "pod": 0, "service": 0}, ns)
 
 
 def delete_all_chi(ns=namespace):
@@ -121,7 +121,11 @@ def count_objects(label="", ns=namespace):
     sts = get_count("sts", ns=ns, label=label)
     pod = get_count("pod", ns=ns, label=label)
     service = get_count("service", ns=ns, label=label)
-    return [sts, pod, service]
+    return {
+        "statefulset": sts,
+        "pod": pod,
+        "service": service,
+    }
 
 
 def apply(config, ns=namespace, validate=True, timeout=30):
@@ -139,15 +143,19 @@ def delete(config, ns=namespace, timeout=30):
         assert cmd.exitcode == 0, error()
 
 
-def wait_objects(chi, objects, ns=namespace):
-    with Then(f"{objects[0]} statefulsets, {objects[1]} pods and {objects[2]} services should be created"):
+def wait_objects(chi, object_counts, ns=namespace):
+    with Then(
+            f"{object_counts[0]} statefulsets, "
+            f"{object_counts[1]} pods and "
+            f"{object_counts[2]} services should be created"
+    ):
         for i in range(1, max_retries):
-            counts = count_objects(label=f"-l clickhouse.altinity.com/chi={chi}", ns=ns)
-            if counts == objects:
+            cur_object_counts = count_objects(label=f"-l clickhouse.altinity.com/chi={chi}", ns=ns)
+            if cur_object_counts == object_counts:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                 time.sleep(i * 5)
-        assert counts == objects, error()
+        assert cur_object_counts == object_counts, error()
 
 
 def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries):

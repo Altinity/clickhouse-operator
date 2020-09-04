@@ -583,7 +583,11 @@ def test_system_settings_changed():
                     "templates/tpl-clickhouse-latest.yaml",
                     "templates/tpl-persistent-volume-100Mi.yaml"
                 ],
-                "object_counts": [2, 2, 3],
+                "object_counts": {
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
+                },
                 "do_not_delete": 1
             }
         )
@@ -601,7 +605,11 @@ def test_system_settings_changed():
                     "templates/tpl-clickhouse-latest.yaml",
                     "templates/tpl-persistent-volume-100Mi.yaml"
                 ],
-                "object_counts": [2, 2, 3],
+                "object_counts": {
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
+                },
                 "do_not_delete": 1
             }
         )
@@ -715,7 +723,11 @@ if main():
                         "templates/tpl-clickhouse-latest.yaml",
                         "templates/tpl-persistent-volume-100Mi.yaml"
                     ],
-                    "object_counts": [2, 2, 3],
+                    "object_counts": {
+                        "statefulset": 2,
+                        "pod": 2,
+                        "service": 3,
+                    },
                     "do_not_delete": 1
                 }
             )

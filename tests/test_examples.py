@@ -10,7 +10,11 @@ def test_examples01_1():
     kubectl.create_and_check(
         config="../docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml",
         check={
-            "object_counts": [1, 1, 2]
+            "object_counts": {
+                "statefulset": 1,
+                "pod": 1,
+                "service": 2,
+            }
         })
 
 
@@ -20,7 +24,11 @@ def test_examples01_2():
     kubectl.create_and_check(
         config="../docs/chi-examples/01-simple-layout-02-1shard-2repl.yaml",
         check={
-            "object_counts": [2, 2, 3]
+            "object_counts": {
+                "statefulset": 2,
+                "pod": 2,
+                "service": 3,
+            }
         })
 
 

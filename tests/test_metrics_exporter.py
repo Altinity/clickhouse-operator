@@ -59,8 +59,17 @@ def test_metrics_exporter_reboot():
         kubectl.create_ns(kubectl.namespace)
         check_monitoring_chi(operator_namespace, operator_pod, [])
         with And("created simple clickhouse installation"):
-            config = kubectl.get_full_path("../docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml")
-            kubectl.create_and_check(config, {"object_counts": [1, 1, 2], "do_not_delete": True})
+            config = util.get_full_path("../docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml")
+            kubectl.create_and_check(
+                config=config,
+                check={
+                    "object_counts": {
+                        "statefulset": 1,
+                        "pod": 1,
+                        "service": 2,
+                    },
+                    "do_not_delete": True,
+                })
             expected_chi = [{
                 "namespace": "test", "name": "simple-01",
                 "hostnames": ["chi-simple-01-cluster-0-0.test.svc.cluster.local"]
@@ -114,7 +123,16 @@ def test_metrics_exporter_with_multiple_clickhouse_version():
 
         with Then("Install multiple clickhouse version"):
             config = util.get_full_path("configs/test-017-multi-version.yaml")
-            kubectl.create_and_check(config, {"object_counts": [4, 4, 5], "do_not_delete": True})
+            kubectl.create_and_check(
+                config=config,
+                check={
+                    "object_counts": {
+                        "statefulset": 4,
+                        "pod": 4,
+                        "service": 5,
+                    },
+                    "do_not_delete": True,
+                })
             with And("Check not empty /metrics"):
                 check_monitoring_metrics(operator_namespace, operator_pod, expect_result={
                     '# HELP chi_clickhouse_metric_VersionInteger': True,
