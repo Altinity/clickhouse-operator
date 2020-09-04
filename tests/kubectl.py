@@ -88,8 +88,8 @@ def create_and_check(config, check, ns=namespace):
         delete_chi(chi_name, ns)
 
 
-def get(_type, name, label="", ns=namespace):
-    cmd = shell(f"{kubectl_cmd} get {_type} {name} {label} -o json -n {ns}")
+def get(kind, name, label="", ns=namespace):
+    cmd = shell(f"{kubectl_cmd} get {kind} {name} {label} -o json -n {ns}")
     assert cmd.exitcode == 0, error()
     return json.loads(cmd.output.strip())
 
@@ -105,12 +105,12 @@ def delete_ns(ns):
     shell(f"{kubectl_cmd} delete ns {ns}", timeout=60)
 
 
-def get_count(_type, name="", label="", ns=namespace):
+def get_count(kind, name="", label="", ns=namespace):
     if ns is None:
         ns = '--all-namespaces'
     elif '-n' not in ns and '--namespace' not in ns:
         ns = f"-n {ns}"
-    cmd = shell(f"{kubectl_cmd} get {_type} {name} {ns} -o=custom-columns=kind:kind,name:.metadata.name {label}")
+    cmd = shell(f"{kubectl_cmd} get {kind} {name} {ns} -o=custom-columns=kind:kind,name:.metadata.name {label}")
     if cmd.exitcode == 0:
         return len(cmd.output.splitlines()) - 1
     else:
@@ -150,10 +150,10 @@ def wait_objects(chi, objects, ns=namespace):
         assert counts == objects, error()
 
 
-def wait_object(_type, name, label="", count=1, ns=namespace, retries=max_retries):
-    with Then(f"{count} {_type}(s) {name} should be created"):
+def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries):
+    with Then(f"{count} {kind}(s) {name} should be created"):
         for i in range(1, retries):
-            cur_count = get_count(_type, ns=ns, name=name, label=label)
+            cur_count = get_count(kind, ns=ns, name=name, label=label)
             if cur_count >= count:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
@@ -173,10 +173,10 @@ def wait_pod_status(pod, status, ns=namespace):
     wait_field("pod", pod, ".status.phase", status, ns)
 
 
-def wait_field(_type, name, field, value, ns=namespace, retries=max_retries):
-    with Then(f"{_type} {name} {field} should be {value}"):
+def wait_field(kind, name, field, value, ns=namespace, retries=max_retries):
+    with Then(f"{kind} {name} {field} should be {value}"):
         for i in range(1, retries):
-            cur_value = get_field(_type, name, field, ns)
+            cur_value = get_field(kind, name, field, ns)
             if cur_value == value:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
@@ -184,10 +184,10 @@ def wait_field(_type, name, field, value, ns=namespace, retries=max_retries):
         assert cur_value == value, error()
 
 
-def wait_jsonpath(_type, name, field, value, ns=namespace, retries=max_retries):
-    with Then(f"{_type} {name} -o jsonpath={field} should be {value}"):
+def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
+    with Then(f"{kind} {name} -o jsonpath={field} should be {value}"):
         for i in range(1, retries):
-            cur_value = get_jsonpath(_type, name, field, ns)
+            cur_value = get_jsonpath(kind, name, field, ns)
             if cur_value == value:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
@@ -195,13 +195,13 @@ def wait_jsonpath(_type, name, field, value, ns=namespace, retries=max_retries):
         assert cur_value == value, error()
 
 
-def get_field(_type, name, field, ns=namespace):
-    out = run(f"get {_type} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
+def get_field(kind, name, field, ns=namespace):
+    out = run(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
     return out[1]
 
 
-def get_jsonpath(_type, name, field, ns=namespace):
-    out = run(f"get {_type} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
+def get_jsonpath(kind, name, field, ns=namespace):
+    out = run(f"get {kind} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
     return out[0]
 
 
