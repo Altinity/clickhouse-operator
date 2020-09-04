@@ -5,7 +5,9 @@ import pathlib
 
 def get_ch_version(test_file):
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    return yaml.safe_load(open(os.path.join(current_dir, test_file),"r"))["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
+    return yaml.safe_load(
+        open(os.path.join(current_dir, test_file), "r")
+    )["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
 
 
 # kubectl_cmd="minikube kubectl --"
