@@ -93,14 +93,15 @@ def test_005():
 @TestScenario
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
 def test_006():
-    kubectl.create_and_check(
-        config="configs/test-006-ch-upgrade-1.yaml",
-        check={
-            "pod_count": 2,
-            "pod_image": "yandex/clickhouse-server:19.11",
-            "do_not_delete": 1,
-        }
-    )
+    with Then("Create initial position"):
+        kubectl.create_and_check(
+            config="configs/test-006-ch-upgrade-1.yaml",
+            check={
+                "pod_count": 2,
+                "pod_image": "yandex/clickhouse-server:19.11",
+                "do_not_delete": 1,
+            }
+        )
     with Then("Use different podTemplate and confirm that pod image is updated"):
         kubectl.create_and_check(
             config="configs/test-006-ch-upgrade-2.yaml",
@@ -110,14 +111,14 @@ def test_006():
                 "do_not_delete": 1,
             }
         )
-        with Then("Change image in podTemplate itself and confirm that pod image is updated"):
-            kubectl.create_and_check(
-                config="configs/test-006-ch-upgrade-3.yaml",
-                check={
-                    "pod_count": 2,
-                    "pod_image": "yandex/clickhouse-server:19.11",
-                }
-            )
+    with Then("Change image in podTemplate itself and confirm that pod image is updated"):
+        kubectl.create_and_check(
+            config="configs/test-006-ch-upgrade-3.yaml",
+            check={
+                "pod_count": 2,
+                "pod_image": "yandex/clickhouse-server:19.11",
+            }
+        )
 
 
 @TestScenario
@@ -200,7 +201,7 @@ def test_operator_restart(config, version=settings.operator_version):
 @Name("test_008. Test operator restart")
 def test_008():
     with Then("Test simple chi for operator restart"):
-        test_operator_restart("configs/test-009-operator-upgrade.yaml")
+        test_operator_restart("configs/test-009-operator-upgrade-1.yaml")
     with Then("Test advanced chi for operator restart"):
         test_operator_restart("configs/test-009-operator-upgrade-2.yaml")
 
@@ -209,7 +210,7 @@ def test_008():
 @Name("test_009. Test operator upgrade")
 def test_009(version_from="0.8.0", version_to=settings.operator_version):
     with Then("Test simple chi for operator upgrade"):
-        test_operator_upgrade("configs/test-009-operator-upgrade.yaml", version_from, version_to)
+        test_operator_upgrade("configs/test-009-operator-upgrade-1.yaml", version_from, version_to)
     with Then("Test advanced chi for operator upgrade"):
         test_operator_upgrade("configs/test-009-operator-upgrade-2.yaml", version_from, version_to)
 
