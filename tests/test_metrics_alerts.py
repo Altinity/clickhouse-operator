@@ -5,11 +5,12 @@ import random
 
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module
 from testflows.asserts import error
+
 import settings
 import kubectl
 import clickhouse
 
-from test_operator import set_operator_version, require_zookeeper, create_and_check
+from test_operator import set_operator_version, require_zookeeper
 from test_metrics_exporter import set_metrics_exporter_version
 
 prometheus_operator_spec = None
@@ -32,7 +33,7 @@ def check_alert_state(alert_name, alert_state="firing", labels=None, time_range=
         labels.update({"alertname": alert_name, "alertstate": alert_state})
         cmd += ",".join([f"{name}=\"{value}\"" for name, value in labels.items()])
         cmd += f"}}[{time_range}]' 2>/dev/null"
-        out = kubectl.kubectl(cmd)
+        out = kubectl.run(cmd)
         out = json.loads(out)
         assert "status" in out and out["status"] == "success", error("wrong response from prometheus query API")
         if len(out["data"]["result"]) == 0:
@@ -128,7 +129,7 @@ def test_prometheus_setup():
 def test_metrics_exporter_down():
     def reboot_metrics_exporter():
         clickhouse_operator_pod = clickhouse_operator_spec["items"][0]["metadata"]["name"]
-        kubectl.kubectl(
+        kubectl.run(
             f"exec -n {settings.operator_namespace} {clickhouse_operator_pod} -c metrics-exporter -- reboot",
             ok_to_fail=True,
         )
@@ -150,7 +151,7 @@ def test_clickhouse_server_reboot():
     clickhouse_svc = chi["status"]["fqdns"][random_idx]
 
     def reboot_clickhouse_server():
-        kubectl.kubectl(
+        kubectl.run(
             f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse -- kill 1",
             ok_to_fail=True,
         )
@@ -184,7 +185,7 @@ def test_clickhouse_dns_errors():
     clickhouse_pod = chi["status"]["pods"][random_idx]
     clickhouse_svc = chi["status"]["fqdns"][random_idx]
 
-    old_dns = kubectl.kubectl(
+    old_dns = kubectl.run(
         f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse -- cat /etc/resolv.conf",
         ok_to_fail=False,
     )
@@ -192,11 +193,11 @@ def test_clickhouse_dns_errors():
 
     def rewrite_dns_on_clickhouse_server(write_new=True):
         dns = new_dns if write_new else old_dns
-        kubectl.kubectl(
+        kubectl.run(
             f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse -- bash -c \"printf \\\"{dns}\\\" > /etc/resolv.conf\"",
             ok_to_fail=False,
         )
-        kubectl.kubectl(
+        kubectl.run(
             f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse -- clickhouse-client --echo -mn -q \"SYSTEM DROP DNS CACHE; SELECT count() FROM cluster('all-sharded',system,metrics)\"",
             ok_to_fail=True,
         )
@@ -229,7 +230,7 @@ def test_distributed_files_to_insert():
     files_to_insert_from_disk = 0
     tries = 0
     while files_to_insert_from_disk < 50 and tries < 500:
-        kubectl.kubectl(
+        kubectl.run(
             f"exec -n {kubectl.namespace} {restarted_pod} -c clickhouse -- kill 1",
             ok_to_fail=True,
         )
@@ -240,7 +241,7 @@ def test_distributed_files_to_insert():
         )
         files_to_insert_from_metrics = int(files_to_insert_from_metrics)
 
-        files_to_insert_from_disk = int(kubectl.kubectl(
+        files_to_insert_from_disk = int(kubectl.run(
             f"exec -n {kubectl.namespace} {delayed_pod} -c clickhouse -- bash -c 'ls -la /var/lib/clickhouse/data/default/test_distr/*/*.bin 2>/dev/null | wc -l'",
             ok_to_fail=False,
         ))
@@ -270,7 +271,7 @@ def test_distributed_connection_exceptions():
         insert_sql = 'INSERT INTO default.test_distr(event_time, test) SELECT now(), number FROM system.numbers LIMIT 10000'
         select_sql = 'SELECT count() FROM default.test_distr'
         with Then("reboot clickhouse-server pod"):
-            kubectl.kubectl(
+            kubectl.run(
                 f"exec -n {kubectl.namespace} {restarted_pod} -c clickhouse -- kill 1",
                 ok_to_fail=True,
             )
@@ -393,7 +394,7 @@ def test_query_preempted():
         for i in range(50):
             sql += f"SET priority={i % 20};SELECT uniq(number) FROM numbers(20000000):"
         cmd = f"echo \\\"{sql} SELECT 1\\\" | xargs -i'{{}}' --no-run-if-empty -d ':' -P 20 clickhouse-client --time -m -n -q \\\"{{}}\\\""
-        kubectl.kubectl(f"exec {priority_pod} -- bash -c \"{cmd}\"", timeout=120)
+        kubectl.run(f"exec {priority_pod} -- bash -c \"{cmd}\"", timeout=120)
         clickhouse.query(
             chi["metadata"]["name"],
             "SELECT event_time, CurrentMetric_QueryPreempted FROM system.metric_log WHERE CurrentMetric_QueryPreempted > 0",
@@ -416,7 +417,7 @@ def test_read_only_replica():
     create_replicated_table_on_cluster()
 
     def restart_zookeeper():
-        kubectl.kubectl(
+        kubectl.run(
             f"exec -n {kubectl.namespace} zookeeper-0 -- sh -c \"kill 1\"",
             ok_to_fail=True,
         )
@@ -455,12 +456,12 @@ def test_replicas_max_abosulute_delay():
     def restart_clickhouse_and_insert_to_replicated_table():
         with When(f"stop replica fetches on {stop_replica_svc}"):
             sql = "SYSTEM STOP FETCHES default.test_repl"
-            kubectl.kubectl(
+            kubectl.run(
                 f"exec -n {kubectl.namespace} {stop_replica_pod} -c clickhouse -- clickhouse-client -q \"{sql}\"",
                 ok_to_fail=True,
             )
             sql = "INSERT INTO default.test_repl SELECT now(), number FROM numbers(100000)"
-            kubectl.kubectl(
+            kubectl.run(
                 f"exec -n {kubectl.namespace} {insert_pod} -c clickhouse -- clickhouse-client -q \"{sql}\"",
             )
 
@@ -485,7 +486,7 @@ def test_replicas_max_abosulute_delay():
 def test_too_many_connections():
     too_many_connection_pod, too_many_connection_svc, _, _ = random_pod_choice_for_callbacks()
     cmd = "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y netcat"
-    kubectl.kubectl(
+    kubectl.run(
         f"exec -n {kubectl.namespace} {too_many_connection_pod} -c clickhouse -- bash -c  \"{cmd}\"",
         ok_to_fail=True,
     )
@@ -507,11 +508,11 @@ def test_too_many_connections():
         with open("/tmp/nc_cmd.sh", "w") as f:
             f.write(nc_cmd)
 
-        kubectl.kubectl(
+        kubectl.run(
             f"cp /tmp/nc_cmd.sh {too_many_connection_pod}:/tmp/nc_cmd.sh -c clickhouse"
         )
 
-        kubectl.kubectl(
+        kubectl.run(
             f"exec -n {kubectl.namespace} {too_many_connection_pod} -c clickhouse -- bash /tmp/nc_cmd.sh",
             timeout=120,
         )
@@ -531,7 +532,7 @@ def test_too_many_connections():
 def test_too_much_running_queries():
     _, _, too_many_queries_pod, too_many_queries_svc = random_pod_choice_for_callbacks()
     cmd = "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y mysql-client"
-    kubectl.kubectl(
+    kubectl.run(
         f"exec -n {kubectl.namespace} {too_many_queries_pod} -c clickhouse -- bash -c  \"{cmd}\"",
         ok_to_fail=True,
     )
@@ -551,10 +552,10 @@ def test_too_much_running_queries():
         with open("/tmp/long_cmd.sh", "w") as f:
             f.write(long_cmd)
 
-        kubectl.kubectl(
+        kubectl.run(
             f"cp /tmp/long_cmd.sh {too_many_queries_pod}:/tmp/long_cmd.sh -c clickhouse"
         )
-        kubectl.kubectl(
+        kubectl.run(
             f"exec -n {kubectl.namespace} {too_many_queries_pod} -c clickhouse -- bash /tmp/long_cmd.sh",
             timeout=70,
         )
@@ -575,9 +576,9 @@ def test_system_settings_changed():
     changed_pod, changed_svc, _, _ = random_pod_choice_for_callbacks()
 
     with When("apply changed settings"):
-        create_and_check(
-            "configs/test-cluster-for-alerts-changed-settings.yaml",
-            {
+        kubectl.create_and_check(
+            config="configs/test-cluster-for-alerts-changed-settings.yaml",
+            check={
                 "apply_templates": [
                     "templates/tpl-clickhouse-latest.yaml",
                     "templates/tpl-persistent-volume-100Mi.yaml"
@@ -593,9 +594,9 @@ def test_system_settings_changed():
         assert fired, error("can't get ClickHouseTooManyConnections alert in firing state")
 
     with When("rollback changed settings"):
-        create_and_check(
-            "configs/test-cluster-for-alerts.yaml",
-            {
+        kubectl.create_and_check(
+            config="configs/test-cluster-for-alerts.yaml",
+            check={
                 "apply_templates": [
                     "templates/tpl-clickhouse-latest.yaml",
                     "templates/tpl-persistent-volume-100Mi.yaml"
@@ -609,15 +610,16 @@ def test_system_settings_changed():
         resolved = wait_alert_state("ClickHouseSystemSettingsChanged", "firing", False, labels={"hostname": changed_svc}, sleep_time=30)
         assert resolved, error("can't check ClickHouseTooManyConnections alert is gone away")
 
+
 @TestScenario
 @Name("Check ClickHouseVersionChanged")
 def test_version_changed():
     changed_pod, changed_svc, _, _ = random_pod_choice_for_callbacks()
 
     with When("apply changed settings"):
-        create_and_check(
-            "configs/test-cluster-for-alerts-changed-settings.yaml",
-            {
+        kubectl.create_and_check(
+            config="configs/test-cluster-for-alerts-changed-settings.yaml",
+            check={
                 "apply_templates": [
                     "templates/tpl-clickhouse-20.3.yaml",
                     "templates/tpl-persistent-volume-100Mi.yaml"
@@ -636,9 +638,9 @@ def test_version_changed():
         assert fired, error("can't get ClickHouseVersionChanged alert in firing state")
 
     with When("rollback changed settings"):
-        create_and_check(
-            "configs/test-cluster-for-alerts.yaml",
-            {
+        kubectl.create_and_check(
+            config="configs/test-cluster-for-alerts.yaml",
+            check={
                 "apply_templates": [
                     "templates/tpl-clickhouse-latest.yaml",
                     "templates/tpl-persistent-volume-100Mi.yaml"
@@ -652,6 +654,7 @@ def test_version_changed():
         resolved = wait_alert_state("ClickHouseVersionChanged", "firing", False, labels={"hostname": changed_svc}, sleep_time=30)
         assert resolved, error("can't check ClickHouseVersionChanged alert is gone away")
 
+
 @TestScenario
 @Name("Check ZooKeeperHardwareExceptions")
 def test_zookeeper_hardware_exceptions():
@@ -659,7 +662,7 @@ def test_zookeeper_hardware_exceptions():
     chi_name = chi["metadata"]["name"]
 
     def restart_zookeeper():
-        kubectl.kubectl(
+        kubectl.run(
             f"exec -n {kubectl.namespace} zookeeper-0 -- sh -c \"kill 1\"",
             ok_to_fail=True,
         )
@@ -705,9 +708,9 @@ if main():
             kubectl.delete_ns(kubectl.namespace)
             kubectl.create_ns(kubectl.namespace)
             require_zookeeper()
-            create_and_check(
-                "configs/test-cluster-for-alerts.yaml",
-                {
+            kubectl.create_and_check(
+                config="configs/test-cluster-for-alerts.yaml",
+                check={
                     "apply_templates": [
                         "templates/tpl-clickhouse-latest.yaml",
                         "templates/tpl-persistent-volume-100Mi.yaml"
