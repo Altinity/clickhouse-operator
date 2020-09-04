@@ -161,7 +161,7 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
             # TODO: assert
             if start_time != new_start_time:
-                print("!!!Pods have been restarted!!!")
+                print(f"!!!Pods have been restarted!!! {start_time} != {new_start_time}")
 
         kubectl.delete_chi(chi)
 
@@ -192,7 +192,7 @@ def test_operator_restart(config, version=settings.operator_version):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
             # TODO: assert
             if start_time != new_start_time:
-                print("!!!Pods have been restarted!!!")
+                print(f"!!!Pods have been restarted!!! {start_time} != {new_start_time}")
 
         kubectl.delete_chi(chi)
 
@@ -515,7 +515,7 @@ def test_013():
     new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
     # TODO: assert
     if start_time != new_start_time:
-        print("!!!Pods have been restarted!!!")
+        print(f"!!!Pods have been restarted!!! {start_time} != {new_start_time}")
 
     with And("Schema objects should be migrated to new shards"):
         for obj in schema_objects:
@@ -541,12 +541,18 @@ def test_014():
     require_zookeeper()
 
     create_table = """
-    create table test_local(a Int8) 
+    CREATE TABLE test_local(a Int8) 
     Engine = ReplicatedMergeTree('/clickhouse/{installation}/{cluster}/tables/{shard}/{database}/{table}', '{replica}')
-    partition by tuple() order by a""".replace('\r', '').replace('\n', '')
+    PARTITION BY tuple() 
+    ORDER BY a
+    """.replace('\r', '').replace('\n', '')
+
+    config = "configs/test-014-replication.yaml"
+    chi = manifest.get_chi_name(config)
+    cluster = "default"
 
     kubectl.create_and_check(
-        config="configs/test-014-replication.yaml",
+        config=config,
         check={
             "apply_templates": {
                 settings.clickhouse_template,
@@ -561,37 +567,45 @@ def test_014():
         }
     )
 
-    schema_objects = ['test_local', 'test_view', 'test_mv', 'a_view']
+    schema_objects = [
+        'test_local',
+        'test_view',
+        'test_mv',
+        'a_view',
+    ]
     with Given("Create schema objects"):
         clickhouse.query(
-            "test-014-replication",
+            chi,
             create_table,
-            host="chi-test-014-replication-default-0-0")
+            host=f"chi-{chi}-{cluster}-0-0")
         clickhouse.query(
-            "test-014-replication",
+            chi,
             "CREATE VIEW test_view as SELECT * from test_local",
-            host="chi-test-014-replication-default-0-0")
+            host=f"chi-{chi}-{cluster}-0-0")
         clickhouse.query(
-            "test-014-replication",
+            chi,
             "CREATE VIEW a_view as SELECT * from test_view",
-            host="chi-test-014-replication-default-0-0")
+            host=f"chi-{chi}-{cluster}-0-0")
         clickhouse.query(
-            "test-014-replication",
+            chi,
             "CREATE MATERIALIZED VIEW test_mv Engine = Log as SELECT * from test_local",
-            host="chi-test-014-replication-default-0-0")
+            host=f"chi-{chi}-{cluster}-0-0")
 
     with Given("Replicated table is created on a first replica and data is inserted"):
         clickhouse.query(
-            "test-014-replication",
-            "insert into test_local values(1)",
-            host="chi-test-014-replication-default-0-0")
+            chi,
+            "INSERT INTO test_local values(1)",
+            host=f"chi-{chi}-{cluster}-0-0")
         with When("Table is created on the second replica"):
-            clickhouse.query("test-014-replication", create_table, host="chi-test-014-replication-default-0-1")
+            clickhouse.query(
+                chi,
+                create_table,
+                host=f"chi-{chi}-{cluster}-0-1")
             with Then("Data should be replicated"):
                 out = clickhouse.query(
-                    "test-014-replication",
-                    "select a from test_local",
-                    host="chi-test-014-replication-default-0-1")
+                    chi,
+                    "SELECT a FROM test_local",
+                    host=f"chi-{chi}-{cluster}-0-1")
                 assert out == "1"
 
     with When("Add one more replica"):
@@ -602,21 +616,21 @@ def test_014():
                 "do_not_delete": 1,
             }
         )
-        # that also works:
-        # kubectl patch chi test-014-replication -n test --type=json -p '[{"op":"add", "path": "/spec/configuration/clusters/0/layout/shards/0/replicasCount", "value": 3}]'
+        # Give some time for replication to catch up
+        time.sleep(10)
         with Then("Schema objects should be migrated to the new replica"):
             for obj in schema_objects:
                 out = clickhouse.query(
-                    "test-014-replication",
+                    chi,
                     f"SELECT count() FROM system.tables WHERE name = '{obj}'",
-                    host="chi-test-014-replication-default-0-2")
+                    host=f"chi-{chi}-{cluster}-0-2")
                 assert out == "1"
 
         with And("Replicated table should have the data"):
             out = clickhouse.query(
-                "test-014-replication",
+                chi,
                 "SELECT a FROM test_local",
-                host="chi-test-014-replication-default-0-2")
+                host=f"chi-{chi}-{cluster}-0-2")
             assert out == "1"
 
     with When("Remove replica"):
@@ -628,8 +642,8 @@ def test_014():
             })
         with Then("Replica needs to be removed from the Zookeeper as well"):
             out = clickhouse.query(
-                "test-014-replication",
-                "select count() from system.replicas where table='test_local'")
+                chi,
+                "SELECT count() FROM system.replicas WHERE table='test_local'")
             assert out == "1"
 
     with When("Restart Zookeeper pod"):
@@ -638,7 +652,7 @@ def test_014():
             time.sleep(1)
 
         with Then("Insert into the table while there is no Zookeeper -- table should be in readonly mode"):
-            out = clickhouse.query_with_error("test-014-replication", "insert into test_local values(2)")
+            out = clickhouse.query_with_error(chi, "INSERT INTO test_local values(2)")
             assert "Table is in readonly mode" in out
 
         with Then("Wait for Zookeeper pod to come back"):
@@ -652,7 +666,7 @@ def test_014():
         #    kubectl("delete pod chi-test-014-replication-default-0-1-0")
 
         with Then("Table should be back to normal"):
-            clickhouse.query("test-014-replication", "insert into test_local values(3)")
+            clickhouse.query(chi, "INSERT INTO test_local values(3)")
 
     kubectl.delete_chi("test-014-replication")
 
