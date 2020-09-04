@@ -23,7 +23,6 @@ def run(command, ok_to_fail=False, ns=namespace, timeout=60):
     code = cmd.exitcode
     if not ok_to_fail:
         if code != 0:
-
             print("command failed, output:")
             print(cmd.output)
         assert code == 0, error()
@@ -118,7 +117,7 @@ def get_count(_type, name="", label="", ns=namespace):
         return 0
 
 
-def count_resources(label="", ns=namespace):
+def count_objects(label="", ns=namespace):
     sts = get_count("sts", ns=ns, label=label)
     pod = get_count("pod", ns=ns, label=label)
     service = get_count("service", ns=ns, label=label)
@@ -143,7 +142,7 @@ def delete(config, ns=namespace, timeout=30):
 def wait_objects(chi, objects, ns=namespace):
     with Then(f"{objects[0]} statefulsets, {objects[1]} pods and {objects[2]} services should be created"):
         for i in range(1, max_retries):
-            counts = count_resources(label=f"-l clickhouse.altinity.com/chi={chi}", ns=ns)
+            counts = count_objects(label=f"-l clickhouse.altinity.com/chi={chi}", ns=ns)
             if counts == objects:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
@@ -154,12 +153,12 @@ def wait_objects(chi, objects, ns=namespace):
 def wait_object(_type, name, label="", count=1, ns=namespace, retries=max_retries):
     with Then(f"{count} {_type}(s) {name} should be created"):
         for i in range(1, retries):
-            counts = get_count(_type, ns=ns, name=name, label=label)
-            if counts >= count:
+            cur_count = get_count(_type, ns=ns, name=name, label=label)
+            if cur_count >= count:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                 time.sleep(i * 5)
-        assert counts >= count, error()
+        assert cur_count >= count, error()
 
 
 def wait_chi_status(chi, status, ns=namespace, retries=max_retries):
@@ -177,23 +176,24 @@ def wait_pod_status(pod, status, ns=namespace):
 def wait_field(_object, name, field, value, ns=namespace, retries=max_retries):
     with Then(f"{_object} {name} {field} should be {value}"):
         for i in range(1, retries):
-            obj_status = run(f"get {_object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
-            if obj_status[1] == value:
+            cur_value = get_field(_object, name, field, ns)
+            if cur_value == value:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                 time.sleep(i * 5)
-        assert obj_status[1] == value, error()
+        assert cur_value == value, error()
 
 
 def wait_jsonpath(_object, name, field, value, ns=namespace, retries=max_retries):
     with Then(f"{_object} {name} -o jsonpath={field} should be {value}"):
         for i in range(1, retries):
-            obj_status = run(f"get {_object} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
-            if obj_status[0] == value:
+            status = run(f"get {_object} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
+            cur_value = status[0]
+            if cur_value == value:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                 time.sleep(i * 5)
-        assert obj_status[0] == value, error()
+        assert cur_value == value, error()
 
 
 def get_field(_object, name, field, ns=namespace):
@@ -279,18 +279,19 @@ def get_pvc_size(pvc_name, ns=namespace):
 
 def check_pod_antiaffinity(chi_name, ns=namespace):
     pod_spec = get_pod_spec(chi_name, ns)
-    expected = {"requiredDuringSchedulingIgnoredDuringExecution": [
-        {
-            "labelSelector": {
-                "matchLabels": {
-                    "clickhouse.altinity.com/app": "chop",
-                    "clickhouse.altinity.com/chi": f"{chi_name}",
-                    "clickhouse.altinity.com/namespace": f"{ns}"
-                }
+    expected = {
+        "requiredDuringSchedulingIgnoredDuringExecution": [
+            {
+                "labelSelector": {
+                    "matchLabels": {
+                        "clickhouse.altinity.com/app": "chop",
+                        "clickhouse.altinity.com/chi": f"{chi_name}",
+                        "clickhouse.altinity.com/namespace": f"{ns}",
+                    },
+                },
+                "topologyKey": "kubernetes.io/hostname",
             },
-            "topologyKey": "kubernetes.io/hostname"
-        }
-    ]
+        ],
     }
     with Then(f"Expect podAntiAffinity to exist and match {expected}"):
         assert "affinity" in pod_spec
@@ -306,16 +307,24 @@ def check_service(service_name, service_type, ns=namespace):
 
 
 def check_configmaps(chi_name, ns=namespace):
-    check_configmap(f"chi-{chi_name}-common-configd",
-                    ["01-clickhouse-listen.xml",
-                     "02-clickhouse-logger.xml",
-                     "03-clickhouse-querylog.xml"],
-                    ns=ns)
+    check_configmap(
+        f"chi-{chi_name}-common-configd",
+        [
+            "01-clickhouse-listen.xml",
+            "02-clickhouse-logger.xml",
+            "03-clickhouse-querylog.xml",
+        ],
+        ns=ns,
+    )
 
-    check_configmap(f"chi-{chi_name}-common-usersd",
-                    ["01-clickhouse-user.xml",
-                     "02-clickhouse-default-profile.xml"],
-                    ns=ns)
+    check_configmap(
+        f"chi-{chi_name}-common-usersd",
+        [
+            "01-clickhouse-user.xml",
+            "02-clickhouse-default-profile.xml",
+        ],
+        ns=ns,
+    )
 
 
 def check_configmap(cfg_name, values, ns=namespace):
