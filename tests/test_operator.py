@@ -160,8 +160,14 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
             kubectl.wait_objects(chi, {"statefulset": 1, "pod": 1, "service": 2})
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
             # TODO: assert
-            if start_time != new_start_time:
-                print(f"!!!Pods have been restarted!!! {start_time} != {new_start_time}")
+            if start_time == new_start_time:
+                print(
+                    f"Pods survived operator upgrade "
+                    f"{version_from}=>{version_to} config={config} {start_time} == {new_start_time}")
+            else:
+                print(
+                    f"!!!Pods have been restarted during operator upgrade "
+                    f"{version_from}=>{version_to} config={config}!!! {start_time} != {new_start_time}")
 
         kubectl.delete_chi(chi)
 
@@ -171,6 +177,7 @@ def test_operator_restart(config, version=settings.operator_version):
         set_operator_version(version)
         config = util.get_full_path(config)
         chi = manifest.get_chi_name(config)
+        cluster = chi
 
         kubectl.create_and_check(
             config=config,
@@ -182,17 +189,25 @@ def test_operator_restart(config, version=settings.operator_version):
                 },
                 "do_not_delete": 1,
             })
-        start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
+        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
         with When("Restart operator"):
             restart_operator()
             time.sleep(5)
             kubectl.wait_chi_status(chi, "Completed")
-            kubectl.wait_objects(chi, {"statefulset": 1, "pod": 1, "service": 2})
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
+            kubectl.wait_objects(
+                chi,
+                {
+                    "statefulset": 1,
+                    "pod": 1,
+                    "service": 2,
+                })
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
             # TODO: assert
-            if start_time != new_start_time:
-                print(f"!!!Pods have been restarted!!! {start_time} != {new_start_time}")
+            if start_time == new_start_time:
+                print(f"Pods survived operator restart for config={config} {start_time} == {new_start_time}")
+            else:
+                print(f"!!!Pods have been restarted with operator config={config}!!! {start_time} != {new_start_time}")
 
         kubectl.delete_chi(chi)
 
@@ -202,8 +217,8 @@ def test_operator_restart(config, version=settings.operator_version):
 def test_008():
     with Then("Test simple chi for operator restart"):
         test_operator_restart("configs/test-008-operator-restart-1.yaml")
-    with Then("Test advanced chi for operator restart"):
-        test_operator_restart("configs/test-008-operator-restart-2.yaml")
+#    with Then("Test advanced chi for operator restart"):
+#        test_operator_restart("configs/test-008-operator-restart-2.yaml")
 
 
 @TestScenario
@@ -514,8 +529,10 @@ def test_013():
 
     new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
     # TODO: assert
-    if start_time != new_start_time:
-        print(f"!!!Pods have been restarted!!! {start_time} != {new_start_time}")
+    if start_time == new_start_time:
+        print(f"Pods survived when shard added {start_time} == {new_start_time}")
+    else:
+        print(f"!!!Pods have been restarted when shard added !!! {start_time} != {new_start_time}")
 
     with And("Schema objects should be migrated to new shards"):
         for obj in schema_objects:
@@ -547,7 +564,7 @@ def test_014():
     ORDER BY a
     """.replace('\r', '').replace('\n', '')
 
-    config = "configs/test-014-replication.yaml"
+    config = "configs/test-014-replication-1.yaml"
     chi = manifest.get_chi_name(config)
     cluster = "default"
 
@@ -566,6 +583,8 @@ def test_014():
             "do_not_delete": 1,
         }
     )
+
+    start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
     schema_objects = [
         'test_local',
@@ -601,6 +620,8 @@ def test_014():
                 chi,
                 create_table,
                 host=f"chi-{chi}-{cluster}-0-1")
+            # Give some time for replication to catch up
+            time.sleep(10)
             with Then("Data should be replicated"):
                 out = clickhouse.query(
                     chi,
@@ -618,6 +639,18 @@ def test_014():
         )
         # Give some time for replication to catch up
         time.sleep(10)
+
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        # TODO: assert
+        if start_time == new_start_time:
+            print(
+                f"Pods survived when new replica added "
+                f"{start_time} == {new_start_time}")
+        else:
+            print(
+                f"!!!Pods have been restarted when new replica added!!! "
+                f"{start_time} != {new_start_time}")
+
         with Then("Schema objects should be migrated to the new replica"):
             for obj in schema_objects:
                 out = clickhouse.query(
@@ -635,11 +668,23 @@ def test_014():
 
     with When("Remove replica"):
         kubectl.create_and_check(
-            config="configs/test-014-replication.yaml",
+            config=config,
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
             })
+
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        # TODO: assert
+        if start_time == new_start_time:
+            print(
+                f"Pods survived replica deletion "
+                f"{start_time} == {new_start_time}")
+        else:
+            print(
+                f"!!!Pods have been restarted when replica deleted!!! "
+                f"{start_time} != {new_start_time}")
+
         with Then("Replica needs to be removed from the Zookeeper as well"):
             out = clickhouse.query(
                 chi,
