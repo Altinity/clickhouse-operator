@@ -18,25 +18,41 @@ namespace = settings.test_namespace
 kubectl_cmd = settings.kubectl_cmd
 
 
-def run(command, ok_to_fail=False, ns=namespace, timeout=60):
-    cmd = shell(f"{kubectl_cmd} -n {ns} {command}", timeout=timeout)
+def launch(command, ok_to_fail=False, ns=namespace, timeout=60):
+    # Build command
+    cmd = f"{kubectl_cmd}"
+    if (ns is not None) and (ns != ""):
+        cmd += f" --namespace {ns}"
+    cmd += f" {command}"
+    # Run command
+    cmd = shell(cmd, timeout=timeout)
+    # Check command failure
     code = cmd.exitcode
     if not ok_to_fail:
         if code != 0:
             print("command failed, output:")
             print(cmd.output)
         assert code == 0, error()
-    return cmd.output
+    # Command test result
+    return cmd.output if code == 0 else ""
 
 
 def delete_chi(chi, ns=namespace):
     with When(f"Delete chi {chi}"):
-        shell(f"{kubectl_cmd} delete chi {chi} -n {ns}", timeout=900)
-        wait_objects(chi, {"statefulset": 0, "pod": 0, "service": 0}, ns)
+        launch(f"delete chi {chi}", ns=ns, timeout=900)
+        wait_objects(
+            chi,
+            {
+                "statefulset": 0,
+                "pod": 0,
+                "service": 0,
+            },
+            ns,
+        )
 
 
 def delete_all_chi(ns=namespace):
-    crds = run("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
+    crds = launch("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
     if "clickhouseinstallations.clickhouse.altinity.com" in crds:
         chis = get("chi", "", ns=ns)["items"]
         for chi in chis:
@@ -49,9 +65,11 @@ def create_and_check(config, check, ns=namespace):
     chi_name = manifest.get_chi_name(config)
 
     if "apply_templates" in check:
+        print("Need to apply additional templates")
         for t in check["apply_templates"]:
+            print("Applying template:" + t)
             apply(util.get_full_path(t), ns)
-        time.sleep(1)
+        time.sleep(5)
 
     apply(config, ns)
 
@@ -89,30 +107,23 @@ def create_and_check(config, check, ns=namespace):
 
 
 def get(kind, name, label="", ns=namespace):
-    cmd = shell(f"{kubectl_cmd} get {kind} {name} {label} -o json -n {ns}")
-    assert cmd.exitcode == 0, error()
-    return json.loads(cmd.output.strip())
+    out = launch(f"get {kind} {name} {label} -o json", ns=ns)
+    return json.loads(out.strip())
 
 
 def create_ns(ns):
-    cmd = shell(f"{kubectl_cmd} create ns {ns}")
-    assert cmd.exitcode == 0, error()
-    cmd = shell(f"{kubectl_cmd} get ns {ns}")
-    assert cmd.exitcode == 0, error()
+    launch(f"create ns {ns}", ns=None)
+    launch(f"get ns {ns}", ns=None)
 
 
 def delete_ns(ns):
-    shell(f"{kubectl_cmd} delete ns {ns}", timeout=60)
+    launch(f"delete ns {ns}", ns=None)
 
 
 def get_count(kind, name="", label="", ns=namespace):
-    if ns is None:
-        ns = '--all-namespaces'
-    elif '-n' not in ns and '--namespace' not in ns:
-        ns = f"-n {ns}"
-    cmd = shell(f"{kubectl_cmd} get {kind} {name} {ns} -o=custom-columns=kind:kind,name:.metadata.name {label}")
-    if cmd.exitcode == 0:
-        return len(cmd.output.splitlines()) - 1
+    out = launch(f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}", ns=ns, ok_to_fail=True)
+    if len(out) > 0:
+        return len(out.splitlines()) - 1
     else:
         return 0
 
@@ -130,17 +141,12 @@ def count_objects(label="", ns=namespace):
 
 def apply(config, ns=namespace, validate=True, timeout=30):
     with When(f"{config} is applied"):
-        cmd = f"{kubectl_cmd} apply --validate={validate} -n {ns} -f {config}"
-        cmd = shell(cmd, timeout=timeout)
-    with Then("exitcode should be 0"):
-        assert cmd.exitcode == 0, error()
+        launch(f"apply --validate={validate} -f {config}", ns=ns, timeout=timeout)
 
 
 def delete(config, ns=namespace, timeout=30):
     with When(f"{config} is deleted"):
-        cmd = shell(f"{kubectl_cmd} delete -n {ns} -f {config}", timeout=timeout)
-    with Then("exitcode should be 0"):
-        assert cmd.exitcode == 0, error()
+        launch(f"delete -f {config}", ns=ns, timeout=timeout)
 
 
 def wait_objects(chi, object_counts, ns=namespace):
@@ -206,26 +212,32 @@ def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
 
 
 def get_field(kind, name, field, ns=namespace):
-    out = run(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
+    out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
     return out[1]
 
 
 def get_jsonpath(kind, name, field, ns=namespace):
-    out = run(f"get {kind} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
+    out = launch(f"get {kind} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
     return out[0]
 
 
 def get_default_storage_class(ns=namespace):
-    out = run(
-        f"get storageclass -o=custom-columns=DEFAULT:\".metadata.annotations.storageclass\.kubernetes\.io/is-default-class\",NAME:.metadata.name",
-        ns=ns).splitlines()
+    out = launch(
+        f"get storageclass "
+        f"-o=custom-columns="
+        f"DEFAULT:\".metadata.annotations.storageclass\.kubernetes\.io/is-default-class\",NAME:.metadata.name",
+        ns=ns,
+    ).splitlines()
     for line in out[1:]:
         if line.startswith("true"):
             parts = line.split(maxsplit=1)
             return parts[1].strip()
-    out = run(
-        f"get storageclass -o=custom-columns=DEFAULT:\".metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class\",NAME:.metadata.name",
-        ns=ns).splitlines()
+    out = launch(
+        f"get storageclass "
+        f"-o=custom-columns="
+        f"DEFAULT:\".metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class\",NAME:.metadata.name",
+        ns=ns,
+    ).splitlines()
     for line in out[1:]:
         if line.startswith("true"):
             parts = line.split(maxsplit=1)
@@ -243,9 +255,9 @@ def get_pod_image(chi_name, ns=namespace):
 
 
 def get_pod_names(chi_name, ns=namespace):
-    pod_names = run(
+    pod_names = launch(
         f"get pods -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
-        ns=ns
+        ns=ns,
     ).splitlines()
     return pod_names[1:]
 
