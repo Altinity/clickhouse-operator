@@ -23,21 +23,23 @@ def query(
 
     if with_error:
         return kubectl.launch(
-            f"exec {pod_name} -n {ns}"
+            f"exec {pod_name}"
             f" -- "
             f"clickhouse-client -mn -h {host} --port={port} -u {user} {pwd_str} "
             f"--query=\"{sql}\""
             f" 2>&1",
             timeout=timeout,
+            ns=ns,
             ok_to_fail=True,
         )
     else:
         return kubectl.launch(
-            f"exec {pod_name} -n {ns}"
+            f"exec {pod_name}"
             f" -- "
             f"clickhouse-client -mn -h {host} --port={port} -u {user} {pwd_str} "
             f"--query=\"{sql}\"",
             timeout=timeout,
+            ns=ns,
         )
 
 
