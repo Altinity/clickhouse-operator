@@ -18,10 +18,14 @@ namespace = settings.test_namespace
 kubectl_cmd = settings.kubectl_cmd
 
 
-def kubectl(command, ok_to_fail=False, ns=namespace, timeout=60):
+def run(command, ok_to_fail=False, ns=namespace, timeout=60):
     cmd = shell(f"{kubectl_cmd} -n {ns} {command}", timeout=timeout)
     code = cmd.exitcode
     if not ok_to_fail:
+        if code != 0:
+
+            print("command failed, output:")
+            print(cmd.output)
         assert code == 0, error()
     return cmd.output
 
@@ -33,7 +37,7 @@ def delete_chi(chi, ns=namespace):
 
 
 def delete_all_chi(ns=namespace):
-    crds = kubectl("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
+    crds = run("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
     if "clickhouseinstallations.clickhouse.altinity.com" in crds:
         chis = get("chi", "", ns=ns)["items"]
         for chi in chis:
@@ -41,47 +45,47 @@ def delete_all_chi(ns=namespace):
             delete_chi(chi["metadata"]["name"], ns)
 
 
-def create_and_check(test_file, checks, ns=namespace):
-    config = util.get_full_path(test_file)
+def create_and_check(config, check, ns=namespace):
+    config = util.get_full_path(config)
     chi_name = manifest.get_chi_name(config)
 
-    if "apply_templates" in checks:
-        for t in checks["apply_templates"]:
+    if "apply_templates" in check:
+        for t in check["apply_templates"]:
             apply(util.get_full_path(t), ns)
         time.sleep(1)
 
     apply(config, ns)
 
-    if "object_counts" in checks:
-        wait_objects(chi_name, checks["object_counts"], ns)
+    if "object_counts" in check:
+        wait_objects(chi_name, check["object_counts"], ns)
 
-    if "pod_count" in checks:
-        wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi_name}", count=checks["pod_count"], ns=ns)
+    if "pod_count" in check:
+        wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi_name}", count=check["pod_count"], ns=ns)
 
-    if "chi_status" in checks:
-        wait_chi_status(chi_name, checks["chi_status"], ns)
+    if "chi_status" in check:
+        wait_chi_status(chi_name, check["chi_status"], ns)
     else:
         wait_chi_status(chi_name, "Completed", ns)
 
-    if "pod_image" in checks:
-        check_pod_image(chi_name, checks["pod_image"], ns)
+    if "pod_image" in check:
+        check_pod_image(chi_name, check["pod_image"], ns)
 
-    if "pod_volumes" in checks:
-        check_pod_volumes(chi_name, checks["pod_volumes"], ns)
+    if "pod_volumes" in check:
+        check_pod_volumes(chi_name, check["pod_volumes"], ns)
 
-    if "pod_podAntiAffinity" in checks:
+    if "pod_podAntiAffinity" in check:
         check_pod_antiaffinity(chi_name, ns)
 
-    if "pod_ports" in checks:
-        check_pod_ports(chi_name, checks["pod_ports"], ns)
+    if "pod_ports" in check:
+        check_pod_ports(chi_name, check["pod_ports"], ns)
 
-    if "service" in checks:
-        check_service(checks["service"][0], checks["service"][1], ns)
+    if "service" in check:
+        check_service(check["service"][0], check["service"][1], ns)
 
-    if "configmaps" in checks:
+    if "configmaps" in check:
         check_configmaps(chi_name, ns)
 
-    if "do_not_delete" not in checks:
+    if "do_not_delete" not in check:
         delete_chi(chi_name, ns)
 
 
@@ -173,7 +177,7 @@ def wait_pod_status(pod, status, ns=namespace):
 def wait_field(_object, name, field, value, ns=namespace, retries=max_retries):
     with Then(f"{_object} {name} {field} should be {value}"):
         for i in range(1, retries):
-            obj_status = kubectl(f"get {_object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
+            obj_status = run(f"get {_object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
             if obj_status[1] == value:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
@@ -184,7 +188,7 @@ def wait_field(_object, name, field, value, ns=namespace, retries=max_retries):
 def wait_jsonpath(_object, name, field, value, ns=namespace, retries=max_retries):
     with Then(f"{_object} {name} -o jsonpath={field} should be {value}"):
         for i in range(1, retries):
-            obj_status = kubectl(f"get {_object} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
+            obj_status = run(f"get {_object} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
             if obj_status[0] == value:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
@@ -193,19 +197,19 @@ def wait_jsonpath(_object, name, field, value, ns=namespace, retries=max_retries
 
 
 def get_field(_object, name, field, ns=namespace):
-    out = kubectl(f"get {_object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
+    out = run(f"get {_object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
     return out[1]
 
 
 def get_default_storage_class(ns=namespace):
-    out = kubectl(
+    out = run(
         f"get storageclass -o=custom-columns=DEFAULT:\".metadata.annotations.storageclass\.kubernetes\.io/is-default-class\",NAME:.metadata.name",
         ns=ns).splitlines()
     for line in out[1:]:
         if line.startswith("true"):
             parts = line.split(maxsplit=1)
             return parts[1].strip()
-    out = kubectl(
+    out = run(
         f"get storageclass -o=custom-columns=DEFAULT:\".metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class\",NAME:.metadata.name",
         ns=ns).splitlines()
     for line in out[1:]:
@@ -225,7 +229,7 @@ def get_pod_image(chi_name, ns=namespace):
 
 
 def get_pod_names(chi_name, ns=namespace):
-    pod_names = kubectl(
+    pod_names = run(
         f"get pods -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
         ns=ns
     ).splitlines()
