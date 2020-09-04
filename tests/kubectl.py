@@ -173,10 +173,10 @@ def wait_pod_status(pod, status, ns=namespace):
     wait_field("pod", pod, ".status.phase", status, ns)
 
 
-def wait_field(_object, name, field, value, ns=namespace, retries=max_retries):
-    with Then(f"{_object} {name} {field} should be {value}"):
+def wait_field(_type, name, field, value, ns=namespace, retries=max_retries):
+    with Then(f"{_type} {name} {field} should be {value}"):
         for i in range(1, retries):
-            cur_value = get_field(_object, name, field, ns)
+            cur_value = get_field(_type, name, field, ns)
             if cur_value == value:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
@@ -184,10 +184,10 @@ def wait_field(_object, name, field, value, ns=namespace, retries=max_retries):
         assert cur_value == value, error()
 
 
-def wait_jsonpath(_object, name, field, value, ns=namespace, retries=max_retries):
-    with Then(f"{_object} {name} -o jsonpath={field} should be {value}"):
+def wait_jsonpath(_type, name, field, value, ns=namespace, retries=max_retries):
+    with Then(f"{_type} {name} -o jsonpath={field} should be {value}"):
         for i in range(1, retries):
-            cur_value = get_jsonpath(_object, name, field, ns)
+            cur_value = get_jsonpath(_type, name, field, ns)
             if cur_value == value:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
@@ -195,13 +195,13 @@ def wait_jsonpath(_object, name, field, value, ns=namespace, retries=max_retries
         assert cur_value == value, error()
 
 
-def get_field(_object, name, field, ns=namespace):
-    out = run(f"get {_object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
+def get_field(_type, name, field, ns=namespace):
+    out = run(f"get {_type} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
     return out[1]
 
 
-def get_jsonpath(_object, name, field, ns=namespace):
-    out = run(f"get {_object} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
+def get_jsonpath(_type, name, field, ns=namespace):
+    out = run(f"get {_type} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
     return out[0]
 
 
