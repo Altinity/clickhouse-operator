@@ -215,19 +215,19 @@ def test_009(version_from="0.8.0", version_to=settings.operator_version):
 
 
 def set_operator_version(version, ns=settings.operator_namespace, timeout=60):
-    kubectl.run(
+    kubectl.launch(
         f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator=altinity/clickhouse-operator:{version}",
         ns=ns)
-    kubectl.run(
+    kubectl.launch(
         f"set image deployment.v1.apps/clickhouse-operator metrics-exporter=altinity/metrics-exporter:{version}",
         ns=ns)
-    kubectl.run("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
+    kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
     assert kubectl.get_count("pod", ns=ns, label="-l app=clickhouse-operator") > 0, error()
 
 
 def restart_operator(ns=settings.operator_namespace, timeout=60):
     pod_name = kubectl.get("pod", name="", ns=ns, label="-l app=clickhouse-operator")["items"][0]["metadata"]["name"]
-    kubectl.run(f"delete pod {pod_name}", ns=ns, timeout=timeout)
+    kubectl.launch(f"delete pod {pod_name}", ns=ns, timeout=timeout)
     kubectl.wait_object("pod", name="", ns=ns, label="-l app=clickhouse-operator")
     pod_name = kubectl.get("pod", name="", ns=ns, label="-l app=clickhouse-operator")["items"][0]["metadata"]["name"]
     kubectl.wait_pod_status(pod_name, "Running", ns=ns)
@@ -611,7 +611,7 @@ def test_014():
 
     with When("Restart Zookeeper pod"):
         with Then("Delete Zookeeper pod"):
-            kubectl.run("delete pod zookeeper-0")
+            kubectl.launch("delete pod zookeeper-0")
             time.sleep(1)
 
         with Then("Insert into the table while there is no Zookeeper -- table should be in readonly mode"):
@@ -721,7 +721,7 @@ def test_016():
             config_map_applied_num = "0"
             i = 1
             while config_map_applied_num == "0" and i < 10:
-                config_map_applied_num = kubectl.run(
+                config_map_applied_num = kubectl.launch(
                     f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep test_norestart /etc/clickhouse-server/users.d/my_users.xml | wc -l\""
                 )
                 if config_map_applied_num != "0":
@@ -905,7 +905,7 @@ def test_021(config="configs/test-021-rescale-volume.yaml"):
         assert len(default_storage_class) > 0
         allow_volume_expansion = kubectl.get_field("storageclass", default_storage_class, ".allowVolumeExpansion")
         if allow_volume_expansion != "true":
-            kubectl.run(f"patch storageclass {default_storage_class} -p '{{\"allowVolumeExpansion\":true}}'")
+            kubectl.launch(f"patch storageclass {default_storage_class} -p '{{\"allowVolumeExpansion\":true}}'")
 
     chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
