@@ -34,7 +34,7 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=60):
             print(cmd.output)
         assert code == 0, error()
     # Command test result
-    return cmd.output if code == 0 else ""
+    return cmd.output if (code == 0) or ok_to_fail else ""
 
 
 def delete_chi(chi, ns=namespace):
