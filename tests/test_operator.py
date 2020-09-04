@@ -201,9 +201,9 @@ def test_operator_restart(config, version=settings.operator_version):
 @Name("test_008. Test operator restart")
 def test_008():
     with Then("Test simple chi for operator restart"):
-        test_operator_restart("configs/test-009-operator-upgrade-1.yaml")
+        test_operator_restart("configs/test-008-operator-restart-1.yaml")
     with Then("Test advanced chi for operator restart"):
-        test_operator_restart("configs/test-009-operator-upgrade-2.yaml")
+        test_operator_restart("configs/test-008-operator-restart-2.yaml")
 
 
 @TestScenario
@@ -457,8 +457,12 @@ def test_012():
 @TestScenario
 @Name("test_013. Test adding shards and creating local and distributed tables automatically")
 def test_013():
+    config = "configs/test-013-add-shards-1.yaml"
+    chi = manifest.get_chi_name(config)
+    cluster = "default"
+
     kubectl.create_and_check(
-        config="configs/test-013-add-shards-1.yaml",
+        config=config,
         check={
             "apply_templates": {
                 settings.clickhouse_template,
@@ -471,17 +475,27 @@ def test_013():
             "do_not_delete": 1,
         }
     )
+    start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
-    schema_objects = ['test_local', 'test_distr', 'events-distr']
+    schema_objects = [
+        'test_local',
+        'test_distr',
+        'events-distr',
+    ]
     with Then("Create local and distributed tables"):
-        clickhouse.query("test-013-add-shards",
-                         "CREATE TABLE test_local Engine = Log as select * from system.one")
-        clickhouse.query("test-013-add-shards",
-                         "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
-        clickhouse.query("test-013-add-shards",
-                         "CREATE DATABASE \\\"test-db\\\"")
-        clickhouse.query("test-013-add-shards",
-                         "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events ENGINE = Distributed('all-sharded', system, events)")
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_local Engine = Log as SELECT * FROM system.one")
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
+        clickhouse.query(
+            chi,
+            "CREATE DATABASE \\\"test-db\\\"")
+        clickhouse.query(
+            chi,
+            "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events "
+            "ENGINE = Distributed('all-sharded', system, events)")
     with Then("Add shards"):
         kubectl.create_and_check(
             config="configs/test-013-add-shards-2.yaml",
@@ -495,22 +509,30 @@ def test_013():
             }
         )
 
+    # Give some time for replication to catch up
+    time.sleep(10)
+
+    new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+    # TODO: assert
+    if start_time != new_start_time:
+        print("!!!Pods have been restarted!!!")
+
     with And("Schema objects should be migrated to new shards"):
         for obj in schema_objects:
             out = clickhouse.query(
-                "test-013-add-shards",
-                f"select count() from system.tables where name = '{obj}'",
-                host="chi-test-013-add-shards-default-1-0"
+                chi,
+                f"SELECT count() FROM system.tables WHERE name = '{obj}'",
+                host=f"chi-{chi}-{cluster}-1-0"
             )
             assert out == "1"
             out = clickhouse.query(
-                "test-013-add-shards",
-                f"select count() from system.tables where name = '{obj}'",
-                host="chi-test-013-add-shards-default-2-0"
+                chi,
+                f"SELECT count() FROM system.tables WHERE name = '{obj}'",
+                host=f"chi-{chi}-{cluster}-2-0"
             )
             assert out == "1"
 
-    kubectl.delete_chi("test-013-add-shards")
+    kubectl.delete_chi(chi)
 
 
 @TestScenario
