@@ -22,7 +22,7 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=60):
     # Build command
     cmd = f"{kubectl_cmd}"
     if (ns is not None) and (ns != ""):
-        cmd += f" --namespace {ns}"
+        cmd += f" --namespace={ns}"
     cmd += f" {command}"
     # Run command
     cmd = shell(cmd, timeout=timeout)
@@ -122,20 +122,16 @@ def delete_ns(ns):
 
 def get_count(kind, name="", label="", ns=namespace):
     out = launch(f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}", ns=ns, ok_to_fail=True)
-    if len(out) > 0:
-        return len(out.splitlines()) - 1
-    else:
+    if (out is None) or (len(out) == 0):
         return 0
+    return len(out.splitlines()) - 1
 
 
 def count_objects(label="", ns=namespace):
-    sts = get_count("sts", ns=ns, label=label)
-    pod = get_count("pod", ns=ns, label=label)
-    service = get_count("service", ns=ns, label=label)
     return {
-        "statefulset": sts,
-        "pod": pod,
-        "service": service,
+        "statefulset": get_count("sts", ns=ns, label=label),
+        "pod": get_count("pod", ns=ns, label=label),
+        "service": get_count("service", ns=ns, label=label),
     }
 
 
@@ -161,7 +157,13 @@ def wait_objects(chi, object_counts, ns=namespace):
             cur_object_counts = count_objects(label=f"-l clickhouse.altinity.com/chi={chi}", ns=ns)
             if cur_object_counts == object_counts:
                 break
-            with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
+            with Then(
+                    f"Not ready yet. [ "
+                    f"statefulset: {cur_object_counts['statefulset']} "
+                    f"pod: {cur_object_counts['pod']} "
+                    f"service: {cur_object_counts['service']} ]. "
+                    f"Wait for {i * 5} seconds"
+            ):
                 time.sleep(i * 5)
         assert cur_object_counts == object_counts, error()
 
