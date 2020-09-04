@@ -145,9 +145,11 @@ def delete(config, ns=namespace, timeout=30):
 
 def wait_objects(chi, object_counts, ns=namespace):
     with Then(
-            f"{object_counts[0]} statefulsets, "
-            f"{object_counts[1]} pods and "
-            f"{object_counts[2]} services should be created"
+            f"Waiting for: "
+            f"{object_counts['statefulset']} statefulsets, "
+            f"{object_counts['pod']} pods and "
+            f"{object_counts['service']} services "
+            f"to be available"
     ):
         for i in range(1, max_retries):
             cur_object_counts = count_objects(label=f"-l clickhouse.altinity.com/chi={chi}", ns=ns)
