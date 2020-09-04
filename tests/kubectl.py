@@ -187,8 +187,7 @@ def wait_field(_object, name, field, value, ns=namespace, retries=max_retries):
 def wait_jsonpath(_object, name, field, value, ns=namespace, retries=max_retries):
     with Then(f"{_object} {name} -o jsonpath={field} should be {value}"):
         for i in range(1, retries):
-            status = run(f"get {_object} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
-            cur_value = status[0]
+            cur_value = get_jsonpath(_object, name, field, ns)
             if cur_value == value:
                 break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
@@ -199,6 +198,11 @@ def wait_jsonpath(_object, name, field, value, ns=namespace, retries=max_retries
 def get_field(_object, name, field, ns=namespace):
     out = run(f"get {_object} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
     return out[1]
+
+
+def get_jsonpath(_object, name, field, ns=namespace):
+    out = run(f"get {_object} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
+    return out[0]
 
 
 def get_default_storage_class(ns=namespace):
