@@ -54,6 +54,9 @@ const (
 
 	// Default number of controller threads running concurrently (used in case no other specified in config)
 	defaultReconcileThreadsNumber = 1
+
+	// Default number of system controller threads running concurrently (used in case no other specified in config)
+	DefaultReconcileSystemThreadsNumber = 1
 )
 
 // !!! IMPORTANT !!!
