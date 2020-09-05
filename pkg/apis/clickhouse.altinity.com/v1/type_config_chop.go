@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"os"
 	"strings"
+	"time"
 
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
@@ -54,6 +55,9 @@ const (
 
 	// Default number of controller threads running concurrently (used in case no other specified in config)
 	defaultReconcileThreadsNumber = 1
+
+	// Default reconcile threads warmup time
+	DefaultReconcileThreadsWarmup = 10 * time.Second
 
 	// Default number of system controller threads running concurrently (used in case no other specified in config)
 	DefaultReconcileSystemThreadsNumber = 1
