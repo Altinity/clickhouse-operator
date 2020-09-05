@@ -20,9 +20,9 @@ if main():
                 kubectl.apply(
                     ns=settings.operator_namespace,
                     config=f"<(cat {config} | "
-                    f"OPERATOR_IMAGE=\"altinity/clickhouse-operator:{settings.operator_version}\" "
+                    f"OPERATOR_IMAGE=\"{settings.operator_docker_repo}:{settings.operator_version}\" "
                     f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
-                    f"METRICS_EXPORTER_IMAGE=\"altinity/metrics-exporter:{settings.operator_version}\" "
+                    f"METRICS_EXPORTER_IMAGE=\"{settings.metrics_exporter_docker_repo}:{settings.operator_version}\" "
                     f"METRICS_EXPORTER_NAMESPACE=\"{settings.operator_namespace}\" "
                     f"envsubst)",
                     validate=False
@@ -38,28 +38,28 @@ if main():
         # python3 tests/test.py --only operator*
         with Module("operator"):
             all_tests = [
-                test_operator.test_001,
-                test_operator.test_002,
-                test_operator.test_004,
-                test_operator.test_005,
-                test_operator.test_006,
-                test_operator.test_007,
+#                test_operator.test_001,
+#                test_operator.test_002,
+#                test_operator.test_004,
+#                test_operator.test_005,
+#                test_operator.test_006,
+#                test_operator.test_007,
                 test_operator.test_008,
-                (test_operator.test_009, {"version_from": "0.9.10"}),
-                test_operator.test_010,
-                test_operator.test_011,
-                test_operator.test_011_1,
-                test_operator.test_012,
-                test_operator.test_013,
-                test_operator.test_014,
-                test_operator.test_015,
-                test_operator.test_016,
-                test_operator.test_017,
-                test_operator.test_018,
-                test_operator.test_019,
-                test_operator.test_020,
-                test_operator.test_021,
-                test_operator.test_022,
+#                (test_operator.test_009, {"version_from": "0.9.10"}),
+#                test_operator.test_010,
+#                test_operator.test_011,
+#                test_operator.test_011_1,
+#                test_operator.test_012,
+#                test_operator.test_013,
+#                test_operator.test_014,
+#                test_operator.test_015,
+#                test_operator.test_016,
+#                test_operator.test_017,
+#                test_operator.test_018,
+#                test_operator.test_019,
+#                test_operator.test_020,
+#                test_operator.test_021,
+#                test_operator.test_022,
             ]
             run_tests = all_tests
 
