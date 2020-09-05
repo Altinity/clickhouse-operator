@@ -57,7 +57,7 @@ func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
 			c.chop.Config().CHPort,
 		),
 		creator: nil,
-		start:   time.Now().Add(10 * time.Second),
+		start:   time.Now().Add(chop.DefaultReconcileThreadsWarmup),
 	}
 }
 
