@@ -17,6 +17,8 @@ test_namespace = "test"
 operator_version = open(os.path.join(pathlib.Path(__file__).parent.absolute(), "../release")).read(1024)
 # operator_version = "0.11.0"
 operator_namespace = os.getenv('OPERATOR_NAMESPACE') if 'OPERATOR_NAMESPACE' in os.environ else 'kube-system'
+operator_docker_repo = "altinity/clickhouse-operator"
+metrics_exporter_docker_repo = "altinity/metrics-exporter"
 
 clickhouse_template = "templates/tpl-clickhouse-stable.yaml"
 # clickhouse_template = "templates/tpl-clickhouse-19.11.yaml"
