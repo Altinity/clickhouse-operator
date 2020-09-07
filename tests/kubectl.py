@@ -11,7 +11,7 @@ from testflows.connect import Shell
 import settings
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-max_retries = 10
+max_retries = 15
 
 shell = Shell()
 namespace = settings.test_namespace
