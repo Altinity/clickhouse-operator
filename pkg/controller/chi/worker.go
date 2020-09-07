@@ -25,6 +25,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
+	"time"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
@@ -40,6 +41,7 @@ type worker struct {
 	normalizer *chopmodel.Normalizer
 	schemer    *chopmodel.Schemer
 	creator    *chopmodel.Creator
+	start      time.Time
 }
 
 // newWorker
@@ -55,6 +57,7 @@ func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
 			c.chop.Config().CHPort,
 		),
 		creator: nil,
+		start:   time.Now().Add(chop.DefaultReconcileThreadsWarmup),
 	}
 }
 
@@ -95,6 +98,10 @@ func (w *worker) processItem(item interface{}) error {
 	switch item.(type) {
 
 	case *ReconcileChi:
+		for time.Now().Before(w.start) {
+			w.a.V(2).Info("ReconcileChi - not yet")
+			time.Sleep(1 * time.Second)
+		}
 		reconcile, _ := item.(*ReconcileChi)
 		switch reconcile.cmd {
 		case reconcileAdd:
@@ -814,6 +821,10 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 	curStatefulSet, err := w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
 	if curStatefulSet != nil {
+		if diff, equal := messagediff.DeepDiff(*curStatefulSet, *newStatefulSet); !equal {
+			_ = diff
+			w.a.V(1).Info("StatefulSet Diffs")
+		}
 		return w.updateStatefulSet(curStatefulSet, newStatefulSet, host)
 	}
 

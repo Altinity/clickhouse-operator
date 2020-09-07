@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"fmt"
+
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
@@ -25,6 +26,7 @@ import (
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+
 	log "github.com/golang/glog"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -97,8 +99,14 @@ func NewController(
 }
 
 func (c *Controller) initQueues() {
-	for i := 0; i < c.chop.Config().ReconcileThreadsNumber; i++ {
-		c.queues = append(c.queues, workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("chi%d", i)))
+	for i := 0; i < c.chop.Config().ReconcileThreadsNumber+chi.DefaultReconcileSystemThreadsNumber; i++ {
+		c.queues = append(
+			c.queues,
+			workqueue.NewNamedRateLimitingQueue(
+				workqueue.DefaultControllerRateLimiter(),
+				fmt.Sprintf("chi%d", i),
+			),
+		)
 	}
 }
 
@@ -387,10 +395,24 @@ func (c *Controller) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-// enqueueObject adds ClickHouseInstallation object to the workqueue
+// enqueueObject adds ClickHouseInstallation object to the work queue
 func (c *Controller) enqueueObject(namespace, name string, obj interface{}) {
+	uid := []byte(fmt.Sprintf("%s/%s", namespace, name))
+	index := 0
+	switch obj.(type) {
+	case *ReconcileChi:
+		variants := len(c.queues) - chi.DefaultReconcileSystemThreadsNumber
+		index = chi.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(uid, variants)
+		break
 
-	c.queues[util.HashIntoIntTopped([]byte(fmt.Sprintf("%s/%s", namespace, name)), len(c.queues))].AddRateLimited(obj)
+	case *ReconcileChit:
+	case *ReconcileChopConfig:
+	case *DropDns:
+		variants := chi.DefaultReconcileSystemThreadsNumber
+		index = util.HashIntoIntTopped(uid, variants)
+		break
+	}
+	c.queues[index].AddRateLimited(obj)
 }
 
 func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
