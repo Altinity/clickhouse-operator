@@ -60,7 +60,7 @@ def delete_all_chi(ns=namespace):
             delete_chi(chi["metadata"]["name"], ns)
 
 
-def create_and_check(config, check, ns=namespace):
+def create_and_check(config, check, ns=namespace, timeout=30):
     config = util.get_full_path(config)
     chi_name = manifest.get_chi_name(config)
 
@@ -71,7 +71,7 @@ def create_and_check(config, check, ns=namespace):
             apply(util.get_full_path(t), ns)
         time.sleep(5)
 
-    apply(config, ns)
+    apply(config, ns=ns, timeout=timeout)
 
     if "object_counts" in check:
         wait_objects(chi_name, check["object_counts"], ns)
