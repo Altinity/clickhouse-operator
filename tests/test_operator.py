@@ -87,6 +87,7 @@ def test_005():
                 "/var/lib/clickhouse",
             },
         },
+        timeout=1200,
     )
 
 
