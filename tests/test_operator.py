@@ -223,7 +223,7 @@ def test_008():
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
-def test_009(version_from="0.8.0", version_to=settings.operator_version):
+def test_009(version_from="0.11.0", version_to=settings.operator_version):
     with Then("Test simple chi for operator upgrade"):
         test_operator_upgrade("configs/test-009-operator-upgrade-1.yaml", version_from, version_to)
     with Then("Test advanced chi for operator upgrade"):
