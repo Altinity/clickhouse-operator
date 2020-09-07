@@ -160,14 +160,6 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
             kubectl.wait_chi_status(chi, "Completed", retries=6)
             kubectl.wait_objects(chi, {"statefulset": 1, "pod": 1, "service": 2})
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
-            if start_time == new_start_time:
-                print(
-                    f"Pods survived operator upgrade "
-                    f"{version_from}=>{version_to} config={config} {start_time} == {new_start_time}")
-            else:
-                print(
-                    f"!!!Pods have been restarted during operator upgrade "
-                    f"{version_from}=>{version_to} config={config}!!! {start_time} != {new_start_time}")
             assert start_time == new_start_time
 
         kubectl.delete_chi(chi)
@@ -204,10 +196,6 @@ def test_operator_restart(config, version=settings.operator_version):
                     "service": 2,
                 })
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-            if start_time == new_start_time:
-                print(f"Pods survived operator restart for config={config} {start_time} == {new_start_time}")
-            else:
-                print(f"!!!Pods have been restarted with operator config={config}!!! {start_time} != {new_start_time}")
             assert start_time == new_start_time
 
         kubectl.delete_chi(chi)
@@ -526,11 +514,8 @@ def test_013():
     # Give some time for replication to catch up
     time.sleep(10)
 
+    # Ensure no pod restarted
     new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-    if start_time == new_start_time:
-        print(f"Pods survived when shard added {start_time} == {new_start_time}")
-    else:
-        print(f"!!!Pods have been restarted when shard added !!! {start_time} != {new_start_time}")
     assert start_time == new_start_time
 
     with And("Schema objects should be migrated to new shards"):
@@ -640,14 +625,6 @@ def test_014():
         time.sleep(10)
 
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-        if start_time == new_start_time:
-            print(
-                f"Pods survived when new replica added "
-                f"{start_time} == {new_start_time}")
-        else:
-            print(
-                f"!!!Pods have been restarted when new replica added!!! "
-                f"{start_time} != {new_start_time}")
         assert start_time == new_start_time
 
         with Then("Schema objects should be migrated to the new replica"):
@@ -674,14 +651,6 @@ def test_014():
             })
 
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-        if start_time == new_start_time:
-            print(
-                f"Pods survived replica deletion "
-                f"{start_time} == {new_start_time}")
-        else:
-            print(
-                f"!!!Pods have been restarted when replica deleted!!! "
-                f"{start_time} != {new_start_time}")
         assert start_time == new_start_time
 
         with Then("Replica needs to be removed from the Zookeeper as well"):
