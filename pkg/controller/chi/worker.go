@@ -351,6 +351,7 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 	)
 }
 
+// reconcileCHIPreliminary reconciles CHI preliminary ensured ConfigMaos are in place
 func (w *worker) reconcileCHIPreliminary(chi *chop.ClickHouseInstallation) error {
 	w.a.V(2).Info("reconcileCHIPreliminary() - start")
 	defer w.a.V(2).Info("reconcileCHIPreliminary() - end")
@@ -373,6 +374,7 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	return w.reconcileCHIConfigMaps(chi, true)
 }
 
+// reconcileCHIConfigMaps reconciles all CHI's ConfigMaps
 func (w *worker) reconcileCHIConfigMaps(chi *chop.ClickHouseInstallation, update bool) error {
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
@@ -854,6 +856,7 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 	return err
 }
 
+// reconcilePersistentVolumes
 func (w *worker) reconcilePersistentVolumes(host *chop.ChiHost) {
 	w.c.walkPVs(host, func(pv *core.PersistentVolume) {
 		pv = w.creator.PreparePersistentVolume(pv, host)
