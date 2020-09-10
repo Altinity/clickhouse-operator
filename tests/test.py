@@ -11,7 +11,7 @@ if main():
     with Module("main"):
         with Given(f"Clean namespace {settings.test_namespace}"):
             kubectl.delete_all_chi(settings.test_namespace)
-            kubectl.delete_ns(settings.test_namespace)
+            kubectl.delete_ns(settings.test_namespace, ok_to_fail=True)
             kubectl.create_ns(settings.test_namespace)
 
         with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
