@@ -498,6 +498,7 @@ def test_013():
             chi,
             "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events "
             "ENGINE = Distributed('all-sharded', system, events)")
+    
     with Then("Add shards"):
         kubectl.create_and_check(
             config="configs/test-013-add-shards-2.yaml",
@@ -514,9 +515,9 @@ def test_013():
     # Give some time for replication to catch up
     time.sleep(10)
 
-    # Ensure no pod restarted
-    new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-    assert start_time == new_start_time
+    with Then("Unaffected pod should not be restarted"):
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        assert start_time == new_start_time
 
     with And("Schema objects should be migrated to new shards"):
         for obj in schema_objects:
@@ -533,6 +534,23 @@ def test_013():
             )
             assert out == "1"
 
+    with When("Remove shards"):
+        kubectl.create_and_check(
+            config=config,
+            check={
+                "object_counts": {
+                    "statefulset": 1,
+                    "pod": 1,
+                    "service": 2,
+                    },
+                "do_not_delete": 1,
+            }
+        )
+        time.sleep(10)
+        with Then("Unaffected pod should not be restarted"):
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+            assert start_time == new_start_time
+    
     kubectl.delete_chi(chi)
 
 
