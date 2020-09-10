@@ -89,7 +89,8 @@ Vagrant.configure(2) do |config|
 
 
     # minikube
-    wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+    MINIKUBE_VERSION=1.12.3
+    wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
     apt-get install -y conntrack
@@ -100,26 +101,46 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
 #    K8S_VERSION=${K8S_VERSION:-1.17.11}
 #    K8S_VERSION=${K8S_VERSION:-1.18.8}
-    K8S_VERSION=${K8S_VERSION:-1.19.0}
+    K8S_VERSION=${K8S_VERSION:-1.19.1}
     export VALIDATE_YAML=true
+
+    wget -c --progress=bar:force:noscroll -O /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl
+    chmod +x /usr/local/bin/kubectl
+
+    usermod -a -G docker vagrant
+    mkdir -p /home/vagrant/.minikube
+    ln -svf /home/vagrant/.minikube /root/.minikube
+
+    mkdir -p /home/vagrant/.kube
+    ln -svf /home/vagrant/.kube /root/.kube
+
+    chown vagrant:vagrant -R /home/vagrant/
+
+#    sudo -H -u vagrant minikube config set vm-driver docker
+#    sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
+#    sudo -H -u vagrant minikube start
+#    sudo -H -u vagrant minikube addons enable ingress
+#    sudo -H -u vagrant minikube addons enable ingress-dns
+#    sudo -H -u vagrant minikube addons enable metrics-server
 
     minikube config set vm-driver none
     minikube config set kubernetes-version ${K8S_VERSION}
-    minikube start
+    minikube start --vm=true
 #    minikube addons enable ingress
 #    minikube addons enable ingress-dns
     minikube addons enable metrics-server
-    ln -svf $(find /var/lib/minikube/binaries/ -type f -name kubectl) /bin/kubectl
 
     #krew
     (
         curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/krew.tar.gz" &&
         tar zxvf krew.tar.gz &&
         KREW=./krew-"$(uname | tr '[:upper:]' '[:lower:]')_amd64" &&
-        "$KREW" install krew
+        sudo -H -u vagrant "$KREW" install krew
     )
-    echo export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH" | tee $HOME/.bashrc
+    sudo -H -u vagrant bash -c 'echo export PATH="\${KREW_ROOT:-\$HOME/.krew}/bin:\$PATH" | tee \$HOME/.bashrc'
+    echo export PATH="/home/vagrant/.krew/bin:$PATH" | tee $HOME/.bashrc
     source $HOME/.bashrc
+    export KREW_ROOT=/home/vagrant/.krew
     kubectl krew install tap
     kubectl krew install debug
     kubectl krew install sniff

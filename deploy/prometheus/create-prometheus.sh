@@ -87,6 +87,10 @@ else
     exit 1
 fi
 
+echo "Setup Prometheus <-> zookeeper integration."
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f ${CUR_DIR}/prometheus-zookeeper-service-monitor.yaml
+echo "DONE"
+
 echo "Setup Prometheus -> AlertManager -> Slack integration"
 if [[ ! -f ${CUR_DIR}/prometheus-sensitive-data.sh ]]; then
     echo "!!! IMPORTANT !!!"
