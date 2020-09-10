@@ -7,7 +7,7 @@ echo "External value for \$VALIDATE_YAML=$VALIDATE_YAML"
 export PROMETHEUS_NAMESPACE="${PROMETHEUS_NAMESPACE:-prometheus}"
 export OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
 # look https://github.com/coreos/prometheus-operator/issues/3168, master branch is not stable
-export PROMETHEUS_OPERATOR_BRANCH="${PROMETHEUS_OPERATOR_BRANCH:-release-0.41}"
+export PROMETHEUS_OPERATOR_BRANCH="${PROMETHEUS_OPERATOR_BRANCH:-release-0.42}"
 export ALERT_MANAGER_EXTERNAL_URL="${ALERT_MANAGER_EXTERNAL_URL:-http://localhost:9093}"
 # Possible values for "validate yaml" are values from --validate=XXX kubectl option. They are true/false ATM
 export VALIDATE_YAML="${VALIDATE_YAML:-true}"
