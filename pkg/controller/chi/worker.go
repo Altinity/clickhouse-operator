@@ -431,10 +431,6 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	// Reconcile host's StatefulSet
 	statefulSet := w.creator.CreateStatefulSet(host)
 	if err := w.reconcileStatefulSet(statefulSet, host); err != nil {
-		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(host.CHI).
-			WithStatusError(host.CHI).
-			Error("Reconcile Host %s failed to reconcile StatefulSet %s", host.Name, statefulSet.Name)
 		return err
 	}
 
@@ -819,23 +815,25 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 	curStatefulSet, err := w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
 	if curStatefulSet != nil {
+		// We have StatefulSet - try to update it
 		if diff, equal := messagediff.DeepDiff(*curStatefulSet, *newStatefulSet); !equal {
 			_ = diff
 			w.a.V(1).Info("StatefulSet Diffs")
 		}
-		return w.updateStatefulSet(curStatefulSet, newStatefulSet, host)
+		err = w.updateStatefulSet(curStatefulSet, newStatefulSet, host)
 	}
 
 	if apierrors.IsNotFound(err) {
-		return w.createStatefulSet(newStatefulSet, host)
+		// StatefulSet not found - even during Update process - try to create it
+		err = w.createStatefulSet(newStatefulSet, host)
 	}
 
-	// Not create, not update - weird thing
-
-	w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
-		WithStatusAction(host.CHI).
-		WithStatusError(host.CHI).
-		Error("Create or Update StatefulSet %s/%s - UNEXPECTED FLOW", newStatefulSet.Namespace, newStatefulSet.Name)
+	if err != nil {
+		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(host.CHI).
+			WithStatusError(host.CHI).
+			Error("FAILED to reconcile StatefulSet: %s CHI: %s ", newStatefulSet.Name, host.CHI.Name)
+	}
 
 	return err
 }
