@@ -358,10 +358,6 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	// 1. CHI Service
 	service := w.creator.CreateServiceCHI()
 	if err := w.reconcileService(chi, service); err != nil {
-		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(chi).
-			WithStatusError(chi).
-			Error("Reconcile CHI %s failed to reconcile Service %s", chi.Name, service.Name)
 		return err
 	}
 
@@ -448,10 +444,6 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	// Reconcile host's Service
 	service := w.creator.CreateServiceHost(host)
 	if err := w.reconcileService(host.CHI, service); err != nil {
-		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(host.CHI).
-			WithStatusError(host.CHI).
-			Error("Reconcile Host %s failed to reconcile Service %s", host.Name, service.Name)
 		return err
 	}
 
@@ -799,11 +791,20 @@ func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *cor
 	curService, err := w.c.getService(&service.ObjectMeta, false)
 
 	if curService != nil {
-		return w.updateService(chi, curService, service)
+		// We have Service - try to update it
+		err = w.updateService(chi, curService, service)
 	}
 
 	if apierrors.IsNotFound(err) {
-		return w.createService(chi, service)
+		// Service not found - even during Update process - try to create it
+		err = w.createService(chi, service)
+	}
+
+	if err != nil {
+		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("FAILED to reconcile Service: %s CHI: %s ", service.Name, chi.Name)
 	}
 
 	return err
