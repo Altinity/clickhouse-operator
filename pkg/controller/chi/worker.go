@@ -372,20 +372,12 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	// such as remote servers, zookeeper setup, etc
 	configMapCommon := w.creator.CreateConfigMapCHICommon()
 	if err := w.reconcileConfigMap(chi, configMapCommon); err != nil {
-		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(chi).
-			WithStatusError(chi).
-			Error("Reconcile CHI %s failed to reconcile ConfigMap %s", chi.Name, configMapCommon.Name)
 		return err
 	}
 
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
 	if err := w.reconcileConfigMap(chi, configMapUsers); err != nil {
-		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(chi).
-			WithStatusError(chi).
-			Error("Reconcile CHI %s failed to reconcile ConfigMap %s", chi.Name, configMapUsers.Name)
 		return err
 	}
 
@@ -437,10 +429,6 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	// Reconcile host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)
 	if err := w.reconcileConfigMap(host.CHI, configMap); err != nil {
-		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(host.CHI).
-			WithStatusError(host.CHI).
-			Error("Reconcile Host %s failed to reconcile ConfigMap %s", host.Name, configMap.Name)
 		return err
 	}
 
@@ -724,11 +712,20 @@ func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap 
 	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, false)
 
 	if curConfigMap != nil {
-		return w.updateConfigMap(chi, configMap)
+		// We have ConfigMap - try to update it
+		err = w.updateConfigMap(chi, configMap)
 	}
 
 	if apierrors.IsNotFound(err) {
-		return w.createConfigMap(chi, configMap)
+		// ConfigMap not found - even during Update process - try to create it
+		err = w.createConfigMap(chi, configMap)
+	}
+
+	if err != nil {
+		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("FAILED to reconcile ConfigMap: %s CHI: %s ", configMap.Name, chi.Name)
 	}
 
 	return err
