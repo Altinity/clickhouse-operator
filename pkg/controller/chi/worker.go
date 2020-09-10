@@ -343,11 +343,19 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 
 	w.creator = chopmodel.NewCreator(w.c.chop, chi)
 	return chi.WalkTillError(
-		w.reconcileCHI,
+		w.reconcileCHIPreliminary,
 		w.reconcileCluster,
 		w.reconcileShard,
 		w.reconcileHost,
+		w.reconcileCHI,
 	)
+}
+
+func (w *worker) reconcileCHIPreliminary(chi *chop.ClickHouseInstallation) error {
+	w.a.V(2).Info("reconcileCHIPreliminary() - start")
+	defer w.a.V(2).Info("reconcileCHIPreliminary() - end")
+
+	return w.reconcileCHIConfigMaps(chi, false)
 }
 
 // reconcileCHI reconciles CHI global objects
@@ -362,22 +370,23 @@ func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
 	}
 
 	// 2. CHI ConfigMaps
+	return w.reconcileCHIConfigMaps(chi, true)
+}
 
+func (w *worker) reconcileCHIConfigMaps(chi *chop.ClickHouseInstallation, update bool) error {
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
 	configMapCommon := w.creator.CreateConfigMapCHICommon()
-	if err := w.reconcileConfigMap(chi, configMapCommon); err != nil {
+	if err := w.reconcileConfigMap(chi, configMapCommon, update); err != nil {
 		return err
 	}
 
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
-	if err := w.reconcileConfigMap(chi, configMapUsers); err != nil {
+	if err := w.reconcileConfigMap(chi, configMapUsers, update); err != nil {
 		return err
 	}
-
-	// Add here other CHI components to be reconciled
 
 	return nil
 }
@@ -424,7 +433,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 	// Reconcile host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)
-	if err := w.reconcileConfigMap(host.CHI, configMap); err != nil {
+	if err := w.reconcileConfigMap(host.CHI, configMap, true); err != nil {
 		return err
 	}
 
@@ -692,7 +701,11 @@ func (w *worker) createConfigMap(chi *chop.ClickHouseInstallation, configMap *co
 }
 
 // reconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
-func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
+func (w *worker) reconcileConfigMap(
+	chi *chop.ClickHouseInstallation,
+	configMap *core.ConfigMap,
+	update bool,
+) error {
 	w.a.V(2).Info("reconcileConfigMap() - start")
 	defer w.a.V(2).Info("reconcileConfigMap() - end")
 
@@ -701,6 +714,9 @@ func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap 
 
 	if curConfigMap != nil {
 		// We have ConfigMap - try to update it
+		if !update {
+			return nil
+		}
 		err = w.updateConfigMap(chi, configMap)
 	}
 
