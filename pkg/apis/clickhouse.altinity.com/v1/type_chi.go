@@ -391,14 +391,14 @@ func (chi *ClickHouseInstallation) WalkHostsTillError(
 }
 
 func (chi *ClickHouseInstallation) WalkTillError(
-	fChiPreliminary func(chi *ClickHouseInstallation) error,
+	fCHIPreliminary func(chi *ClickHouseInstallation) error,
 	fCluster func(cluster *ChiCluster) error,
 	fShard func(shard *ChiShard) error,
 	fHost func(host *ChiHost) error,
-	fChi func(chi *ClickHouseInstallation) error,
+	fCHI func(chi *ClickHouseInstallation) error,
 ) error {
 
-	if err := fChiPreliminary(chi); err != nil {
+	if err := fCHIPreliminary(chi); err != nil {
 		return err
 	}
 
@@ -421,7 +421,7 @@ func (chi *ClickHouseInstallation) WalkTillError(
 		}
 	}
 
-	if err := fChi(chi); err != nil {
+	if err := fCHI(chi); err != nil {
 		return err
 	}
 
