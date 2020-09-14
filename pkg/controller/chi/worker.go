@@ -356,6 +356,13 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallat
 	w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - start")
 	defer w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - end")
 
+	// 1. CHI Service
+	service := w.creator.CreateServiceCHI()
+	if err := w.reconcileService(chi, service); err != nil {
+		return err
+	}
+
+	// 2. CHI ConfigMaps without update - create only
 	return w.reconcileCHIConfigMaps(chi, false)
 }
 
@@ -364,13 +371,7 @@ func (w *worker) reconcileCHIAuxObjectsFinal(chi *chop.ClickHouseInstallation) e
 	w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - start")
 	defer w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - end")
 
-	// 1. CHI Service
-	service := w.creator.CreateServiceCHI()
-	if err := w.reconcileService(chi, service); err != nil {
-		return err
-	}
-
-	// 2. CHI ConfigMaps
+	// CHI ConfigMaps with update
 	return w.reconcileCHIConfigMaps(chi, true)
 }
 
