@@ -18,7 +18,7 @@ spec:
         templates:
           clusterServiceTemplate: cluster-service-template
         layout:
-          shardsCount: 2
+          shardsCount: 1
           replicasCount: 1
   templates:
     serviceTemplates:

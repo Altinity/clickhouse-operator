@@ -443,20 +443,37 @@ def test_012():
                 "pod": 2,
                 "service": 4,
             },
-            "service": [
-                "service-test-012",
-                "ClusterIP",
-            ],
             "do_not_delete": 1,
         }
     )
-    with Then("There should be a service for shard 0"):
+    with Then("There should be a service for chi"):
+        kubectl.check_service("service-test-012", "LoadBalancer")
+    with And("There should be a service for shard 0"):
         kubectl.check_service("service-test-012-0-0", "ClusterIP")
     with And("There should be a service for shard 1"):
         kubectl.check_service("service-test-012-1-0", "ClusterIP")
     with And("There should be a service for default cluster"):
         kubectl.check_service("service-default", "ClusterIP")
 
+    nodePort = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
+    
+    with Then("Update chi"):
+        kubectl.create_and_check(
+        config="configs/test-012-service-template-2.yaml",
+        check={
+            "object_counts": {
+                "statefulset": 1,
+                "pod": 1,
+                "service": 3,
+            },
+            "do_not_delete": 1,
+        }
+        )
+        
+        with And("NodePort should not change"):
+            newNodePort = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
+            assert newNodePort == nodePort, "LoadBalancer.spec.ports[0].nodePort changed from %r to %r" % (nodePort, newNodePort)
+    
     kubectl.delete_chi("test-012")
 
 
