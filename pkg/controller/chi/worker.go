@@ -343,26 +343,26 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 
 	w.creator = chopmodel.NewCreator(w.c.chop, chi)
 	return chi.WalkTillError(
-		w.reconcileCHIPreliminary,
+		w.reconcileCHIAuxObjectsPreliminary,
 		w.reconcileCluster,
 		w.reconcileShard,
 		w.reconcileHost,
-		w.reconcileCHI,
+		w.reconcileCHIAuxObjectsFinal,
 	)
 }
 
-// reconcileCHIPreliminary reconciles CHI preliminary ensured ConfigMaos are in place
-func (w *worker) reconcileCHIPreliminary(chi *chop.ClickHouseInstallation) error {
-	w.a.V(2).Info("reconcileCHIPreliminary() - start")
-	defer w.a.V(2).Info("reconcileCHIPreliminary() - end")
+// reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary ensured ConfigMaos are in place
+func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallation) error {
+	w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - start")
+	defer w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - end")
 
 	return w.reconcileCHIConfigMaps(chi, false)
 }
 
-// reconcileCHI reconciles CHI global objects
-func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
-	w.a.V(2).Info("reconcileCHI() - start")
-	defer w.a.V(2).Info("reconcileCHI() - end")
+// reconcileCHIAuxObjectsFinal reconciles CHI global objects
+func (w *worker) reconcileCHIAuxObjectsFinal(chi *chop.ClickHouseInstallation) error {
+	w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - start")
+	defer w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - end")
 
 	// 1. CHI Service
 	service := w.creator.CreateServiceCHI()
