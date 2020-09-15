@@ -526,7 +526,7 @@ spec:
                     type: object
                     required:
                       - name
-                    properies:
+                    properties:
                       name:
                         type: string
                       generateName:
