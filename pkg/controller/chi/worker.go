@@ -763,12 +763,11 @@ func (w *worker) updateService(chi *chop.ClickHouseInstallation, curService, new
 					// Already have this port specified - reuse all internals,
 					// due to limitations with auto-assigned values
 					*newPort = *curPort
+					w.a.Info("reuse Port %d values", newPort.Port)
 					break
 				}
 			}
 		}
-
-		newService.Spec.Ports = curService.Spec.Ports
 	}
 
 	// spec.clusterIP field is immutable, need to use already assigned value
