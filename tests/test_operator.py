@@ -421,7 +421,7 @@ def test_011_1():
             with Then("Wait until configmap is reloaded"):
                 # Need to wait to make sure configuration is reloaded. For some reason it takes long here
                 # Maybe we can restart the pod to speed it up
-                time.sleep(60) 
+                time.sleep(60)
             with Then("Connection to localhost should succeed with default user"):
                 out = clickhouse.query_with_error(
                     "test-011-secured-default",
@@ -455,25 +455,26 @@ def test_012():
     with And("There should be a service for default cluster"):
         kubectl.check_service("service-default", "ClusterIP")
 
-    nodePort = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
-    
+    node_port = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
+
     with Then("Update chi"):
         kubectl.create_and_check(
-        config="configs/test-012-service-template-2.yaml",
-        check={
-            "object_counts": {
-                "statefulset": 1,
-                "pod": 1,
-                "service": 3,
-            },
-            "do_not_delete": 1,
-        }
+            config="configs/test-012-service-template-2.yaml",
+            check={
+                "object_counts": {
+                    "statefulset": 1,
+                    "pod": 1,
+                    "service": 3,
+                },
+                "do_not_delete": 1,
+            }
         )
-        
+
         with And("NodePort should not change"):
-            newNodePort = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
-            assert newNodePort == nodePort, "LoadBalancer.spec.ports[0].nodePort changed from %r to %r" % (nodePort, newNodePort)
-    
+            new_node_port = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
+            assert new_node_port == node_port, \
+                f"LoadBalancer.spec.ports[0].nodePort changed from {node_port} to {new_node_port}"
+
     kubectl.delete_chi("test-012")
 
 
@@ -519,7 +520,7 @@ def test_013():
             chi,
             "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events "
             "ENGINE = Distributed('all-sharded', system, events)")
-    
+
     with Then("Add shards"):
         kubectl.create_and_check(
             config="configs/test-013-add-shards-2.yaml",
@@ -563,7 +564,7 @@ def test_013():
                     "statefulset": 1,
                     "pod": 1,
                     "service": 2,
-                    },
+                },
                 "do_not_delete": 1,
             }
         )
@@ -571,7 +572,7 @@ def test_013():
         with Then("Unaffected pod should not be restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
             assert start_time == new_start_time
-    
+
     kubectl.delete_chi(chi)
 
 
