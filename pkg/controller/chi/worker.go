@@ -745,6 +745,32 @@ func (w *worker) updateService(chi *chop.ClickHouseInstallation, curService, new
 	// spec.resourceVersion is required in order to update object
 	newService.ResourceVersion = curService.ResourceVersion
 
+	// The port on each node on which this service is exposed when type=NodePort or LoadBalancer.
+	// Usually assigned by the system. If specified, it will be allocated to the service
+	// if unused or else creation of the service will fail.
+	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
+	if ((curService.Spec.Type == core.ServiceTypeNodePort) && (newService.Spec.Type == core.ServiceTypeNodePort)) ||
+		((curService.Spec.Type == core.ServiceTypeLoadBalancer) && (newService.Spec.Type == core.ServiceTypeLoadBalancer)) {
+		// No changes in service type and service type assumes NodePort to be allocated.
+		// !!! IMPORTANT !!!
+		// The same exposed port details can not be changed. This is important limitation
+		for i := range newService.Spec.Ports {
+			newPort := &newService.Spec.Ports[i]
+			for j := range curService.Spec.Ports {
+				curPort := &curService.Spec.Ports[j]
+				if newPort.Port == curPort.Port {
+					// Already have this port specified - reuse all internals,
+					// due to limitations with auto-assigned values
+					*newPort = *curPort
+					break
+				}
+			}
+		}
+
+		newService.Spec.Ports = curService.Spec.Ports
+	}
+
 	// spec.clusterIP field is immutable, need to use already assigned value
 	// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
 	// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
