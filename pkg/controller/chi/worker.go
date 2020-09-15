@@ -835,8 +835,9 @@ func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *cor
 		err = w.updateService(chi, curService, service)
 	}
 
-	if apierrors.IsNotFound(err) {
-		// Service not found - even during Update process - try to create it
+	if err != nil {
+		// Service not found or not updated. Try to recreate
+		_ = w.c.deleteServiceIfExists(service.Namespace, service.Name)
 		err = w.createService(chi, service)
 	}
 
