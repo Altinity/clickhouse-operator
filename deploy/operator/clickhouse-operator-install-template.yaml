@@ -540,6 +540,7 @@ spec:
                             type: string
                           values:
                             type: array
+                            nullable: true
                             items:
                               type: string
                       distribution:
@@ -1192,6 +1193,7 @@ spec:
                             type: string
                           values:
                             type: array
+                            nullable: true
                             items:
                               type: string
                       distribution:
