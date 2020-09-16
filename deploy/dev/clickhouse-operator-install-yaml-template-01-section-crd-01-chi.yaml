@@ -552,6 +552,7 @@ spec:
                           - "OnePerHost"
                       podDistribution:
                         type: array
+                        nullable: true
                         items:
                           type: object
                           required:
