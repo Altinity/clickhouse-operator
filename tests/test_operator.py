@@ -988,7 +988,7 @@ def test_020(config="configs/test-020-multi-volume.yaml"):
 
 @TestScenario
 @Name("test-021-rescale-volume. Test rescaling storage")
-def test_021(config="configs/test-021-rescale-volume.yaml"):
+def test_021(config="configs/test-021-rescale-volume-01.yaml"):
     with Given("Default storage class is expandable"):
         default_storage_class = kubectl.get_default_storage_class()
         assert default_storage_class is not None
@@ -1011,7 +1011,7 @@ def test_021(config="configs/test-021-rescale-volume.yaml"):
 
     with When("Re-scale volume configuration to 200Mb"):
         kubectl.create_and_check(
-            config="configs/test-021-rescale-volume-add-storage.yaml",
+            config="configs/test-021-rescale-volume-02-enlarge-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1023,7 +1023,7 @@ def test_021(config="configs/test-021-rescale-volume.yaml"):
 
     with When("Add second disk 50Mi"):
         kubectl.create_and_check(
-            config="configs/test-021-rescale-volume-add-disk.yaml",
+            config="configs/test-021-rescale-volume-03-add-disk.yaml",
             check={
                 "pod_count": 1,
                 "pod_volumes": {
@@ -1040,7 +1040,12 @@ def test_021(config="configs/test-021-rescale-volume.yaml"):
             assert size == "50Mi"
 
         with And("There should be two disks recognized by ClickHouse"):
-            out = clickhouse.query(chi, "select count() from system.disks")
+            # ClickHouse requires some time to mount volume. Race conditions.
+
+            time.sleep(120)
+            out = clickhouse.query(chi, "SELECT count() FROM system.disks")
+            print("SELECT count() FROM system.disks RETURNED:")
+            print(out)
             assert out == "2"
 
     kubectl.delete_chi(chi)
