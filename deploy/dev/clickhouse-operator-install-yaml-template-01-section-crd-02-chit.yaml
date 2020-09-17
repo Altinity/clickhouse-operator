@@ -162,8 +162,8 @@ spec:
                       type: array
                       items:
                         type: object
-                        required:
-                          - host
+                        #required:
+                        #  - host
                         properties:
                           host:
                             type: string
@@ -193,8 +193,8 @@ spec:
                   type: array
                   items:
                     type: object
-                    required:
-                      - name
+                    #required:
+                    #  - name
                     properties:
                       name:
                         type: string
@@ -209,8 +209,8 @@ spec:
                             type: array
                             items:
                               type: object
-                              required:
-                                - host
+                              #required:
+                              #  - host
                               properties:
                                 host:
                                   type: string
@@ -459,8 +459,8 @@ spec:
                   type: array
                   items:
                     type: object
-                    required:
-                      - name
+                    #required:
+                    #  - name
                     properties:
                       name:
                         type: string
@@ -468,8 +468,8 @@ spec:
                         type: array
                         items:
                           type: object
-                          required:
-                            - type
+                          #required:
+                          #  - type
                           properties:
                             type:
                               type: string
@@ -524,8 +524,8 @@ spec:
                   type: array
                   items:
                     type: object
-                    required:
-                      - name
+                    #required:
+                    #  - name
                     properties:
                       name:
                         type: string
@@ -533,14 +533,13 @@ spec:
                         type: string
                       zone:
                         type: object
-                        required:
-                          - values
+                        #required:
+                        #  - values
                         properties:
                           key:
                             type: string
                           values:
                             type: array
-                            nullable: true
                             items:
                               type: string
                       distribution:
@@ -552,11 +551,10 @@ spec:
                           - "OnePerHost"
                       podDistribution:
                         type: array
-                        nullable: true
                         items:
                           type: object
-                          required:
-                            - type
+                          #required:
+                          #  - type
                           properties:
                             type:
                               type: string
@@ -600,9 +598,9 @@ spec:
                   type: array
                   items:
                     type: object
-                    required:
-                      - name
-                      - spec
+                    #required:
+                    #  - name
+                    #  - spec
                     properties:
                       name:
                         type: string
@@ -619,9 +617,9 @@ spec:
                   type: array
                   items:
                     type: object
-                    required:
-                      - name
-                      - spec
+                    #required:
+                    #  - name
+                    #  - spec
                     properties:
                       name:
                         type: string
@@ -637,8 +635,8 @@ spec:
               type: array
               items:
                 type: object
-                required:
-                  - name
+                #required:
+                #  - name
                 properties:
                   name:
                     type: string
