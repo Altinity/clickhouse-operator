@@ -160,6 +160,7 @@ spec:
                   properties:
                     nodes:
                       type: array
+                      nullable: true
                       items:
                         type: object
                         #required:
@@ -191,6 +192,7 @@ spec:
                   type: object
                 clusters:
                   type: array
+                  nullable: true
                   items:
                     type: object
                     #required:
@@ -207,6 +209,7 @@ spec:
                         properties:
                           nodes:
                             type: array
+                            nullable: true
                             items:
                               type: object
                               #required:
@@ -238,6 +241,7 @@ spec:
                             type: integer
                           shards:
                             type: array
+                            nullable: true
                             items:
                               type: object
                               properties:
@@ -304,6 +308,7 @@ spec:
                                   minimum: 1
                                 replicas:
                                   type: array
+                                  nullable: true
                                   items:
                                     # Host
                                     type: object
@@ -351,6 +356,7 @@ spec:
                                             type: string
                           replicas:
                             type: array
+                            nullable: true
                             items:
                               type: object
                               properties:
@@ -388,6 +394,7 @@ spec:
                                   minimum: 1
                                 shards:
                                   type: array
+                                  nullable: true
                                   items:
                                     # Host
                                     type: object
@@ -457,6 +464,7 @@ spec:
               properties:
                 hostTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
                     #required:
@@ -466,6 +474,7 @@ spec:
                         type: string
                       portDistribution:
                         type: array
+                        nullable: true
                         items:
                           type: object
                           #required:
@@ -522,6 +531,7 @@ spec:
 
                 podTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
                     #required:
@@ -540,6 +550,7 @@ spec:
                             type: string
                           values:
                             type: array
+                            nullable: true
                             items:
                               type: string
                       distribution:
@@ -551,6 +562,7 @@ spec:
                           - "OnePerHost"
                       podDistribution:
                         type: array
+                        nullable: true
                         items:
                           type: object
                           #required:
@@ -596,6 +608,7 @@ spec:
                         type: object
                 volumeClaimTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
                     #required:
@@ -615,6 +628,7 @@ spec:
                         type: object
                 serviceTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
                     #required:
@@ -633,6 +647,7 @@ spec:
                         type: object
             useTemplates:
               type: array
+              nullable: true
               items:
                 type: object
                 #required:
@@ -812,6 +827,7 @@ spec:
                   properties:
                     nodes:
                       type: array
+                      nullable: true
                       items:
                         type: object
                         #required:
@@ -843,6 +859,7 @@ spec:
                   type: object
                 clusters:
                   type: array
+                  nullable: true
                   items:
                     type: object
                     #required:
@@ -859,6 +876,7 @@ spec:
                         properties:
                           nodes:
                             type: array
+                            nullable: true
                             items:
                               type: object
                               #required:
@@ -890,6 +908,7 @@ spec:
                             type: integer
                           shards:
                             type: array
+                            nullable: true
                             items:
                               type: object
                               properties:
@@ -956,6 +975,7 @@ spec:
                                   minimum: 1
                                 replicas:
                                   type: array
+                                  nullable: true
                                   items:
                                     # Host
                                     type: object
@@ -1003,6 +1023,7 @@ spec:
                                             type: string
                           replicas:
                             type: array
+                            nullable: true
                             items:
                               type: object
                               properties:
@@ -1040,6 +1061,7 @@ spec:
                                   minimum: 1
                                 shards:
                                   type: array
+                                  nullable: true
                                   items:
                                     # Host
                                     type: object
@@ -1109,6 +1131,7 @@ spec:
               properties:
                 hostTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
                     #required:
@@ -1118,6 +1141,7 @@ spec:
                         type: string
                       portDistribution:
                         type: array
+                        nullable: true
                         items:
                           type: object
                           #required:
@@ -1174,6 +1198,7 @@ spec:
 
                 podTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
                     #required:
@@ -1192,6 +1217,7 @@ spec:
                             type: string
                           values:
                             type: array
+                            nullable: true
                             items:
                               type: string
                       distribution:
@@ -1203,6 +1229,7 @@ spec:
                           - "OnePerHost"
                       podDistribution:
                         type: array
+                        nullable: true
                         items:
                           type: object
                           #required:
@@ -1248,6 +1275,7 @@ spec:
                         type: object
                 volumeClaimTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
                     #required:
@@ -1267,6 +1295,7 @@ spec:
                         type: object
                 serviceTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
                     #required:
@@ -1285,6 +1314,7 @@ spec:
                         type: object
             useTemplates:
               type: array
+              nullable: true
               items:
                 type: object
                 #required:
