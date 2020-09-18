@@ -99,9 +99,9 @@ Vagrant.configure(2) do |config|
 #    export VALIDATE_YAML=false # only for 1.14
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
-#    K8S_VERSION=${K8S_VERSION:-1.17.11}
-#    K8S_VERSION=${K8S_VERSION:-1.18.8}
-    K8S_VERSION=${K8S_VERSION:-1.19.1}
+#    K8S_VERSION=${K8S_VERSION:-1.17.12}
+#    K8S_VERSION=${K8S_VERSION:-1.18.9}
+    K8S_VERSION=${K8S_VERSION:-1.19.2}
     export VALIDATE_YAML=true
 
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl
