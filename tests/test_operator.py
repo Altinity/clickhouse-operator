@@ -297,6 +297,8 @@ def test_011():
             }
         )
 
+        time.sleep(60)
+
         with Then("Connection to localhost should succeed with default user"):
             out = clickhouse.query_with_error("test-011-secured-cluster", "select 'OK'")
             assert out == 'OK', f"out={out} should be 'OK'"
@@ -421,7 +423,7 @@ def test_011_1():
             with Then("Wait until configmap is reloaded"):
                 # Need to wait to make sure configuration is reloaded. For some reason it takes long here
                 # Maybe we can restart the pod to speed it up
-                time.sleep(60)
+                time.sleep(120)
             with Then("Connection to localhost should succeed with default user"):
                 out = clickhouse.query_with_error(
                     "test-011-secured-default",
