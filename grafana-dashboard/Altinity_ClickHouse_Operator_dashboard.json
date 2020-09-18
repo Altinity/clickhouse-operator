@@ -845,14 +845,14 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "iirate(chi_clickhouse_event_SelectQuery{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_SelectQuery{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "intervalFactor": 2,
           "legendFormat": "select {{hostname}}",
           "refId": "B",
           "step": 10
         },
         {
-          "expr": "iirate(chi_clickhouse_event_Query{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_Query{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "hide": true,
           "intervalFactor": 2,
           "legendFormat": "total {{hostname}}",
