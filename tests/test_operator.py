@@ -765,7 +765,7 @@ def test_015():
 def test_016():
     chi = "test-016-settings"
     kubectl.create_and_check(
-        config="configs/test-016-settings.yaml",
+        config="configs/test-016-settings-01.yaml",
         check={
             "apply_templates": {
                 settings.clickhouse_template,
@@ -798,6 +798,9 @@ def test_016():
     with And("test_usersd user should be available"):
         clickhouse.query(chi, sql="select version()", user="test_usersd")
 
+    with And("user1 user should be available"):
+        clickhouse.query(chi, sql="select version()", user="user1", pwd="qwerty")
+
     with And("system.clusters should be empty due to remote_servers override"):
         out = clickhouse.query(chi, sql="select count() from system.clusters")
         assert out == "0"
@@ -805,7 +808,7 @@ def test_016():
     with When("Update usersd settings"):
         start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         kubectl.create_and_check(
-            config="configs/test-016-settings-2.yaml",
+            config="configs/test-016-settings-02.yaml",
             check={
                 "do_not_delete": 1,
             })
@@ -824,8 +827,15 @@ def test_016():
 
             assert config_map_applied_num != "0", "ConfigMap should be applied"
 
+        version = ""
         with Then("test_norestart user should be available"):
-            clickhouse.query(chi, sql="select version()", user="test_norestart")
+            version = clickhouse.query(chi, sql="select version()", user="test_norestart")
+        with And("user1 user should not be available"):
+            version_user1 = clickhouse.query_with_error(chi, sql="select version()", user="user1", pwd="qwerty")
+            assert version != version_user1
+        with And("user2 user should be available"):
+            version_user2 = clickhouse.query(chi, sql="select version()", user="user2", pwd="qwerty")
+            assert version == version_user2
         with And("ClickHouse should not be restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time == new_start_time
