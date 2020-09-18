@@ -845,14 +845,14 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "iirate(chi_clickhouse_event_SelectQuery{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_SelectQuery{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "intervalFactor": 2,
           "legendFormat": "select {{hostname}}",
           "refId": "B",
           "step": 10
         },
         {
-          "expr": "iirate(chi_clickhouse_event_Query{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_Query{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "hide": true,
           "intervalFactor": 2,
           "legendFormat": "total {{hostname}}",
@@ -3601,22 +3601,26 @@
         {
           "expr": "increase(chi_clickhouse_event_DiskReadElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "Disk Read syscall {{hostname}}",
-          "refId": "A"
+          "refId": "A",
+          "hide": true
         },
         {
           "expr": "increase(chi_clickhouse_event_DiskWriteElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "Disk Write syscall {{hostname}}",
-          "refId": "B"
+          "refId": "B",
+          "hide": true
         },
         {
           "expr": "increase(chi_clickhouse_event_NetworkReceiveElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "Network Receive {{hostname}}",
-          "refId": "C"
+          "refId": "C",
+          "hide": true
         },
         {
           "expr": "increase(chi_clickhouse_event_NetworkSendElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "Network Send {{hostname}}",
-          "refId": "D"
+          "refId": "D",
+          "hide": true
         },
         {
           "expr": "increase(chi_clickhouse_event_RealTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
