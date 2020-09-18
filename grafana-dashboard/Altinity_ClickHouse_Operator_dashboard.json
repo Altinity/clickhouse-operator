@@ -3599,56 +3599,56 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "increase(chi_clickhouse_event_DiskReadElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_DiskReadElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "Disk Read syscall {{hostname}}",
           "refId": "A",
           "hide": true
         },
         {
-          "expr": "increase(chi_clickhouse_event_DiskWriteElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_DiskWriteElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "Disk Write syscall {{hostname}}",
           "refId": "B",
           "hide": true
         },
         {
-          "expr": "increase(chi_clickhouse_event_NetworkReceiveElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_NetworkReceiveElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "Network Receive {{hostname}}",
           "refId": "C",
           "hide": true
         },
         {
-          "expr": "increase(chi_clickhouse_event_NetworkSendElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_NetworkSendElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "Network Send {{hostname}}",
           "refId": "D",
           "hide": true
         },
         {
-          "expr": "increase(chi_clickhouse_event_RealTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_RealTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "Real Time {{hostname}}",
           "refId": "E"
         },
         {
-          "expr": "increase(chi_clickhouse_event_UserTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_UserTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "User Time {{hostname}}",
           "refId": "F"
         },
         {
-          "expr": "increase(chi_clickhouse_event_SystemTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_SystemTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "System Time {{hostname}}",
           "refId": "G"
         },
         {
-          "expr": "increase(chi_clickhouse_event_OSIOWaitMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_OSIOWaitMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "OS IO Wait {{hostname}}",
           "refId": "H"
         },
         {
-          "expr": "increase(chi_clickhouse_event_OSCPUWaitMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_OSCPUWaitMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "OS CPU Wait {{hostname}}",
           "refId": "I"
         },
         {
-          "expr": "increase(chi_clickhouse_event_OSCPUVirtualTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
+          "expr": "irate(chi_clickhouse_event_OSCPUVirtualTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[2m])",
           "legendFormat": "OS CPU Virtual {{hostname}}",
           "refId": "J"
         }
@@ -3657,7 +3657,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "CPU Time microseconds last 2 minutes",
+      "title": "CPU Time microseconds per seconds",
       "tooltip": {
         "shared": true,
         "sort": 0,
