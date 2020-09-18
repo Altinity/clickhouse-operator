@@ -25,6 +25,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
+	"time"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
@@ -40,6 +41,7 @@ type worker struct {
 	normalizer *chopmodel.Normalizer
 	schemer    *chopmodel.Schemer
 	creator    *chopmodel.Creator
+	start      time.Time
 }
 
 // newWorker
@@ -55,6 +57,7 @@ func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
 			c.chop.Config().CHPort,
 		),
 		creator: nil,
+		start:   time.Now().Add(chop.DefaultReconcileThreadsWarmup),
 	}
 }
 
@@ -95,6 +98,10 @@ func (w *worker) processItem(item interface{}) error {
 	switch item.(type) {
 
 	case *ReconcileChi:
+		for time.Now().Before(w.start) {
+			w.a.V(2).Info("ReconcileChi - not yet")
+			time.Sleep(1 * time.Second)
+		}
 		reconcile, _ := item.(*ReconcileChi)
 		switch reconcile.cmd {
 		case reconcileAdd:
@@ -336,53 +343,53 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 
 	w.creator = chopmodel.NewCreator(w.c.chop, chi)
 	return chi.WalkTillError(
-		w.reconcileCHI,
+		w.reconcileCHIAuxObjectsPreliminary,
 		w.reconcileCluster,
 		w.reconcileShard,
 		w.reconcileHost,
+		w.reconcileCHIAuxObjectsFinal,
 	)
 }
 
-// reconcileCHI reconciles CHI global objects
-func (w *worker) reconcileCHI(chi *chop.ClickHouseInstallation) error {
-	w.a.V(2).Info("reconcileCHI() - start")
-	defer w.a.V(2).Info("reconcileCHI() - end")
+// reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary ensured ConfigMaos are in place
+func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallation) error {
+	w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - start")
+	defer w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - end")
 
 	// 1. CHI Service
 	service := w.creator.CreateServiceCHI()
 	if err := w.reconcileService(chi, service); err != nil {
-		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(chi).
-			WithStatusError(chi).
-			Error("Reconcile CHI %s failed to reconcile Service %s", chi.Name, service.Name)
 		return err
 	}
 
-	// 2. CHI ConfigMaps
+	// 2. CHI ConfigMaps without update - create only
+	return w.reconcileCHIConfigMaps(chi, false)
+}
 
+// reconcileCHIAuxObjectsFinal reconciles CHI global objects
+func (w *worker) reconcileCHIAuxObjectsFinal(chi *chop.ClickHouseInstallation) error {
+	w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - start")
+	defer w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - end")
+
+	// CHI ConfigMaps with update
+	return w.reconcileCHIConfigMaps(chi, true)
+}
+
+// reconcileCHIConfigMaps reconciles all CHI's ConfigMaps
+func (w *worker) reconcileCHIConfigMaps(chi *chop.ClickHouseInstallation, update bool) error {
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
 	configMapCommon := w.creator.CreateConfigMapCHICommon()
-	if err := w.reconcileConfigMap(chi, configMapCommon); err != nil {
-		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(chi).
-			WithStatusError(chi).
-			Error("Reconcile CHI %s failed to reconcile ConfigMap %s", chi.Name, configMapCommon.Name)
+	if err := w.reconcileConfigMap(chi, configMapCommon, update); err != nil {
 		return err
 	}
 
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
-	if err := w.reconcileConfigMap(chi, configMapUsers); err != nil {
-		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(chi).
-			WithStatusError(chi).
-			Error("Reconcile CHI %s failed to reconcile ConfigMap %s", chi.Name, configMapUsers.Name)
+	if err := w.reconcileConfigMap(chi, configMapUsers, update); err != nil {
 		return err
 	}
-
-	// Add here other CHI components to be reconciled
 
 	return nil
 }
@@ -429,21 +436,13 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 	// Reconcile host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)
-	if err := w.reconcileConfigMap(host.CHI, configMap); err != nil {
-		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(host.CHI).
-			WithStatusError(host.CHI).
-			Error("Reconcile Host %s failed to reconcile ConfigMap %s", host.Name, configMap.Name)
+	if err := w.reconcileConfigMap(host.CHI, configMap, true); err != nil {
 		return err
 	}
 
 	// Reconcile host's StatefulSet
 	statefulSet := w.creator.CreateStatefulSet(host)
 	if err := w.reconcileStatefulSet(statefulSet, host); err != nil {
-		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(host.CHI).
-			WithStatusError(host.CHI).
-			Error("Reconcile Host %s failed to reconcile StatefulSet %s", host.Name, statefulSet.Name)
 		return err
 	}
 
@@ -453,10 +452,6 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	// Reconcile host's Service
 	service := w.creator.CreateServiceHost(host)
 	if err := w.reconcileService(host.CHI, service); err != nil {
-		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(host.CHI).
-			WithStatusError(host.CHI).
-			Error("Reconcile Host %s failed to reconcile Service %s", host.Name, service.Name)
 		return err
 	}
 
@@ -709,7 +704,11 @@ func (w *worker) createConfigMap(chi *chop.ClickHouseInstallation, configMap *co
 }
 
 // reconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
-func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
+func (w *worker) reconcileConfigMap(
+	chi *chop.ClickHouseInstallation,
+	configMap *core.ConfigMap,
+	update bool,
+) error {
 	w.a.V(2).Info("reconcileConfigMap() - start")
 	defer w.a.V(2).Info("reconcileConfigMap() - end")
 
@@ -717,11 +716,23 @@ func (w *worker) reconcileConfigMap(chi *chop.ClickHouseInstallation, configMap 
 	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, false)
 
 	if curConfigMap != nil {
-		return w.updateConfigMap(chi, configMap)
+		// We have ConfigMap - try to update it
+		if !update {
+			return nil
+		}
+		err = w.updateConfigMap(chi, configMap)
 	}
 
 	if apierrors.IsNotFound(err) {
-		return w.createConfigMap(chi, configMap)
+		// ConfigMap not found - even during Update process - try to create it
+		err = w.createConfigMap(chi, configMap)
+	}
+
+	if err != nil {
+		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("FAILED to reconcile ConfigMap: %s CHI: %s ", configMap.Name, chi.Name)
 	}
 
 	return err
@@ -733,6 +744,31 @@ func (w *worker) updateService(chi *chop.ClickHouseInstallation, curService, new
 
 	// spec.resourceVersion is required in order to update object
 	newService.ResourceVersion = curService.ResourceVersion
+
+	// The port on each node on which this service is exposed when type=NodePort or LoadBalancer.
+	// Usually assigned by the system. If specified, it will be allocated to the service
+	// if unused or else creation of the service will fail.
+	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
+	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
+	if ((curService.Spec.Type == core.ServiceTypeNodePort) && (newService.Spec.Type == core.ServiceTypeNodePort)) ||
+		((curService.Spec.Type == core.ServiceTypeLoadBalancer) && (newService.Spec.Type == core.ServiceTypeLoadBalancer)) {
+		// No changes in service type and service type assumes NodePort to be allocated.
+		// !!! IMPORTANT !!!
+		// The same exposed port details can not be changed. This is important limitation
+		for i := range newService.Spec.Ports {
+			newPort := &newService.Spec.Ports[i]
+			for j := range curService.Spec.Ports {
+				curPort := &curService.Spec.Ports[j]
+				if newPort.Port == curPort.Port {
+					// Already have this port specified - reuse all internals,
+					// due to limitations with auto-assigned values
+					*newPort = *curPort
+					w.a.Info("reuse Port %d values", newPort.Port)
+					break
+				}
+			}
+		}
+	}
 
 	// spec.clusterIP field is immutable, need to use already assigned value
 	// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
@@ -795,11 +831,21 @@ func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *cor
 	curService, err := w.c.getService(&service.ObjectMeta, false)
 
 	if curService != nil {
-		return w.updateService(chi, curService, service)
+		// We have Service - try to update it
+		err = w.updateService(chi, curService, service)
 	}
 
-	if apierrors.IsNotFound(err) {
-		return w.createService(chi, service)
+	if err != nil {
+		// Service not found or not updated. Try to recreate
+		_ = w.c.deleteServiceIfExists(service.Namespace, service.Name)
+		err = w.createService(chi, service)
+	}
+
+	if err != nil {
+		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			Error("FAILED to reconcile Service: %s CHI: %s ", service.Name, chi.Name)
 	}
 
 	return err
@@ -814,23 +860,30 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 	curStatefulSet, err := w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
 	if curStatefulSet != nil {
-		return w.updateStatefulSet(curStatefulSet, newStatefulSet, host)
+		// We have StatefulSet - try to update it
+		if diff, equal := messagediff.DeepDiff(*curStatefulSet, *newStatefulSet); !equal {
+			_ = diff
+			w.a.V(1).Info("StatefulSet Diffs")
+		}
+		err = w.updateStatefulSet(curStatefulSet, newStatefulSet, host)
 	}
 
 	if apierrors.IsNotFound(err) {
-		return w.createStatefulSet(newStatefulSet, host)
+		// StatefulSet not found - even during Update process - try to create it
+		err = w.createStatefulSet(newStatefulSet, host)
 	}
 
-	// Not create, not update - weird thing
-
-	w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
-		WithStatusAction(host.CHI).
-		WithStatusError(host.CHI).
-		Error("Create or Update StatefulSet %s/%s - UNEXPECTED FLOW", newStatefulSet.Namespace, newStatefulSet.Name)
+	if err != nil {
+		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(host.CHI).
+			WithStatusError(host.CHI).
+			Error("FAILED to reconcile StatefulSet: %s CHI: %s ", newStatefulSet.Name, host.CHI.Name)
+	}
 
 	return err
 }
 
+// reconcilePersistentVolumes
 func (w *worker) reconcilePersistentVolumes(host *chop.ChiHost) {
 	w.c.walkPVs(host, func(pv *core.PersistentVolume) {
 		pv = w.creator.PreparePersistentVolume(pv, host)
