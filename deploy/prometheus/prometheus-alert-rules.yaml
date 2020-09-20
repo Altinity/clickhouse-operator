@@ -8,7 +8,7 @@ metadata:
   name: prometheus-clickhouse-operator-rules
 spec:
   groups:
-    - name: ./clickhouse-operator.rules
+    - name: ClickHouseOperatorRulesf
       rules:
         - alert: ClickHouseMetricsExporterDown
           expr: up{job='clickhouse-operator-metrics'} == 0
@@ -462,7 +462,7 @@ spec:
 
     # based on https://blog.serverdensity.com/how-to-monitor-zookeeper/
     # and https://github.com/apache/zookeeper/blob/master/zookeeper-contrib/zookeeper-contrib-monitoring/nagios/services.cfg
-    - name: ./zookeeper.rules
+    - name: ZookeeperRules
       rules:
         - alert: ZookeeperDown
           expr: up{app='zookeeper'} == 0
