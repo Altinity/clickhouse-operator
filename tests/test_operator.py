@@ -484,7 +484,7 @@ def test_012():
 @Name("test_013. Test adding shards and creating local and distributed tables automatically")
 def test_013():
     config = "configs/test-013-add-shards-1.yaml"
-    chi = manifest.get_chi_name(config)
+    chi = manifest.get_chi_name(util.get_full_path(config))
     cluster = "default"
 
     kubectl.create_and_check(
@@ -591,7 +591,7 @@ def test_014():
     """.replace('\r', '').replace('\n', '')
 
     config = "configs/test-014-replication-1.yaml"
-    chi = manifest.get_chi_name(config)
+    chi = manifest.get_chi_name(util.get_full_path(config))
     cluster = "default"
 
     kubectl.create_and_check(

@@ -1,1 +1,27 @@
-test-009-operator-upgrade-1.yaml
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-008"
+  labels:
+    test: test
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+      - name: test-008
+        layout:
+          shardsCount: 1
+  defaults:
+    templates:
+      volumeClaimTemplate: default
+      podTemplate: default
+  templates:
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Mi

@@ -12,21 +12,24 @@ def query(
         pwd="",
         ns=settings.test_namespace,
         timeout=60,
+        advanced_params="",
+        pod="",
 ):
     pod_names = kubectl.get_pod_names(chi_name, ns)
     pod_name = pod_names[0]
     for p in pod_names:
-        if host in p:
+        if host in p or p == pod:
             pod_name = p
+            break
 
     pwd_str = "" if pwd == "" else f"--password={pwd}"
 
     if with_error:
         return kubectl.launch(
             f"exec {pod_name}"
-            f" -- "
-            f"clickhouse-client -mn -h {host} --port={port} -u {user} {pwd_str} "
-            f"--query=\"{sql}\""
+            f" --"
+            f" clickhouse-client -mn -h {host} --port={port} -u {user} {pwd_str} {advanced_params}"
+            f" --query=\"{sql}\""
             f" 2>&1",
             timeout=timeout,
             ns=ns,
@@ -34,9 +37,9 @@ def query(
         )
     else:
         return kubectl.launch(
-            f"exec {pod_name}"
+            f"exec {pod_name} -n {ns}"
             f" -- "
-            f"clickhouse-client -mn -h {host} --port={port} -u {user} {pwd_str} "
+            f"clickhouse-client -mn -h {host} --port={port} -u {user} {pwd_str} {advanced_params}"
             f"--query=\"{sql}\"",
             timeout=timeout,
             ns=ns,
@@ -52,5 +55,20 @@ def query_with_error(
         pwd="",
         ns=settings.test_namespace,
         timeout=60,
+        advanced_params="",
+        pod="",
+
 ):
-    return query(chi_name, sql, True, host, port, user, pwd, ns, timeout)
+    return query(
+        chi_name=chi_name,
+        sql=sql,
+        with_error=True,
+        host=host,
+        port=port,
+        user=user,
+        pwd=pwd,
+        ns=ns,
+        timeout=timeout,
+        advanced_params=advanced_params,
+        pod=pod
+    )
