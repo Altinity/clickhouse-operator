@@ -115,7 +115,7 @@ def test_prometheus_setup():
         assert kubectl.get_count("pod", ns=settings.prometheus_namespace,
                                  label="-l app=alertmanager,alertmanager=alertmanager") > 0, error(
             "please run deploy/promehteus/create_prometheus.sh before test run")
-        prometheus_operator_exptected_version = f"quay.io/coreos/prometheus-operator:v{settings.prometheus_operator_version}"
+        prometheus_operator_exptected_version = f"quay.io/prometheus-operator/prometheus-operator:v{settings.prometheus_operator_version}"
         assert prometheus_operator_exptected_version in prometheus_operator_spec["items"][0]["spec"]["containers"][0]["image"], error(f"require {prometheus_operator_exptected_version} image")
 
 
@@ -217,7 +217,7 @@ def test_distributed_files_to_insert():
     create_distributed_table_on_cluster()
 
     insert_sql = 'INSERT INTO default.test_distr(event_time, test) SELECT now(), number FROM system.numbers LIMIT 1000'
-    clickhouse.clickhouse_query(
+    clickhouse.query(
         chi["metadata"]["name"], 'SYSTEM STOP DISTRIBUTED SENDS default.test_distr',
         pod=delayed_pod, ns=kubectl.namespace
     )
@@ -647,7 +647,11 @@ def test_version_changed():
                     "templates/tpl-clickhouse-20.7.yaml",
                     "templates/tpl-persistent-volume-100Mi.yaml"
                 ],
-                "object_counts": [2, 2, 3],
+                "object_counts": {
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
+                },
                 "do_not_delete": 1
             }
         )
@@ -668,7 +672,11 @@ def test_version_changed():
                     "templates/tpl-clickhouse-latest.yaml",
                     "templates/tpl-persistent-volume-100Mi.yaml"
                 ],
-                "object_counts": [2, 2, 3],
+                "object_counts": {
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
+                },
                 "do_not_delete": 1
             }
         )
@@ -717,11 +725,12 @@ def test_distributed_sync_insertion_timeout():
     def insert_distributed_sync():
         with When("Insert to distributed table SYNC"):
             # look to https://github.com/ClickHouse/ClickHouse/pull/14260#issuecomment-683616862
-            insert_sql = 'INSERT INTO default.test_distr SELECT now(), number FROM numbers(toUInt64(5e9))'
+            # insert_sql = 'INSERT INTO default.test_distr SELECT now(), number FROM numbers(toUInt64(5e9))'
+            insert_sql = "INSERT INTO FUNCTION remote('127.1', currentDatabase(), test_distr) SELECT now(), number FROM numbers(toUInt64(5e9))"
             insert_params = '--insert_distributed_timeout=1 --insert_distributed_sync=1'
             error = clickhouse.query_with_error(
                 chi["metadata"]["name"], insert_sql,
-                host=sync_pod, ns=kubectl.namespace, advanced_params=insert_params
+                pod=sync_pod, host=sync_pod, ns=kubectl.namespace, advanced_params=insert_params
             )
             assert 'Code: 159' in error
 
@@ -742,7 +751,7 @@ def test_distributed_sync_insertion_timeout():
 @TestScenario
 @Name("Check ZookeeperDown, ZookeeperRestartRecently")
 def test_zookeeper_alerts():
-    zookeeper_spec = kubectl.kube_get("endpoints", "zookeeper")
+    zookeeper_spec = kubectl.get("endpoints", "zookeeper")
     zookeeper_pod = random.choice(zookeeper_spec["subsets"][0]["addresses"])["targetRef"]["name"]
 
     def restart_zookeeper():
@@ -802,7 +811,7 @@ if main():
             assert "items" in prometheus_spec and len(prometheus_spec["items"]) > 0 and "metadata" in prometheus_spec["items"][0], "invalid prometheus_spec"
 
         with Given("install zookeeper+clickhouse"):
-            kubectl.delete_ns(kubectl.namespace)
+            kubectl.delete_ns(kubectl.namespace, ok_to_fail=True)
             kubectl.create_ns(kubectl.namespace)
             require_zookeeper()
             kubectl.create_and_check(
@@ -830,7 +839,6 @@ if main():
                 test_prometheus_setup,
                 test_read_only_replica,
                 test_metrics_exporter_down,
-                test_clickhouse_server_reboot,
                 test_clickhouse_dns_errors,
                 test_replicas_max_abosulute_delay,
                 test_distributed_connection_exceptions,
@@ -843,6 +851,7 @@ if main():
                 test_zookeeper_hardware_exceptions,
                 test_distributed_sync_insertion_timeout,
                 test_distributed_files_to_insert,
+                test_clickhouse_server_reboot,
                 test_zookeeper_alerts,
             ]
             for t in test_cases:

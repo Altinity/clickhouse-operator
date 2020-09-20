@@ -115,7 +115,7 @@ def test_metrics_exporter_with_multiple_clickhouse_version():
         operator_namespace = "kube-system"
 
         with Then("check empty /metrics"):
-            kubectl.delete_ns(kubectl.namespace)
+            kubectl.delete_ns(kubectl.namespace, ok_to_fail=True)
             kubectl.create_ns(kubectl.namespace)
             check_monitoring_metrics(operator_namespace, operator_pod, expect_result={
                 'chi_clickhouse_metric_VersionInteger': False,

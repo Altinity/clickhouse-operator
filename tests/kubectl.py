@@ -21,8 +21,10 @@ kubectl_cmd = settings.kubectl_cmd
 def launch(command, ok_to_fail=False, ns=namespace, timeout=60):
     # Build command
     cmd = f"{kubectl_cmd}"
-    if (ns is not None) and (ns != ""):
+    if ns is not None and ns != "" and ns != "--all-namespaces":
         cmd += f" --namespace={ns}"
+    elif ns == "--all-namespaces":
+        cmd += f" {ns}"
     cmd += f" {command}"
     # Run command
     cmd = shell(cmd, timeout=timeout)
