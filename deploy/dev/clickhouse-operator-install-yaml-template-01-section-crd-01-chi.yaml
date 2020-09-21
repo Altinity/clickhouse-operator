@@ -160,10 +160,11 @@ spec:
                   properties:
                     nodes:
                       type: array
+                      nullable: true
                       items:
                         type: object
-                        required:
-                          - host
+                        #required:
+                        #  - host
                         properties:
                           host:
                             type: string
@@ -191,10 +192,11 @@ spec:
                   type: object
                 clusters:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
+                    #required:
+                    #  - name
                     properties:
                       name:
                         type: string
@@ -207,10 +209,11 @@ spec:
                         properties:
                           nodes:
                             type: array
+                            nullable: true
                             items:
                               type: object
-                              required:
-                                - host
+                              #required:
+                              #  - host
                               properties:
                                 host:
                                   type: string
@@ -238,6 +241,7 @@ spec:
                             type: integer
                           shards:
                             type: array
+                            nullable: true
                             items:
                               type: object
                               properties:
@@ -304,6 +308,7 @@ spec:
                                   minimum: 1
                                 replicas:
                                   type: array
+                                  nullable: true
                                   items:
                                     # Host
                                     type: object
@@ -351,6 +356,7 @@ spec:
                                             type: string
                           replicas:
                             type: array
+                            nullable: true
                             items:
                               type: object
                               properties:
@@ -388,6 +394,7 @@ spec:
                                   minimum: 1
                                 shards:
                                   type: array
+                                  nullable: true
                                   items:
                                     # Host
                                     type: object
@@ -457,19 +464,21 @@ spec:
               properties:
                 hostTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
+                    #required:
+                    #  - name
                     properties:
                       name:
                         type: string
                       portDistribution:
                         type: array
+                        nullable: true
                         items:
                           type: object
-                          required:
-                            - type
+                          #required:
+                          #  - type
                           properties:
                             type:
                               type: string
@@ -522,24 +531,26 @@ spec:
 
                 podTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
-                    properies:
+                    #required:
+                    #  - name
+                    properties:
                       name:
                         type: string
                       generateName:
                         type: string
                       zone:
                         type: object
-                        required:
-                          - values
+                        #required:
+                        #  - values
                         properties:
                           key:
                             type: string
                           values:
                             type: array
+                            nullable: true
                             items:
                               type: string
                       distribution:
@@ -551,10 +562,11 @@ spec:
                           - "OnePerHost"
                       podDistribution:
                         type: array
+                        nullable: true
                         items:
                           type: object
-                          required:
-                            - type
+                          #required:
+                          #  - type
                           properties:
                             type:
                               type: string
@@ -596,11 +608,12 @@ spec:
                         type: object
                 volumeClaimTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
-                      - spec
+                    #required:
+                    #  - name
+                    #  - spec
                     properties:
                       name:
                         type: string
@@ -615,11 +628,12 @@ spec:
                         type: object
                 serviceTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
-                      - spec
+                    #required:
+                    #  - name
+                    #  - spec
                     properties:
                       name:
                         type: string
@@ -633,10 +647,11 @@ spec:
                         type: object
             useTemplates:
               type: array
+              nullable: true
               items:
                 type: object
-                required:
-                  - name
+                #required:
+                #  - name
                 properties:
                   name:
                     type: string

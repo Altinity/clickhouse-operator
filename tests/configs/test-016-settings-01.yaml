@@ -14,6 +14,11 @@ spec:
           shardsCount: 1
     profiles:
       default/max_memory_usage: 7000000000 # test for big value      
+    users:
+      user1/profile: default
+      user1/quota: default
+      user1/password: qwerty
+      user1/networks/ip: "::/0"
     settings:
       dictionaries_config: config.d/*.dict
       macros/layer: "01"
