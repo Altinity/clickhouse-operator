@@ -230,16 +230,16 @@ type ChiTemplates struct {
 type ChiPodTemplate struct {
 	Name         string             `json:"name"                    yaml:"name"`
 	GenerateName string             `json:"generateName,omitempty"  yaml:"generateName"`
-	Zone         ChiPodTemplateZone `json:"zone"                    yaml:"zone"`
+	Zone         ChiPodTemplateZone `json:"zone,omitempty"          yaml:"zone"`
 	// DEPRECATED - to be removed soon
-	Distribution    string               `json:"distribution"    yaml:"distribution"`
-	PodDistribution []ChiPodDistribution `json:"podDistribution" yaml:"podDistribution"`
-	Spec            corev1.PodSpec       `json:"spec"            yaml:"spec"`
+	Distribution    string               `json:"distribution"              yaml:"distribution"`
+	PodDistribution []ChiPodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution"`
+	Spec            corev1.PodSpec       `json:"spec"                      yaml:"spec"`
 }
 
 type ChiPodTemplateZone struct {
-	Key    string   `json:"key"    yaml:"key"`
-	Values []string `json:"values" yaml:"values"`
+	Key    string   `json:"key,omitempty"    yaml:"key"`
+	Values []string `json:"values,omitempty" yaml:"values"`
 }
 
 type ChiPodDistribution struct {

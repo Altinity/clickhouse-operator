@@ -7,27 +7,62 @@ metadata:
 type: Opaque
 stringData:
   notifications.tmpl: |-
-    {{ define "__single_message_title" }}{{ range .Alerts.Firing }}{{ .Labels.alertname }} @ {{ .Annotations.identifier }}{{ end }}{{ range .Alerts.Resolved }}{{ .Labels.alertname }} @ {{ .Annotations.identifier }}{{ end }}{{ end }}
-    {{ define "custom_title" }}[ {{ .Status | toUpper }}:{{ if eq .Status "firing" }} :fire: {{ .Alerts.Firing | len }}{{ else }} :ok_hand: {{ .Alerts.Resolved | len }}{{ end }} ] {{ if or (and (eq (len .Alerts.Firing) 1) (eq (len .Alerts.Resolved) 0)) (and (eq (len .Alerts.Firing) 0) (eq (len .Alerts.Resolved) 1)) }}{{ template "__single_message_title" . }}{{ end }}{{ end }}
-    {{ define "custom_slack_message" }}
-    {{ range .Alerts.Firing }}
-    *:fire: fired {{ .Labels.severity | toUpper }} {{ .Annotations.summary }}*
-    {{ .Annotations.description }}
+    {{ define "__subject" }}
+      [{{ if eq .Status "firing" }}FIRE:{{len .Alerts.Firing}}{{ else }}OK{{ end }}] {{.GroupLabels.alertname}}
     {{ end }}
-    {{ range .Alerts.Resolved }}
-    *:ok: resolved {{ .Labels.severity | toUpper }} {{ .Annotations.summary }}*
-    {{ .Annotations.description }}
+
+    {{ define "slack_message" }}
+      {{ range .Alerts.Firing -}}
+       {{- range .Annotations.SortedPairs }}
+      *{{   .Name }}*: {{ .Value }}
+       {{- end }}
+
+       {{ range .Labels.SortedPairs -}}
+        {{- if and (ne .Name "alertname") (ne .Name "severity") (ne .Name "tenant") }}
+      {{     .Name}} = `{{.Value}}`
+        {{- end }}
+       {{- end }}
+    ---
+      {{ end }}
+
+      {{ range .Alerts.Resolved -}}
+       {{- range .Annotations.SortedPairs }}
+        {{- if (ne .Name "description") }}
+      *{{   .Name }}*: {{ .Value }}
+        {{- end }}
+       {{- end }}
+
+       {{- range .Labels.SortedPairs }}
+        {{- if and (ne .Name "alertname") (ne .Name "severity") (ne .Name "tenant") }}
+      {{     .Name }} = `{{ .Value }}`
+        {{- end }}
+       {{- end }}
+    ---
+      {{ end }}
     {{ end }}
-    {{ end }}
+
+    {{ define "slack_color" -}}
+        {{ if eq .Status "firing" -}}
+            {{ if eq .CommonLabels.severity "warning" -}}
+                warning
+            {{- else if eq .CommonLabels.severity "critical" -}}
+                danger
+            {{- else -}}
+                #439FE0
+            {{- end -}}
+        {{ else -}}
+        good
+        {{- end }}
+    {{- end }}
   alertmanager.yaml: |-
     global:
       resolve_timeout: 1m
     templates:
       - /etc/alertmanager/config/notifications.tmpl
     route:
-      group_by: ['job']
-      group_wait: 30s
-      group_interval: 1m
+      group_by: ['...']
+      group_wait: 0s
+      group_interval: 1s
       repeat_interval: 6h
       receiver: "slack"
     receivers:
@@ -35,9 +70,8 @@ stringData:
       slack_configs:
         - api_url: "${SLACK_WEBHOOK_URL}"
           channel: "${SLACK_CHANNEL}"
-          icon_url: https://avatars3.githubusercontent.com/u/3380462
-          title: '{{ template "custom_title" . }}'
-          text: '{{ template "custom_slack_message" . }}'
+          text: '{{ template "slack_message" . }}'
+          color: '{{ template "slack_color" . }}'
           send_resolved: true
 ---
 # Setup AlertManager

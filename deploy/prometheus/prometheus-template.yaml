@@ -8,13 +8,16 @@ metadata:
   labels:
     prometheus: prometheus
 spec:
-  replicas: 2
+  replicas: 1
   retention: 1w
+  # only for speedup e2e tests
+  scrapeInterval: 5s
+  evaluationInterval: 5s
   serviceAccountName: prometheus
   # which ServiceMonitors to be used
   serviceMonitorSelector:
     matchLabels:
-      service: clickhouse-operator
+      app: prometheus
   ruleSelector:
     matchLabels:
       role: alert-rules
