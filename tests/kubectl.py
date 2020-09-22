@@ -54,8 +54,8 @@ def delete_chi(chi, ns=namespace):
 
 
 def delete_all_chi(ns=namespace):
-    crds = launch("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
-    if "clickhouseinstallations.clickhouse.altinity.com" in crds:
+    chi_count = get_count("chi", ns=ns)
+    if chi_count:
         chis = get("chi", "", ns=ns)["items"]
         for chi in chis:
             # kubectl(f"patch chi {chi} --type=merge -p '\{\"metadata\":\{\"finalizers\": [null]\}\}'", ns = ns)
