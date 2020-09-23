@@ -162,19 +162,18 @@ jobs:
           command: |
             sudo apt-get install -y gettext-base
             curl -sL https://github.com/Altinity/clickhouse-operator/raw/master/deploy/operator-web-installer/clickhouse-operator-install.sh | bash -xue
-#      - run:
-#          name: Install prometheus
-#          command: |
-#            bash -xe deploy/prometheus/create-prometheus.sh
+      - run:
+          name: Install prometheus
+          command: |
+            touch deploy/prometheus/prometheus-sensitive-data.sh
+            bash -xe deploy/prometheus/create-prometheus.sh
       - run:
           name: Run integration tests
           command: |
-            ls -la ./tests/configs/
-            # ~/clickhouse-operator/venv/bin/python3 ./tests/test.py --no-colors
-            # ~/clickhouse-operator/venv/bin/python3 ./tests/test_examples.py --no-colors
-            # ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_exporter.py --no-colors
-            # TODO need sensitive data ?
-            # ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_alerts.py --no-colors
+            ~/clickhouse-operator/venv/bin/python3 ./tests/test.py --no-colors
+            ~/clickhouse-operator/venv/bin/python3 ./tests/test_examples.py --no-colors
+            ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_exporter.py --no-colors
+            ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_alerts.py --no-colors
 
 
 workflows:
