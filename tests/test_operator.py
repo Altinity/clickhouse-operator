@@ -6,7 +6,7 @@ import settings
 import util
 import manifest
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
+from testflows.core import TestScenario, Name, When, Then, Given, And, By, main, Scenario, Module, TE
 from testflows.asserts import error
 
 
@@ -781,30 +781,30 @@ def test_016(self):
         out = clickhouse.query(chi, sql="select substitution from system.macros where macro='layer'")
         assert out == "01"
 
-    with And("Custom macro 'test' should be available"):
+    with Then("Custom macro 'test' should be available"):
         out = clickhouse.query(chi, sql="select substitution from system.macros where macro='test'")
         assert out == "test"
 
-    with And("dictGet() should work"):
+    with Then("dictGet() should work"):
         out = clickhouse.query(chi, sql="select dictGet('one', 'one', toUInt64(0))")
         assert out == "0"
 
-    with And("query_log should be disabled"):
+    with Then("query_log should be disabled"):
         clickhouse.query(chi, sql="system flush logs")
         out = clickhouse.query_with_error(chi, sql="select count() from system.query_log")
         assert "doesn't exist" in out
 
-    with And("max_memory_usage should be 7000000000"):
+    with Then("max_memory_usage should be 7000000000"):
         out = clickhouse.query(chi, sql="select value from system.settings where name='max_memory_usage'")
         assert out == "7000000000"
 
-    with And("test_usersd user should be available"):
+    with Then("test_usersd user should be available"):
         clickhouse.query(chi, sql="select version()", user="test_usersd")
 
-    with And("user1 user should be available"):
+    with Then("user1 user should be available"):
         clickhouse.query(chi, sql="select version()", user="user1", pwd="qwerty")
 
-    with And("system.clusters should be empty due to remote_servers override"):
+    with Then("system.clusters should be empty due to remote_servers override"):
         out = clickhouse.query(chi, sql="select count() from system.clusters")
         assert out == "0"
 
@@ -815,31 +815,31 @@ def test_016(self):
             check={
                 "do_not_delete": 1,
             })
-        with Then("Wait for configmap changes to apply"):
-            config_map_applied_num = "0"
-            i = 1
-            while config_map_applied_num == "0" and i < 10:
-                config_map_applied_num = kubectl.launch(
-                    f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep test_norestart /etc/clickhouse-server/users.d/my_users.xml | wc -l\""
-                )
-                if config_map_applied_num != "0":
-                    break
-                with And(f"not applied, wait {15 * i}s"):
-                    time.sleep(15 * i)
-                    i += 1
+    with Then("Wait for configmap changes to apply"):
+        config_map_applied_num = "0"
+        i = 1
+        while config_map_applied_num == "0" and i < 10:
+            config_map_applied_num = kubectl.launch(
+                f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep test_norestart /etc/clickhouse-server/users.d/my_users.xml | wc -l\""
+            )
+            if config_map_applied_num != "0":
+                break
+            with By(f"not applied, wait {15 * i}s"):
+                time.sleep(15 * i)
+                i += 1
 
-            assert config_map_applied_num != "0", "ConfigMap should be applied"
+        assert config_map_applied_num != "0", "ConfigMap should be applied"
 
         version = ""
         with Then("test_norestart user should be available"):
             version = clickhouse.query(chi, sql="select version()", user="test_norestart")
-        with And("user1 user should not be available"):
+        with Then("user1 user should not be available"):
             version_user1 = clickhouse.query_with_error(chi, sql="select version()", user="user1", pwd="qwerty")
             assert version != version_user1
-        with And("user2 user should be available"):
+        with Then("user2 user should be available"):
             version_user2 = clickhouse.query(chi, sql="select version()", user="user2", pwd="qwerty")
             assert version == version_user2
-        with And("ClickHouse should not be restarted"):
+        with Then("ClickHouse should not be restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time == new_start_time
 
@@ -906,11 +906,11 @@ def test_018(self):
     with Then("user2/networks should be in config"):
         chi = kubectl.get("chi", chi_name)
         assert "user2/networks/ip" in chi["spec"]["configuration"]["users"]
-        with And("user1/networks/ip should NOT be in config"):
-            assert "user1/networks/ip" not in chi["spec"]["configuration"]["users"]
-        with And("Pod should not be restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi_name}-default-0-0-0", ".status.startTime")
-            assert start_time == new_start_time
+    with And("user1/networks/ip should NOT be in config"):
+        assert "user1/networks/ip" not in chi["spec"]["configuration"]["users"]
+    with And("Pod should not be restarted"):
+        new_start_time = kubectl.get_field("pod", f"chi-{chi_name}-default-0-0-0", ".status.startTime")
+        assert start_time == new_start_time
 
     kubectl.delete_chi(chi_name)
 
@@ -958,12 +958,13 @@ def test_019(self, config="configs/test-019-retain-volume.yaml"):
             })
 
     with Then("PVC should be re-mounted"):
-        with And("Non-replicated table should have data"):
-            out = clickhouse.query(chi, sql="select a from t1")
-            assert out == "1"
-        with And("Replicated table should have data"):
-            out = clickhouse.query(chi, sql="select a from t2")
-            assert out == "1"
+        pass
+    with And("Non-replicated table should have data"):
+        out = clickhouse.query(chi, sql="select a from t1")
+        assert out == "1"
+    with And("Replicated table should have data"):
+        out = clickhouse.query(chi, sql="select a from t2")
+        assert out == "1"
 
     kubectl.delete_chi(chi)
 

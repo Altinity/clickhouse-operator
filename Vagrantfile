@@ -104,6 +104,7 @@ Vagrant.configure(2) do |config|
     K8S_VERSION=${K8S_VERSION:-1.19.2}
     export VALIDATE_YAML=true
 
+    killall kubectl || true
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl
     chmod +x /usr/local/bin/kubectl
 
@@ -129,6 +130,7 @@ Vagrant.configure(2) do |config|
 #    minikube addons enable ingress
 #    minikube addons enable ingress-dns
     minikube addons enable metrics-server
+    minikube stop
 
     #krew
     (
@@ -207,7 +209,7 @@ Vagrant.configure(2) do |config|
 
     # Circle CI
     # TODO wait when resolve https://github.com/CircleCI-Public/circleci-cli/issues/394
-    # TODO wait when resolve https://github.com/CircleCI-Public/circleci-cli/issues/402
+    # curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | bash -x
     curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | VERSION=0.1.6893 bash -x
 
     # circleci optimizations for speedup run
@@ -215,8 +217,9 @@ Vagrant.configure(2) do |config|
     mkdir -v -m 0777 -p /circleci/home/circleci/.minikube /circleci/var/lib/docker /circleci/root/.cache
 
     # Run tests local with circleci
-    time circleci local execute -v ${PWD}:/workdir -v /circleci/home/circleci/.minikube:/home/circleci/.minikube -v /circleci/var/lib/docker:/var/lib/docker -v /circleci/root/.cache:/root/.cache -e COMPANY_REPO=${COMPANY_REPO:-altinity} --job=integration_tests
-
+    # TODO wait when resolve https://github.com/CircleCI-Public/circleci-cli/issues/402
+    # exec < /dev/tty
+    # time circleci local execute -v ${PWD}:/workdir -v /circleci/home/circleci/.minikube:/home/circleci/.minikube -v /circleci/var/lib/docker:/var/lib/docker -v /circleci/root/.cache:/root/.cache -e COMPANY_REPO=${COMPANY_REPO:-altinity} --job=integration_tests
 
   SHELL
 end

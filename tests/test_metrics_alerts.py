@@ -3,7 +3,7 @@ import time
 import json
 import random
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Module
 from testflows.asserts import error
 
 import settings
@@ -49,7 +49,7 @@ def wait_alert_state(alert_name, alert_state, expected_state, labels=None, callb
                      time_range="10s"):
     catched = False
     for i in range(max_try):
-        if not callback is None:
+        if callback is not None:
             callback()
         if expected_state == check_alert_state(alert_name, alert_state, labels, time_range):
             catched = True
@@ -320,8 +320,7 @@ def test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_in
         min_block = "SET max_block_size=1; SET max_insert_block_size=1; SET min_insert_block_size_rows=1;"
         with When(f"Insert to MergeTree table {parts_limits} parts"):
             r = parts_limits
-            sql = stop_merges + min_block + \
-                  "INSERT INTO default.test(event_time, test) SELECT now(), number FROM system.numbers LIMIT %d;" % r
+            sql = f"{stop_merges}{min_block}INSERT INTO default.test(event_time, test) SELECT now(), number FROM system.numbers LIMIT {r};"
             clickhouse.query(chi_name, sql, host=selected_svc, ns=kubectl.namespace)
 
             # @TODO we need only one query after resolve https://github.com/ClickHouse/ClickHouse/issues/11384

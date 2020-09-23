@@ -136,7 +136,8 @@ def count_objects(label="", ns=namespace):
         "service": get_count("service", ns=ns, label=label),
     }
 
-def kube_apply(config, ns=namespace, validate=True, timeout=30):
+
+def apply(config, ns=namespace, validate=True, timeout=30):
     with When(f"{config} is applied"):
         launch(f"apply --validate={validate} -f {config}", ns=ns, timeout=timeout)
 
@@ -322,7 +323,7 @@ def check_pod_antiaffinity(chi_name, ns=namespace):
             },
         ],
     }
-    with Then(f"Expect podAntiAffinity to exist and match {expected}"):
+    with Then(f"Expect podAntiAffinity to exist and match {expected}", format_name=False):
         assert "affinity" in pod_spec
         assert "podAntiAffinity" in pod_spec["affinity"]
         assert pod_spec["affinity"]["podAntiAffinity"] == expected
