@@ -170,10 +170,10 @@ jobs:
       - run:
           name: Run integration tests
           command: |
+            ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_alerts.py --no-colors
             ~/clickhouse-operator/venv/bin/python3 ./tests/test.py --no-colors
             ~/clickhouse-operator/venv/bin/python3 ./tests/test_examples.py --no-colors
             ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_exporter.py --no-colors
-            ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_alerts.py --no-colors
 
 
 workflows:

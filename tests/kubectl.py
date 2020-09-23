@@ -118,8 +118,8 @@ def create_ns(ns):
     launch(f"get ns {ns}", ns=None)
 
 
-def delete_ns(ns, ok_to_fail=False):
-    launch(f"delete ns {ns}", ns=None, ok_to_fail=ok_to_fail)
+def delete_ns(ns, ok_to_fail=False, timeout=600):
+    launch(f"delete ns {ns}", ns=None, ok_to_fail=ok_to_fail, timeout=timeout)
 
 
 def get_count(kind, name="", label="", ns=namespace):
