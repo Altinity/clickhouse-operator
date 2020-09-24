@@ -65,7 +65,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1600925613144,
+  "iteration": 1600942356930,
   "links": [],
   "panels": [
     {
@@ -3719,7 +3719,7 @@
         "y": 67
       },
       "id": 52,
-      "interval": null,
+      "interval": "1m",
       "legend": {
         "header": "",
         "percentage": true,
@@ -3738,25 +3738,21 @@
       "targets": [
         {
           "expr": "increase(chi_clickhouse_event_DiskReadElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
-          "hide": false,
           "legendFormat": "Disk Read syscall {{hostname}}",
           "refId": "A"
         },
         {
           "expr": "increase(chi_clickhouse_event_DiskWriteElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
-          "hide": false,
           "legendFormat": "Disk Write syscall {{hostname}}",
           "refId": "B"
         },
         {
           "expr": "increase(chi_clickhouse_event_NetworkReceiveElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
-          "hide": false,
           "legendFormat": "Network Receive {{hostname}}",
           "refId": "C"
         },
         {
           "expr": "increase(chi_clickhouse_event_NetworkSendElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
-          "hide": false,
           "legendFormat": "Network Send {{hostname}}",
           "refId": "D"
         },
@@ -3824,11 +3820,31 @@
           "expr": "increase(chi_clickhouse_event_RWLockWritersWaitMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "RWLock Writer Wait {{hostname}}",
           "refId": "Q"
+        },
+        {
+          "expr": "increase(chi_clickhouse_event_SelectQueryTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "legendFormat": "Select Query {{hostname}}",
+          "refId": "Q"
+        },
+        {
+          "expr": "increase(chi_clickhouse_event_InsertQueryTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "legendFormat": "Insert Query {{hostname}}",
+          "refId": "Q"
+        },
+        {
+          "expr": "increase(chi_clickhouse_event_S3ReadMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "legendFormat": "S3 Read {{hostname}}",
+          "refId": "Q"
+        },
+        {
+          "expr": "increase(chi_clickhouse_event_S3WriteMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "legendFormat": "S3 Write {{hostname}}",
+          "refId": "Q"
         }
       ],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Total ClickHouse CPU Time microseconds ",
+      "title": "Total ClickHouse CPU Time microseconds",
       "type": "grafana-piechart-panel",
       "valueName": "total"
     },
