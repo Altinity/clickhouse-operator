@@ -3903,13 +3903,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(go_memstats_alloc_bytes_total{service=\"clickhouse-operator-metrics\",}[1m])",
+          "expr": "irate(go_memstats_alloc_bytes_total{app=\"clickhouse-operator\",}[1m])",
           "hide": false,
           "legendFormat": "GO malloc bytes / sec",
           "refId": "A"
         },
         {
-          "expr": "process_resident_memory_bytes{service=\"clickhouse-operator-metrics\"}",
+          "expr": "process_resident_memory_bytes{app=\"clickhouse-operator\"}",
           "legendFormat": "Process RSS Memory",
           "refId": "B"
         }
