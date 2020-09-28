@@ -80,9 +80,16 @@ const (
 	    UNION ALL
 	    SELECT 
 	        'metric.DiskFreeBytes'                     AS metric,
-    	         toString(filesystemFree())                 AS value,
-	        'Free disk space available at file system' AS description,
+            toString(sum(free_space))                 AS value,
+	        'Free disk space available from system.disks' AS description,
 	        'gauge'                                    AS type
+        FROM system.disks
+	    SELECT 
+	        'metric.DiskTotalBytes'                     AS metric,
+            toString(sum(total_space))                 AS value,
+	        'Total disk space available from system.disks' AS description,
+	        'gauge'                                    AS type
+        FROM system.disks
 	    UNION ALL
 	    SELECT
 		'metric.LongestRunningQuery' AS metric,
