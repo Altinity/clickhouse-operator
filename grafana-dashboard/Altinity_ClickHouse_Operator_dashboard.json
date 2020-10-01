@@ -3792,7 +3792,7 @@
           "refId": "K"
         },
         {
-          "expr": "increase(chi_clickhouse_event_DelayedInsertsMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_DelayedInsertsMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) * 1000",
           "legendFormat": "Delayed Insert {{hostname}}",
           "refId": "L"
         },
@@ -3807,39 +3807,39 @@
           "refId": "N"
         },
         {
-          "expr": "increase(chi_clickhouse_event_MergesTimeMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_MergesTimeMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) * 1000",
           "legendFormat": "Merges {{hostname}}",
           "refId": "O"
         },
         {
-          "expr": "increase(chi_clickhouse_event_RWLockReadersWaitMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_RWLockReadersWaitMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) * 1000",
           "legendFormat": "RWLock Reader Wait {{hostname}}",
           "refId": "P"
         },
         {
-          "expr": "increase(chi_clickhouse_event_RWLockWritersWaitMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_RWLockWritersWaitMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) * 1000",
           "legendFormat": "RWLock Writer Wait {{hostname}}",
           "refId": "Q"
         },
         {
           "expr": "increase(chi_clickhouse_event_SelectQueryTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Select Query {{hostname}}",
-          "refId": "Q"
+          "refId": "R"
         },
         {
           "expr": "increase(chi_clickhouse_event_InsertQueryTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Insert Query {{hostname}}",
-          "refId": "Q"
+          "refId": "S"
         },
         {
           "expr": "increase(chi_clickhouse_event_S3ReadMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "S3 Read {{hostname}}",
-          "refId": "Q"
+          "refId": "T"
         },
         {
           "expr": "increase(chi_clickhouse_event_S3WriteMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "S3 Write {{hostname}}",
-          "refId": "Q"
+          "refId": "U"
         }
       ],
       "timeFrom": null,
