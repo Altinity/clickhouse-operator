@@ -1,13 +1,12 @@
 apiVersion: integreatly.org/v1alpha1
 kind: GrafanaDashboard
 metadata:
-  # name: "$GRAFANA_DASHBOARD_NAME"
-  name: zookeeper-dashboard
+  name: "$GRAFANA_ZOOKEEPER_DASHBOARD_NAME"
   labels:
     app: grafana
 spec:
-  name: ${GRAFANA_DASHBOARD_NAME}.json
-  url: https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/grafana-dashboard/Zookeeper.json
+  name: ${GRAFANA_ZOOKEEPER_DASHBOARD_NAME}.json
+  url: https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/grafana-dashboard/Zookeeper_dashboard.json
   datasources:
     - inputName: "DS_PROMETHEUS"
       datasourceName: "$GRAFANA_PROMETHEUS_DATASOURCE_NAME"
