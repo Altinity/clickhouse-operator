@@ -2885,7 +2885,7 @@
       "targets": [
         {
           "expr": "chi_clickhouse_metric_DiskFreeBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"} / chi_clickhouse_metric_DiskTotalBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "{{hostname}}",
+          "legendFormat": "{{ disk }} {{hostname}}",
           "refId": "A"
         }
       ],
