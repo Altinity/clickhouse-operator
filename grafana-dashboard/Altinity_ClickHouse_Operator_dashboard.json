@@ -3663,7 +3663,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "CPU Time microseconds per seconds",
+      "title": "ClickHouse CPU Time per seconds",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -3844,7 +3844,7 @@
       ],
       "timeFrom": null,
       "timeShift": null,
-      "title": "Total ClickHouse CPU Time microseconds",
+      "title": "ClickHouse CPU Time total",
       "type": "grafana-piechart-panel",
       "valueName": "total"
     },
