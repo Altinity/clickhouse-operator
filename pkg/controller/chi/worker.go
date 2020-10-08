@@ -190,6 +190,22 @@ func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseIns
 	return chi
 }
 
+// ensureFinalizer
+func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) {
+	// Check whether finalizer is already listed in CHI
+	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
+		w.a.V(2).Info("ensureFinalizer(%s/%s): finalizer already installed", chi.Namespace, chi.Name)
+	}
+
+	// No finalizer found - need to install it
+
+	if err := w.c.installFinalizer(chi); err != nil {
+		w.a.V(1).Info("ensureFinalizer(%s/%s): unable to install finalizer. err: %v", chi.Namespace, chi.Name, err)
+	}
+
+	w.a.V(3).Info("ensureFinalizer(%s/%s): finalizer installed", chi.Namespace, chi.Name)
+}
+
 // updateCHI sync CHI which was already created earlier
 func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	w.a.V(3).Info("updateCHI() - start")
@@ -206,16 +222,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	// Check DeletionTimestamp in order to understand, whether the object is being deleted
 	if new.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted
-		if !util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
-			// Install finalizer
-			w.a.V(2).Info("updateCHI(%s/%s): install finalizer", new.Namespace, new.Name)
-
-			if err := w.c.installFinalizer(new); err != nil {
-				w.a.V(1).Info("updateCHI(%s/%s): unable to install finalizer: %v", new.Namespace, new.Name, err)
-			}
-		}
-
-		w.a.V(3).Info("updateCHI(%s/%s): finalizer installed", new.Namespace, new.Name)
+		w.ensureFinalizer(new)
 	} else {
 		// The object is being deleted
 		cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(new.Name, newGetOptions())
