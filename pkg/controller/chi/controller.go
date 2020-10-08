@@ -98,6 +98,7 @@ func NewController(
 	return controller
 }
 
+// initQueues
 func (c *Controller) initQueues() {
 	for i := 0; i < c.chop.Config().ReconcileThreadsNumber+chi.DefaultReconcileSystemThreadsNumber; i++ {
 		c.queues = append(
@@ -110,6 +111,7 @@ func (c *Controller) initQueues() {
 	}
 }
 
+// addEventHandlers
 func (c *Controller) addEventHandlers(
 	chopInformerFactory chopinformers.SharedInformerFactory,
 	kubeInformerFactory kubeinformers.SharedInformerFactory,
@@ -415,10 +417,12 @@ func (c *Controller) enqueueObject(namespace, name string, obj interface{}) {
 	c.queues[index].AddRateLimited(obj)
 }
 
+// updateWatch
 func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
 	go c.updateWatchAsync(namespace, name, hostnames)
 }
 
+// updateWatchAsync
 func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string) {
 	if err := metrics.InformMetricsExporterAboutWatchedCHI(namespace, name, hostnames); err != nil {
 		log.V(1).Infof("FAIL update watch (%s/%s): %q", namespace, name, err)
@@ -427,10 +431,12 @@ func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string
 	}
 }
 
+// deleteWatch
 func (c *Controller) deleteWatch(namespace, name string) {
 	go c.deleteWatchAsync(namespace, name)
 }
 
+// deleteWatchAsync
 func (c *Controller) deleteWatchAsync(namespace, name string) {
 	if err := metrics.InformMetricsExporterToDeleteWatchedCHI(namespace, name); err != nil {
 		log.V(1).Infof("FAIL delete watch (%s/%s): %q", namespace, name, err)
@@ -557,6 +563,7 @@ func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tole
 	return c.updateCHIObject(cur)
 }
 
+// installFinalizer
 func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
 	namespace, name := NamespaceName(chi.ObjectMeta)
 	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
@@ -578,6 +585,7 @@ func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
 	return c.updateCHIObject(cur)
 }
 
+// uninstallFinalizer
 func (c *Controller) uninstallFinalizer(chi *chi.ClickHouseInstallation) error {
 	namespace, name := NamespaceName(chi.ObjectMeta)
 	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
