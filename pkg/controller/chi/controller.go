@@ -569,8 +569,12 @@ func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
 		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
 	}
 
-	cur.ObjectMeta.Finalizers = append(cur.ObjectMeta.Finalizers, FinalizerName)
+	if util.InArray(FinalizerName, cur.ObjectMeta.Finalizers) {
+		// Already installed
+		return nil
+	}
 
+	cur.ObjectMeta.Finalizers = append(cur.ObjectMeta.Finalizers, FinalizerName)
 	return c.updateCHIObject(cur)
 }
 
