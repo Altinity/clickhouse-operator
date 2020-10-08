@@ -769,7 +769,8 @@ func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 						// SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='all-sharded' AND is_local
 						url.QueryEscape(
 							fmt.Sprintf(
-								"SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local", allShardsOneReplicaClusterName,
+								"SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local",
+								allShardsOneReplicaClusterName,
 							),
 						),
 					Port: intstr.Parse(chDefaultHTTPPortName),
