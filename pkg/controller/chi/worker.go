@@ -192,18 +192,20 @@ func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseIns
 
 // ensureFinalizer
 func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) {
+	namespace, name := NamespaceName(chi.ObjectMeta)
+
 	// Check whether finalizer is already listed in CHI
 	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
-		w.a.V(2).Info("ensureFinalizer(%s/%s): finalizer already installed", chi.Namespace, chi.Name)
+		w.a.V(2).Info("ensureFinalizer(%s/%s): finalizer already installed", namespace, name)
 	}
 
 	// No finalizer found - need to install it
 
 	if err := w.c.installFinalizer(chi); err != nil {
-		w.a.V(1).Info("ensureFinalizer(%s/%s): unable to install finalizer. err: %v", chi.Namespace, chi.Name, err)
+		w.a.V(1).Info("ensureFinalizer(%s/%s): unable to install finalizer. err: %v", namespace, name, err)
 	}
 
-	w.a.V(3).Info("ensureFinalizer(%s/%s): finalizer installed", chi.Namespace, chi.Name)
+	w.a.V(3).Info("ensureFinalizer(%s/%s): finalizer installed", namespace, name)
 }
 
 // updateCHI sync CHI which was already created earlier
