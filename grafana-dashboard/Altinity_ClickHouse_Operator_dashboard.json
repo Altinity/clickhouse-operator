@@ -50,6 +50,22 @@
   "annotations": {
     "list": [
       {
+        "datasource": "${DS_PROMETHEUS}",
+        "enable": true,
+        "expr": "ALERTS{app=~\"clickhouse-operator|zookeeper\"}",
+        "hide": false,
+        "iconColor": "rgba(255, 96, 96, 1)",
+        "limit": 100,
+        "name": "prometheus alerts",
+        "showIn": 0,
+        "step": "30s",
+        "tagKeys": "chi,pod,hostname,exported_namespace,namespace",
+        "tags": [],
+        "textFormat": "{{alertstate}}",
+        "titleFormat": "{{alertname}}",
+        "type": "tags"
+      },
+      {
         "builtIn": 1,
         "datasource": "-- Grafana --",
         "enable": true,
@@ -65,7 +81,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1600942356930,
+  "iteration": 1602226784521,
   "links": [],
   "panels": [
     {
@@ -4067,5 +4083,5 @@
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
   "uid": "80bd73d2a243583a9ec0d1b3fdf86e98",
-  "version": 24092020
+  "version": 20201009
 }
