@@ -447,7 +447,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_DistributedConnectionFailAtAll{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_DistributedConnectionFailAtAll{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "DistributedConnectionFailAtAll {{hostname}}",
           "metric": "chi_clickhouse_event_DistributedConnectionFailAtAll",
@@ -2241,7 +2241,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",active=\"1\"})",
+          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",active=\"1\"})",
           "legendFormat": "Parts {{hostname}}",
           "refId": "C"
         }
@@ -2345,7 +2345,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",active=\"0\"})",
+          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",active=\"0\"})",
           "legendFormat": "Parts {{hostname}}",
           "refId": "C"
         }
@@ -2690,7 +2690,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_MemoryPrimaryKeyBytesAllocated",
+          "expr": "chi_clickhouse_metric_MemoryPrimaryKeyBytesAllocated{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "{{ hostname }}",
           "refId": "A"
         }
