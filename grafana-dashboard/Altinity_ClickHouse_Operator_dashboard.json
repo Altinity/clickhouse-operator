@@ -50,6 +50,22 @@
   "annotations": {
     "list": [
       {
+        "datasource": "${DS_PROMETHEUS}",
+        "enable": true,
+        "expr": "ALERTS{app=~\"clickhouse-operator|zookeeper\"}",
+        "hide": false,
+        "iconColor": "rgba(255, 96, 96, 1)",
+        "limit": 100,
+        "name": "prometheus alerts",
+        "showIn": 0,
+        "step": "30s",
+        "tagKeys": "chi,pod,hostname,exported_namespace,namespace",
+        "tags": [],
+        "textFormat": "{{alertstate}}",
+        "titleFormat": "{{alertname}}",
+        "type": "tags"
+      },
+      {
         "builtIn": 1,
         "datasource": "-- Grafana --",
         "enable": true,
@@ -65,7 +81,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1600942356930,
+  "iteration": 1602226784521,
   "links": [],
   "panels": [
     {
@@ -447,7 +463,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_DistributedConnectionFailAtAll{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",hostname=~\"[[hostname]]\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_DistributedConnectionFailAtAll{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "DistributedConnectionFailAtAll {{hostname}}",
           "metric": "chi_clickhouse_event_DistributedConnectionFailAtAll",
@@ -2241,7 +2257,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",active=\"1\"})",
+          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",active=\"1\"})",
           "legendFormat": "Parts {{hostname}}",
           "refId": "C"
         }
@@ -2345,7 +2361,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"[[exported_namespace]]\",chi=~\"[[chi]]\",active=\"0\"})",
+          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",active=\"0\"})",
           "legendFormat": "Parts {{hostname}}",
           "refId": "C"
         }
@@ -2690,7 +2706,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_MemoryPrimaryKeyBytesAllocated",
+          "expr": "chi_clickhouse_metric_MemoryPrimaryKeyBytesAllocated{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "{{ hostname }}",
           "refId": "A"
         }
@@ -4062,5 +4078,5 @@
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
   "uid": "80bd73d2a243583a9ec0d1b3fdf86e98",
-  "version": 24092020
+  "version": 20201009
 }
