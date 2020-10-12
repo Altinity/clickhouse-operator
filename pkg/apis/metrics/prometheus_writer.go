@@ -120,6 +120,17 @@ func (w *PrometheusWriter) WriteMutations(data [][]string) {
 	}
 }
 
+func (w *PrometheusWriter) WriteSystemDisks(data [][]string) {
+	for _, metric := range data {
+		writeSingleMetricToPrometheus(w.out, "metric_DiskFreeBytes", "Free disk space available from system.disks", metric[1], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "disk"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0])
+		writeSingleMetricToPrometheus(w.out, "metric_DiskTotalBytes", "Total disk space available from system.disks", metric[2], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "disk"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0])
+	}
+}
+
 func (w *PrometheusWriter) WriteErrorFetch(fetch_type string) {
 	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "1", prometheus.GaugeValue,
 		[]string{"chi", "namespace", "hostname", "fetch_type"},

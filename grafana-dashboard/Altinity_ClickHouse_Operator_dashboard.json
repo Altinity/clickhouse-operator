@@ -2858,7 +2858,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "shows how much space the data stored in the ClickHouse takes from the free space inside <path> ClickHouse setting in the kubernetes pod\n\nbe careful with multiple volumes configuration, kubernetes volume claims and S3 as storage backend ",
+      "description": "shows how much space available in the kubernetes pod\n\nbe careful with multiple volumes configuration, kubernetes volume claims and S3 as storage backend",
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -2883,13 +2883,8 @@
       "links": [
         {
           "targetBlank": true,
-          "title": "filesystemFree()",
-          "url": "https://clickhouse.tech/docs/en/sql-reference/functions/other-functions/#filesystemfree"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.parts",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-parts"
+          "title": "system.disks",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/disks/"
         },
         {
           "targetBlank": true,
@@ -2911,8 +2906,8 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_DiskDataBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"} / (chi_clickhouse_metric_DiskFreeBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"} + chi_clickhouse_metric_DiskDataBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
-          "legendFormat": "{{hostname}}",
+          "expr": "chi_clickhouse_metric_DiskFreeBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"} / chi_clickhouse_metric_DiskTotalBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "{{ disk }} {{hostname}}",
           "refId": "A"
         }
       ],
@@ -2920,7 +2915,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Disk Space Usage",
+      "title": "Disk Space Free",
       "tooltip": {
         "shared": true,
         "sort": 0,

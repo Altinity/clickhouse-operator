@@ -219,6 +219,20 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		//e.enqueueToRemoveFromWatched(chi)
 		return
 	}
+
+	log.V(2).Infof("Querying disks for %s\n", hostname)
+	if disks, err := fetcher.getClickHouseQuerySystemDisks(); err == nil {
+		log.V(2).Infof("Extracted %d disks for %s\n", len(disks), hostname)
+		writer.WriteSystemDisks(disks)
+		writer.WriteOKFetch("system.disks")
+	} else {
+		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
+		log.V(2).Infof("Error querying disks for %s: %s\n", hostname, err)
+		writer.WriteErrorFetch("system.disks")
+		//e.enqueueToRemoveFromWatched(chi)
+		return
+	}
+
 }
 
 // getWatchedCHI serves HTTP request to get list of watched CHIs
