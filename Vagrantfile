@@ -8,9 +8,9 @@ end
 
 
 Vagrant.configure(2) do |config|
-  config.vm.box = "ubuntu/bionic64"
+  config.vm.box = "ubuntu/focal64"
   config.vm.box_check_update = false
-  config.vm.synced_folder ".", "/vagrant", type: "nfs"
+  config.vm.synced_folder ".", "/vagrant"
 
   if Vagrant.has_plugin?("vagrant-vbguest")
     config.vbguest.auto_update = false
@@ -20,10 +20,22 @@ Vagrant.configure(2) do |config|
     config.timezone.value = "UTC"
   end
 
+  config.vm.provider "virtualbox" do |vb|
+    vb.gui = false
+    vb.cpus = total_cpus
+    vb.memory = "6144"
+    vb.default_nic_type = "virtio"
+    vb.customize ["modifyvm", :id, "--uartmode1", "file", File::NULL ]
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+    vb.customize ["modifyvm", :id, "--ioapic", "on"]
+    vb.customize ["guestproperty", "set", :id, "/VirtualBox/GuestAdd/VBoxService/--timesync-set-threshold", 10000]
+  end
+
   config.vm.define :clickhouse_operator do |clickhouse_operator|
     clickhouse_operator.vm.network "private_network", ip: "172.16.2.99", nic_type: "virtio"
-    # port forwarding works only when pair with kubectl port-forward 
-    # grafana	
+    # port forwarding works only when pair with kubectl port-forward
+    # grafana
     clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 3000, host_ip: "127.0.0.1", host: 3000
     # mertics-exporter
     clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 8888, host_ip: "127.0.0.1", host: 8888
@@ -35,17 +47,6 @@ Vagrant.configure(2) do |config|
     clickhouse_operator.vm.host_name = "local-altinity-clickhouse-operator"
     # vagrant plugin install vagrant-disksize
     clickhouse_operator.disksize.size = '50GB'
-  end
-
-  config.vm.provider "virtualbox" do |vb|
-    vb.gui = false
-    vb.cpus = total_cpus
-    vb.memory = "6144"
-    vb.default_nic_type = "virtio"
-    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
-    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
-    vb.customize ["modifyvm", :id, "--ioapic", "on"]
-    vb.customize ["guestproperty", "set", :id, "/VirtualBox/GuestAdd/VBoxService/--timesync-set-threshold", 10000]
   end
 
   config.vm.provision "shell", inline: <<-SHELL
@@ -68,7 +69,7 @@ Vagrant.configure(2) do |config|
 
     # docker
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8D81803C0EBFCD88
-    add-apt-repository "deb https://download.docker.com/linux/ubuntu bionic edge"
+    add-apt-repository "deb https://download.docker.com/linux/ubuntu focal edge"
     apt-get install --no-install-recommends -y docker-ce
 
     # docker compose
