@@ -23,7 +23,7 @@ spec:
     preferService: True
   config:
     server:
-      root_url: $GRAFANA_FULL_URL
+      root_url: $GRAFANA_ROOT_URL
     log:
       mode: "console"
       level: "warn"
