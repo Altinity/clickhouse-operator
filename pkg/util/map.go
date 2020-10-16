@@ -34,13 +34,13 @@ func IncludeNonEmpty(dst map[string]string, key, src string) {
 
 // MergeStringMaps inserts (and overwrites) data into dst map object from src
 func MergeStringMaps(dst, src map[string]string, keys ...string) map[string]string {
-	if dst == nil {
-		dst = make(map[string]string)
-	}
-
 	if src == nil {
 		// Nothing to merge from
 		return dst
+	}
+
+	if dst == nil {
+		dst = make(map[string]string)
 	}
 
 	// Place key->value pair from src into dst
