@@ -490,7 +490,8 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.Statefu
 func statefulSetApplyPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
 	// StatefulSet's pod template is not directly compatible with ChiPodTemplate, we need some fields only
 	dst.Spec.Template.Name = template.Name
-	dst.Spec.Template.Spec = template.Spec
+	dst.Spec.Template.ObjectMeta = *template.ObjectMeta.DeepCopy()
+	dst.Spec.Template.Spec = *template.Spec.DeepCopy()
 }
 
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
