@@ -100,7 +100,7 @@ Vagrant.configure(2) do |config|
 #    export VALIDATE_YAML=false # only for 1.14
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
-#    K8S_VERSION=${K8S_VERSION:-1.17.12}
+#    K8S_VERSION=${K8S_VERSION:-1.17.13}
 #    K8S_VERSION=${K8S_VERSION:-1.18.9}
     K8S_VERSION=${K8S_VERSION:-1.19.3}
     export VALIDATE_YAML=true
