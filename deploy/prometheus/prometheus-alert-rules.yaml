@@ -8,7 +8,7 @@ metadata:
   name: prometheus-clickhouse-operator-rules
 spec:
   groups:
-    - name: ClickHouseOperatorRulesf
+    - name: ClickHouseOperatorRules
       rules:
         - alert: ClickHouseMetricsExporterDown
           expr: up{job='clickhouse-operator-metrics'} == 0

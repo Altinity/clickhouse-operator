@@ -234,6 +234,7 @@ type ChiPodTemplate struct {
 	// DEPRECATED - to be removed soon
 	Distribution    string               `json:"distribution"              yaml:"distribution"`
 	PodDistribution []ChiPodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution"`
+	ObjectMeta      metav1.ObjectMeta    `json:"metadata"                  yaml:"metadata"`
 	Spec            corev1.PodSpec       `json:"spec"                      yaml:"spec"`
 }
 

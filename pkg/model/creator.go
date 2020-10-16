@@ -20,6 +20,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"net/url"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -331,18 +332,9 @@ func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chi
 
 // setupStatefulSetPodTemplate performs PodTemplate setup of StatefulSet
 func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-
-	// Initial PodTemplateSpec
-	statefulSet.Spec.Template = corev1.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:      c.labeler.getLabelsHostScope(host, true),
-			Annotations: c.labeler.getAnnotationsHostScope(host),
-		},
-	}
-
 	// Process Pod Template
 	podTemplate := c.getPodTemplate(host)
-	statefulSetApplyPodTemplate(statefulSet, podTemplate)
+	c.statefulSetApplyPodTemplate(statefulSet, podTemplate, host)
 
 	// Post-process StatefulSet
 	c.ensureStatefulSetIntegrity(statefulSet, host)
@@ -350,16 +342,16 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 }
 
 func (c *Creator) ensureStatefulSetIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	ensureClickHouseContainer(statefulSet, host)
+	c.ensureClickHouseContainer(statefulSet, host)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
-func ensureClickHouseContainer(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
+func (c *Creator) ensureClickHouseContainer(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
 	if _, ok := getClickHouseContainer(statefulSet); !ok {
 		// No ClickHouse container available
 		addContainer(
 			&statefulSet.Spec.Template.Spec,
-			newDefaultClickHouseContainer(),
+			c.newDefaultClickHouseContainer(),
 		)
 	}
 }
@@ -407,7 +399,7 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 		log.V(1).Infof("getPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
 	} else {
 		// Host references UNKNOWN PodTemplate, will use default one
-		podTemplate = newDefaultPodTemplate(statefulSetName)
+		podTemplate = c.newDefaultPodTemplate(statefulSetName)
 		log.V(1).Infof("getPodTemplate() statefulSet %s use default generated template", statefulSetName)
 	}
 
@@ -485,11 +477,28 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.Statefu
 	c.setupStatefulSetApplyVolumeClaimTemplates(statefulSet, host)
 }
 
-// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
-func statefulSetApplyPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
-	// StatefulSet's pod template is not directly compatible with ChiPodTemplate, we need some fields only
-	dst.Spec.Template.Name = template.Name
-	dst.Spec.Template.Spec = template.Spec
+// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided ChiPodTemplate
+func (c *Creator) statefulSetApplyPodTemplate(
+	statefulSet *apps.StatefulSet,
+	template *chiv1.ChiPodTemplate,
+	host *chiv1.ChiHost,
+) {
+	// StatefulSet's pod template is not directly compatible with ChiPodTemplate,
+	// we need to extract some fields from ChiPodTemplate and apply on StatefulSet
+	statefulSet.Spec.Template = corev1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: template.Name,
+			Labels: util.MergeStringMaps(
+				c.labeler.getLabelsHostScope(host, true),
+				template.ObjectMeta.Labels,
+			),
+			Annotations: util.MergeStringMaps(
+				c.labeler.getAnnotationsHostScope(host),
+				template.ObjectMeta.Annotations,
+			),
+		},
+		Spec: *template.Spec.DeepCopy(),
+	}
 }
 
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
@@ -712,7 +721,7 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 }
 
 // newDefaultPodTemplate returns default Pod Template to be used with StatefulSet
-func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
+func (c *Creator) newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 	podTemplate := &chiv1.ChiPodTemplate{
 		Name: name,
 		Spec: corev1.PodSpec{
@@ -723,14 +732,14 @@ func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 
 	addContainer(
 		&podTemplate.Spec,
-		newDefaultClickHouseContainer(),
+		c.newDefaultClickHouseContainer(),
 	)
 
 	return podTemplate
 }
 
 // newDefaultClickHouseContainer returns default ClickHouse Container
-func newDefaultClickHouseContainer() corev1.Container {
+func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 	return corev1.Container{
 		Name:  ClickHouseContainerName,
 		Image: defaultClickHouseDockerImage,
@@ -748,7 +757,7 @@ func newDefaultClickHouseContainer() corev1.Container {
 				ContainerPort: chDefaultInterserverHTTPPortNumber,
 			},
 		},
-		ReadinessProbe: &corev1.Probe{
+		LivenessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/ping",
@@ -756,6 +765,32 @@ func newDefaultClickHouseContainer() corev1.Container {
 				},
 			},
 			InitialDelaySeconds: 10,
+			PeriodSeconds:       10,
+		},
+		ReadinessProbe: &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/?" +
+						"user=" + url.QueryEscape(c.chop.Config().CHUsername) +
+						"&password=" + url.QueryEscape(c.chop.Config().CHPassword) +
+						"&query=" +
+						// SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='all-sharded' AND is_local
+						url.QueryEscape(
+							fmt.Sprintf(
+								"SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local",
+								allShardsOneReplicaClusterName,
+							),
+						),
+					Port: intstr.Parse(chDefaultHTTPPortName),
+					HTTPHeaders: []corev1.HTTPHeader{
+						{
+							Name:  "Accept",
+							Value: "*/*",
+						},
+					},
+				},
+			},
+			InitialDelaySeconds: 30,
 			PeriodSeconds:       10,
 		},
 	}

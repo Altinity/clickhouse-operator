@@ -190,6 +190,24 @@ func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseIns
 	return chi
 }
 
+// ensureFinalizer
+func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) {
+	namespace, name := NamespaceName(chi.ObjectMeta)
+
+	// Check whether finalizer is already listed in CHI
+	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
+		w.a.V(2).Info("ensureFinalizer(%s/%s): finalizer already installed", namespace, name)
+	}
+
+	// No finalizer found - need to install it
+
+	if err := w.c.installFinalizer(chi); err != nil {
+		w.a.V(1).Info("ensureFinalizer(%s/%s): unable to install finalizer. err: %v", namespace, name, err)
+	}
+
+	w.a.V(3).Info("ensureFinalizer(%s/%s): finalizer installed", namespace, name)
+}
+
 // updateCHI sync CHI which was already created earlier
 func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	w.a.V(3).Info("updateCHI() - start")
@@ -206,42 +224,10 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	// Check DeletionTimestamp in order to understand, whether the object is being deleted
 	if new.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted
-		if !util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
-			// Install finalizer
-			w.a.V(2).Info("updateCHI(%s/%s): install finalizer", new.Namespace, new.Name)
-
-			if err := w.c.installFinalizer(new); err != nil {
-				w.a.V(1).Info("updateCHI(%s/%s): unable to install finalizer: %v", new.Namespace, new.Name, err)
-			}
-		}
-
-		w.a.V(3).Info("updateCHI(%s/%s): finalizer installed", new.Namespace, new.Name)
+		w.ensureFinalizer(new)
 	} else {
 		// The object is being deleted
-		cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(new.Name, newGetOptions())
-		if (err == nil) && (cur != nil) {
-			if util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
-				// Delete CHI
-				(&new.Status).DeleteStart()
-				if err := w.c.updateCHIObjectStatus(new, true); err != nil {
-					w.a.V(1).Info("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
-					return nil
-				}
-
-				_ = w.deleteCHI(new)
-
-				// Uninstall finalizer
-				w.a.V(2).Info("updateCHI(%s/%s): uninstall finalizer", new.Namespace, new.Name)
-				if err := w.c.uninstallFinalizer(new); err != nil {
-					w.a.V(1).Info("updateCHI(%s/%s): unable to uninstall finalizer: %v", new.Namespace, new.Name, err)
-				}
-			}
-
-			// Object can now be deleted by Kubernetes
-			w.a.V(3).Info("updateCHI(%s/%s): finalizer uninstalled, object can be deleted", new.Namespace, new.Name)
-		}
-
-		return nil
+		return w.finalizeCHI(new)
 	}
 
 	old = w.normalize(old)
@@ -351,7 +337,7 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 	)
 }
 
-// reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary ensured ConfigMaos are in place
+// reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary in order to ensure that ConfigMaps are in place
 func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallation) error {
 	w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - start")
 	defer w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - end")
@@ -459,6 +445,40 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
 		WithStatusAction(host.CHI).
 		Info("Reconcile Host %s completed", host.Name)
+
+	return nil
+}
+
+// finalizeCHI
+func (w *worker) finalizeCHI(chi *chop.ClickHouseInstallation) error {
+	namespace, name := NamespaceName(chi.ObjectMeta)
+	w.a.V(3).Info("finalizeCHI(%s/%s) - start", namespace, name)
+	defer w.a.V(3).Info("finalizeCHI(%s/%s) - end", namespace, name)
+
+	cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
+	if (err != nil) || (cur == nil) {
+		return nil
+	}
+
+	if !util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
+		// No finalizer found, unexpected behavior
+		return nil
+	}
+
+	// Delete CHI
+	(&chi.Status).DeleteStart()
+	if err := w.c.updateCHIObjectStatus(chi, true); err != nil {
+		w.a.V(1).Info("UNABLE to write normalized CHI (%s/%s). err:%q", namespace, name, err)
+		return nil
+	}
+
+	_ = w.deleteCHI(chi)
+
+	// Uninstall finalizer
+	w.a.V(2).Info("finalizeCHI(%s/%s): uninstall finalizer", namespace, name)
+	if err := w.c.uninstallFinalizer(chi); err != nil {
+		w.a.V(1).Info("finalizeCHI(%s/%s): unable to uninstall finalizer: err:%v", namespace, name, err)
+	}
 
 	return nil
 }

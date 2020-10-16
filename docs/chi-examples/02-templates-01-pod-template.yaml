@@ -1,11 +1,11 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "template-custom-ports"
+  name: "template-pod"
 spec:
   defaults:
     templates:
-      podTemplate: default    
+      podTemplate: pod-template
   configuration:
     settings:
       http_port: 8124
@@ -13,7 +13,12 @@ spec:
       interserver_http_port: 9010
   templates:
     podTemplates:
-      - name: default
+      - name: pod-template
+        metadata:
+          labels:
+            custom.label: "label.value"
+          annotations:
+            custom.annotation: "annotation.value"
         spec:
           containers:
             - name: clickhouse
