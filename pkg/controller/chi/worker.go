@@ -337,7 +337,7 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 	)
 }
 
-// reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary ensured ConfigMaos are in place
+// reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary in order to ensure that ConfigMaps are in place
 func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallation) error {
 	w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - start")
 	defer w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - end")
