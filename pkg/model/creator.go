@@ -332,18 +332,9 @@ func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chi
 
 // setupStatefulSetPodTemplate performs PodTemplate setup of StatefulSet
 func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-
-	// Initial PodTemplateSpec
-	statefulSet.Spec.Template = corev1.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:      c.labeler.getLabelsHostScope(host, true),
-			Annotations: c.labeler.getAnnotationsHostScope(host),
-		},
-	}
-
 	// Process Pod Template
 	podTemplate := c.getPodTemplate(host)
-	statefulSetApplyPodTemplate(statefulSet, podTemplate)
+	c.statefulSetApplyPodTemplate(statefulSet, podTemplate, host)
 
 	// Post-process StatefulSet
 	c.ensureStatefulSetIntegrity(statefulSet, host)
@@ -486,13 +477,28 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.Statefu
 	c.setupStatefulSetApplyVolumeClaimTemplates(statefulSet, host)
 }
 
-// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
-func statefulSetApplyPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
-	// StatefulSet's pod template is not directly compatible with ChiPodTemplate, we need some fields only
-	dst.Spec.Template.Name = template.Name
-	dst.Spec.Template.ObjectMeta.Labels = util.MergeStringMaps(dst.Spec.Template.ObjectMeta.Labels, template.ObjectMeta.Labels)
-	dst.Spec.Template.ObjectMeta.Annotations = util.MergeStringMaps(dst.Spec.Template.ObjectMeta.Annotations, template.ObjectMeta.Annotations)
-	dst.Spec.Template.Spec = *template.Spec.DeepCopy()
+// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided ChiPodTemplate
+func (c *Creator) statefulSetApplyPodTemplate(
+	statefulSet *apps.StatefulSet,
+	template *chiv1.ChiPodTemplate,
+	host *chiv1.ChiHost,
+) {
+	// StatefulSet's pod template is not directly compatible with ChiPodTemplate,
+	// we need to extract some fields from ChiPodTemplate and apply on StatefulSet
+	statefulSet.Spec.Template = corev1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: template.Name,
+			Labels: util.MergeStringMaps(
+				c.labeler.getLabelsHostScope(host, true),
+				template.ObjectMeta.Labels,
+			),
+			Annotations: util.MergeStringMaps(
+				c.labeler.getAnnotationsHostScope(host),
+				template.ObjectMeta.Annotations,
+			),
+		},
+		Spec: *template.Spec.DeepCopy(),
+	}
 }
 
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
