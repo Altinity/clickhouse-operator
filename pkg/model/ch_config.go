@@ -33,6 +33,9 @@ const (
 	allShardsOneReplicaClusterName = "all-sharded"
 )
 
+// ClickHouseConfigGenerator generates ClickHouse configuration files content for specified CHI
+// ClickHouse configuration files content is an XML ATM, so config generator provides set of Get*() functions
+// which produces XML which are parts of ClickHouse configuration and can/should be used as ClickHouse config files.
 type ClickHouseConfigGenerator struct {
 	chi *chiv1.ClickHouseInstallation
 }
