@@ -19,8 +19,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// configSections
-type configSections struct {
+// configSectionsGenerator
+type configSectionsGenerator struct {
 	// ClickHouse config generator
 	chConfigGenerator *ClickHouseConfigGenerator
 	// clickhouse-operator configuration
@@ -28,15 +28,18 @@ type configSections struct {
 }
 
 // NewConfigSections
-func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig *chi.OperatorConfig) *configSections {
-	return &configSections{
+func NewConfigSectionsGenerator(
+	chConfigGenerator *ClickHouseConfigGenerator,
+	chopConfig *chi.OperatorConfig,
+) *configSectionsGenerator {
+	return &configSectionsGenerator{
 		chConfigGenerator: chConfigGenerator,
 		chopConfig:        chopConfig,
 	}
 }
 
 // CreateConfigsCommon
-func (c *configSections) CreateConfigsCommon() map[string]string {
+func (c *configSectionsGenerator) CreateConfigsCommon() map[string]string {
 	commonConfigSections := make(map[string]string)
 	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. remote servers
@@ -52,7 +55,7 @@ func (c *configSections) CreateConfigsCommon() map[string]string {
 }
 
 // CreateConfigsUsers
-func (c *configSections) CreateConfigsUsers() map[string]string {
+func (c *configSectionsGenerator) CreateConfigsUsers() map[string]string {
 	commonUsersConfigSections := make(map[string]string)
 	// commonUsersConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. users
@@ -70,7 +73,7 @@ func (c *configSections) CreateConfigsUsers() map[string]string {
 }
 
 // CreateConfigsHost
-func (c *configSections) CreateConfigsHost(host *chi.ChiHost) map[string]string {
+func (c *configSectionsGenerator) CreateConfigsHost(host *chi.ChiHost) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	hostConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configMacros), c.chConfigGenerator.GetHostMacros(host))
