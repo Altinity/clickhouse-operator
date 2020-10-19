@@ -240,7 +240,6 @@ func (c *Creator) createServiceFromTemplate(
 
 // CreateConfigMapCHICommon creates new corev1.ConfigMap
 func (c *Creator) CreateConfigMapCHICommon() *corev1.ConfigMap {
-	c.chConfigSectionsGenerator.CreateConfigsCommon()
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonName(c.chi),
@@ -248,7 +247,7 @@ func (c *Creator) CreateConfigMapCHICommon() *corev1.ConfigMap {
 			Labels:    c.labeler.getLabelsConfigMapCHICommon(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigSectionsGenerator.commonConfigSections,
+		Data: c.chConfigSectionsGenerator.CreateConfigsCommon(),
 	}
 }
 

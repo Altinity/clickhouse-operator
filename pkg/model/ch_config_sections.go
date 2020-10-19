@@ -21,8 +21,6 @@ import (
 
 // configSections
 type configSections struct {
-	// commonConfigSections maps section name to section XML config string
-	commonConfigSections map[string]string
 	// commonUsersConfigSections maps section name to section XML config string
 	commonUsersConfigSections map[string]string
 
@@ -35,7 +33,6 @@ type configSections struct {
 // NewConfigSections
 func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig *chi.OperatorConfig) *configSections {
 	return &configSections{
-		commonConfigSections:      make(map[string]string),
 		commonUsersConfigSections: make(map[string]string),
 		chConfigGenerator:         chConfigGenerator,
 		chopConfig:                chopConfig,
@@ -43,16 +40,19 @@ func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig 
 }
 
 // CreateConfigsCommon
-func (c *configSections) CreateConfigsCommon() {
+func (c *configSections) CreateConfigsCommon() map[string]string {
+	commonConfigSections := make(map[string]string)
 	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. remote servers
 	// 2. common settings
 	// 3. common files
-	util.IncludeNonEmpty(c.commonConfigSections, createConfigSectionFilename(configRemoteServers), c.chConfigGenerator.GetRemoteServers())
-	util.IncludeNonEmpty(c.commonConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings(nil))
-	util.MergeStringMaps(c.commonConfigSections, c.chConfigGenerator.GetFiles(chi.SectionCommon, true, nil))
+	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configRemoteServers), c.chConfigGenerator.GetRemoteServers())
+	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings(nil))
+	util.MergeStringMaps(commonConfigSections, c.chConfigGenerator.GetFiles(chi.SectionCommon, true, nil))
 	// Extra user-specified config files
-	util.MergeStringMaps(c.commonConfigSections, c.chopConfig.CHCommonConfigs)
+	util.MergeStringMaps(commonConfigSections, c.chopConfig.CHCommonConfigs)
+
+	return commonConfigSections
 }
 
 // CreateConfigsUsers
