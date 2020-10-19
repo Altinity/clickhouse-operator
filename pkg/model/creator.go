@@ -253,7 +253,6 @@ func (c *Creator) CreateConfigMapCHICommon() *corev1.ConfigMap {
 
 // CreateConfigMapCHICommonUsers creates new corev1.ConfigMap
 func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
-	c.chConfigSectionsGenerator.CreateConfigsUsers()
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonUsersName(c.chi),
@@ -261,7 +260,7 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 			Labels:    c.labeler.getLabelsConfigMapCHICommonUsers(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigSectionsGenerator.commonUsersConfigSections,
+		Data: c.chConfigSectionsGenerator.CreateConfigsUsers(),
 	}
 }
 
