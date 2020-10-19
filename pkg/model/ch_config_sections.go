@@ -21,9 +21,6 @@ import (
 
 // configSections
 type configSections struct {
-	// commonUsersConfigSections maps section name to section XML config string
-	commonUsersConfigSections map[string]string
-
 	// ClickHouse config generator
 	chConfigGenerator *ClickHouseConfigGenerator
 	// clickhouse-operator configuration
@@ -33,9 +30,8 @@ type configSections struct {
 // NewConfigSections
 func NewConfigSections(chConfigGenerator *ClickHouseConfigGenerator, chopConfig *chi.OperatorConfig) *configSections {
 	return &configSections{
-		commonUsersConfigSections: make(map[string]string),
-		chConfigGenerator:         chConfigGenerator,
-		chopConfig:                chopConfig,
+		chConfigGenerator: chConfigGenerator,
+		chopConfig:        chopConfig,
 	}
 }
 
@@ -56,18 +52,21 @@ func (c *configSections) CreateConfigsCommon() map[string]string {
 }
 
 // CreateConfigsUsers
-func (c *configSections) CreateConfigsUsers() {
+func (c *configSections) CreateConfigsUsers() map[string]string {
+	commonUsersConfigSections := make(map[string]string)
 	// commonUsersConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. users
 	// 2. quotas
 	// 3. profiles
 	// 4. user files
-	util.IncludeNonEmpty(c.commonUsersConfigSections, createConfigSectionFilename(configUsers), c.chConfigGenerator.GetUsers())
-	util.IncludeNonEmpty(c.commonUsersConfigSections, createConfigSectionFilename(configQuotas), c.chConfigGenerator.GetQuotas())
-	util.IncludeNonEmpty(c.commonUsersConfigSections, createConfigSectionFilename(configProfiles), c.chConfigGenerator.GetProfiles())
-	util.MergeStringMaps(c.commonUsersConfigSections, c.chConfigGenerator.GetFiles(chi.SectionUsers, false, nil))
+	util.IncludeNonEmpty(commonUsersConfigSections, createConfigSectionFilename(configUsers), c.chConfigGenerator.GetUsers())
+	util.IncludeNonEmpty(commonUsersConfigSections, createConfigSectionFilename(configQuotas), c.chConfigGenerator.GetQuotas())
+	util.IncludeNonEmpty(commonUsersConfigSections, createConfigSectionFilename(configProfiles), c.chConfigGenerator.GetProfiles())
+	util.MergeStringMaps(commonUsersConfigSections, c.chConfigGenerator.GetFiles(chi.SectionUsers, false, nil))
 	// Extra user-specified config files
-	util.MergeStringMaps(c.commonUsersConfigSections, c.chopConfig.CHUsersConfigs)
+	util.MergeStringMaps(commonUsersConfigSections, c.chopConfig.CHUsersConfigs)
+
+	return commonUsersConfigSections
 }
 
 // CreateConfigsHost
