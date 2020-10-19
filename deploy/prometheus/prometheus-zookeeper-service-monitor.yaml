@@ -3,27 +3,26 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: clickhouse-operator
+  name: zookeeper
   labels:
     app: prometheus
-    service: clickhouse-operator
+    service: zookeeper
 spec:
   # IMPORTANT
-  # Specify namespace where clickhouse-operator-metrics service is located
+  # Specify namespaces where zookeeper service is located
   namespaceSelector:
-    matchNames:
-      - kube-system
-  # Specify labels of clickhouse-operator-metrics service
+     any: true
+  # Specify labels of zookeeper service
   selector:
     matchLabels:
-      app: clickhouse-operator
+      app: zookeeper
   # Specify which labels will stored in prometheus from service
   targetLabels:
     - app
-  # Specify port where clickhouse-operator-metrics service listens
+  # Specify port where zookeeper service prometheus /metrics  listens
   endpoints:
-    # This is port name from clickhouse-operator-metrics service (it is the same as service name in there)
-    - port: clickhouse-operator-metrics
+    # This is port name from `zookeeper` service (it is the same as service name in there)
+    - port: prometheus
 #    - targetPort: 8888
 #      interval: 10s
 #      scheme: http

@@ -78,12 +78,6 @@ const (
 	        'gauge'                                  AS type
 	    FROM system.dictionaries
 	    UNION ALL
-	    SELECT 
-	        'metric.DiskFreeBytes'                     AS metric,
-    	         toString(filesystemFree())                 AS value,
-	        'Free disk space available at file system' AS description,
-	        'gauge'                                    AS type
-	    UNION ALL
 	    SELECT
 		'metric.LongestRunningQuery' AS metric,
 		toString(max(elapsed))       AS value,
@@ -121,6 +115,14 @@ const (
 		FROM system.mutations 
 		WHERE is_done = 0 
 		GROUP BY database, table
+	`
+
+	querySystemDisksSQL = `
+	    SELECT 
+	        name,
+            toString(free_space) AS free_space,
+			toString(total_space) AS total_space			
+        FROM system.disks
 	`
 )
 
@@ -180,7 +182,7 @@ func (f *ClickHouseFetcher) getClickHouseQuerySystemReplicas() ([][]string, erro
 	)
 }
 
-// clickHouseQuerySystemMutations requests mutations information from ClickHouse
+// getClickHouseQueryMutations requests mutations information from ClickHouse
 func (f *ClickHouseFetcher) getClickHouseQueryMutations() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		queryMutationsSQL,
@@ -188,6 +190,20 @@ func (f *ClickHouseFetcher) getClickHouseQueryMutations() ([][]string, error) {
 			var database, table, mutations, parts_to_do string
 			if err := rows.Scan(&database, &table, &mutations, &parts_to_do); err == nil {
 				*data = append(*data, []string{database, table, mutations, parts_to_do})
+			}
+			return nil
+		},
+	)
+}
+
+// getClickHouseQuerySystemDisks requests used disks information from ClickHouse
+func (f *ClickHouseFetcher) getClickHouseQuerySystemDisks() ([][]string, error) {
+	return f.clickHouseQueryScanRows(
+		querySystemDisksSQL,
+		func(rows *sqlmodule.Rows, data *[][]string) error {
+			var disk, freeBytes, totalBytes string
+			if err := rows.Scan(&disk, &freeBytes, &totalBytes); err == nil {
+				*data = append(*data, []string{disk, freeBytes, totalBytes})
 			}
 			return nil
 		},

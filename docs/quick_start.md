@@ -164,7 +164,7 @@ There are two ways to connect to ClickHouse database
 
 1. In case previous command `kubectl get service -n test` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
 ```bash
-clickhouse-client -h abc-123.us-east-1.elb.amazonaws.com
+clickhouse-client -h abc-123.us-east-1.elb.amazonaws.com -u clickhouse_operator --password clickhouse_operator_password 
 ```
 ```text
 ClickHouse client version 18.14.12.
