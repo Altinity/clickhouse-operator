@@ -34,7 +34,7 @@ type Creator struct {
 	chop                      *chop.CHOp
 	chi                       *chiv1.ClickHouseInstallation
 	chConfigGenerator         *ClickHouseConfigGenerator
-	chConfigSectionsGenerator *configSections
+	chConfigSectionsGenerator *configSectionsGenerator
 	labeler                   *Labeler
 }
 
@@ -42,14 +42,14 @@ func NewCreator(
 	chop *chop.CHOp,
 	chi *chiv1.ClickHouseInstallation,
 ) *Creator {
-	creator := &Creator{
-		chop:              chop,
-		chi:               chi,
-		chConfigGenerator: NewClickHouseConfigGenerator(chi),
-		labeler:           NewLabeler(chop, chi),
+	chConfigGenerator := NewClickHouseConfigGenerator(chi)
+	return &Creator{
+		chop:                      chop,
+		chi:                       chi,
+		chConfigGenerator:         chConfigGenerator,
+		chConfigSectionsGenerator: NewConfigSectionsGenerator(chConfigGenerator, chop.Config()),
+		labeler:                   NewLabeler(chop, chi),
 	}
-	creator.chConfigSectionsGenerator = NewConfigSections(creator.chConfigGenerator, creator.chop.Config())
-	return creator
 }
 
 // CreateServiceCHI creates new corev1.Service for specified CHI
