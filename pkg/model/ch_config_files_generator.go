@@ -19,27 +19,27 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// configSectionsGenerator
-type configSectionsGenerator struct {
+// ClickHouseConfigFilesGenerator
+type ClickHouseConfigFilesGenerator struct {
 	// ClickHouse config generator
 	chConfigGenerator *ClickHouseConfigGenerator
 	// clickhouse-operator configuration
 	chopConfig *chi.OperatorConfig
 }
 
-// NewConfigSections
-func NewConfigSectionsGenerator(
+// NewClickHouseConfigFilesGenerator
+func NewClickHouseConfigFilesGenerator(
 	chConfigGenerator *ClickHouseConfigGenerator,
 	chopConfig *chi.OperatorConfig,
-) *configSectionsGenerator {
-	return &configSectionsGenerator{
+) *ClickHouseConfigFilesGenerator {
+	return &ClickHouseConfigFilesGenerator{
 		chConfigGenerator: chConfigGenerator,
 		chopConfig:        chopConfig,
 	}
 }
 
-// CreateConfigsCommon
-func (c *configSectionsGenerator) CreateConfigsCommon() map[string]string {
+// CreateConfigFilesGroupCommon
+func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupCommon() map[string]string {
 	commonConfigSections := make(map[string]string)
 	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. remote servers
@@ -54,8 +54,8 @@ func (c *configSectionsGenerator) CreateConfigsCommon() map[string]string {
 	return commonConfigSections
 }
 
-// CreateConfigsUsers
-func (c *configSectionsGenerator) CreateConfigsUsers() map[string]string {
+// CreateConfigFilesGroupUsers
+func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupUsers() map[string]string {
 	commonUsersConfigSections := make(map[string]string)
 	// commonUsersConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. users
@@ -72,8 +72,8 @@ func (c *configSectionsGenerator) CreateConfigsUsers() map[string]string {
 	return commonUsersConfigSections
 }
 
-// CreateConfigsHost
-func (c *configSectionsGenerator) CreateConfigsHost(host *chi.ChiHost) map[string]string {
+// CreateConfigFilesGroupHost
+func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *chi.ChiHost) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	hostConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configMacros), c.chConfigGenerator.GetHostMacros(host))

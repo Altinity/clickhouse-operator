@@ -34,7 +34,7 @@ type Creator struct {
 	chop                      *chop.CHOp
 	chi                       *chiv1.ClickHouseInstallation
 	chConfigGenerator         *ClickHouseConfigGenerator
-	chConfigSectionsGenerator *configSectionsGenerator
+	chConfigSectionsGenerator *ClickHouseConfigFilesGenerator
 	labeler                   *Labeler
 }
 
@@ -47,7 +47,7 @@ func NewCreator(
 		chop:                      chop,
 		chi:                       chi,
 		chConfigGenerator:         chConfigGenerator,
-		chConfigSectionsGenerator: NewConfigSectionsGenerator(chConfigGenerator, chop.Config()),
+		chConfigSectionsGenerator: NewClickHouseConfigFilesGenerator(chConfigGenerator, chop.Config()),
 		labeler:                   NewLabeler(chop, chi),
 	}
 }
@@ -247,7 +247,7 @@ func (c *Creator) CreateConfigMapCHICommon() *corev1.ConfigMap {
 			Labels:    c.labeler.getLabelsConfigMapCHICommon(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigSectionsGenerator.CreateConfigsCommon(),
+		Data: c.chConfigSectionsGenerator.CreateConfigFilesGroupCommon(),
 	}
 }
 
@@ -260,7 +260,7 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 			Labels:    c.labeler.getLabelsConfigMapCHICommonUsers(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigSectionsGenerator.CreateConfigsUsers(),
+		Data: c.chConfigSectionsGenerator.CreateConfigFilesGroupUsers(),
 	}
 }
 
@@ -272,7 +272,7 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 			Namespace: host.Address.Namespace,
 			Labels:    c.labeler.getLabelsConfigMapHost(host),
 		},
-		Data: c.chConfigSectionsGenerator.CreateConfigsHost(host),
+		Data: c.chConfigSectionsGenerator.CreateConfigFilesGroupHost(host),
 	}
 }
 

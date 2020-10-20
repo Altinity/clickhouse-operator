@@ -47,12 +47,12 @@ func NewClickHouseConfigGenerator(chi *chiv1.ClickHouseInstallation) *ClickHouse
 	}
 }
 
-// GetUsers creates data for "users.xml"
+// GetUsers creates data for users section. Used as "users.xml"
 func (c *ClickHouseConfigGenerator) GetUsers() string {
 	return c.generateXMLConfig(c.chi.Spec.Configuration.Users, configUsers)
 }
 
-// GetProfiles creates data for "profiles.xml"
+// GetProfiles creates data for profiles section. Used as "profiles.xml"
 func (c *ClickHouseConfigGenerator) GetProfiles() string {
 	return c.generateXMLConfig(c.chi.Spec.Configuration.Profiles, configProfiles)
 }
