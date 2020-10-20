@@ -144,7 +144,7 @@ func (s *Schemer) getCreateDistributedObjects(host *chop.ChiHost) ([]string, []s
 	sqlTables := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
 			concat(database,'.', name) as name, 
-			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
+			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
 		FROM 
 		(
 			SELECT 
@@ -242,7 +242,7 @@ func (s *Schemer) getCreateReplicaObjects(host *chop.ChiHost) ([]string, []strin
 	sqlTables := heredoc.Doc(strings.ReplaceAll(`
 		SELECT DISTINCT 
 			name, 
-			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW)', 'CREATE \\1 IF NOT EXISTS')
+			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
 		FROM system.tables
 		WHERE database != 'system' and create_table_query != '' and name not like '.inner.%'
 		SETTINGS skip_unavailable_shards = 1`,
