@@ -34,7 +34,7 @@ type Creator struct {
 	chop                      *chop.CHOp
 	chi                       *chiv1.ClickHouseInstallation
 	chConfigGenerator         *ClickHouseConfigGenerator
-	chConfigSectionsGenerator *configSections
+	chConfigSectionsGenerator *configSectionsGenerator
 	labeler                   *Labeler
 }
 
@@ -42,14 +42,14 @@ func NewCreator(
 	chop *chop.CHOp,
 	chi *chiv1.ClickHouseInstallation,
 ) *Creator {
-	creator := &Creator{
-		chop:              chop,
-		chi:               chi,
-		chConfigGenerator: NewClickHouseConfigGenerator(chi),
-		labeler:           NewLabeler(chop, chi),
+	chConfigGenerator := NewClickHouseConfigGenerator(chi)
+	return &Creator{
+		chop:                      chop,
+		chi:                       chi,
+		chConfigGenerator:         chConfigGenerator,
+		chConfigSectionsGenerator: NewConfigSectionsGenerator(chConfigGenerator, chop.Config()),
+		labeler:                   NewLabeler(chop, chi),
 	}
-	creator.chConfigSectionsGenerator = NewConfigSections(creator.chConfigGenerator, creator.chop.Config())
-	return creator
 }
 
 // CreateServiceCHI creates new corev1.Service for specified CHI
@@ -240,7 +240,6 @@ func (c *Creator) createServiceFromTemplate(
 
 // CreateConfigMapCHICommon creates new corev1.ConfigMap
 func (c *Creator) CreateConfigMapCHICommon() *corev1.ConfigMap {
-	c.chConfigSectionsGenerator.CreateConfigsCommon()
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonName(c.chi),
@@ -248,13 +247,12 @@ func (c *Creator) CreateConfigMapCHICommon() *corev1.ConfigMap {
 			Labels:    c.labeler.getLabelsConfigMapCHICommon(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigSectionsGenerator.commonConfigSections,
+		Data: c.chConfigSectionsGenerator.CreateConfigsCommon(),
 	}
 }
 
 // CreateConfigMapCHICommonUsers creates new corev1.ConfigMap
 func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
-	c.chConfigSectionsGenerator.CreateConfigsUsers()
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonUsersName(c.chi),
@@ -262,7 +260,7 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 			Labels:    c.labeler.getLabelsConfigMapCHICommonUsers(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigSectionsGenerator.commonUsersConfigSections,
+		Data: c.chConfigSectionsGenerator.CreateConfigsUsers(),
 	}
 }
 
