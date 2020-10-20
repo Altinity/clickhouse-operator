@@ -31,24 +31,21 @@ import (
 )
 
 type Creator struct {
-	chop                      *chop.CHOp
-	chi                       *chiv1.ClickHouseInstallation
-	chConfigGenerator         *ClickHouseConfigGenerator
-	chConfigSectionsGenerator *ClickHouseConfigFilesGenerator
-	labeler                   *Labeler
+	chop                   *chop.CHOp
+	chi                    *chiv1.ClickHouseInstallation
+	chConfigFilesGenerator *ClickHouseConfigFilesGenerator
+	labeler                *Labeler
 }
 
 func NewCreator(
 	chop *chop.CHOp,
 	chi *chiv1.ClickHouseInstallation,
 ) *Creator {
-	chConfigGenerator := NewClickHouseConfigGenerator(chi)
 	return &Creator{
-		chop:                      chop,
-		chi:                       chi,
-		chConfigGenerator:         chConfigGenerator,
-		chConfigSectionsGenerator: NewClickHouseConfigFilesGenerator(chConfigGenerator, chop.Config()),
-		labeler:                   NewLabeler(chop, chi),
+		chop:                   chop,
+		chi:                    chi,
+		chConfigFilesGenerator: NewClickHouseConfigFilesGenerator(NewClickHouseConfigGenerator(chi), chop.Config()),
+		labeler:                NewLabeler(chop, chi),
 	}
 }
 
@@ -247,7 +244,7 @@ func (c *Creator) CreateConfigMapCHICommon() *corev1.ConfigMap {
 			Labels:    c.labeler.getLabelsConfigMapCHICommon(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigSectionsGenerator.CreateConfigFilesGroupCommon(),
+		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupCommon(),
 	}
 }
 
@@ -260,7 +257,7 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 			Labels:    c.labeler.getLabelsConfigMapCHICommonUsers(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigSectionsGenerator.CreateConfigFilesGroupUsers(),
+		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupUsers(),
 	}
 }
 
@@ -272,7 +269,7 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 			Namespace: host.Address.Namespace,
 			Labels:    c.labeler.getLabelsConfigMapHost(host),
 		},
-		Data: c.chConfigSectionsGenerator.CreateConfigFilesGroupHost(host),
+		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host),
 	}
 }
 
