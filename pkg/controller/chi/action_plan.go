@@ -315,3 +315,7 @@ func (ap *ActionPlan) WalkModified(
 		}
 	}
 }
+
+func (ap *ActionPlan) LabelsChanged() bool {
+	return !ap.labelsEqual
+}
