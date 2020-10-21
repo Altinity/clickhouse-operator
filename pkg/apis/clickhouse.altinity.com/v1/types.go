@@ -166,6 +166,7 @@ type ChiHost struct {
 	// Internal data
 	Address     ChiHostAddress          `json:"-"`
 	Config      ChiHostConfig           `json:"-"`
+	Reconcile   ChiHostReconcileStatus  `json:"-"`
 	StatefulSet *v1.StatefulSet         `json:"-" testdiff:"ignore"`
 	CHI         *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
@@ -209,6 +210,25 @@ type ChiHostConfig struct {
 	ZookeeperFingerprint string `json:"zookeeperfingerprint"`
 	SettingsFingerprint  string `json:"settingsfingerprint"`
 	FilesFingerprint     string `json:"filesfingerprint"`
+}
+
+// ChiHostReconcileStatus defines host reconcile status
+type ChiHostReconcileStatus struct {
+	Added    bool
+	Removed  bool
+	Modified bool
+}
+
+func (s *ChiHostReconcileStatus) SetAdded() {
+	s.Added = true
+}
+
+func (s *ChiHostReconcileStatus) SetRemoved() {
+	s.Removed = true
+}
+
+func (s *ChiHostReconcileStatus) SetModified() {
+	s.Modified = true
 }
 
 // CHITemplates defines templates section of .spec
