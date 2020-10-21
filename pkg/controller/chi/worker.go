@@ -257,18 +257,18 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	actionPlan.WalkAdded(
 		func(cluster *chop.ChiCluster) {
 			cluster.WalkHosts(func(host *chop.ChiHost) error {
-				(&host.Reconcile).SetAdded()
+				(&host.ReconcileAttributes).SetAdded()
 				return nil
 			})
 		},
 		func(shard *chop.ChiShard) {
 			shard.WalkHosts(func(host *chop.ChiHost) error {
-				(&host.Reconcile).SetAdded()
+				(&host.ReconcileAttributes).SetAdded()
 				return nil
 			})
 		},
 		func(host *chop.ChiHost) {
-			(&host.Reconcile).SetAdded()
+			(&host.ReconcileAttributes).SetAdded()
 		},
 	)
 
@@ -278,29 +278,28 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		func(shard *chop.ChiShard) {
 		},
 		func(host *chop.ChiHost) {
-			(&host.Reconcile).SetModified()
+			(&host.ReconcileAttributes).SetModified()
 		},
 	)
 
 	if actionPlan.LabelsChanged() {
 		new.WalkHosts(func(host *chop.ChiHost) error {
-			if host.Reconcile.IsAdded() {
+			if host.ReconcileAttributes.IsAdded() {
 				// Already added
-			} else if host.Reconcile.IsModified() {
+			} else if host.ReconcileAttributes.IsModified() {
 				// Already modified
 			} else {
 				// Not touched yet, but labels are changed, need to modify
-				(&host.Reconcile).SetModified()
+				(&host.ReconcileAttributes).SetModified()
 			}
 			return nil
 		})
 	}
 
-
 	new.WalkHosts(func(host *chop.ChiHost) error {
-		if host.Reconcile.IsAdded() {
+		if host.ReconcileAttributes.IsAdded() {
 			w.a.Info("ADDED host: %s", host.Address.ShortString())
-		} else if host.Reconcile.IsModified() {
+		} else if host.ReconcileAttributes.IsModified() {
 			w.a.Info("MODIFIED host: %s", host.Address.ShortString())
 		} else {
 			w.a.Info("UNTOUCHED host: %s", host.Address.ShortString())

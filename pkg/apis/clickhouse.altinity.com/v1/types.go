@@ -164,11 +164,11 @@ type ChiHost struct {
 	Templates           ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data
-	Address     ChiHostAddress          `json:"-"`
-	Config      ChiHostConfig           `json:"-"`
-	Reconcile   ChiHostReconcileStatus  `json:"-"`
-	StatefulSet *v1.StatefulSet         `json:"-" testdiff:"ignore"`
-	CHI         *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+	Address             ChiHostAddress             `json:"-"`
+	Config              ChiHostConfig              `json:"-"`
+	ReconcileAttributes ChiHostReconcileAttributes `json:"-"`
+	StatefulSet         *v1.StatefulSet            `json:"-" testdiff:"ignore"`
+	CHI                 *ClickHouseInstallation    `json:"-" testdiff:"ignore"`
 }
 
 // ChiHostTemplate defines full Host Template
@@ -189,34 +189,34 @@ type ChiHostConfig struct {
 	FilesFingerprint     string `json:"filesfingerprint"`
 }
 
-// ChiHostReconcileStatus defines host reconcile status
-type ChiHostReconcileStatus struct {
+// ChiHostReconcileAttributes defines host reconcile status
+type ChiHostReconcileAttributes struct {
 	Added    bool
 	Removed  bool
 	Modified bool
 }
 
-func (s *ChiHostReconcileStatus) SetAdded() {
+func (s *ChiHostReconcileAttributes) SetAdded() {
 	s.Added = true
 }
 
-func (s *ChiHostReconcileStatus) SetRemoved() {
+func (s *ChiHostReconcileAttributes) SetRemoved() {
 	s.Removed = true
 }
 
-func (s *ChiHostReconcileStatus) SetModified() {
+func (s *ChiHostReconcileAttributes) SetModified() {
 	s.Modified = true
 }
 
-func (s *ChiHostReconcileStatus) IsAdded() bool {
+func (s *ChiHostReconcileAttributes) IsAdded() bool {
 	return s.Added
 }
 
-func (s *ChiHostReconcileStatus) IsRemoved() bool {
+func (s *ChiHostReconcileAttributes) IsRemoved() bool {
 	return s.Removed
 }
 
-func (s *ChiHostReconcileStatus) IsModified() bool {
+func (s *ChiHostReconcileAttributes) IsModified() bool {
 	return s.Modified
 }
 
