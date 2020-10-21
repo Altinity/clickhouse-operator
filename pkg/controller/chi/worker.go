@@ -254,6 +254,26 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		Info("updateCHI(%s/%s) reconcile started", new.Namespace, new.Name)
 	w.a.V(2).Info("updateCHI(%s/%s) - action plan\n%s\n", new.Namespace, new.Name, actionPlan.String())
 
+	actionPlan.WalkAdded(
+		func(cluster *chop.ChiCluster) {
+		},
+		func(shard *chop.ChiShard) {
+		},
+		func(host *chop.ChiHost) {
+			host.Reconcile.SetAdded()
+		},
+	)
+
+	actionPlan.WalkModified(
+		func(cluster *chop.ChiCluster) {
+		},
+		func(shard *chop.ChiShard) {
+		},
+		func(host *chop.ChiHost) {
+			host.Reconcile.SetModified()
+		},
+	)
+
 	if err := w.reconcile(new); err != nil {
 		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(new).

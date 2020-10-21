@@ -284,3 +284,34 @@ func (ap *ActionPlan) WalkAdded(
 		}
 	}
 }
+
+// WalkModified walk modified cluster items
+func (ap *ActionPlan) WalkModified(
+	clusterFunc func(cluster *v1.ChiCluster),
+	shardFunc func(shard *v1.ChiShard),
+	hostFunc func(host *v1.ChiHost),
+) {
+	// TODO refactor to map[string]object handling, instead of slice
+	for path := range ap.specDiff.Modified {
+		switch ap.specDiff.Modified[path].(type) {
+		case v1.ChiCluster:
+			cluster := ap.specDiff.Modified[path].(v1.ChiCluster)
+			clusterFunc(&cluster)
+		case v1.ChiShard:
+			shard := ap.specDiff.Modified[path].(v1.ChiShard)
+			shardFunc(&shard)
+		case v1.ChiHost:
+			host := ap.specDiff.Modified[path].(v1.ChiHost)
+			hostFunc(&host)
+		case *v1.ChiCluster:
+			cluster := ap.specDiff.Modified[path].(*v1.ChiCluster)
+			clusterFunc(cluster)
+		case *v1.ChiShard:
+			shard := ap.specDiff.Modified[path].(*v1.ChiShard)
+			shardFunc(shard)
+		case *v1.ChiHost:
+			host := ap.specDiff.Modified[path].(*v1.ChiHost)
+			hostFunc(host)
+		}
+	}
+}
