@@ -231,6 +231,18 @@ func (s *ChiHostReconcileStatus) SetModified() {
 	s.Modified = true
 }
 
+func (s *ChiHostReconcileStatus) IsAdded() bool {
+	return s.Added
+}
+
+func (s *ChiHostReconcileStatus) IsRemoved() bool {
+	return s.Removed
+}
+
+func (s *ChiHostReconcileStatus) IsModified() bool {
+	return s.Modified
+}
+
 // CHITemplates defines templates section of .spec
 type ChiTemplates struct {
 	// Templates
