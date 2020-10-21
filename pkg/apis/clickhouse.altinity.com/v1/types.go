@@ -182,29 +182,6 @@ type ChiPortDistribution struct {
 	Type string `json:"type,omitempty"   yaml:"type"`
 }
 
-// ChiHostAddress defines address of a host within ClickHouseInstallation
-type ChiHostAddress struct {
-	Namespace               string `json:"namespace"`
-	CHIName                 string `json:"chiName"`
-	ClusterName             string `json:"clusterName"`
-	ClusterIndex            int    `json:"clusterIndex"`
-	ShardName               string `json:"shardName,omitempty"`
-	ShardIndex              int    `json:"shardIndex"`
-	ShardScopeIndex         int    `json:"shardScopeIndex"`
-	ReplicaName             string `json:"replicaName,omitempty"`
-	ReplicaIndex            int    `json:"replicaIndex"`
-	ReplicaScopeIndex       int    `json:"replicaScopeIndex"`
-	HostName                string `json:"hostName,omitempty"`
-	CHIScopeIndex           int    `json:"chiScopeIndex"`
-	CHIScopeCycleSize       int    `json:"chiScopeCycleSize"`
-	CHIScopeCycleIndex      int    `json:"chiScopeCycleIndex"`
-	CHIScopeCycleOffset     int    `json:"chiScopeCycleOffset"`
-	ClusterScopeIndex       int    `json:"clusterScopeIndex"`
-	ClusterScopeCycleSize   int    `json:"clusterScopeCycleSize"`
-	ClusterScopeCycleIndex  int    `json:"clusterScopeCycleIndex"`
-	ClusterScopeCycleOffset int    `json:"clusterScopeCycleOffset"`
-}
-
 // ChiHostConfig defines additional data related to a host
 type ChiHostConfig struct {
 	ZookeeperFingerprint string `json:"zookeeperfingerprint"`
