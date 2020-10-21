@@ -23,7 +23,9 @@ import (
 
 // ActionPlan is an action plan with list of differences between two CHIs
 type ActionPlan struct {
-	old, new  *v1.ClickHouseInstallation
+	old *v1.ClickHouseInstallation
+	new *v1.ClickHouseInstallation
+
 	specDiff  *messagediff.Diff
 	specEqual bool
 
