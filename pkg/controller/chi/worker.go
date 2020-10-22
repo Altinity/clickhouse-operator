@@ -419,7 +419,7 @@ func (w *worker) reconcileCHIConfigMaps(chi *chop.ClickHouseInstallation, update
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.creator.CreateConfigMapCHICommon()
+	configMapCommon := w.creator.CreateConfigMapCHICommon(nil)
 	if err := w.reconcileConfigMap(chi, configMapCommon, update); err != nil {
 		return err
 	}
