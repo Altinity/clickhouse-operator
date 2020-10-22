@@ -15,10 +15,31 @@
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
+type ChiHost struct {
+	Name string `json:"name,omitempty"`
+	// DEPRECATED - to be removed soon
+	Port                int32            `json:"port,omitempty"`
+	TCPPort             int32            `json:"tcpPort,omitempty"`
+	HTTPPort            int32            `json:"httpPort,omitempty"`
+	InterserverHTTPPort int32            `json:"interserverHTTPPort,omitempty"`
+	Settings            Settings         `json:"settings,omitempty"`
+	Files               Settings         `json:"files,omitempty"`
+	Templates           ChiTemplateNames `json:"templates,omitempty"`
+
+	// Internal data
+	Address             ChiHostAddress             `json:"-"`
+	Config              ChiHostConfig              `json:"-"`
+	ReconcileAttributes ChiHostReconcileAttributes `json:"-"`
+	StatefulSet         *appsv1.StatefulSet        `json:"-" testdiff:"ignore"`
+	CHI                 *ClickHouseInstallation    `json:"-" testdiff:"ignore"`
+}
 
 func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
@@ -145,7 +166,7 @@ func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTem
 	host.CHI.WalkVolumeClaimTemplates(f)
 }
 
-func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *v1.VolumeMount)) {
+func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *corev1.VolumeMount)) {
 	if host.StatefulSet == nil {
 		return
 	}

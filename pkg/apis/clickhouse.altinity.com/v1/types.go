@@ -15,7 +15,6 @@
 package v1
 
 import (
-	"k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -149,26 +148,6 @@ type ChiReplicaAddress struct {
 	ClusterIndex int    `json:"clusterIndex"`
 	ReplicaName  string `json:"replicaName,omitempty"`
 	ReplicaIndex int    `json:"replicaIndex"`
-}
-
-// ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
-type ChiHost struct {
-	Name string `json:"name,omitempty"`
-	// DEPRECATED - to be removed soon
-	Port                int32            `json:"port,omitempty"`
-	TCPPort             int32            `json:"tcpPort,omitempty"`
-	HTTPPort            int32            `json:"httpPort,omitempty"`
-	InterserverHTTPPort int32            `json:"interserverHTTPPort,omitempty"`
-	Settings            Settings         `json:"settings,omitempty"`
-	Files               Settings         `json:"files,omitempty"`
-	Templates           ChiTemplateNames `json:"templates,omitempty"`
-
-	// Internal data
-	Address             ChiHostAddress             `json:"-"`
-	Config              ChiHostConfig              `json:"-"`
-	ReconcileAttributes ChiHostReconcileAttributes `json:"-"`
-	StatefulSet         *v1.StatefulSet            `json:"-" testdiff:"ignore"`
-	CHI                 *ClickHouseInstallation    `json:"-" testdiff:"ignore"`
 }
 
 // ChiHostTemplate defines full Host Template
