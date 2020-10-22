@@ -197,10 +197,16 @@ type ChiHostReconcileAttributes struct {
 }
 
 func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
+	if s == nil {
+		return false
+	}
 	return (s.Added == to.Added) && (s.Removed == to.Removed) && (s.Modified == to.Modified)
 }
 
 func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
+	if s == nil {
+		return false
+	}
 	return (s.Added && to.Added) || (s.Removed && to.Removed) || (s.Modified && to.Modified)
 }
 
