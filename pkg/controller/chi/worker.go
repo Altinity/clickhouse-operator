@@ -282,15 +282,15 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		},
 	)
 
-	if actionPlan.LabelsChanged() {
+	if actionPlan.HasActionsToDo() {
 		new.WalkHosts(func(host *chop.ChiHost) error {
 			if host.ReconcileAttributes.IsAdded() {
 				// Already added
 			} else if host.ReconcileAttributes.IsModified() {
 				// Already modified
 			} else {
-				// Not touched yet, but labels are changed, need to modify
-				(&host.ReconcileAttributes).SetModified()
+				// Not clear yet
+				(&host.ReconcileAttributes).SetUnclear()
 			}
 			return nil
 		})
@@ -301,6 +301,8 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 			w.a.Info("ADDED host: %s", host.Address.ShortString())
 		} else if host.ReconcileAttributes.IsModified() {
 			w.a.Info("MODIFIED host: %s", host.Address.ShortString())
+		} else if host.ReconcileAttributes.IsUnclear() {
+			w.a.Info("UNCLEAR host: %s", host.Address.ShortString())
 		} else {
 			w.a.Info("UNTOUCHED host: %s", host.Address.ShortString())
 		}

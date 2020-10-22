@@ -173,20 +173,21 @@ type ChiHostReconcileAttributes struct {
 	Added    bool
 	Removed  bool
 	Modified bool
+	Unclear  bool
 }
 
 func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
-	return (s.Added == to.Added) && (s.Removed == to.Removed) && (s.Modified == to.Modified)
+	return (s.Added == to.Added) && (s.Removed == to.Removed) && (s.Modified == to.Modified) && (s.Unclear == to.Unclear)
 }
 
 func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
-	return (s.Added && to.Added) || (s.Removed && to.Removed) || (s.Modified && to.Modified)
+	return (s.Added && to.Added) || (s.Removed && to.Removed) || (s.Modified && to.Modified) || (s.Unclear && to.Unclear)
 }
 
 func (s *ChiHostReconcileAttributes) SetAdded() {
@@ -201,6 +202,10 @@ func (s *ChiHostReconcileAttributes) SetModified() {
 	s.Modified = true
 }
 
+func (s *ChiHostReconcileAttributes) SetUnclear() {
+	s.Unclear = true
+}
+
 func (s *ChiHostReconcileAttributes) IsAdded() bool {
 	return s.Added
 }
@@ -211,6 +216,10 @@ func (s *ChiHostReconcileAttributes) IsRemoved() bool {
 
 func (s *ChiHostReconcileAttributes) IsModified() bool {
 	return s.Modified
+}
+
+func (s *ChiHostReconcileAttributes) IsUnclear() bool {
+	return s.Unclear
 }
 
 // CHITemplates defines templates section of .spec

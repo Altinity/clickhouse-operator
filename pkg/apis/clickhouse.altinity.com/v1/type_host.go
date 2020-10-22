@@ -36,7 +36,7 @@ type ChiHost struct {
 	// Internal data
 	Address             ChiHostAddress             `json:"-"`
 	Config              ChiHostConfig              `json:"-"`
-	ReconcileAttributes ChiHostReconcileAttributes `json:"-"`
+	ReconcileAttributes ChiHostReconcileAttributes `json:"-" testdiff:"ignore"`
 	StatefulSet         *appsv1.StatefulSet        `json:"-" testdiff:"ignore"`
 	CHI                 *ClickHouseInstallation    `json:"-" testdiff:"ignore"`
 }
