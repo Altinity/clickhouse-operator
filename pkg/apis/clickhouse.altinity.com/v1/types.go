@@ -196,6 +196,14 @@ type ChiHostReconcileAttributes struct {
 	Modified bool
 }
 
+func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
+	return (s.Added == to.Added) && (s.Removed == to.Removed) && (s.Modified == to.Modified)
+}
+
+func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
+	return (s.Added && to.Added) || (s.Removed && to.Removed) || (s.Modified && to.Modified)
+}
+
 func (s *ChiHostReconcileAttributes) SetAdded() {
 	s.Added = true
 }
