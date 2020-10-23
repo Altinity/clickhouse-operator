@@ -750,10 +750,10 @@ func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/?" +
-					"user=" + url.QueryEscape(c.chop.Config().CHUsername) +
-					"&password=" + url.QueryEscape(c.chop.Config().CHPassword) +
-					"&query=" +
+				Path: fmt.Sprintf(
+					"/?user=%s&password=%s&query=%s",
+					url.QueryEscape(c.chop.Config().CHUsername),
+					url.QueryEscape(c.chop.Config().CHPassword),
 					// SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='all-sharded' AND is_local
 					url.QueryEscape(
 						fmt.Sprintf(
@@ -761,6 +761,7 @@ func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
 							allShardsOneReplicaClusterName,
 						),
 					),
+				),
 				Port: intstr.Parse(chDefaultHTTPPortName),
 				HTTPHeaders: []corev1.HTTPHeader{
 					{
