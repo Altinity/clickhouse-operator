@@ -514,7 +514,7 @@ func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfigur
 
 // updateCHIObject updates ClickHouseInstallation object
 func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
-	namespace, name := NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Update(chi)
 
 	if err != nil {
@@ -539,7 +539,7 @@ func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
 func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
-	namespace, name := NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
 
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
@@ -565,7 +565,7 @@ func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tole
 
 // installFinalizer
 func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
-	namespace, name := NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
 
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
@@ -587,7 +587,7 @@ func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
 
 // uninstallFinalizer
 func (c *Controller) uninstallFinalizer(chi *chi.ClickHouseInstallation) error {
-	namespace, name := NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
 
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())

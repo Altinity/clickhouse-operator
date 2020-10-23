@@ -192,7 +192,7 @@ func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseIns
 
 // ensureFinalizer
 func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) {
-	namespace, name := NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
 
 	// Check whether finalizer is already listed in CHI
 	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
@@ -506,7 +506,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 // finalizeCHI
 func (w *worker) finalizeCHI(chi *chop.ClickHouseInstallation) error {
-	namespace, name := NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	w.a.V(3).Info("finalizeCHI(%s/%s) - start", namespace, name)
 	defer w.a.V(3).Info("finalizeCHI(%s/%s) - end", namespace, name)
 
