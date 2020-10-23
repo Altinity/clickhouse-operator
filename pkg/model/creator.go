@@ -338,6 +338,7 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 
 func (c *Creator) ensureStatefulSetIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	c.ensureClickHouseContainer(statefulSet, host)
+	c.ensureProbesSpecified(statefulSet)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
@@ -348,6 +349,19 @@ func (c *Creator) ensureClickHouseContainer(statefulSet *apps.StatefulSet, _ *ch
 			&statefulSet.Spec.Template.Spec,
 			c.newDefaultClickHouseContainer(),
 		)
+	}
+}
+
+func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
+	container, ok := getClickHouseContainer(statefulSet)
+	if !ok {
+		return
+	}
+	if container.LivenessProbe == nil {
+		container.LivenessProbe = newDefaultLivenessProbe()
+	}
+	if container.ReadinessProbe == nil {
+		container.ReadinessProbe = c.newDefaultReadinessProbe()
 	}
 }
 
