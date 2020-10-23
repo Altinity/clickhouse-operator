@@ -15,7 +15,6 @@
 package v1
 
 import (
-	"k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -151,25 +150,6 @@ type ChiReplicaAddress struct {
 	ReplicaIndex int    `json:"replicaIndex"`
 }
 
-// ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
-type ChiHost struct {
-	Name string `json:"name,omitempty"`
-	// DEPRECATED - to be removed soon
-	Port                int32            `json:"port,omitempty"`
-	TCPPort             int32            `json:"tcpPort,omitempty"`
-	HTTPPort            int32            `json:"httpPort,omitempty"`
-	InterserverHTTPPort int32            `json:"interserverHTTPPort,omitempty"`
-	Settings            Settings         `json:"settings,omitempty"`
-	Files               Settings         `json:"files,omitempty"`
-	Templates           ChiTemplateNames `json:"templates,omitempty"`
-
-	// Internal data
-	Address     ChiHostAddress          `json:"-"`
-	Config      ChiHostConfig           `json:"-"`
-	StatefulSet *v1.StatefulSet         `json:"-" testdiff:"ignore"`
-	CHI         *ClickHouseInstallation `json:"-" testdiff:"ignore"`
-}
-
 // ChiHostTemplate defines full Host Template
 type ChiHostTemplate struct {
 	Name             string                `json:"name"                       yaml:"name"`
@@ -181,34 +161,65 @@ type ChiPortDistribution struct {
 	Type string `json:"type,omitempty"   yaml:"type"`
 }
 
-// ChiHostAddress defines address of a host within ClickHouseInstallation
-type ChiHostAddress struct {
-	Namespace               string `json:"namespace"`
-	CHIName                 string `json:"chiName"`
-	ClusterName             string `json:"clusterName"`
-	ClusterIndex            int    `json:"clusterIndex"`
-	ShardName               string `json:"shardName,omitempty"`
-	ShardIndex              int    `json:"shardIndex"`
-	ShardScopeIndex         int    `json:"shardScopeIndex"`
-	ReplicaName             string `json:"replicaName,omitempty"`
-	ReplicaIndex            int    `json:"replicaIndex"`
-	ReplicaScopeIndex       int    `json:"replicaScopeIndex"`
-	HostName                string `json:"hostName,omitempty"`
-	CHIScopeIndex           int    `json:"chiScopeIndex"`
-	CHIScopeCycleSize       int    `json:"chiScopeCycleSize"`
-	CHIScopeCycleIndex      int    `json:"chiScopeCycleIndex"`
-	CHIScopeCycleOffset     int    `json:"chiScopeCycleOffset"`
-	ClusterScopeIndex       int    `json:"clusterScopeIndex"`
-	ClusterScopeCycleSize   int    `json:"clusterScopeCycleSize"`
-	ClusterScopeCycleIndex  int    `json:"clusterScopeCycleIndex"`
-	ClusterScopeCycleOffset int    `json:"clusterScopeCycleOffset"`
-}
-
 // ChiHostConfig defines additional data related to a host
 type ChiHostConfig struct {
 	ZookeeperFingerprint string `json:"zookeeperfingerprint"`
 	SettingsFingerprint  string `json:"settingsfingerprint"`
 	FilesFingerprint     string `json:"filesfingerprint"`
+}
+
+// ChiHostReconcileAttributes defines host reconcile status
+type ChiHostReconcileAttributes struct {
+	Added    bool
+	Removed  bool
+	Modified bool
+	Unclear  bool
+}
+
+func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
+	if s == nil {
+		return false
+	}
+	return (s.Added == to.Added) && (s.Removed == to.Removed) && (s.Modified == to.Modified) && (s.Unclear == to.Unclear)
+}
+
+func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
+	if s == nil {
+		return false
+	}
+	return (s.Added && to.Added) || (s.Removed && to.Removed) || (s.Modified && to.Modified) || (s.Unclear && to.Unclear)
+}
+
+func (s *ChiHostReconcileAttributes) SetAdded() {
+	s.Added = true
+}
+
+func (s *ChiHostReconcileAttributes) SetRemoved() {
+	s.Removed = true
+}
+
+func (s *ChiHostReconcileAttributes) SetModified() {
+	s.Modified = true
+}
+
+func (s *ChiHostReconcileAttributes) SetUnclear() {
+	s.Unclear = true
+}
+
+func (s *ChiHostReconcileAttributes) IsAdded() bool {
+	return s.Added
+}
+
+func (s *ChiHostReconcileAttributes) IsRemoved() bool {
+	return s.Removed
+}
+
+func (s *ChiHostReconcileAttributes) IsModified() bool {
+	return s.Modified
+}
+
+func (s *ChiHostReconcileAttributes) IsUnclear() bool {
+	return s.Unclear
 }
 
 // CHITemplates defines templates section of .spec

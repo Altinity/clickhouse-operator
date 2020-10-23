@@ -47,12 +47,12 @@ func NewClickHouseConfigGenerator(chi *chiv1.ClickHouseInstallation) *ClickHouse
 	}
 }
 
-// GetUsers creates data for "users.xml"
+// GetUsers creates data for users section. Used as "users.xml"
 func (c *ClickHouseConfigGenerator) GetUsers() string {
 	return c.generateXMLConfig(c.chi.Spec.Configuration.Users, configUsers)
 }
 
-// GetProfiles creates data for "profiles.xml"
+// GetProfiles creates data for profiles section. Used as "profiles.xml"
 func (c *ClickHouseConfigGenerator) GetProfiles() string {
 	return c.generateXMLConfig(c.chi.Spec.Configuration.Profiles, configProfiles)
 }
@@ -154,8 +154,41 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string
 	return b.String()
 }
 
+type RemoteServersGeneratorOptions struct {
+	Exclude struct {
+		ReconcileAttributes *chiv1.ChiHostReconcileAttributes
+		Hosts               []*chiv1.ChiHost
+	}
+}
+
+func defaultRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
+	return &RemoteServersGeneratorOptions{}
+}
+
+func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
+	if o == nil {
+		return false
+	}
+
+	if o.Exclude.ReconcileAttributes.Any(host.ReconcileAttributes) {
+		return false
+	}
+
+	for _, val := range o.Exclude.Hosts {
+		if val == host {
+			return false
+		}
+	}
+
+	return true
+}
+
 // GetRemoteServers creates "remote_servers.xml" content and calculates data generation parameters for other sections
-func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
+func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGeneratorOptions) string {
+	if options == nil {
+		options = defaultRemoteServersGeneratorOptions()
+	}
+
 	b := &bytes.Buffer{}
 
 	// <yandex>
@@ -183,15 +216,16 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 			}
 
 			shard.WalkHosts(func(host *chiv1.ChiHost) error {
-				// <replica>
-				//		<host>XXX</host>
-				//		<port>XXX</port>
-				// </replica>
-				util.Iline(b, 16, "<replica>")
-				util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-				util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
-				util.Iline(b, 16, "</replica>")
-
+				if options.Include(host) {
+					// <replica>
+					//		<host>XXX</host>
+					//		<port>XXX</port>
+					// </replica>
+					util.Iline(b, 16, "<replica>")
+					util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
+					util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
+					util.Iline(b, 16, "</replica>")
+				}
 				return nil
 			})
 

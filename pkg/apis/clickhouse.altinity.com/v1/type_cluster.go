@@ -43,12 +43,14 @@ type ChiClusterLayout struct {
 	ShardsCount   int    `json:"shardsCount,omitempty"`
 	ReplicasCount int    `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiShard
-	Shards            []ChiShard   `json:"shards,omitempty"`
-	Replicas          []ChiReplica `json:"replicas,omitempty"`
-	ShardsSpecified   bool         `json:"-" testdiff:"ignore"`
-	ReplicasSpecified bool         `json:"-" testdiff:"ignore"`
+	Shards   []ChiShard   `json:"shards,omitempty"`
+	Replicas []ChiReplica `json:"replicas,omitempty"`
 
-	HostsField *HostsField `json:"-" testdiff:"ignore"`
+	// Internal data
+	// Whether shards or replicas are explicitly specified as Shards []ChiShard or Replicas []ChiReplica
+	ShardsSpecified   bool        `json:"-" testdiff:"ignore"`
+	ReplicasSpecified bool        `json:"-" testdiff:"ignore"`
+	HostsField        *HostsField `json:"-" testdiff:"ignore"`
 }
 
 func (cluster *ChiCluster) FillShardReplicaSpecified() {

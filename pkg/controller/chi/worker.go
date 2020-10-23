@@ -254,6 +254,61 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		Info("updateCHI(%s/%s) reconcile started", new.Namespace, new.Name)
 	w.a.V(2).Info("updateCHI(%s/%s) - action plan\n%s\n", new.Namespace, new.Name, actionPlan.String())
 
+	actionPlan.WalkAdded(
+		func(cluster *chop.ChiCluster) {
+			cluster.WalkHosts(func(host *chop.ChiHost) error {
+				(&host.ReconcileAttributes).SetAdded()
+				return nil
+			})
+		},
+		func(shard *chop.ChiShard) {
+			shard.WalkHosts(func(host *chop.ChiHost) error {
+				(&host.ReconcileAttributes).SetAdded()
+				return nil
+			})
+		},
+		func(host *chop.ChiHost) {
+			(&host.ReconcileAttributes).SetAdded()
+		},
+	)
+
+	actionPlan.WalkModified(
+		func(cluster *chop.ChiCluster) {
+		},
+		func(shard *chop.ChiShard) {
+		},
+		func(host *chop.ChiHost) {
+			(&host.ReconcileAttributes).SetModified()
+		},
+	)
+
+	if actionPlan.HasActionsToDo() {
+		new.WalkHosts(func(host *chop.ChiHost) error {
+			if host.ReconcileAttributes.IsAdded() {
+				// Already added
+			} else if host.ReconcileAttributes.IsModified() {
+				// Already modified
+			} else {
+				// Not clear yet
+				(&host.ReconcileAttributes).SetUnclear()
+			}
+			return nil
+		})
+	}
+
+	new.WalkHosts(func(host *chop.ChiHost) error {
+		if host.ReconcileAttributes.IsAdded() {
+			w.a.Info("ADDED host: %s", host.Address.ShortString())
+		} else if host.ReconcileAttributes.IsModified() {
+			w.a.Info("MODIFIED host: %s", host.Address.ShortString())
+		} else if host.ReconcileAttributes.IsUnclear() {
+			w.a.Info("UNCLEAR host: %s", host.Address.ShortString())
+		} else {
+			w.a.Info("UNTOUCHED host: %s", host.Address.ShortString())
+		}
+		return nil
+	})
+
 	if err := w.reconcile(new); err != nil {
 		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(new).
@@ -366,7 +421,7 @@ func (w *worker) reconcileCHIConfigMaps(chi *chop.ClickHouseInstallation, update
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.creator.CreateConfigMapCHICommon()
+	configMapCommon := w.creator.CreateConfigMapCHICommon(nil)
 	if err := w.reconcileConfigMap(chi, configMapCommon, update); err != nil {
 		return err
 	}

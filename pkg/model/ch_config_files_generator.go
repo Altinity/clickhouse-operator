@@ -19,33 +19,51 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// configSectionsGenerator
-type configSectionsGenerator struct {
+// ClickHouseConfigFilesGenerator
+type ClickHouseConfigFilesGenerator struct {
 	// ClickHouse config generator
 	chConfigGenerator *ClickHouseConfigGenerator
 	// clickhouse-operator configuration
 	chopConfig *chi.OperatorConfig
 }
 
-// NewConfigSections
-func NewConfigSectionsGenerator(
+// NewClickHouseConfigFilesGenerator
+func NewClickHouseConfigFilesGenerator(
 	chConfigGenerator *ClickHouseConfigGenerator,
 	chopConfig *chi.OperatorConfig,
-) *configSectionsGenerator {
-	return &configSectionsGenerator{
+) *ClickHouseConfigFilesGenerator {
+	return &ClickHouseConfigFilesGenerator{
 		chConfigGenerator: chConfigGenerator,
 		chopConfig:        chopConfig,
 	}
 }
 
-// CreateConfigsCommon
-func (c *configSectionsGenerator) CreateConfigsCommon() map[string]string {
+type ClickHouseConfigFilesGeneratorOptions struct {
+	RemoteServersGeneratorOptions *RemoteServersGeneratorOptions
+}
+
+func (o *ClickHouseConfigFilesGeneratorOptions) GetRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
+	if o == nil {
+		return nil
+	}
+	return o.RemoteServersGeneratorOptions
+}
+
+func defaultClickHouseConfigFilesGeneratorOptions() *ClickHouseConfigFilesGeneratorOptions {
+	return &ClickHouseConfigFilesGeneratorOptions{}
+}
+
+// CreateConfigFilesGroupCommon
+func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupCommon(options *ClickHouseConfigFilesGeneratorOptions) map[string]string {
+	if options == nil {
+		options = defaultClickHouseConfigFilesGeneratorOptions()
+	}
 	commonConfigSections := make(map[string]string)
 	// commonConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. remote servers
 	// 2. common settings
 	// 3. common files
-	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configRemoteServers), c.chConfigGenerator.GetRemoteServers())
+	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configRemoteServers), c.chConfigGenerator.GetRemoteServers(options.GetRemoteServersGeneratorOptions()))
 	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings(nil))
 	util.MergeStringMaps(commonConfigSections, c.chConfigGenerator.GetFiles(chi.SectionCommon, true, nil))
 	// Extra user-specified config files
@@ -54,8 +72,8 @@ func (c *configSectionsGenerator) CreateConfigsCommon() map[string]string {
 	return commonConfigSections
 }
 
-// CreateConfigsUsers
-func (c *configSectionsGenerator) CreateConfigsUsers() map[string]string {
+// CreateConfigFilesGroupUsers
+func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupUsers() map[string]string {
 	commonUsersConfigSections := make(map[string]string)
 	// commonUsersConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. users
@@ -72,8 +90,8 @@ func (c *configSectionsGenerator) CreateConfigsUsers() map[string]string {
 	return commonUsersConfigSections
 }
 
-// CreateConfigsHost
-func (c *configSectionsGenerator) CreateConfigsHost(host *chi.ChiHost) map[string]string {
+// CreateConfigFilesGroupHost
+func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *chi.ChiHost) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	hostConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configMacros), c.chConfigGenerator.GetHostMacros(host))

@@ -17,7 +17,6 @@ require (
 	github.com/prometheus/client_golang v1.6.0
 	github.com/r3labs/diff v0.0.0-20191120142937-b4ed99a31f5a
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/testify v1.4.0
 	gopkg.in/d4l3k/messagediff.v1 v1.2.1
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.15.11

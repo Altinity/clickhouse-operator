@@ -31,24 +31,21 @@ import (
 )
 
 type Creator struct {
-	chop                      *chop.CHOp
-	chi                       *chiv1.ClickHouseInstallation
-	chConfigGenerator         *ClickHouseConfigGenerator
-	chConfigSectionsGenerator *configSectionsGenerator
-	labeler                   *Labeler
+	chop                   *chop.CHOp
+	chi                    *chiv1.ClickHouseInstallation
+	chConfigFilesGenerator *ClickHouseConfigFilesGenerator
+	labeler                *Labeler
 }
 
 func NewCreator(
 	chop *chop.CHOp,
 	chi *chiv1.ClickHouseInstallation,
 ) *Creator {
-	chConfigGenerator := NewClickHouseConfigGenerator(chi)
 	return &Creator{
-		chop:                      chop,
-		chi:                       chi,
-		chConfigGenerator:         chConfigGenerator,
-		chConfigSectionsGenerator: NewConfigSectionsGenerator(chConfigGenerator, chop.Config()),
-		labeler:                   NewLabeler(chop, chi),
+		chop:                   chop,
+		chi:                    chi,
+		chConfigFilesGenerator: NewClickHouseConfigFilesGenerator(NewClickHouseConfigGenerator(chi), chop.Config()),
+		labeler:                NewLabeler(chop, chi),
 	}
 }
 
@@ -239,7 +236,7 @@ func (c *Creator) createServiceFromTemplate(
 }
 
 // CreateConfigMapCHICommon creates new corev1.ConfigMap
-func (c *Creator) CreateConfigMapCHICommon() *corev1.ConfigMap {
+func (c *Creator) CreateConfigMapCHICommon(options *ClickHouseConfigFilesGeneratorOptions) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonName(c.chi),
@@ -247,7 +244,7 @@ func (c *Creator) CreateConfigMapCHICommon() *corev1.ConfigMap {
 			Labels:    c.labeler.getLabelsConfigMapCHICommon(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigSectionsGenerator.CreateConfigsCommon(),
+		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupCommon(options),
 	}
 }
 
@@ -260,11 +257,11 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 			Labels:    c.labeler.getLabelsConfigMapCHICommonUsers(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigSectionsGenerator.CreateConfigsUsers(),
+		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupUsers(),
 	}
 }
 
-// createConfigMapHost creates new corev1.ConfigMap
+// CreateConfigMapHost creates new corev1.ConfigMap
 func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -272,11 +269,11 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 			Namespace: host.Address.Namespace,
 			Labels:    c.labeler.getLabelsConfigMapHost(host),
 		},
-		Data: c.chConfigSectionsGenerator.CreateConfigsHost(host),
+		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host),
 	}
 }
 
-// createStatefulSet creates new apps.StatefulSet
+// CreateStatefulSet creates new apps.StatefulSet
 func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(host)
 	serviceName := CreateStatefulSetServiceName(host)
@@ -341,6 +338,7 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 
 func (c *Creator) ensureStatefulSetIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	c.ensureClickHouseContainer(statefulSet, host)
+	c.ensureProbesSpecified(statefulSet)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
@@ -351,6 +349,19 @@ func (c *Creator) ensureClickHouseContainer(statefulSet *apps.StatefulSet, _ *ch
 			&statefulSet.Spec.Template.Spec,
 			c.newDefaultClickHouseContainer(),
 		)
+	}
+}
+
+func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
+	container, ok := getClickHouseContainer(statefulSet)
+	if !ok {
+		return
+	}
+	if container.LivenessProbe == nil {
+		container.LivenessProbe = newDefaultLivenessProbe()
+	}
+	if container.ReadinessProbe == nil {
+		container.ReadinessProbe = c.newDefaultReadinessProbe()
 	}
 }
 
@@ -370,16 +381,7 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.LogVolumeClaimTemplate != "" {
-		addContainer(&statefulSet.Spec.Template.Spec, corev1.Container{
-			Name:  ClickHouseLogContainerName,
-			Image: defaultBusyBoxDockerImage,
-			Command: []string{
-				"/bin/sh", "-c", "--",
-			},
-			Args: []string{
-				"while true; do sleep 30; done;",
-			},
-		})
+		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
 		log.V(1).Infof("setupStatefulSetPodTemplate() add log container for statefulSet %s", statefulSetName)
 	}
 }
@@ -411,7 +413,7 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
 func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
-	configMapMacrosName := CreateConfigMapPodName(host)
+	configMapPodName := CreateConfigMapPodName(host)
 	configMapCommonName := CreateConfigMapCommonName(c.chi)
 	configMapCommonUsersName := CreateConfigMapCommonUsersName(c.chi)
 
@@ -420,7 +422,7 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 		statefulSetObject.Spec.Template.Spec.Volumes,
 		newVolumeForConfigMap(configMapCommonName),
 		newVolumeForConfigMap(configMapCommonUsersName),
-		newVolumeForConfigMap(configMapMacrosName),
+		newVolumeForConfigMap(configMapPodName),
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
@@ -433,7 +435,7 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 			container.VolumeMounts,
 			newVolumeMount(configMapCommonName, dirPathCommonConfig),
 			newVolumeMount(configMapCommonUsersName, dirPathUsersConfig),
-			newVolumeMount(configMapMacrosName, dirPathHostConfig),
+			newVolumeMount(configMapPodName, dirPathHostConfig),
 		)
 	}
 }
@@ -509,13 +511,13 @@ func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, b
 
 func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	// Ensure ClickHouse container has all named ports specified
-	chContainer, ok := getClickHouseContainer(statefulSet)
+	container, ok := getClickHouseContainer(statefulSet)
 	if !ok {
 		return
 	}
-	ensurePortByName(chContainer, chDefaultTCPPortName, host.TCPPort)
-	ensurePortByName(chContainer, chDefaultHTTPPortName, host.HTTPPort)
-	ensurePortByName(chContainer, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
+	ensurePortByName(container, chDefaultTCPPortName, host.TCPPort)
+	ensurePortByName(container, chDefaultHTTPPortName, host.HTTPPort)
+	ensurePortByName(container, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
 }
 
 func ensurePortByName(container *corev1.Container, name string, port int32) {
@@ -700,6 +702,7 @@ func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 	}
 }
 
+// newDefaultHostTemplateForHostNetwork
 func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 	return &chiv1.ChiHostTemplate{
 		Name: name,
@@ -736,6 +739,51 @@ func (c *Creator) newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 	return podTemplate
 }
 
+// newDefaultLivenessProbe
+func newDefaultLivenessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/ping",
+				Port: intstr.Parse(chDefaultHTTPPortName),
+			},
+		},
+		InitialDelaySeconds: 30,
+		PeriodSeconds:       10,
+	}
+}
+
+// newDefaultReadinessProbe
+func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: fmt.Sprintf(
+					"/?user=%s&password=%s&query=%s",
+					url.QueryEscape(c.chop.Config().CHUsername),
+					url.QueryEscape(c.chop.Config().CHPassword),
+					// SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='all-sharded' AND is_local
+					url.QueryEscape(
+						fmt.Sprintf(
+							"SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local",
+							allShardsOneReplicaClusterName,
+						),
+					),
+				),
+				Port: intstr.Parse(chDefaultHTTPPortName),
+				HTTPHeaders: []corev1.HTTPHeader{
+					{
+						Name:  "Accept",
+						Value: "*/*",
+					},
+				},
+			},
+		},
+		InitialDelaySeconds: 30,
+		PeriodSeconds:       10,
+	}
+}
+
 // newDefaultClickHouseContainer returns default ClickHouse Container
 func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 	return corev1.Container{
@@ -755,41 +803,21 @@ func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 				ContainerPort: chDefaultInterserverHTTPPortNumber,
 			},
 		},
-		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/ping",
-					Port: intstr.Parse(chDefaultHTTPPortName),
-				},
-			},
-			InitialDelaySeconds: 10,
-			PeriodSeconds:       10,
+		LivenessProbe:  newDefaultLivenessProbe(),
+		ReadinessProbe: c.newDefaultReadinessProbe(),
+	}
+}
+
+// newDefaultLogContainer returns default Log Container
+func newDefaultLogContainer() corev1.Container {
+	return corev1.Container{
+		Name:  ClickHouseLogContainerName,
+		Image: defaultBusyBoxDockerImage,
+		Command: []string{
+			"/bin/sh", "-c", "--",
 		},
-		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/?" +
-						"user=" + url.QueryEscape(c.chop.Config().CHUsername) +
-						"&password=" + url.QueryEscape(c.chop.Config().CHPassword) +
-						"&query=" +
-						// SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='all-sharded' AND is_local
-						url.QueryEscape(
-							fmt.Sprintf(
-								"SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local",
-								allShardsOneReplicaClusterName,
-							),
-						),
-					Port: intstr.Parse(chDefaultHTTPPortName),
-					HTTPHeaders: []corev1.HTTPHeader{
-						{
-							Name:  "Accept",
-							Value: "*/*",
-						},
-					},
-				},
-			},
-			InitialDelaySeconds: 30,
-			PeriodSeconds:       10,
+		Args: []string{
+			"while true; do sleep 30; done;",
 		},
 	}
 }

@@ -528,6 +528,18 @@ func (chi *ClickHouseInstallation) HostsCount() int {
 	return count
 }
 
+// HostsCountAttributes
+func (chi *ClickHouseInstallation) HostsCountAttributes(a ChiHostReconcileAttributes) int {
+	count := 0
+	chi.WalkHosts(func(host *ChiHost) error {
+		if host.ReconcileAttributes.Any(a) {
+			count++
+		}
+		return nil
+	})
+	return count
+}
+
 // GetHostTemplate gets ChiHostTemplate by name
 func (chi *ClickHouseInstallation) GetHostTemplate(name string) (*ChiHostTemplate, bool) {
 	if chi.Spec.Templates.HostTemplatesIndex == nil {
