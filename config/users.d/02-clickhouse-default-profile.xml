@@ -5,6 +5,7 @@
       <connect_timeout_with_failover_ms>1000</connect_timeout_with_failover_ms>
       <distributed_aggregation_memory_efficient>1</distributed_aggregation_memory_efficient>
       <parallel_view_processing>1</parallel_view_processing>
+      <http_connection_timeout>5</http_connection_timeout>
     </default>
   </profiles>
 </yandex>
