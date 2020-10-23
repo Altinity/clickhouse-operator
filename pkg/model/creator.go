@@ -759,7 +759,7 @@ func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 					Port: intstr.Parse(chDefaultHTTPPortName),
 				},
 			},
-			InitialDelaySeconds: 10,
+			InitialDelaySeconds: 30,
 			PeriodSeconds:       10,
 		},
 		ReadinessProbe: &corev1.Probe{
