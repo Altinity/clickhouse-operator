@@ -16,18 +16,18 @@ package model
 
 import (
 	"fmt"
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"net/url"
 
+	log "github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	log "github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	// log "k8s.io/klog"
+
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type Creator struct {
@@ -337,12 +337,12 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 }
 
 func (c *Creator) ensureStatefulSetIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	c.ensureClickHouseContainer(statefulSet, host)
+	c.ensureClickHouseContainerSpecified(statefulSet, host)
 	c.ensureProbesSpecified(statefulSet)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
-func (c *Creator) ensureClickHouseContainer(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
+func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
 	if _, ok := getClickHouseContainer(statefulSet); !ok {
 		// No ClickHouse container available
 		addContainer(
