@@ -733,6 +733,19 @@ func (c *Creator) newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 	return podTemplate
 }
 
+func newDefaultLivenessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/ping",
+				Port: intstr.Parse(chDefaultHTTPPortName),
+			},
+		},
+		InitialDelaySeconds: 30,
+		PeriodSeconds:       10,
+	}
+}
+
 // newDefaultClickHouseContainer returns default ClickHouse Container
 func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 	return corev1.Container{
@@ -752,16 +765,7 @@ func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 				ContainerPort: chDefaultInterserverHTTPPortNumber,
 			},
 		},
-		LivenessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/ping",
-					Port: intstr.Parse(chDefaultHTTPPortName),
-				},
-			},
-			InitialDelaySeconds: 30,
-			PeriodSeconds:       10,
-		},
+		LivenessProbe: newDefaultLivenessProbe(),
 		ReadinessProbe: &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
