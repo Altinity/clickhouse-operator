@@ -367,16 +367,7 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.LogVolumeClaimTemplate != "" {
-		addContainer(&statefulSet.Spec.Template.Spec, corev1.Container{
-			Name:  ClickHouseLogContainerName,
-			Image: defaultBusyBoxDockerImage,
-			Command: []string{
-				"/bin/sh", "-c", "--",
-			},
-			Args: []string{
-				"while true; do sleep 30; done;",
-			},
-		})
+		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
 		log.V(1).Infof("setupStatefulSetPodTemplate() add log container for statefulSet %s", statefulSetName)
 	}
 }
@@ -800,6 +791,20 @@ func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 		},
 		LivenessProbe:  newDefaultLivenessProbe(),
 		ReadinessProbe: c.newDefaultReadinessProbe(),
+	}
+}
+
+// newDefaultLogContainer returns default Log Container
+func newDefaultLogContainer() corev1.Container {
+	return corev1.Container{
+		Name:  ClickHouseLogContainerName,
+		Image: defaultBusyBoxDockerImage,
+		Command: []string{
+			"/bin/sh", "-c", "--",
+		},
+		Args: []string{
+			"while true; do sleep 30; done;",
+		},
 	}
 }
 
