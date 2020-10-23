@@ -511,13 +511,13 @@ func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, b
 
 func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	// Ensure ClickHouse container has all named ports specified
-	chContainer, ok := getClickHouseContainer(statefulSet)
+	container, ok := getClickHouseContainer(statefulSet)
 	if !ok {
 		return
 	}
-	ensurePortByName(chContainer, chDefaultTCPPortName, host.TCPPort)
-	ensurePortByName(chContainer, chDefaultHTTPPortName, host.HTTPPort)
-	ensurePortByName(chContainer, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
+	ensurePortByName(container, chDefaultTCPPortName, host.TCPPort)
+	ensurePortByName(container, chDefaultHTTPPortName, host.HTTPPort)
+	ensurePortByName(container, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
 }
 
 func ensurePortByName(container *corev1.Container, name string, port int32) {
