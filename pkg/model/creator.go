@@ -746,6 +746,35 @@ func newDefaultLivenessProbe() *corev1.Probe {
 	}
 }
 
+func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/?" +
+					"user=" + url.QueryEscape(c.chop.Config().CHUsername) +
+					"&password=" + url.QueryEscape(c.chop.Config().CHPassword) +
+					"&query=" +
+					// SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='all-sharded' AND is_local
+					url.QueryEscape(
+						fmt.Sprintf(
+							"SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local",
+							allShardsOneReplicaClusterName,
+						),
+					),
+				Port: intstr.Parse(chDefaultHTTPPortName),
+				HTTPHeaders: []corev1.HTTPHeader{
+					{
+						Name:  "Accept",
+						Value: "*/*",
+					},
+				},
+			},
+		},
+		InitialDelaySeconds: 30,
+		PeriodSeconds:       10,
+	}
+}
+
 // newDefaultClickHouseContainer returns default ClickHouse Container
 func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 	return corev1.Container{
@@ -765,33 +794,8 @@ func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 				ContainerPort: chDefaultInterserverHTTPPortNumber,
 			},
 		},
-		LivenessProbe: newDefaultLivenessProbe(),
-		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/?" +
-						"user=" + url.QueryEscape(c.chop.Config().CHUsername) +
-						"&password=" + url.QueryEscape(c.chop.Config().CHPassword) +
-						"&query=" +
-						// SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='all-sharded' AND is_local
-						url.QueryEscape(
-							fmt.Sprintf(
-								"SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local",
-								allShardsOneReplicaClusterName,
-							),
-						),
-					Port: intstr.Parse(chDefaultHTTPPortName),
-					HTTPHeaders: []corev1.HTTPHeader{
-						{
-							Name:  "Accept",
-							Value: "*/*",
-						},
-					},
-				},
-			},
-			InitialDelaySeconds: 30,
-			PeriodSeconds:       10,
-		},
+		LivenessProbe:  newDefaultLivenessProbe(),
+		ReadinessProbe: c.newDefaultReadinessProbe(),
 	}
 }
 
