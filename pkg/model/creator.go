@@ -261,7 +261,7 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 	}
 }
 
-// createConfigMapHost creates new corev1.ConfigMap
+// CreateConfigMapHost creates new corev1.ConfigMap
 func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -273,7 +273,7 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 	}
 }
 
-// createStatefulSet creates new apps.StatefulSet
+// CreateStatefulSet creates new apps.StatefulSet
 func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(host)
 	serviceName := CreateStatefulSetServiceName(host)
@@ -697,6 +697,7 @@ func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 	}
 }
 
+// newDefaultHostTemplateForHostNetwork
 func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 	return &chiv1.ChiHostTemplate{
 		Name: name,
@@ -733,6 +734,7 @@ func (c *Creator) newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 	return podTemplate
 }
 
+// newDefaultLivenessProbe
 func newDefaultLivenessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		Handler: corev1.Handler{
@@ -746,6 +748,7 @@ func newDefaultLivenessProbe() *corev1.Probe {
 	}
 }
 
+// newDefaultReadinessProbe
 func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		Handler: corev1.Handler{
