@@ -343,13 +343,16 @@ func (c *Creator) ensureStatefulSetIntegrity(statefulSet *apps.StatefulSet, host
 }
 
 func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
-	if _, ok := getClickHouseContainer(statefulSet); !ok {
-		// No ClickHouse container available
-		addContainer(
-			&statefulSet.Spec.Template.Spec,
-			c.newDefaultClickHouseContainer(),
-		)
+	_, ok := getClickHouseContainer(statefulSet);
+	if ok {
+		return
 	}
+
+	// No ClickHouse container available, let's add one
+	addContainer(
+		&statefulSet.Spec.Template.Spec,
+		c.newDefaultClickHouseContainer(),
+	)
 }
 
 func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
