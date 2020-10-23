@@ -332,18 +332,18 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 	c.statefulSetApplyPodTemplate(statefulSet, podTemplate, host)
 
 	// Post-process StatefulSet
-	c.ensureStatefulSetIntegrity(statefulSet, host)
+	c.ensureStatefulSetTemplateIntegrity(statefulSet, host)
 	c.personalizeStatefulSetTemplate(statefulSet, host)
 }
 
-func (c *Creator) ensureStatefulSetIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+func (c *Creator) ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	c.ensureClickHouseContainerSpecified(statefulSet, host)
 	c.ensureProbesSpecified(statefulSet)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
 func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
-	_, ok := getClickHouseContainer(statefulSet);
+	_, ok := getClickHouseContainer(statefulSet)
 	if ok {
 		return
 	}
