@@ -561,6 +561,10 @@ func isStatefulSetLive(statefulSet *apps.StatefulSet) bool {
 	if statefulSet == nil {
 		return false
 	}
+
+	if statefulSet.Spec.Replicas == nil {
+		return false
+	}
 	// All replicas are in "Ready" status - meaning ready to be used - no failure inside
 	return statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas
 }
@@ -568,6 +572,10 @@ func isStatefulSetLive(statefulSet *apps.StatefulSet) bool {
 // isStatefulSetReady returns whether StatefulSet is ready or not
 func isStatefulSetReady(statefulSet *apps.StatefulSet) bool {
 	if statefulSet == nil {
+		return false
+	}
+
+	if statefulSet.Spec.Replicas == nil {
 		return false
 	}
 	// All replicas are in "Ready" status - meaning ready to be used - no failure inside
