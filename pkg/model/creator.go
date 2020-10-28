@@ -538,6 +538,56 @@ func getClickHouseContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, boo
 	return nil, false
 }
 
+// isStatefulSetGeneration returns whether StatefulSet has requested generation or not
+func isStatefulSetGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
+	if statefulSet == nil {
+		return false
+	}
+
+	// StatefulSet has .spec generation we are looking for
+	return (statefulSet.Generation == generation) &&
+		// and this .spec generation is being applied to replicas - it is observed right now
+		(statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
+		// and all replicas are of expected generation
+		(statefulSet.Status.CurrentReplicas == *statefulSet.Spec.Replicas) &&
+		// and all replicas are updated - meaning rolling update completed over all replicas
+		(statefulSet.Status.UpdatedReplicas == *statefulSet.Spec.Replicas) &&
+		// and current revision is an updated one - meaning rolling update completed over all replicas
+		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
+}
+
+// isStatefulSetLive returns whether StatefulSet is live or not
+func isStatefulSetLive(statefulSet *apps.StatefulSet) bool {
+	if statefulSet == nil {
+		return false
+	}
+	// All replicas are in "Ready" status - meaning ready to be used - no failure inside
+	return statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas
+}
+
+// isStatefulSetReady returns whether StatefulSet is ready or not
+func isStatefulSetReady(statefulSet *apps.StatefulSet) bool {
+	if statefulSet == nil {
+		return false
+	}
+	// All replicas are in "Ready" status - meaning ready to be used - no failure inside
+	return statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas
+}
+
+// strStatefulSetStatus returns human-friendly string representation of StatefulSet status
+func strStatefulSetStatus(status *apps.StatefulSetStatus) string {
+	return fmt.Sprintf(
+		"ObservedGeneration:%d Replicas:%d ReadyReplicas:%d CurrentReplicas:%d UpdatedReplicas:%d CurrentRevision:%s UpdateRevision:%s",
+		status.ObservedGeneration,
+		status.Replicas,
+		status.ReadyReplicas,
+		status.CurrentReplicas,
+		status.UpdatedReplicas,
+		status.CurrentRevision,
+		status.UpdateRevision,
+	)
+}
+
 func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	// Ensure ClickHouse container has all named ports specified
 	container, ok := getClickHouseContainer(statefulSet)
