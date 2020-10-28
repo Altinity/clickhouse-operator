@@ -505,11 +505,37 @@ func (c *Creator) statefulSetApplyPodTemplate(
 }
 
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
+	// Find by name
+	for i := range statefulSet.Spec.Template.Spec.Containers {
+		container := &statefulSet.Spec.Template.Spec.Containers[i]
+		if container.Name == ClickHouseContainerName {
+			return container, true
+		}
+	}
+
+	// Find by index
 	if len(statefulSet.Spec.Template.Spec.Containers) > 0 {
 		return &statefulSet.Spec.Template.Spec.Containers[0], true
-	} else {
-		return nil, false
 	}
+
+	return nil, false
+}
+
+func getClickHouseContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, bool) {
+	// Find by name
+	for i := range pod.Status.ContainerStatuses {
+		status := &pod.Status.ContainerStatuses[i]
+		if status.Name == ClickHouseContainerName {
+			return status, true
+		}
+	}
+
+	// Find by index
+	if len(pod.Status.ContainerStatuses) > 0 {
+		return &pod.Status.ContainerStatuses[0], true
+	}
+
+	return nil, false
 }
 
 func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
