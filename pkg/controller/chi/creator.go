@@ -43,11 +43,11 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
 		// Error call Create()
 		return err
-	} else if err := c.waitStatefulSetReady(statefulSet); err == nil {
+	} else if err := c.waitHostRunning(host); err == nil {
 		// Target generation reached, StatefulSet created successfully
 		return nil
 	} else {
-		// Unable to reach target generation, StatefulSet create failed, time to rollback?
+		// Unable to run StatefulSet, StatefulSet create failed, time to rollback?
 		return c.onStatefulSetCreateFailed(statefulSet, host)
 	}
 
@@ -55,7 +55,7 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 }
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
-func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet) error {
+func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	// Convenience shortcuts
 	namespace := newStatefulSet.Namespace
 	name := newStatefulSet.Name
@@ -81,11 +81,11 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 
 	log.V(1).Infof("updateStatefulSet(%s/%s) - generation change %d=>%d", namespace, name, oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
-	if err := c.waitStatefulSetReady(updatedStatefulSet); err == nil {
+	if err := c.waitHostRunning(host); err == nil {
 		// Target generation reached, StatefulSet updated successfully
 		return nil
 	} else {
-		// Unable to reach target generation, StatefulSet update failed, time to rollback?
+		// Unable to run StatefulSet, StatefulSet update failed, time to rollback?
 		return c.onStatefulSetUpdateFailed(oldStatefulSet)
 	}
 

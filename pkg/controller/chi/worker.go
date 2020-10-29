@@ -501,6 +501,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	// Include host back to ClickHouse clusters
 
 	// Wait host to be ready
+	w.c.waitStatefulSetReady(statefulSet)
 
 	// If host is not ready - fallback
 
@@ -1009,7 +1010,7 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 		WithStatusAction(host.CHI).
 		Info("Update StatefulSet(%s/%s) - started", namespace, name)
 
-	err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet)
+	err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet, host)
 	if err == nil {
 		host.CHI.Status.UpdatedHostsCount++
 		_ = w.c.updateCHIObjectStatus(host.CHI, false)

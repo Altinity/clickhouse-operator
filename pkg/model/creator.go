@@ -822,7 +822,7 @@ func newDefaultLivenessProbe() *corev1.Probe {
 				Port: intstr.Parse(chDefaultHTTPPortName),
 			},
 		},
-		InitialDelaySeconds: 30,
+		InitialDelaySeconds: 60,
 		PeriodSeconds:       10,
 	}
 }
@@ -853,7 +853,7 @@ func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
 				},
 			},
 		},
-		InitialDelaySeconds: 30,
+		InitialDelaySeconds: 120,
 		PeriodSeconds:       10,
 	}
 }
