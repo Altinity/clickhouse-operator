@@ -475,6 +475,8 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		WithStatusAction(host.CHI).
 		Info("Reconcile Host %s started", host.Name)
 
+	// Exclude host from ClickHouse clusters
+
 	// Reconcile host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)
 	if err := w.reconcileConfigMap(host.CHI, configMap, true); err != nil {
@@ -495,6 +497,12 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	if err := w.reconcileService(host.CHI, service); err != nil {
 		return err
 	}
+
+	// Include host back to ClickHouse clusters
+
+	// Wait host to be ready
+
+	// If host is not ready - fallback
 
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).

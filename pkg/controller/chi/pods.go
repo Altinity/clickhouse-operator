@@ -53,3 +53,13 @@ func (c *Controller) walkContainerStatuses(host *chop.ChiHost, f func(status *v1
 		f(status)
 	}
 }
+
+func (c *Controller) isHostRunning(host *chop.ChiHost) bool {
+	all := true
+	c.walkContainerStatuses(host, func(status *v1.ContainerStatus) {
+		if status.State.Running == nil {
+			all = false
+		}
+	})
+	return all
+}

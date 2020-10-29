@@ -556,19 +556,6 @@ func IsStatefulSetGeneration(statefulSet *apps.StatefulSet, generation int64) bo
 		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
 }
 
-// IsStatefulSetLive returns whether StatefulSet is live or not
-func IsStatefulSetLive(statefulSet *apps.StatefulSet) bool {
-	if statefulSet == nil {
-		return false
-	}
-
-	if statefulSet.Spec.Replicas == nil {
-		return false
-	}
-	// All replicas are in "Ready" status - meaning ready to be used - no failure inside
-	return statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas
-}
-
 // IsStatefulSetReady returns whether StatefulSet is ready or not
 func IsStatefulSetReady(statefulSet *apps.StatefulSet) bool {
 	if statefulSet == nil {

@@ -43,7 +43,7 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
 		// Error call Create()
 		return err
-	} else if err := c.waitStatefulSetReady(statefulSet.Namespace, statefulSet.Name, statefulSet.Generation); err == nil {
+	} else if err := c.waitStatefulSetReady(statefulSet); err == nil {
 		// Target generation reached, StatefulSet created successfully
 		return nil
 	} else {
@@ -81,7 +81,7 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 
 	log.V(1).Infof("updateStatefulSet(%s/%s) - generation change %d=>%d", namespace, name, oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
-	if err := c.waitStatefulSetReady(namespace, name, updatedStatefulSet.Generation); err == nil {
+	if err := c.waitStatefulSetReady(updatedStatefulSet); err == nil {
 		// Target generation reached, StatefulSet updated successfully
 		return nil
 	} else {
@@ -112,29 +112,57 @@ func (c *Controller) updatePersistentVolume(pv *v1.PersistentVolume) error {
 
 // waitStatefulSetReady polls StatefulSet for reaching target generation and Ready state
 // Used in createStatefulSet, updateStatefulSet and deleteStatefulSet function only
-func (c *Controller) waitStatefulSetReady(namespace, name string, targetGeneration int64) error {
-	if err := c.waitStatefulSet(namespace, name, func(statefulSet *apps.StatefulSet) bool {
-		return model.IsStatefulSetGeneration(statefulSet, targetGeneration)
+func (c *Controller) waitStatefulSetReady(statefulSet *apps.StatefulSet) error {
+	if err := c.waitStatefulSet(statefulSet, func(statefulSet *apps.StatefulSet) bool {
+		return model.IsStatefulSetGeneration(statefulSet, statefulSet.Generation)
 	}); err != nil {
 		return err
 	}
-	return c.waitStatefulSet(namespace, name, model.IsStatefulSetReady)
+	return c.waitStatefulSet(statefulSet, model.IsStatefulSetReady)
 }
 
 // waitStatefulSetLive polls StatefulSet for reaching target generation and Live state
 // Used in createStatefulSet, updateStatefulSet and deleteStatefulSet function only
-func (c *Controller) waitStatefulSetLive(namespace, name string, targetGeneration int64) error {
-	if err := c.waitStatefulSet(namespace, name, func(statefulSet *apps.StatefulSet) bool {
-		return model.IsStatefulSetGeneration(statefulSet, targetGeneration)
-	}); err != nil {
-		return err
+func (c *Controller) waitHostRunning(host *chop.ChiHost) error {
+	namespace := host.Address.Namespace
+	name := host.Address.HostName
+	// Wait for some limited time for StatefulSet to reach target generation
+	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
+	start := time.Now()
+	for {
+		if c.isHostRunning(host) {
+			// All is good, job done, exit
+			log.V(1).Infof("waitHostRunning(%s/%s)-OK", namespace, name)
+			return nil
+		}
+
+		// Object is found, function not positive
+		if time.Since(start) >= (time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second) {
+			// Start bothering with log messages after some time only
+			log.V(1).Infof("waitHostRunning(%s/%s)-WAIT", namespace, name)
+		}
+
+		if time.Since(start) >= (time.Duration(c.chop.Config().StatefulSetUpdateTimeout) * time.Second) {
+			// Timeout reached, no good result available, time to quit
+			log.V(1).Infof("ERROR waitHostRunning(%s/%s) - TIMEOUT reached", namespace, name)
+			return errors.New(fmt.Sprintf("waitHostRunning(%s/%s) - wait timeout", namespace, name))
+		}
+
+		// Wait some more time
+		log.V(2).Infof("waithostRunning(%s/%s)", namespace, name)
+		select {
+		case <-time.After(time.Duration(c.chop.Config().StatefulSetUpdatePollPeriod) * time.Second):
+		}
 	}
-	return c.waitStatefulSet(namespace, name, model.IsStatefulSetLive)
+
+	return fmt.Errorf("unexpected flow")
 }
 
 // waitStatefulSetGeneration polls StatefulSet for reaching target generation.
 // Used in createStatefulSet, updateStatefulSet and deleteStatefulSet function only
-func (c *Controller) waitStatefulSet(namespace, name string, f func(set *apps.StatefulSet) bool) error {
+func (c *Controller) waitStatefulSet(sts *apps.StatefulSet, f func(set *apps.StatefulSet) bool) error {
+	namespace := sts.Namespace
+	name := sts.Name
 	// Wait for some limited time for StatefulSet to reach target generation
 	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
 	start := time.Now()
