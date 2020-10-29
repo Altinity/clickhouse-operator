@@ -131,7 +131,7 @@ func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 	var zero int32 = 0
 	statefulSet.Spec.Replicas = &zero
 	statefulSet, _ = c.kubeClient.AppsV1().StatefulSets(namespace).Update(statefulSet)
-	_ = c.waitStatefulSetGeneration(namespace, statefulSet.Name, statefulSet.Generation)
+	_ = c.waitStatefulSetReady(namespace, statefulSet.Name, statefulSet.Generation)
 	host.StatefulSet = statefulSet
 
 	// And now delete empty StatefulSet

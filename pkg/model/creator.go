@@ -538,8 +538,8 @@ func getClickHouseContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, boo
 	return nil, false
 }
 
-// isStatefulSetGeneration returns whether StatefulSet has requested generation or not
-func isStatefulSetGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
+// IsStatefulSetGeneration returns whether StatefulSet has requested generation or not
+func IsStatefulSetGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
 	if statefulSet == nil {
 		return false
 	}
@@ -556,8 +556,8 @@ func isStatefulSetGeneration(statefulSet *apps.StatefulSet, generation int64) bo
 		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
 }
 
-// isStatefulSetLive returns whether StatefulSet is live or not
-func isStatefulSetLive(statefulSet *apps.StatefulSet) bool {
+// IsStatefulSetLive returns whether StatefulSet is live or not
+func IsStatefulSetLive(statefulSet *apps.StatefulSet) bool {
 	if statefulSet == nil {
 		return false
 	}
@@ -569,8 +569,8 @@ func isStatefulSetLive(statefulSet *apps.StatefulSet) bool {
 	return statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas
 }
 
-// isStatefulSetReady returns whether StatefulSet is ready or not
-func isStatefulSetReady(statefulSet *apps.StatefulSet) bool {
+// IsStatefulSetReady returns whether StatefulSet is ready or not
+func IsStatefulSetReady(statefulSet *apps.StatefulSet) bool {
 	if statefulSet == nil {
 		return false
 	}
@@ -582,8 +582,8 @@ func isStatefulSetReady(statefulSet *apps.StatefulSet) bool {
 	return statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas
 }
 
-// strStatefulSetStatus returns human-friendly string representation of StatefulSet status
-func strStatefulSetStatus(status *apps.StatefulSetStatus) string {
+// StrStatefulSetStatus returns human-friendly string representation of StatefulSet status
+func StrStatefulSetStatus(status *apps.StatefulSetStatus) string {
 	return fmt.Sprintf(
 		"ObservedGeneration:%d Replicas:%d ReadyReplicas:%d CurrentReplicas:%d UpdatedReplicas:%d CurrentRevision:%s UpdateRevision:%s",
 		status.ObservedGeneration,

@@ -958,14 +958,6 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 	return err
 }
 
-// reconcilePersistentVolumes
-func (w *worker) reconcilePersistentVolumes(host *chop.ChiHost) {
-	w.c.walkPVs(host, func(pv *core.PersistentVolume) {
-		pv = w.creator.PreparePersistentVolume(pv, host)
-		_ = w.c.updatePersistentVolume(pv)
-	})
-}
-
 // createStatefulSet
 func (w *worker) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	w.a.V(2).Info("createStatefulSet() - start")
@@ -1030,15 +1022,23 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 	w.a.Info(util.MessageDiffString(diff, equal))
 
 	err = w.c.deleteStatefulSet(host)
-	err = w.reconcilePVCs(host)
+	err = w.reconcilePersistentVolumeClaims(host)
 	return w.createStatefulSet(newStatefulSet, host)
 }
 
-// reconcilePVCs
-func (w *worker) reconcilePVCs(host *chop.ChiHost) error {
+// reconcilePersistentVolumes
+func (w *worker) reconcilePersistentVolumes(host *chop.ChiHost) {
+	w.c.walkPVs(host, func(pv *core.PersistentVolume) {
+		pv = w.creator.PreparePersistentVolume(pv, host)
+		_ = w.c.updatePersistentVolume(pv)
+	})
+}
+
+// reconcilePersistentVolumeClaims
+func (w *worker) reconcilePersistentVolumeClaims(host *chop.ChiHost) error {
 	namespace := host.Address.Namespace
-	w.a.V(2).Info("reconcilePVCs for host %s/%s - start", namespace, host.Name)
-	defer w.a.V(2).Info("reconcilePVCs for host %s/%s - end", namespace, host.Name)
+	w.a.V(2).Info("reconcilePersistentVolumeClaims for host %s/%s - start", namespace, host.Name)
+	defer w.a.V(2).Info("reconcilePersistentVolumeClaims for host %s/%s - end", namespace, host.Name)
 
 	host.WalkVolumeMounts(func(volumeMount *core.VolumeMount) {
 		volumeClaimTemplateName := volumeMount.Name

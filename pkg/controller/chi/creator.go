@@ -18,16 +18,18 @@ package chi
 import (
 	"errors"
 	"fmt"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"time"
+
 	log "github.com/golang/glog"
 	"k8s.io/api/core/v1"
 
 	// log "k8s.io/klog"
 
 	apps "k8s.io/api/apps/v1"
-	"time"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
+	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model"
 )
 
 const (
@@ -41,7 +43,7 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
 		// Error call Create()
 		return err
-	} else if err := c.waitStatefulSetGeneration(statefulSet.Namespace, statefulSet.Name, statefulSet.Generation); err == nil {
+	} else if err := c.waitStatefulSetReady(statefulSet.Namespace, statefulSet.Name, statefulSet.Generation); err == nil {
 		// Target generation reached, StatefulSet created successfully
 		return nil
 	} else {
@@ -79,7 +81,7 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 
 	log.V(1).Infof("updateStatefulSet(%s/%s) - generation change %d=>%d", namespace, name, oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
-	if err := c.waitStatefulSetGeneration(namespace, name, updatedStatefulSet.Generation); err == nil {
+	if err := c.waitStatefulSetReady(namespace, name, updatedStatefulSet.Generation); err == nil {
 		// Target generation reached, StatefulSet updated successfully
 		return nil
 	} else {
@@ -108,40 +110,60 @@ func (c *Controller) updatePersistentVolume(pv *v1.PersistentVolume) error {
 	return nil
 }
 
+// waitStatefulSetReady polls StatefulSet for reaching target generation and Ready state
+// Used in createStatefulSet, updateStatefulSet and deleteStatefulSet function only
+func (c *Controller) waitStatefulSetReady(namespace, name string, targetGeneration int64) error {
+	if err := c.waitStatefulSet(namespace, name, func(statefulSet *apps.StatefulSet) bool {
+		return model.IsStatefulSetGeneration(statefulSet, targetGeneration)
+	}); err != nil {
+		return err
+	}
+	return c.waitStatefulSet(namespace, name, model.IsStatefulSetReady)
+}
+
+// waitStatefulSetLive polls StatefulSet for reaching target generation and Live state
+// Used in createStatefulSet, updateStatefulSet and deleteStatefulSet function only
+func (c *Controller) waitStatefulSetLive(namespace, name string, targetGeneration int64) error {
+	if err := c.waitStatefulSet(namespace, name, func(statefulSet *apps.StatefulSet) bool {
+		return model.IsStatefulSetGeneration(statefulSet, targetGeneration)
+	}); err != nil {
+		return err
+	}
+	return c.waitStatefulSet(namespace, name, model.IsStatefulSetLive)
+}
+
 // waitStatefulSetGeneration polls StatefulSet for reaching target generation.
 // Used in createStatefulSet, updateStatefulSet and deleteStatefulSet function only
-func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGeneration int64) error {
+func (c *Controller) waitStatefulSet(namespace, name string, f func(set *apps.StatefulSet) bool) error {
 	// Wait for some limited time for StatefulSet to reach target generation
 	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
 	start := time.Now()
 	for {
 		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err == nil {
 			// Object is found
-			if hasStatefulSetReachedGeneration(statefulSet, targetGeneration) {
-				// StatefulSet is available and generation reached
+			if f(statefulSet) {
 				// All is good, job done, exit
-				log.V(1).Infof("waitStatefulSetGeneration(%s/%s)-OK  :%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
+				log.V(1).Infof("waitStatefulSet(%s/%s)-OK  :%s", namespace, name, model.StrStatefulSetStatus(&statefulSet.Status))
 				return nil
 			}
 
-			// Object is found, target generation not reached yet
+			// Object is found, function not positive
 			if time.Since(start) >= (time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second) {
-				// Generation not yet reached
 				// Start bothering with log messages after some time only
-				log.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
+				log.V(1).Infof("waitStatefulSet(%s/%s)-WAIT:%s", namespace, name, model.StrStatefulSetStatus(&statefulSet.Status))
 			}
 		} else if apierrors.IsNotFound(err) {
 			// Object is not found - it either failed to be created or just still not created
 			if time.Since(start) >= (time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second) {
 				// No more wait for object to be created. Consider create as failed.
-				log.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED - StatefulSet still not found, abort", namespace, name)
+				log.V(1).Infof("ERROR waitStatefulSet(%s/%s) Get() FAILED - StatefulSet still not found, abort", namespace, name)
 				return err
 			}
 			// Object with such name not found - may be is still being created - wait for it
-			log.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT: object not yet created, need to wait", namespace, name)
+			log.V(1).Infof("waitStatefulSet(%s/%s)-WAIT: object not yet created, need to wait", namespace, name)
 		} else {
 			// Some kind of total error
-			log.Errorf("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
+			log.Errorf("ERROR waitStatefulSet(%s/%s) Get() FAILED", namespace, name)
 			return err
 		}
 
@@ -149,12 +171,12 @@ func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGen
 
 		if time.Since(start) >= (time.Duration(c.chop.Config().StatefulSetUpdateTimeout) * time.Second) {
 			// Timeout reached, no good result available, time to quit
-			log.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) - TIMEOUT reached", namespace, name)
-			return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - wait timeout", namespace, name))
+			log.V(1).Infof("ERROR waitStatefulSet(%s/%s) - TIMEOUT reached", namespace, name)
+			return errors.New(fmt.Sprintf("waitStatefulSet(%s/%s) - wait timeout", namespace, name))
 		}
 
 		// Wait some more time
-		log.V(2).Infof("waitStatefulSetGeneration(%s/%s)", namespace, name)
+		log.V(2).Infof("waitStatefulSet(%s/%s)", namespace, name)
 		select {
 		case <-time.After(time.Duration(c.chop.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}
