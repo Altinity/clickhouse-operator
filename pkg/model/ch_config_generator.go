@@ -165,6 +165,24 @@ func defaultRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return &RemoteServersGeneratorOptions{}
 }
 
+func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
+	if o == nil {
+		return false
+	}
+
+	if o.Exclude.ReconcileAttributes.Any(host.ReconcileAttributes) {
+		return true
+	}
+
+	for _, val := range o.Exclude.Hosts {
+		if val == host {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 	if o == nil {
 		return false
