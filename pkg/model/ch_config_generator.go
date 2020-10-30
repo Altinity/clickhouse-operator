@@ -165,12 +165,13 @@ func NewRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return &RemoteServersGeneratorOptions{}
 }
 
-func (o *RemoteServersGeneratorOptions) Add(host *chiv1.ChiHost) {
+func (o *RemoteServersGeneratorOptions) Add(host *chiv1.ChiHost) *RemoteServersGeneratorOptions {
 	if (o == nil) || (host == nil) {
-		return
+		return o
 	}
 
 	o.Exclude.Hosts = append(o.Exclude.Hosts, host)
+	return o
 }
 
 func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {

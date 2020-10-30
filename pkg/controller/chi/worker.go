@@ -476,6 +476,10 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		Info("Reconcile Host %s started", host.Name)
 
 	// Exclude host from ClickHouse clusters
+	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(
+		chopmodel.NewRemoteServersGeneratorOptions().Add(host),
+	)
+	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
 
 	// Reconcile host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)

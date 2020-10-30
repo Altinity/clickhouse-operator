@@ -188,7 +188,7 @@ func (c *Controller) waitStatefulSet(sts *apps.StatefulSet, f func(set *apps.Sta
 				return err
 			}
 			// Object with such name not found - may be is still being created - wait for it
-			log.V(1).Infof("waitStatefulSet(%s/%s)-WAIT: object not yet created, need to wait", namespace, name)
+			log.V(1).Infof("waitStatefulSet(%s/%s)-WAIT: object not found. Not created yet?", namespace, name)
 		} else {
 			// Some kind of total error
 			log.Errorf("ERROR waitStatefulSet(%s/%s) Get() FAILED", namespace, name)
