@@ -404,7 +404,7 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallat
 	}
 
 	// 2. CHI ConfigMaps without update - create only
-	return w.reconcileCHIConfigMaps(chi, false)
+	return w.reconcileCHIConfigMaps(chi, nil, false)
 }
 
 // reconcileCHIAuxObjectsFinal reconciles CHI global objects
@@ -413,15 +413,15 @@ func (w *worker) reconcileCHIAuxObjectsFinal(chi *chop.ClickHouseInstallation) e
 	defer w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - end")
 
 	// CHI ConfigMaps with update
-	return w.reconcileCHIConfigMaps(chi, true)
+	return w.reconcileCHIConfigMaps(chi, nil, true)
 }
 
 // reconcileCHIConfigMaps reconciles all CHI's ConfigMaps
-func (w *worker) reconcileCHIConfigMaps(chi *chop.ClickHouseInstallation, update bool) error {
+func (w *worker) reconcileCHIConfigMaps(chi *chop.ClickHouseInstallation, options *chopmodel.ClickHouseConfigFilesGeneratorOptions, update bool) error {
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.creator.CreateConfigMapCHICommon(nil)
+	configMapCommon := w.creator.CreateConfigMapCHICommon(options)
 	if err := w.reconcileConfigMap(chi, configMapCommon, update); err != nil {
 		return err
 	}
