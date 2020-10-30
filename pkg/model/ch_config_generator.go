@@ -161,8 +161,16 @@ type RemoteServersGeneratorOptions struct {
 	}
 }
 
-func defaultRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
+func NewRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return &RemoteServersGeneratorOptions{}
+}
+
+func (o *RemoteServersGeneratorOptions) Add(host *chiv1.ChiHost) {
+	if (o == nil) || (host == nil) {
+		return
+	}
+
+	o.Exclude.Hosts = append(o.Exclude.Hosts, host)
 }
 
 func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
@@ -199,6 +207,10 @@ func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 	}
 
 	return true
+}
+
+func defaultRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
+	return NewRemoteServersGeneratorOptions()
 }
 
 // GetRemoteServers creates "remote_servers.xml" content and calculates data generation parameters for other sections
