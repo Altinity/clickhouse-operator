@@ -116,15 +116,47 @@ func (n *Normalizer) NormalizeCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 
 // finalizeCHI performs some finalization tasks, which should be done after CHI is normalized
 func (n *Normalizer) finalizeCHI() {
-	n.chi.FillAddressInfo()
+	n.chi.FillSelfCalculatedAddressInfo()
 	n.chi.FillCHIPointer()
 	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		hostTemplate := n.getHostTemplate(host)
 		hostApplyHostTemplate(host, hostTemplate)
 		return nil
 	})
+	n.FillCHIAddressInfo()
 	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		return n.calcFingerprints(host)
+	})
+}
+
+func (n *Normalizer) FillCHIAddressInfo() {
+	n.chi.WalkHostsFullPath(0, 0, func(
+		chi *chiv1.ClickHouseInstallation,
+
+		chiScopeIndex int,
+		chiScopeCycleSize int,
+		chiScopeCycleIndex int,
+		chiScopeCycleOffset int,
+
+		clusterScopeIndex int,
+		clusterScopeCycleSize int,
+		clusterScopeCycleIndex int,
+		clusterScopeCycleOffset int,
+
+		clusterIndex int,
+		cluster *chiv1.ChiCluster,
+
+		shardIndex int,
+		shard *chiv1.ChiShard,
+
+		replicaIndex int,
+		replica *chiv1.ChiReplica,
+
+		host *chiv1.ChiHost,
+	) error {
+		host.Address.StatefulSet = CreateStatefulSetName(host)
+
+		return nil
 	})
 }
 

@@ -15,9 +15,8 @@
 package v1
 
 import (
-	"math"
-
 	"github.com/altinity/clickhouse-operator/pkg/version"
+	"math"
 )
 
 // fillStatus fills .Status
@@ -35,8 +34,7 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.Status.NormalizedCHI = chi.Spec
 }
 
-// FillAddressInfo
-func (chi *ClickHouseInstallation) FillAddressInfo() {
+func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 	// What is the max number of Pods allowed per Node
 	// TODO need to support multi-cluster
 	maxNumberOfPodsPerNode := 0
@@ -130,6 +128,8 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 		replica.Address.ReplicaIndex = replicaIndex
 
 		host.Address.Namespace = chi.Namespace
+		// Skip StatefulSet as impossible to self-calculate
+		// host.Address.StatefulSet = CreateStatefulSetName(host)
 		host.Address.CHIName = chi.Name
 		host.Address.ClusterName = cluster.Name
 		host.Address.ClusterIndex = clusterIndex

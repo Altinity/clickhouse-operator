@@ -44,20 +44,20 @@ spec:
 
   templates:
     podTemplates:
-      - name: clickhouse:19.3.7
+      - name: clickhouse:20.5
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:19.3.7
+              image: yandex/clickhouse-server:20.5
 
-      - name: clickhouse:19.3.5
+      - name: clickhouse:20.6
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:19.3.5
+              image: yandex/clickhouse-server:20.6
 
-      - name: clickhouse:19.1.10
+      - name: clickhouse:20.7
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:19.1.10
+              image: yandex/clickhouse-server:20.7

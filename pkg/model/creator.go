@@ -16,18 +16,18 @@ package model
 
 import (
 	"fmt"
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"net/url"
 
+	log "github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	log "github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	// log "k8s.io/klog"
+
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type Creator struct {
@@ -332,24 +332,27 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 	c.statefulSetApplyPodTemplate(statefulSet, podTemplate, host)
 
 	// Post-process StatefulSet
-	c.ensureStatefulSetIntegrity(statefulSet, host)
+	c.ensureStatefulSetTemplateIntegrity(statefulSet, host)
 	c.personalizeStatefulSetTemplate(statefulSet, host)
 }
 
-func (c *Creator) ensureStatefulSetIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	c.ensureClickHouseContainer(statefulSet, host)
+func (c *Creator) ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	c.ensureClickHouseContainerSpecified(statefulSet, host)
 	c.ensureProbesSpecified(statefulSet)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
-func (c *Creator) ensureClickHouseContainer(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
-	if _, ok := getClickHouseContainer(statefulSet); !ok {
-		// No ClickHouse container available
-		addContainer(
-			&statefulSet.Spec.Template.Spec,
-			c.newDefaultClickHouseContainer(),
-		)
+func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
+	_, ok := getClickHouseContainer(statefulSet)
+	if ok {
+		return
 	}
+
+	// No ClickHouse container available, let's add one
+	addContainer(
+		&statefulSet.Spec.Template.Spec,
+		c.newDefaultClickHouseContainer(),
+	)
 }
 
 func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
@@ -502,11 +505,91 @@ func (c *Creator) statefulSetApplyPodTemplate(
 }
 
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
+	// Find by name
+	for i := range statefulSet.Spec.Template.Spec.Containers {
+		container := &statefulSet.Spec.Template.Spec.Containers[i]
+		if container.Name == ClickHouseContainerName {
+			return container, true
+		}
+	}
+
+	// Find by index
 	if len(statefulSet.Spec.Template.Spec.Containers) > 0 {
 		return &statefulSet.Spec.Template.Spec.Containers[0], true
-	} else {
-		return nil, false
 	}
+
+	return nil, false
+}
+
+func getClickHouseContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, bool) {
+	// Find by name
+	for i := range pod.Status.ContainerStatuses {
+		status := &pod.Status.ContainerStatuses[i]
+		if status.Name == ClickHouseContainerName {
+			return status, true
+		}
+	}
+
+	// Find by index
+	if len(pod.Status.ContainerStatuses) > 0 {
+		return &pod.Status.ContainerStatuses[0], true
+	}
+
+	return nil, false
+}
+
+// IsStatefulSetGeneration returns whether StatefulSet has requested generation or not
+func IsStatefulSetGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
+	if statefulSet == nil {
+		return false
+	}
+
+	// StatefulSet has .spec generation we are looking for
+	return (statefulSet.Generation == generation) &&
+		// and this .spec generation is being applied to replicas - it is observed right now
+		(statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
+		// and all replicas are of expected generation
+		(statefulSet.Status.CurrentReplicas == *statefulSet.Spec.Replicas) &&
+		// and all replicas are updated - meaning rolling update completed over all replicas
+		(statefulSet.Status.UpdatedReplicas == *statefulSet.Spec.Replicas) &&
+		// and current revision is an updated one - meaning rolling update completed over all replicas
+		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
+}
+
+// IsStatefulSetReady returns whether StatefulSet is ready
+func IsStatefulSetReady(statefulSet *apps.StatefulSet) bool {
+	if statefulSet == nil {
+		return false
+	}
+
+	if statefulSet.Spec.Replicas == nil {
+		return false
+	}
+	// All replicas are in "Ready" status - meaning ready to be used - no failure inside
+	return statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas
+}
+
+// IsStatefulSetNotReady returns whether StatefulSet is not ready
+func IsStatefulSetNotReady(statefulSet *apps.StatefulSet) bool {
+	if statefulSet == nil {
+		return false
+	}
+
+	return !IsStatefulSetReady(statefulSet)
+}
+
+// StrStatefulSetStatus returns human-friendly string representation of StatefulSet status
+func StrStatefulSetStatus(status *apps.StatefulSetStatus) string {
+	return fmt.Sprintf(
+		"ObservedGeneration:%d Replicas:%d ReadyReplicas:%d CurrentReplicas:%d UpdatedReplicas:%d CurrentRevision:%s UpdateRevision:%s",
+		status.ObservedGeneration,
+		status.Replicas,
+		status.ReadyReplicas,
+		status.CurrentReplicas,
+		status.UpdatedReplicas,
+		status.CurrentRevision,
+		status.UpdateRevision,
+	)
 }
 
 func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
@@ -748,7 +831,7 @@ func newDefaultLivenessProbe() *corev1.Probe {
 				Port: intstr.Parse(chDefaultHTTPPortName),
 			},
 		},
-		InitialDelaySeconds: 30,
+		InitialDelaySeconds: 60,
 		PeriodSeconds:       10,
 	}
 }
@@ -779,7 +862,7 @@ func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
 				},
 			},
 		},
-		InitialDelaySeconds: 30,
+		InitialDelaySeconds: 120,
 		PeriodSeconds:       10,
 	}
 }

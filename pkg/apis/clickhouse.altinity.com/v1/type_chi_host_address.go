@@ -19,6 +19,7 @@ import "fmt"
 // ChiHostAddress defines address of a host within ClickHouseInstallation
 type ChiHostAddress struct {
 	Namespace               string `json:"namespace"`
+	StatefulSet             string `json:"statefulSet"`
 	CHIName                 string `json:"chiName"`
 	ClusterName             string `json:"clusterName"`
 	ClusterIndex            int    `json:"clusterIndex"`

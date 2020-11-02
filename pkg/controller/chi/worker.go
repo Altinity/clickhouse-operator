@@ -192,7 +192,7 @@ func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseIns
 
 // ensureFinalizer
 func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) {
-	namespace, name := NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
 
 	// Check whether finalizer is already listed in CHI
 	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
@@ -404,7 +404,7 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallat
 	}
 
 	// 2. CHI ConfigMaps without update - create only
-	return w.reconcileCHIConfigMaps(chi, false)
+	return w.reconcileCHIConfigMaps(chi, nil, false)
 }
 
 // reconcileCHIAuxObjectsFinal reconciles CHI global objects
@@ -413,15 +413,15 @@ func (w *worker) reconcileCHIAuxObjectsFinal(chi *chop.ClickHouseInstallation) e
 	defer w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - end")
 
 	// CHI ConfigMaps with update
-	return w.reconcileCHIConfigMaps(chi, true)
+	return w.reconcileCHIConfigMaps(chi, nil, true)
 }
 
 // reconcileCHIConfigMaps reconciles all CHI's ConfigMaps
-func (w *worker) reconcileCHIConfigMaps(chi *chop.ClickHouseInstallation, update bool) error {
+func (w *worker) reconcileCHIConfigMaps(chi *chop.ClickHouseInstallation, options *chopmodel.ClickHouseConfigFilesGeneratorOptions, update bool) error {
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.creator.CreateConfigMapCHICommon(nil)
+	configMapCommon := w.creator.CreateConfigMapCHICommon(options)
 	if err := w.reconcileConfigMap(chi, configMapCommon, update); err != nil {
 		return err
 	}
@@ -475,6 +475,13 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		WithStatusAction(host.CHI).
 		Info("Reconcile Host %s started", host.Name)
 
+	// Exclude host from ClickHouse clusters
+	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(
+		chopmodel.NewRemoteServersGeneratorOptions().Add(host),
+	)
+	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
+	_ = w.c.waitHostNotReady(host)
+
 	// Reconcile host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)
 	if err := w.reconcileConfigMap(host.CHI, configMap, true); err != nil {
@@ -496,6 +503,12 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		return err
 	}
 
+	// Include host back to ClickHouse clusters
+	_ = w.reconcileCHIConfigMaps(host.CHI, nil, true)
+	_ = w.c.waitStatefulSetReady(statefulSet)
+
+	// If host is not ready - fallback
+
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
 		WithStatusAction(host.CHI).
@@ -506,7 +519,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 // finalizeCHI
 func (w *worker) finalizeCHI(chi *chop.ClickHouseInstallation) error {
-	namespace, name := NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	w.a.V(3).Info("finalizeCHI(%s/%s) - start", namespace, name)
 	defer w.a.V(3).Info("finalizeCHI(%s/%s) - end", namespace, name)
 
@@ -958,14 +971,6 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 	return err
 }
 
-// reconcilePersistentVolumes
-func (w *worker) reconcilePersistentVolumes(host *chop.ChiHost) {
-	w.c.walkPVs(host, func(pv *core.PersistentVolume) {
-		pv = w.creator.PreparePersistentVolume(pv, host)
-		_ = w.c.updatePersistentVolume(pv)
-	})
-}
-
 // createStatefulSet
 func (w *worker) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	w.a.V(2).Info("createStatefulSet() - start")
@@ -1009,7 +1014,7 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 		WithStatusAction(host.CHI).
 		Info("Update StatefulSet(%s/%s) - started", namespace, name)
 
-	err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet)
+	err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet, host)
 	if err == nil {
 		host.CHI.Status.UpdatedHostsCount++
 		_ = w.c.updateCHIObjectStatus(host.CHI, false)
@@ -1030,15 +1035,23 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 	w.a.Info(util.MessageDiffString(diff, equal))
 
 	err = w.c.deleteStatefulSet(host)
-	err = w.reconcilePVCs(host)
+	err = w.reconcilePersistentVolumeClaims(host)
 	return w.createStatefulSet(newStatefulSet, host)
 }
 
-// reconcilePVCs
-func (w *worker) reconcilePVCs(host *chop.ChiHost) error {
+// reconcilePersistentVolumes
+func (w *worker) reconcilePersistentVolumes(host *chop.ChiHost) {
+	w.c.walkPVs(host, func(pv *core.PersistentVolume) {
+		pv = w.creator.PreparePersistentVolume(pv, host)
+		_ = w.c.updatePersistentVolume(pv)
+	})
+}
+
+// reconcilePersistentVolumeClaims
+func (w *worker) reconcilePersistentVolumeClaims(host *chop.ChiHost) error {
 	namespace := host.Address.Namespace
-	w.a.V(2).Info("reconcilePVCs for host %s/%s - start", namespace, host.Name)
-	defer w.a.V(2).Info("reconcilePVCs for host %s/%s - end", namespace, host.Name)
+	w.a.V(2).Info("reconcilePersistentVolumeClaims for host %s/%s - start", namespace, host.Name)
+	defer w.a.V(2).Info("reconcilePersistentVolumeClaims for host %s/%s - end", namespace, host.Name)
 
 	host.WalkVolumeMounts(func(volumeMount *core.VolumeMount) {
 		volumeClaimTemplateName := volumeMount.Name

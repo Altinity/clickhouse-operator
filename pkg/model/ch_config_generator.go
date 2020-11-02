@@ -161,8 +161,35 @@ type RemoteServersGeneratorOptions struct {
 	}
 }
 
-func defaultRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
+func NewRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return &RemoteServersGeneratorOptions{}
+}
+
+func (o *RemoteServersGeneratorOptions) Add(host *chiv1.ChiHost) *RemoteServersGeneratorOptions {
+	if (o == nil) || (host == nil) {
+		return o
+	}
+
+	o.Exclude.Hosts = append(o.Exclude.Hosts, host)
+	return o
+}
+
+func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
+	if o == nil {
+		return false
+	}
+
+	if o.Exclude.ReconcileAttributes.Any(host.ReconcileAttributes) {
+		return true
+	}
+
+	for _, val := range o.Exclude.Hosts {
+		if val == host {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
@@ -181,6 +208,10 @@ func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 	}
 
 	return true
+}
+
+func defaultRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
+	return NewRemoteServersGeneratorOptions()
 }
 
 // GetRemoteServers creates "remote_servers.xml" content and calculates data generation parameters for other sections
@@ -252,15 +283,16 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 	util.Iline(b, 8, "    <shard>")
 	util.Iline(b, 8, "        <internal_replication>true</internal_replication>")
 	c.chi.WalkHosts(func(host *chiv1.ChiHost) error {
-		// <replica>
-		//		<host>XXX</host>
-		//		<port>XXX</port>
-		// </replica>
-		util.Iline(b, 16, "<replica>")
-		util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-		util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
-		util.Iline(b, 16, "</replica>")
-
+		if options.Include(host) {
+			// <replica>
+			//		<host>XXX</host>
+			//		<port>XXX</port>
+			// </replica>
+			util.Iline(b, 16, "<replica>")
+			util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
+			util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
+			util.Iline(b, 16, "</replica>")
+		}
 		return nil
 	})
 
@@ -275,23 +307,24 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 	clusterName = allShardsOneReplicaClusterName
 	util.Iline(b, 8, "<%s>", clusterName)
 	c.chi.WalkHosts(func(host *chiv1.ChiHost) error {
-		// <shard>
-		//     <internal_replication>
-		util.Iline(b, 12, "<shard>")
-		util.Iline(b, 12, "    <internal_replication>false</internal_replication>")
+		if options.Include(host) {
+			// <shard>
+			//     <internal_replication>
+			util.Iline(b, 12, "<shard>")
+			util.Iline(b, 12, "    <internal_replication>false</internal_replication>")
 
-		// <replica>
-		//		<host>XXX</host>
-		//		<port>XXX</port>
-		// </replica>
-		util.Iline(b, 16, "<replica>")
-		util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-		util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
-		util.Iline(b, 16, "</replica>")
+			// <replica>
+			//		<host>XXX</host>
+			//		<port>XXX</port>
+			// </replica>
+			util.Iline(b, 16, "<replica>")
+			util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
+			util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
+			util.Iline(b, 16, "</replica>")
 
-		// </shard>
-		util.Iline(b, 12, "</shard>")
-
+			// </shard>
+			util.Iline(b, 12, "</shard>")
+		}
 		return nil
 	})
 	// </my_cluster_name>
