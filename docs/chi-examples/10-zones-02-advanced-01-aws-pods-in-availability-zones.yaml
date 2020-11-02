@@ -56,7 +56,7 @@ spec:
                           - "us-east-1a"
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:19.3.7
+              image: yandex/clickhouse-server:20.7
 
       - name: clickhouse-in-zone-us-east-1b
         spec:
@@ -72,4 +72,4 @@ spec:
                           - "us-east-1b"
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:19.3.7
+              image: yandex/clickhouse-server:20.7

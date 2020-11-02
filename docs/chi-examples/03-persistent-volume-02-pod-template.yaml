@@ -19,7 +19,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:19.3.7
+              image: yandex/clickhouse-server:20.7
               volumeMounts:
                 - name: data-storage-vc-template
                   mountPath: /var/lib/clickhouse

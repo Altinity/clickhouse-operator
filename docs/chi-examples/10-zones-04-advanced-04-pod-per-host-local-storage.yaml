@@ -57,7 +57,7 @@ spec:
                 type: DirectoryOrCreate
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:19.3.7
+              image: yandex/clickhouse-server:20.7
               volumeMounts:
                 - name: local-path
                   mountPath: /var/lib/clickhouse
