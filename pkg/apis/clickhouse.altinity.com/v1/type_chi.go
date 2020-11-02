@@ -16,6 +16,7 @@ package v1
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/version"
+	"math"
 )
 
 // fillStatus fills .Status
@@ -31,6 +32,125 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.Status.FQDNs = fqdns
 	chi.Status.Endpoint = endpoint
 	chi.Status.NormalizedCHI = chi.Spec
+}
+
+func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
+	// What is the max number of Pods allowed per Node
+	// TODO need to support multi-cluster
+	maxNumberOfPodsPerNode := 0
+	chi.WalkPodTemplates(func(template *ChiPodTemplate) {
+		for i := range template.PodDistribution {
+			podDistribution := &template.PodDistribution[i]
+			if podDistribution.Type == PodDistributionMaxNumberPerNode {
+				maxNumberOfPodsPerNode = podDistribution.Number
+			}
+		}
+	})
+
+	//          1perNode   2perNode  3perNode  4perNode  5perNode
+	// sh1r1    n1   a     n1  a     n1 a      n1  a     n1  a
+	// sh1r2    n2   a     n2  a     n2 a      n2  a     n2  a
+	// sh1r3    n3   a     n3  a     n3 a      n3  a     n3  a
+	// sh2r1    n4   a     n4  a     n4 a      n4  a     n1  b
+	// sh2r2    n5   a     n5  a     n5 a      n1  b     n2  b
+	// sh2r3    n6   a     n6  a     n1 b      n2  b     n3  b
+	// sh3r1    n7   a     n7  a     n2 b      n3  b     n1  c
+	// sh3r2    n8   a     n8  a     n3 b      n4  b     n2  c
+	// sh3r3    n9   a     n1  b     n4 b      n1  c     n3  c
+	// sh4r1    n10  a     n2  b     n5 b      n2  c     n1  d
+	// sh4r2    n11  a     n3  b     n1 c      n3  c     n2  d
+	// sh4r3    n12  a     n4  b     n2 c      n4  c     n3  d
+	// sh5r1    n13  a     n5  b     n3 c      n1  d     n1  e
+	// sh5r2    n14  a     n6  b     n4 c      n2  d     n2  e
+	// sh5r3    n15  a     n7  b     n5 c      n3  d     n3  e
+	// 1perNode = ceil(15 / 1 'cycles num') = 15 'cycle len'
+	// 2perNode = ceil(15 / 2 'cycles num') = 8  'cycle len'
+	// 3perNode = ceil(15 / 3 'cycles num') = 5  'cycle len'
+	// 4perNode = ceil(15 / 4 'cycles num') = 4  'cycle len'
+	// 5perNode = ceil(15 / 5 'cycles num') = 3  'cycle len'
+
+	// Number of requested cycles equals to max number of ClickHouses per node, but can't be less than 1
+	requestedClusterScopeCyclesNum := maxNumberOfPodsPerNode
+	if requestedClusterScopeCyclesNum <= 0 {
+		requestedClusterScopeCyclesNum = 1
+	}
+
+	chiScopeCycleSize := 0 // Unlimited
+	clusterScopeCycleSize := 0
+	if requestedClusterScopeCyclesNum == 1 {
+		// One cycle only requested
+		clusterScopeCycleSize = 0 // Unlimited
+	} else {
+		clusterScopeCycleSize = int(math.Ceil(float64(chi.HostsCount()) / float64(requestedClusterScopeCyclesNum)))
+	}
+
+	chi.WalkHostsFullPath(chiScopeCycleSize, clusterScopeCycleSize, func(
+		chi *ClickHouseInstallation,
+
+		chiScopeIndex int,
+		chiScopeCycleSize int,
+		chiScopeCycleIndex int,
+		chiScopeCycleOffset int,
+
+		clusterScopeIndex int,
+		clusterScopeCycleSize int,
+		clusterScopeCycleIndex int,
+		clusterScopeCycleOffset int,
+
+		clusterIndex int,
+		cluster *ChiCluster,
+
+		shardIndex int,
+		shard *ChiShard,
+
+		replicaIndex int,
+		replica *ChiReplica,
+
+		host *ChiHost,
+	) error {
+		cluster.Address.Namespace = chi.Namespace
+		cluster.Address.CHIName = chi.Name
+		cluster.Address.ClusterName = cluster.Name
+		cluster.Address.ClusterIndex = clusterIndex
+
+		shard.Address.Namespace = chi.Namespace
+		shard.Address.CHIName = chi.Name
+		shard.Address.ClusterName = cluster.Name
+		shard.Address.ClusterIndex = clusterIndex
+		shard.Address.ShardName = shard.Name
+		shard.Address.ShardIndex = shardIndex
+
+		replica.Address.Namespace = chi.Namespace
+		replica.Address.CHIName = chi.Name
+		replica.Address.ClusterName = cluster.Name
+		replica.Address.ClusterIndex = clusterIndex
+		replica.Address.ReplicaName = replica.Name
+		replica.Address.ReplicaIndex = replicaIndex
+
+		host.Address.Namespace = chi.Namespace
+		// Skip StatefulSet as impossible to self-calculate
+		// host.Address.StatefulSet = CreateStatefulSetName(host)
+		host.Address.CHIName = chi.Name
+		host.Address.ClusterName = cluster.Name
+		host.Address.ClusterIndex = clusterIndex
+		host.Address.ShardName = shard.Name
+		host.Address.ShardIndex = shardIndex
+		host.Address.ReplicaName = replica.Name
+		host.Address.ReplicaIndex = replicaIndex
+		host.Address.HostName = host.Name
+		host.Address.CHIScopeIndex = chiScopeIndex
+		host.Address.CHIScopeCycleSize = chiScopeCycleSize
+		host.Address.CHIScopeCycleIndex = chiScopeCycleIndex
+		host.Address.CHIScopeCycleOffset = chiScopeCycleOffset
+		host.Address.ClusterScopeIndex = clusterScopeIndex
+		host.Address.ClusterScopeCycleSize = clusterScopeCycleSize
+		host.Address.ClusterScopeCycleIndex = clusterScopeCycleIndex
+		host.Address.ClusterScopeCycleOffset = clusterScopeCycleOffset
+		host.Address.ShardScopeIndex = replicaIndex
+		host.Address.ReplicaScopeIndex = shardIndex
+
+		return nil
+	})
 }
 
 // FillCHIPointer
