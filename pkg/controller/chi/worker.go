@@ -480,6 +480,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		chopmodel.NewRemoteServersGeneratorOptions().Add(host),
 	)
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
+	_ = w.c.waitHostNotReady(host)
 
 	// Reconcile host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)
@@ -503,9 +504,8 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	}
 
 	// Include host back to ClickHouse clusters
-
-	// Wait host to be ready
-	w.c.waitStatefulSetReady(statefulSet)
+	_ = w.reconcileCHIConfigMaps(host.CHI, nil, true)
+	_ = w.c.waitStatefulSetReady(statefulSet)
 
 	// If host is not ready - fallback
 
