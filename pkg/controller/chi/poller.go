@@ -46,6 +46,16 @@ func (c *Controller) waitStatefulSetReady(statefulSet *apps.StatefulSet) error {
 	}
 }
 
+// waitHostNotReady polls StatefulSet for not exists or not ready
+func (c *Controller) waitHostNotReady(host *chop.ChiHost) error {
+	err := c.pollStatefulSet(host, NewStatefulSetPollOptionsConfigNoCreate(c.chop.Config()), model.IsStatefulSetNotReady)
+	if apierrors.IsNotFound(err) {
+		err = nil
+	}
+
+	return err
+}
+
 // waitHostRunning polls host for `Running` state
 func (c *Controller) waitHostRunning(host *chop.ChiHost) error {
 	namespace := host.Address.Namespace
@@ -83,17 +93,10 @@ func (c *Controller) waitHostRunning(host *chop.ChiHost) error {
 }
 
 type StatefulSetPollOptions struct {
-	// (time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second)
-	TimeoutBeforeStartBothering time.Duration
-
-	// (time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second)
-	TimeoutToCreate time.Duration
-
-	// (time.Duration(c.chop.Config().StatefulSetUpdateTimeout) * time.Second
-	Timeout time.Duration
-
-	// time.Duration(c.chop.Config().StatefulSetUpdatePollPeriod) * time.Second
-	Interval time.Duration
+	StartBotheringAfterTimeout time.Duration
+	CreateTimeout              time.Duration
+	Timeout                    time.Duration
+	Interval                   time.Duration
 }
 
 func NewStatefulSetPollOptions() *StatefulSetPollOptions {
@@ -102,10 +105,19 @@ func NewStatefulSetPollOptions() *StatefulSetPollOptions {
 
 func NewStatefulSetPollOptionsConfig(config *chop.OperatorConfig) *StatefulSetPollOptions {
 	return &StatefulSetPollOptions{
-		TimeoutBeforeStartBothering: time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second,
-		TimeoutToCreate:             time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second,
-		Timeout:                     time.Duration(config.StatefulSetUpdateTimeout) * time.Second,
-		Interval:                    time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second,
+		StartBotheringAfterTimeout: time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second,
+		CreateTimeout:              time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second,
+		Timeout:                    time.Duration(config.StatefulSetUpdateTimeout) * time.Second,
+		Interval:                   time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second,
+	}
+}
+
+func NewStatefulSetPollOptionsConfigNoCreate(config *chop.OperatorConfig) *StatefulSetPollOptions {
+	return &StatefulSetPollOptions{
+		StartBotheringAfterTimeout: time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second,
+		//CreateTimeout:              time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second,
+		Timeout:  time.Duration(config.StatefulSetUpdateTimeout) * time.Second,
+		Interval: time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second,
 	}
 }
 
@@ -141,15 +153,19 @@ func (c *Controller) pollStatefulSet(entity interface{}, opts *StatefulSetPollOp
 			}
 
 			// Object is found, but function is not positive
-			if time.Since(start) >= opts.TimeoutBeforeStartBothering {
+			if time.Since(start) >= opts.StartBotheringAfterTimeout {
 				// Start bothering with log messages after some time only
 				log.V(1).Infof("pollStatefulSet(%s/%s)-WAIT:%s", namespace, name, model.StrStatefulSetStatus(&statefulSet.Status))
 			}
 		} else if apierrors.IsNotFound(err) {
 			// Object is not found - it either failed to be created or just still not created
-			if time.Since(start) >= opts.TimeoutToCreate {
+			if time.Since(start) >= opts.CreateTimeout {
 				// No more wait for object to be created. Consider create as failed.
-				log.V(1).Infof("ERROR waitStatefulSet(%s/%s) Get() FAILED - StatefulSet still not found, abort", namespace, name)
+				if opts.CreateTimeout > 0 {
+					log.V(1).Infof("ERROR pollStatefulSet(%s/%s) Get() FAILED - StatefulSet still not found, abort", namespace, name)
+				} else {
+					log.V(1).Infof("pollStatefulSet(%s/%s) Get() NEUTRAL StatefulSet not found and no wait required", namespace, name)
+				}
 				return err
 			}
 			// Object with such name not found - may be is still being created - wait for it
