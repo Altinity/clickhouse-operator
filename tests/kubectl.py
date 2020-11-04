@@ -180,6 +180,16 @@ def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries
                 time.sleep(i * 5)
         assert cur_count >= count, error()
 
+def wait_command(command, result, count=1, ns=namespace, retries=max_retries):
+    with Then(f"{command} should return {result}"):
+        for i in range(1, retries):
+            res = launch(command, ok_to_fail=True, ns=ns)
+            if res == result:
+                break
+            with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
+                time.sleep(i * 5)
+        assert res == result, error()
+
 
 def wait_chi_status(chi, status, ns=namespace, retries=max_retries):
     wait_field("chi", chi, ".status.status", status, ns, retries)

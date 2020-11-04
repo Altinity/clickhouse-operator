@@ -815,6 +815,7 @@ def test_016():
         out = clickhouse.query(chi, sql="select count() from system.clusters")
         assert out == "0"
 
+    # test-016-settings-02.yaml
     with When("Update usersd settings"):
         start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         kubectl.create_and_check(
@@ -823,19 +824,9 @@ def test_016():
                 "do_not_delete": 1,
             })
         with Then("Wait for configmap changes to apply"):
-            config_map_applied_num = "0"
-            i = 1
-            while config_map_applied_num == "0" and i < 10:
-                config_map_applied_num = kubectl.launch(
-                    f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep test_norestart /etc/clickhouse-server/users.d/my_users.xml | wc -l\""
-                )
-                if config_map_applied_num != "0":
-                    break
-                with And(f"not applied, wait {15 * i}s"):
-                    time.sleep(15 * i)
-                    i += 1
-
-            assert config_map_applied_num != "0", "ConfigMap should be applied"
+            kubectl.wait_command(
+                f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep test_norestart /etc/clickhouse-server/users.d/my_users.xml | wc -l\"",
+                "1")
 
         version = ""
         with Then("test_norestart user should be available"):
@@ -849,6 +840,48 @@ def test_016():
         with And("ClickHouse should not be restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time == new_start_time
+
+    # test-016-settings-03.yaml
+    with When("Update custom.xml settings"):
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        kubectl.create_and_check(
+            config="configs/test-016-settings-03.yaml",
+            check={
+                "do_not_delete": 1,
+            })
+        with Then("Wait for configmap changes to apply"):
+            kubectl.wait_command(
+                f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep test-03 /etc/clickhouse-server/config.d/custom.xml | wc -l\"",
+                "1")
+        
+        with And("Custom macro 'test' should change the value"):
+            out = clickhouse.query(chi, sql="select substitution from system.macros where macro='test'")
+            assert out == "test-03"
+        
+        with And("ClickHouse SHOULD BE restarted"):
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            assert start_time < new_start_time
+
+    # test-016-settings-04.yaml
+    with When("Add new custom2.xml config file"):
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        kubectl.create_and_check(
+            config="configs/test-016-settings-04.yaml",
+            check={
+                "do_not_delete": 1,
+            })
+        with Then("Wait for configmap changes to apply"):
+            kubectl.wait_command(
+                f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep test-custom2 /etc/clickhouse-server/config.d/custom2.xml | wc -l\"",
+                "1")
+        
+        with And("Custom macro 'test-custom2' should be found"):
+            out = clickhouse.query(chi, sql="select substitution from system.macros where macro='test-custom2'")
+            assert out == "test-custom2"
+        
+        with And("ClickHouse SHOULD BE restarted"):
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            assert start_time < new_start_time
 
     kubectl.delete_chi("test-016-settings")
 
@@ -889,7 +922,7 @@ def test_017():
 
 @TestScenario
 @Name("test-018-configmap. Test that configuration is properly updated")
-def test_018():
+def test_018(): # Obsolete, covered by test_016
     kubectl.create_and_check(
         config="configs/test-018-configmap.yaml",
         check={
