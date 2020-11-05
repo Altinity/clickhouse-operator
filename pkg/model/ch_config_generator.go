@@ -155,9 +155,9 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string
 }
 
 type RemoteServersGeneratorOptions struct {
-	Exclude struct {
-		ReconcileAttributes *chiv1.ChiHostReconcileAttributes
-		Hosts               []*chiv1.ChiHost
+	exclude struct {
+		reconcileAttributes *chiv1.ChiHostReconcileAttributes
+		hosts               []*chiv1.ChiHost
 	}
 }
 
@@ -165,12 +165,21 @@ func NewRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return &RemoteServersGeneratorOptions{}
 }
 
-func (o *RemoteServersGeneratorOptions) Add(host *chiv1.ChiHost) *RemoteServersGeneratorOptions {
+func (o *RemoteServersGeneratorOptions) ExcludeHost(host *chiv1.ChiHost) *RemoteServersGeneratorOptions {
 	if (o == nil) || (host == nil) {
 		return o
 	}
 
-	o.Exclude.Hosts = append(o.Exclude.Hosts, host)
+	o.exclude.hosts = append(o.exclude.hosts, host)
+	return o
+}
+
+func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *chiv1.ChiHostReconcileAttributes) *RemoteServersGeneratorOptions {
+	if (o == nil) || (attrs == nil) {
+		return o
+	}
+
+	o.exclude.reconcileAttributes = attrs
 	return o
 }
 
@@ -179,11 +188,11 @@ func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
 		return false
 	}
 
-	if o.Exclude.ReconcileAttributes.Any(host.ReconcileAttributes) {
+	if o.exclude.reconcileAttributes.Any(host.ReconcileAttributes) {
 		return true
 	}
 
-	for _, val := range o.Exclude.Hosts {
+	for _, val := range o.exclude.hosts {
 		if val == host {
 			return true
 		}
@@ -197,11 +206,11 @@ func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 		return false
 	}
 
-	if o.Exclude.ReconcileAttributes.Any(host.ReconcileAttributes) {
+	if o.exclude.reconcileAttributes.Any(host.ReconcileAttributes) {
 		return false
 	}
 
-	for _, val := range o.Exclude.Hosts {
+	for _, val := range o.exclude.hosts {
 		if val == host {
 			return false
 		}

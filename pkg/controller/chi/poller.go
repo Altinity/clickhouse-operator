@@ -56,6 +56,11 @@ func (c *Controller) waitHostNotReady(host *chop.ChiHost) error {
 	return err
 }
 
+// waitHostReady polls hosts's StatefulSet until it is ready
+func (c *Controller) waitHostReady(host *chop.ChiHost) error {
+	return c.waitStatefulSetReady(host.StatefulSet)
+}
+
 // waitHostRunning polls host for `Running` state
 func (c *Controller) waitHostRunning(host *chop.ChiHost) error {
 	namespace := host.Address.Namespace
