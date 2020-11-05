@@ -264,7 +264,7 @@ def test_010():
     )
     with And("ClickHouse should complain regarding zookeeper path"):
         out = clickhouse.query_with_error("test-010-zkroot", "select * from system.zookeeper where path = '/'")
-        assert "You should create root node /clickhouse/test-010-zkroot before start" in out, error()
+        assert "Received exception from server" in out, error()
 
     kubectl.delete_chi("test-010-zkroot")
 
