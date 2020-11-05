@@ -475,7 +475,9 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		WithStatusAction(host.CHI).
 		Info("Reconcile Host %s started", host.Name)
 
-	_ = w.excludeHost(host)
+	if err := w.excludeHost(host); err != nil {
+		return err
+	}
 
 	// Reconcile host's ConfigMap
 	configMap := w.creator.CreateConfigMapHost(host)
@@ -498,11 +500,10 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		return err
 	}
 
-	// Include host back to ClickHouse clusters
-	_ = w.reconcileCHIConfigMaps(host.CHI, nil, true)
-	_ = w.c.waitStatefulSetReady(statefulSet)
-
-	// If host is not ready - fallback
+	if err := w.includeHost(host); err != nil {
+		// If host is not ready - fallback
+		return err
+	}
 
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
@@ -519,6 +520,15 @@ func (w *worker) excludeHost(host *chop.ChiHost) error {
 		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().Add(host))
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
 	_ = w.c.waitHostNotReady(host)
+
+	return nil
+}
+
+// Include host back to ClickHouse clusters
+func (w *worker) includeHost(host *chop.ChiHost) error {
+	// Include host back to ClickHouse clusters
+	_ = w.reconcileCHIConfigMaps(host.CHI, nil, true)
+	_ = w.c.waitHostReady(host)
 
 	return nil
 }
