@@ -480,18 +480,27 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		WithStatusAction(host.CHI).
 		Info("Reconcile Host %s started", host.Name)
 
-	if err := w.excludeHost(host); err != nil {
+	// Create artifacts
+	configMap := w.creator.CreateConfigMapHost(host)
+	statefulSet := w.creator.CreateStatefulSet(host)
+	service := w.creator.CreateServiceHost(host)
+
+	status := w.getStatefulSetStatus(statefulSet)
+	wait := true
+	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
+		wait = false
+	}
+
+	if err := w.excludeHost(host, wait); err != nil {
 		return err
 	}
 
 	// Reconcile host's ConfigMap
-	configMap := w.creator.CreateConfigMapHost(host)
 	if err := w.reconcileConfigMap(host.CHI, configMap, true); err != nil {
 		return err
 	}
 
 	// Reconcile host's StatefulSet
-	statefulSet := w.creator.CreateStatefulSet(host)
 	if err := w.reconcileStatefulSet(statefulSet, host); err != nil {
 		return err
 	}
@@ -500,7 +509,6 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	w.reconcilePersistentVolumes(host)
 
 	// Reconcile host's Service
-	service := w.creator.CreateServiceHost(host)
 	if err := w.reconcileService(host.CHI, service); err != nil {
 		return err
 	}
@@ -537,8 +545,9 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 }
 
 // Exclude host from ClickHouse clusters
-func (w *worker) excludeHost(host *chop.ChiHost) error {
-	// Exclude host from ClickHouse clusters
+func (w *worker) excludeHost(host *chop.ChiHost, wait bool) error {
+	w.a.V(1).
+		Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
 		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
 			ExcludeHost(host).
@@ -547,14 +556,17 @@ func (w *worker) excludeHost(host *chop.ChiHost) error {
 			),
 		)
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
-	_ = w.c.waitHostNotReady(host)
+	if wait {
+		_ = w.c.waitHostNotReady(host)
+	}
 
 	return nil
 }
 
 // Include host back to ClickHouse clusters
 func (w *worker) includeHost(host *chop.ChiHost) error {
-	// Include host back to ClickHouse clusters
+	w.a.V(1).
+		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
 		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
 			ExcludeReconcileAttributes(
@@ -989,6 +1001,41 @@ func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *cor
 	return err
 }
 
+type StatefulSetStatus string
+
+const (
+	statefulSetStatusModified StatefulSetStatus = "modified"
+	statefulSetStatusNew      StatefulSetStatus = "new"
+	statefulSetStatusSame     StatefulSetStatus = "same"
+	statefulSetStatusUnknown  StatefulSetStatus = "unknown"
+)
+
+func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) StatefulSetStatus {
+	w.a.V(2).Info("getStatefulSetStatus() - start")
+	defer w.a.V(2).Info("getStatefulSetStatus() - end")
+
+	// Check whether this object already exists in k8s
+	curStatefulSet, err := w.c.getStatefulSet(&statefulSet.ObjectMeta, false)
+
+	if curStatefulSet != nil {
+		// We have StatefulSet - try to update it
+		if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
+			w.a.Info("INFO StatefulSet ARE EQUAL no reconcile is actually needed")
+			return statefulSetStatusSame
+		} else {
+			w.a.Info("INFO StatefulSet ARE DIFFERENT reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
+			return statefulSetStatusModified
+		}
+	}
+
+	if apierrors.IsNotFound(err) {
+		// StatefulSet not found - even during Update process - try to create it
+		return statefulSetStatusNew
+	}
+
+	return statefulSetStatusUnknown
+}
+
 // reconcileStatefulSet reconciles apps.StatefulSet
 func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	w.a.V(2).Info("reconcileStatefulSet() - start")
@@ -999,10 +1046,6 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 
 	if curStatefulSet != nil {
 		// We have StatefulSet - try to update it
-		if diff, equal := messagediff.DeepDiff(*curStatefulSet, *newStatefulSet); !equal {
-			_ = diff
-			w.a.V(1).Info("StatefulSet Diffs")
-		}
 		err = w.updateStatefulSet(curStatefulSet, newStatefulSet, host)
 	}
 
