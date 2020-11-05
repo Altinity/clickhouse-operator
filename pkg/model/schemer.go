@@ -334,22 +334,27 @@ func (s *Schemer) shardApplySQLs(shard *chop.ChiShard, sqls []string, retry bool
 // applySQLs runs set of SQL queries on set on hosts
 // Retry logic traverses the list of SQLs multiple times until all SQLs succeed
 func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
-	var err error = nil
+	maxTries := 1
+	if retry {
+		maxTries = defaultMaxTries
+	}
+	var errors []error
+
 	// For each host in the list run all SQL queries
 	for _, host := range hosts {
 		conn := s.getCHConnection(host)
-		maxTries := 1
-		if retry {
-			maxTries = defaultMaxTries
+		if conn == nil {
+			log.V(1).Infof("Unabel to get conn to host %s", host)
+			continue
 		}
-		err = util.Retry(maxTries, "Applying sqls", func() error {
-			var runErr error = nil
+		err := util.Retry(maxTries, "Applying sqls", func() error {
+			var errors []error
 			for i, sql := range sqls {
 				if len(sql) == 0 {
 					// Skip malformed or already executed SQL query, move to the next one
 					continue
 				}
-				err = conn.Exec(sql)
+				err := conn.Exec(sql)
 				if err != nil && strings.Contains(err.Error(), "Code: 253,") && strings.Contains(sql, "CREATE TABLE") {
 					log.V(1).Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
 					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
@@ -358,12 +363,23 @@ func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 				if err == nil {
 					sqls[i] = "" // Query is executed, removing from the list
 				} else {
-					runErr = err
+					errors = append(errors, err)
 				}
 			}
-			return runErr
+
+			if len(errors) > 0 {
+				return errors[0]
+			}
+			return nil
 		})
+
+		if err != nil {
+			errors = append(errors, err)
+		}
 	}
 
-	return err
+	if len(errors) > 0 {
+		return errors[0]
+	}
+	return nil
 }
