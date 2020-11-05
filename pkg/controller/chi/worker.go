@@ -282,19 +282,24 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		},
 	)
 
-	if actionPlan.HasActionsToDo() {
-		new.WalkHosts(func(host *chop.ChiHost) error {
-			if host.ReconcileAttributes.IsAdd() {
-				// Already added
-			} else if host.ReconcileAttributes.IsModify() {
-				// Already modified
-			} else {
-				// Not clear yet
-				(&host.ReconcileAttributes).SetUnclear()
-			}
-			return nil
-		})
-	}
+	new.WalkHosts(func(host *chop.ChiHost) error {
+		if update {
+			host.ReconcileAttributes.SetMigrate()
+		}
+		return nil
+	})
+
+	new.WalkHosts(func(host *chop.ChiHost) error {
+		if host.ReconcileAttributes.IsAdd() {
+			// Already added
+		} else if host.ReconcileAttributes.IsModify() {
+			// Already modified
+		} else {
+			// Not clear yet
+			(&host.ReconcileAttributes).SetUnclear()
+		}
+		return nil
+	})
 
 	new.WalkHosts(func(host *chop.ChiHost) error {
 		if host.ReconcileAttributes.IsAdd() {
@@ -506,6 +511,19 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	if err := w.includeHost(host); err != nil {
 		// If host is not ready - fallback
 		return err
+	}
+
+	if host.ReconcileAttributes.IsMigrate() {
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
+			WithStatusAction(host.CHI).
+			Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
+		if err := w.schemer.HostCreateTables(host); err != nil {
+			w.a.Error("ERROR create tables on host %s. err: %v", host.Name, err)
+		}
+	} else {
+		w.a.V(1).
+			Info("As CHI is just created, not need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	}
 
 	host.ReconcileAttributes.SetReconciled()
