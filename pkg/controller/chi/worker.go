@@ -257,18 +257,18 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	actionPlan.WalkAdded(
 		func(cluster *chop.ChiCluster) {
 			cluster.WalkHosts(func(host *chop.ChiHost) error {
-				(&host.ReconcileAttributes).SetAdded()
+				(&host.ReconcileAttributes).SetAdd()
 				return nil
 			})
 		},
 		func(shard *chop.ChiShard) {
 			shard.WalkHosts(func(host *chop.ChiHost) error {
-				(&host.ReconcileAttributes).SetAdded()
+				(&host.ReconcileAttributes).SetAdd()
 				return nil
 			})
 		},
 		func(host *chop.ChiHost) {
-			(&host.ReconcileAttributes).SetAdded()
+			(&host.ReconcileAttributes).SetAdd()
 		},
 	)
 
@@ -278,15 +278,15 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		func(shard *chop.ChiShard) {
 		},
 		func(host *chop.ChiHost) {
-			(&host.ReconcileAttributes).SetModified()
+			(&host.ReconcileAttributes).SetModify()
 		},
 	)
 
 	if actionPlan.HasActionsToDo() {
 		new.WalkHosts(func(host *chop.ChiHost) error {
-			if host.ReconcileAttributes.IsAdded() {
+			if host.ReconcileAttributes.IsAdd() {
 				// Already added
-			} else if host.ReconcileAttributes.IsModified() {
+			} else if host.ReconcileAttributes.IsModify() {
 				// Already modified
 			} else {
 				// Not clear yet
@@ -297,14 +297,14 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	}
 
 	new.WalkHosts(func(host *chop.ChiHost) error {
-		if host.ReconcileAttributes.IsAdded() {
-			w.a.Info("ADDED host: %s", host.Address.ShortString())
-		} else if host.ReconcileAttributes.IsModified() {
-			w.a.Info("MODIFIED host: %s", host.Address.ShortString())
+		if host.ReconcileAttributes.IsAdd() {
+			w.a.Info("ADD host: %s", host.Address.ShortString())
+		} else if host.ReconcileAttributes.IsModify() {
+			w.a.Info("MODIFY host: %s", host.Address.ShortString())
 		} else if host.ReconcileAttributes.IsUnclear() {
 			w.a.Info("UNCLEAR host: %s", host.Address.ShortString())
 		} else {
-			w.a.Info("UNTOUCHED host: %s", host.Address.ShortString())
+			w.a.Info("UNTOUCH host: %s", host.Address.ShortString())
 		}
 		return nil
 	})
@@ -500,10 +500,15 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		return err
 	}
 
+	host.ReconcileAttributes.UnsetAdd()
+	host.ReconcileAttributes.SetReconciled()
+
 	if err := w.includeHost(host); err != nil {
 		// If host is not ready - fallback
 		return err
 	}
+
+	host.ReconcileAttributes.SetReconciled()
 
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
@@ -517,7 +522,12 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 func (w *worker) excludeHost(host *chop.ChiHost) error {
 	// Exclude host from ClickHouse clusters
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
-		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().Exclude(host))
+		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
+			ExcludeHost(host).
+			ExcludeReconcileAttributes(
+				chop.NewChiHostReconcileAttributes().SetAdd(),
+			),
+		)
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
 	_ = w.c.waitHostNotReady(host)
 
@@ -527,7 +537,13 @@ func (w *worker) excludeHost(host *chop.ChiHost) error {
 // Include host back to ClickHouse clusters
 func (w *worker) includeHost(host *chop.ChiHost) error {
 	// Include host back to ClickHouse clusters
-	_ = w.reconcileCHIConfigMaps(host.CHI, nil, true)
+	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
+		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
+			ExcludeReconcileAttributes(
+				chop.NewChiHostReconcileAttributes().SetAdd(),
+			),
+		)
+	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
 	_ = w.c.waitHostReady(host)
 
 	return nil

@@ -170,57 +170,71 @@ type ChiHostConfig struct {
 
 // ChiHostReconcileAttributes defines host reconcile status
 type ChiHostReconcileAttributes struct {
-	added      bool
-	removed    bool
-	modified   bool
+	add        bool
+	remove     bool
+	modify     bool
 	unclear    bool
 	reconciled bool
+}
+
+func NewChiHostReconcileAttributes() *ChiHostReconcileAttributes {
+	return &ChiHostReconcileAttributes{}
 }
 
 func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
-	return (s.added == to.added) && (s.removed == to.removed) && (s.modified == to.modified) && (s.unclear == to.unclear)
+	return (s.add == to.add) && (s.remove == to.remove) && (s.modify == to.modify) && (s.unclear == to.unclear)
 }
 
 func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
-	return (s.added && to.added) || (s.removed && to.removed) || (s.modified && to.modified) || (s.unclear && to.unclear)
+	return (s.add && to.add) || (s.remove && to.remove) || (s.modify && to.modify) || (s.unclear && to.unclear)
 }
 
-func (s *ChiHostReconcileAttributes) SetAdded() {
-	s.added = true
+func (s *ChiHostReconcileAttributes) SetAdd() *ChiHostReconcileAttributes {
+	s.add = true
+	return s
 }
 
-func (s *ChiHostReconcileAttributes) SetRemoved() {
-	s.removed = true
+func (s *ChiHostReconcileAttributes) UnsetAdd() *ChiHostReconcileAttributes {
+	s.add = false
+	return s
 }
 
-func (s *ChiHostReconcileAttributes) SetModified() {
-	s.modified = true
+func (s *ChiHostReconcileAttributes) SetRemove() *ChiHostReconcileAttributes {
+	s.remove = true
+	return s
 }
 
-func (s *ChiHostReconcileAttributes) SetUnclear() {
+func (s *ChiHostReconcileAttributes) SetModify() *ChiHostReconcileAttributes {
+	s.modify = true
+	return s
+}
+
+func (s *ChiHostReconcileAttributes) SetUnclear() *ChiHostReconcileAttributes {
 	s.unclear = true
+	return s
 }
 
-func (s *ChiHostReconcileAttributes) SetReconciled() {
+func (s *ChiHostReconcileAttributes) SetReconciled() *ChiHostReconcileAttributes {
 	s.reconciled = true
+	return s
 }
 
-func (s *ChiHostReconcileAttributes) IsAdded() bool {
-	return s.added
+func (s *ChiHostReconcileAttributes) IsAdd() bool {
+	return s.add
 }
 
-func (s *ChiHostReconcileAttributes) IsRemoved() bool {
-	return s.removed
+func (s *ChiHostReconcileAttributes) IsRemove() bool {
+	return s.remove
 }
 
-func (s *ChiHostReconcileAttributes) IsModified() bool {
-	return s.modified
+func (s *ChiHostReconcileAttributes) IsModify() bool {
+	return s.modify
 }
 
 func (s *ChiHostReconcileAttributes) IsUnclear() bool {

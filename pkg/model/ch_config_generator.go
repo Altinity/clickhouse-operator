@@ -165,12 +165,21 @@ func NewRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return &RemoteServersGeneratorOptions{}
 }
 
-func (o *RemoteServersGeneratorOptions) Exclude(host *chiv1.ChiHost) *RemoteServersGeneratorOptions {
+func (o *RemoteServersGeneratorOptions) ExcludeHost(host *chiv1.ChiHost) *RemoteServersGeneratorOptions {
 	if (o == nil) || (host == nil) {
 		return o
 	}
 
 	o.exclude.hosts = append(o.exclude.hosts, host)
+	return o
+}
+
+func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *chiv1.ChiHostReconcileAttributes) *RemoteServersGeneratorOptions {
+	if (o == nil) || (attrs == nil) {
+		return o
+	}
+
+	o.exclude.reconcileAttributes = attrs
 	return o
 }
 
