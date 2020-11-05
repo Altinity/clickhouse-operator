@@ -170,10 +170,12 @@ type ChiHostConfig struct {
 
 // ChiHostReconcileAttributes defines host reconcile status
 type ChiHostReconcileAttributes struct {
-	add        bool
-	remove     bool
-	modify     bool
-	unclear    bool
+	add     bool
+	remove  bool
+	modify  bool
+	unclear bool
+
+	migrate    bool
 	reconciled bool
 }
 
@@ -220,6 +222,11 @@ func (s *ChiHostReconcileAttributes) SetUnclear() *ChiHostReconcileAttributes {
 	return s
 }
 
+func (s *ChiHostReconcileAttributes) SetMigrate() *ChiHostReconcileAttributes {
+	s.migrate = true
+	return s
+}
+
 func (s *ChiHostReconcileAttributes) SetReconciled() *ChiHostReconcileAttributes {
 	s.reconciled = true
 	return s
@@ -239,6 +246,10 @@ func (s *ChiHostReconcileAttributes) IsModify() bool {
 
 func (s *ChiHostReconcileAttributes) IsUnclear() bool {
 	return s.unclear
+}
+
+func (s *ChiHostReconcileAttributes) IsMigrate() bool {
+	return s.migrate
 }
 
 func (s *ChiHostReconcileAttributes) IsReconciled() bool {
