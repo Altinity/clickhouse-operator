@@ -517,7 +517,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 func (w *worker) excludeHost(host *chop.ChiHost) error {
 	// Exclude host from ClickHouse clusters
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
-		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().Add(host))
+		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().Exclude(host))
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
 	_ = w.c.waitHostNotReady(host)
 
