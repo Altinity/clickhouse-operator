@@ -533,7 +533,8 @@ def test_013():
                     "service": 4,
                 },
                 "do_not_delete": 1,
-            }
+            },
+            timeout=1500,
         )
 
     # Give some time for replication to catch up
@@ -607,7 +608,8 @@ def test_014():
                 "service": 3,
             },
             "do_not_delete": 1,
-        }
+        },
+        timeout=600,
     )
 
     start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
@@ -665,7 +667,8 @@ def test_014():
             check={
                 "pod_count": 3,
                 "do_not_delete": 1,
-            }
+            },
+            timeout=600,
         )
         # Give some time for replication to catch up
         time.sleep(10)
@@ -744,7 +747,9 @@ def test_015():
         check={
             "pod_count": 2,
             "do_not_delete": 1,
-        })
+        },
+        timeout=600,
+    )
 
     time.sleep(30)
 
@@ -782,7 +787,8 @@ def test_016():
             },
             "pod_count": 1,
             "do_not_delete": 1,
-        })
+        },
+    )
 
     with Then("Custom macro 'layer' should be available"):
         out = clickhouse.query(chi, sql="select substitution from system.macros where macro='layer'")
@@ -822,7 +828,8 @@ def test_016():
             config="configs/test-016-settings-02.yaml",
             check={
                 "do_not_delete": 1,
-            })
+            },
+        )
         with Then("Wait for configmap changes to apply"):
             kubectl.wait_command(
                 f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep test_norestart /etc/clickhouse-server/users.d/my_users.xml | wc -l\"",
@@ -894,7 +901,9 @@ def test_017():
         check={
             "pod_count": 4,
             "do_not_delete": 1,
-        })
+        },
+        timeout=600,
+    )
     chi = "test-017-multi-version"
     queries = [
         "CREATE TABLE test_max (epoch Int32, offset SimpleAggregateFunction(max, Int64)) ENGINE = AggregatingMergeTree() ORDER BY epoch",
@@ -928,7 +937,8 @@ def test_018(): # Obsolete, covered by test_016
         check={
             "pod_count": 1,
             "do_not_delete": 1,
-        })
+        },
+    )
     chi_name = "test-018-configmap"
 
     with Then("user1/networks/ip should be in config"):
@@ -942,7 +952,8 @@ def test_018(): # Obsolete, covered by test_016
         check={
             "pod_count": 1,
             "do_not_delete": 1,
-        })
+        },
+    )
     with Then("user2/networks should be in config"):
         chi = kubectl.get("chi", chi_name)
         assert "user2/networks/ip" in chi["spec"]["configuration"]["users"]
@@ -966,7 +977,8 @@ def test_019(config="configs/test-019-retain-volume.yaml"):
         check={
             "pod_count": 1,
             "do_not_delete": 1,
-        })
+        },
+    )
 
     create_non_replicated_table = "create table t1 Engine = Log as select 1 as a"
     create_replicated_table = """
@@ -995,7 +1007,8 @@ def test_019(config="configs/test-019-retain-volume.yaml"):
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
-            })
+            },
+        )
 
     with Then("PVC should be re-mounted"):
         with And("Non-replicated table should have data"):
@@ -1021,7 +1034,8 @@ def test_020(config="configs/test-020-multi-volume.yaml"):
                 "/var/lib/clickhouse2",
             },
             "do_not_delete": 1,
-        })
+        },
+    )
 
     with When("Create a table and insert 1 row"):
         clickhouse.query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
@@ -1058,7 +1072,8 @@ def test_021(config="configs/test-021-rescale-volume-01.yaml"):
         check={
             "pod_count": 1,
             "do_not_delete": 1,
-        })
+        },
+    )
 
     with Then("Storage size should be 100Mi"):
         size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
@@ -1070,7 +1085,8 @@ def test_021(config="configs/test-021-rescale-volume-01.yaml"):
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
-            })
+            },
+        )
 
         with Then("Storage size should be 200Mi"):
             size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
@@ -1086,7 +1102,8 @@ def test_021(config="configs/test-021-rescale-volume-01.yaml"):
                     "/var/lib/clickhouse2",
                 },
                 "do_not_delete": 1,
-            })
+            },
+        )
 
         with Then("There should be two PVC"):
             size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
@@ -1116,7 +1133,8 @@ def test_022(config="configs/test-022-broken-image.yaml"):
             "pod_count": 1,
             "do_not_delete": 1,
             "chi_status": "InProgress",
-        })
+        },
+    )
     with When("ClickHouse image can not be retrieved"):
         kubectl.wait_field(
             "pod",
