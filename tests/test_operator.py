@@ -817,9 +817,9 @@ def test_016():
     with And("user1 user should be available"):
         clickhouse.query(chi, sql="select version()", user="user1", pwd="qwerty")
 
-    with And("system.clusters should be empty due to remote_servers override"):
-        out = clickhouse.query(chi, sql="select count() from system.clusters")
-        assert out == "0"
+    with And("system.clusters should have a custom cluster"):
+        out = clickhouse.query(chi, sql="select count() from system.clusters where cluster='custom'")
+        assert out == "1"
 
     # test-016-settings-02.yaml
     with When("Update usersd settings"):
