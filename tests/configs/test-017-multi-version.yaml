@@ -30,15 +30,11 @@ spec:
     - name: default
       layout:
         shards:
-         - shard0:
-           templates:
+         - templates:
              podTemplate: v19.11
-         - shard1:
-           templates:
+         - templates:
              podTemplate: v19.16
-         - shard2:
-           templates:
+         - templates:
              podTemplate: v20.1
-         - shard3:
-           templates:
+         - templates:
              podTemplate: v20.3
