@@ -490,6 +490,9 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
 		wait = false
 	}
+	if host.GetCluster().HostsCount() == 1 {
+		wait = false
+	}
 
 	if err := w.excludeHost(host, wait); err != nil {
 		return err
