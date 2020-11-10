@@ -910,7 +910,8 @@ def test_017():
         "insert into test_max select 0, 3650487030+number from numbers(5) settings max_block_size=1",
         "insert into test_max select 0, 5898217176+number from numbers(5)",
         "insert into test_max select 0, 5898217176+number from numbers(10) settings max_block_size=1",
-        "OPTIMIZE TABLE test_max FINAL"]
+        "OPTIMIZE TABLE test_max FINAL",
+    ]
 
     for q in queries:
         print(f"{q}")
