@@ -138,16 +138,7 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 
 func (host *ChiHost) GetCluster() *ChiCluster {
 	// Host has to have filled Address
-	for index := range host.CHI.Spec.Configuration.Clusters {
-		cluster := &host.CHI.Spec.Configuration.Clusters[index]
-		if host.Address.ClusterName == cluster.Name {
-			return cluster
-		}
-	}
-
-	// This should not happen, actually
-
-	return nil
+	return host.GetCHI().FindCluster(host.Address.ClusterName)
 }
 
 func (host *ChiHost) CanDeleteAllPVCs() bool {
