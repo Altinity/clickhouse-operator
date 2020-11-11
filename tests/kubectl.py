@@ -62,7 +62,7 @@ def delete_all_chi(ns=namespace):
             delete_chi(chi["metadata"]["name"], ns)
 
 
-def create_and_check(config, check, ns=namespace, timeout=300):
+def create_and_check(config, check, ns=namespace, timeout=600):
     config = util.get_full_path(config)
     chi_name = manifest.get_chi_name(config)
 

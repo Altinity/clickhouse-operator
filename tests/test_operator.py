@@ -103,6 +103,7 @@ def test_006():
                 "do_not_delete": 1,
             }
         )
+    time.sleep(60)
     with Then("Use different podTemplate and confirm that pod image is updated"):
         kubectl.create_and_check(
             config="configs/test-006-ch-upgrade-2.yaml",
@@ -112,6 +113,7 @@ def test_006():
                 "do_not_delete": 1,
             }
         )
+    time.sleep(60)
     with Then("Change image in podTemplate itself and confirm that pod image is updated"):
         kubectl.create_and_check(
             config="configs/test-006-ch-upgrade-3.yaml",
