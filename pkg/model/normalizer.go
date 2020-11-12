@@ -70,12 +70,22 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withD
 	// Apply CHI-specified templates
 
 	var useTemplates []chiv1.ChiUseTemplate
-	if len(chi.Spec.UseTemplates) > 0 {
-		useTemplates = make([]chiv1.ChiUseTemplate, len(chi.Spec.UseTemplates))
-		copy(useTemplates, chi.Spec.UseTemplates)
 
-		// UseTemplates must contain reasonable data, thus has to be normalized
-		n.normalizeUseTemplates(&useTemplates)
+	for _, template := range n.chop.Config().FindAutoTemplates() {
+		useTemplates = append(useTemplates, chiv1.ChiUseTemplate{
+			Name:      template.Name,
+			Namespace: template.Namespace,
+			UseType:   useTypeMerge,
+		})
+	}
+
+	if len(chi.Spec.UseTemplates) > 0 {
+		useTemplates = append(useTemplates, chi.Spec.UseTemplates...)
+	}
+
+	// UseTemplates must contain reasonable data, thus has to be normalized
+	if len(useTemplates) > 0 {
+		n.normalizeUseTemplates(useTemplates)
 	}
 
 	for i := range useTemplates {
@@ -1070,9 +1080,9 @@ func (n *Normalizer) normalizeServiceTemplate(template *chiv1.ChiServiceTemplate
 }
 
 // normalizeUseTemplates normalizes .spec.useTemplates
-func (n *Normalizer) normalizeUseTemplates(useTemplates *[]chiv1.ChiUseTemplate) {
-	for i := range *useTemplates {
-		useTemplate := &(*useTemplates)[i]
+func (n *Normalizer) normalizeUseTemplates(useTemplates []chiv1.ChiUseTemplate) {
+	for i := range useTemplates {
+		useTemplate := &useTemplates[i]
 		n.normalizeUseTemplate(useTemplate)
 	}
 }
