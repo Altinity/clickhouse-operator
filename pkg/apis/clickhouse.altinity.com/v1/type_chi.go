@@ -17,6 +17,7 @@ package v1
 import (
 	"github.com/altinity/clickhouse-operator/pkg/version"
 	"math"
+	"strings"
 )
 
 // fillStatus fills .Status
@@ -617,4 +618,16 @@ func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 		return false
 	}
 	return (chi.Namespace == namespace) && (chi.Name == name)
+}
+
+const TemplatingPolicyAuto = "auto"
+
+func (chi *ClickHouseInstallation) IsAuto() bool {
+	if chi == nil {
+		return false
+	}
+	if (chi.Namespace == "") && (chi.Name == "") {
+		return false
+	}
+	return strings.ToLower(chi.Spec.Templating.Policy) == TemplatingPolicyAuto
 }

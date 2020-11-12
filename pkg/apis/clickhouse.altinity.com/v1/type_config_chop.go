@@ -240,6 +240,17 @@ func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string
 	return nil
 }
 
+func (config *OperatorConfig) FindAutoTemplates() []*ClickHouseInstallation {
+	var res []*ClickHouseInstallation
+	for _, _template := range config.CHITemplates {
+		if _template.IsAuto() {
+			res = append(res, _template)
+		}
+	}
+	log.V(1).Infof("Found %d auto templates", len(res))
+	return res
+}
+
 // buildUnifiedCHITemplate builds combined CHI Template from templates catalog
 func (config *OperatorConfig) buildUnifiedCHITemplate() {
 
