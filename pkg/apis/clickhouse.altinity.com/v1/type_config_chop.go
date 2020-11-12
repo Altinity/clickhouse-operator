@@ -213,9 +213,7 @@ func (config *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation
 func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *ClickHouseInstallation {
 	// Try to find direct match
 	for _, _template := range config.CHITemplates {
-		if _template == nil {
-			// Skip
-		} else if _template.MatchFullName(use.Namespace, use.Name) {
+		if _template.MatchFullName(use.Namespace, use.Name) {
 			// Direct match, found result
 			return _template
 		}
@@ -233,9 +231,7 @@ func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string
 	// Improvise with use.Namespace
 
 	for _, _template := range config.CHITemplates {
-		if _template == nil {
-			// Skip
-		} else if _template.MatchFullName(namespace, use.Name) {
+		if _template.MatchFullName(namespace, use.Name) {
 			// Found template with searched name in specified namespace
 			return _template
 		}
