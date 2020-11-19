@@ -502,6 +502,9 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 			Error("Delete CHI %s/%s failed - unable to normalize: %q", chi.Namespace, chi.Name, err)
 		return err
 	}
+	
+	// Exclude this CHI from monitoring
+	w.c.deleteWatch(chi.Namespace, chi.Name)
 
 	// Delete all clusters
 	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
@@ -518,9 +521,6 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 		WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
 		WithStatusAction(chi).
 		Info("Delete CHI %s/%s - completed", chi.Namespace, chi.Name)
-
-	// Exclude this CHI from monitoring
-	w.c.deleteWatch(chi.Namespace, chi.Name)
 
 	return nil
 }
