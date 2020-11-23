@@ -1,4 +1,64 @@
 ---
+# Prometheus scrape_configs
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: prometheus-scraping-config
+  labels:
+    prometheus: prometheus
+stringData:
+  prometheus-kubernetes-pods-scraping.yaml: |-
+    ### --- KUBE PODS (with prometheus annotations) ---
+    - job_name: 'kubernetes-pods'
+      kubernetes_sd_configs:
+      - role: pod
+      scrape_interval: 30s
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        insecure_skip_verify: false
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        regex: true
+        action: keep
+
+      - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        regex: (.+);(.+)
+        replacement: $1:$2
+        target_label: __address__
+
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        regex: ()
+        replacement: /metrics
+        target_label: __meta_kubernetes_pod_annotation_prometheus_io_path
+
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod_name
+
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+
+      - action: labeldrop
+        regex: 'container_id|image_id|controller_revision_hash|pod_template_generation|pod_template_hash'
+
+      metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'process_virtual.*|process_max_fds|process_start_time.*|http_.*|go_gc.*'
+        action: drop
+
+---
 # Setup Prometheus
 # Prometheus would be created in kubectl-specified namespace
 apiVersion: monitoring.coreos.com/v1
@@ -18,6 +78,9 @@ spec:
   serviceMonitorSelector:
     matchLabels:
       app: prometheus
+  additionalScrapeConfigs:
+    name: prometheus-scraping-config
+    key: prometheus-kubernetes-pods-scraping.yaml
   ruleSelector:
     matchLabels:
       role: alert-rules
