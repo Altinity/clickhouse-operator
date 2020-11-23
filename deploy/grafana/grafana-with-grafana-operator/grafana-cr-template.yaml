@@ -22,8 +22,6 @@ spec:
     timeout: 30
     preferService: True
   config:
-    server:
-      root_url: $GRAFANA_ROOT_URL
     log:
       mode: "console"
       level: "warn"
@@ -39,6 +37,8 @@ spec:
     auth.anonymous:
       enabled: True
 # look to https://grafana.com/docs/grafana/latest/auth/generic-oauth/
+#    server:
+#      root_url: $GRAFANA_ROOT_URL
 #    auth.generic_oauth:
 #      enabled: True
 #      name: OAuth
