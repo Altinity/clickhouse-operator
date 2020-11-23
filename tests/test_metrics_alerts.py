@@ -70,7 +70,7 @@ def random_pod_choice_for_callbacks():
 
 
 def drop_table_on_cluster(cluster_name='all-sharded', table='default.test'):
-    drop_local_sql = f'DROP TABLE {table} ON CLUSTER \\\"{cluster_name}\\\"'
+    drop_local_sql = f'DROP TABLE {table} ON CLUSTER \\\"{cluster_name}\\\" SYNC'
     clickhouse.query(chi["metadata"]["name"], drop_local_sql, timeout=120)
 
 
@@ -423,7 +423,7 @@ def test_read_only_replica():
     read_only_pod, read_only_svc, other_pod, other_svc = random_pod_choice_for_callbacks()
     chi_name = chi["metadata"]["name"]
     create_table_on_cluster('all-replicated', 'default.test_repl',
-                            '(event_time DateTime, test UInt64) ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/test_repl\', \'{replica}\') ORDER BY tuple()')
+                            '(event_time DateTime, test UInt64) ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/{uuid}/test_repl\', \'{replica}\') ORDER BY tuple()')
 
     def restart_zookeeper():
         kubectl.launch(
@@ -461,7 +461,7 @@ def test_read_only_replica():
 def test_replicas_max_abosulute_delay():
     stop_replica_pod, stop_replica_svc, insert_pod, insert_svc = random_pod_choice_for_callbacks()
     create_table_on_cluster('all-replicated', 'default.test_repl',
-                            '(event_time DateTime, test UInt64) ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/test_repl\', \'{replica}\') ORDER BY tuple()')
+                            '(event_time DateTime, test UInt64) ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/{uuid}/test_repl\', \'{replica}\') ORDER BY tuple()')
     prometheus_scrape_interval = 15
 
     def restart_clickhouse_and_insert_to_replicated_table():
@@ -838,9 +838,9 @@ if main():
             test_cases = [
                 test_prometheus_setup,
                 test_read_only_replica,
+                test_replicas_max_abosulute_delay,
                 test_metrics_exporter_down,
                 test_clickhouse_dns_errors,
-                test_replicas_max_abosulute_delay,
                 test_distributed_connection_exceptions,
                 test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_inserted_rows_per_query,
                 test_too_many_connections,
