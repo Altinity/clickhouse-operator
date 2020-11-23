@@ -37,21 +37,21 @@ spec:
     auth.basic:
       enabled: True
     auth.anonymous:
-      enabled: False
-    # look to https://grafana.com/docs/grafana/latest/auth/generic-oauth/
-    auth.generic_oauth:
       enabled: True
-      name: OAuth
-      allow_sign_up: True
-      allowed_domains: $OAUTH_ALLOWED_DOMAINS
-      team_ids: $OAUTH_ALLOWED_TEAM_IDS
-      allowed_organizations: $OAUTH_ALLOWED_ORGANIZATIONS
-      client_id: $OAUTH_CLIENT_ID
-      client_secret: $OAUTH_CLIENT_SECRET
-      scopes: openid profile email
-      auth_url: https://$OAUTH_DOMAIN/authorize
-      token_url: https://$OAUTH_DOMAIN/oauth/token
-      api_url: https://$OAUTH_DOMAIN/userinfo
+# look to https://grafana.com/docs/grafana/latest/auth/generic-oauth/
+#    auth.generic_oauth:
+#      enabled: True
+#      name: OAuth
+#      allow_sign_up: True
+#      allowed_domains: $OAUTH_ALLOWED_DOMAINS
+#      team_ids: $OAUTH_ALLOWED_TEAM_IDS
+#      allowed_organizations: $OAUTH_ALLOWED_ORGANIZATIONS
+#      client_id: $OAUTH_CLIENT_ID
+#      client_secret: $OAUTH_CLIENT_SECRET
+#      scopes: openid profile email
+#      auth_url: https://$OAUTH_DOMAIN/authorize
+#      token_url: https://$OAUTH_DOMAIN/oauth/token
+#      api_url: https://$OAUTH_DOMAIN/userinfo
   dashboardLabelSelector:
   - matchExpressions:
     - {key: app, operator: In, values: [grafana]}

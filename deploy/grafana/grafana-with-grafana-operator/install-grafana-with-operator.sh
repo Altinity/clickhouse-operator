@@ -111,12 +111,9 @@ function wait_grafana_datasource_to_start() {
 ##                       ##
 ###########################
 
-if [[ ! -f "${CUR_DIR}/sensitive-data.sh" ]]; then
-  echo "$CUR_DIR/sensitive-data.sh not exists please create and use $CUR_DIR/sensitive-data.sh.example as template"
-  exit 1
+if [[ -f "${CUR_DIR}/sensitive-data.sh" ]]; then
+  source $CUR_DIR/sensitive-data.sh
 fi
-
-source $CUR_DIR/sensitive-data.sh
 
 echo "Install Grafana"
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
