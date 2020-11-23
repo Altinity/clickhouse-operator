@@ -616,7 +616,7 @@ def test_014():
         'test_local',
         'test_view',
         'test_mv',
-        'a_view',
+        'a_view'
     ]
     with Given("Create schema objects"):
         clickhouse.query(
@@ -634,6 +634,10 @@ def test_014():
         clickhouse.query(
             chi,
             "CREATE MATERIALIZED VIEW test_mv Engine = Log as SELECT * from test_local",
+            host=f"chi-{chi}-{cluster}-0-0")
+        clickhouse.query(
+            chi,
+            "CREATE DICTIONARY test_dict (a Int8, b Int8) PRIMARY KEY a SOURCE(CLICKHOUSE(host 'localhost' port 9000 table 'test_local' user 'default')) LAYOUT(FLAT()) LIFETIME(0)",
             host=f"chi-{chi}-{cluster}-0-0")
 
     with Given("Replicated table is created on a first replica and data is inserted"):
@@ -676,6 +680,12 @@ def test_014():
                     f"SELECT count() FROM system.tables WHERE name = '{obj}'",
                     host=f"chi-{chi}-{cluster}-0-2")
                 assert out == "1"
+            # Check dictionary
+            out = clickhouse.query(
+                    chi,
+                    f"SELECT count() FROM system.dictionaries WHERE name = 'test_dict'",
+                    host=f"chi-{chi}-{cluster}-0-2")
+            assert out == "1"
 
         with And("Replicated table should have the data"):
             out = clickhouse.query(
