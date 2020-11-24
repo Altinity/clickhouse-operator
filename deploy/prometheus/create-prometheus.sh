@@ -6,8 +6,7 @@ echo "External value for \$VALIDATE_YAML=$VALIDATE_YAML"
 
 export PROMETHEUS_NAMESPACE="${PROMETHEUS_NAMESPACE:-prometheus}"
 export OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
-# look https://github.com/coreos/prometheus-operator/issues/3168, master branch is not stable
-export PROMETHEUS_OPERATOR_BRANCH="${PROMETHEUS_OPERATOR_BRANCH:-release-0.42}"
+export PROMETHEUS_OPERATOR_BRANCH="${PROMETHEUS_OPERATOR_BRANCH:-release-0.43}"
 export ALERT_MANAGER_EXTERNAL_URL="${ALERT_MANAGER_EXTERNAL_URL:-http://localhost:9093}"
 # Possible values for "validate yaml" are values from --validate=XXX kubectl option. They are true/false ATM
 export VALIDATE_YAML="${VALIDATE_YAML:-true}"
@@ -27,7 +26,7 @@ echo "Apply options now..."
 # Let's setup all prometheus-related stuff into dedicated namespace called "prometheus"
 kubectl create namespace "${PROMETHEUS_NAMESPACE}" || true
 
-BASE_PATH="https://raw.githubusercontent.com/coreos/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}"
+BASE_PATH="https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}"
 
 echo "Create prometheus-operator's CRDs"
 CRD_PATH="${BASE_PATH}/example/prometheus-operator-crd"
@@ -65,31 +64,6 @@ echo "Setup Prometheus instance via prometheus-operator into '${PROMETHEUS_NAMES
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
     cat ${CUR_DIR}/prometheus-template.yaml | PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} envsubst \
 )
-
-echo "Setup Prometheus <-> clickhouse-operator integration."
-# Specify endpoint, where Prometheus can gather data from clickhouse-operator
-# IMPORTANT: clickhouse-operator should be installed and running prior to this step,
-# otherwise Prometheus would not be able to setup integration with clickhouse-operator
-
-if kubectl --namespace="${OPERATOR_NAMESPACE}" get service clickhouse-operator-metrics; then
-    echo "clickhouse-operator-metrics endpoint found. Configuring integration with clickhouse-operator"
-    # clickhouse-operator-metrics service found, can setup integration
-    kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
-        cat ${CUR_DIR}/prometheus-clickhouse-operator-service-monitor.yaml | \
-        OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} sed "s/- kube-system/- ${OPERATOR_NAMESPACE}/" \
-    )
-    echo ""
-    echo "DONE"
-else
-    echo ""
-    echo "ERROR install prometheus. Unable to find service '${OPERATOR_NAMESPACE}/clickhouse-operator-metrics'."
-    echo "Please setup clickhouse-operator into ${OPERATOR_NAMESPACE} namespace and restart this script."
-    exit 1
-fi
-
-echo "Setup Prometheus <-> zookeeper integration."
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f ${CUR_DIR}/prometheus-zookeeper-service-monitor.yaml
-echo "DONE"
 
 echo "Setup Prometheus -> AlertManager -> Slack integration"
 if [[ ! -f ${CUR_DIR}/prometheus-sensitive-data.sh ]]; then

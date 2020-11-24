@@ -128,21 +128,21 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "znode_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "znode_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "instant": false,
           "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} znode_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} znode_count",
           "refId": "A"
         },
         {
-          "expr": "ephemerals_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "ephemerals_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "instant": false,
           "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} ephemerals",
+          "legendFormat": "{{pod_name}}.{{namespace}} ephemerals",
           "refId": "B"
         }
       ],
@@ -233,21 +233,21 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(znode_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(znode_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "instant": false,
           "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} znode_count_rate",
+          "legendFormat": "{{pod_name}}.{{namespace}} znode_count_rate",
           "refId": "A"
         },
         {
-          "expr": "rate(ephemerals_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(ephemerals_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "instant": false,
           "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} ephemerals_rate",
+          "legendFormat": "{{pod_name}}.{{namespace}} ephemerals_rate",
           "refId": "B"
         }
       ],
@@ -334,11 +334,11 @@
       "pluginVersion": "6.5.1",
       "targets": [
         {
-          "expr": "global_sessions{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "global_sessions{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "instant": false,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}}",
+          "legendFormat": "{{pod_name}}.{{namespace}}",
           "refId": "A"
         }
       ],
@@ -388,10 +388,10 @@
       "pluginVersion": "6.5.1",
       "targets": [
         {
-          "expr": "local_sessions{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "local_sessions{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}}",
+          "legendFormat": "{{pod_name}}.{{namespace}}",
           "refId": "A"
         }
       ],
@@ -442,10 +442,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "write_per_namespace_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "write_per_namespace_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} write_per_namespace:{{key}}",
+          "legendFormat": "{{pod_name}}.{{namespace}} write_per_namespace:{{key}}",
           "refId": "C"
         }
       ],
@@ -532,11 +532,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "read_per_namespace_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "read_per_namespace_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} read_per_namespace:{{key}}",
+          "legendFormat": "{{pod_name}}.{{namespace}} read_per_namespace:{{key}}",
           "refId": "C"
         }
       ],
@@ -623,10 +623,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "approximate_data_size{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "approximate_data_size{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{pod}}.{{namespace}} approximate_data_size",
+          "legendFormat": "{{pod_name}}.{{namespace}} approximate_data_size",
           "refId": "A"
         }
       ],
@@ -713,10 +713,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(packets_received{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[1m])",
+          "expr": "rate(packets_received{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} packets_received",
+          "legendFormat": "{{pod_name}}.{{namespace}} packets_received",
           "refId": "A"
         }
       ],
@@ -804,10 +804,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(packets_sent{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[1m])",
+          "expr": "rate(packets_sent{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} packets_sent",
+          "legendFormat": "{{pod_name}}.{{namespace}} packets_sent",
           "refId": "A"
         }
       ],
@@ -911,31 +911,31 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(response_packet_cache_misses{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[1m])",
+          "expr": "rate(response_packet_cache_misses{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} response_packet_cache_misses",
+          "legendFormat": "{{pod_name}}.{{namespace}} response_packet_cache_misses",
           "refId": "A"
         },
         {
-          "expr": "rate(response_packet_cache_hits{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[1m])",
+          "expr": "rate(response_packet_cache_hits{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} response_packet_cache_hits",
+          "legendFormat": "{{pod_name}}.{{namespace}} response_packet_cache_hits",
           "refId": "B"
         },
         {
-          "expr": "rate(response_packet_get_children_cache_misses{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[1m])",
+          "expr": "rate(response_packet_get_children_cache_misses{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} response_packet_get_children_cache_misses",
+          "legendFormat": "{{pod_name}}.{{namespace}} response_packet_get_children_cache_misses",
           "refId": "C"
         },
         {
-          "expr": "rate(response_packet_get_children_cache_hits{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[1m])",
+          "expr": "rate(response_packet_get_children_cache_hits{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} response_packet_get_children_cache_hits",
+          "legendFormat": "{{pod_name}}.{{namespace}} response_packet_get_children_cache_hits",
           "refId": "D"
         }
       ],
@@ -1022,10 +1022,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "unrecoverable_error_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "unrecoverable_error_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} unrecoverable_error_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} unrecoverable_error_count",
           "refId": "A"
         }
       ],
@@ -1113,10 +1113,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "digest_mismatches_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "digest_mismatches_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} digest_mismatches_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} digest_mismatches_count",
           "refId": "C"
         }
       ],
@@ -1207,7 +1207,7 @@
           "format": "time_series",
           "hide": true,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} startup_snap_load_time-{{quantile}}",
+          "legendFormat": "{{pod_name}}.{{namespace}} startup_snap_load_time-{{quantile}}",
           "refId": "A"
         },
         {
@@ -1215,14 +1215,14 @@
           "format": "time_series",
           "hide": true,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} startup_snap_load_time_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} startup_snap_load_time_count",
           "refId": "B"
         },
         {
-          "expr": "startup_snap_load_time_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "startup_snap_load_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} startup_snap_load_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} startup_snap_load_time",
           "refId": "C"
         }
       ],
@@ -1313,7 +1313,7 @@
           "format": "time_series",
           "hide": true,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} startup_txns_loaded-{{quantile}}",
+          "legendFormat": "{{pod_name}}.{{namespace}} startup_txns_loaded-{{quantile}}",
           "refId": "A"
         },
         {
@@ -1321,14 +1321,14 @@
           "format": "time_series",
           "hide": true,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} startup_txns_loaded_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} startup_txns_loaded_count",
           "refId": "B"
         },
         {
-          "expr": "startup_txns_loaded_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "startup_txns_loaded_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} startup_txns_loaded",
+          "legendFormat": "{{pod_name}}.{{namespace}} startup_txns_loaded",
           "refId": "C"
         }
       ],
@@ -1419,7 +1419,7 @@
           "format": "time_series",
           "hide": true,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} dbinittime-{{quantile}}",
+          "legendFormat": "{{pod_name}}.{{namespace}} dbinittime-{{quantile}}",
           "refId": "A"
         },
         {
@@ -1427,14 +1427,14 @@
           "format": "time_series",
           "hide": true,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} dbinittime_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} dbinittime_count",
           "refId": "B"
         },
         {
-          "expr": "dbinittime_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "dbinittime_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} db_init_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} db_init_time",
           "refId": "C"
         }
       ],
@@ -1555,7 +1555,7 @@
           "tableColumn": "",
           "targets": [
             {
-              "expr": "max(quorum_size{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"})",
+              "expr": "max(quorum_size{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "quorum_size",
@@ -1640,10 +1640,10 @@
           "tableColumn": "",
           "targets": [
             {
-              "expr": "leader_uptime{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "leader_uptime{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 1,
-              "legendFormat": "{{pod}}.{{namespace}}",
+              "legendFormat": "{{pod_name}}.{{namespace}}",
               "refId": "A"
             }
           ],
@@ -1725,10 +1725,10 @@
           "tableColumn": "",
           "targets": [
             {
-              "expr": "leader_uptime{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "leader_uptime{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 1,
-              "legendFormat": "{{pod}}.{{namespace}} leader_uptime",
+              "legendFormat": "{{pod_name}}.{{namespace}} leader_uptime",
               "refId": "A"
             }
           ],
@@ -1787,21 +1787,21 @@
           "pluginVersion": "6.5.1",
           "targets": [
             {
-              "expr": "max(learners{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"})",
+              "expr": "max(learners{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "learners",
               "refId": "B"
             },
             {
-              "expr": "max(synced_non_voting_followers{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"})",
+              "expr": "max(synced_non_voting_followers{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "synced_non_voting_followers",
               "refId": "C"
             },
             {
-              "expr": "max(synced_observers{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"})",
+              "expr": "max(synced_observers{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"})",
               "format": "time_series",
               "intervalFactor": 2,
               "legendFormat": "synced_observers",
@@ -1861,31 +1861,31 @@
               "format": "time_series",
               "hide": true,
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} election_time",
+              "legendFormat": "{{pod_name}}.{{namespace}} election_time",
               "refId": "A"
             },
             {
-              "expr": "election_time_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "election_time_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} election_time_count",
+              "legendFormat": "{{pod_name}}.{{namespace}} election_time_count",
               "refId": "B"
             },
             {
-              "expr": "election_time_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "election_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} election_time_sum(ms)",
+              "legendFormat": "{{pod_name}}.{{namespace}} election_time_sum(ms)",
               "refId": "C"
             },
             {
-              "expr": "election_time_sum/election_time_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "election_time_sum/election_time_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "hide": false,
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} election_avg_time(ms)",
+              "legendFormat": "{{pod_name}}.{{namespace}} election_avg_time(ms)",
               "refId": "D"
             }
           ],
@@ -1972,10 +1972,10 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "uptime{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "uptime{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 1,
-              "legendFormat": "{{pod}}.{{namespace}} uptime",
+              "legendFormat": "{{pod_name}}.{{namespace}} uptime",
               "refId": "B"
             }
           ],
@@ -2062,10 +2062,10 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "learner_commit_received_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "learner_commit_received_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} learner_commit_received_count",
+              "legendFormat": "{{pod_name}}.{{namespace}} learner_commit_received_count",
               "refId": "A"
             }
           ],
@@ -2152,10 +2152,10 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "commit_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "commit_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} commit_count",
+              "legendFormat": "{{pod_name}}.{{namespace}} commit_count",
               "refId": "A"
             }
           ],
@@ -2242,10 +2242,10 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "snap_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "snap_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} snap_count",
+              "legendFormat": "{{pod_name}}.{{namespace}} snap_count",
               "refId": "A"
             }
           ],
@@ -2332,10 +2332,10 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "diff_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "diff_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} diff_count",
+              "legendFormat": "{{pod_name}}.{{namespace}} diff_count",
               "refId": "A"
             }
           ],
@@ -2422,10 +2422,10 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "looking_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "looking_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} looking_count",
+              "legendFormat": "{{pod_name}}.{{namespace}} looking_count",
               "refId": "A"
             }
           ],
@@ -2512,10 +2512,10 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "proposal_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "proposal_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} proposal_count",
+              "legendFormat": "{{pod_name}}.{{namespace}} proposal_count",
               "refId": "A"
             }
           ],
@@ -2602,24 +2602,24 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "last_proposal_size{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "last_proposal_size{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} last_proposal_size",
+              "legendFormat": "{{pod_name}}.{{namespace}} last_proposal_size",
               "refId": "A"
             },
             {
-              "expr": "max_proposal_size{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "max_proposal_size{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} max_proposal_size",
+              "legendFormat": "{{pod_name}}.{{namespace}} max_proposal_size",
               "refId": "B"
             },
             {
-              "expr": "min_proposal_size{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "min_proposal_size{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} min_proposal_size",
+              "legendFormat": "{{pod_name}}.{{namespace}} min_proposal_size",
               "refId": "C"
             }
           ],
@@ -2706,10 +2706,10 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(follower_sync_time_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[1m])",
+              "expr": "rate(follower_sync_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} follower_sync_time",
+              "legendFormat": "{{pod_name}}.{{namespace}} follower_sync_time",
               "refId": "C"
             }
           ],
@@ -2796,10 +2796,10 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "learner_handler_qp_size_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "learner_handler_qp_size_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} learner_handler_qp_size_sum sid:{{key}}",
+              "legendFormat": "{{pod_name}}.{{namespace}} learner_handler_qp_size_sum sid:{{key}}",
               "refId": "C"
             }
           ],
@@ -2886,10 +2886,10 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "quit_leading_due_to_disloyal_voter{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+              "expr": "quit_leading_due_to_disloyal_voter{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} quit_leading_due_to_disloyal_voter",
+              "legendFormat": "{{pod_name}}.{{namespace}} quit_leading_due_to_disloyal_voter",
               "refId": "A"
             }
           ],
@@ -2976,17 +2976,17 @@
           "steppedLine": false,
           "targets": [
             {
-              "expr": "rate(om_commit_process_time_ms_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+              "expr": "rate(om_commit_process_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} om_commit_process_time",
+              "legendFormat": "{{pod_name}}.{{namespace}} om_commit_process_time",
               "refId": "C"
             },
             {
-              "expr": "rate(om_proposal_process_time_ms_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+              "expr": "rate(om_proposal_process_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
               "format": "time_series",
               "intervalFactor": 2,
-              "legendFormat": "{{pod}}.{{namespace}} om_proposal_process_time",
+              "legendFormat": "{{pod_name}}.{{namespace}} om_proposal_process_time",
               "refId": "A"
             }
           ],
@@ -3091,10 +3091,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "watch_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "watch_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} watch_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} watch_count",
           "refId": "A"
         }
       ],
@@ -3181,10 +3181,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "node_changed_watch_count_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "node_changed_watch_count_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} node_changed_watch_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} node_changed_watch_count",
           "refId": "C"
         }
       ],
@@ -3271,10 +3271,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "node_children_watch_count_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "node_children_watch_count_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} node_children_watch_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} node_children_watch_count",
           "refId": "C"
         }
       ],
@@ -3361,10 +3361,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "node_deleted_watch_count_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "node_deleted_watch_count_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} node_deleted_watch_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} node_deleted_watch_count",
           "refId": "C"
         }
       ],
@@ -3451,10 +3451,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "node_created_watch_count_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "node_created_watch_count_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} node_created_watch_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} node_created_watch_count",
           "refId": "A"
         }
       ],
@@ -3541,10 +3541,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "revalidate_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "revalidate_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} revalidate_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} revalidate_count",
           "refId": "A"
         }
       ],
@@ -3631,10 +3631,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "stale_sessions_expired{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "stale_sessions_expired{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{pod}}.{{namespace}} stale_sessions_expired",
+          "legendFormat": "{{pod_name}}.{{namespace}} stale_sessions_expired",
           "refId": "A"
         }
       ],
@@ -3721,24 +3721,24 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "dead_watchers_cleared{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "dead_watchers_cleared{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} dead_watchers_cleared",
+          "legendFormat": "{{pod_name}}.{{namespace}} dead_watchers_cleared",
           "refId": "A"
         },
         {
-          "expr": "dead_watchers_queued{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "dead_watchers_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} dead_watchers_queued",
+          "legendFormat": "{{pod_name}}.{{namespace}} dead_watchers_queued",
           "refId": "B"
         },
         {
-          "expr": "rate(dead_watchers_cleaner_latency_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(dead_watchers_cleaner_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} dead_watchers_cleaner_latency",
+          "legendFormat": "{{pod_name}}.{{namespace}} dead_watchers_cleaner_latency",
           "refId": "C"
         }
       ],
@@ -3825,10 +3825,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "add_dead_watcher_stall_time{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "add_dead_watcher_stall_time{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} add_dead_watcher_stall_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} add_dead_watcher_stall_time",
           "refId": "A"
         }
       ],
@@ -3929,10 +3929,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "outstanding_requests{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "outstanding_requests{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} outstanding_requests",
+          "legendFormat": "{{pod_name}}.{{namespace}} outstanding_requests",
           "refId": "A"
         }
       ],
@@ -4019,24 +4019,24 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "last_client_response_size{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "last_client_response_size{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} last_client_response_size",
+          "legendFormat": "{{pod_name}}.{{namespace}} last_client_response_size",
           "refId": "A"
         },
         {
-          "expr": "min_client_response_size{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "min_client_response_size{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} min_client_response_size",
+          "legendFormat": "{{pod_name}}.{{namespace}} min_client_response_size",
           "refId": "B"
         },
         {
-          "expr": "max_client_response_size{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "max_client_response_size{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} max_client_response_size",
+          "legendFormat": "{{pod_name}}.{{namespace}} max_client_response_size",
           "refId": "C"
         }
       ],
@@ -4123,10 +4123,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "bytes_received_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "bytes_received_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} bytes_received_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} bytes_received_count",
           "refId": "A"
         }
       ],
@@ -4213,10 +4213,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "connection_request_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "connection_request_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} connection_request_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} connection_request_count",
           "refId": "A"
         }
       ],
@@ -4303,10 +4303,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "num_alive_connections{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "num_alive_connections{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{pod}}.{{namespace}} num_alive_connections",
+          "legendFormat": "{{pod_name}}.{{namespace}} num_alive_connections",
           "refId": "A"
         }
       ],
@@ -4393,10 +4393,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "connection_rejected{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "connection_rejected{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} connection_rejected",
+          "legendFormat": "{{pod_name}}.{{namespace}} connection_rejected",
           "refId": "A"
         }
       ],
@@ -4483,10 +4483,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "connection_drop_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "connection_drop_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} connection_drop_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} connection_drop_count",
           "refId": "A"
         }
       ],
@@ -4573,10 +4573,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "connection_drop_probability{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "connection_drop_probability{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} connection_drop_probability",
+          "legendFormat": "{{pod_name}}.{{namespace}} connection_drop_probability",
           "refId": "A"
         }
       ],
@@ -4663,10 +4663,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sessionless_connections_expired{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "sessionless_connections_expired{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} sessionless_connections_expired",
+          "legendFormat": "{{pod_name}}.{{namespace}} sessionless_connections_expired",
           "refId": "A"
         }
       ],
@@ -4753,10 +4753,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(connection_token_deficit_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(connection_token_deficit_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} connection_token_deficit",
+          "legendFormat": "{{pod_name}}.{{namespace}} connection_token_deficit",
           "refId": "C"
         }
       ],
@@ -4857,10 +4857,10 @@
       "pluginVersion": "6.5.1",
       "targets": [
         {
-          "expr": "open_file_descriptor_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "open_file_descriptor_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}}",
+          "legendFormat": "{{pod_name}}.{{namespace}}",
           "refId": "A"
         }
       ],
@@ -4919,44 +4919,44 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "fsynctime{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "fsynctime{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "hide": true,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} fsynctime",
+          "legendFormat": "{{pod_name}}.{{namespace}} fsynctime",
           "refId": "A"
         },
         {
-          "expr": "fsynctime_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "fsynctime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "hide": true,
           "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} fsynctime_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} fsynctime_count",
           "refId": "B"
         },
         {
-          "expr": "fsynctime_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "fsynctime_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "hide": true,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} fsynctime_sum(ms)",
+          "legendFormat": "{{pod_name}}.{{namespace}} fsynctime_sum(ms)",
           "refId": "C"
         },
         {
-          "expr": "fsynctime_sum * 1000 /fsynctime_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "fsynctime_sum * 1000 /fsynctime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} fsynctime_avg(μs)",
+          "legendFormat": "{{pod_name}}.{{namespace}} fsynctime_avg(μs)",
           "refId": "D"
         },
         {
-          "expr": "irate(fsynctime_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[1m])",
+          "expr": "irate(fsynctime_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} fsynctime_rate",
+          "legendFormat": "{{pod_name}}.{{namespace}} fsynctime_rate",
           "refId": "E"
         }
       ],
@@ -5047,27 +5047,27 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(snapshottime_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(snapshottime_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} snapshot_time_rate",
+          "legendFormat": "{{pod_name}}.{{namespace}} snapshot_time_rate",
           "refId": "C"
         },
         {
-          "expr": "snapshottime_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "snapshottime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "hide": true,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} snapshottime_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} snapshottime_count",
           "refId": "A"
         },
         {
-          "expr": "snapshottime_sum / snapshottime_count{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "snapshottime_sum / snapshottime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "hide": true,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} snapshottime_avg(ms)",
+          "legendFormat": "{{pod_name}}.{{namespace}} snapshottime_avg(ms)",
           "refId": "B"
         }
       ],
@@ -5168,10 +5168,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(prep_process_time_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(prep_process_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{pod}}.{{namespace}} prep_process_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} prep_process_time",
           "refId": "A"
         }
       ],
@@ -5258,10 +5258,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(prep_processor_queue_time_ms_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(prep_processor_queue_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{pod}}.{{namespace}} prep_processor_queue_time_ms",
+          "legendFormat": "{{pod_name}}.{{namespace}} prep_processor_queue_time_ms",
           "refId": "C"
         }
       ],
@@ -5348,10 +5348,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(prep_processor_queue_size_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(prep_processor_queue_size_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} prep_processor_queue_size",
+          "legendFormat": "{{pod_name}}.{{namespace}} prep_processor_queue_size",
           "refId": "C"
         }
       ],
@@ -5438,10 +5438,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "prep_processor_request_queued{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "prep_processor_request_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} prep_processor_request_queued",
+          "legendFormat": "{{pod_name}}.{{namespace}} prep_processor_request_queued",
           "refId": "A"
         }
       ],
@@ -5528,17 +5528,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "outstanding_changes_queued{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "outstanding_changes_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} outstanding_changes_queued",
+          "legendFormat": "{{pod_name}}.{{namespace}} outstanding_changes_queued",
           "refId": "A"
         },
         {
-          "expr": "outstanding_changes_removed{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "outstanding_changes_removed{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} outstanding_changes_removed",
+          "legendFormat": "{{pod_name}}.{{namespace}} outstanding_changes_removed",
           "refId": "B"
         }
       ],
@@ -5625,10 +5625,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(close_session_prep_time_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(close_session_prep_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} close_session_prep_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} close_session_prep_time",
           "refId": "A"
         }
       ],
@@ -5730,10 +5730,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(sync_process_time_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(sync_process_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} sync_process_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} sync_process_time",
           "refId": "C"
         }
       ],
@@ -5820,10 +5820,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(sync_processor_queue_flush_time_ms_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(sync_processor_queue_flush_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} sync_processor_queue_flush_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} sync_processor_queue_flush_time",
           "refId": "A"
         }
       ],
@@ -5910,10 +5910,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(sync_processor_queue_size_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(sync_processor_queue_size_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} sync_processor_queue_size",
+          "legendFormat": "{{pod_name}}.{{namespace}} sync_processor_queue_size",
           "refId": "C"
         }
       ],
@@ -6000,10 +6000,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sync_processor_request_queued{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "sync_processor_request_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} sync_processor_request_queued",
+          "legendFormat": "{{pod_name}}.{{namespace}} sync_processor_request_queued",
           "refId": "A"
         }
       ],
@@ -6090,10 +6090,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(sync_processor_batch_size_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(sync_processor_batch_size_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} sync_processor_batch_size",
+          "legendFormat": "{{pod_name}}.{{namespace}} sync_processor_batch_size",
           "refId": "C"
         }
       ],
@@ -6194,24 +6194,24 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(commit_process_time_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(commit_process_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} commit_process_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} commit_process_time",
           "refId": "C"
         },
         {
-          "expr": "rate(read_commitproc_time_ms_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(read_commitproc_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} read_commitproc_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} read_commitproc_time",
           "refId": "A"
         },
         {
-          "expr": "rate(write_commitproc_time_ms_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(write_commitproc_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} write_commitproc_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} write_commitproc_time",
           "refId": "B"
         }
       ],
@@ -6298,24 +6298,24 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(write_commit_proc_req_queued_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(write_commit_proc_req_queued_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} write_commit_proc_req_queued",
+          "legendFormat": "{{pod_name}}.{{namespace}} write_commit_proc_req_queued",
           "refId": "C"
         },
         {
-          "expr": "rate(read_commit_proc_req_queued_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(read_commit_proc_req_queued_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} read_commit_proc_req_queued",
+          "legendFormat": "{{pod_name}}.{{namespace}} read_commit_proc_req_queued",
           "refId": "A"
         },
         {
-          "expr": "rate(commit_commit_proc_req_queued_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(commit_commit_proc_req_queued_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} commit_commit_proc_req_queued",
+          "legendFormat": "{{pod_name}}.{{namespace}} commit_commit_proc_req_queued",
           "refId": "B"
         }
       ],
@@ -6402,10 +6402,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(requests_in_session_queue_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(requests_in_session_queue_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} requests_in_session_queue",
+          "legendFormat": "{{pod_name}}.{{namespace}} requests_in_session_queue",
           "refId": "C"
         }
       ],
@@ -6492,17 +6492,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(read_commit_proc_issued_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(read_commit_proc_issued_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} read_commit_proc_issued",
+          "legendFormat": "{{pod_name}}.{{namespace}} read_commit_proc_issued",
           "refId": "C"
         },
         {
-          "expr": "rate(write_commit_proc_issued_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(write_commit_proc_issued_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} write_commit_proc_issued",
+          "legendFormat": "{{pod_name}}.{{namespace}} write_commit_proc_issued",
           "refId": "A"
         }
       ],
@@ -6589,10 +6589,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(concurrent_request_processing_in_commit_processor_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(concurrent_request_processing_in_commit_processor_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} concurrent_request_processing_in_commit_processor",
+          "legendFormat": "{{pod_name}}.{{namespace}} concurrent_request_processing_in_commit_processor",
           "refId": "C"
         }
       ],
@@ -6679,11 +6679,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(time_waiting_empty_pool_in_commit_processor_read_ms_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(time_waiting_empty_pool_in_commit_processor_read_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} time_waiting_empty_pool_in_commit_processor_read",
+          "legendFormat": "{{pod_name}}.{{namespace}} time_waiting_empty_pool_in_commit_processor_read",
           "refId": "C"
         }
       ],
@@ -6770,10 +6770,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(pending_session_queue_size_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(pending_session_queue_size_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} pending_session_queue_size",
+          "legendFormat": "{{pod_name}}.{{namespace}} pending_session_queue_size",
           "refId": "B"
         }
       ],
@@ -6860,10 +6860,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(local_write_committed_time_ms_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(local_write_committed_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} local_write_committed_time_ms",
+          "legendFormat": "{{pod_name}}.{{namespace}} local_write_committed_time_ms",
           "refId": "C"
         }
       ],
@@ -6950,10 +6950,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(server_write_committed_time_ms_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(server_write_committed_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} server_write_committed_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} server_write_committed_time",
           "refId": "A"
         }
       ],
@@ -7040,11 +7040,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(write_batch_time_in_commit_processor_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(write_batch_time_in_commit_processor_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "hide": false,
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} write_batch_time_in_commit_processor",
+          "legendFormat": "{{pod_name}}.{{namespace}} write_batch_time_in_commit_processor",
           "refId": "A"
         }
       ],
@@ -7131,10 +7131,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(reads_after_write_in_session_queue_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(reads_after_write_in_session_queue_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{pod}}.{{namespace}} reads_after_write_in_session_queue",
+          "legendFormat": "{{pod_name}}.{{namespace}} reads_after_write_in_session_queue",
           "refId": "B"
         }
       ],
@@ -7221,10 +7221,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(session_queues_drained_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(session_queues_drained_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} session_queues_drained",
+          "legendFormat": "{{pod_name}}.{{namespace}} session_queues_drained",
           "refId": "C"
         }
       ],
@@ -7311,10 +7311,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(reads_issued_from_session_queue_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(reads_issued_from_session_queue_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} reads_issued_from_session_queue",
+          "legendFormat": "{{pod_name}}.{{namespace}} reads_issued_from_session_queue",
           "refId": "C"
         }
       ],
@@ -7401,10 +7401,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "request_commit_queued{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "request_commit_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 1,
-          "legendFormat": "{{pod}}.{{namespace}} request_commit_queued",
+          "legendFormat": "{{pod_name}}.{{namespace}} request_commit_queued",
           "refId": "A"
         }
       ],
@@ -7505,10 +7505,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(write_final_proc_time_ms_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(write_final_proc_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} write_final_proc_time_ms",
+          "legendFormat": "{{pod_name}}.{{namespace}} write_final_proc_time_ms",
           "refId": "C"
         }
       ],
@@ -7595,10 +7595,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(read_final_proc_time_ms_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(read_final_proc_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} read_final_proc_time_ms",
+          "legendFormat": "{{pod_name}}.{{namespace}} read_final_proc_time_ms",
           "refId": "C"
         }
       ],
@@ -7699,10 +7699,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(readlatency_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(readlatency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} readlatency",
+          "legendFormat": "{{pod_name}}.{{namespace}} readlatency",
           "refId": "C"
         }
       ],
@@ -7791,10 +7791,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(updatelatency_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(updatelatency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} updatelatency",
+          "legendFormat": "{{pod_name}}.{{namespace}} updatelatency",
           "refId": "C"
         }
       ],
@@ -7883,25 +7883,25 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "max_latency{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "max_latency{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} max_latency",
+          "legendFormat": "{{pod_name}}.{{namespace}} max_latency",
           "refId": "A"
         },
         {
-          "expr": "min_latency{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "min_latency{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} min_latency",
+          "legendFormat": "{{pod_name}}.{{namespace}} min_latency",
           "refId": "B"
         },
         {
-          "expr": "avg_latency{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "avg_latency{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} avg_latency",
+          "legendFormat": "{{pod_name}}.{{namespace}} avg_latency",
           "refId": "C"
         }
       ],
@@ -7988,10 +7988,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(proposal_latency_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(proposal_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} proposal_latency",
+          "legendFormat": "{{pod_name}}.{{namespace}} proposal_latency",
           "refId": "C"
         }
       ],
@@ -8078,10 +8078,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(quorum_ack_latency_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(quorum_ack_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} quorum_ack_latency",
+          "legendFormat": "{{pod_name}}.{{namespace}} quorum_ack_latency",
           "refId": "C"
         }
       ],
@@ -8168,10 +8168,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(ack_latency_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(ack_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} ack_latency_sum",
+          "legendFormat": "{{pod_name}}.{{namespace}} ack_latency_sum",
           "refId": "C"
         }
       ],
@@ -8258,10 +8258,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(propagation_latency_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(propagation_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} propagation_latency",
+          "legendFormat": "{{pod_name}}.{{namespace}} propagation_latency",
           "refId": "C"
         }
       ],
@@ -8348,10 +8348,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(commit_propagation_latency_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(commit_propagation_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} commit_propagation_latency",
+          "legendFormat": "{{pod_name}}.{{namespace}} commit_propagation_latency",
           "refId": "C"
         }
       ],
@@ -8438,10 +8438,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "proposal_ack_creation_latency{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "proposal_ack_creation_latency{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} proposal_ack_creation_latency-{{quantile}}",
+          "legendFormat": "{{pod_name}}.{{namespace}} proposal_ack_creation_latency-{{quantile}}",
           "refId": "A"
         }
       ],
@@ -8542,17 +8542,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "tls_handshake_exceeded{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "tls_handshake_exceeded{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} tls_handshake_exceeded",
+          "legendFormat": "{{pod_name}}.{{namespace}} tls_handshake_exceeded",
           "refId": "C"
         },
         {
-          "expr": "outstanding_tls_handshake{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "outstanding_tls_handshake{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} outstanding_tls_handshake",
+          "legendFormat": "{{pod_name}}.{{namespace}} outstanding_tls_handshake",
           "refId": "A"
         }
       ],
@@ -8639,24 +8639,24 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "ensemble_auth_fail{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "ensemble_auth_fail{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} ensemble_auth_fail",
+          "legendFormat": "{{pod_name}}.{{namespace}} ensemble_auth_fail",
           "refId": "A"
         },
         {
-          "expr": "ensemble_auth_success{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "ensemble_auth_success{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} ensemble_auth_success",
+          "legendFormat": "{{pod_name}}.{{namespace}} ensemble_auth_success",
           "refId": "B"
         },
         {
-          "expr": "ensemble_auth_skip{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "ensemble_auth_skip{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} ensemble_auth_skip",
+          "legendFormat": "{{pod_name}}.{{namespace}} ensemble_auth_skip",
           "refId": "C"
         }
       ],
@@ -8777,7 +8777,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "max(jvm_classes_loaded{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"})",
+          "expr": "max(jvm_classes_loaded{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"})",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "",
@@ -8861,7 +8861,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "max(jvm_threads_current{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"})",
+          "expr": "max(jvm_threads_current{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"})",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "",
@@ -8945,7 +8945,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "max(jvm_threads_deadlocked{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"})",
+          "expr": "max(jvm_threads_deadlocked{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"})",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "",
@@ -9009,10 +9009,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(jvm_pause_time_ms_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(jvm_pause_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} jvm_pause_time_ms",
+          "legendFormat": "{{pod_name}}.{{namespace}} jvm_pause_time_ms",
           "refId": "C"
         }
       ],
@@ -9099,10 +9099,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(jvm_gc_collection_seconds_sum{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}[5m])",
+          "expr": "rate(jvm_gc_collection_seconds_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} gc:{{gc}}",
+          "legendFormat": "{{pod_name}}.{{namespace}} gc:{{gc}}",
           "refId": "C"
         }
       ],
@@ -9189,10 +9189,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "jvm_threads_state{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "jvm_threads_state{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} state:{{state}}",
+          "legendFormat": "{{pod_name}}.{{namespace}} state:{{state}}",
           "refId": "C"
         }
       ],
@@ -9279,10 +9279,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "jvm_memory_pool_bytes_used{namespace=~\"$namespace\",pod=~\"$pod\",job=~\"$job\"}",
+          "expr": "jvm_memory_pool_bytes_used{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "intervalFactor": 2,
-          "legendFormat": "{{pod}}.{{namespace}} pool:{{pool}}",
+          "legendFormat": "{{pod_name}}.{{namespace}} pool:{{pool}}",
           "refId": "C"
         }
       ],
@@ -9341,14 +9341,14 @@
         "allValue": null,
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(job)",
+        "definition": "label_values(znode_count,job)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "Scraping Job",
-        "multi": false,
+        "multi": true,
         "name": "job",
         "options": [],
-        "query": "label_values(job)",
+        "query": "label_values(znode_count,job)",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -9363,14 +9363,14 @@
         "allValue": null,
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values({job=~\"$job\"}, namespace)",
+        "definition": "label_values(znode_count{job=~\"$job\"}, namespace)",
         "hide": 0,
         "includeAll": true,
         "label": "K8S Namespace",
         "multi": true,
         "name": "namespace",
         "options": [],
-        "query": "label_values({job=~\"$job\"}, namespace)",
+        "query": "label_values(znode_count{job=~\"$job\"}, namespace)",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -9385,14 +9385,14 @@
         "allValue": null,
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values({job=~\"$job\",namespace=~\"$namespace\"}, pod)",
+        "definition": "label_values(znode_count{job=~\"$job\",namespace=~\"$namespace\"}, pod_name)",
         "hide": 0,
         "includeAll": true,
         "label": "Pod",
         "multi": true,
-        "name": "pod",
+        "name": "pod_name",
         "options": [],
-        "query": "label_values({job=~\"$job\",namespace=~\"$namespace\"}, pod)",
+        "query": "label_values(znode_count{job=~\"$job\",namespace=~\"$namespace\"}, pod_name)",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
