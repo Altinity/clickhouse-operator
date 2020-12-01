@@ -518,12 +518,6 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	}
 
 	host.ReconcileAttributes.UnsetAdd()
-	host.ReconcileAttributes.SetReconciled()
-
-	if err := w.includeHost(host); err != nil {
-		// If host is not ready - fallback
-		return err
-	}
 
 	if host.ReconcileAttributes.IsMigrate() {
 		w.a.V(1).
@@ -536,6 +530,11 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	} else {
 		w.a.V(1).
 			Info("As CHI is just created, not need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+	}
+	
+	if err := w.includeHost(host); err != nil {
+		// If host is not ready - fallback
+		return err
 	}
 
 	host.ReconcileAttributes.SetReconciled()
@@ -561,7 +560,8 @@ func (w *worker) excludeHost(host *chop.ChiHost, wait bool) error {
 		)
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
 	if wait {
-		_ = w.c.waitHostNotReady(host)
+		// _ = w.c.waitHostNotReady(host)
+		// TODO: Check query "select count() from system.clusters where cluster='all-sharded' and is_local" returns not 0
 	}
 
 	return nil
@@ -579,6 +579,7 @@ func (w *worker) includeHost(host *chop.ChiHost) error {
 		)
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
 	_ = w.c.waitHostReady(host)
+	// TODO: Check query "select count() from system.clusters where cluster='all-sharded' and is_local" returns 0
 
 	return nil
 }

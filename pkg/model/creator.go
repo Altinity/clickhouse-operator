@@ -841,28 +841,11 @@ func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
-				Path: fmt.Sprintf(
-					"/?user=%s&password=%s&query=%s",
-					url.QueryEscape(c.chop.Config().CHUsername),
-					url.QueryEscape(c.chop.Config().CHPassword),
-					// SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='all-sharded' AND is_local
-					url.QueryEscape(
-						fmt.Sprintf(
-							"SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local",
-							allShardsOneReplicaClusterName,
-						),
-					),
-				),
+				Path: "/replicas_status",
 				Port: intstr.Parse(chDefaultHTTPPortName),
-				HTTPHeaders: []corev1.HTTPHeader{
-					{
-						Name:  "Accept",
-						Value: "*/*",
-					},
-				},
 			},
 		},
-		InitialDelaySeconds: 20,
+		InitialDelaySeconds: 10,
 		PeriodSeconds:       3,
 	}
 }
