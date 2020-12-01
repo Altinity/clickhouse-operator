@@ -78,7 +78,7 @@ func NewLabeler(chop *chop.CHOp, chi *chi.ClickHouseInstallation) *Labeler {
 
 // getLabelsConfigMapCHICommon
 func (l *Labeler) getLabelsConfigMapCHICommon() map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsCHIScope(),
 		map[string]string{
 			LabelConfigMap: labelConfigMapValueCHICommon,
@@ -87,7 +87,7 @@ func (l *Labeler) getLabelsConfigMapCHICommon() map[string]string {
 
 // getLabelsConfigMapCHICommonUsers
 func (l *Labeler) getLabelsConfigMapCHICommonUsers() map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsCHIScope(),
 		map[string]string{
 			LabelConfigMap: labelConfigMapValueCHICommonUsers,
@@ -96,7 +96,7 @@ func (l *Labeler) getLabelsConfigMapCHICommonUsers() map[string]string {
 
 // getLabelsConfigMapHost
 func (l *Labeler) getLabelsConfigMapHost(host *chi.ChiHost) map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsHostScope(host, false),
 		map[string]string{
 			LabelConfigMap: labelConfigMapValueHost,
@@ -105,7 +105,7 @@ func (l *Labeler) getLabelsConfigMapHost(host *chi.ChiHost) map[string]string {
 
 // getLabelsServiceCHI
 func (l *Labeler) getLabelsServiceCHI() map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsCHIScope(),
 		map[string]string{
 			LabelService: labelServiceValueCHI,
@@ -114,7 +114,7 @@ func (l *Labeler) getLabelsServiceCHI() map[string]string {
 
 // getLabelsServiceCluster
 func (l *Labeler) getLabelsServiceCluster(cluster *chi.ChiCluster) map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsClusterScope(cluster),
 		map[string]string{
 			LabelService: labelServiceValueCluster,
@@ -123,7 +123,7 @@ func (l *Labeler) getLabelsServiceCluster(cluster *chi.ChiCluster) map[string]st
 
 // getLabelsServiceShard
 func (l *Labeler) getLabelsServiceShard(shard *chi.ChiShard) map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsShardScope(shard),
 		map[string]string{
 			LabelService: labelServiceValueShard,
@@ -132,7 +132,7 @@ func (l *Labeler) getLabelsServiceShard(shard *chi.ChiShard) map[string]string {
 
 // getLabelsServiceHost
 func (l *Labeler) getLabelsServiceHost(host *chi.ChiHost) map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsHostScope(host, false),
 		map[string]string{
 			LabelService: labelServiceValueHost,
@@ -252,7 +252,7 @@ func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 
 // appendCHILabels appends CHI-provided labels to labels set
 func (l *Labeler) appendCHILabels(dst map[string]string) map[string]string {
-	return util.MergeStringMaps(dst, l.chi.Labels)
+	return util.MergeStringMapsOverwrite(dst, l.chi.Labels)
 }
 
 // getAnnotationsHostScope gets annotations for Host-scoped object
@@ -397,7 +397,7 @@ func makeSetFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Set, error) {
 	}
 
 	set := kublabels.Set{}
-	util.MergeStringMaps(set, objMeta.Labels, labels...)
+	util.MergeStringMapsOverwrite(set, objMeta.Labels, labels...)
 
 	// skip StatefulSet
 	// skip Zookeeper

@@ -16,6 +16,8 @@ package chi
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/juliangruber/go-intersect"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -25,7 +27,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
-	"time"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
