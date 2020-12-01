@@ -227,10 +227,10 @@ func (c *Creator) createServiceFromTemplate(
 	service.Namespace = namespace
 
 	// Append provided Labels to already specified Labels in template
-	service.Labels = util.MergeStringMaps(service.Labels, labels)
+	service.Labels = util.MergeStringMapsOverwrite(service.Labels, labels)
 
 	// Append provided Selector to already specified Selector in template
-	service.Spec.Selector = util.MergeStringMaps(service.Spec.Selector, selector)
+	service.Spec.Selector = util.MergeStringMapsOverwrite(service.Spec.Selector, selector)
 
 	return service
 }
@@ -321,7 +321,7 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 
 // PreparePersistentVolume
 func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chiv1.ChiHost) *corev1.PersistentVolume {
-	pv.Labels = util.MergeStringMaps(pv.Labels, c.labeler.getLabelsHostScope(host, false))
+	pv.Labels = util.MergeStringMapsOverwrite(pv.Labels, c.labeler.getLabelsHostScope(host, false))
 	return pv
 }
 
@@ -491,11 +491,11 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	statefulSet.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: template.Name,
-			Labels: util.MergeStringMaps(
+			Labels: util.MergeStringMapsOverwrite(
 				c.labeler.getLabelsHostScope(host, true),
 				template.ObjectMeta.Labels,
 			),
-			Annotations: util.MergeStringMaps(
+			Annotations: util.MergeStringMapsOverwrite(
 				c.labeler.getAnnotationsHostScope(host),
 				template.ObjectMeta.Annotations,
 			),

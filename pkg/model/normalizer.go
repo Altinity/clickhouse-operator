@@ -799,7 +799,7 @@ func (n *Normalizer) newMatchLabels(
 		scopeLabels = map[string]string{}
 	}
 
-	return util.MergeStringMaps(matchLabels, scopeLabels)
+	return util.MergeStringMapsOverwrite(matchLabels, scopeLabels)
 }
 
 // newPodAntiAffinity

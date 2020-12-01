@@ -16,6 +16,8 @@ package chi
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/juliangruber/go-intersect"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -25,7 +27,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
-	"time"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
@@ -937,6 +938,9 @@ func (w *worker) updateService(chi *chop.ClickHouseInstallation, curService, new
 		(newService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) {
 		newService.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
 	}
+
+	newService.ObjectMeta.Labels = util.MergeStringMapsPreserve(newService.ObjectMeta.Labels, curService.ObjectMeta.Labels)
+	newService.ObjectMeta.Annotations = util.MergeStringMapsPreserve(newService.ObjectMeta.Annotations, curService.ObjectMeta.Annotations)
 
 	// And only now we are ready to actually update the service with new version of the service
 	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(newService)
