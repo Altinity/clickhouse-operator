@@ -939,6 +939,9 @@ func (w *worker) updateService(chi *chop.ClickHouseInstallation, curService, new
 		newService.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
 	}
 
+	newService.ObjectMeta.Labels = util.MergeStringMapsPreserve(newService.ObjectMeta.Labels, curService.ObjectMeta.Labels)
+	newService.ObjectMeta.Annotations = util.MergeStringMapsPreserve(newService.ObjectMeta.Annotations, curService.ObjectMeta.Annotations)
+
 	// And only now we are ready to actually update the service with new version of the service
 	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(newService)
 
