@@ -636,6 +636,9 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 		return err
 	}
 
+	// Exclude this CHI from monitoring
+	w.c.deleteWatch(chi.Namespace, chi.Name)
+
 	// Delete all clusters
 	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
 		return w.deleteCluster(cluster)
@@ -651,9 +654,6 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 		WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
 		WithStatusAction(chi).
 		Info("Delete CHI %s/%s - completed", chi.Namespace, chi.Name)
-
-	// Exclude this CHI from monitoring
-	w.c.deleteWatch(chi.Namespace, chi.Name)
 
 	return nil
 }

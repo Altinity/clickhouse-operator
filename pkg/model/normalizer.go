@@ -112,7 +112,7 @@ func (n *Normalizer) NormalizeCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 	}
 
 	// Walk over ChiSpec datatype fields
-	n.normalizeUseTemplates(&n.chi.Spec.UseTemplates)
+	n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
 	n.normalizeStop(&n.chi.Spec.Stop)
 	n.normalizeDefaults(&n.chi.Spec.Defaults)
 	n.normalizeConfiguration(&n.chi.Spec.Configuration)
