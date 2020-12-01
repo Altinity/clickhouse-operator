@@ -68,6 +68,46 @@ func MergeStringMapsOverwrite(dst, src map[string]string, keys ...string) map[st
 	}
 }
 
+// MergeStringMapsPreserve inserts (and preserved existing) data into dst map object from src
+func MergeStringMapsPreserve(dst, src map[string]string, keys ...string) map[string]string {
+	if len(src) == 0 {
+		// Nothing to merge from
+		return dst
+	}
+
+	var created bool
+	if dst == nil {
+		dst = make(map[string]string)
+		created = true
+	}
+
+	// Place key->value pair from src into dst
+
+	if len(keys) == 0 {
+		// No explicitly specified keys to merge, just merge the whole src
+		for key := range src {
+			if _, ok := dst[key]; !ok {
+				dst[key] = src[key]
+			}
+		}
+	} else {
+		// We have explicitly specified list of keys to merge from src
+		for _, key := range keys {
+			if value, ok := src[key]; ok {
+				if _, ok := dst[key]; !ok {
+					dst[key] = value
+				}
+			}
+		}
+	}
+
+	if created && (len(dst) == 0) {
+		return nil
+	} else {
+		return dst
+	}
+}
+
 // MapHasKeys checks whether map has all keys from specified list
 func MapHasKeys(m map[string]string, keys ...string) bool {
 	for _, needle := range keys {
