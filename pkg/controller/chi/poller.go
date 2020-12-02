@@ -198,3 +198,42 @@ func (c *Controller) pollStatefulSet(entity interface{}, opts *StatefulSetPollOp
 
 	return fmt.Errorf("unexpected flow")
 }
+
+// pollHost polls host with poll callback function.
+func (c *Controller) pollHost(host *chop.ChiHost, opts *StatefulSetPollOptions, f func(host *chop.ChiHost) bool) error {
+	if opts == nil {
+		opts = NewStatefulSetPollOptionsConfig(c.chop.Config())
+	}
+	namespace := host.Address.Namespace
+	name := host.Address.HostName
+
+	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
+	start := time.Now()
+	for {
+		if f(host) {
+			// All is good, job done, exit
+			log.V(1).Infof("pollHost(%s/%s)-OK", namespace, name)
+			return nil
+		}
+
+		// Object is found, but function is not positive
+		if time.Since(start) >= opts.StartBotheringAfterTimeout {
+			// Start bothering with log messages after some time only
+			log.V(1).Infof("pollHost(%s/%s)-WAIT", namespace, name)
+		}
+
+		if time.Since(start) >= opts.Timeout {
+			// Timeout reached, no good result available, time to quit
+			log.V(1).Infof("ERROR pollHost(%s/%s) - TIMEOUT reached", namespace, name)
+			return errors.New(fmt.Sprintf("pollHost(%s/%s) - wait timeout", namespace, name))
+		}
+
+		// Wait some more time
+		log.V(2).Infof("pollHost(%s/%s)", namespace, name)
+		select {
+		case <-time.After(opts.Interval):
+		}
+	}
+
+	return fmt.Errorf("unexpected flow")
+}

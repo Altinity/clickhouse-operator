@@ -302,6 +302,15 @@ func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
 	return nil
 }
 
+// IsHostInCluster
+func (s *Schemer) IsHostInCluster(host *chop.ChiHost) bool {
+	sqls := []string{heredoc.Docf(
+		`SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local`,
+		allShardsOneReplicaClusterName,
+	)}
+	return s.hostApplySQLs(host, sqls, false) == nil
+}
+
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
 func (s *Schemer) CHIDropDnsCache(chi *chop.ClickHouseInstallation) error {
 	sqls := []string{
@@ -344,7 +353,7 @@ func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 	for _, host := range hosts {
 		conn := s.getCHConnection(host)
 		if conn == nil {
-			log.V(1).Infof("Unabel to get conn to host %s", host)
+			log.V(1).Infof("Unable to get conn to host %s", host)
 			continue
 		}
 		err := util.Retry(maxTries, "Applying sqls", func() error {

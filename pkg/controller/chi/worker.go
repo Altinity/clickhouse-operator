@@ -531,7 +531,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		w.a.V(1).
 			Info("As CHI is just created, not need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	}
-	
+
 	if err := w.includeHost(host); err != nil {
 		// If host is not ready - fallback
 		return err
@@ -560,8 +560,7 @@ func (w *worker) excludeHost(host *chop.ChiHost, wait bool) error {
 		)
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
 	if wait {
-		// _ = w.c.waitHostNotReady(host)
-		// TODO: Check query "select count() from system.clusters where cluster='all-sharded' and is_local" returns not 0
+		_ = w.waitHostNotInCluster(host)
 	}
 
 	return nil
@@ -578,10 +577,19 @@ func (w *worker) includeHost(host *chop.ChiHost) error {
 			),
 		)
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
-	_ = w.c.waitHostReady(host)
-	// TODO: Check query "select count() from system.clusters where cluster='all-sharded' and is_local" returns 0
+	_ = w.waitHostInCluster(host)
 
 	return nil
+}
+
+func (w *worker) waitHostInCluster(host *chop.ChiHost) error {
+	return w.c.pollHost(host, nil, w.schemer.IsHostInCluster)
+}
+
+func (w *worker) waitHostNotInCluster(host *chop.ChiHost) error {
+	return w.c.pollHost(host, nil, func(host *chop.ChiHost) bool {
+		return !w.schemer.IsHostInCluster(host)
+	})
 }
 
 // finalizeCHI
@@ -1026,7 +1034,6 @@ func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) StatefulSet
 	curStatefulSet, err := w.c.getStatefulSet(&statefulSet.ObjectMeta, false)
 
 	if curStatefulSet != nil {
-		// We have StatefulSet - try to update it
 		if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
 			w.a.Info("INFO StatefulSet ARE EQUAL no reconcile is actually needed")
 			return statefulSetStatusSame
