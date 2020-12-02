@@ -247,7 +247,7 @@ func (config *OperatorConfig) FindAutoTemplates() []*ClickHouseInstallation {
 			res = append(res, _template)
 		}
 	}
-	log.V(1).Infof("Found %d auto templates", len(res))
+	log.V(3).Infof("Found %d auto templates", len(res))
 	return res
 }
 
