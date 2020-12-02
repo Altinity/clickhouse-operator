@@ -305,10 +305,10 @@ func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
 // IsHostInCluster
 func (s *Schemer) IsHostInCluster(host *chop.ChiHost) bool {
 	sqls := []string{heredoc.Docf(
-		`SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local`,
+		`SELECT count() FROM system.clusters WHERE cluster='%s' AND is_local`,
 		allShardsOneReplicaClusterName,
 	)}
-	return s.hostApplySQLs(host, sqls, false) == nil
+	return s.hostApplySQLs(host, sqls, false) == "1"
 }
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
