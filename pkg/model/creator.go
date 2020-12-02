@@ -16,7 +16,7 @@ package model
 
 import (
 	"fmt"
-	"net/url"
+	// "net/url"
 
 	log "github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
