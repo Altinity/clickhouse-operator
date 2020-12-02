@@ -3,16 +3,8 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "test-007-custom-ports"
 spec:
-  defaults:
-    templates:
-      podTemplate: default    
-  templates:
-    podTemplates:
-      - name: default
-        spec:
-          containers:
-            - name: clickhouse
-              image: yandex/clickhouse-server:19.16
+  useTemplates:
+    - name: clickhouse-version
   configuration:
     clusters:
       - name: single

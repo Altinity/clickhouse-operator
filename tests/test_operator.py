@@ -94,12 +94,14 @@ def test_005():
 @TestScenario
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
 def test_006():
+    old_version = "yandex/clickhouse-server:20.8.6.6"
+    new_version = "yandex/clickhouse-server:20.8.7.15"
     with Then("Create initial position"):
         kubectl.create_and_check(
             config="configs/test-006-ch-upgrade-1.yaml",
             check={
                 "pod_count": 2,
-                "pod_image": "yandex/clickhouse-server:19.11",
+                "pod_image": old_version,
                 "do_not_delete": 1,
             }
         )
@@ -109,7 +111,7 @@ def test_006():
             config="configs/test-006-ch-upgrade-2.yaml",
             check={
                 "pod_count": 2,
-                "pod_image": "yandex/clickhouse-server:19.16",
+                "pod_image": new_version,
                 "do_not_delete": 1,
             }
         )
@@ -119,7 +121,7 @@ def test_006():
             config="configs/test-006-ch-upgrade-3.yaml",
             check={
                 "pod_count": 2,
-                "pod_image": "yandex/clickhouse-server:19.11",
+                "pod_image": old_version,
             }
         )
 
@@ -896,12 +898,13 @@ def test_016():
 
 
 @TestScenario
-@Name("test-017-multi-version. Test certain functions across multiple versions")
+@Name("test_017. Test deployment of multiple versions in a cluster")
 def test_017():
+    pod_count = 2
     kubectl.create_and_check(
         config="configs/test-017-multi-version.yaml",
         check={
-            "pod_count": 4,
+            "pod_count": pod_count,
             "do_not_delete": 1,
         },
         timeout=600,
@@ -920,7 +923,7 @@ def test_017():
     test_query = "select min(offset), max(offset) from test_max"
     print(f"{test_query}")
 
-    for shard in range(4):
+    for shard in range(pod_count):
         host = f"chi-{chi}-default-{shard}-0"
         for q in queries:
             clickhouse.query(chi, host=host, sql=q)
@@ -933,7 +936,7 @@ def test_017():
 
 
 @TestScenario
-@Name("test-018-configmap. Test that configuration is properly updated")
+@Name("test_018. Test that configuration is properly updated")
 def test_018(): # Obsolete, covered by test_016
     kubectl.create_and_check(
         config="configs/test-018-configmap.yaml",
@@ -970,7 +973,7 @@ def test_018(): # Obsolete, covered by test_016
 
 
 @TestScenario
-@Name("test-019-retain-volume. Test that volume is correctly retained and can be re-attached")
+@Name("test_019. Test that volume is correctly retained and can be re-attached")
 def test_019(config="configs/test-019-retain-volume.yaml"):
     require_zookeeper()
 
@@ -1025,7 +1028,7 @@ def test_019(config="configs/test-019-retain-volume.yaml"):
 
 
 @TestScenario
-@Name("test-020-multi-volume. Test multi-volume configuration")
+@Name("test_020. Test multi-volume configuration")
 def test_020(config="configs/test-020-multi-volume.yaml"):
     chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
@@ -1059,7 +1062,7 @@ def test_020(config="configs/test-020-multi-volume.yaml"):
 
 
 @TestScenario
-@Name("test-021-rescale-volume. Test rescaling storage")
+@Name("test_021. Test rescaling storage")
 def test_021(config="configs/test-021-rescale-volume-01.yaml"):
     with Given("Default storage class is expandable"):
         default_storage_class = kubectl.get_default_storage_class()
@@ -1092,6 +1095,7 @@ def test_021(config="configs/test-021-rescale-volume-01.yaml"):
         )
 
         with Then("Storage size should be 200Mi"):
+            kubectl.wait_field("pvc", "disk1-chi-test-021-rescale-volume-simple-0-0-0", ".spec.resources.requests.storage", "200Mi")
             size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
             assert size == "200Mi"
 
@@ -1100,24 +1104,27 @@ def test_021(config="configs/test-021-rescale-volume-01.yaml"):
             config="configs/test-021-rescale-volume-03-add-disk.yaml",
             check={
                 "pod_count": 1,
-                "pod_volumes": {
-                    "/var/lib/clickhouse",
-                    "/var/lib/clickhouse2",
-                },
+                # "pod_volumes": {
+                #   "/var/lib/clickhouse",
+                #    "/var/lib/clickhouse2",
+                # },
                 "do_not_delete": 1,
             },
         )
+        # Adding new volume takes time, so pod_volumes check does not work
 
         with Then("There should be two PVC"):
             size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
             assert size == "200Mi"
+            kubectl.wait_object("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0")
             size = kubectl.get_pvc_size("disk2-chi-test-021-rescale-volume-simple-0-0-0")
             assert size == "50Mi"
 
         with And("There should be two disks recognized by ClickHouse"):
+            kubectl.wait_pod_status("chi-test-021-rescale-volume-simple-0-0-0", "Running")
             # ClickHouse requires some time to mount volume. Race conditions.
-
-            time.sleep(120)
+            # TODO: wait for proper pod state and check the liveness probe probably. This is better than waiting
+            time.sleep(10)
             out = clickhouse.query(chi, "SELECT count() FROM system.disks")
             print("SELECT count() FROM system.disks RETURNED:")
             print(out)
@@ -1127,7 +1134,7 @@ def test_021(config="configs/test-021-rescale-volume-01.yaml"):
 
 
 @TestScenario
-@Name("test-022-broken-image. Test broken image")
+@Name("test_022. Test that chi with broken image can be deleted")
 def test_022(config="configs/test-022-broken-image.yaml"):
     chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
