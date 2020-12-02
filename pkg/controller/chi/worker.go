@@ -532,7 +532,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 			Info("As CHI is just created, not need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	}
 
-	if err := w.includeHost(host); err != nil {
+	if err := w.includeHost(host, wait); err != nil {
 		// If host is not ready - fallback
 		return err
 	}
@@ -567,7 +567,7 @@ func (w *worker) excludeHost(host *chop.ChiHost, wait bool) error {
 }
 
 // Include host back to ClickHouse clusters
-func (w *worker) includeHost(host *chop.ChiHost) error {
+func (w *worker) includeHost(host *chop.ChiHost, wait bool) error {
 	w.a.V(1).
 		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
@@ -577,7 +577,9 @@ func (w *worker) includeHost(host *chop.ChiHost) error {
 			),
 		)
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
-	_ = w.waitHostInCluster(host)
+	if wait {
+		_ = w.waitHostInCluster(host)
+	}
 
 	return nil
 }
