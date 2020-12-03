@@ -485,15 +485,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	configMap := w.creator.CreateConfigMapHost(host)
 	statefulSet := w.creator.CreateStatefulSet(host)
 	service := w.creator.CreateServiceHost(host)
-
-	status := w.getStatefulSetStatus(statefulSet)
-	wait := true
-	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
-		wait = false
-	}
-	if host.GetCluster().HostsCount() == 1 {
-		wait = false
-	}
+	wait := w.waitExcludeInclude(host)
 
 	if err := w.excludeHost(host, wait); err != nil {
 		return err
@@ -564,6 +556,18 @@ func (w *worker) excludeHost(host *chop.ChiHost, wait bool) error {
 	}
 
 	return nil
+}
+
+// waitExcludeInclude determines whether reconciler should wait for host to be excluded from/included into cluster
+func (w *worker) waitExcludeInclude(host *chop.ChiHost) bool {
+	status := w.getStatefulSetStatus(host.StatefulSet)
+	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
+		return false
+	}
+	if host.GetCluster().HostsCount() == 1 {
+		return false
+	}
+	return true
 }
 
 // Include host back to ClickHouse clusters
