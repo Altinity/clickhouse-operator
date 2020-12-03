@@ -631,3 +631,16 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 	}
 	return strings.ToLower(chi.Spec.Templating.Policy) == TemplatingPolicyAuto
 }
+
+const ReconcilingPolicyWait = "wait"
+const ReconcilingPolicyNoWait = "nowait"
+
+func (chi *ClickHouseInstallation) IsReconcilingPolicyNoWait() bool {
+	if chi == nil {
+		return false
+	}
+	if (chi.Namespace == "") && (chi.Name == "") {
+		return false
+	}
+	return strings.ToLower(chi.Spec.Reconciling.Policy) == ReconcilingPolicyNoWait
+}
