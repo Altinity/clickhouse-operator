@@ -1046,10 +1046,15 @@ func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) StatefulSet
 	curStatefulSet, err := w.c.getStatefulSet(&statefulSet.ObjectMeta, false)
 
 	if curStatefulSet != nil {
+		if cur, ok := curStatefulSet.Labels[chopmodel.LabelStatefulSetVersion]; ok {
+			if new, ok := curStatefulSet.Labels[chopmodel.LabelStatefulSetVersion]; ok {
+				if cur == new {
+					w.a.Info("INFO StatefulSet ARE EQUAL no reconcile is actually needed")
+					return statefulSetStatusSame
+				}
+			}
+		}
 		if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
-			w.a.Info("INFO StatefulSet ARE EQUAL no reconcile is actually needed")
-			return statefulSetStatusSame
-		} else {
 			w.a.Info("INFO StatefulSet ARE DIFFERENT reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
 			return statefulSetStatusModified
 		}
@@ -1067,6 +1072,12 @@ func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) StatefulSet
 func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	w.a.V(2).Info("reconcileStatefulSet() - start")
 	defer w.a.V(2).Info("reconcileStatefulSet() - end")
+
+	status := w.getStatefulSetStatus(host.StatefulSet)
+	if status == statefulSetStatusSame {
+		defer w.a.V(2).Info("reconcileStatefulSet() - no need to reconcile the same StaetfulSet")
+		return nil
+	}
 
 	// Check whether this object already exists in k8s
 	curStatefulSet, err := w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
