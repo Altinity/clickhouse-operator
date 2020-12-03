@@ -7699,7 +7699,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(readlatency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(readlatency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(readlatency_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} readlatency",
@@ -7726,7 +7726,7 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -7791,7 +7791,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(updatelatency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(updatelatency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(updatelatency_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} updatelatency",
@@ -7818,7 +7818,7 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
