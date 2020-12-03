@@ -114,9 +114,13 @@ func (n *Normalizer) NormalizeCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 	// Walk over ChiSpec datatype fields
 	n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
 	n.normalizeStop(&n.chi.Spec.Stop)
+	n.normalizeNamespaceDomainPattern(&n.chi.Spec.NamespaceDomainPattern)
+	n.normalizeTemplating(&n.chi.Spec.Templating)
+	n.normalizeReconciling(&n.chi.Spec.Reconciling)
 	n.normalizeDefaults(&n.chi.Spec.Defaults)
 	n.normalizeConfiguration(&n.chi.Spec.Configuration)
 	n.normalizeTemplates(&n.chi.Spec.Templates)
+	// UseTemplates already done
 
 	n.finalizeCHI()
 	n.fillStatus()
@@ -301,6 +305,14 @@ func (n *Normalizer) normalizeStop(stop *string) {
 	}
 }
 
+// normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
+func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern *string) {
+	count := strings.Count(*namespaceDomainPattern, "%s")
+	if count > 1 {
+		*namespaceDomainPattern = ""
+	}
+}
+
 // normalizeDefaults normalizes .spec.defaults
 func (n *Normalizer) normalizeDefaults(defaults *chiv1.ChiDefaults) {
 	// Set defaults for CHI object properties
@@ -342,6 +354,26 @@ func (n *Normalizer) normalizeTemplates(templates *chiv1.ChiTemplates) {
 	for i := range templates.ServiceTemplates {
 		serviceTemplate := &templates.ServiceTemplates[i]
 		n.normalizeServiceTemplate(serviceTemplate)
+	}
+}
+
+// normalizeTemplating normalizes .spec.templating
+func (n *Normalizer) normalizeTemplating(templating *chiv1.ChiTemplating) {
+	switch strings.ToLower(templating.Policy) {
+	case chiv1.TemplatingPolicyManual, chiv1.TemplatingPolicyAuto:
+		templating.Policy = strings.ToLower(templating.Policy)
+	default:
+		templating.Policy = strings.ToLower(chiv1.TemplatingPolicyManual)
+	}
+}
+
+// normalizeReconciling normalizes .spec.reconciling
+func (n *Normalizer) normalizeReconciling(reconciling *chiv1.ChiReconciling) {
+	switch strings.ToLower(reconciling.Policy) {
+	case chiv1.ReconcilingPolicyWait, chiv1.ReconcilingPolicyNoWait:
+		reconciling.Policy = strings.ToLower(reconciling.Policy)
+	default:
+		reconciling.Policy = strings.ToLower(chiv1.ReconcilingPolicyWait)
 	}
 }
 

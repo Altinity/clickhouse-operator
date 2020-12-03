@@ -59,11 +59,12 @@ type ClickHouseOperatorConfiguration struct {
 type ChiSpec struct {
 	Stop                   string           `json:"stop,omitempty"                   yaml:"stop"`
 	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern"`
+	Templating             ChiTemplating    `json:"templating,omitempty"             yaml:"templating"`
+	Reconciling            ChiReconciling   `json:"reconciling,omitempty"            yaml:"reconciling"`
 	Defaults               ChiDefaults      `json:"defaults,omitempty"               yaml:"defaults"`
 	Configuration          Configuration    `json:"configuration"                    yaml:"configuration"`
 	Templates              ChiTemplates     `json:"templates,omitempty"              yaml:"templates"`
 	UseTemplates           []ChiUseTemplate `json:"useTemplates,omitempty"           yaml:"useTemplates"`
-	Templating             ChiTemplating    `json:"templating,omitempty"             yaml:"templating"`
 }
 
 // ChiUseTemplates defines UseTemplates section of ClickHouseInstallation resource
@@ -74,6 +75,10 @@ type ChiUseTemplate struct {
 }
 
 type ChiTemplating struct {
+	Policy string `json:"policy" yaml:"policy"`
+}
+
+type ChiReconciling struct {
 	Policy string `json:"policy" yaml:"policy"`
 }
 

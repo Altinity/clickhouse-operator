@@ -620,6 +620,7 @@ func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 	return (chi.Namespace == namespace) && (chi.Name == name)
 }
 
+const TemplatingPolicyManual = "manual"
 const TemplatingPolicyAuto = "auto"
 
 func (chi *ClickHouseInstallation) IsAuto() bool {
@@ -630,4 +631,17 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 		return false
 	}
 	return strings.ToLower(chi.Spec.Templating.Policy) == TemplatingPolicyAuto
+}
+
+const ReconcilingPolicyWait = "wait"
+const ReconcilingPolicyNoWait = "nowait"
+
+func (chi *ClickHouseInstallation) IsReconcilingPolicyNoWait() bool {
+	if chi == nil {
+		return false
+	}
+	if (chi.Namespace == "") && (chi.Name == "") {
+		return false
+	}
+	return strings.ToLower(chi.Spec.Reconciling.Policy) == ReconcilingPolicyNoWait
 }

@@ -485,17 +485,9 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	configMap := w.creator.CreateConfigMapHost(host)
 	statefulSet := w.creator.CreateStatefulSet(host)
 	service := w.creator.CreateServiceHost(host)
+	status := w.getStatefulSetStatus(host.StatefulSet)
 
-	status := w.getStatefulSetStatus(statefulSet)
-	wait := true
-	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
-		wait = false
-	}
-	if host.GetCluster().HostsCount() == 1 {
-		wait = false
-	}
-
-	if err := w.excludeHost(host, wait); err != nil {
+	if err := w.excludeHost(host, status); err != nil {
 		return err
 	}
 
@@ -532,7 +524,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 			Info("As CHI is just created, not need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	}
 
-	if err := w.includeHost(host, wait); err != nil {
+	if err := w.includeHost(host, status); err != nil {
 		// If host is not ready - fallback
 		return err
 	}
@@ -548,7 +540,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 }
 
 // Exclude host from ClickHouse clusters
-func (w *worker) excludeHost(host *chop.ChiHost, wait bool) error {
+func (w *worker) excludeHost(host *chop.ChiHost, status StatefulSetStatus) error {
 	w.a.V(1).
 		Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
@@ -559,15 +551,57 @@ func (w *worker) excludeHost(host *chop.ChiHost, wait bool) error {
 			),
 		)
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
-	if wait {
+	if w.waitExcludeHost(host, status) {
 		_ = w.waitHostNotInCluster(host)
 	}
 
 	return nil
 }
 
+// determines whether reconciler should wait for host to be excluded from/included into cluster
+func (w *worker) waitExcludeHost(host *chop.ChiHost, status StatefulSetStatus) bool {
+	if host.CHI.IsReconcilingPolicyNoWait() {
+		return false
+	}
+
+	if host.GetCluster().HostsCount() == 1 {
+		return false
+	}
+
+	if w.c.chop.Config().ReconcileWaitExclude == false {
+		return false
+	}
+
+	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
+		return false
+	}
+
+	return true
+}
+
+// determines whether reconciler should wait for host to be excluded from/included into cluster
+func (w *worker) waitIncludeHost(host *chop.ChiHost, status StatefulSetStatus) bool {
+	if host.CHI.IsReconcilingPolicyNoWait() {
+		return false
+	}
+
+	if host.GetCluster().HostsCount() == 1 {
+		return false
+	}
+
+	if w.c.chop.Config().ReconcileWaitInclude == false {
+		return false
+	}
+
+	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
+		return false
+	}
+
+	return true
+}
+
 // Include host back to ClickHouse clusters
-func (w *worker) includeHost(host *chop.ChiHost, wait bool) error {
+func (w *worker) includeHost(host *chop.ChiHost, status StatefulSetStatus) error {
 	w.a.V(1).
 		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
@@ -577,7 +611,7 @@ func (w *worker) includeHost(host *chop.ChiHost, wait bool) error {
 			),
 		)
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
-	if wait {
+	if w.waitIncludeHost(host, status) {
 		_ = w.waitHostInCluster(host)
 	}
 
@@ -1036,10 +1070,15 @@ func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) StatefulSet
 	curStatefulSet, err := w.c.getStatefulSet(&statefulSet.ObjectMeta, false)
 
 	if curStatefulSet != nil {
+		if cur, ok := curStatefulSet.Labels[chopmodel.LabelStatefulSetVersion]; ok {
+			if new, ok := curStatefulSet.Labels[chopmodel.LabelStatefulSetVersion]; ok {
+				if cur == new {
+					w.a.Info("INFO StatefulSet ARE EQUAL no reconcile is actually needed")
+					return statefulSetStatusSame
+				}
+			}
+		}
 		if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
-			w.a.Info("INFO StatefulSet ARE EQUAL no reconcile is actually needed")
-			return statefulSetStatusSame
-		} else {
 			w.a.Info("INFO StatefulSet ARE DIFFERENT reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
 			return statefulSetStatusModified
 		}
@@ -1057,6 +1096,12 @@ func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) StatefulSet
 func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	w.a.V(2).Info("reconcileStatefulSet() - start")
 	defer w.a.V(2).Info("reconcileStatefulSet() - end")
+
+	status := w.getStatefulSetStatus(host.StatefulSet)
+	if status == statefulSetStatusSame {
+		defer w.a.V(2).Info("reconcileStatefulSet() - no need to reconcile the same StaetfulSet")
+		return nil
+	}
 
 	// Check whether this object already exists in k8s
 	curStatefulSet, err := w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)

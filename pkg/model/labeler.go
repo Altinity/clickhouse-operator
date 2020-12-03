@@ -58,6 +58,7 @@ const (
 	// Supplementary service labels - used to cooperate with k8s
 	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/zookeeper-version"
 	LabelSettingsConfigVersion  = clickhousealtinitycom.GroupName + "/settings-version"
+	LabelStatefulSetVersion     = clickhousealtinitycom.GroupName + "/statefulset-version"
 )
 
 // Labeler is an entity which can label CHI artifacts
