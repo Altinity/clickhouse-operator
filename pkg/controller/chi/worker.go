@@ -560,13 +560,19 @@ func (w *worker) excludeHost(host *chop.ChiHost, wait bool) error {
 
 // waitExcludeInclude determines whether reconciler should wait for host to be excluded from/included into cluster
 func (w *worker) waitExcludeInclude(host *chop.ChiHost) bool {
+	if host.CHI.IsReconcilingPolicyNoWait(){
+		return false
+	}
+
+	if host.GetCluster().HostsCount() == 1 {
+		return false
+	}
+
 	status := w.getStatefulSetStatus(host.StatefulSet)
 	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
 		return false
 	}
-	if host.GetCluster().HostsCount() == 1 {
-		return false
-	}
+
 	return true
 }
 
