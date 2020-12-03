@@ -33,7 +33,7 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
 		// Error call Create()
 		return err
-	} else if err := c.waitHostRunning(host); err == nil {
+	} else if err := c.waitHostReady(host); err == nil {
 		// Target generation reached, StatefulSet created successfully
 		return nil
 	} else {
@@ -71,7 +71,7 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 
 	log.V(1).Infof("updateStatefulSet(%s/%s) - generation change %d=>%d", namespace, name, oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
-	if err := c.waitHostRunning(host); err == nil {
+	if err := c.waitHostReady(host); err == nil {
 		// Target generation reached, StatefulSet updated successfully
 		return nil
 	} else {
