@@ -120,6 +120,7 @@ func (n *Normalizer) NormalizeCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 	n.normalizeTemplates(&n.chi.Spec.Templates)
 	// skip UseTemplates
 	n.normalizeTemplating(&n.chi.Spec.Templating)
+	n.normalizeReconciling(&n.chi.Spec.Reconciling)
 
 	n.finalizeCHI()
 	n.fillStatus()
@@ -357,15 +358,24 @@ func (n *Normalizer) normalizeTemplates(templates *chiv1.ChiTemplates) {
 }
 
 // normalizeTemplating normalizes .spec.templating
-func (n *Normalizer) normalizeTemplating(templating *chiv1.ChiTemplating){
+func (n *Normalizer) normalizeTemplating(templating *chiv1.ChiTemplating) {
 	switch strings.ToLower(templating.Policy) {
-	case chiv1.TemplatingPolicyManual,chiv1.TemplatingPolicyAuto:
+	case chiv1.TemplatingPolicyManual, chiv1.TemplatingPolicyAuto:
 		templating.Policy = strings.ToLower(templating.Policy)
 	default:
 		templating.Policy = strings.ToLower(chiv1.TemplatingPolicyManual)
 	}
 }
 
+// normalizeReconciling normalizes .spec.reconciling
+func (n *Normalizer) normalizeReconciling(reconciling *chiv1.ChiReconciling) {
+	switch strings.ToLower(reconciling.Policy) {
+	case chiv1.ReconcilingPolicyWait, chiv1.ReconcilingPolicyNoWait:
+		reconciling.Policy = strings.ToLower(reconciling.Policy)
+	default:
+		reconciling.Policy = strings.ToLower(chiv1.ReconcilingPolicyWait)
+	}
+}
 
 // normalizeHostTemplate normalizes .spec.templates.hostTemplates
 func (n *Normalizer) normalizeHostTemplate(template *chiv1.ChiHostTemplate) {
