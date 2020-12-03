@@ -114,6 +114,7 @@ func (n *Normalizer) NormalizeCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 	// Walk over ChiSpec datatype fields
 	n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
 	n.normalizeStop(&n.chi.Spec.Stop)
+	n.normalizeNamespaceDomainPattern(&n.chi.Spec.NamespaceDomainPattern)
 	n.normalizeDefaults(&n.chi.Spec.Defaults)
 	n.normalizeConfiguration(&n.chi.Spec.Configuration)
 	n.normalizeTemplates(&n.chi.Spec.Templates)
@@ -298,6 +299,14 @@ func (n *Normalizer) normalizeStop(stop *string) {
 	if !util.IsStringBool(*stop) {
 		// In case it is unknown value - just use set it to false
 		*stop = util.StringBoolFalseLowercase
+	}
+}
+
+// normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
+func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern *string) {
+	count := strings.Count(*namespaceDomainPattern, "%s")
+	if count > 1 {
+		*namespaceDomainPattern = ""
 	}
 }
 
