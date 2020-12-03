@@ -1438,6 +1438,10 @@ spec:
               type: integer
               minimum: 1
               maximum: 65535
+            reconcileWaitExclude:
+              type: string
+            reconcileWaintInclude:
+              type: string
 ---
 # Possible Template Parameters:
 #
@@ -1600,6 +1604,8 @@ data:
     
     # Max number of concurrent reconciles in progress
     reconcileThreadsNumber: 10
+    reconcileWaitExclude: true
+    reconcileWaintInclude: true
 
 ---
 # Possible Template Parameters:
