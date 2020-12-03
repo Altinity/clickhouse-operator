@@ -1070,9 +1070,9 @@ func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) StatefulSet
 	curStatefulSet, err := w.c.getStatefulSet(&statefulSet.ObjectMeta, false)
 
 	if curStatefulSet != nil {
-		if cur, ok := curStatefulSet.Labels[chopmodel.LabelStatefulSetVersion]; ok {
-			if new, ok := curStatefulSet.Labels[chopmodel.LabelStatefulSetVersion]; ok {
-				if cur == new {
+		if _cur, ok := curStatefulSet.Labels[chopmodel.LabelStatefulSetVersion]; ok {
+			if _new, _ok := statefulSet.Labels[chopmodel.LabelStatefulSetVersion]; _ok {
+				if _cur == _new {
 					w.a.Info("INFO StatefulSet ARE EQUAL no reconcile is actually needed")
 					return statefulSetStatusSame
 				}
