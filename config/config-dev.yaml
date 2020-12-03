@@ -118,4 +118,4 @@ log_backtrace_at: ""
 # Max number of concurrent reconciles in progress
 reconcileThreadsNumber: 1
 reconcileWaitExclude: false
-reconcileWaintInclude: false
+reconcileWaitInclude: false

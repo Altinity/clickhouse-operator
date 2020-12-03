@@ -1440,7 +1440,7 @@ spec:
               maximum: 65535
             reconcileWaitExclude:
               type: string
-            reconcileWaintInclude:
+            reconcileWaitInclude:
               type: string
 ---
 # Possible Template Parameters:
@@ -1605,7 +1605,7 @@ data:
     # Max number of concurrent reconciles in progress
     reconcileThreadsNumber: 10
     reconcileWaitExclude: true
-    reconcileWaintInclude: true
+    reconcileWaitInclude: true
 
 ---
 # Possible Template Parameters:
