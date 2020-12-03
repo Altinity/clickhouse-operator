@@ -115,12 +115,12 @@ func (n *Normalizer) NormalizeCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 	n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
 	n.normalizeStop(&n.chi.Spec.Stop)
 	n.normalizeNamespaceDomainPattern(&n.chi.Spec.NamespaceDomainPattern)
+	n.normalizeTemplating(&n.chi.Spec.Templating)
+	n.normalizeReconciling(&n.chi.Spec.Reconciling)
 	n.normalizeDefaults(&n.chi.Spec.Defaults)
 	n.normalizeConfiguration(&n.chi.Spec.Configuration)
 	n.normalizeTemplates(&n.chi.Spec.Templates)
-	// skip UseTemplates
-	n.normalizeTemplating(&n.chi.Spec.Templating)
-	n.normalizeReconciling(&n.chi.Spec.Reconciling)
+	// UseTemplates already done
 
 	n.finalizeCHI()
 	n.fillStatus()
