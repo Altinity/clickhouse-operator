@@ -134,7 +134,9 @@ type OperatorConfig struct {
 	Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
 
 	// Max number of concurrent reconciles in progress
-	ReconcileThreadsNumber int `json:"reconcileThreadsNumber" yaml:"reconcileThreadsNumber"`
+	ReconcileThreadsNumber int  `json:"reconcileThreadsNumber" yaml:"reconcileThreadsNumber"`
+	ReconcileWaitExclude   bool `json:"reconcileWaitExclude"   yaml:"reconcileWaitExclude"`
+	ReconcileWaitInclude   bool `json:"reconcileWaitInclude"   yaml:"reconcileWaitInclude"`
 
 	//
 	// The end of OperatorConfig
