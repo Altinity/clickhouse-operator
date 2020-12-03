@@ -118,6 +118,8 @@ func (n *Normalizer) NormalizeCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 	n.normalizeDefaults(&n.chi.Spec.Defaults)
 	n.normalizeConfiguration(&n.chi.Spec.Configuration)
 	n.normalizeTemplates(&n.chi.Spec.Templates)
+	// skip UseTemplates
+	n.normalizeTemplating(&n.chi.Spec.Templating)
 
 	n.finalizeCHI()
 	n.fillStatus()
@@ -353,6 +355,17 @@ func (n *Normalizer) normalizeTemplates(templates *chiv1.ChiTemplates) {
 		n.normalizeServiceTemplate(serviceTemplate)
 	}
 }
+
+// normalizeTemplating normalizes .spec.templating
+func (n *Normalizer) normalizeTemplating(templating *chiv1.ChiTemplating){
+	switch strings.ToLower(templating.Policy) {
+	case chiv1.TemplatingPolicyManual,chiv1.TemplatingPolicyAuto:
+		templating.Policy = strings.ToLower(templating.Policy)
+	default:
+		templating.Policy = strings.ToLower(chiv1.TemplatingPolicyManual)
+	}
+}
+
 
 // normalizeHostTemplate normalizes .spec.templates.hostTemplates
 func (n *Normalizer) normalizeHostTemplate(template *chiv1.ChiHostTemplate) {

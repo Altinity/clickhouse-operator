@@ -620,6 +620,7 @@ func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 	return (chi.Namespace == namespace) && (chi.Name == name)
 }
 
+const TemplatingPolicyManual = "manual"
 const TemplatingPolicyAuto = "auto"
 
 func (chi *ClickHouseInstallation) IsAuto() bool {
