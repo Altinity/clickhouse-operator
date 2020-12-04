@@ -8,7 +8,7 @@ def query(
         with_error=False,
         host="127.0.0.1",
         port="9000",
-        user="default",
+        user="",
         pwd="",
         ns=settings.test_namespace,
         timeout=60,
@@ -23,12 +23,13 @@ def query(
             break
 
     pwd_str = "" if pwd == "" else f"--password={pwd}"
+    user_str = "" if user == "" else f"--user={user}"
 
     if with_error:
         return kubectl.launch(
             f"exec {pod_name}"
             f" --"
-            f" clickhouse-client -mn -h {host} --port={port} -u {user} {pwd_str} {advanced_params}"
+            f" clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
             f" --query=\"{sql}\""
             f" 2>&1",
             timeout=timeout,
@@ -39,7 +40,7 @@ def query(
         return kubectl.launch(
             f"exec {pod_name} -n {ns}"
             f" -- "
-            f"clickhouse-client -mn -h {host} --port={port} -u {user} {pwd_str} {advanced_params}"
+            f"clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
             f"--query=\"{sql}\"",
             timeout=timeout,
             ns=ns,
@@ -51,7 +52,7 @@ def query_with_error(
         sql,
         host="127.0.0.1",
         port="9000",
-        user="default",
+        user="",
         pwd="",
         ns=settings.test_namespace,
         timeout=60,
