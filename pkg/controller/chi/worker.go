@@ -560,7 +560,7 @@ func (w *worker) excludeHost(host *chop.ChiHost, status StatefulSetStatus) error
 
 // determines whether reconciler should wait for host to be excluded from/included into cluster
 func (w *worker) waitExcludeHost(host *chop.ChiHost, status StatefulSetStatus) bool {
-	if host.CHI.IsReconcilingPolicyNoWait() {
+	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
 		return false
 	}
 
@@ -568,11 +568,13 @@ func (w *worker) waitExcludeHost(host *chop.ChiHost, status StatefulSetStatus) b
 		return false
 	}
 
-	if w.c.chop.Config().ReconcileWaitExclude == false {
+	if host.CHI.IsReconcilingPolicyWait() {
+		return true
+	} else if host.CHI.IsReconcilingPolicyNoWait() {
 		return false
 	}
 
-	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
+	if !w.c.chop.Config().ReconcileWaitExclude {
 		return false
 	}
 
@@ -581,7 +583,7 @@ func (w *worker) waitExcludeHost(host *chop.ChiHost, status StatefulSetStatus) b
 
 // determines whether reconciler should wait for host to be excluded from/included into cluster
 func (w *worker) waitIncludeHost(host *chop.ChiHost, status StatefulSetStatus) bool {
-	if host.CHI.IsReconcilingPolicyNoWait() {
+	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
 		return false
 	}
 
@@ -589,11 +591,13 @@ func (w *worker) waitIncludeHost(host *chop.ChiHost, status StatefulSetStatus) b
 		return false
 	}
 
-	if w.c.chop.Config().ReconcileWaitInclude == false {
+	if host.CHI.IsReconcilingPolicyWait() {
+		return true
+	} else if host.CHI.IsReconcilingPolicyNoWait() {
 		return false
 	}
 
-	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
+	if w.c.chop.Config().ReconcileWaitInclude == false {
 		return false
 	}
 
