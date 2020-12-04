@@ -373,7 +373,7 @@ func (n *Normalizer) normalizeReconciling(reconciling *chiv1.ChiReconciling) {
 	case chiv1.ReconcilingPolicyWait, chiv1.ReconcilingPolicyNoWait:
 		reconciling.Policy = strings.ToLower(reconciling.Policy)
 	default:
-		reconciling.Policy = strings.ToLower(chiv1.ReconcilingPolicyWait)
+		reconciling.Policy = strings.ToLower(chiv1.ReconcilingPolicyUnspecified)
 	}
 }
 
