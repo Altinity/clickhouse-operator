@@ -186,11 +186,12 @@ def test_operator_restart(config, version=settings.operator_version):
                 },
                 "do_not_delete": 1,
             })
+        time.sleep(10)
         start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
         with When("Restart operator"):
             restart_operator()
-            time.sleep(5)
+            time.sleep(10)
             kubectl.wait_chi_status(chi, "Completed")
             kubectl.wait_objects(
                 chi,
@@ -199,6 +200,7 @@ def test_operator_restart(config, version=settings.operator_version):
                     "pod": 1,
                     "service": 2,
                 })
+            time.sleep(10)
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
             assert start_time == new_start_time
 
@@ -266,6 +268,7 @@ def test_010():
             "do_not_delete": 1,
         }
     )
+    time.sleep(10)
     with And("ClickHouse should complain regarding zookeeper path"):
         out = clickhouse.query_with_error("test-010-zkroot", "select * from system.zookeeper where path = '/'")
         assert "Received exception from server" in out, error()
@@ -507,6 +510,19 @@ def test_013():
     )
     start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
+    # wait for cluster to start
+    for i in range(20):
+        time.sleep(10)
+        out = clickhouse.query_with_error(
+            chi,
+            "SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
+        print("cluster out=")
+        print(out)
+        if out == "1":
+            break
+    else:
+        assert out == "1"
+
     schema_objects = [
         'test_local',
         'test_distr',
@@ -541,8 +557,18 @@ def test_013():
             timeout=1500,
         )
 
-    # Give some time for replication to catch up
-    time.sleep(10)
+    # wait for cluster to start
+    for i in range(20):
+        time.sleep(10)
+        out = clickhouse.query_with_error(
+            chi,
+            "SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
+        print("cluster out=")
+        print(out)
+        if out == "3":
+            break
+    else:
+        assert out == "3"
 
     with Then("Unaffected pod should not be restarted"):
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
@@ -575,7 +601,20 @@ def test_013():
                 "do_not_delete": 1,
             }
         )
-        time.sleep(10)
+
+        # wait for cluster to start
+        for i in range(20):
+            time.sleep(10)
+            out = clickhouse.query_with_error(
+                chi,
+                "SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
+            print("cluster out=")
+            print(out)
+            if out == "1":
+                break
+        else:
+            assert out == "1"
+
         with Then("Unaffected pod should not be restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
             assert start_time == new_start_time
@@ -756,25 +795,29 @@ def test_015():
     )
 
     time.sleep(30)
-
     with Then("Query from one server to another one should work"):
         out = clickhouse.query(
             "test-015-host-network",
             host="chi-test-015-host-network-default-0-0",
             port="10000",
-            sql="SELECT * FROM remote('chi-test-015-host-network-default-0-1', system.one)")
+            sql="SELECT * FROM remote('chi-test-015-host-network-default-0-1:11000', system.one)")
         print("remote out=")
         print(out)
 
     with Then("Distributed query should work"):
-        out = clickhouse.query(
-            "test-015-host-network",
-            host="chi-test-015-host-network-default-0-0",
-            port="10000",
-            sql="SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
-        print("cluster out=")
-        print(out)
-        assert out == "2"
+        for i in range(20):
+            time.sleep(10)
+            out = clickhouse.query_with_error(
+                "test-015-host-network",
+                host="chi-test-015-host-network-default-0-0",
+                port="10000",
+                sql="SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
+            print("cluster out=")
+            print(out)
+            if out == "2":
+                break
+        else:
+            assert out == "2"
 
     kubectl.delete_chi("test-015-host-network")
 
@@ -985,6 +1028,7 @@ def test_019(config="configs/test-019-retain-volume.yaml"):
             "do_not_delete": 1,
         },
     )
+    time.sleep(30)
 
     create_non_replicated_table = "create table t1 Engine = Log as select 1 as a"
     create_replicated_table = """
@@ -1015,6 +1059,7 @@ def test_019(config="configs/test-019-retain-volume.yaml"):
                 "do_not_delete": 1,
             },
         )
+        time.sleep(30)
 
     with Then("PVC should be re-mounted"):
         with And("Non-replicated table should have data"):
