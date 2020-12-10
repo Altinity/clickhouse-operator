@@ -882,7 +882,8 @@ def test_016():
                 f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep test_norestart /etc/clickhouse-server/users.d/my_users.xml | wc -l\"",
                 "1")
 
-        version = ""
+        with Then("Force reload config"):
+            clickhouse.query(chi, sql="SYSTEM RELOAD CONFIG")
         with Then("test_norestart user should be available"):
             version = clickhouse.query(chi, sql="select version()", user="test_norestart")
         with And("user1 user should not be available"):
@@ -891,7 +892,7 @@ def test_016():
         with And("user2 user should be available"):
             version_user2 = clickhouse.query(chi, sql="select version()", user="user2", pwd="qwerty")
             assert version == version_user2
-        with And("ClickHouse should not be restarted"):
+        with And("ClickHouse SHOULD NOT be restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time == new_start_time
 
