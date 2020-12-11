@@ -115,7 +115,7 @@ func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	return template, ok
 }
 
-func (host *ChiHost) GetReplicasNum() int32 {
+func (host *ChiHost) GetStatefulSetReplicasNum() int32 {
 	if util.IsStringBoolTrue(host.CHI.Spec.Stop) {
 		return 0
 	} else {
