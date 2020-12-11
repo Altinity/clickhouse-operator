@@ -123,6 +123,24 @@ func (cluster *ChiCluster) GetReplica(replica int) *ChiReplica {
 	return &cluster.Layout.Replicas[replica]
 }
 
+func (cluster *ChiCluster) FindShard(needle interface{}) *ChiShard {
+	var resultShard *ChiShard
+	cluster.WalkShards(func(index int, shard *ChiShard) error {
+		switch v := needle.(type) {
+		case string:
+			if shard.Name == v {
+				resultShard = shard
+			}
+		case int:
+			if index == v {
+				resultShard = shard
+			}
+		}
+		return nil
+	})
+	return resultShard
+}
+
 func (cluster *ChiCluster) WalkShards(
 	f func(index int, shard *ChiShard) error,
 ) []error {

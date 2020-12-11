@@ -561,10 +561,12 @@ func (w *worker) excludeHost(host *chop.ChiHost, status StatefulSetStatus) error
 // determines whether reconciler should wait for host to be excluded from/included into cluster
 func (w *worker) waitExcludeHost(host *chop.ChiHost, status StatefulSetStatus) bool {
 	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
+		// No need to wait for new and non-modified StatefulSets
 		return false
 	}
 
-	if host.GetCluster().HostsCount() == 1 {
+	if host.GetShard().HostsCount() == 1 {
+		// In case shard where current host is located has only one host (means no replication), no need to wait
 		return false
 	}
 
@@ -587,7 +589,8 @@ func (w *worker) waitIncludeHost(host *chop.ChiHost, status StatefulSetStatus) b
 		return false
 	}
 
-	if host.GetCluster().HostsCount() == 1 {
+	if host.GetShard().HostsCount() == 1 {
+		// In case shard where current host is located has only one host (means no replication), no need to wait
 		return false
 	}
 

@@ -115,7 +115,7 @@ func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	return template, ok
 }
 
-func (host *ChiHost) GetReplicasNum() int32 {
+func (host *ChiHost) GetStatefulSetReplicasNum() int32 {
 	if util.IsStringBoolTrue(host.CHI.Spec.Stop) {
 		return 0
 	} else {
@@ -139,6 +139,11 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 func (host *ChiHost) GetCluster() *ChiCluster {
 	// Host has to have filled Address
 	return host.GetCHI().FindCluster(host.Address.ClusterName)
+}
+
+func (host *ChiHost) GetShard() *ChiShard {
+	// Host has to have filled Address
+	return host.GetCHI().FindShard(host.Address.ClusterName, host.Address.ShardName)
 }
 
 func (host *ChiHost) CanDeleteAllPVCs() bool {
@@ -175,19 +180,10 @@ func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *corev1.VolumeMount)) {
 func (host *ChiHost) GetAnnotations() map[string]string {
 	annotations := make(map[string]string, 0)
 	for key, value := range host.CHI.Annotations {
-		if isAnnotationToBeSkipped(key) {
+		if util.IsAnnotationToBeSkipped(key) {
 			continue
 		}
 		annotations[key] = value
 	}
 	return annotations
-}
-
-// isAnnotationToBeSkipped checks whether an annotation be skipped
-func isAnnotationToBeSkipped(annotation string) bool {
-	switch annotation {
-	case "kubectl.kubernetes.io/last-applied-configuration":
-		return true
-	}
-	return false
 }

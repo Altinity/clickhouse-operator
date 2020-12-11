@@ -132,8 +132,8 @@ data:
     
     # Max number of concurrent reconciles in progress
     reconcileThreadsNumber: 10
-    reconcileWaitExclude: true
-    reconcileWaitInclude: true
+    reconcileWaitExclude: false
+    reconcileWaitInclude: false
 
 ---
 # Possible Template Parameters:

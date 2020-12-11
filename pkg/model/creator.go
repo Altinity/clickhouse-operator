@@ -279,7 +279,7 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	serviceName := CreateStatefulSetServiceName(host)
 
 	// Create apps.StatefulSet object
-	replicasNum := host.GetReplicasNum()
+	replicasNum := host.GetStatefulSetReplicasNum()
 	revisionHistoryLimit := int32(10)
 	// StatefulSet has additional label - ZK config fingerprint
 	statefulSet := &apps.StatefulSet{
