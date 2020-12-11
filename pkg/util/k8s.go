@@ -19,3 +19,12 @@ import "k8s.io/apimachinery/pkg/apis/meta/v1"
 func NamespaceName(meta v1.ObjectMeta) (string, string) {
 	return meta.Namespace, meta.Name
 }
+
+// IsAnnotationToBeSkipped checks whether an annotation should be skipped
+func IsAnnotationToBeSkipped(annotation string) bool {
+	switch annotation {
+	case "kubectl.kubernetes.io/last-applied-configuration":
+		return true
+	}
+	return false
+}
