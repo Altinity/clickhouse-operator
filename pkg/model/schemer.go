@@ -282,15 +282,23 @@ func (s *Schemer) HostDeleteTables(host *chop.ChiHost) error {
 func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
 	log.V(1).Infof("Migrating schema objects to host %s", host.Address.HostName)
 
-	names, createSQLs, _ := s.getCreateReplicaObjects(host)
-	log.V(1).Infof("Creating replica objects at %s: %v", host.Address.HostName, names)
-	log.V(1).Infof("\n%v", createSQLs)
-	err1 := s.hostApplySQLs(host, createSQLs, true)
+	var err1, err2 error
 
-	names, createSQLs, _ = s.getCreateDistributedObjects(host)
-	log.V(1).Infof("Creating distributed objects at %s: %v", host.Address.HostName, names)
-	log.V(1).Infof("\n%v", createSQLs)
-	err2 := s.hostApplySQLs(host, createSQLs, true)
+	if names, createSQLs, err := s.getCreateReplicaObjects(host); err == nil {
+		if len(createSQLs) > 0 {
+			log.V(1).Infof("Creating replica objects at %s: %v", host.Address.HostName, names)
+			log.V(1).Infof("\n%v", createSQLs)
+			err1 = s.hostApplySQLs(host, createSQLs, true)
+		}
+	}
+
+	if names, createSQLs, err := s.getCreateDistributedObjects(host); err == nil {
+		if len(createSQLs) > 0 {
+			log.V(1).Infof("Creating distributed objects at %s: %v", host.Address.HostName, names)
+			log.V(1).Infof("\n%v", createSQLs)
+			err2 = s.hostApplySQLs(host, createSQLs, true)
+		}
+	}
 
 	if err2 != nil {
 		return err2
