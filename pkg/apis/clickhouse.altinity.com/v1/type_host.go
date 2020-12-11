@@ -141,6 +141,11 @@ func (host *ChiHost) GetCluster() *ChiCluster {
 	return host.GetCHI().FindCluster(host.Address.ClusterName)
 }
 
+func (host *ChiHost) GetShard() *ChiShard {
+	// Host has to have filled Address
+	return host.GetCHI().FindShard(host.Address.ClusterName, host.Address.ShardName)
+}
+
 func (host *ChiHost) CanDeleteAllPVCs() bool {
 	canDeleteAllPVCs := true
 	host.CHI.WalkVolumeClaimTemplates(func(template *ChiVolumeClaimTemplate) {
