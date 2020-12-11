@@ -488,15 +488,22 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 }
 
 // FindCluster
-func (chi *ClickHouseInstallation) FindCluster(name string) *ChiCluster {
-	var cluster *ChiCluster
-	chi.WalkClusters(func(c *ChiCluster) error {
-		if c.Name == name {
-			cluster = c
+func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *ChiCluster {
+	var resultCluster *ChiCluster
+	chi.WalkClustersFullPath(func(chi *ClickHouseInstallation, clusterIndex int, cluster *ChiCluster) error {
+		switch v := needle.(type) {
+		case string:
+			if cluster.Name == v {
+				resultCluster = cluster
+			}
+		case int:
+			if clusterIndex == v {
+				resultCluster = cluster
+			}
 		}
 		return nil
 	})
-	return cluster
+	return resultCluster
 }
 
 // ClustersCount
