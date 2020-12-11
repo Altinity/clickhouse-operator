@@ -506,6 +506,14 @@ func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *ChiCluster {
 	return resultCluster
 }
 
+// FindShard
+func (chi *ClickHouseInstallation) FindShard(needleCluster interface{}, needleShard interface{}) *ChiShard {
+	if cluster := chi.FindCluster(needleCluster); cluster != nil {
+		return cluster.FindShard(needleShard)
+	}
+	return nil
+}
+
 // ClustersCount
 func (chi *ClickHouseInstallation) ClustersCount() int {
 	count := 0
