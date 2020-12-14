@@ -13,7 +13,7 @@
     {
       "type": "panel",
       "id": "bargauge",
-      "name": "Bar Gauge",
+      "name": "Bar gauge",
       "version": ""
     },
     {
@@ -26,7 +26,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "6.5.1"
+      "version": "7.1.1"
     },
     {
       "type": "panel",
@@ -65,7 +65,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1599586083620,
+  "iteration": 1607017745582,
   "links": [],
   "panels": [
     {
@@ -88,6 +88,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -115,10 +122,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -193,6 +198,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -220,10 +232,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -295,6 +305,33 @@
     {
       "cacheTimeout": null,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {},
+          "displayName": "",
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -305,33 +342,17 @@
       "links": [],
       "options": {
         "displayMode": "lcd",
-        "fieldOptions": {
+        "orientation": "horizontal",
+        "reduceOptions": {
           "calcs": [
             "last"
           ],
-          "defaults": {
-            "mappings": [],
-            "max": 100,
-            "min": 0,
-            "thresholds": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ],
-            "title": "",
-            "unit": "short"
-          },
-          "override": {},
+          "fields": "",
           "values": false
         },
-        "orientation": "horizontal"
+        "showUnfilled": true
       },
-      "pluginVersion": "6.5.1",
+      "pluginVersion": "7.1.1",
       "targets": [
         {
           "expr": "global_sessions{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
@@ -350,6 +371,32 @@
     {
       "cacheTimeout": null,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {},
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 8,
         "w": 12,
@@ -360,32 +407,17 @@
       "links": [],
       "options": {
         "displayMode": "lcd",
-        "fieldOptions": {
+        "orientation": "horizontal",
+        "reduceOptions": {
           "calcs": [
             "last"
           ],
-          "defaults": {
-            "mappings": [],
-            "max": 100,
-            "min": 0,
-            "thresholds": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ],
-            "unit": "short"
-          },
-          "override": {},
+          "fields": "",
           "values": false
         },
-        "orientation": "horizontal"
+        "showUnfilled": true
       },
-      "pluginVersion": "6.5.1",
+      "pluginVersion": "7.1.1",
       "targets": [
         {
           "expr": "local_sessions{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
@@ -406,6 +438,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -429,10 +468,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -442,8 +479,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "write_per_namespace_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(write_per_namespace_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} write_per_namespace:{{key}}",
           "refId": "C"
@@ -496,6 +534,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -519,10 +564,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -532,9 +575,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "read_per_namespace_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(read_per_namespace_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
           "hide": false,
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} read_per_namespace:{{key}}",
           "refId": "C"
@@ -587,6 +631,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -610,10 +661,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -677,6 +726,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -700,10 +756,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -713,8 +767,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(packets_received{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
+          "expr": "irate(packets_received{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} packets_received",
           "refId": "A"
@@ -740,6 +795,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:2720",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -748,6 +804,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:2721",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -767,6 +824,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -791,10 +855,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -804,8 +866,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(packets_sent{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
+          "expr": "irate(packets_sent{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} packets_sent",
           "refId": "A"
@@ -831,6 +894,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:2773",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -839,6 +903,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:2774",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -858,6 +923,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 3,
       "gridPos": {
@@ -881,29 +953,21 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
       "seriesOverrides": [
         {
-          "alias": "/.+response_packet_cache_misses.*/",
-          "color": "#C4162A"
-        },
-        {
-          "alias": "/.+response_packet_get_children_cache_misses.*/",
-          "color": "#FF7383"
-        },
-        {
+          "$$hashKey": "object:302",
           "alias": "/.+response_packet_cache_hits.*/",
           "color": "#37872D"
         },
         {
+          "$$hashKey": "object:303",
           "alias": "/.+response_packet_get_children_cache_hits.*/",
-          "color": "#96D98D"
+          "color": "#F2CC0C"
         }
       ],
       "spaceLength": 10,
@@ -911,32 +975,21 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(response_packet_cache_misses{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
+          "expr": "increase(response_packet_cache_hits{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / (increase(response_packet_cache_misses{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) + increase(response_packet_cache_hits{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]))",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} response_packet_cache_misses",
+          "legendFormat": "{{pod_name}}.{{namespace}} response_packet_cache_hits_rate",
           "refId": "A"
         },
         {
-          "expr": "rate(response_packet_cache_hits{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
+          "expr": "increase(response_packet_get_children_cache_hits{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / (increase(response_packet_get_children_cache_misses{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) + increase(response_packet_get_children_cache_hits{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])) ",
           "format": "time_series",
+          "hide": false,
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} response_packet_cache_hits",
-          "refId": "B"
-        },
-        {
-          "expr": "rate(response_packet_get_children_cache_misses{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
-          "format": "time_series",
-          "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} response_packet_get_children_cache_misses",
+          "legendFormat": "{{pod_name}}.{{namespace}} response_packet_get_children_cache_hits_rate",
           "refId": "C"
-        },
-        {
-          "expr": "rate(response_packet_get_children_cache_hits{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
-          "format": "time_series",
-          "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} response_packet_get_children_cache_hits",
-          "refId": "D"
         }
       ],
       "thresholds": [],
@@ -959,7 +1012,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:235",
+          "format": "percentunit",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -967,6 +1021,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:236",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -986,6 +1041,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -1009,10 +1071,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1022,8 +1082,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "unrecoverable_error_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "increase(unrecoverable_error_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} unrecoverable_error_count",
           "refId": "A"
@@ -1049,6 +1110,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:382",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -1057,6 +1119,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:383",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -1077,6 +1140,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -1100,10 +1170,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1113,8 +1181,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "digest_mismatches_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "increase(digest_mismatches_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} digest_mismatches_count",
           "refId": "C"
@@ -1140,6 +1209,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:435",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -1148,6 +1218,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:436",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -1167,6 +1238,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -1189,11 +1267,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1206,6 +1282,7 @@
           "expr": "startup_snap_load_time",
           "format": "time_series",
           "hide": true,
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} startup_snap_load_time-{{quantile}}",
           "refId": "A"
@@ -1214,13 +1291,15 @@
           "expr": "startup_snap_load_time_count",
           "format": "time_series",
           "hide": true,
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} startup_snap_load_time_count",
           "refId": "B"
         },
         {
-          "expr": "startup_snap_load_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "increase(startup_snap_load_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(startup_snap_load_time_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} startup_snap_load_time",
           "refId": "C"
@@ -1246,6 +1325,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:500",
           "format": "ms",
           "label": null,
           "logBase": 1,
@@ -1254,6 +1334,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:501",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -1273,6 +1354,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -1295,11 +1383,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1325,8 +1411,9 @@
           "refId": "B"
         },
         {
-          "expr": "startup_txns_loaded_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "increase(startup_txns_loaded_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(startup_txns_loaded_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} startup_txns_loaded",
           "refId": "C"
@@ -1352,6 +1439,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:553",
           "format": "ms",
           "label": null,
           "logBase": 1,
@@ -1360,6 +1448,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:554",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -1379,6 +1468,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -1402,10 +1498,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -1418,6 +1512,7 @@
           "expr": "dbinittime",
           "format": "time_series",
           "hide": true,
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} dbinittime-{{quantile}}",
           "refId": "A"
@@ -1433,9 +1528,20 @@
         {
           "expr": "dbinittime_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
+          "hide": false,
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} db_init_time",
           "refId": "C"
+        },
+        {
+          "expr": "dbinittime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "format": "time_series",
+          "hide": true,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod_name}}.{{namespace}} db_init_time",
+          "refId": "D"
         }
       ],
       "thresholds": [],
@@ -1458,6 +1564,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:606",
           "format": "ms",
           "label": null,
           "logBase": 1,
@@ -1466,6 +1573,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:607",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -1502,6 +1610,12 @@
             "#d44a3a"
           ],
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
           "format": "short",
           "gauge": {
             "maxValue": 100,
@@ -1533,7 +1647,6 @@
           "maxDataPoints": 100,
           "nullPointMode": "connected",
           "nullText": null,
-          "options": {},
           "pluginVersion": "6.2.2",
           "postfix": "",
           "postfixFontSize": "80%",
@@ -1587,6 +1700,12 @@
             "#F2495C"
           ],
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
           "format": "ms",
           "gauge": {
             "maxValue": 100,
@@ -1618,7 +1737,6 @@
           "maxDataPoints": 100,
           "nullPointMode": "connected",
           "nullText": null,
-          "options": {},
           "pluginVersion": "6.2.2",
           "postfix": "",
           "postfixFontSize": "50%",
@@ -1672,6 +1790,12 @@
             "#5794F2"
           ],
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {}
+            },
+            "overrides": []
+          },
           "format": "ms",
           "gauge": {
             "maxValue": 100,
@@ -1703,7 +1827,6 @@
           "maxDataPoints": 100,
           "nullPointMode": "connected",
           "nullText": null,
-          "options": {},
           "pluginVersion": "6.2.2",
           "postfix": "",
           "postfixFontSize": "50%",
@@ -1750,6 +1873,31 @@
         {
           "cacheTimeout": null,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {},
+              "mappings": [],
+              "max": 100,
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
           "gridPos": {
             "h": 8,
             "w": 24,
@@ -1760,31 +1908,17 @@
           "links": [],
           "options": {
             "displayMode": "lcd",
-            "fieldOptions": {
+            "orientation": "vertical",
+            "reduceOptions": {
               "calcs": [
                 "last"
               ],
-              "defaults": {
-                "mappings": [],
-                "max": 100,
-                "min": 0,
-                "thresholds": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              },
-              "override": {},
+              "fields": "",
               "values": false
             },
-            "orientation": "vertical"
+            "showUnfilled": true
           },
-          "pluginVersion": "6.5.1",
+          "pluginVersion": "7.1.1",
           "targets": [
             {
               "expr": "max(learners{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"})",
@@ -1819,6 +1953,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -1843,11 +1984,9 @@
           "lines": true,
           "linewidth": 2,
           "links": [],
-          "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
+          "nullPointMode": "null as zero",
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -1865,27 +2004,28 @@
               "refId": "A"
             },
             {
-              "expr": "election_time_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
-              "format": "time_series",
-              "hide": false,
-              "intervalFactor": 2,
-              "legendFormat": "{{pod_name}}.{{namespace}} election_time_count",
-              "refId": "B"
-            },
-            {
               "expr": "election_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
               "format": "time_series",
-              "hide": false,
+              "hide": true,
               "intervalFactor": 2,
               "legendFormat": "{{pod_name}}.{{namespace}} election_time_sum(ms)",
               "refId": "C"
             },
             {
-              "expr": "election_time_sum/election_time_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+              "expr": "election_time_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+              "format": "time_series",
+              "hide": true,
+              "intervalFactor": 2,
+              "legendFormat": "{{pod_name}}.{{namespace}} election_time_count",
+              "refId": "B"
+            },
+            {
+              "expr": "increase(election_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(election_time_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
               "format": "time_series",
               "hide": false,
+              "interval": "",
               "intervalFactor": 2,
-              "legendFormat": "{{pod_name}}.{{namespace}} election_avg_time(ms)",
+              "legendFormat": "{{pod_name}}.{{namespace}} election_avg_time",
               "refId": "D"
             }
           ],
@@ -1909,7 +2049,8 @@
           },
           "yaxes": [
             {
-              "format": "short",
+              "$$hashKey": "object:711",
+              "format": "ms",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -1917,7 +2058,8 @@
               "show": true
             },
             {
-              "format": "short",
+              "$$hashKey": "object:712",
+              "format": "ms",
               "label": null,
               "logBase": 1,
               "max": null,
@@ -1936,6 +2078,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -1959,10 +2108,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -2026,6 +2173,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -2049,10 +2203,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -2116,6 +2268,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -2139,10 +2298,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -2206,6 +2363,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -2229,10 +2393,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -2296,6 +2458,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -2319,10 +2488,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -2386,6 +2553,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -2409,10 +2583,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -2476,6 +2648,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -2499,10 +2678,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -2566,6 +2743,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -2589,10 +2773,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -2670,6 +2852,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -2693,10 +2882,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -2760,6 +2947,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -2783,10 +2977,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -2850,6 +3042,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -2873,10 +3072,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -2940,6 +3137,13 @@
           "dashLength": 10,
           "dashes": false,
           "datasource": "${DS_PROMETHEUS}",
+          "fieldConfig": {
+            "defaults": {
+              "custom": {},
+              "links": []
+            },
+            "overrides": []
+          },
           "fill": 1,
           "fillGradient": 0,
           "gridPos": {
@@ -2963,10 +3167,8 @@
           "linewidth": 2,
           "links": [],
           "nullPointMode": "connected",
-          "options": {
-            "dataLinks": []
-          },
           "percentage": false,
+          "pluginVersion": "7.1.1",
           "pointradius": 2,
           "points": false,
           "renderer": "flot",
@@ -3055,6 +3257,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -3078,10 +3287,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3118,6 +3325,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:776",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3126,6 +3334,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:777",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3145,6 +3354,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -3167,22 +3383,21 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
       "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
-      "steppedLine": false,
+      "steppedLine": true,
       "targets": [
         {
-          "expr": "node_changed_watch_count_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(node_changed_watch_count_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} node_changed_watch_count",
           "refId": "C"
@@ -3192,7 +3407,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "node_changed_watch_count",
+      "title": "node_changed_watch_triggered",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -3208,6 +3423,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:829",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3216,6 +3432,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:830",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3235,6 +3452,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -3257,11 +3481,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3271,8 +3493,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "node_children_watch_count_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(node_children_watch_count_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} node_children_watch_count",
           "refId": "C"
@@ -3282,7 +3505,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "node_children_watch_count",
+      "title": "node_children_watch_triggered",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -3298,6 +3521,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:882",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3306,6 +3530,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:883",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3325,6 +3550,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -3347,22 +3579,21 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
       "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
-      "steppedLine": false,
+      "steppedLine": true,
       "targets": [
         {
-          "expr": "node_deleted_watch_count_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(node_deleted_watch_count_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} node_deleted_watch_count",
           "refId": "C"
@@ -3372,7 +3603,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "node_deleted_watch_count",
+      "title": "node_deleted_watch_triggered",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -3388,6 +3619,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:998",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3396,6 +3628,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:999",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3415,6 +3648,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -3438,10 +3678,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3451,8 +3689,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "node_created_watch_count_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(node_created_watch_count_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} node_created_watch_count",
           "refId": "A"
@@ -3462,7 +3701,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "node_created_watch_count",
+      "title": "node_created_watch_triggered",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -3478,6 +3717,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:1306",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3486,6 +3726,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:1307",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3505,6 +3746,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -3527,11 +3775,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3541,8 +3787,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "revalidate_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(revalidate_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} revalidate_count",
           "refId": "A"
@@ -3568,6 +3815,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:1359",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3576,6 +3824,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:1360",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3595,6 +3844,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -3605,6 +3861,7 @@
       },
       "hiddenSeries": false,
       "id": 46,
+      "interval": "",
       "legend": {
         "avg": false,
         "current": false,
@@ -3617,22 +3874,21 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
       "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
-      "steppedLine": false,
+      "steppedLine": true,
       "targets": [
         {
-          "expr": "stale_sessions_expired{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(stale_sessions_expired{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 1,
           "legendFormat": "{{pod_name}}.{{namespace}} stale_sessions_expired",
           "refId": "A"
@@ -3658,6 +3914,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:1424",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3666,6 +3923,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:1425",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3685,6 +3943,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -3707,38 +3972,46 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
+      "seriesOverrides": [
+        {
+          "$$hashKey": "object:1496",
+          "alias": "/.+dead_watchers_cleaner_latency_avg$/",
+          "color": "#E02F44",
+          "yaxis": 2
+        }
+      ],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "dead_watchers_cleared{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(dead_watchers_cleared{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} dead_watchers_cleared",
           "refId": "A"
         },
         {
-          "expr": "dead_watchers_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(dead_watchers_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} dead_watchers_queued",
           "refId": "B"
         },
         {
-          "expr": "rate(dead_watchers_cleaner_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(dead_watchers_cleaner_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(dead_watchers_cleaner_latency_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} dead_watchers_cleaner_latency",
+          "legendFormat": "{{pod_name}}.{{namespace}} dead_watchers_cleaner_latency_avg",
           "refId": "C"
         }
       ],
@@ -3762,6 +4035,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:1478",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3770,7 +4044,8 @@
           "show": true
         },
         {
-          "format": "short",
+          "$$hashKey": "object:1479",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -3789,6 +4064,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -3812,21 +4094,20 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
       "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
-      "steppedLine": false,
+      "steppedLine": true,
       "targets": [
         {
-          "expr": "add_dead_watcher_stall_time{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(add_dead_watcher_stall_time{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} add_dead_watcher_stall_time",
           "refId": "A"
@@ -3852,6 +4133,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:1543",
           "format": "ms",
           "label": null,
           "logBase": 1,
@@ -3860,6 +4142,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:1544",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3893,6 +4176,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -3916,10 +4206,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -3931,6 +4219,7 @@
         {
           "expr": "outstanding_requests{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} outstanding_requests",
           "refId": "A"
@@ -3956,6 +4245,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:1608",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3964,6 +4254,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:1609",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -3983,6 +4274,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -4006,10 +4304,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -4035,6 +4331,7 @@
         {
           "expr": "max_client_response_size{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} max_client_response_size",
           "refId": "C"
@@ -4060,6 +4357,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:1661",
           "format": "bytes",
           "label": null,
           "logBase": 1,
@@ -4068,6 +4366,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:1662",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4087,6 +4386,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -4110,10 +4416,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -4123,8 +4427,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "bytes_received_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(bytes_received_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} bytes_received_count",
           "refId": "A"
@@ -4134,7 +4439,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "bytes_received_count",
+      "title": "bytes_received",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -4150,6 +4455,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:1714",
           "format": "bytes",
           "label": null,
           "logBase": 1,
@@ -4158,6 +4464,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:1715",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4177,6 +4484,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -4200,10 +4514,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -4213,8 +4525,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "connection_request_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "rate(connection_request_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} connection_request_count",
           "refId": "A"
@@ -4240,6 +4553,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:1771",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4248,6 +4562,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:1772",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4267,6 +4582,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -4290,10 +4612,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -4305,6 +4625,7 @@
         {
           "expr": "num_alive_connections{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 1,
           "legendFormat": "{{pod_name}}.{{namespace}} num_alive_connections",
           "refId": "A"
@@ -4330,6 +4651,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:1824",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4338,6 +4660,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:1825",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4357,6 +4680,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -4380,10 +4710,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -4393,8 +4721,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "connection_rejected{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "rate(connection_rejected{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} connection_rejected",
           "refId": "A"
@@ -4420,6 +4749,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:1877",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4428,6 +4758,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:1878",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4447,6 +4778,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -4470,10 +4808,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -4483,8 +4819,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "connection_drop_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "rate(connection_drop_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} connection_drop_count",
           "refId": "A"
@@ -4510,6 +4847,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:1930",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4518,6 +4856,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:1931",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4537,6 +4876,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -4560,10 +4906,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -4575,6 +4919,7 @@
         {
           "expr": "connection_drop_probability{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} connection_drop_probability",
           "refId": "A"
@@ -4600,14 +4945,16 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:2084",
+          "format": "percentunit",
           "label": null,
           "logBase": 1,
           "max": null,
-          "min": null,
+          "min": "0",
           "show": true
         },
         {
+          "$$hashKey": "object:2085",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4627,6 +4974,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -4650,10 +5004,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -4663,8 +5015,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sessionless_connections_expired{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "rate(sessionless_connections_expired{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} sessionless_connections_expired",
           "refId": "A"
@@ -4690,6 +5043,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:2137",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4698,6 +5052,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:2138",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4717,6 +5072,14 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "how much tokens deficit per sec, during connection throttling",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -4740,10 +5103,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -4755,6 +5116,7 @@
         {
           "expr": "rate(connection_token_deficit_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} connection_token_deficit",
           "refId": "C"
@@ -4780,6 +5142,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:2190",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4788,6 +5151,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:2191",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -4817,6 +5181,32 @@
     },
     {
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {},
+          "mappings": [],
+          "max": 1024,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 800
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 8,
         "w": 24,
@@ -4827,34 +5217,18 @@
       "interval": "",
       "links": [],
       "options": {
-        "fieldOptions": {
+        "orientation": "horizontal",
+        "reduceOptions": {
           "calcs": [
             "last"
           ],
-          "defaults": {
-            "mappings": [],
-            "max": 1024,
-            "min": 0,
-            "thresholds": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 800
-              }
-            ],
-            "unit": "short"
-          },
-          "override": {},
+          "fields": "",
           "values": false
         },
-        "orientation": "horizontal",
         "showThresholdLabels": false,
         "showThresholdMarkers": true
       },
-      "pluginVersion": "6.5.1",
+      "pluginVersion": "7.1.1",
       "targets": [
         {
           "expr": "open_file_descriptor_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
@@ -4875,6 +5249,14 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "frequency and the average time for FSYNC",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -4900,17 +5282,17 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
       "seriesOverrides": [
         {
-          "alias": "/.+fsynctime_rate.*/",
+          "$$hashKey": "object:2339",
+          "alias": "/.+fsynctime quantile.*/",
+          "color": "#E02F44",
           "yaxis": 2
         }
       ],
@@ -4921,18 +5303,19 @@
         {
           "expr": "fsynctime{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
-          "hide": true,
+          "hide": false,
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} fsynctime",
+          "legendFormat": "{{pod_name}}.{{namespace}} fsynctime quantile={{quantile}}",
           "refId": "A"
         },
         {
-          "expr": "fsynctime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(fsynctime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
-          "hide": true,
+          "hide": false,
           "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} fsynctime_count",
+          "legendFormat": "{{pod_name}}.{{namespace}} fsynctime_count_rate",
           "refId": "B"
         },
         {
@@ -4944,17 +5327,19 @@
           "refId": "C"
         },
         {
-          "expr": "fsynctime_sum * 1000 /fsynctime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "(increase(fsynctime_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])) / increase(fsynctime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
-          "hide": false,
+          "hide": true,
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} fsynctime_avg(μs)",
           "refId": "D"
         },
         {
-          "expr": "irate(fsynctime_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
+          "expr": "fsynctime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
-          "hide": false,
+          "hide": true,
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} fsynctime_rate",
           "refId": "E"
@@ -4980,8 +5365,9 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:2321",
           "decimals": null,
-          "format": "µs",
+          "format": "short",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -4989,8 +5375,9 @@
           "show": true
         },
         {
+          "$$hashKey": "object:2322",
           "decimals": null,
-          "format": "short",
+          "format": "ms",
           "label": "",
           "logBase": 1,
           "max": null,
@@ -5009,6 +5396,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -5033,26 +5427,40 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
+      "seriesOverrides": [
+        {
+          "$$hashKey": "object:2544",
+          "alias": "/.+snapshottime_count_rate.*/",
+          "yaxis": 2
+        }
+      ],
       "spaceLength": 10,
       "stack": false,
-      "steppedLine": false,
+      "steppedLine": true,
       "targets": [
         {
-          "expr": "rate(snapshottime_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "snapshottime{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "hide": false,
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} snapshot_time_rate",
+          "legendFormat": "{{pod_name}}.{{namespace}} snapshot_time quantile={{quantile}}",
           "refId": "C"
+        },
+        {
+          "expr": "increase(snapshottime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
+          "format": "time_series",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod_name}}.{{namespace}} snapshottime_count_rate",
+          "refId": "D"
         },
         {
           "expr": "snapshottime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
@@ -5063,9 +5471,10 @@
           "refId": "A"
         },
         {
-          "expr": "snapshottime_sum / snapshottime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "snapshottime_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"} / snapshottime_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "hide": true,
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} snapshottime_avg(ms)",
           "refId": "B"
@@ -5091,7 +5500,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:2526",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -5099,6 +5509,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:2527",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -5132,6 +5543,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -5155,10 +5573,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -5168,8 +5584,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(prep_process_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(prep_process_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(prep_process_time_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 1,
           "legendFormat": "{{pod_name}}.{{namespace}} prep_process_time",
           "refId": "A"
@@ -5195,7 +5612,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:2826",
+          "format": "s",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -5203,6 +5621,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:2827",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -5222,6 +5641,14 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -5245,10 +5672,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -5258,10 +5683,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(prep_processor_queue_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "prep_processor_queue_time_ms{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\", quantile=\"0.99\"}",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "{{pod_name}}.{{namespace}} prep_processor_queue_time_ms",
+          "legendFormat": "{{pod_name}}.{{namespace}} prep_processor_queue_time_ms quantile={{quantile}}",
           "refId": "C"
         }
       ],
@@ -5269,7 +5695,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "prep_processor_queue_time",
+      "title": "prep_processor_queue_time quantile=0.99",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -5312,6 +5738,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -5335,10 +5768,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -5348,8 +5779,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(prep_processor_queue_size_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "irate(prep_processor_queue_size_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} prep_processor_queue_size",
           "refId": "C"
@@ -5402,6 +5834,14 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "queued per second",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -5425,10 +5865,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -5438,8 +5876,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "prep_processor_request_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(prep_processor_request_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} prep_processor_request_queued",
           "refId": "A"
@@ -5492,6 +5931,14 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "changes per second",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -5515,10 +5962,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -5528,15 +5973,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "outstanding_changes_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(outstanding_changes_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} outstanding_changes_queued",
           "refId": "A"
         },
         {
-          "expr": "outstanding_changes_removed{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(outstanding_changes_removed{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} outstanding_changes_removed",
           "refId": "B"
@@ -5546,7 +5993,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "outstanding_changes_queued",
+      "title": "outstanding_changes queued / removed ",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -5589,6 +6036,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -5611,11 +6065,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -5625,10 +6077,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(close_session_prep_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "close_session_prep_time{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\", quantile=\"0.99\"}",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} close_session_prep_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} close_session_prep_time quantile={{quantile}}",
           "refId": "A"
         }
       ],
@@ -5652,7 +6105,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:3003",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -5660,6 +6114,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3004",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -5694,6 +6149,14 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "milliseconds per second",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -5716,11 +6179,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -5730,11 +6191,21 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(sync_process_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(sync_process_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])/increase(sync_process_time_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} sync_process_time",
           "refId": "C"
+        },
+        {
+          "expr": "sync_process_time{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "format": "time_series",
+          "hide": true,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod_name}}.{{namespace}} sync_process_time {{quantile}}",
+          "refId": "A"
         }
       ],
       "thresholds": [],
@@ -5757,7 +6228,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:3068",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -5765,6 +6237,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3069",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -5784,6 +6257,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -5806,11 +6286,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -5820,10 +6298,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(sync_processor_queue_flush_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "sync_processor_queue_flush_time_ms{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} sync_processor_queue_flush_time",
+          "legendFormat": "{{pod_name}}.{{namespace}} sync_processor_queue_flush_time quantile={{quantile}}",
           "refId": "A"
         }
       ],
@@ -5847,7 +6326,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:3099",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -5855,6 +6335,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3100",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -5874,6 +6355,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -5897,10 +6385,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -5910,11 +6396,21 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(sync_processor_queue_size_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(sync_processor_queue_size_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(sync_processor_queue_size_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} sync_processor_queue_size",
           "refId": "C"
+        },
+        {
+          "expr": "sync_processor_queue_size{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "format": "time_series",
+          "hide": true,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod_name}}.{{namespace}} sync_processor_queue_size",
+          "refId": "A"
         }
       ],
       "thresholds": [],
@@ -5937,6 +6433,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:3174",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -5945,6 +6442,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3175",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -5964,6 +6462,14 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "queued requests per second",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 0,
       "fillGradient": 0,
       "gridPos": {
@@ -5986,11 +6492,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -6000,8 +6504,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sync_processor_request_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(sync_processor_request_queued{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} sync_processor_request_queued",
           "refId": "A"
@@ -6027,6 +6532,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:3238",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -6035,6 +6541,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3239",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -6054,6 +6561,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -6076,11 +6590,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -6090,11 +6602,22 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(sync_processor_batch_size_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(sync_processor_batch_size_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(sync_processor_batch_size_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "hide": false,
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} sync_processor_batch_size",
           "refId": "C"
+        },
+        {
+          "expr": "sync_processor_batch_size{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "format": "time_series",
+          "hide": true,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod_name}}.{{namespace}} sync_processor_batch_size quantile={{quantile}}",
+          "refId": "A"
         }
       ],
       "thresholds": [],
@@ -6117,6 +6640,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:3291",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -6125,6 +6649,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3292",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -6158,6 +6683,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -6180,11 +6712,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -6194,22 +6724,25 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(commit_process_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(commit_process_time_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(commit_process_time_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} commit_process_time",
           "refId": "C"
         },
         {
-          "expr": "rate(read_commitproc_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(read_commitproc_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(read_commitproc_time_ms_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} read_commitproc_time",
           "refId": "A"
         },
         {
-          "expr": "rate(write_commitproc_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(write_commitproc_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(write_commitproc_time_ms_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} write_commitproc_time",
           "refId": "B"
@@ -6235,7 +6768,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:3356",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -6243,6 +6777,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3357",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -6262,6 +6797,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -6285,10 +6827,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -6298,22 +6838,25 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(write_commit_proc_req_queued_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "irate(write_commit_proc_req_queued_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} write_commit_proc_req_queued",
           "refId": "C"
         },
         {
-          "expr": "rate(read_commit_proc_req_queued_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "irate(read_commit_proc_req_queued_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} read_commit_proc_req_queued",
           "refId": "A"
         },
         {
-          "expr": "rate(commit_commit_proc_req_queued_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "irate(commit_commit_proc_req_queued_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} commit_commit_proc_req_queued",
           "refId": "B"
@@ -6339,6 +6882,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:3493",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -6347,6 +6891,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3494",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -6366,6 +6911,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -6389,10 +6941,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -6402,8 +6952,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(requests_in_session_queue_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "irate(requests_in_session_queue_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} requests_in_session_queue",
           "refId": "C"
@@ -6429,6 +6980,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:3546",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -6437,6 +6989,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3547",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -6456,6 +7009,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -6479,10 +7039,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -6553,6 +7111,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -6576,10 +7141,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -6643,6 +7206,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -6666,10 +7236,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -6734,6 +7302,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -6757,10 +7332,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -6824,6 +7397,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -6847,10 +7427,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -6914,6 +7492,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -6937,10 +7522,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -7004,6 +7587,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -7027,10 +7617,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -7095,6 +7683,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -7118,10 +7713,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -7185,6 +7778,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -7208,10 +7808,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -7275,6 +7873,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -7298,10 +7903,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -7365,6 +7968,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -7388,10 +7998,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -7469,6 +8077,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -7492,10 +8107,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -7559,6 +8172,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -7582,10 +8202,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -7663,6 +8281,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -7685,11 +8310,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -7699,10 +8322,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(readlatency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "readlatency{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\", quantile=\"0.99\"}",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} readlatency",
+          "legendFormat": "{{pod_name}}.{{namespace}} readlatency quantile={{quantile}}",
           "refId": "C"
         }
       ],
@@ -7726,7 +8350,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:3599",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -7734,6 +8359,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3600",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -7753,6 +8379,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -7775,26 +8408,27 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
       "seriesOverrides": [
-        {}
+        {
+          "$$hashKey": "object:3652"
+        }
       ],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(updatelatency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "updatelatency{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\", quantile=\"0.99\"}",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} updatelatency",
+          "legendFormat": "{{pod_name}}.{{namespace}} updatelatency quantile={{quantile}}",
           "refId": "C"
         }
       ],
@@ -7818,7 +8452,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:3657",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -7826,6 +8461,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3658",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -7846,6 +8482,13 @@
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
       "decimals": null,
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -7870,10 +8513,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -7883,19 +8524,19 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "max_latency{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
-          "format": "time_series",
-          "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} max_latency",
-          "refId": "A"
-        },
-        {
           "expr": "min_latency{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} min_latency",
           "refId": "B"
+        },
+        {
+          "expr": "max_latency{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "format": "time_series",
+          "intervalFactor": 2,
+          "legendFormat": "{{pod_name}}.{{namespace}} max_latency",
+          "refId": "A"
         },
         {
           "expr": "avg_latency{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
@@ -7925,6 +8566,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:3710",
           "format": "ms",
           "label": null,
           "logBase": 1,
@@ -7933,6 +8575,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3711",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -7952,6 +8595,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -7974,11 +8624,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -7988,8 +8636,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(proposal_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(proposal_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(proposal_latency_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} proposal_latency",
           "refId": "C"
@@ -8015,7 +8664,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:3763",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -8023,6 +8673,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3764",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -8042,6 +8693,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -8064,11 +8722,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -8078,8 +8734,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(quorum_ack_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(quorum_ack_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(quorum_ack_latency_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} quorum_ack_latency",
           "refId": "C"
@@ -8105,7 +8762,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:3816",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -8113,6 +8771,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3817",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -8132,6 +8791,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -8155,10 +8821,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -8168,8 +8832,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(ack_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "ack_latency{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} ack_latency_sum",
           "refId": "C"
@@ -8195,6 +8860,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:3869",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -8203,6 +8869,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3870",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -8222,6 +8889,14 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "normalized latency by last minute",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -8244,11 +8919,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -8258,8 +8931,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(propagation_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(propagation_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(propagation_latency_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} propagation_latency",
           "refId": "C"
@@ -8285,7 +8959,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:3922",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -8293,6 +8968,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3923",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -8312,6 +8988,14 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "normalized latency by last minute",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -8334,11 +9018,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -8348,8 +9030,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(commit_propagation_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "increase(commit_propagation_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(commit_propagation_latency_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} commit_propagation_latency",
           "refId": "C"
@@ -8375,7 +9058,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:3975",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -8383,6 +9067,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:3976",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -8402,6 +9087,30 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "normalized latency by last minute",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": null
+          },
+          "links": [],
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -8424,11 +9133,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -8438,8 +9145,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "proposal_ack_creation_latency{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "increase(proposal_ack_creation_latency_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m]) / increase(proposal_ack_creation_latency_count{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} proposal_ack_creation_latency-{{quantile}}",
           "refId": "A"
@@ -8465,6 +9173,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:4028",
           "format": "ms",
           "label": null,
           "logBase": 1,
@@ -8473,6 +9182,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:4029",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -8506,6 +9216,14 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "ops per second",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -8529,10 +9247,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -8542,15 +9258,17 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "tls_handshake_exceeded{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(tls_handshake_exceeded{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} tls_handshake_exceeded",
           "refId": "C"
         },
         {
-          "expr": "outstanding_tls_handshake{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(outstanding_tls_handshake{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} outstanding_tls_handshake",
           "refId": "A"
@@ -8576,6 +9294,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:4246",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -8584,6 +9303,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:4247",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -8603,6 +9323,14 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "description": "ops per second",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -8626,10 +9354,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -8639,22 +9365,25 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "ensemble_auth_fail{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(ensemble_auth_fail{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} ensemble_auth_fail",
           "refId": "A"
         },
         {
-          "expr": "ensemble_auth_success{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(ensemble_auth_success{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} ensemble_auth_success",
           "refId": "B"
         },
         {
-          "expr": "ensemble_auth_skip{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
+          "expr": "irate(ensemble_auth_skip{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} ensemble_auth_skip",
           "refId": "C"
@@ -8680,6 +9409,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:4299",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -8688,6 +9418,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:4300",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -8725,6 +9456,12 @@
         "#37872D"
       ],
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
       "format": "none",
       "gauge": {
         "maxValue": 100,
@@ -8756,7 +9493,6 @@
       "maxDataPoints": 100,
       "nullPointMode": "connected",
       "nullText": null,
-      "options": {},
       "postfix": "",
       "postfixFontSize": "50%",
       "prefix": "",
@@ -8809,6 +9545,12 @@
         "#1F60C4"
       ],
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
       "format": "short",
       "gauge": {
         "maxValue": 100,
@@ -8840,7 +9582,6 @@
       "maxDataPoints": 100,
       "nullPointMode": "connected",
       "nullText": null,
-      "options": {},
       "postfix": "",
       "postfixFontSize": "50%",
       "prefix": "",
@@ -8893,6 +9634,12 @@
         "#E0B400"
       ],
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {}
+        },
+        "overrides": []
+      },
       "format": "short",
       "gauge": {
         "maxValue": 100,
@@ -8924,7 +9671,6 @@
       "maxDataPoints": 100,
       "nullPointMode": "connected",
       "nullText": null,
-      "options": {},
       "postfix": "",
       "postfixFontSize": "50%",
       "prefix": "",
@@ -8973,6 +9719,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -8996,10 +9749,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -9009,10 +9760,11 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(jvm_pause_time_ms_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "jvm_pause_time_ms{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "{{pod_name}}.{{namespace}} jvm_pause_time_ms",
+          "legendFormat": "{{pod_name}}.{{namespace}} jvm_pause_time_ms quantile={{quantile}}",
           "refId": "C"
         }
       ],
@@ -9036,6 +9788,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:4356",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -9044,6 +9797,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:4357",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -9063,6 +9817,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -9086,10 +9847,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -9099,8 +9858,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(jvm_gc_collection_seconds_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[5m])",
+          "expr": "irate(jvm_gc_collection_seconds_sum{namespace=~\"$namespace\",pod_name=~\"$pod_name\",job=~\"$job\"}[1m])",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 2,
           "legendFormat": "{{pod_name}}.{{namespace}} gc:{{gc}}",
           "refId": "C"
@@ -9126,7 +9886,8 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "$$hashKey": "object:4409",
+          "format": "s",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -9134,6 +9895,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:4410",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -9153,6 +9915,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -9176,10 +9945,8 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -9216,6 +9983,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:4462",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -9224,6 +9992,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:4463",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -9243,6 +10012,13 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "links": []
+        },
+        "overrides": []
+      },
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -9265,11 +10041,9 @@
       "lines": true,
       "linewidth": 2,
       "links": [],
-      "nullPointMode": "connected",
-      "options": {
-        "dataLinks": []
-      },
+      "nullPointMode": "null as zero",
       "percentage": false,
+      "pluginVersion": "7.1.1",
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
@@ -9306,6 +10080,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:4515",
           "format": "bytes",
           "label": null,
           "logBase": 1,
@@ -9314,6 +10089,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:4516",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -9328,8 +10104,8 @@
       }
     }
   ],
-  "refresh": "5s",
-  "schemaVersion": 21,
+  "refresh": false,
+  "schemaVersion": 26,
   "style": "dark",
   "tags": [
     "Altinity",
@@ -9406,7 +10182,7 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-2d",
     "to": "now"
   },
   "timepicker": {
@@ -9437,5 +10213,5 @@
   "timezone": "",
   "title": "ZooKeeper Dashboard",
   "uid": "309a682046bad930887fdb05de642f51",
-  "version": 3
+  "version": 5
 }
