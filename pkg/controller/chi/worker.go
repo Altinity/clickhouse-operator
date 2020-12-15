@@ -404,9 +404,14 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallat
 	defer w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - end")
 
 	// 1. CHI Service
-	service := w.creator.CreateServiceCHI()
-	if err := w.reconcileService(chi, service); err != nil {
-		return err
+	if chi.IsStopped() {
+		// Stopped cluster must have no entry point
+		_ = w.c.deleteServiceCHI(chi)
+	} else {
+		service := w.creator.CreateServiceCHI()
+		if err := w.reconcileService(chi, service); err != nil {
+			return err
+		}
 	}
 
 	// 2. CHI ConfigMaps without update - create only
