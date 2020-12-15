@@ -1199,3 +1199,20 @@ def test_022(config="configs/test-022-broken-image.yaml"):
             "ErrImagePull"
         )
         kubectl.delete_chi(chi)
+
+@TestScenario
+@Name("test_023. Test auto templates. test-001.yaml does not have a template reference but should get correct ClickHouse version")
+def test_023():
+    kubectl.create_and_check(
+        config="configs/test-001.yaml",
+        check={
+            "pod_count": 1,
+            "apply_templates": {
+                settings.clickhouse_template,
+                "templates/tpl-clickhouse-auto.yaml",
+            },
+            "pod_image": settings.clickhouse_version,
+        }
+    )
+    
+    kubectl.launch("delete chit clickhouse-stable")
