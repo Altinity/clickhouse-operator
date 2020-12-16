@@ -42,7 +42,6 @@ func processor(diff *messagediff.Diff) {
 }
 
 func ReplicaAdd(replica ChiReplica) {
-	fmt.Printf("ReplicaAdd() %d %v\n", replica.Port, replica.Deployment)
 	Reconfigure()
 }
 
