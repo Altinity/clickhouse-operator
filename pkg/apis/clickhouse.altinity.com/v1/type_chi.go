@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 	"math"
 	"strings"
@@ -670,4 +671,8 @@ func (chi *ClickHouseInstallation) IsReconcilingPolicyNoWait() bool {
 		return false
 	}
 	return strings.ToLower(chi.Spec.Reconciling.Policy) == ReconcilingPolicyNoWait
+}
+
+func (chi *ClickHouseInstallation) IsStopped() bool {
+	return util.IsStringBoolTrue(chi.Spec.Stop)
 }

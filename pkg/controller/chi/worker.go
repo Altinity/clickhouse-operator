@@ -255,6 +255,14 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		Info("updateCHI(%s/%s) reconcile started", new.Namespace, new.Name)
 	w.a.V(2).Info("updateCHI(%s/%s) - action plan\n%s\n", new.Namespace, new.Name, actionPlan.String())
 
+	if new.IsStopped() {
+		w.a.V(1).
+			WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
+			WithStatusAction(new).
+			Info("updateCHI(%s/%s) exclude CHI from monitoring", new.Namespace, new.Name)
+		w.c.deleteWatch(new.Namespace, new.Name)
+	}
+
 	actionPlan.WalkAdded(
 		func(cluster *chop.ChiCluster) {
 			cluster.WalkHosts(func(host *chop.ChiHost) error {
@@ -365,11 +373,13 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		},
 	)
 
-	w.a.V(1).
-		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
-		WithStatusAction(new).
-		Info("updateCHI(%s/%s) update monitoring list", new.Namespace, new.Name)
-	w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfCHI(new))
+	if !new.IsStopped() {
+		w.a.V(1).
+			WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
+			WithStatusAction(new).
+			Info("updateCHI(%s/%s) add CHI to monitoring", new.Namespace, new.Name)
+		w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfCHI(new))
+	}
 
 	// Update CHI object
 	(&new.Status).ReconcileComplete()
@@ -404,9 +414,14 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallat
 	defer w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - end")
 
 	// 1. CHI Service
-	service := w.creator.CreateServiceCHI()
-	if err := w.reconcileService(chi, service); err != nil {
-		return err
+	if chi.IsStopped() {
+		// Stopped cluster must have no entry point
+		_ = w.c.deleteServiceCHI(chi)
+	} else {
+		service := w.creator.CreateServiceCHI()
+		if err := w.reconcileService(chi, service); err != nil {
+			return err
+		}
 	}
 
 	// 2. CHI ConfigMaps without update - create only
