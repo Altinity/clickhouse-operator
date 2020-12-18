@@ -47,12 +47,12 @@ func NewClickHouseConfigGenerator(chi *chiv1.ClickHouseInstallation) *ClickHouse
 	}
 }
 
-// GetUsers creates data for "users.xml"
+// GetUsers creates data for users section. Used as "users.xml"
 func (c *ClickHouseConfigGenerator) GetUsers() string {
 	return c.generateXMLConfig(c.chi.Spec.Configuration.Users, configUsers)
 }
 
-// GetProfiles creates data for "profiles.xml"
+// GetProfiles creates data for profiles section. Used as "profiles.xml"
 func (c *ClickHouseConfigGenerator) GetProfiles() string {
 	return c.generateXMLConfig(c.chi.Spec.Configuration.Profiles, configProfiles)
 }
@@ -154,8 +154,113 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string
 	return b.String()
 }
 
+type RemoteServersGeneratorOptions struct {
+	exclude struct {
+		reconcileAttributes *chiv1.ChiHostReconcileAttributes
+		hosts               []*chiv1.ChiHost
+	}
+}
+
+func NewRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
+	return &RemoteServersGeneratorOptions{}
+}
+
+func (o *RemoteServersGeneratorOptions) ExcludeHost(host *chiv1.ChiHost) *RemoteServersGeneratorOptions {
+	if (o == nil) || (host == nil) {
+		return o
+	}
+
+	o.exclude.hosts = append(o.exclude.hosts, host)
+	return o
+}
+
+func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *chiv1.ChiHostReconcileAttributes) *RemoteServersGeneratorOptions {
+	if (o == nil) || (attrs == nil) {
+		return o
+	}
+
+	o.exclude.reconcileAttributes = attrs
+	return o
+}
+
+func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
+	if o == nil {
+		return false
+	}
+
+	if o.exclude.reconcileAttributes.Any(host.ReconcileAttributes) {
+		return true
+	}
+
+	for _, val := range o.exclude.hosts {
+		if val == host {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
+	if o == nil {
+		return false
+	}
+
+	if o.exclude.reconcileAttributes.Any(host.ReconcileAttributes) {
+		return false
+	}
+
+	for _, val := range o.exclude.hosts {
+		if val == host {
+			return false
+		}
+	}
+
+	return true
+}
+
+func defaultRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
+	return NewRemoteServersGeneratorOptions()
+}
+
+func (c *ClickHouseConfigGenerator) CHIHostsNum(options *RemoteServersGeneratorOptions) int {
+	num := 0
+	c.chi.WalkHosts(func(host *chiv1.ChiHost) error {
+		if options.Include(host) {
+			num++
+		}
+		return nil
+	})
+	return num
+}
+
+func (c *ClickHouseConfigGenerator) ClusterHostsNum(cluster *chiv1.ChiCluster, options *RemoteServersGeneratorOptions) int {
+	num := 0
+	// Build each shard XML
+	cluster.WalkShards(func(index int, shard *chiv1.ChiShard) error {
+		num += c.ShardHostsNum(shard, options)
+		return nil
+	})
+	return num
+}
+
+func (c *ClickHouseConfigGenerator) ShardHostsNum(shard *chiv1.ChiShard, options *RemoteServersGeneratorOptions) int {
+	num := 0
+	shard.WalkHosts(func(host *chiv1.ChiHost) error {
+		if options.Include(host) {
+			num++
+		}
+		return nil
+	})
+	return num
+}
+
 // GetRemoteServers creates "remote_servers.xml" content and calculates data generation parameters for other sections
-func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
+func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGeneratorOptions) string {
+	if options == nil {
+		options = defaultRemoteServersGeneratorOptions()
+	}
+
 	b := &bytes.Buffer{}
 
 	// <yandex>
@@ -167,11 +272,20 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 
 	// Build each cluster XML
 	c.chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
+		if c.ClusterHostsNum(cluster, options) < 1 {
+			// Skip empty cluster
+			return nil
+		}
 		// <my_cluster_name>
 		util.Iline(b, 8, "<%s>", cluster.Name)
 
 		// Build each shard XML
 		cluster.WalkShards(func(index int, shard *chiv1.ChiShard) error {
+			if c.ShardHostsNum(shard, options) < 1 {
+				// Skip empty shard
+				return nil
+			}
+
 			// <shard>
 			//		<internal_replication>VALUE(true/false)</internal_replication>
 			util.Iline(b, 12, "<shard>")
@@ -183,15 +297,16 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 			}
 
 			shard.WalkHosts(func(host *chiv1.ChiHost) error {
-				// <replica>
-				//		<host>XXX</host>
-				//		<port>XXX</port>
-				// </replica>
-				util.Iline(b, 16, "<replica>")
-				util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-				util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
-				util.Iline(b, 16, "</replica>")
-
+				if options.Include(host) {
+					// <replica>
+					//		<host>XXX</host>
+					//		<port>XXX</port>
+					// </replica>
+					util.Iline(b, 16, "<replica>")
+					util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
+					util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
+					util.Iline(b, 16, "</replica>")
+				}
 				return nil
 			})
 
@@ -206,62 +321,69 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers() string {
 		return nil
 	})
 
-	util.Iline(b, 8, "<!-- Autogenerated clusters -->")
+	// Auto-generated clusters
 
-	// One Shard All Replicas
+	if c.CHIHostsNum(options) < 1 {
+		util.Iline(b, 8, "<!-- Autogenerated clusters are skipped due to absence of hots -->")
+	} else {
+		util.Iline(b, 8, "<!-- Autogenerated clusters -->")
+		// One Shard All Replicas
 
-	// <my_cluster_name>
-	//     <shard>
-	//         <internal_replication>
-	clusterName := oneShardAllReplicasClusterName
-	util.Iline(b, 8, "<%s>", clusterName)
-	util.Iline(b, 8, "    <shard>")
-	util.Iline(b, 8, "        <internal_replication>true</internal_replication>")
-	c.chi.WalkHosts(func(host *chiv1.ChiHost) error {
-		// <replica>
-		//		<host>XXX</host>
-		//		<port>XXX</port>
-		// </replica>
-		util.Iline(b, 16, "<replica>")
-		util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-		util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
-		util.Iline(b, 16, "</replica>")
+		// <my_cluster_name>
+		//     <shard>
+		//         <internal_replication>
+		clusterName := oneShardAllReplicasClusterName
+		util.Iline(b, 8, "<%s>", clusterName)
+		util.Iline(b, 8, "    <shard>")
+		util.Iline(b, 8, "        <internal_replication>true</internal_replication>")
+		c.chi.WalkHosts(func(host *chiv1.ChiHost) error {
+			if options.Include(host) {
+				// <replica>
+				//		<host>XXX</host>
+				//		<port>XXX</port>
+				// </replica>
+				util.Iline(b, 16, "<replica>")
+				util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
+				util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
+				util.Iline(b, 16, "</replica>")
+			}
+			return nil
+		})
 
-		return nil
-	})
+		//     </shard>
+		// </my_cluster_name>
+		util.Iline(b, 8, "    </shard>")
+		util.Iline(b, 8, "</%s>", clusterName)
 
-	//     </shard>
-	// </my_cluster_name>
-	util.Iline(b, 8, "    </shard>")
-	util.Iline(b, 8, "</%s>", clusterName)
+		// All Shards One Replica
 
-	// All Shards One Replica
+		// <my_cluster_name>
+		clusterName = allShardsOneReplicaClusterName
+		util.Iline(b, 8, "<%s>", clusterName)
+		c.chi.WalkHosts(func(host *chiv1.ChiHost) error {
+			if options.Include(host) {
+				// <shard>
+				//     <internal_replication>
+				util.Iline(b, 12, "<shard>")
+				util.Iline(b, 12, "    <internal_replication>false</internal_replication>")
 
-	// <my_cluster_name>
-	clusterName = allShardsOneReplicaClusterName
-	util.Iline(b, 8, "<%s>", clusterName)
-	c.chi.WalkHosts(func(host *chiv1.ChiHost) error {
-		// <shard>
-		//     <internal_replication>
-		util.Iline(b, 12, "<shard>")
-		util.Iline(b, 12, "    <internal_replication>false</internal_replication>")
+				// <replica>
+				//		<host>XXX</host>
+				//		<port>XXX</port>
+				// </replica>
+				util.Iline(b, 16, "<replica>")
+				util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
+				util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
+				util.Iline(b, 16, "</replica>")
 
-		// <replica>
-		//		<host>XXX</host>
-		//		<port>XXX</port>
-		// </replica>
-		util.Iline(b, 16, "<replica>")
-		util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-		util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
-		util.Iline(b, 16, "</replica>")
-
-		// </shard>
-		util.Iline(b, 12, "</shard>")
-
-		return nil
-	})
-	// </my_cluster_name>
-	util.Iline(b, 8, "</%s>", clusterName)
+				// </shard>
+				util.Iline(b, 12, "</shard>")
+			}
+			return nil
+		})
+		// </my_cluster_name>
+		util.Iline(b, 8, "</%s>", clusterName)
+	}
 
 	// 		</remote_servers>
 	// </yandex>

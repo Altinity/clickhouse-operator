@@ -134,7 +134,9 @@ type OperatorConfig struct {
 	Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
 
 	// Max number of concurrent reconciles in progress
-	ReconcileThreadsNumber int `json:"reconcileThreadsNumber" yaml:"reconcileThreadsNumber"`
+	ReconcileThreadsNumber int  `json:"reconcileThreadsNumber" yaml:"reconcileThreadsNumber"`
+	ReconcileWaitExclude   bool `json:"reconcileWaitExclude"   yaml:"reconcileWaitExclude"`
+	ReconcileWaitInclude   bool `json:"reconcileWaitInclude"   yaml:"reconcileWaitInclude"`
 
 	//
 	// The end of OperatorConfig
@@ -213,9 +215,7 @@ func (config *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation
 func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *ClickHouseInstallation {
 	// Try to find direct match
 	for _, _template := range config.CHITemplates {
-		if _template == nil {
-			// Skip
-		} else if _template.MatchFullName(use.Namespace, use.Name) {
+		if _template.MatchFullName(use.Namespace, use.Name) {
 			// Direct match, found result
 			return _template
 		}
@@ -233,15 +233,24 @@ func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string
 	// Improvise with use.Namespace
 
 	for _, _template := range config.CHITemplates {
-		if _template == nil {
-			// Skip
-		} else if _template.MatchFullName(namespace, use.Name) {
+		if _template.MatchFullName(namespace, use.Name) {
 			// Found template with searched name in specified namespace
 			return _template
 		}
 	}
 
 	return nil
+}
+
+func (config *OperatorConfig) FindAutoTemplates() []*ClickHouseInstallation {
+	var res []*ClickHouseInstallation
+	for _, _template := range config.CHITemplates {
+		if _template.IsAuto() {
+			res = append(res, _template)
+		}
+	}
+	log.V(3).Infof("Found %d auto templates", len(res))
+	return res
 }
 
 // buildUnifiedCHITemplate builds combined CHI Template from templates catalog

@@ -27,7 +27,7 @@ spec:
       custom.xml: |
          <yandex>
             <macros>
-              <test>test</test>
+              <test>test-03</test>
             </macros>
          </yandex>
       users.d/my_users.xml:
@@ -44,11 +44,6 @@ spec:
                <quota>default</quota>
              </test_norestart>
           </users>
-          <profiles>
-             <default>
-                <skip_unavailable_shards>1</skip_unavailable_shards>
-             </default>
-          </profiles>
         </yandex> 
       config.d/remote_servers.xml:
         <yandex>

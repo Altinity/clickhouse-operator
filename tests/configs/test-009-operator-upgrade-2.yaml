@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "test-009"
+  name: "test-009-2"
 spec:
   defaults:
     replicasUseFQDN: "0"
@@ -27,7 +27,7 @@ spec:
       default/max_query_size: 41943040
       default/max_ast_elements: 100000
     clusters:
-      - name: test-009
+      - name: test-009-2
         templates:
           podTemplate: clickhouse-template
           volumeClaimTemplate: aws-ebs-volume-claim
@@ -62,7 +62,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:19.16
+              image: yandex/clickhouse-server:20.8.7.15
               ports:
                 - name: http
                   containerPort: 8123

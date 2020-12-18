@@ -15,10 +15,31 @@
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
+type ChiHost struct {
+	Name string `json:"name,omitempty"`
+	// DEPRECATED - to be removed soon
+	Port                int32            `json:"port,omitempty"`
+	TCPPort             int32            `json:"tcpPort,omitempty"`
+	HTTPPort            int32            `json:"httpPort,omitempty"`
+	InterserverHTTPPort int32            `json:"interserverHTTPPort,omitempty"`
+	Settings            Settings         `json:"settings,omitempty"`
+	Files               Settings         `json:"files,omitempty"`
+	Templates           ChiTemplateNames `json:"templates,omitempty"`
+
+	// Internal data
+	Address             ChiHostAddress             `json:"-"`
+	Config              ChiHostConfig              `json:"-"`
+	ReconcileAttributes ChiHostReconcileAttributes `json:"-" testdiff:"ignore"`
+	StatefulSet         *appsv1.StatefulSet        `json:"-" testdiff:"ignore"`
+	CHI                 *ClickHouseInstallation    `json:"-" testdiff:"ignore"`
+}
 
 func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
@@ -94,8 +115,8 @@ func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	return template, ok
 }
 
-func (host *ChiHost) GetReplicasNum() int32 {
-	if util.IsStringBoolTrue(host.CHI.Spec.Stop) {
+func (host *ChiHost) GetStatefulSetReplicasNum() int32 {
+	if host.CHI.IsStopped() {
 		return 0
 	} else {
 		return 1
@@ -117,16 +138,12 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 
 func (host *ChiHost) GetCluster() *ChiCluster {
 	// Host has to have filled Address
-	for index := range host.CHI.Spec.Configuration.Clusters {
-		cluster := &host.CHI.Spec.Configuration.Clusters[index]
-		if host.Address.ClusterName == cluster.Name {
-			return cluster
-		}
-	}
+	return host.GetCHI().FindCluster(host.Address.ClusterName)
+}
 
-	// This should not happen, actually
-
-	return nil
+func (host *ChiHost) GetShard() *ChiShard {
+	// Host has to have filled Address
+	return host.GetCHI().FindShard(host.Address.ClusterName, host.Address.ShardName)
 }
 
 func (host *ChiHost) CanDeleteAllPVCs() bool {
@@ -145,7 +162,7 @@ func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTem
 	host.CHI.WalkVolumeClaimTemplates(f)
 }
 
-func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *v1.VolumeMount)) {
+func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *corev1.VolumeMount)) {
 	if host.StatefulSet == nil {
 		return
 	}
@@ -163,19 +180,10 @@ func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *v1.VolumeMount)) {
 func (host *ChiHost) GetAnnotations() map[string]string {
 	annotations := make(map[string]string, 0)
 	for key, value := range host.CHI.Annotations {
-		if isAnnotationToBeSkipped(key) {
+		if util.IsAnnotationToBeSkipped(key) {
 			continue
 		}
 		annotations[key] = value
 	}
 	return annotations
-}
-
-// isAnnotationToBeSkipped checks whether an annotation be skipped
-func isAnnotationToBeSkipped(annotation string) bool {
-	switch annotation {
-	case "kubectl.kubernetes.io/last-applied-configuration":
-		return true
-	}
-	return false
 }

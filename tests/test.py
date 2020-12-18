@@ -45,7 +45,7 @@ if main():
                 test_operator.test_006,
                 test_operator.test_007,
                 test_operator.test_008,
-                (test_operator.test_009, {"version_from": "0.11.0"}),
+                (test_operator.test_009, {"version_from": "0.12.0"}),
                 test_operator.test_010,
                 test_operator.test_011,
                 test_operator.test_011_1,
@@ -55,11 +55,12 @@ if main():
                 test_operator.test_015,
                 test_operator.test_016,
                 test_operator.test_017,
-                test_operator.test_018,
+                # test_operator.test_018, # Obsolete, covered by test_016
                 test_operator.test_019,
                 test_operator.test_020,
                 test_operator.test_021,
                 test_operator.test_022,
+                test_operator.test_023,
             ]
             run_tests = all_tests
 

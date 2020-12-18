@@ -2,8 +2,10 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallationTemplate"
 
 metadata:
-  name: clickhouse-version
+  name: clickhouse-stable
 spec:
+  templating:
+    policy: auto
   defaults:
     templates:
       podTemplate: default
