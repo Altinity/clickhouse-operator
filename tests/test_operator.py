@@ -1018,9 +1018,10 @@ def test_018(): # Obsolete, covered by test_016
 
 @TestScenario
 @Name("test_019. Test that volume is correctly retained and can be re-attached")
-def test_019(config="configs/test-019-retain-volume.yaml"):
+def test_019():
     require_zookeeper()
 
+    config="configs/test-019-retain-volume.yaml"
     chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
         config=config,
@@ -1029,7 +1030,6 @@ def test_019(config="configs/test-019-retain-volume.yaml"):
             "do_not_delete": 1,
         },
     )
-    time.sleep(30)
 
     create_non_replicated_table = "create table t1 Engine = Log as select 1 as a"
     create_replicated_table = """
@@ -1060,7 +1060,6 @@ def test_019(config="configs/test-019-retain-volume.yaml"):
                 "do_not_delete": 1,
             },
         )
-        time.sleep(30)
 
     with Then("PVC should be re-mounted"):
         with And("Non-replicated table should have data"):
@@ -1069,6 +1068,41 @@ def test_019(config="configs/test-019-retain-volume.yaml"):
         with And("Replicated table should have data"):
             out = clickhouse.query(chi, sql="select a from t2")
             assert out == "1"
+            
+    with Then("Stop the Installation"):
+        kubectl.create_and_check(
+            config="configs/test-019-retain-volume-2.yaml",
+            check={
+                "object_counts": { 
+                    "statefulset": 1, # When stopping, pod is removed but statefulset and all volumes are in place
+                    "pod": 0,
+                    "service": 1, # load balancer service should be removed
+                },
+                "do_not_delete": 1,
+                },
+            )
+
+    with Then("Re-start the Installation"):
+        kubectl.create_and_check(
+            config="configs/test-019-retain-volume.yaml",
+            check={
+                "object_counts": {
+                    "statefulset": 1,
+                    "pod": 1,
+                    "service": 2, # load balancer service should be back
+                },
+                "do_not_delete": 1,
+                },
+            )
+
+    with Then("Data should be in place"):
+        with And("Non-replicated table should have data"):
+            out = clickhouse.query(chi, sql="select a from t1")
+            assert out == "1"
+        with And("Replicated table should have data"):
+            out = clickhouse.query(chi, sql="select a from t2")
+            assert out == "1"
+
 
     kubectl.delete_chi(chi)
 
