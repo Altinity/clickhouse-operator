@@ -1232,10 +1232,12 @@ def test_022(config="configs/test-022-broken-image.yaml"):
             ".status.containerStatuses[0].state.waiting.reason",
             "ErrImagePull"
         )
-        kubectl.delete_chi(chi)
+        with Then("CHI should be able to delete"):
+            kubectl.launch(f"delete chi {chi}", ok_to_fail=True, timeout=60)
+            assert kubectl.get_count("chi", f"{chi}") == 0
 
 @TestScenario
-@Name("test_023. Test auto templates. test-001.yaml does not have a template reference but should get correct ClickHouse version")
+@Name("test_023. Test auto templates")
 def test_023():
     kubectl.create_and_check(
         config="configs/test-001.yaml",
@@ -1245,8 +1247,30 @@ def test_023():
                 settings.clickhouse_template,
                 "templates/tpl-clickhouse-auto.yaml",
             },
+            # test-001.yaml does not have a template reference but should get correct ClickHouse version
             "pod_image": settings.clickhouse_version,
         }
     )
     
     kubectl.launch("delete chit clickhouse-stable")
+
+@TestScenario
+@Name("test_024. Test annotations for various template types")
+def test_024(config="configs/test-024-template-annotations.yaml"):
+    chi = manifest.get_chi_name(util.get_full_path(config))
+    kubectl.create_and_check(
+        config=config,
+        check={
+            "pod_count": 1,
+            "do_not_delete": 1,
+        },
+    )
+    
+    with Then("Pod annotations should be populated"):
+        assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", ".metadata.annotations.test") == "test"
+    with And("Service annotations should be populated"):
+        assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.test") == "test"
+    with And("PV annotations should be populated"):
+        assert kubectl.get_field("pv", "-l clickhouse.altinity.com/chi=test-024", ".metadata.annotations.test") == "test"
+        
+    kubectl.delete_chi(chi)
