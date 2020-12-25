@@ -556,17 +556,19 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 // Exclude host from ClickHouse clusters
 func (w *worker) excludeHost(host *chop.ChiHost, status StatefulSetStatus) error {
-	w.a.V(1).
-		Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
-		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
-			ExcludeHost(host).
-			ExcludeReconcileAttributes(
-				chop.NewChiHostReconcileAttributes().SetAdd(),
-			),
-		)
-	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
 	if w.waitExcludeHost(host, status) {
+		w.a.V(1).
+			Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+
+		options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
+			SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
+				ExcludeHost(host).
+				ExcludeReconcileAttributes(
+					chop.NewChiHostReconcileAttributes().SetAdd(),
+				),
+			)
+
+		_ = w.reconcileCHIConfigMaps(host.CHI, options, true) // remove host from cluster config only if we are going to wait for exclusion
 		_ = w.waitHostNotInCluster(host)
 	}
 

@@ -170,14 +170,14 @@ def wait_objects(chi, object_counts, ns=namespace):
         assert cur_object_counts == object_counts, error()
 
 
-def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries):
+def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries, backoff = 5):
     with Then(f"{count} {kind}(s) {name} should be created"):
         for i in range(1, retries):
             cur_count = get_count(kind, ns=ns, name=name, label=label)
             if cur_count >= count:
                 break
-            with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
-                time.sleep(i * 5)
+            with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
+                time.sleep(i * backoff)
         assert cur_count >= count, error()
 
 
@@ -204,14 +204,14 @@ def wait_pod_status(pod, status, ns=namespace):
     wait_field("pod", pod, ".status.phase", status, ns)
 
 
-def wait_field(kind, name, field, value, ns=namespace, retries=max_retries):
+def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff = 5):
     with Then(f"{kind} {name} {field} should be {value}"):
         for i in range(1, retries):
             cur_value = get_field(kind, name, field, ns)
             if cur_value == value:
                 break
-            with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
-                time.sleep(i * 5)
+            with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
+                time.sleep(i * backoff)
         assert cur_value == value, error()
 
 
