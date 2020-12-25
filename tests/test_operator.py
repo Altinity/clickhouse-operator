@@ -1274,3 +1274,81 @@ def test_024(config="configs/test-024-template-annotations.yaml"):
         assert kubectl.get_field("pv", "-l clickhouse.altinity.com/chi=test-024", ".metadata.annotations.test") == "test"
         
     kubectl.delete_chi(chi)
+    
+@TestScenario
+@Name("test_025. Test that service is available during re-scalaling, upgades etc.")
+def test_025():
+    require_zookeeper()
+
+    create_table = """
+    CREATE TABLE test_local(a UInt32) 
+    Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+    PARTITION BY tuple() 
+    ORDER BY a
+    """.replace('\r', '').replace('\n', '')
+
+    config = "configs/test-025-rescaling.yaml"
+    chi = manifest.get_chi_name(util.get_full_path(config))
+    cluster = "default"
+
+    kubectl.create_and_check(
+        config=config,
+        check={
+            "apply_templates": {
+                settings.clickhouse_template,
+                "templates/tpl-persistent-volume-100Mi.yaml",
+            },
+            "object_counts": {
+                "statefulset": 1,
+                "pod": 1,
+                "service": 2,
+            },
+            "do_not_delete": 1,
+        },
+        timeout=600,
+    )
+
+    numbers = "100000000"
+
+    with Given("Create replicated table and populate it"):
+        clickhouse.query(chi, create_table)
+        clickhouse.query(chi, "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
+        clickhouse.query(chi, f"INSERT INTO test_local select * from numbers({numbers})")
+
+    with When("Add one more replica, but do not wait for completion"):
+        kubectl.create_and_check(
+            config="configs/test-025-rescaling-2.yaml",
+            check={
+                "do_not_delete": 1,
+                "pod_count": 2,
+                "chi_status": "InProgress", # do not wait
+            },
+            timeout=600,
+        )
+    
+    with Then("Query second pod using service as soon as pod is in ready state"):
+        kubectl.wait_field(
+            "pod", "chi-test-025-rescaling-default-0-1-0",
+            ".status.containerStatuses[0].ready", "true",
+            backoff = 1
+        )
+        tables_notready_cnt = 0
+        data_notready_cnt = 0
+        for i in range(1, 100):
+            cnt_local = clickhouse.query_with_error(chi, "select count() from test_local", "chi-test-025-rescaling-default-0-1.test.svc.cluster.local")
+            cnt_distr = clickhouse.query_with_error(chi, "select count() from test_distr", "chi-test-025-rescaling-default-0-1.test.svc.cluster.local")
+            if "Exception" in cnt_local:
+                tables_notready_cnt = tables_notready_cnt + 1
+                print("Exception. Waiting 1 second.")
+            else:
+                print(f"local: {cnt_local}, distr: {cnt_distr}")
+                if cnt_local == numbers:
+                    break
+                data_notready_cnt = data_notready_cnt + 1
+                print("Replicated table did not catch up. Waiting 1 second.")
+            time.sleep(1)
+        data_notready_cnt += tables_notready_cnt
+        print(f"Tables not ready: {tables_notready_cnt}s, data not ready: {data_notready_cnt}s")
+
+    kubectl.delete_chi(chi)
+   
