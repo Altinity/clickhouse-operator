@@ -368,7 +368,7 @@ func (c *Controller) Run(ctx context.Context) {
 	log.V(1).Info("Starting ClickHouseInstallation controller")
 	if !waitForCacheSync(
 		"ClickHouseInstallation",
-		ctx.Done(),
+		ctx,
 		c.chiListerSynced,
 		c.statefulSetListerSynced,
 		c.configMapListerSynced,
@@ -649,9 +649,9 @@ func (c *Controller) handleObject(obj interface{}) {
 }
 
 // waitForCacheSync is a logger-wrapper over cache.WaitForCacheSync() and it waits for caches to populate
-func waitForCacheSync(name string, stopCh <-chan struct{}, cacheSyncs ...cache.InformerSynced) bool {
+func waitForCacheSync(name string, ctx context.Context, cacheSyncs ...cache.InformerSynced) bool {
 	log.V(1).Infof("Syncing caches for %s controller", name)
-	if !cache.WaitForCacheSync(stopCh, cacheSyncs...) {
+	if !cache.WaitForCacheSync(ctx.Done(), cacheSyncs...) {
 		utilruntime.HandleError(fmt.Errorf(messageUnableToSync, name))
 		return false
 	}
