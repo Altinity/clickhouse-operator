@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"context"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 	"math"
@@ -403,37 +404,38 @@ func (chi *ClickHouseInstallation) WalkHostsTillError(
 
 // WalkTillError
 func (chi *ClickHouseInstallation) WalkTillError(
-	fCHIPreliminary func(chi *ClickHouseInstallation) error,
-	fCluster func(cluster *ChiCluster) error,
-	fShard func(shard *ChiShard) error,
-	fHost func(host *ChiHost) error,
-	fCHI func(chi *ClickHouseInstallation) error,
+	ctx context.Context,
+	fCHIPreliminary func(ctx context.Context, chi *ClickHouseInstallation) error,
+	fCluster func(ctx context.Context, cluster *ChiCluster) error,
+	fShard func(ctx context.Context, shard *ChiShard) error,
+	fHost func(ctx context.Context, host *ChiHost) error,
+	fCHI func(ctx context.Context, chi *ClickHouseInstallation) error,
 ) error {
 
-	if err := fCHIPreliminary(chi); err != nil {
+	if err := fCHIPreliminary(ctx, chi); err != nil {
 		return err
 	}
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
 		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
-		if err := fCluster(cluster); err != nil {
+		if err := fCluster(ctx, cluster); err != nil {
 			return err
 		}
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
-			if err := fShard(shard); err != nil {
+			if err := fShard(ctx, shard); err != nil {
 				return err
 			}
 			for replicaIndex := range shard.Hosts {
 				host := shard.Hosts[replicaIndex]
-				if err := fHost(host); err != nil {
+				if err := fHost(ctx, host); err != nil {
 					return err
 				}
 			}
 		}
 	}
 
-	if err := fCHI(chi); err != nil {
+	if err := fCHI(ctx, chi); err != nil {
 		return err
 	}
 

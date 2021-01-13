@@ -39,12 +39,23 @@ func IsContextDone(ctx context.Context) bool {
 }
 
 // WaitContextDoneOrTimeout waits either for ctx to be done or specified timeout
-// returns tru in case ctx is Done or false in case timeout reached
+// returns true in case ctx is Done or false in case timeout reached
 func WaitContextDoneOrTimeout(ctx context.Context, timeout time.Duration) bool {
 	select {
 	case <-ctx.Done():
 		return true
 	case <-time.After(timeout):
+		return false
+	}
+}
+
+// WaitContextDoneUntil waits either for ctx to be done or specified moment in time reached
+// returns true in case ctx is Done or false in case specified time reached
+func WaitContextDoneUntil(ctx context.Context, t time.Time) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	case <-time.After(time.Until(t)):
 		return false
 	}
 }

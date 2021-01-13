@@ -538,7 +538,11 @@ func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
 }
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
+func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
+	if util.IsContextDone(ctx) {
+		return nil
+	}
+
 	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
 

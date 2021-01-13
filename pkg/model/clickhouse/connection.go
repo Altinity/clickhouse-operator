@@ -108,7 +108,7 @@ func (q *Query) Close() {
 	}
 }
 
-// QueryContext runs given sql query
+// QueryContext runs given sql query on behalf of specified context
 func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*Query, error) {
 	if len(sql) == 0 {
 		return nil, nil
@@ -144,6 +144,11 @@ func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*Query, er
 		cancelFunc: cancel,
 		Rows:       rows,
 	}, nil
+}
+
+// Query runs given sql query
+func (c *CHConnection) Query(sql string) (*Query, error) {
+	return c.QueryContext(nil, sql)
 }
 
 // ExecContext runs given sql query

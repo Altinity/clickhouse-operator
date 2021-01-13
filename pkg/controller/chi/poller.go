@@ -16,8 +16,10 @@
 package chi
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"time"
 
 	log "github.com/golang/glog"
@@ -36,19 +38,19 @@ const (
 )
 
 // waitStatefulSetReady polls StatefulSet for reaching target generation and Ready state
-func (c *Controller) waitStatefulSetReady(statefulSet *apps.StatefulSet) error {
-	if err := c.pollStatefulSet(statefulSet, nil, func(sts *apps.StatefulSet) bool {
+func (c *Controller) waitStatefulSetReady(ctx context.Context, statefulSet *apps.StatefulSet) error {
+	if err := c.pollStatefulSet(ctx, statefulSet, nil, func(sts *apps.StatefulSet) bool {
 		return model.IsStatefulSetGeneration(sts, sts.Generation)
 	}); err == nil {
-		return c.pollStatefulSet(statefulSet, nil, model.IsStatefulSetReady)
+		return c.pollStatefulSet(ctx, statefulSet, nil, model.IsStatefulSetReady)
 	} else {
 		return err
 	}
 }
 
 // waitHostNotReady polls StatefulSet for not exists or not ready
-func (c *Controller) waitHostNotReady(host *chop.ChiHost) error {
-	err := c.pollStatefulSet(host, NewStatefulSetPollOptionsConfigNoCreate(c.chop.Config()), model.IsStatefulSetNotReady)
+func (c *Controller) waitHostNotReady(ctx context.Context, host *chop.ChiHost) error {
+	err := c.pollStatefulSet(ctx, host, NewStatefulSetPollOptionsConfigNoCreate(c.chop.Config()), model.IsStatefulSetNotReady)
 	if apierrors.IsNotFound(err) {
 		err = nil
 	}
@@ -57,8 +59,8 @@ func (c *Controller) waitHostNotReady(host *chop.ChiHost) error {
 }
 
 // waitHostReady polls hosts's StatefulSet until it is ready
-func (c *Controller) waitHostReady(host *chop.ChiHost) error {
-	return c.waitStatefulSetReady(host.StatefulSet)
+func (c *Controller) waitHostReady(ctx context.Context, host *chop.ChiHost) error {
+	return c.waitStatefulSetReady(ctx, host.StatefulSet)
 }
 
 // waitHostRunning polls host for `Running` state
@@ -127,7 +129,15 @@ func NewStatefulSetPollOptionsConfigNoCreate(config *chop.OperatorConfig) *State
 }
 
 // pollStatefulSet polls StatefulSet with poll callback function.
-func (c *Controller) pollStatefulSet(entity interface{}, opts *StatefulSetPollOptions, f func(set *apps.StatefulSet) bool) error {
+func (c *Controller) pollStatefulSet(
+	ctx context.Context,
+	entity interface{},
+	opts *StatefulSetPollOptions,
+	f func(set *apps.StatefulSet) bool,
+) error {
+	if util.IsContextDone(ctx) {
+		return nil
+	}
 	if opts == nil {
 		opts = NewStatefulSetPollOptionsConfig(c.chop.Config())
 	}
@@ -149,6 +159,10 @@ func (c *Controller) pollStatefulSet(entity interface{}, opts *StatefulSetPollOp
 	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
 	start := time.Now()
 	for {
+		if util.IsContextDone(ctx) {
+			return nil
+		}
+
 		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err == nil {
 			// Object is found
 			if f(statefulSet) {
@@ -191,16 +205,22 @@ func (c *Controller) pollStatefulSet(entity interface{}, opts *StatefulSetPollOp
 
 		// Wait some more time
 		log.V(2).Infof("pollStatefulSet(%s/%s)", namespace, name)
-		select {
-		case <-time.After(opts.Interval):
-		}
+		util.WaitContextDoneOrTimeout(ctx, opts.Interval)
 	}
 
 	return fmt.Errorf("unexpected flow")
 }
 
 // pollHost polls host with poll callback function.
-func (c *Controller) pollHost(host *chop.ChiHost, opts *StatefulSetPollOptions, f func(host *chop.ChiHost) bool) error {
+func (c *Controller) pollHostContext(
+	ctx context.Context,
+	host *chop.ChiHost,
+	opts *StatefulSetPollOptions,
+	f func(ctx context.Context, host *chop.ChiHost) bool,
+) error {
+	if util.IsContextDone(ctx) {
+		return nil
+	}
 	if opts == nil {
 		opts = NewStatefulSetPollOptionsConfig(c.chop.Config())
 	}
@@ -210,9 +230,17 @@ func (c *Controller) pollHost(host *chop.ChiHost, opts *StatefulSetPollOptions, 
 	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
 	start := time.Now()
 	for {
-		if f(host) {
+		if util.IsContextDone(ctx) {
+			return nil
+		}
+
+		if f(ctx, host) {
 			// All is good, job done, exit
 			log.V(1).Infof("pollHost(%s/%s)-OK", namespace, name)
+			return nil
+		}
+
+		if util.IsContextDone(ctx) {
 			return nil
 		}
 
@@ -230,9 +258,7 @@ func (c *Controller) pollHost(host *chop.ChiHost, opts *StatefulSetPollOptions, 
 
 		// Wait some more time
 		log.V(2).Infof("pollHost(%s/%s)", namespace, name)
-		select {
-		case <-time.After(opts.Interval):
-		}
+		util.WaitContextDoneOrTimeout(ctx, opts.Interval)
 	}
 
 	return fmt.Errorf("unexpected flow")

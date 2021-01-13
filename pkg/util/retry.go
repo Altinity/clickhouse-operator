@@ -45,7 +45,7 @@ func RetryContext(ctx context.Context, tries int, desc string, f func() error) e
 			// Try failed, need to sleep and retry
 			seconds := try * 5
 			log.V(1).Infof("FAILED attempt %d of %d, sleep %d sec and retry: %s", try, tries, seconds, desc)
-			WaitContextDoneOrTimeout(ctx, time.Duration(seconds) * time.Second)
+			WaitContextDoneOrTimeout(ctx, time.Duration(seconds)*time.Second)
 		} else if tries == 1 {
 			// On single try do not put so much emotion. It just failed and user is not intended to retry
 			log.V(1).Infof("FAILED single try. No retries will be made for %s", desc)

@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"context"
 	"fmt"
 
 	log "github.com/golang/glog"
@@ -143,6 +144,6 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 
 	// Propagate status updates into object
 	if a.writeStatusAction || a.writeStatusActions || a.writeStatusError {
-		_ = a.c.updateCHIObjectStatus(a.chi, true)
+		_ = a.c.updateCHIObjectStatus(context.Background(), a.chi, true)
 	}
 }
