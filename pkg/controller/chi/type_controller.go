@@ -17,7 +17,6 @@ package chi
 import (
 	"time"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -25,7 +24,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 
-	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	choplisters "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
@@ -85,61 +83,3 @@ const (
 	messageUnableToDecode = "unable to decode object (invalid type)"
 	messageUnableToSync   = "unable to sync caches for %s controller"
 )
-
-const (
-	reconcileAdd    = "add"
-	reconcileUpdate = "update"
-	reconcileDelete = "delete"
-)
-
-type ReconcileChi struct {
-	cmd string
-	old *chi.ClickHouseInstallation
-	new *chi.ClickHouseInstallation
-}
-
-func NewReconcileChi(cmd string, old, new *chi.ClickHouseInstallation) *ReconcileChi {
-	return &ReconcileChi{
-		cmd: cmd,
-		old: old,
-		new: new,
-	}
-}
-
-type ReconcileChit struct {
-	cmd string
-	old *chi.ClickHouseInstallationTemplate
-	new *chi.ClickHouseInstallationTemplate
-}
-
-func NewReconcileChit(cmd string, old, new *chi.ClickHouseInstallationTemplate) *ReconcileChit {
-	return &ReconcileChit{
-		cmd: cmd,
-		old: old,
-		new: new,
-	}
-}
-
-type ReconcileChopConfig struct {
-	cmd string
-	old *chi.ClickHouseOperatorConfiguration
-	new *chi.ClickHouseOperatorConfiguration
-}
-
-func NewReconcileChopConfig(cmd string, old, new *chi.ClickHouseOperatorConfiguration) *ReconcileChopConfig {
-	return &ReconcileChopConfig{
-		cmd: cmd,
-		old: old,
-		new: new,
-	}
-}
-
-type DropDns struct {
-	initiator *v1.ObjectMeta
-}
-
-func NewDropDns(initiator *v1.ObjectMeta) *DropDns {
-	return &DropDns{
-		initiator: initiator,
-	}
-}
