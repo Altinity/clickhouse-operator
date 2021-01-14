@@ -401,10 +401,15 @@ func (c *Controller) Run(ctx context.Context) {
 func (c *Controller) enqueueObject(obj Handler) {
 	uid := []byte(obj.Handle())
 	index := 0
-	switch obj.(type) {
+	enqueue := true
+	switch command := obj.(type) {
 	case *ReconcileCHI:
 		variants := len(c.queues) - chi.DefaultReconcileSystemThreadsNumber
 		index = chi.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(uid, variants)
+		if command.cmd == reconcileUpdate {
+			actionPlan := NewActionPlan(command.old, command.new)
+			enqueue = actionPlan.HasActionsToDo()
+		}
 		break
 
 	case *ReconcileCHIT:
@@ -414,7 +419,9 @@ func (c *Controller) enqueueObject(obj Handler) {
 		index = util.HashIntoIntTopped(uid, variants)
 		break
 	}
-	c.queues[index].AddRateLimited(obj)
+	if enqueue {
+		c.queues[index].AddRateLimited(obj)
+	}
 }
 
 // updateWatch
