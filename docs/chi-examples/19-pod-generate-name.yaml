@@ -1,0 +1,24 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "pod-generate-name"
+spec:
+  configuration:
+    clusters:
+      - name: shard1-repl1
+        templates:
+          podTemplate: clickhouse-pod-template
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  templates:
+    podTemplates:
+      - name: clickhouse-pod-template
+        generateName: "chi-{chi}-{cluster}-{host}"
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:20.7
+              volumeMounts:
+                - name: clickhouse-storage-template
+                  mountPath: /var/lib/clickhouse

@@ -82,21 +82,21 @@ func (w *PrometheusWriter) WriteTableSizes(data [][]string) {
 		if len(metric) < 2 {
 			continue
 		}
-		writeSingleMetricToPrometheus(w.out, "table_partitions", "Number of partitions of the table", metric[2], prometheus.GaugeValue,
-			[]string{"chi", "namespace", "hostname", "database", "table"},
-			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
-		writeSingleMetricToPrometheus(w.out, "table_parts", "Number of parts of the table", metric[3], prometheus.GaugeValue,
-			[]string{"chi", "namespace", "hostname", "database", "table"},
-			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
-		writeSingleMetricToPrometheus(w.out, "table_parts_bytes", "Table size in bytes", metric[4], prometheus.GaugeValue,
-			[]string{"chi", "namespace", "hostname", "database", "table"},
-			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
-		writeSingleMetricToPrometheus(w.out, "table_parts_bytes_uncompressed", "Table size in bytes uncompressed", metric[5], prometheus.GaugeValue,
-			[]string{"chi", "namespace", "hostname", "database", "table"},
-			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
-		writeSingleMetricToPrometheus(w.out, "table_parts_rows", "Number of rows in the table", metric[6], prometheus.GaugeValue,
-			[]string{"chi", "namespace", "hostname", "database", "table"},
-			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1])
+		writeSingleMetricToPrometheus(w.out, "table_partitions", "Number of partitions of the table", metric[3], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "database", "table", "active"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1], metric[2])
+		writeSingleMetricToPrometheus(w.out, "table_parts", "Number of parts of the table", metric[4], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "database", "table", "active"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1], metric[2])
+		writeSingleMetricToPrometheus(w.out, "table_parts_bytes", "Table size in bytes", metric[5], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "database", "table", "active"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1], metric[2])
+		writeSingleMetricToPrometheus(w.out, "table_parts_bytes_uncompressed", "Table size in bytes uncompressed", metric[6], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "database", "table", "active"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1], metric[2])
+		writeSingleMetricToPrometheus(w.out, "table_parts_rows", "Number of rows in the table", metric[7], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "database", "table", "active"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1], metric[2])
 	}
 }
 
@@ -120,14 +120,25 @@ func (w *PrometheusWriter) WriteMutations(data [][]string) {
 	}
 }
 
+func (w *PrometheusWriter) WriteSystemDisks(data [][]string) {
+	for _, metric := range data {
+		writeSingleMetricToPrometheus(w.out, "metric_DiskFreeBytes", "Free disk space available from system.disks", metric[1], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "disk"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0])
+		writeSingleMetricToPrometheus(w.out, "metric_DiskTotalBytes", "Total disk space available from system.disks", metric[2], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "disk"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[0])
+	}
+}
+
 func (w *PrometheusWriter) WriteErrorFetch(fetch_type string) {
-	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "Number of errors fetching metrics from ClickHouse", "1", prometheus.CounterValue,
+	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "1", prometheus.GaugeValue,
 		[]string{"chi", "namespace", "hostname", "fetch_type"},
 		w.chi.Name, w.chi.Namespace, w.hostname, fetch_type)
 }
 
 func (w *PrometheusWriter) WriteOKFetch(fetch_type string) {
-	writeSingleMetricToPrometheus(w.out, "metric_fetches", "Number of successful metric fetches from ClickHouse", "1", prometheus.CounterValue,
+	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "0", prometheus.GaugeValue,
 		[]string{"chi", "namespace", "hostname", "fetch_type"},
 		w.chi.Name, w.chi.Namespace, w.hostname, fetch_type)
 }

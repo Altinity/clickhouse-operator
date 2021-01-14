@@ -25,6 +25,9 @@ spec:
       labels:
         app: zookeeper
         what: node
+      annotations:
+        prometheus.io/port: '7000'
+        prometheus.io/scrape: 'true'
     spec:
       affinity:
         podAntiAffinity:
@@ -38,8 +41,8 @@ spec:
               topologyKey: "kubernetes.io/hostname"
       containers:
         - name: kubernetes-zookeeper
-          imagePullPolicy: Always
-          image: "docker.io/zookeeper:3.5.6"
+          imagePullPolicy: IfNotPresent
+          image: "docker.io/zookeeper:3.6.1"
           resources:
             requests:
               memory: "1Gi"
@@ -51,9 +54,12 @@ spec:
               name: server
             - containerPort: 3888
               name: leader-election
+            - containerPort: 7000
+              name: prometheus
 # See those links for proper startup settings:
 # https://github.com/kow3ns/kubernetes-zookeeper/blob/master/docker/scripts/start-zookeeper
 # https://clickhouse.yandex/docs/en/operations/tips/#zookeeper
+# https://github.com/ClickHouse/ClickHouse/issues/11781
           command:
             - bash
             - -x
@@ -65,12 +71,13 @@ spec:
               CLIENT_PORT=2181 &&
               SERVER_PORT=2888 &&
               ELECTION_PORT=3888 &&
+              PROMETHEUS_PORT=7000 &&
               ZOO_DATA_DIR=/var/lib/zookeeper/data &&
               ZOO_DATA_LOG_DIR=/var/lib/zookeeper/datalog &&
               {
                 echo "clientPort=${CLIENT_PORT}"
                 echo 'tickTime=2000'
-                echo 'initLimit=30000'
+                echo 'initLimit=300'
                 echo 'syncLimit=10'
                 echo 'maxClientCnxns=2000'
                 echo 'maxSessionTimeout=60000000'
@@ -83,6 +90,8 @@ spec:
                 echo 'leaderServes=yes'
                 echo 'standaloneEnabled=true'
                 echo '4lw.commands.whitelist=stat, ruok, conf, isro'
+                echo 'metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider'
+                echo "metricsProvider.httpPort=${PROMETHEUS_PORT}"
               } > /conf/zoo.cfg &&
               {
                 echo "zookeeper.root.logger=CONSOLE"
@@ -93,12 +102,12 @@ spec:
                 echo "log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout"
                 echo "log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n"
               } > /conf/log4j.properties &&
-              echo 'JVMFLAGS="-Xms128M -Xmx1G -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+CMSParallelRemarkEnabled"' > /conf/java.env &&
+              echo 'JVMFLAGS="-Xms128M -Xmx1G -XX:+UseG1GC -XX:+CMSParallelRemarkEnabled"' > /conf/java.env &&
               if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
                   NAME=${BASH_REMATCH[1]}
                   ORD=${BASH_REMATCH[2]}
               else
-                  echo "Fialed to parse name and ordinal of Pod"
+                  echo "Failed to parse name and ordinal of Pod"
                   exit 1
               fi &&
               mkdir -p ${ZOO_DATA_DIR} &&

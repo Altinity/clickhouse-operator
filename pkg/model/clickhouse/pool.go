@@ -26,6 +26,8 @@ var (
 	dbConnectionPoolEntryInitMutex = sync.Mutex{}
 )
 
+// GetPooledDBConnection gets connection out of the pool.
+// In case no connection available new connection is created and returned.
 func GetPooledDBConnection(params *CHConnectionParams) *CHConnection {
 	key := makePoolKey(params)
 
@@ -62,6 +64,7 @@ func DropHost(host string) {
 
 }
 
+// makePoolKey makes key out of connection params to be used by the pool
 func makePoolKey(params *CHConnectionParams) string {
 	return params.GetDSN()
 }

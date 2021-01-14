@@ -9,7 +9,7 @@ spec:
       spec:
         containers:
         - name: clickhouse-pod
-          image: yandex/clickhouse-server:20.3
+          image: yandex/clickhouse-server:20.8.7.15
           ports:
           - name: http
             containerPort: 8123
@@ -67,14 +67,14 @@ spec:
           <https_port>8443</https_port>
           <tcp_port_secure>9440</tcp_port_secure>
         </yandex>
-      node.csr:
-      - '**** HIDDEN ****'
-      node.key:
-      - '**** HIDDEN ****'
-      node.crt:
-      - '**** HIDDEN ****'
-      dhparam.pem:
-      - '**** HIDDEN ****'
+      node.csr: |
+        **** HIDDEN ****
+      node.key: |
+        **** HIDDEN ****
+      node.crt: |
+        **** HIDDEN ****
+      dhparam.pem: |
+        **** HIDDEN ****
     clusters:
     - name: t1
       layout:

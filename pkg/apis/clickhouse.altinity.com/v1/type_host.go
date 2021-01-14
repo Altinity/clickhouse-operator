@@ -14,15 +14,62 @@
 
 package v1
 
-import "github.com/altinity/clickhouse-operator/pkg/util"
+import (
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
+)
+
+// ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
+type ChiHost struct {
+	Name string `json:"name,omitempty"`
+	// DEPRECATED - to be removed soon
+	Port                int32            `json:"port,omitempty"`
+	TCPPort             int32            `json:"tcpPort,omitempty"`
+	HTTPPort            int32            `json:"httpPort,omitempty"`
+	InterserverHTTPPort int32            `json:"interserverHTTPPort,omitempty"`
+	Settings            Settings         `json:"settings,omitempty"`
+	Files               Settings         `json:"files,omitempty"`
+	Templates           ChiTemplateNames `json:"templates,omitempty"`
+
+	// Internal data
+	Address             ChiHostAddress             `json:"-"`
+	Config              ChiHostConfig              `json:"-"`
+	ReconcileAttributes ChiHostReconcileAttributes `json:"-" testdiff:"ignore"`
+	StatefulSet         *appsv1.StatefulSet        `json:"-" testdiff:"ignore"`
+	CHI                 *ClickHouseInstallation    `json:"-" testdiff:"ignore"`
+}
+
+func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
+	if shard != nil {
+		(&host.Settings).MergeFrom(shard.Settings)
+	}
+
+	if replica != nil {
+		(&host.Settings).MergeFrom(replica.Settings)
+	}
+}
+
+func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
+	if shard != nil {
+		(&host.Files).MergeFrom(shard.Files)
+	}
+
+	if replica != nil {
+		(&host.Files).MergeFrom(replica.Files)
+	}
+}
 
 func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *ChiHostTemplate) {
 	if shard != nil {
 		(&host.Templates).MergeFrom(&shard.Templates, MergeTypeFillEmptyValues)
 	}
+
 	if replica != nil {
 		(&host.Templates).MergeFrom(&replica.Templates, MergeTypeFillEmptyValues)
 	}
+
 	if template != nil {
 		(&host.Templates).MergeFrom(&template.Spec.Templates, MergeTypeFillEmptyValues)
 	}
@@ -68,8 +115,8 @@ func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	return template, ok
 }
 
-func (host *ChiHost) GetReplicasNum() int32 {
-	if util.IsStringBoolTrue(host.CHI.Spec.Stop) {
+func (host *ChiHost) GetStatefulSetReplicasNum() int32 {
+	if host.CHI.IsStopped() {
 		return 0
 	} else {
 		return 1
@@ -77,7 +124,12 @@ func (host *ChiHost) GetReplicasNum() int32 {
 }
 
 func (host *ChiHost) GetSettings() Settings {
-	return host.CHI.Spec.Configuration.Settings
+	return host.Settings
+}
+
+func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
+	cluster := host.GetCluster()
+	return &cluster.Zookeeper
 }
 
 func (host *ChiHost) GetCHI() *ClickHouseInstallation {
@@ -86,21 +138,12 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 
 func (host *ChiHost) GetCluster() *ChiCluster {
 	// Host has to have filled Address
-	for index := range host.CHI.Spec.Configuration.Clusters {
-		cluster := &host.CHI.Spec.Configuration.Clusters[index]
-		if host.Address.ClusterName == cluster.Name {
-			return cluster
-		}
-	}
-
-	// This should not happen, actually
-
-	return nil
+	return host.GetCHI().FindCluster(host.Address.ClusterName)
 }
 
-func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
-	cluster := host.GetCluster()
-	return &cluster.Zookeeper
+func (host *ChiHost) GetShard() *ChiShard {
+	// Host has to have filled Address
+	return host.GetCHI().FindShard(host.Address.ClusterName, host.Address.ShardName)
 }
 
 func (host *ChiHost) CanDeleteAllPVCs() bool {
@@ -119,23 +162,28 @@ func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTem
 	host.CHI.WalkVolumeClaimTemplates(f)
 }
 
+func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *corev1.VolumeMount)) {
+	if host.StatefulSet == nil {
+		return
+	}
+
+	for i := range host.StatefulSet.Spec.Template.Spec.Containers {
+		container := &host.StatefulSet.Spec.Template.Spec.Containers[i]
+		for j := range container.VolumeMounts {
+			volumeMount := &container.VolumeMounts[j]
+			f(volumeMount)
+		}
+	}
+}
+
 // GetAnnotations returns chi annotations and excludes
 func (host *ChiHost) GetAnnotations() map[string]string {
 	annotations := make(map[string]string, 0)
 	for key, value := range host.CHI.Annotations {
-		if isAnnotationToBeSkipped(key) {
+		if util.IsAnnotationToBeSkipped(key) {
 			continue
 		}
 		annotations[key] = value
 	}
 	return annotations
-}
-
-// isAnnotationToBeSkipped checks whether an annotation be skipped
-func isAnnotationToBeSkipped(annotation string) bool {
-	switch annotation {
-	case "kubectl.kubernetes.io/last-applied-configuration":
-		return true
-	}
-	return false
 }

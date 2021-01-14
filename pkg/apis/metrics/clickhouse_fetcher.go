@@ -17,7 +17,6 @@ package metrics
 import (
 	sqlmodule "database/sql"
 
-	"context"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"time"
@@ -79,25 +78,32 @@ const (
 	        'gauge'                                  AS type
 	    FROM system.dictionaries
 	    UNION ALL
-	    SELECT 
-	        'metric.DiskFreeBytes'                     AS metric,
-    	    toString(filesystemFree())                 AS value,
-	        'Free disk space available at file system' AS description,
-	        'gauge'                                    AS type
+	    SELECT
+		'metric.LongestRunningQuery' AS metric,
+		toString(max(elapsed))       AS value,
+		'Longest running query time' AS description,
+		'gauge'                      AS type
+	    FROM system.processes
+		UNION ALL
+		SELECT
+		'metric.ChangedSettingsHash'       AS metric,
+		toString(groupBitXor(cityHash64(name,value))) AS value,
+		'Control sum for changed settings' AS description,
+		'gauge'                            AS type
+		FROM system.settings WHERE changed
 	`
-
 	queryTableSizesSQL = `
 		SELECT
 			database,
-			table, 
+			table,
+			toString(active)                       AS active,
 			toString(uniq(partition))              AS partitions, 
 			toString(count())                      AS parts, 
 			toString(sum(bytes))                   AS bytes, 
 			toString(sum(data_uncompressed_bytes)) AS uncompressed_bytes, 
 			toString(sum(rows))                    AS rows 
 		FROM system.parts
-		WHERE active = 1
-		GROUP BY database, table
+		GROUP BY active, database, table
 	`
 
 	queryMutationsSQL = `
@@ -109,6 +115,14 @@ const (
 		FROM system.mutations 
 		WHERE is_done = 0 
 		GROUP BY database, table
+	`
+
+	querySystemDisksSQL = `
+	    SELECT 
+	        name,
+            toString(free_space) AS free_space,
+			toString(total_space) AS total_space			
+        FROM system.disks
 	`
 )
 
@@ -145,9 +159,9 @@ func (f *ClickHouseFetcher) getClickHouseQueryTableSizes() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		queryTableSizesSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
-			var database, table, partitions, parts, bytes, uncompressed, _rows string
-			if err := rows.Scan(&database, &table, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
-				*data = append(*data, []string{database, table, partitions, parts, bytes, uncompressed, _rows})
+			var database, table, active, partitions, parts, bytes, uncompressed, _rows string
+			if err := rows.Scan(&database, &table, &active, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
+				*data = append(*data, []string{database, table, active, partitions, parts, bytes, uncompressed, _rows})
 			}
 			return nil
 		},
@@ -168,7 +182,7 @@ func (f *ClickHouseFetcher) getClickHouseQuerySystemReplicas() ([][]string, erro
 	)
 }
 
-// clickHouseQuerySystemMutations requests mutations information from ClickHouse
+// getClickHouseQueryMutations requests mutations information from ClickHouse
 func (f *ClickHouseFetcher) getClickHouseQueryMutations() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		queryMutationsSQL,
@@ -176,6 +190,20 @@ func (f *ClickHouseFetcher) getClickHouseQueryMutations() ([][]string, error) {
 			var database, table, mutations, parts_to_do string
 			if err := rows.Scan(&database, &table, &mutations, &parts_to_do); err == nil {
 				*data = append(*data, []string{database, table, mutations, parts_to_do})
+			}
+			return nil
+		},
+	)
+}
+
+// getClickHouseQuerySystemDisks requests used disks information from ClickHouse
+func (f *ClickHouseFetcher) getClickHouseQuerySystemDisks() ([][]string, error) {
+	return f.clickHouseQueryScanRows(
+		querySystemDisksSQL,
+		func(rows *sqlmodule.Rows, data *[][]string) error {
+			var disk, freeBytes, totalBytes string
+			if err := rows.Scan(&disk, &freeBytes, &totalBytes); err == nil {
+				*data = append(*data, []string{disk, freeBytes, totalBytes})
 			}
 			return nil
 		},
@@ -190,18 +218,14 @@ func (f *ClickHouseFetcher) clickHouseQueryScanRows(
 		data *[][]string,
 	) error,
 ) ([][]string, error) {
-	// Query should be deadlined
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
-	defer cancel()
-
-	rows, err := f.getCHConnection().QueryContext(ctx, heredoc.Doc(sql))
+	query, err := f.getCHConnection().Query(heredoc.Doc(sql))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer query.Close()
 	data := make([][]string, 0)
-	for rows.Next() {
-		_ = scan(rows, &data)
+	for query.Rows.Next() {
+		_ = scan(query.Rows, &data)
 	}
 	return data, nil
 }

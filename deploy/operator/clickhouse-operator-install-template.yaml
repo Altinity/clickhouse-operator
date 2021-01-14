@@ -69,9 +69,11 @@ spec:
   #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
+      type: object
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             # Need to be StringBool
             stop:
@@ -97,6 +99,18 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
+            namespaceDomainPattern:
+              type: string
+            templating:
+              type: object
+              properties:
+                policy:
+                  type: string
+            reconcilling:
+              type: object
+              properties:
+                policy:
+                  type: string
             defaults:
               type: object
               properties:
@@ -156,10 +170,11 @@ spec:
                   properties:
                     nodes:
                       type: array
+                      nullable: true
                       items:
                         type: object
-                        required:
-                          - host
+                        #required:
+                        #  - host
                         properties:
                           host:
                             type: string
@@ -187,10 +202,11 @@ spec:
                   type: object
                 clusters:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
+                    #required:
+                    #  - name
                     properties:
                       name:
                         type: string
@@ -203,10 +219,11 @@ spec:
                         properties:
                           nodes:
                             type: array
+                            nullable: true
                             items:
                               type: object
-                              required:
-                                - host
+                              #required:
+                              #  - host
                               properties:
                                 host:
                                   type: string
@@ -234,6 +251,7 @@ spec:
                             type: integer
                           shards:
                             type: array
+                            nullable: true
                             items:
                               type: object
                               properties:
@@ -246,9 +264,6 @@ spec:
                                 # DEPRECATED - to be removed soon
                                 definitionType:
                                   type: string
-                                replicasCount:
-                                  type: integer
-                                  minimum: 1
                                 weight:
                                   type: integer
                                 # Need to be StringBool
@@ -275,6 +290,10 @@ spec:
                                     - "disabled"
                                     - "Enabled"
                                     - "enabled"
+                                settings:
+                                  type: object
+                                files:
+                                  type: object
                                 templates:
                                   type: object
                                   properties:
@@ -294,8 +313,12 @@ spec:
                                       type: string
                                     replicaServiceTemplate:
                                       type: string
+                                replicasCount:
+                                  type: integer
+                                  minimum: 1
                                 replicas:
                                   type: array
+                                  nullable: true
                                   items:
                                     # Host
                                     type: object
@@ -318,6 +341,10 @@ spec:
                                         type: integer
                                         minimum: 1
                                         maximum: 65535
+                                      settings:
+                                        type: object
+                                      files:
+                                        type: object
                                       templates:
                                         type: object
                                         properties:
@@ -339,6 +366,7 @@ spec:
                                             type: string
                           replicas:
                             type: array
+                            nullable: true
                             items:
                               type: object
                               properties:
@@ -348,9 +376,10 @@ spec:
                                   # See namePartShardMaxLen const
                                   maxLength: 15
                                   pattern: "^[a-zA-Z0-9-]{0,15}$"
-                                shardsCount:
-                                  type: integer
-                                  minimum: 1
+                                settings:
+                                  type: object
+                                files:
+                                  type: object
                                 templates:
                                   type: object
                                   properties:
@@ -370,8 +399,12 @@ spec:
                                       type: string
                                     replicaServiceTemplate:
                                       type: string
+                                shardsCount:
+                                  type: integer
+                                  minimum: 1
                                 shards:
                                   type: array
+                                  nullable: true
                                   items:
                                     # Host
                                     type: object
@@ -394,6 +427,10 @@ spec:
                                         type: integer
                                         minimum: 1
                                         maximum: 65535
+                                      settings:
+                                        type: object
+                                      files:
+                                        type: object
                                       templates:
                                         type: object
                                         properties:
@@ -437,19 +474,21 @@ spec:
               properties:
                 hostTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
+                    #required:
+                    #  - name
                     properties:
                       name:
                         type: string
                       portDistribution:
                         type: array
+                        nullable: true
                         items:
                           type: object
-                          required:
-                            - type
+                          #required:
+                          #  - type
                           properties:
                             type:
                               type: string
@@ -502,22 +541,26 @@ spec:
 
                 podTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
-                    properies:
+                    #required:
+                    #  - name
+                    properties:
                       name:
+                        type: string
+                      generateName:
                         type: string
                       zone:
                         type: object
-                        required:
-                          - values
+                        #required:
+                        #  - values
                         properties:
                           key:
                             type: string
                           values:
                             type: array
+                            nullable: true
                             items:
                               type: string
                       distribution:
@@ -529,10 +572,11 @@ spec:
                           - "OnePerHost"
                       podDistribution:
                         type: array
+                        nullable: true
                         items:
                           type: object
-                          required:
-                            - type
+                          #required:
+                          #  - type
                           properties:
                             type:
                               type: string
@@ -574,11 +618,12 @@ spec:
                         type: object
                 volumeClaimTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
-                      - spec
+                    #required:
+                    #  - name
+                    #  - spec
                     properties:
                       name:
                         type: string
@@ -593,11 +638,12 @@ spec:
                         type: object
                 serviceTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
-                      - spec
+                    #required:
+                    #  - name
+                    #  - spec
                     properties:
                       name:
                         type: string
@@ -611,10 +657,11 @@ spec:
                         type: object
             useTemplates:
               type: array
+              nullable: true
               items:
                 type: object
-                required:
-                  - name
+                #required:
+                #  - name
                 properties:
                   name:
                     type: string
@@ -626,6 +673,7 @@ spec:
                       # List useTypeXXX constants from model
                       - ""
                       - "merge"
+
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -698,9 +746,11 @@ spec:
   #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
+      type: object
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             # Need to be StringBool
             stop:
@@ -726,6 +776,18 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
+            namespaceDomainPattern:
+              type: string
+            templating:
+              type: object
+              properties:
+                policy:
+                  type: string
+            reconcilling:
+              type: object
+              properties:
+                policy:
+                  type: string
             defaults:
               type: object
               properties:
@@ -785,10 +847,11 @@ spec:
                   properties:
                     nodes:
                       type: array
+                      nullable: true
                       items:
                         type: object
-                        required:
-                          - host
+                        #required:
+                        #  - host
                         properties:
                           host:
                             type: string
@@ -816,10 +879,11 @@ spec:
                   type: object
                 clusters:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
+                    #required:
+                    #  - name
                     properties:
                       name:
                         type: string
@@ -832,10 +896,11 @@ spec:
                         properties:
                           nodes:
                             type: array
+                            nullable: true
                             items:
                               type: object
-                              required:
-                                - host
+                              #required:
+                              #  - host
                               properties:
                                 host:
                                   type: string
@@ -863,6 +928,7 @@ spec:
                             type: integer
                           shards:
                             type: array
+                            nullable: true
                             items:
                               type: object
                               properties:
@@ -875,9 +941,6 @@ spec:
                                 # DEPRECATED - to be removed soon
                                 definitionType:
                                   type: string
-                                replicasCount:
-                                  type: integer
-                                  minimum: 1
                                 weight:
                                   type: integer
                                 # Need to be StringBool
@@ -904,6 +967,10 @@ spec:
                                     - "disabled"
                                     - "Enabled"
                                     - "enabled"
+                                settings:
+                                  type: object
+                                files:
+                                  type: object
                                 templates:
                                   type: object
                                   properties:
@@ -923,8 +990,12 @@ spec:
                                       type: string
                                     replicaServiceTemplate:
                                       type: string
+                                replicasCount:
+                                  type: integer
+                                  minimum: 1
                                 replicas:
                                   type: array
+                                  nullable: true
                                   items:
                                     # Host
                                     type: object
@@ -947,6 +1018,10 @@ spec:
                                         type: integer
                                         minimum: 1
                                         maximum: 65535
+                                      settings:
+                                        type: object
+                                      files:
+                                        type: object
                                       templates:
                                         type: object
                                         properties:
@@ -968,6 +1043,7 @@ spec:
                                             type: string
                           replicas:
                             type: array
+                            nullable: true
                             items:
                               type: object
                               properties:
@@ -977,9 +1053,10 @@ spec:
                                   # See namePartShardMaxLen const
                                   maxLength: 15
                                   pattern: "^[a-zA-Z0-9-]{0,15}$"
-                                shardsCount:
-                                  type: integer
-                                  minimum: 1
+                                settings:
+                                  type: object
+                                files:
+                                  type: object
                                 templates:
                                   type: object
                                   properties:
@@ -999,8 +1076,12 @@ spec:
                                       type: string
                                     replicaServiceTemplate:
                                       type: string
+                                shardsCount:
+                                  type: integer
+                                  minimum: 1
                                 shards:
                                   type: array
+                                  nullable: true
                                   items:
                                     # Host
                                     type: object
@@ -1023,6 +1104,10 @@ spec:
                                         type: integer
                                         minimum: 1
                                         maximum: 65535
+                                      settings:
+                                        type: object
+                                      files:
+                                        type: object
                                       templates:
                                         type: object
                                         properties:
@@ -1066,19 +1151,21 @@ spec:
               properties:
                 hostTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
+                    #required:
+                    #  - name
                     properties:
                       name:
                         type: string
                       portDistribution:
                         type: array
+                        nullable: true
                         items:
                           type: object
-                          required:
-                            - type
+                          #required:
+                          #  - type
                           properties:
                             type:
                               type: string
@@ -1131,22 +1218,26 @@ spec:
 
                 podTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
-                    properies:
+                    #required:
+                    #  - name
+                    properties:
                       name:
+                        type: string
+                      generateName:
                         type: string
                       zone:
                         type: object
-                        required:
-                          - values
+                        #required:
+                        #  - values
                         properties:
                           key:
                             type: string
                           values:
                             type: array
+                            nullable: true
                             items:
                               type: string
                       distribution:
@@ -1158,10 +1249,11 @@ spec:
                           - "OnePerHost"
                       podDistribution:
                         type: array
+                        nullable: true
                         items:
                           type: object
-                          required:
-                            - type
+                          #required:
+                          #  - type
                           properties:
                             type:
                               type: string
@@ -1203,11 +1295,12 @@ spec:
                         type: object
                 volumeClaimTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
-                      - spec
+                    #required:
+                    #  - name
+                    #  - spec
                     properties:
                       name:
                         type: string
@@ -1222,11 +1315,12 @@ spec:
                         type: object
                 serviceTemplates:
                   type: array
+                  nullable: true
                   items:
                     type: object
-                    required:
-                      - name
-                      - spec
+                    #required:
+                    #  - name
+                    #  - spec
                     properties:
                       name:
                         type: string
@@ -1240,10 +1334,11 @@ spec:
                         type: object
             useTemplates:
               type: array
+              nullable: true
               items:
                 type: object
-                required:
-                  - name
+                #required:
+                #  - name
                 properties:
                   name:
                     type: string
@@ -1255,6 +1350,7 @@ spec:
                       # List useTypeXXX constants from model
                       - ""
                       - "merge"
+
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -1282,9 +1378,11 @@ spec:
   #  preserveUnknownFields: false
   validation:
     openAPIV3Schema:
+      type: object
       properties:
         spec:
           type: object
+          x-kubernetes-preserve-unknown-fields: true
           properties:
             watchNamespaces:
               type: array
@@ -1340,6 +1438,10 @@ spec:
               type: integer
               minimum: 1
               maximum: 65535
+            reconcileWaitExclude:
+              type: string
+            reconcileWaitInclude:
+              type: string
 ---
 # Possible Template Parameters:
 #
@@ -1358,7 +1460,7 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: clickhouse-operator
+  name: clickhouse-operator-$OPERATOR_NAMESPACE
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -1463,7 +1565,7 @@ data:
     chConfigUserDefaultPassword: "default"
     
     # Default host_regexp to limit network connectivity from outside
-    ChConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+    chConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
     
     ################################################
     ##
@@ -1502,6 +1604,8 @@ data:
     
     # Max number of concurrent reconciles in progress
     reconcileThreadsNumber: 10
+    reconcileWaitExclude: false
+    reconcileWaitInclude: false
 
 ---
 # Possible Template Parameters:
@@ -1557,13 +1661,22 @@ data:
 
   03-clickhouse-querylog.xml: |
     <yandex>
-    <query_log>
+    <query_log replace="1">
         <database>system</database>
         <table>query_log</table>
-        <partition_by>toMonday(event_date)</partition_by>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
         <flush_interval_milliseconds>7500</flush_interval_milliseconds>
     </query_log>
     <query_thread_log remove="1"/>
+    </yandex>
+  04-clickhouse-partlog.xml: |
+    <yandex>
+    <part_log replace="1">
+        <database>system</database>
+        <table>part_log</table>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+    </part_log>
     </yandex>
 ---
 # Possible Template Parameters:
@@ -1696,6 +1809,8 @@ data:
         <profiles>
             <clickhouse_operator>
                 <log_queries>0</log_queries>
+                <skip_unavailable_shards>1</skip_unavailable_shards>
+                <http_connection_timeout>10</http_connection_timeout>
             </clickhouse_operator>
         </profiles>
     </yandex>
@@ -1706,10 +1821,8 @@ data:
         <default>
           <log_queries>1</log_queries>
           <connect_timeout_with_failover_ms>1000</connect_timeout_with_failover_ms>
-          <optimize_move_to_prewhere>0</optimize_move_to_prewhere>
           <distributed_aggregation_memory_efficient>1</distributed_aggregation_memory_efficient>
           <parallel_view_processing>1</parallel_view_processing>
-          <http_connection_timeout>5</http_connection_timeout>
         </default>
       </profiles>
     </yandex>

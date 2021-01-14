@@ -1,0 +1,128 @@
+---
+# Setup AlterManager Configuration with Slack Integration
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-alertmanager
+type: Opaque
+stringData:
+  notifications.tmpl: |-
+    {{ define "__subject" }}
+      [{{ if eq .Status "firing" }}FIRE:{{len .Alerts.Firing}}{{ else }}OK{{ end }}] {{.GroupLabels.alertname}}
+    {{ end }}
+
+    {{ define "slack_message" }}
+      {{ range .Alerts.Firing -}}
+       {{- range .Annotations.SortedPairs }}
+      *{{   .Name }}*: {{ .Value }}
+       {{- end }}
+
+       {{ range .Labels.SortedPairs -}}
+        {{- if and (ne .Name "alertname") (ne .Name "severity") (ne .Name "tenant") }}
+      {{     .Name}} = `{{.Value}}`
+        {{- end }}
+       {{- end }}
+    ---
+      {{ end }}
+
+      {{ range .Alerts.Resolved -}}
+       {{- range .Annotations.SortedPairs }}
+        {{- if (ne .Name "description") }}
+      *{{   .Name }}*: {{ .Value }}
+        {{- end }}
+       {{- end }}
+
+       {{- range .Labels.SortedPairs }}
+        {{- if and (ne .Name "alertname") (ne .Name "severity") (ne .Name "tenant") }}
+      {{     .Name }} = `{{ .Value }}`
+        {{- end }}
+       {{- end }}
+    ---
+      {{ end }}
+    {{ end }}
+
+    {{ define "slack_color" -}}
+        {{ if eq .Status "firing" -}}
+            {{ if eq .CommonLabels.severity "warning" -}}
+                warning
+            {{- else if eq .CommonLabels.severity "critical" -}}
+                danger
+            {{- else -}}
+                #439FE0
+            {{- end -}}
+        {{ else -}}
+        good
+        {{- end }}
+    {{- end }}
+  alertmanager.yaml: |-
+    global:
+      resolve_timeout: 1m
+    templates:
+      - /etc/alertmanager/config/notifications.tmpl
+    route:
+      group_by: ['...']
+      group_wait: 0s
+      group_interval: 1s
+      repeat_interval: 6h
+      receiver: "slack"
+    receivers:
+    - name: "slack"
+      slack_configs:
+        - api_url: "${SLACK_WEBHOOK_URL}"
+          channel: "${SLACK_CHANNEL}"
+          text: '{{ template "slack_message" . }}'
+          color: '{{ template "slack_color" . }}'
+          send_resolved: true
+---
+# Setup AlertManager
+apiVersion: monitoring.coreos.com/v1
+kind: Alertmanager
+metadata:
+  name: alertmanager
+  labels:
+    alertmanager: alertmanager
+spec:
+  replicas: 1
+  serviceAccountName: prometheus
+  externalUrl: ${ALERT_MANAGER_EXTERNAL_URL}
+
+---
+# Setup ClusterIP Service
+# Service would be created in kubectl-specified namespace
+# In order to get access outside of k8s it should be exposed as:
+# kubectl --namespace ${PROMETHEUS_NAMESPACE} port-forward service/alertmanager 9093
+# and point browser to http://localhost:9093
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  labels:
+    alertmanager: alertmanager
+spec:
+  type: ClusterIP
+  ports:
+    - name: web
+      port: 9093
+      protocol: TCP
+      targetPort: web
+  selector:
+    alertmanager: alertmanager
+
+---
+# Setup AlertManager metrics scraping back to prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    alertmanager: alertmanager
+  name: alertmanager
+spec:
+  endpoints:
+    - interval: 30s
+      port: web
+  namespaceSelector:
+    matchNames:
+      - ${PROMETHEUS_NAMESPACE}
+  selector:
+    matchLabels:
+      alertmanager: alertmanager

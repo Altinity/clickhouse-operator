@@ -3,8 +3,6 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "test-020-multi-volume"
 spec:
-  useTemplates:
-    - name: clickhouse-version
   configuration:
     clusters:
     - name: simple
@@ -38,9 +36,13 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:20.3
+              image: yandex/clickhouse-server:20.8.7.15
               volumeMounts:
                 - name: disk1
                   mountPath: /var/lib/clickhouse
                 - name: disk2
                   mountPath: /var/lib/clickhouse2
+              command:
+                - /bin/bash
+                - '-c'
+                - chown clickhouse /var/lib/clickhouse2 && /entrypoint.sh

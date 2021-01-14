@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"fmt"
+
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
@@ -25,6 +26,7 @@ import (
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+
 	log "github.com/golang/glog"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -96,12 +98,20 @@ func NewController(
 	return controller
 }
 
+// initQueues
 func (c *Controller) initQueues() {
-	for i := 0; i < c.chop.Config().ReconcileThreadsNumber; i++ {
-		c.queues = append(c.queues, workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("chi%d", i)))
+	for i := 0; i < c.chop.Config().ReconcileThreadsNumber+chi.DefaultReconcileSystemThreadsNumber; i++ {
+		c.queues = append(
+			c.queues,
+			workqueue.NewNamedRateLimitingQueue(
+				workqueue.DefaultControllerRateLimiter(),
+				fmt.Sprintf("chi%d", i),
+			),
+		)
 	}
 }
 
+// addEventHandlers
 func (c *Controller) addEventHandlers(
 	chopInformerFactory chopinformers.SharedInformerFactory,
 	kubeInformerFactory kubeinformers.SharedInformerFactory,
@@ -387,16 +397,32 @@ func (c *Controller) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-// enqueueObject adds ClickHouseInstallation object to the workqueue
+// enqueueObject adds ClickHouseInstallation object to the work queue
 func (c *Controller) enqueueObject(namespace, name string, obj interface{}) {
+	uid := []byte(fmt.Sprintf("%s/%s", namespace, name))
+	index := 0
+	switch obj.(type) {
+	case *ReconcileChi:
+		variants := len(c.queues) - chi.DefaultReconcileSystemThreadsNumber
+		index = chi.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(uid, variants)
+		break
 
-	c.queues[util.HashIntoIntTopped([]byte(fmt.Sprintf("%s/%s", namespace, name)), len(c.queues))].AddRateLimited(obj)
+	case *ReconcileChit:
+	case *ReconcileChopConfig:
+	case *DropDns:
+		variants := chi.DefaultReconcileSystemThreadsNumber
+		index = util.HashIntoIntTopped(uid, variants)
+		break
+	}
+	c.queues[index].AddRateLimited(obj)
 }
 
+// updateWatch
 func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
 	go c.updateWatchAsync(namespace, name, hostnames)
 }
 
+// updateWatchAsync
 func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string) {
 	if err := metrics.InformMetricsExporterAboutWatchedCHI(namespace, name, hostnames); err != nil {
 		log.V(1).Infof("FAIL update watch (%s/%s): %q", namespace, name, err)
@@ -405,10 +431,12 @@ func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string
 	}
 }
 
+// deleteWatch
 func (c *Controller) deleteWatch(namespace, name string) {
 	go c.deleteWatchAsync(namespace, name)
 }
 
+// deleteWatchAsync
 func (c *Controller) deleteWatchAsync(namespace, name string) {
 	if err := metrics.InformMetricsExporterToDeleteWatchedCHI(namespace, name); err != nil {
 		log.V(1).Infof("FAIL delete watch (%s/%s): %q", namespace, name, err)
@@ -486,7 +514,7 @@ func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfigur
 
 // updateCHIObject updates ClickHouseInstallation object
 func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
-	namespace, name := NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Update(chi)
 
 	if err != nil {
@@ -497,7 +525,7 @@ func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
 
 	if chi.ObjectMeta.ResourceVersion != new.ObjectMeta.ResourceVersion {
 		// Updated
-		log.V(2).Infof("CHI (%s/%s) bump resource version %d/%d",
+		log.V(2).Infof("updateCHIObject(%s/%s): ResourceVersion bump %s=>%s",
 			namespace, name, chi.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion,
 		)
 		chi.ObjectMeta.ResourceVersion = new.ObjectMeta.ResourceVersion
@@ -511,7 +539,7 @@ func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
 func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
-	namespace, name := NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
 
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
@@ -532,6 +560,46 @@ func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tole
 
 	// Update status of a real object
 	cur.Status = chi.Status
+	return c.updateCHIObject(cur)
+}
+
+// installFinalizer
+func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
+	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
+
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
+	if err != nil {
+		return err
+	}
+	if cur == nil {
+		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
+	}
+
+	if util.InArray(FinalizerName, cur.ObjectMeta.Finalizers) {
+		// Already installed
+		return nil
+	}
+
+	cur.ObjectMeta.Finalizers = append(cur.ObjectMeta.Finalizers, FinalizerName)
+	return c.updateCHIObject(cur)
+}
+
+// uninstallFinalizer
+func (c *Controller) uninstallFinalizer(chi *chi.ClickHouseInstallation) error {
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
+	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
+
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
+	if err != nil {
+		return err
+	}
+	if cur == nil {
+		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
+	}
+
+	cur.ObjectMeta.Finalizers = util.RemoveFromArray(FinalizerName, cur.ObjectMeta.Finalizers)
+
 	return c.updateCHIObject(cur)
 }
 

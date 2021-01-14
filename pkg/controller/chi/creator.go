@@ -18,19 +18,13 @@ package chi
 import (
 	"errors"
 	"fmt"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	log "github.com/golang/glog"
+	"k8s.io/api/core/v1"
+
 	// log "k8s.io/klog"
 
+	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	apps "k8s.io/api/apps/v1"
-	"time"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-)
-
-const (
-	waitStatefulSetGenerationTimeoutBeforeStartBothering = 60
-	waitStatefulSetGenerationTimeoutToCreateStatefulSet  = 30
 )
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
@@ -39,11 +33,11 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
 		// Error call Create()
 		return err
-	} else if err := c.waitStatefulSetGeneration(statefulSet.Namespace, statefulSet.Name, statefulSet.Generation); err == nil {
+	} else if err := c.waitHostReady(host); err == nil {
 		// Target generation reached, StatefulSet created successfully
 		return nil
 	} else {
-		// Unable to reach target generation, StatefulSet create failed, time to rollback?
+		// Unable to run StatefulSet, StatefulSet create failed, time to rollback?
 		return c.onStatefulSetCreateFailed(statefulSet, host)
 	}
 
@@ -51,7 +45,7 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 }
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
-func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet) error {
+func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	// Convenience shortcuts
 	namespace := newStatefulSet.Namespace
 	name := newStatefulSet.Name
@@ -61,6 +55,7 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(newStatefulSet)
 	if err != nil {
 		// Update failed
+		log.V(1).Infof("updateStatefulSet(%s/%s) - git err: %v", namespace, name, err)
 		return err
 	}
 
@@ -76,66 +71,33 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 
 	log.V(1).Infof("updateStatefulSet(%s/%s) - generation change %d=>%d", namespace, name, oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
-	if err := c.waitStatefulSetGeneration(namespace, name, updatedStatefulSet.Generation); err == nil {
+	if err := c.waitHostReady(host); err == nil {
 		// Target generation reached, StatefulSet updated successfully
 		return nil
 	} else {
-		// Unable to reach target generation, StatefulSet update failed, time to rollback?
+		// Unable to run StatefulSet, StatefulSet update failed, time to rollback?
 		return c.onStatefulSetUpdateFailed(oldStatefulSet)
 	}
 
 	return fmt.Errorf("unexpected flow")
 }
 
-// waitStatefulSetGeneration polls StatefulSet for reaching target generation.
-// Used in createStatefulSet, updateStatefulSet and deleteStatefulSet function only
-func (c *Controller) waitStatefulSetGeneration(namespace, name string, targetGeneration int64) error {
-	// Wait for some limited time for StatefulSet to reach target generation
-	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
-	start := time.Now()
-	for {
-		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err == nil {
-			if hasStatefulSetReachedGeneration(statefulSet, targetGeneration) {
-				// StatefulSet is available and generation reached
-				// All is good, job done, exit
-				log.V(1).Infof("waitStatefulSetGeneration(%s/%s)-OK  :%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
-				return nil
-			} else if time.Since(start) >= (time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second) {
-				// Generation not yet reached
-				// Start bothering with messages after some time only
-				log.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT:%s", namespace, name, strStatefulSetStatus(&statefulSet.Status))
-			}
-		} else if apierrors.IsNotFound(err) {
-			// Object is not found - it either failed to be created or just still not created
-			if time.Since(start) >= (time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second) {
-				// No more wait for object to be created. Consider create as failed.
-				log.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED - StatefulSet still not found, abort", namespace, name)
-				return err
-			}
-			// Object with such name not found - may be is still being created - wait for it
-			log.V(1).Infof("waitStatefulSetGeneration(%s/%s)-WAIT: object not yet created, need to wait", namespace, name)
-		} else {
-			// Some kind of total error
-			log.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) Get() FAILED", namespace, name)
-			return err
-		}
+// updateStatefulSet is an internal function, used in reconcileStatefulSet only
+func (c *Controller) updatePersistentVolume(pv *v1.PersistentVolume) error {
+	// Convenience shortcuts
+	namespace := pv.Namespace
+	name := pv.Name
+	log.V(2).Infof("updatePersistentVolume(%s/%s)", namespace, name)
 
-		// StatefulSet is either not created or generation is not yet reached
-
-		if time.Since(start) >= (time.Duration(c.chop.Config().StatefulSetUpdateTimeout) * time.Second) {
-			// Timeout reached, no good result available, time to quit
-			log.V(1).Infof("ERROR waitStatefulSetGeneration(%s/%s) - TIMEOUT reached", namespace, name)
-			return errors.New(fmt.Sprintf("waitStatefulSetGeneration(%s/%s) - wait timeout", namespace, name))
-		}
-
-		// Wait some more time
-		log.V(2).Infof("waitStatefulSetGeneration(%s/%s)", namespace, name)
-		select {
-		case <-time.After(time.Duration(c.chop.Config().StatefulSetUpdatePollPeriod) * time.Second):
-		}
+	// Apply newStatefulSet and wait for Generation to change
+	_, err := c.kubeClient.CoreV1().PersistentVolumes().Update(pv)
+	if err != nil {
+		// Update failed
+		log.V(1).Infof("updatePersistentVolume(%s/%s) - git err: %v", namespace, name, err)
+		return err
 	}
 
-	return fmt.Errorf("unexpected flow")
+	return nil
 }
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed
@@ -243,38 +205,4 @@ func (c *Controller) shouldContinueOnUpdateFailed() error {
 
 	// Do not continue update
 	return fmt.Errorf("update stopped due to previous errors")
-}
-
-// hasStatefulSetReachedGeneration returns whether has StatefulSet reached the expected generation after upgrade or not
-func hasStatefulSetReachedGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
-	if statefulSet == nil {
-		return false
-	}
-
-	// StatefulSet has .spec generation we are waiting for
-	return (statefulSet.Generation == generation) &&
-		// and this .spec generation is being applied to replicas - it is observed right now
-		(statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
-		// and all replicas are in "Ready" status - meaning ready to be used - no failure inside
-		(statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas) &&
-		// and all replicas are of expected generation
-		(statefulSet.Status.CurrentReplicas == *statefulSet.Spec.Replicas) &&
-		// and all replicas are updated - meaning rolling update completed over all replicas
-		(statefulSet.Status.UpdatedReplicas == *statefulSet.Spec.Replicas) &&
-		// and current revision is an updated one - meaning rolling update completed over all replicas
-		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
-}
-
-// strStatefulSetStatus returns human-friendly string representation of StatefulSet status
-func strStatefulSetStatus(status *apps.StatefulSetStatus) string {
-	return fmt.Sprintf(
-		"ObservedGeneration:%d Replicas:%d ReadyReplicas:%d CurrentReplicas:%d UpdatedReplicas:%d CurrentRevision:%s UpdateRevision:%s",
-		status.ObservedGeneration,
-		status.Replicas,
-		status.ReadyReplicas,
-		status.CurrentReplicas,
-		status.UpdatedReplicas,
-		status.CurrentRevision,
-		status.UpdateRevision,
-	)
 }

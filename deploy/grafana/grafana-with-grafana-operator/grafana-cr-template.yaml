@@ -18,7 +18,7 @@ spec:
     auth:
       disable_login_form: $GRAFANA_DISABLE_LOGIN_FORM
       disable_signout_menu: $GRAFANA_DISABLE_SIGNOUT_MENU
-    # require for Dashboard Installation - https://github.com/integr8ly/grafana-operator/issues/92
+    # required for Dashboard Installation - https://github.com/integr8ly/grafana-operator/issues/92
     auth.basic:
       enabled: True
     auth.anonymous:

@@ -1,0 +1,12 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "namespace-domain-pattern"
+spec:
+  namespaceDomainPattern: "%s.svc"
+  configuration:
+    clusters:
+      - name: "shard1-repl2"
+        layout:
+          shardsCount: 1
+          replicasCount: 2

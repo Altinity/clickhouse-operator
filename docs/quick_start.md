@@ -30,7 +30,7 @@ kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/
 
 such as namespace where to install operator or operator's image, use the special installer script.
 ```bash
-curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-web-installer/clickhouse-operator-install.sh | OPERATOR_NAMESPACE=test-clickhouse-operator sh
+curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-web-installer/clickhouse-operator-install.sh | OPERATOR_NAMESPACE=test-clickhouse-operator bash
 ```
 Take into account explicitly specified namespace
 ```bash
@@ -164,7 +164,7 @@ There are two ways to connect to ClickHouse database
 
 1. In case previous command `kubectl get service -n test` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
 ```bash
-clickhouse-client -h abc-123.us-east-1.elb.amazonaws.com
+clickhouse-client -h abc-123.us-east-1.elb.amazonaws.com -u clickhouse_operator --password clickhouse_operator_password 
 ```
 ```text
 ClickHouse client version 18.14.12.

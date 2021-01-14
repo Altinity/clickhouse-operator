@@ -1,7 +1,7 @@
 #!/bin/bash
 
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
-
+VALIDATE_YAML="${VALIDATE_YAML:-true}"
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 echo "Setup ClickHouse Operator into ${OPERATOR_NAMESPACE} namespace"
@@ -21,4 +21,4 @@ fi
 
 # Setup into dedicated namespace
 echo "3. Install operator into ${OPERATOR_NAMESPACE} namespace"
-kubectl apply --namespace="${OPERATOR_NAMESPACE}" -f clickhouse-operator-install.yaml
+kubectl apply --validate=${VALIDATE_YAML} --namespace="${OPERATOR_NAMESPACE}" -f "${CUR_DIR}/clickhouse-operator-install.yaml"

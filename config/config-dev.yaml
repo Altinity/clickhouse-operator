@@ -78,11 +78,11 @@ chConfigUserDefaultNetworksIP:
 chConfigUserDefaultPassword: "default"
 
 # Default host_regexp to limit network connectivity from outside
-ChConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+chConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
 
 ################################################
 ##
-## Operator's access to ClickHouse instances
+## Access to ClickHouse instances
 ##
 ################################################
 
@@ -104,7 +104,7 @@ chPort: 8123
 
 logtostderr: "true"
 alsologtostderr: "false"
-v: "100"
+v: "2"
 stderrthreshold: ""
 vmodule: ""
 log_backtrace_at: ""
@@ -116,4 +116,6 @@ log_backtrace_at: ""
 ################################################
 
 # Max number of concurrent reconciles in progress
-reconcileThreadsNumber: 5
+reconcileThreadsNumber: 1
+reconcileWaitExclude: false
+reconcileWaitInclude: false

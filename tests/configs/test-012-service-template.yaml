@@ -30,8 +30,8 @@ spec:
               port: 8123
             - name: tcp
               port: 9000
-          type: ClusterIP
-          clusterIP: None
+          type: LoadBalancer
+          externalTrafficPolicy: Local
       - name: cluster-service-template
         generateName: "service-{cluster}"
         spec:
