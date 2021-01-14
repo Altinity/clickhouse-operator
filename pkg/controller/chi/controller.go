@@ -399,13 +399,13 @@ func (c *Controller) Run(ctx context.Context) {
 
 // enqueueObject adds ClickHouseInstallation object to the work queue
 func (c *Controller) enqueueObject(obj Handler) {
-	uid := []byte(obj.Handle())
+	handle := []byte(obj.Handle())
 	index := 0
 	enqueue := true
 	switch command := obj.(type) {
 	case *ReconcileCHI:
 		variants := len(c.queues) - chi.DefaultReconcileSystemThreadsNumber
-		index = chi.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(uid, variants)
+		index = chi.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(handle, variants)
 		if command.cmd == reconcileUpdate {
 			actionPlan := NewActionPlan(command.old, command.new)
 			enqueue = actionPlan.HasActionsToDo()
@@ -416,7 +416,7 @@ func (c *Controller) enqueueObject(obj Handler) {
 	case *ReconcileChopConfig:
 	case *DropDns:
 		variants := chi.DefaultReconcileSystemThreadsNumber
-		index = util.HashIntoIntTopped(uid, variants)
+		index = util.HashIntoIntTopped(handle, variants)
 		break
 	}
 	if enqueue {
