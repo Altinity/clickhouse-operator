@@ -123,7 +123,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
-			c.enqueueObject(chi.Namespace, chi.Name, NewReconcileChi(reconcileAdd, nil, chi))
+			c.enqueueObject(NewReconcileCHI(reconcileAdd, nil, chi))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldChi := old.(*chi.ClickHouseInstallation)
@@ -132,7 +132,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Info("chiInformer.UpdateFunc")
-			c.enqueueObject(newChi.Namespace, newChi.Name, NewReconcileChi(reconcileUpdate, oldChi, newChi))
+			c.enqueueObject(NewReconcileCHI(reconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: func(obj interface{}) {
 			chi := obj.(*chi.ClickHouseInstallation)
@@ -140,7 +140,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
-			c.enqueueObject(chi.Namespace, chi.Name, NewReconcileChi(reconcileDelete, chi, nil))
+			c.enqueueObject(NewReconcileCHI(reconcileDelete, chi, nil))
 		},
 	})
 
@@ -151,7 +151,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
-			c.enqueueObject(chit.Namespace, chit.Name, NewReconcileChit(reconcileAdd, nil, chit))
+			c.enqueueObject(NewReconcileCHIT(reconcileAdd, nil, chit))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldChit := old.(*chi.ClickHouseInstallationTemplate)
@@ -160,7 +160,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
-			c.enqueueObject(newChit.Namespace, newChit.Name, NewReconcileChit(reconcileUpdate, oldChit, newChit))
+			c.enqueueObject(NewReconcileCHIT(reconcileUpdate, oldChit, newChit))
 		},
 		DeleteFunc: func(obj interface{}) {
 			chit := obj.(*chi.ClickHouseInstallationTemplate)
@@ -168,7 +168,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
-			c.enqueueObject(chit.Namespace, chit.Name, NewReconcileChit(reconcileDelete, chit, nil))
+			c.enqueueObject(NewReconcileCHIT(reconcileDelete, chit, nil))
 		},
 	})
 
@@ -179,7 +179,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chopInformer.AddFunc - %s/%s added", chopConfig.Namespace, chopConfig.Name)
-			c.enqueueObject(chopConfig.Namespace, chopConfig.Name, NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
+			c.enqueueObject(NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			newChopConfig := new.(*chi.ClickHouseOperatorConfiguration)
@@ -188,7 +188,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chopInformer.UpdateFunc - %s/%s", newChopConfig.Namespace, newChopConfig.Name)
-			c.enqueueObject(newChopConfig.Namespace, newChopConfig.Name, NewReconcileChopConfig(reconcileUpdate, oldChopConfig, newChopConfig))
+			c.enqueueObject(NewReconcileChopConfig(reconcileUpdate, oldChopConfig, newChopConfig))
 		},
 		DeleteFunc: func(obj interface{}) {
 			chopConfig := obj.(*chi.ClickHouseOperatorConfiguration)
@@ -196,7 +196,7 @@ func (c *Controller) addEventHandlers(
 				return
 			}
 			log.V(2).Infof("chopInformer.DeleteFunc - %s/%s deleted", chopConfig.Namespace, chopConfig.Name)
-			c.enqueueObject(chopConfig.Namespace, chopConfig.Name, NewReconcileChopConfig(reconcileDelete, chopConfig, nil))
+			c.enqueueObject(NewReconcileChopConfig(reconcileDelete, chopConfig, nil))
 		},
 	})
 
@@ -264,7 +264,7 @@ func (c *Controller) addEventHandlers(
 
 			if added {
 				log.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) IP ASSIGNED %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.Subsets)
-				c.enqueueObject(newEndpoints.Namespace, newEndpoints.Name, NewDropDns(&newEndpoints.ObjectMeta))
+				c.enqueueObject(NewDropDns(&newEndpoints.ObjectMeta))
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -398,16 +398,16 @@ func (c *Controller) Run(ctx context.Context) {
 }
 
 // enqueueObject adds ClickHouseInstallation object to the work queue
-func (c *Controller) enqueueObject(namespace, name string, obj interface{}) {
-	uid := []byte(fmt.Sprintf("%s/%s", namespace, name))
+func (c *Controller) enqueueObject(obj Handler) {
+	uid := []byte(obj.Handle())
 	index := 0
 	switch obj.(type) {
-	case *ReconcileChi:
+	case *ReconcileCHI:
 		variants := len(c.queues) - chi.DefaultReconcileSystemThreadsNumber
 		index = chi.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(uid, variants)
 		break
 
-	case *ReconcileChit:
+	case *ReconcileCHIT:
 	case *ReconcileChopConfig:
 	case *DropDns:
 		variants := chi.DefaultReconcileSystemThreadsNumber
@@ -641,15 +641,16 @@ func (c *Controller) handleObject(obj interface{}) {
 	log.V(1).Infof("Processing object: %s", object.GetName())
 
 	// Get owner - it is expected to be CHI
-	chi, err := c.chiLister.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
+	// TODO chi, err := c.chiLister.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
 
-	if err != nil {
-		log.V(1).Infof("ignoring orphaned object '%s' of ClickHouseInstallation '%s'", object.GetSelfLink(), ownerRef.Name)
-		return
-	}
+	// TODO
+	//if err != nil {
+	//	log.V(1).Infof("ignoring orphaned object '%s' of ClickHouseInstallation '%s'", object.GetSelfLink(), ownerRef.Name)
+	//	return
+	//}
 
 	// Add CHI object into reconcile loop
-	c.enqueueObject(chi.Namespace, chi.Name, chi)
+	// TODO c.enqueueObject(chi.Namespace, chi.Name, chi)
 }
 
 // waitForCacheSync is a logger-wrapper over cache.WaitForCacheSync() and it waits for caches to populate

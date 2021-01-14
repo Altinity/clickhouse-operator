@@ -105,63 +105,59 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 		return nil
 	}
 
-	switch item.(type) {
+	switch command := item.(type) {
 
-	case *ReconcileChi:
-		reconcile, _ := item.(*ReconcileChi)
-		switch reconcile.cmd {
+	case *ReconcileCHI:
+		switch command.cmd {
 		case reconcileAdd:
-			return w.updateCHI(ctx, nil, reconcile.new)
+			return w.updateCHI(ctx, nil, command.new)
 		case reconcileUpdate:
-			return w.updateCHI(ctx, reconcile.old, reconcile.new)
+			return w.updateCHI(ctx, command.old, command.new)
 		case reconcileDelete:
-			return w.deleteCHI(ctx, reconcile.old)
+			return w.deleteCHI(ctx, command.old)
 		}
 
 		// Unknown item type, don't know what to do with it
 		// Just skip it and behave like it never existed
-		utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", reconcile))
+		utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", command))
 		return nil
 
-	case *ReconcileChit:
-		reconcile, _ := item.(*ReconcileChit)
-		switch reconcile.cmd {
+	case *ReconcileCHIT:
+		switch command.cmd {
 		case reconcileAdd:
-			return w.c.addChit(reconcile.new)
+			return w.c.addChit(command.new)
 		case reconcileUpdate:
-			return w.c.updateChit(reconcile.old, reconcile.new)
+			return w.c.updateChit(command.old, command.new)
 		case reconcileDelete:
-			return w.c.deleteChit(reconcile.old)
+			return w.c.deleteChit(command.old)
 		}
 
 		// Unknown item type, don't know what to do with it
 		// Just skip it and behave like it never existed
-		utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", reconcile))
+		utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", command))
 		return nil
 
 	case *ReconcileChopConfig:
-		reconcile, _ := item.(*ReconcileChopConfig)
-		switch reconcile.cmd {
+		switch command.cmd {
 		case reconcileAdd:
-			return w.c.addChopConfig(reconcile.new)
+			return w.c.addChopConfig(command.new)
 		case reconcileUpdate:
-			return w.c.updateChopConfig(reconcile.old, reconcile.new)
+			return w.c.updateChopConfig(command.old, command.new)
 		case reconcileDelete:
-			return w.c.deleteChopConfig(reconcile.old)
+			return w.c.deleteChopConfig(command.old)
 		}
 
 		// Unknown item type, don't know what to do with it
 		// Just skip it and behave like it never existed
-		utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", reconcile))
+		utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", command))
 		return nil
 
 	case *DropDns:
-		drop, _ := item.(*DropDns)
-		if chi, err := w.createCHIFromObjectMeta(drop.initiator); err == nil {
-			w.a.V(2).Info("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", drop.initiator.Namespace, drop.initiator.Name, chi.Name)
+		if chi, err := w.createCHIFromObjectMeta(command.initiator); err == nil {
+			w.a.V(2).Info("endpointsInformer UpdateFunc(%s/%s) flushing DNS for CHI %s", command.initiator.Namespace, command.initiator.Name, chi.Name)
 			_ = w.schemer.CHIDropDnsCache(ctx, chi)
 		} else {
-			w.a.Error("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", drop.initiator.Namespace, drop.initiator.Name, drop.initiator.Labels)
+			w.a.Error("endpointsInformer UpdateFunc(%s/%s) unable to find CHI by %v", command.initiator.Namespace, command.initiator.Name, command.initiator.Labels)
 		}
 		return nil
 	}
