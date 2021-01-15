@@ -48,9 +48,15 @@ func NewNormalizer(chop *chop.CHOp) *Normalizer {
 }
 
 // CreateTemplatedCHI produces ready-to-use CHI object
-func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withDefaultCluster bool) (*chiv1.ClickHouseInstallation, error) {
-	// Whether should insert default cluster if no cluster specified
-	n.withDefaultCluster = withDefaultCluster
+func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
+	if chi == nil {
+		// No CHI specified - meaning we are building 'empty' CHI with no clusters inside
+		chi = new(chiv1.ClickHouseInstallation)
+		n.withDefaultCluster = false
+	} else {
+		// Insert default cluster in case no clusters specified in this CHI
+		n.withDefaultCluster = true
+	}
 
 	// What base should be used to create CHI
 	if n.chop.Config().CHITemplate == nil {
@@ -101,12 +107,12 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withD
 	// After all templates applied, place provided CHI on top of the whole stack
 	n.chi.MergeFrom(chi, chiv1.MergeTypeOverrideByNonEmptyValues)
 
-	return n.NormalizeCHI(nil)
+	return n.normalize(nil)
 }
 
 // NormalizeCHI normalizes CHI.
 // Returns normalized CHI
-func (n *Normalizer) NormalizeCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
+func (n *Normalizer) normalize(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
 	if chi != nil {
 		n.chi = chi
 	}
@@ -137,13 +143,13 @@ func (n *Normalizer) finalizeCHI() {
 		hostApplyHostTemplate(host, hostTemplate)
 		return nil
 	})
-	n.FillCHIAddressInfo()
+	n.fillCHIAddressInfo()
 	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		return n.calcFingerprints(host)
 	})
 }
 
-func (n *Normalizer) FillCHIAddressInfo() {
+func (n *Normalizer) fillCHIAddressInfo() {
 	n.chi.WalkHostsFullPath(0, 0, func(
 		chi *chiv1.ClickHouseInstallation,
 

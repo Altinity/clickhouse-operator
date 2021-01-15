@@ -178,7 +178,7 @@ func (c *Controller) getStatefulSetByHost(host *chop.ChiHost) (*apps.StatefulSet
 	name := chopmodel.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
 
-	return c.statefulSetLister.StatefulSets(namespace).Get(name)
+	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(name, newGetOptions())
 }
 
 // GetCHIByObjectMeta gets CHI by namespaced name
@@ -188,5 +188,5 @@ func (c *Controller) GetCHIByObjectMeta(objectMeta *meta.ObjectMeta) (*chiv1.Cli
 		return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", objectMeta.Name, err)
 	}
 
-	return c.chiLister.ClickHouseInstallations(objectMeta.Namespace).Get(chiName)
+	return c.chopClient.ClickhouseV1().ClickHouseInstallations(objectMeta.Namespace).Get(chiName, newGetOptions())
 }

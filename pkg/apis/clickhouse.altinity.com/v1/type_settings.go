@@ -137,6 +137,10 @@ func (settings *Settings) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	if len(raw) == 0 {
+		return nil
+	}
+
 	if *settings == nil {
 		*settings = NewSettings()
 	}
@@ -156,6 +160,10 @@ func (settings *Settings) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON
 func (settings Settings) MarshalJSON() ([]byte, error) {
+	if len(settings) == 0 {
+		return nil, nil
+	}
+
 	raw := make(map[string]interface{})
 
 	for name, setting := range settings {

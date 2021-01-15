@@ -34,6 +34,7 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.Status.Pods = pods
 	chi.Status.FQDNs = fqdns
 	chi.Status.Endpoint = endpoint
+	// TODO do not copy here
 	chi.Status.NormalizedCHI = chi.Spec
 }
 

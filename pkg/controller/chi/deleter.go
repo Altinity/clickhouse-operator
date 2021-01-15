@@ -54,6 +54,7 @@ func (c *Controller) deleteHost(ctx context.Context, host *chop.ChiHost) error {
 // deleteConfigMapsCHI
 func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -95,8 +96,10 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chop.ClickHou
 // statefulSetDeletePod delete a pod of a StatefulSet. This requests StatefulSet to relaunch deleted pod
 func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps.StatefulSet) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
 	name := chopmodel.CreatePodName(statefulSet)
 	log.V(1).Infof("Delete Pod %s/%s", statefulSet.Namespace, name)
 	err := c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(name, newDeleteOptions())
@@ -115,8 +118,10 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
 func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
 	// IMPORTANT
 	// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
 	// To achieve ordered and graceful termination of the pods in the StatefulSet,
@@ -125,7 +130,6 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) 
 	// Namespaced name
 	name := chopmodel.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
-
 	log.V(1).Infof("deleteStatefulSet(%s/%s)", namespace, name)
 
 	statefulSet, err := c.getStatefulSetByHost(host)
@@ -146,6 +150,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) 
 	_ = c.waitStatefulSetReady(ctx, statefulSet)
 	host.StatefulSet = statefulSet
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -168,12 +173,13 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) 
 func (c *Controller) syncStatefulSet(ctx context.Context, host *chop.ChiHost) {
 	for {
 		if util.IsContextDone(ctx) {
+			log.V(2).Infof("ctx is done")
 			return
 		}
 		// TODO
 		// There should be better way to sync cache
-		if _, err := c.getStatefulSetByHost(host); err == nil {
-			log.V(2).Infof("cache NOT yet synced")
+		if sts, err := c.getStatefulSetByHost(host); err == nil {
+			log.V(2).Infof("cache NOT yet synced sts %s/%s is scheduled for deletion on %s", sts.Namespace, sts.Name, sts.DeletionTimestamp)
 			util.WaitContextDoneOrTimeout(ctx, 15*time.Second)
 		} else {
 			log.V(1).Infof("cache synced")
@@ -184,17 +190,19 @@ func (c *Controller) syncStatefulSet(ctx context.Context, host *chop.ChiHost) {
 
 // deletePVC deletes PersistentVolumeClaim
 func (c *Controller) deletePVC(ctx context.Context, host *chop.ChiHost) error {
-	log.V(2).Info("deletePVC() - start")
-	defer log.V(2).Info("deletePVC() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	log.V(2).Info("deletePVC() - start")
+	defer log.V(2).Info("deletePVC() - end")
 
 	namespace := host.Address.Namespace
 
 	c.walkActualPVCs(host, func(pvc *v1.PersistentVolumeClaim) {
 		if util.IsContextDone(ctx) {
+			log.V(2).Infof("ctx is done")
 			return
 		}
 
@@ -221,12 +229,12 @@ func (c *Controller) deletePVC(ctx context.Context, host *chop.ChiHost) error {
 // deleteConfigMap deletes ConfigMap
 func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
 	name := chopmodel.CreateConfigMapPodName(host)
 	namespace := host.Address.Namespace
-
 	log.V(1).Infof("deleteConfigMap(%s/%s)", namespace, name)
 
 	if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(name, newDeleteOptions()); err == nil {
@@ -244,6 +252,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) er
 // deleteServiceHost deletes Service
 func (c *Controller) deleteServiceHost(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -256,6 +265,7 @@ func (c *Controller) deleteServiceHost(ctx context.Context, host *chop.ChiHost) 
 // deleteServiceShard
 func (c *Controller) deleteServiceShard(ctx context.Context, shard *chop.ChiShard) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -268,6 +278,7 @@ func (c *Controller) deleteServiceShard(ctx context.Context, shard *chop.ChiShar
 // deleteServiceCluster
 func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *chop.ChiCluster) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -280,6 +291,7 @@ func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *chop.Chi
 // deleteServiceCHI
 func (c *Controller) deleteServiceCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -292,6 +304,7 @@ func (c *Controller) deleteServiceCHI(ctx context.Context, chi *chop.ClickHouseI
 // deleteServiceIfExists deletes Service in case it does not exist
 func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name string) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 

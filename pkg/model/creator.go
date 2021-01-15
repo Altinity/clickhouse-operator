@@ -63,37 +63,39 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 			c.labeler.getLabelsServiceCHI(),
 			c.labeler.getSelectorCHIScope(),
 		)
-	} else {
-		// Incorrect/unknown .templates.ServiceTemplate specified
-		// Create default Service
-		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      serviceName,
-				Namespace: c.chi.Namespace,
-				Labels:    c.labeler.getLabelsServiceCHI(),
-			},
-			Spec: corev1.ServiceSpec{
-				// ClusterIP: templateDefaultsServiceClusterIP,
-				Ports: []corev1.ServicePort{
-					{
-						Name:       chDefaultHTTPPortName,
-						Protocol:   corev1.ProtocolTCP,
-						Port:       chDefaultHTTPPortNumber,
-						TargetPort: intstr.FromString(chDefaultHTTPPortName),
-					},
-					{
-						Name:       chDefaultTCPPortName,
-						Protocol:   corev1.ProtocolTCP,
-						Port:       chDefaultTCPPortNumber,
-						TargetPort: intstr.FromString(chDefaultTCPPortName),
-					},
-				},
-				Selector:              c.labeler.getSelectorCHIScope(),
-				Type:                  corev1.ServiceTypeLoadBalancer,
-				ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
-			},
-		}
 	}
+
+	// Create default Service
+	// We do not have .templates.ServiceTemplate specified or it is incorrect
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: c.chi.Namespace,
+			Labels:    c.labeler.getLabelsServiceCHI(),
+		},
+		Spec: corev1.ServiceSpec{
+			// ClusterIP: templateDefaultsServiceClusterIP,
+			Ports: []corev1.ServicePort{
+				{
+					Name:       chDefaultHTTPPortName,
+					Protocol:   corev1.ProtocolTCP,
+					Port:       chDefaultHTTPPortNumber,
+					TargetPort: intstr.FromString(chDefaultHTTPPortName),
+				},
+				{
+					Name:       chDefaultTCPPortName,
+					Protocol:   corev1.ProtocolTCP,
+					Port:       chDefaultTCPPortNumber,
+					TargetPort: intstr.FromString(chDefaultTCPPortName),
+				},
+			},
+			Selector:              c.labeler.getSelectorCHIScope(),
+			Type:                  corev1.ServiceTypeLoadBalancer,
+			ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
+		},
+	}
+	MakeObjectVersionLabel(&svc.ObjectMeta, svc)
+	return svc
 }
 
 // createServiceCluster creates new corev1.Service for specified Cluster
@@ -110,9 +112,9 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 			c.labeler.getLabelsServiceCluster(cluster),
 			c.labeler.getSelectorClusterScope(cluster),
 		)
-	} else {
-		return nil
 	}
+	// No template specified, no need to create service
+	return nil
 }
 
 // createServiceShard creates new corev1.Service for specified Shard
@@ -129,9 +131,9 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 			c.labeler.getLabelsServiceShard(shard),
 			c.labeler.getSelectorShardScope(shard),
 		)
-	} else {
-		return nil
 	}
+	// No template specified, no need to create service
+	return nil
 }
 
 // createServiceHost creates new corev1.Service for specified host
@@ -149,43 +151,45 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			c.labeler.getLabelsServiceHost(host),
 			c.labeler.GetSelectorHostScope(host),
 		)
-	} else {
-		// Incorrect/unknown .templates.ServiceTemplate specified
-		// Create default Service
-		return &corev1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      serviceName,
-				Namespace: host.Address.Namespace,
-				Labels:    c.labeler.getLabelsServiceHost(host),
-			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{
-					{
-						Name:       chDefaultHTTPPortName,
-						Protocol:   corev1.ProtocolTCP,
-						Port:       host.HTTPPort,
-						TargetPort: intstr.FromInt(int(host.HTTPPort)),
-					},
-					{
-						Name:       chDefaultTCPPortName,
-						Protocol:   corev1.ProtocolTCP,
-						Port:       host.TCPPort,
-						TargetPort: intstr.FromInt(int(host.TCPPort)),
-					},
-					{
-						Name:       chDefaultInterserverHTTPPortName,
-						Protocol:   corev1.ProtocolTCP,
-						Port:       host.InterserverHTTPPort,
-						TargetPort: intstr.FromInt(int(host.InterserverHTTPPort)),
-					},
-				},
-				Selector:                 c.labeler.GetSelectorHostScope(host),
-				ClusterIP:                templateDefaultsServiceClusterIP,
-				Type:                     "ClusterIP",
-				PublishNotReadyAddresses: true,
-			},
-		}
 	}
+
+	// Create default Service
+	// We do not have .templates.ServiceTemplate specified or it is incorrect
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      serviceName,
+			Namespace: host.Address.Namespace,
+			Labels:    c.labeler.getLabelsServiceHost(host),
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Name:       chDefaultHTTPPortName,
+					Protocol:   corev1.ProtocolTCP,
+					Port:       host.HTTPPort,
+					TargetPort: intstr.FromInt(int(host.HTTPPort)),
+				},
+				{
+					Name:       chDefaultTCPPortName,
+					Protocol:   corev1.ProtocolTCP,
+					Port:       host.TCPPort,
+					TargetPort: intstr.FromInt(int(host.TCPPort)),
+				},
+				{
+					Name:       chDefaultInterserverHTTPPortName,
+					Protocol:   corev1.ProtocolTCP,
+					Port:       host.InterserverHTTPPort,
+					TargetPort: intstr.FromInt(int(host.InterserverHTTPPort)),
+				},
+			},
+			Selector:                 c.labeler.GetSelectorHostScope(host),
+			ClusterIP:                templateDefaultsServiceClusterIP,
+			Type:                     "ClusterIP",
+			PublishNotReadyAddresses: true,
+		},
+	}
+	MakeObjectVersionLabel(&svc.ObjectMeta, svc)
+	return svc
 }
 
 // verifyServiceTemplatePorts verifies ChiServiceTemplate to have reasonable ports specified
@@ -232,12 +236,15 @@ func (c *Creator) createServiceFromTemplate(
 	// Append provided Selector to already specified Selector in template
 	service.Spec.Selector = util.MergeStringMapsOverwrite(service.Spec.Selector, selector)
 
+	// And after the object is ready we can put version label
+	MakeObjectVersionLabel(&service.ObjectMeta, service)
+
 	return service
 }
 
 // CreateConfigMapCHICommon creates new corev1.ConfigMap
 func (c *Creator) CreateConfigMapCHICommon(options *ClickHouseConfigFilesGeneratorOptions) *corev1.ConfigMap {
-	return &corev1.ConfigMap{
+	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonName(c.chi),
 			Namespace: c.chi.Namespace,
@@ -246,11 +253,14 @@ func (c *Creator) CreateConfigMapCHICommon(options *ClickHouseConfigFilesGenerat
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupCommon(options),
 	}
+	// And after the object is ready we can put version label
+	MakeObjectVersionLabel(&cm.ObjectMeta, cm)
+	return cm
 }
 
 // CreateConfigMapCHICommonUsers creates new corev1.ConfigMap
 func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
-	return &corev1.ConfigMap{
+	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonUsersName(c.chi),
 			Namespace: c.chi.Namespace,
@@ -259,11 +269,14 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupUsers(),
 	}
+	// And after the object is ready we can put version label
+	MakeObjectVersionLabel(&cm.ObjectMeta, cm)
+	return cm
 }
 
 // CreateConfigMapHost creates new corev1.ConfigMap
 func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
-	return &corev1.ConfigMap{
+	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapPodName(host),
 			Namespace: host.Address.Namespace,
@@ -271,6 +284,9 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 		},
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host),
 	}
+	// And after the object is ready we can put version label
+	MakeObjectVersionLabel(&cm.ObjectMeta, cm)
+	return cm
 }
 
 // CreateStatefulSet creates new apps.StatefulSet
@@ -313,8 +329,9 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 
 	c.setupStatefulSetPodTemplate(statefulSet, host)
 	c.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
+	// And after the object is ready we can put version label
+	MakeObjectVersionLabel(&statefulSet.ObjectMeta, statefulSet)
 
-	statefulSet.Labels = util.MergeStringMapsOverwrite(statefulSet.Labels, map[string]string{LabelStatefulSetVersion: util.Fingerprint(statefulSet)})
 	host.StatefulSet = statefulSet
 
 	return statefulSet
@@ -323,6 +340,8 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 // PreparePersistentVolume
 func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chiv1.ChiHost) *corev1.PersistentVolume {
 	pv.Labels = util.MergeStringMapsOverwrite(pv.Labels, c.labeler.getLabelsHostScope(host, false))
+	// And after the object is ready we can put version label
+	MakeObjectVersionLabel(&pv.ObjectMeta, pv)
 	return pv
 }
 

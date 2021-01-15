@@ -60,6 +60,7 @@ func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
 // getObjectListFromClickHouse
 func (s *Schemer) getObjectListFromClickHouseContext(ctx context.Context, endpoints []string, sql string) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil, nil, nil
 	}
 
@@ -77,7 +78,8 @@ func (s *Schemer) getObjectListFromClickHouseContext(ctx context.Context, endpoi
 	var query *clickhouse.Query = nil
 	for _, endpoint := range endpoints {
 		if util.IsContextDone(ctx) {
-			break
+			log.V(2).Infof("ctx is done")
+			return nil, nil, nil
 		}
 		log.V(1).Infof("Run query on: %s of %v", endpoint, endpoints)
 
@@ -122,6 +124,7 @@ func (s *Schemer) getObjectListFromClickHouseContext(ctx context.Context, endpoi
 // That includes all Distributed tables, corresponding local tables, and databases, if necessary
 func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil, nil, nil
 	}
 
@@ -222,6 +225,7 @@ func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *
 // getCreateReplicaObjectsContext returns a list of objects that needs to be created on a host in a cluster
 func (s *Schemer) getCreateReplicaObjectsContext(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil, nil, nil
 	}
 
@@ -304,6 +308,7 @@ func (s *Schemer) HostDeleteTables(ctx context.Context, host *chop.ChiHost) erro
 // HostCreateTables
 func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -381,6 +386,7 @@ func (s *Schemer) shardApplySQLsContext(ctx context.Context, shard *chop.ChiShar
 // Retry logic traverses the list of SQLs multiple times until all SQLs succeed
 func (s *Schemer) applySQLsContext(ctx context.Context, hosts []string, queries []string, retry bool) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -393,7 +399,8 @@ func (s *Schemer) applySQLsContext(ctx context.Context, hosts []string, queries 
 	// For each host in the list run all SQL queries
 	for _, host := range hosts {
 		if util.IsContextDone(ctx) {
-			break
+			log.V(2).Infof("ctx is done")
+			return nil
 		}
 		conn := s.getCHConnection(host)
 		if conn == nil {
@@ -404,6 +411,7 @@ func (s *Schemer) applySQLsContext(ctx context.Context, hosts []string, queries 
 			var errors []error
 			for i, sql := range queries {
 				if util.IsContextDone(ctx) {
+					log.V(2).Infof("ctx is done")
 					return nil
 				}
 				if len(sql) == 0 {

@@ -136,6 +136,7 @@ func (c *Controller) pollStatefulSet(
 	f func(set *apps.StatefulSet) bool,
 ) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 	if opts == nil {
@@ -160,10 +161,11 @@ func (c *Controller) pollStatefulSet(
 	start := time.Now()
 	for {
 		if util.IsContextDone(ctx) {
+			log.V(2).Infof("ctx is done")
 			return nil
 		}
 
-		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err == nil {
+		if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(name, newGetOptions()); err == nil {
 			// Object is found
 			if f(statefulSet) {
 				// All is good, job done, exit
@@ -219,8 +221,10 @@ func (c *Controller) pollHostContext(
 	f func(ctx context.Context, host *chop.ChiHost) bool,
 ) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
 	if opts == nil {
 		opts = NewStatefulSetPollOptionsConfig(c.chop.Config())
 	}
@@ -231,6 +235,7 @@ func (c *Controller) pollHostContext(
 	start := time.Now()
 	for {
 		if util.IsContextDone(ctx) {
+			log.V(2).Infof("ctx is done")
 			return nil
 		}
 
@@ -241,6 +246,7 @@ func (c *Controller) pollHostContext(
 		}
 
 		if util.IsContextDone(ctx) {
+			log.V(2).Infof("ctx is done")
 			return nil
 		}
 

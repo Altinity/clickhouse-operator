@@ -16,6 +16,7 @@ package chi
 
 import (
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/queue"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -24,14 +25,6 @@ const (
 	reconcileUpdate = "update"
 	reconcileDelete = "delete"
 )
-
-type Prioritier interface {
-	Priority() int
-}
-
-type Handler interface {
-	Handle() string
-}
 
 type PriorityQueueItem struct {
 	priority int
@@ -55,7 +48,9 @@ type ReconcileCHI struct {
 	new *chi.ClickHouseInstallation
 }
 
-func (r ReconcileCHI) Handle() string {
+var _ queue.PriorityQueueItem = &ReconcileCHI{}
+
+func (r ReconcileCHI) Handle() queue.T {
 	if r.new != nil {
 		return "ReconcileCHI" + ":" + r.new.Namespace + "/" + r.new.Name
 	}
@@ -74,6 +69,24 @@ func NewReconcileCHI(cmd string, old, new *chi.ClickHouseInstallation) *Reconcil
 		old: old,
 		new: new,
 	}
+
+	/*
+		if old != nil {
+			js, _ := json.Marshal(old)
+			_copy := chi.ClickHouseInstallation{}
+			json.Unmarshal(js, &_copy)
+			c.old = &_copy
+		}
+
+		if new != nil {
+			js, _ := json.Marshal(new)
+			_copy := chi.ClickHouseInstallation{}
+			json.Unmarshal(js, &_copy)
+			c.new = &_copy
+		}
+
+		return c
+	*/
 }
 
 type ReconcileCHIT struct {
@@ -83,7 +96,9 @@ type ReconcileCHIT struct {
 	new *chi.ClickHouseInstallationTemplate
 }
 
-func (r ReconcileCHIT) Handle() string {
+var _ queue.PriorityQueueItem = &ReconcileCHIT{}
+
+func (r ReconcileCHIT) Handle() queue.T {
 	if r.new != nil {
 		return "ReconcileCHIT" + ":" + r.new.Namespace + "/" + r.new.Name
 	}
@@ -111,7 +126,9 @@ type ReconcileChopConfig struct {
 	new *chi.ClickHouseOperatorConfiguration
 }
 
-func (r ReconcileChopConfig) Handle() string {
+var _ queue.PriorityQueueItem = &ReconcileChopConfig{}
+
+func (r ReconcileChopConfig) Handle() queue.T {
 	if r.new != nil {
 		return "ReconcileChopConfig" + ":" + r.new.Namespace + "/" + r.new.Name
 	}
@@ -137,7 +154,9 @@ type DropDns struct {
 	initiator *v1.ObjectMeta
 }
 
-func (r DropDns) Handle() string {
+var _ queue.PriorityQueueItem = &DropDns{}
+
+func (r DropDns) Handle() queue.T {
 	if r.initiator != nil {
 		return "DropDNS" + ":" + r.initiator.Namespace + "/" + r.initiator.Name
 	}

@@ -60,7 +60,7 @@ func (c *Controller) labelMyObjectsTree() {
 	}
 
 	// Pod namespaced name found, fetch the Pod
-	pod, err := c.podLister.Pods(namespace).Get(podName)
+	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(podName, newGetOptions())
 	if err != nil {
 		log.V(1).Infof("ERROR get Pod %s/%s", namespace, podName)
 		return

@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
+	github.com/altinity/queue v0.0.0-20210114142043-ddb7da66064f
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/d4l3k/messagediff v1.2.1 // indirect
 	github.com/evanphx/json-patch v4.5.0+incompatible // indirect

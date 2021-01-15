@@ -58,7 +58,7 @@ const (
 	// Supplementary service labels - used to cooperate with k8s
 	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/zookeeper-version"
 	LabelSettingsConfigVersion  = clickhousealtinitycom.GroupName + "/settings-version"
-	LabelStatefulSetVersion     = clickhousealtinitycom.GroupName + "/statefulset-version"
+	LabelObjectVersion          = clickhousealtinitycom.GroupName + "/object-version"
 )
 
 // Labeler is an entity which can label CHI artifacts
@@ -438,4 +438,46 @@ func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 		return "", fmt.Errorf("can not find %s label in meta", LabelClusterName)
 	}
 	return meta.Labels[LabelClusterName], nil
+}
+
+// MakeObjectVersionLabel
+func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
+	meta.Labels = util.MergeStringMapsOverwrite(
+		meta.Labels,
+		map[string]string{
+			LabelObjectVersion: util.Fingerprint(obj),
+		},
+	)
+}
+
+func isObjectVersionLabelTheSame(meta *meta.ObjectMeta, value string) bool {
+	if meta == nil {
+		return false
+	}
+
+	l, ok := meta.Labels[LabelObjectVersion]
+	if !ok {
+		return false
+	}
+
+	return l == value
+}
+
+func IsObjectTheSame(meta1, meta2 *meta.ObjectMeta) bool {
+	if (meta1 == nil) && (meta2 == nil) {
+		return true
+	}
+	if (meta1 != nil) && (meta2 == nil) {
+		return false
+	}
+	if (meta1 == nil) && (meta2 != nil) {
+		return false
+	}
+
+	l, ok := meta2.Labels[LabelObjectVersion]
+	if !ok {
+		return false
+	}
+
+	return isObjectVersionLabelTheSame(meta1, l)
 }

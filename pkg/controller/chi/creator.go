@@ -32,9 +32,12 @@ import (
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) createStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
 	log.V(1).Infof("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
+
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
 		// Error call Create()
 		return err
@@ -57,8 +60,10 @@ func (c *Controller) updateStatefulSet(
 	host *chop.ChiHost,
 ) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
 	// Convenience shortcuts
 	namespace := newStatefulSet.Namespace
 	name := newStatefulSet.Name
@@ -98,8 +103,10 @@ func (c *Controller) updateStatefulSet(
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
 	// Convenience shortcuts
 	namespace := pv.Namespace
 	name := pv.Name
@@ -120,8 +127,10 @@ func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.Persiste
 // It can just delete failed StatefulSet or do nothing
 func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
 	// Convenience shortcuts
 	namespace := failedStatefulSet.Namespace
 	name := failedStatefulSet.Name
@@ -156,8 +165,10 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatef
 // It can try to revert StatefulSet to its previous version, specified in rollbackStatefulSet
 func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *apps.StatefulSet) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
 	// Convenience shortcuts
 	namespace := rollbackStatefulSet.Namespace
 	name := rollbackStatefulSet.Name
@@ -172,7 +183,7 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	case chop.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
 		log.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - going to ROLLBACK FAILED StatefulSet", namespace, name)
-		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {
+		if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(name, newGetOptions()); err != nil {
 			// Unable to get StatefulSet
 			return err
 		} else {

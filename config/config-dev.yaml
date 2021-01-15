@@ -104,7 +104,7 @@ chPort: 8123
 
 logtostderr: "true"
 alsologtostderr: "false"
-v: "2"
+v: "3"
 stderrthreshold: ""
 vmodule: ""
 log_backtrace_at: ""

@@ -17,8 +17,10 @@ package chi
 import (
 	"context"
 	"fmt"
+	"github.com/altinity/queue"
 	"time"
 
+	log "github.com/golang/glog"
 	"github.com/juliangruber/go-intersect"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -27,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/util/workqueue"
+	//"github.com/altinity/queue"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
@@ -38,9 +40,10 @@ const FinalizerName = "finalizer.clickhouseinstallation.altinity.com"
 
 // worker represents worker thread which runs reconcile tasks
 type worker struct {
-	c          *Controller
-	a          Announcer
-	queue      workqueue.RateLimitingInterface
+	c *Controller
+	a Announcer
+	//queue workqueue.RateLimitingInterface
+	queue      queue.PriorityQueue
 	normalizer *chopmodel.Normalizer
 	schemer    *chopmodel.Schemer
 	creator    *chopmodel.Creator
@@ -48,11 +51,12 @@ type worker struct {
 }
 
 // newWorker
-func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
+//func (c *Controller) newWorker(q workqueue.RateLimitingInterface) *worker {
+func (c *Controller) newWorker(q queue.PriorityQueue) *worker {
 	return &worker{
 		c:          c,
 		a:          NewAnnouncer(c),
-		queue:      queue,
+		queue:      q,
 		normalizer: chopmodel.NewNormalizer(c.chop),
 		schemer: chopmodel.NewSchemer(
 			c.chop.Config().CHUsername,
@@ -69,16 +73,22 @@ func (w *worker) run() {
 	w.a.V(2).Info("run() - start")
 	defer w.a.V(2).Info("run() - end")
 
-	ctx := context.Background()
-	util.WaitContextDoneUntil(ctx, w.start)
+	util.WaitContextDoneUntil(context.Background(), w.start)
 
 	for {
 		// Get() blocks until it can return an item
-		item, shutdown := w.queue.Get()
-		if shutdown {
+		item, ctx, ok := w.queue.Get()
+		if !ok {
 			w.a.Info("shutdown request")
 			return
 		}
+
+		//item, shut := w.queue.Get()
+		//ctx := context.Background()
+		//if shut {
+		//	w.a.Info("shutdown request")
+		//	return
+		//}
 
 		if err := w.processItem(ctx, item); err != nil {
 			// Item not processed
@@ -89,7 +99,7 @@ func (w *worker) run() {
 		// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
 		// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
 		// still have to call `Done` on the queue.
-		w.queue.Forget(item)
+		//w.queue.Forget(item)
 
 		// Remove item from processing set when processing completed
 		w.queue.Done(item)
@@ -98,12 +108,13 @@ func (w *worker) run() {
 
 // processItem processes one work item according to its type
 func (w *worker) processItem(ctx context.Context, item interface{}) error {
-	w.a.V(3).Info("processItem() - start")
-	defer w.a.V(3).Info("processItem() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	w.a.V(3).Info("processItem() - start")
+	defer w.a.V(3).Info("processItem() - end")
 
 	switch command := item.(type) {
 
@@ -169,20 +180,11 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 }
 
 // normalize
-func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseInstallation {
+func (w *worker) normalize(c *chop.ClickHouseInstallation) *chop.ClickHouseInstallation {
 	w.a.V(3).Info("normalize() - start")
 	defer w.a.V(3).Info("normalize() - end")
 
-	var withDefaultCluster bool
-
-	if chi == nil {
-		chi = &chop.ClickHouseInstallation{}
-		withDefaultCluster = false
-	} else {
-		withDefaultCluster = true
-	}
-
-	chi, err := w.normalizer.CreateTemplatedCHI(chi, withDefaultCluster)
+	chi, err := w.normalizer.CreateTemplatedCHI(c)
 	if err != nil {
 		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(chi).
@@ -198,7 +200,8 @@ func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) {
 
 	// Check whether finalizer is already listed in CHI
 	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
-		w.a.V(2).Info("ensureFinalizer(%s/%s): finalizer already installed", namespace, name)
+		w.a.V(3).Info("ensureFinalizer(%s/%s): finalizer already installed", namespace, name)
+		return
 	}
 
 	// No finalizer found - need to install it
@@ -207,18 +210,18 @@ func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) {
 		w.a.V(1).Info("ensureFinalizer(%s/%s): unable to install finalizer. err: %v", namespace, name, err)
 	}
 
-	w.a.V(3).Info("ensureFinalizer(%s/%s): finalizer installed", namespace, name)
+	w.a.V(2).Info("ensureFinalizer(%s/%s): finalizer installed", namespace, name)
 }
 
 // updateCHI sync CHI which was already created earlier
 func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstallation) error {
-	w.a.V(3).Info("updateCHI() - start")
-	defer w.a.V(3).Info("updateCHI() - end")
+	w.a.V(2).Info("updateCHI() - start")
+	defer w.a.V(2).Info("updateCHI() - end")
 
 	update := (old != nil) && (new != nil)
 
 	if update && (old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion) {
-		w.a.V(3).Info("updateCHI(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
+		w.a.V(2).Info("updateCHI(%s/%s): ResourceVersion did not change: %s", new.Namespace, new.Name, new.ObjectMeta.ResourceVersion)
 		// No need to react
 		return nil
 	}
@@ -232,23 +235,31 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 		return w.finalizeCHI(ctx, new)
 	}
 
+	//time.Sleep(5 * time.Second)
+	//w.a.V(3).Info("--- Normalize ---")
+
 	old = w.normalize(old)
 	new = w.normalize(new)
 
-	actionPlan := NewActionPlan(old, new)
+	//time.Sleep(5 * time.Second)
+	//w.a.V(3).Info("--- Action Plan ---")
 
+	actionPlan := NewActionPlan(old, new)
 	if !actionPlan.HasActionsToDo() {
 		// Nothing to do - no changes found - no need to react
-		w.a.V(3).Info("updateCHI(%s/%s) - ResourceVersion changed, but no actual changes found", new.Namespace, new.Name)
+		w.a.V(2).Info("updateCHI(%s/%s) - ResourceVersion changed, but no actual changes found", new.Namespace, new.Name)
 		return nil
 	}
+
+	//time.Sleep(5 * time.Second)
+	//w.a.V(3).Info("--- Reconcile Start 1 ---")
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	(&new.Status).ReconcileStart(actionPlan.GetRemovedHostsNum())
-	if err := w.c.updateCHIObjectStatus(ctx, new, false); err != nil {
-		w.a.V(1).Info("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
-		return nil
-	}
+	_ = w.c.updateCHIObjectStatus(ctx, new, false)
+
+	//time.Sleep(5 * time.Second)
+	//w.a.V(3).Info("--- Reconcile Start 2 ---")
 
 	w.a.V(1).
 		WithEvent(new, eventActionReconcile, eventReasonReconcileStarted).
@@ -263,6 +274,9 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 			Info("updateCHI(%s/%s) exclude CHI from monitoring", new.Namespace, new.Name)
 		w.c.deleteWatch(new.Namespace, new.Name)
 	}
+
+	//time.Sleep(5 * time.Second)
+	//w.a.V(3).Info("--- Reconcile Start 3 ---")
 
 	actionPlan.WalkAdded(
 		func(cluster *chop.ChiCluster) {
@@ -324,6 +338,9 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 		return nil
 	})
 
+	//time.Sleep(5 * time.Second)
+	//w.a.V(3).Info("--- Reconcile Start Real ---")
+
 	if err := w.reconcile(ctx, new); err != nil {
 		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(new).
@@ -364,13 +381,13 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 		Info("updateCHI(%s/%s) remove scheduled for deletion items", new.Namespace, new.Name)
 	actionPlan.WalkRemoved(
 		func(cluster *chop.ChiCluster) {
-			_ = w.deleteCluster(ctx, cluster)
+			_ = w.deleteCluster(ctx, new, cluster)
 		},
 		func(shard *chop.ChiShard) {
-			_ = w.deleteShard(ctx, shard)
+			_ = w.deleteShard(ctx, new, shard)
 		},
 		func(host *chop.ChiHost) {
-			_ = w.deleteHost(ctx, host)
+			_ = w.deleteHost(ctx, new, host)
 		},
 	)
 
@@ -396,6 +413,11 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 
 // reconcile reconciles ClickHouseInstallation
 func (w *worker) reconcile(ctx context.Context, chi *chop.ClickHouseInstallation) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
+		return nil
+	}
+
 	w.a.V(2).Info("reconcile() - start")
 	defer w.a.V(2).Info("reconcile() - end")
 
@@ -412,12 +434,13 @@ func (w *worker) reconcile(ctx context.Context, chi *chop.ClickHouseInstallation
 
 // reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary in order to ensure that ConfigMaps are in place
 func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chop.ClickHouseInstallation) error {
-	w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - start")
-	defer w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - start")
+	defer w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - end")
 
 	// 1. CHI Service
 	if chi.IsStopped() {
@@ -436,12 +459,13 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *cho
 
 // reconcileCHIAuxObjectsFinal reconciles CHI global objects
 func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *chop.ClickHouseInstallation) error {
-	w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - start")
-	defer w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - start")
+	defer w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - end")
 
 	// CHI ConfigMaps with update
 	return w.reconcileCHIConfigMaps(ctx, chi, nil, true)
@@ -457,6 +481,7 @@ func (w *worker) reconcileCHIConfigMaps(
 	if util.IsContextDone(ctx) {
 		return nil
 	}
+
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
@@ -476,12 +501,13 @@ func (w *worker) reconcileCHIConfigMaps(
 
 // reconcileCluster reconciles Cluster, excluding nested shards
 func (w *worker) reconcileCluster(ctx context.Context, cluster *chop.ChiCluster) error {
-	w.a.V(2).Info("reconcileCluster() - start")
-	defer w.a.V(2).Info("reconcileCluster() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	w.a.V(2).Info("reconcileCluster() - start")
+	defer w.a.V(2).Info("reconcileCluster() - end")
 
 	// Add Cluster's Service
 	service := w.creator.CreateServiceCluster(cluster)
@@ -495,12 +521,13 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chop.ChiCluster)
 
 // reconcileShard reconciles Shard, excluding nested replicas
 func (w *worker) reconcileShard(ctx context.Context, shard *chop.ChiShard) error {
-	w.a.V(2).Info("reconcileShard() - start")
-	defer w.a.V(2).Info("reconcileShard() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	w.a.V(2).Info("reconcileShard() - start")
+	defer w.a.V(2).Info("reconcileShard() - end")
 
 	// Add Shard's Service
 	service := w.creator.CreateServiceShard(shard)
@@ -514,12 +541,13 @@ func (w *worker) reconcileShard(ctx context.Context, shard *chop.ChiShard) error
 
 // reconcileHost reconciles ClickHouse host
 func (w *worker) reconcileHost(ctx context.Context, host *chop.ChiHost) error {
-	w.a.V(2).Info("reconcileHost() - start")
-	defer w.a.V(2).Info("reconcileHost() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	w.a.V(2).Info("reconcileHost() - start")
+	defer w.a.V(2).Info("reconcileHost() - end")
 
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileStarted).
@@ -587,6 +615,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chop.ChiHost) error {
 // Exclude host from ClickHouse clusters
 func (w *worker) excludeHost(ctx context.Context, host *chop.ChiHost, status StatefulSetStatus) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -689,13 +718,14 @@ func (w *worker) waitHostNotInCluster(ctx context.Context, host *chop.ChiHost) e
 
 // finalizeCHI
 func (w *worker) finalizeCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
+		return nil
+	}
+
 	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	w.a.V(3).Info("finalizeCHI(%s/%s) - start", namespace, name)
 	defer w.a.V(3).Info("finalizeCHI(%s/%s) - end", namespace, name)
-
-	if util.IsContextDone(ctx) {
-		return nil
-	}
 
 	cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
 	if (err != nil) || (cur == nil) {
@@ -727,12 +757,13 @@ func (w *worker) finalizeCHI(ctx context.Context, chi *chop.ClickHouseInstallati
 
 // deleteCHI deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
 func (w *worker) deleteCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
-	w.a.V(2).Info("deleteCHI() - start")
-	defer w.a.V(2).Info("deleteCHI() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	w.a.V(2).Info("deleteCHI() - start")
+	defer w.a.V(2).Info("deleteCHI() - end")
 
 	var err error
 
@@ -741,7 +772,7 @@ func (w *worker) deleteCHI(ctx context.Context, chi *chop.ClickHouseInstallation
 		WithStatusAction(chi).
 		Info("Delete CHI %s/%s started", chi.Namespace, chi.Name)
 
-	chi, err = w.normalizer.CreateTemplatedCHI(chi, true)
+	chi, err = w.normalizer.CreateTemplatedCHI(chi)
 	if err != nil {
 		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(chi).
@@ -754,10 +785,11 @@ func (w *worker) deleteCHI(ctx context.Context, chi *chop.ClickHouseInstallation
 
 	// Delete all clusters
 	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
-		return w.deleteCluster(ctx, cluster)
+		return w.deleteCluster(ctx, chi, cluster)
 	})
 
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -776,8 +808,10 @@ func (w *worker) deleteCHI(ctx context.Context, chi *chop.ClickHouseInstallation
 }
 
 // deleteTables
-func (w *worker) deleteTables(ctx context.Context, host *chop.ChiHost) error {
+// chi is the new CHI in which there will be no more this tabled
+func (w *worker) deleteTables(ctx context.Context, chi *chop.ClickHouseInstallation, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -788,13 +822,13 @@ func (w *worker) deleteTables(ctx context.Context, host *chop.ChiHost) error {
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(host.CHI).
+			WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(chi).
 			Info("Deleted tables on host %s replica %d to shard %d in cluster %s",
 				host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	} else {
-		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
-			WithStatusError(host.CHI).
+		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(chi).
 			Error("FAILED to delete tables on host %s with error %v", host.Name, err)
 	}
 
@@ -802,22 +836,24 @@ func (w *worker) deleteTables(ctx context.Context, host *chop.ChiHost) error {
 }
 
 // deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
-func (w *worker) deleteHost(ctx context.Context, host *chop.ChiHost) error {
-	w.a.V(2).Info("deleteHost() - start")
-	defer w.a.V(2).Info("deleteHost() - end")
-
+// chi is the new CHI in which there will be no more this host
+func (w *worker) deleteHost(ctx context.Context, chi *chop.ClickHouseInstallation, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
+	w.a.V(2).Info("deleteHost() - start")
+	defer w.a.V(2).Info("deleteHost() - end")
+
 	w.a.V(1).
-		WithEvent(host.CHI, eventActionDelete, eventReasonDeleteStarted).
-		WithStatusAction(host.CHI).
+		WithEvent(chi, eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(chi).
 		Info("Delete host %s/%s - started", host.Address.ClusterName, host.Name)
 
 	if _, err := w.c.getStatefulSetByHost(host); err != nil {
-		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(host.CHI).
+		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(chi).
 			Info("Delete host %s/%s - completed StatefulSet not found - already deleted? err: %v",
 				host.Address.ClusterName, host.Name, err)
 		return nil
@@ -831,21 +867,21 @@ func (w *worker) deleteHost(ctx context.Context, host *chop.ChiHost) error {
 	// Need to delete all these items
 
 	var err error
-	err = w.deleteTables(ctx, host)
+	err = w.deleteTables(ctx, chi, host)
 	err = w.c.deleteHost(ctx, host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
-	host.CHI.Status.DeletedHostsCount++
-	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, true)
+	chi.Status.DeletedHostsCount++
+	_ = w.c.updateCHIObjectStatus(ctx, chi, true)
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(host.CHI).
+			WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(chi).
 			Info("Delete host %s/%s - completed", host.Address.ClusterName, host.Name)
 	} else {
-		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
-			WithStatusError(host.CHI).
+		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(chi).
 			Error("FAILED Delete host %s/%s - completed", host.Address.ClusterName, host.Name)
 	}
 
@@ -853,60 +889,64 @@ func (w *worker) deleteHost(ctx context.Context, host *chop.ChiHost) error {
 }
 
 // deleteShard deletes all kubernetes resources related to shard *chop.ChiShard
-func (w *worker) deleteShard(ctx context.Context, shard *chop.ChiShard) error {
-	w.a.V(2).Info("deleteShard() - start")
-	defer w.a.V(2).Info("deleteShard() - end")
-
+// chi is the new CHI in which there will be no more this shard
+func (w *worker) deleteShard(ctx context.Context, chi *chop.ClickHouseInstallation, shard *chop.ChiShard) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
+	w.a.V(2).Info("deleteShard() - start")
+	defer w.a.V(2).Info("deleteShard() - end")
+
 	w.a.V(1).
-		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteStarted).
-		WithStatusAction(shard.CHI).
+		WithEvent(chi, eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(chi).
 		Info("Delete shard %s/%s - started", shard.Address.Namespace, shard.Name)
 
 	// Delete all replicas
 	shard.WalkHosts(func(host *chop.ChiHost) error {
-		return w.deleteHost(ctx, host)
+		return w.deleteHost(ctx, chi, host)
 	})
 
 	// Delete Shard Service
 	_ = w.c.deleteServiceShard(ctx, shard)
 
 	w.a.V(1).
-		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteCompleted).
-		WithStatusAction(shard.CHI).
+		WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
+		WithStatusAction(chi).
 		Info("Delete shard %s/%s - completed", shard.Address.Namespace, shard.Name)
 
 	return nil
 }
 
 // deleteCluster deletes all kubernetes resources related to cluster *chop.ChiCluster
-func (w *worker) deleteCluster(ctx context.Context, cluster *chop.ChiCluster) error {
-	w.a.V(2).Info("deleteCluster() - start")
-	defer w.a.V(2).Info("deleteCluster() - end")
-
+// chi is the new CHI in which there will be no more this cluster
+func (w *worker) deleteCluster(ctx context.Context, chi *chop.ClickHouseInstallation, cluster *chop.ChiCluster) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
+	w.a.V(2).Info("deleteCluster() - start")
+	defer w.a.V(2).Info("deleteCluster() - end")
+
 	w.a.V(1).
-		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteStarted).
-		WithStatusAction(cluster.CHI).
+		WithEvent(chi, eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(chi).
 		Info("Delete cluster %s/%s - started", cluster.Address.Namespace, cluster.Name)
 
 	// Delete all shards
 	cluster.WalkShards(func(index int, shard *chop.ChiShard) error {
-		return w.deleteShard(ctx, shard)
+		return w.deleteShard(ctx, chi, shard)
 	})
 
 	// Delete Cluster Service
 	_ = w.c.deleteServiceCluster(ctx, cluster)
 
 	w.a.V(1).
-		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteCompleted).
-		WithStatusAction(cluster.CHI).
+		WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
+		WithStatusAction(chi).
 		Info("Delete cluster %s/%s - completed", cluster.Address.Namespace, cluster.Name)
 
 	return nil
@@ -922,7 +962,7 @@ func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.Cli
 		return nil, err
 	}
 
-	chi, err = w.normalizer.NormalizeCHI(chi)
+	chi, err = w.normalizer.CreateTemplatedCHI(chi)
 	if err != nil {
 		return nil, err
 	}
@@ -930,32 +970,10 @@ func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.Cli
 	return chi, nil
 }
 
-// createClusterFromObjectMeta
-func (w *worker) createClusterFromObjectMeta(objectMeta *meta.ObjectMeta) (*chop.ChiCluster, error) {
-	w.a.V(3).Info("createClusterFromObjectMeta() - start")
-	defer w.a.V(3).Info("createClusterFromObjectMeta() - end")
-
-	clusterName, err := chopmodel.GetClusterNameFromObjectMeta(objectMeta)
-	if err != nil {
-		return nil, fmt.Errorf("ObjectMeta %s does not generated by CHI %v", objectMeta.Name, err)
-	}
-
-	chi, err := w.createCHIFromObjectMeta(objectMeta)
-	if err != nil {
-		return nil, err
-	}
-
-	cluster := chi.FindCluster(clusterName)
-	if cluster == nil {
-		return nil, fmt.Errorf("can't find cluster %s in CHI %s", clusterName, chi.Name)
-	}
-
-	return cluster, nil
-}
-
 // updateConfigMap
 func (w *worker) updateConfigMap(ctx context.Context, chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -979,6 +997,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *chop.ClickHouseInstal
 // createConfigMap
 func (w *worker) createConfigMap(ctx context.Context, chi *chop.ClickHouseInstallation, configMap *core.ConfigMap) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -1006,12 +1025,13 @@ func (w *worker) reconcileConfigMap(
 	configMap *core.ConfigMap,
 	update bool,
 ) error {
-	w.a.V(2).Info("reconcileConfigMap() - start")
-	defer w.a.V(2).Info("reconcileConfigMap() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	w.a.V(2).Info("reconcileConfigMap() - start")
+	defer w.a.V(2).Info("reconcileConfigMap() - end")
 
 	// Check whether this object already exists in k8s
 	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, false)
@@ -1047,6 +1067,7 @@ func (w *worker) updateService(
 	newService *core.Service,
 ) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -1101,6 +1122,7 @@ func (w *worker) updateService(
 
 	// And only now we are ready to actually update the service with new version of the service
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(newService)
@@ -1123,6 +1145,7 @@ func (w *worker) updateService(
 // createService
 func (w *worker) createService(ctx context.Context, chi *chop.ClickHouseInstallation, service *core.Service) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -1145,12 +1168,13 @@ func (w *worker) createService(ctx context.Context, chi *chop.ClickHouseInstalla
 
 // reconcileService reconciles core.Service
 func (w *worker) reconcileService(ctx context.Context, chi *chop.ClickHouseInstallation, service *core.Service) error {
-	w.a.V(2).Info("reconcileService() - start")
-	defer w.a.V(2).Info("reconcileService() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	w.a.V(2).Info("reconcileService() - start")
+	defer w.a.V(2).Info("reconcileService() - end")
 
 	// Check whether this object already exists
 	curService, err := w.c.getService(&service.ObjectMeta, false)
@@ -1191,17 +1215,12 @@ func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) StatefulSet
 
 	// Check whether this object already exists in k8s
 	curStatefulSet, err := w.c.getStatefulSet(&statefulSet.ObjectMeta, false)
-
 	if curStatefulSet != nil {
-		if _cur, ok := curStatefulSet.Labels[chopmodel.LabelStatefulSetVersion]; ok {
-			if _new, _ok := statefulSet.Labels[chopmodel.LabelStatefulSetVersion]; _ok {
-				if _cur == _new {
-					w.a.Info("INFO StatefulSet ARE EQUAL no reconcile is actually needed")
-					return statefulSetStatusSame
-				}
-			}
+		if chopmodel.IsObjectTheSame(&curStatefulSet.ObjectMeta, &statefulSet.ObjectMeta) {
+			w.a.Info("INFO StatefulSet ARE EQUAL no reconcile is actually needed")
+			return statefulSetStatusSame
 		}
-		if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
+		if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); !equal {
 			w.a.Info("INFO StatefulSet ARE DIFFERENT reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
 			return statefulSetStatusModified
 		}
@@ -1217,12 +1236,13 @@ func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) StatefulSet
 
 // reconcileStatefulSet reconciles apps.StatefulSet
 func (w *worker) reconcileStatefulSet(ctx context.Context, newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
-	w.a.V(2).Info("reconcileStatefulSet() - start")
-	defer w.a.V(2).Info("reconcileStatefulSet() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	w.a.V(2).Info("reconcileStatefulSet() - start")
+	defer w.a.V(2).Info("reconcileStatefulSet() - end")
 
 	status := w.getStatefulSetStatus(host.StatefulSet)
 	if status == statefulSetStatusSame {
@@ -1255,12 +1275,13 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, newStatefulSet *apps.
 
 // createStatefulSet
 func (w *worker) createStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
-	w.a.V(2).Info("createStatefulSet() - start")
-	defer w.a.V(2).Info("createStatefulSet() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	w.a.V(2).Info("createStatefulSet() - start")
+	defer w.a.V(2).Info("createStatefulSet() - end")
 
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
@@ -1289,12 +1310,13 @@ func (w *worker) createStatefulSet(ctx context.Context, statefulSet *apps.Statef
 
 // updateStatefulSet
 func (w *worker) updateStatefulSet(ctx context.Context, curStatefulSet, newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
-	w.a.V(2).Info("updateStatefulSet() - start")
-	defer w.a.V(2).Info("updateStatefulSet() - end")
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
+
+	w.a.V(2).Info("updateStatefulSet() - start")
+	defer w.a.V(2).Info("updateStatefulSet() - end")
 
 	namespace := newStatefulSet.Namespace
 	name := newStatefulSet.Name
@@ -1385,6 +1407,7 @@ func (w *worker) reconcilePersistentVolumeClaims(ctx context.Context, host *chop
 // reconcileResources
 func (w *worker) reconcileResources(ctx context.Context, pvc *core.PersistentVolumeClaim, template *chop.ChiVolumeClaimTemplate) {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return
 	}
 	w.reconcileResourcesList(ctx, pvc, pvc.Spec.Resources.Requests, template.Spec.Resources.Requests)
@@ -1398,6 +1421,7 @@ func (w *worker) reconcileResourcesList(
 	desiredResourceList core.ResourceList,
 ) {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return
 	}
 
@@ -1426,12 +1450,13 @@ func (w *worker) reconcileResource(
 	desiredResourceList core.ResourceList,
 	resourceName core.ResourceName,
 ) {
-	w.a.V(2).Info("reconcileResource(%s/%s/%s) - start", pvc.Namespace, pvc.Name, resourceName)
-	defer w.a.V(2).Info("reconcileResource(%s/%s/%s) - end", pvc.Namespace, pvc.Name, resourceName)
-
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return
 	}
+
+	w.a.V(2).Info("reconcileResource(%s/%s/%s) - start", pvc.Namespace, pvc.Name, resourceName)
+	defer w.a.V(2).Info("reconcileResource(%s/%s/%s) - end", pvc.Namespace, pvc.Name, resourceName)
 
 	var ok bool
 	if (pvcResourceList == nil) || (desiredResourceList == nil) {

@@ -1,4 +1,5 @@
 // Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,8 +17,8 @@ package chi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
@@ -26,6 +27,7 @@ import (
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/queue"
 
 	log "github.com/golang/glog"
 	"gopkg.in/d4l3k/messagediff.v1"
@@ -40,7 +42,7 @@ import (
 	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
+	//"k8s.io/client-go/util/workqueue"
 	// log "k8s.io/klog"
 )
 
@@ -103,10 +105,11 @@ func (c *Controller) initQueues() {
 	for i := 0; i < c.chop.Config().ReconcileThreadsNumber+chi.DefaultReconcileSystemThreadsNumber; i++ {
 		c.queues = append(
 			c.queues,
-			workqueue.NewNamedRateLimitingQueue(
-				workqueue.DefaultControllerRateLimiter(),
-				fmt.Sprintf("chi%d", i),
-			),
+			queue.New(),
+			//workqueue.NewNamedRateLimitingQueue(
+			//	workqueue.DefaultControllerRateLimiter(),
+			//	fmt.Sprintf("chi%d", i),
+			//),
 		)
 	}
 }
@@ -361,7 +364,8 @@ func (c *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 	defer func() {
 		for i := range c.queues {
-			c.queues[i].ShutDown()
+			//c.queues[i].ShutDown()
+			c.queues[i].Close()
 		}
 	}()
 
@@ -398,29 +402,79 @@ func (c *Controller) Run(ctx context.Context) {
 }
 
 // enqueueObject adds ClickHouseInstallation object to the work queue
-func (c *Controller) enqueueObject(obj Handler) {
-	handle := []byte(obj.Handle())
+func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
+	handle := []byte(obj.Handle().(string))
 	index := 0
 	enqueue := true
 	switch command := obj.(type) {
 	case *ReconcileCHI:
 		variants := len(c.queues) - chi.DefaultReconcileSystemThreadsNumber
 		index = chi.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(handle, variants)
-		if command.cmd == reconcileUpdate {
+		switch command.cmd {
+		case reconcileAdd:
+			newjs, _ := json.Marshal(command.new)
+			newchi := chi.ClickHouseInstallation{}
+			json.Unmarshal(newjs, &newchi)
+			command.new = &newchi
+		case reconcileUpdate:
 			actionPlan := NewActionPlan(command.old, command.new)
 			enqueue = actionPlan.HasActionsToDo()
-		}
-		break
+			if enqueue {
+				//oldjson, _ := json.MarshalIndent(command.old, "", "  ")
+				//newjson, _ := json.MarshalIndent(command.new, "", "  ")
+				//log.V(3).Infof("AP---------------------------------------------:\n%s\n", actionPlan)
+				//log.V(3).Infof("old--------------------------------------------:\n%s\n", string(oldjson))
+				//log.V(3).Infof("new--------------------------------------------:\n%s\n", string(newjson))
 
-	case *ReconcileCHIT:
-	case *ReconcileChopConfig:
-	case *DropDns:
+				if len(command.old.Spec.Configuration.Clusters) > 0 {
+					if command.old.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
+						command.old.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
+						command.old.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
+						log.V(1).Infof("ERROR CHI: NON-EMPTY CHI OLD")
+					}
+				}
+				if len(command.new.Spec.Configuration.Clusters) > 0 {
+					if command.new.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
+						command.new.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
+						command.new.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
+						log.V(1).Infof("ERROR CHI: NON-EMPTY CHI NEW")
+					}
+				}
+
+				oldjs, _ := json.Marshal(command.old)
+				newjs, _ := json.Marshal(command.new)
+				oldchi := chi.ClickHouseInstallation{}
+				newchi := chi.ClickHouseInstallation{}
+				json.Unmarshal(oldjs, &oldchi)
+				json.Unmarshal(newjs, &newchi)
+				command.old = &oldchi
+				command.new = &newchi
+			}
+		}
+		if enqueue {
+			namespace := "uns"
+			name := "un"
+			switch {
+			case command.new != nil:
+				namespace = command.new.Namespace
+				name = command.new.Name
+			case command.old != nil:
+				namespace = command.old.Namespace
+				name = command.old.Name
+			}
+			log.V(1).Infof("ENQUEUE new ReconcileCHI cmd=%s for %s/%s", command.cmd, namespace, name)
+		}
+
+	case
+		*ReconcileCHIT,
+		*ReconcileChopConfig,
+		*DropDns:
 		variants := chi.DefaultReconcileSystemThreadsNumber
 		index = util.HashIntoIntTopped(handle, variants)
-		break
 	}
 	if enqueue {
-		c.queues[index].AddRateLimited(obj)
+		//c.queues[index].AddRateLimited(obj)
+		c.queues[index].Insert(obj)
 	}
 }
 
@@ -522,12 +576,32 @@ func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfigur
 // updateCHIObject updates ClickHouseInstallation object
 func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
 	namespace, name := util.NamespaceName(chi.ObjectMeta)
+
+	js, _ := json.MarshalIndent(chi, "", "  ")
+	log.V(3).Infof("updateCHIObject(%s/%s)\n%s\n", namespace, name, js)
+
+	if len(chi.Spec.Configuration.Clusters) > 0 {
+		if chi.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
+			chi.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
+			chi.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
+			log.V(1).Infof("ERROR update CHI (%s/%s): NON-EMPTY CHI OLD ", namespace, name)
+		}
+	}
+
 	new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Update(chi)
 
 	if err != nil {
 		// Error update
 		log.V(1).Infof("ERROR update CHI (%s/%s): %q", namespace, name, err)
 		return err
+	}
+
+	if len(new.Spec.Configuration.Clusters) > 0 {
+		if new.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
+			new.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
+			new.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
+			log.V(1).Infof("ERROR update CHI (%s/%s): NON-EMPTY CHI NEW ", namespace, name)
+		}
 	}
 
 	if chi.ObjectMeta.ResourceVersion != new.ObjectMeta.ResourceVersion {
@@ -547,6 +621,7 @@ func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
 func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
 	if util.IsContextDone(ctx) {
+		log.V(2).Infof("ctx is done")
 		return nil
 	}
 
@@ -569,7 +644,8 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
 	}
 
-	// Update status of a real object
+	// Update status of a real object.
+	// TODO DeepCopy depletes stack here
 	cur.Status = chi.Status
 	return c.updateCHIObject(cur)
 }
@@ -577,7 +653,7 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 // installFinalizer
 func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
 	namespace, name := util.NamespaceName(chi.ObjectMeta)
-	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
+	log.V(2).Infof("InstallFinalizer(%s/%s)", namespace, name)
 
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
 	if err != nil {
@@ -591,6 +667,7 @@ func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
 		// Already installed
 		return nil
 	}
+	log.V(2).Infof("InstallFinalizer(%s/%s) - no finalizer found, need to install one", namespace, name)
 
 	cur.ObjectMeta.Finalizers = append(cur.ObjectMeta.Finalizers, FinalizerName)
 	return c.updateCHIObject(cur)
@@ -648,7 +725,7 @@ func (c *Controller) handleObject(obj interface{}) {
 	log.V(1).Infof("Processing object: %s", object.GetName())
 
 	// Get owner - it is expected to be CHI
-	// TODO chi, err := c.chiLister.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
+	// TODO chi, err := c.chi.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
 
 	// TODO
 	//if err != nil {

@@ -34,7 +34,7 @@ const (
 type ClickHouseInstallation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" yaml:"metadata"`
-	Spec              ChiSpec   `json:"spec"               yaml:"spec"`
+	Spec              ChiSpec   `json:"spec"     yaml:"spec"`
 	Status            ChiStatus `json:"status"`
 }
 
@@ -107,7 +107,7 @@ type ChiTemplateNames struct {
 // TODO unify with ChiReplica based on HostsSet
 type ChiShard struct {
 	// DEPRECATED - to be removed soon
-	DefinitionType string `json:"definitionType"`
+	DefinitionType string `json:"definitionType,omitempty"`
 
 	Name                string           `json:"name,omitempty"`
 	Weight              int              `json:"weight,omitempty"`
@@ -120,7 +120,7 @@ type ChiShard struct {
 	Hosts []*ChiHost `json:"replicas,omitempty"`
 
 	// Internal data
-	Address ChiShardAddress         `json:"address"`
+	Address ChiShardAddress         `json:"-"`
 	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
@@ -136,33 +136,33 @@ type ChiReplica struct {
 	Hosts []*ChiHost `json:"shards,omitempty"`
 
 	// Internal data
-	Address ChiReplicaAddress       `json:"address"`
+	Address ChiReplicaAddress       `json:"-"`
 	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 
 // ChiShardAddress defines address of a shard within ClickHouseInstallation
 type ChiShardAddress struct {
-	Namespace    string `json:"namespace"`
-	CHIName      string `json:"chiName"`
-	ClusterName  string `json:"clusterName"`
-	ClusterIndex int    `json:"clusterIndex"`
+	Namespace    string `json:"namespace,omitempty"`
+	CHIName      string `json:"chiName,omitempty"`
+	ClusterName  string `json:"clusterName,omitempty"`
+	ClusterIndex int    `json:"clusterIndex,omitempty"`
 	ShardName    string `json:"shardName,omitempty"`
-	ShardIndex   int    `json:"shardIndex"`
+	ShardIndex   int    `json:"shardIndex,omitempty"`
 }
 
 // ChiReplicaAddress defines address of a replica within ClickHouseInstallation
 type ChiReplicaAddress struct {
-	Namespace    string `json:"namespace"`
-	CHIName      string `json:"chiName"`
-	ClusterName  string `json:"clusterName"`
-	ClusterIndex int    `json:"clusterIndex"`
+	Namespace    string `json:"namespace,omitempty"`
+	CHIName      string `json:"chiName,omitempty"`
+	ClusterName  string `json:"clusterName,omitempty"`
+	ClusterIndex int    `json:"clusterIndex,omitempty"`
 	ReplicaName  string `json:"replicaName,omitempty"`
-	ReplicaIndex int    `json:"replicaIndex"`
+	ReplicaIndex int    `json:"replicaIndex,omitempty"`
 }
 
 // ChiHostTemplate defines full Host Template
 type ChiHostTemplate struct {
-	Name             string                `json:"name"                       yaml:"name"`
+	Name             string                `json:"name,omitempty"             yaml:"name"`
 	PortDistribution []ChiPortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution"`
 	Spec             ChiHost               `json:"spec,omitempty"             yaml:"spec"`
 }

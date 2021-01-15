@@ -27,7 +27,8 @@ func RetryContext(ctx context.Context, tries int, desc string, f func() error) e
 	var err error
 	for try := 1; try <= tries; try++ {
 		if IsContextDone(ctx) {
-			return ContextError(ctx)
+			log.V(2).Infof("ctx is done")
+			return nil
 		}
 		// Do useful things
 		err = f()
