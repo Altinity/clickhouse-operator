@@ -200,7 +200,7 @@ func (c *Controller) getStatefulSetByHost(host *chop.ChiHost) (*apps.StatefulSet
 func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
-	case  *chop.ChiHost:
+	case *chop.ChiHost:
 		name = chopmodel.CreatePodName(obj)
 		namespace = typedObj.Address.Namespace
 	case *apps.StatefulSet:
