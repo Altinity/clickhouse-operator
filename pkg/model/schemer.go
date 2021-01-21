@@ -310,7 +310,7 @@ func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
 	return nil
 }
 
-// IsHostInCluster
+// IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
 func (s *Schemer) IsHostInCluster(host *chop.ChiHost) bool {
 	sqls := []string{heredoc.Docf(
 		`SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local`,

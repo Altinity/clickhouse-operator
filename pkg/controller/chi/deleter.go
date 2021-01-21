@@ -116,7 +116,7 @@ func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 
 	log.V(1).Infof("deleteStatefulSet(%s/%s)", namespace, name)
 
-	statefulSet, err := c.getStatefulSetByHost(host)
+	statefulSet, err := c.getStatefulSet(host)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			log.V(1).Infof("NEUTRAL not found StatefulSet %s/%s", namespace, name)
@@ -154,7 +154,7 @@ func (c *Controller) syncStatefulSet(host *chop.ChiHost) {
 	for {
 		// TODO
 		// There should be better way to sync cache
-		if _, err := c.getStatefulSetByHost(host); err == nil {
+		if _, err := c.getStatefulSet(host); err == nil {
 			log.V(2).Infof("cache NOT yet synced")
 			time.Sleep(15 * time.Second)
 		} else {

@@ -554,25 +554,31 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	return nil
 }
 
-// Exclude host from ClickHouse clusters
 func (w *worker) excludeHost(host *chop.ChiHost, status StatefulSetStatus) error {
 	if w.waitExcludeHost(host, status) {
 		w.a.V(1).
 			Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		w.excludeHostFromClickHouseCluster(host)
+	}
 
-		options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
-			SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
+	return nil
+}
+
+// excludeHostFromClickHouseCluster excludes host from all ClickHouse clusters
+func (w *worker) excludeHostFromClickHouseCluster(host *chop.ChiHost) {
+	// Specify in options to exclude host from ClickHouse config file
+	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
+		SetRemoteServersGeneratorOptions(
+			chopmodel.NewRemoteServersGeneratorOptions().
 				ExcludeHost(host).
 				ExcludeReconcileAttributes(
 					chop.NewChiHostReconcileAttributes().SetAdd(),
 				),
-			)
+		)
 
-		_ = w.reconcileCHIConfigMaps(host.CHI, options, true) // remove host from cluster config only if we are going to wait for exclusion
-		_ = w.waitHostNotInCluster(host)
-	}
-
-	return nil
+	// Remove host from cluster config and wait for ClickHouse to pick-up the change
+	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
+	_ = w.waitHostNotInCluster(host)
 }
 
 // determines whether reconciler should wait for host to be excluded from/included into cluster
@@ -642,10 +648,12 @@ func (w *worker) includeHost(host *chop.ChiHost, status StatefulSetStatus) error
 	return nil
 }
 
+// waitHostInCluster waits until host is a member of at least one ClickHouse cluster
 func (w *worker) waitHostInCluster(host *chop.ChiHost) error {
 	return w.c.pollHost(host, nil, w.schemer.IsHostInCluster)
 }
 
+// waitHostNotInCluster waits until host is not a member of any ClickHouse clusters
 func (w *worker) waitHostNotInCluster(host *chop.ChiHost) error {
 	return w.c.pollHost(host, nil, func(host *chop.ChiHost) bool {
 		return !w.schemer.IsHostInCluster(host)
@@ -760,7 +768,7 @@ func (w *worker) deleteHost(host *chop.ChiHost) error {
 		WithStatusAction(host.CHI).
 		Info("Delete host %s/%s - started", host.Address.ClusterName, host.Name)
 
-	if _, err := w.c.getStatefulSetByHost(host); err != nil {
+	if _, err := w.c.getStatefulSet(host); err != nil {
 		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
 			WithStatusAction(host.CHI).
 			Info("Delete host %s/%s - completed StatefulSet not found - already deleted? err: %v",

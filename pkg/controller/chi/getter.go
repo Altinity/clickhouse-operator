@@ -124,9 +124,24 @@ func (c *Controller) getService(objMeta *meta.ObjectMeta, byNameOnly bool) (*cor
 	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
 }
 
+// getStatefulSet gets StatefulSet
+func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.StatefulSet, error) {
+	switch typedObj := obj.(type) {
+	case *meta.ObjectMeta:
+		var b bool
+		if len(byName) > 0 {
+			b = byName[0]
+		}
+		return c.getStatefulSetByMeta(typedObj, b)
+	case *chop.ChiHost:
+		return c.getStatefulSetByHost(typedObj)
+	}
+	return nil, fmt.Errorf("unknown type")
+}
+
 // getStatefulSet gets StatefulSet either by namespaced name or by labels
 // TODO review byNameOnly params
-func (c *Controller) getStatefulSet(objMeta *meta.ObjectMeta, byNameOnly bool) (*apps.StatefulSet, error) {
+func (c *Controller) getStatefulSetByMeta(objMeta *meta.ObjectMeta, byNameOnly bool) (*apps.StatefulSet, error) {
 	get := c.statefulSetLister.StatefulSets(objMeta.Namespace).Get
 	list := c.statefulSetLister.StatefulSets(objMeta.Namespace).List
 	var objects []*apps.StatefulSet
