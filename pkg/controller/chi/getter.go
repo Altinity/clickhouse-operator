@@ -196,6 +196,20 @@ func (c *Controller) getStatefulSetByHost(host *chop.ChiHost) (*apps.StatefulSet
 	return c.statefulSetLister.StatefulSets(namespace).Get(name)
 }
 
+// getPod gets pod for host or StatefulSet
+func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
+	var name, namespace string
+	switch typedObj := obj.(type) {
+	case  *chop.ChiHost:
+		name = chopmodel.CreatePodName(obj)
+		namespace = typedObj.Address.Namespace
+	case *apps.StatefulSet:
+		name = chopmodel.CreatePodName(obj)
+		namespace = typedObj.Namespace
+	}
+	return c.podLister.Pods(namespace).Get(name)
+}
+
 // GetCHIByObjectMeta gets CHI by namespaced name
 func (c *Controller) GetCHIByObjectMeta(objectMeta *meta.ObjectMeta) (*chiv1.ClickHouseInstallation, error) {
 	chiName, err := chopmodel.GetCHINameFromObjectMeta(objectMeta)
