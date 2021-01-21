@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -133,7 +134,14 @@ func (c *Controller) labelMyObjectsTree() {
 	}
 }
 
+// addLabels adds app and version labels
 func (c *Controller) addLabels(meta *v1.ObjectMeta) {
-	meta.Labels[model.LabelAppName] = model.LabelAppValue
-	meta.Labels[model.LabelCHOP] = c.chop.Version
+	util.MergeStringMapsOverwrite(
+		meta.Labels,
+		// Add the following labels
+		map[string]string{
+			model.LabelAppName: model.LabelAppValue,
+			model.LabelCHOP:    c.chop.Version,
+		},
+	)
 }
