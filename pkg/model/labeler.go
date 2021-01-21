@@ -23,10 +23,12 @@ import (
 	"k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kublabels "k8s.io/apimachinery/pkg/labels"
+	"time"
 )
 
 const (
 	// Kubernetes labels
+	LabelReadyName                    = clickhousealtinitycom.GroupName + "/ready"
 	LabelAppName                      = clickhousealtinitycom.GroupName + "/app"
 	LabelAppValue                     = "chop"
 	LabelCHOP                         = clickhousealtinitycom.GroupName + "/chop"
@@ -438,4 +440,24 @@ func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 		return "", fmt.Errorf("can not find %s label in meta", LabelClusterName)
 	}
 	return meta.Labels[LabelClusterName], nil
+}
+
+// AddLabelReady adds "ready" label with value = UTC now
+func AddLabelReady(meta *meta.ObjectMeta) {
+	if meta == nil {
+		return
+	}
+	util.MergeStringMapsOverwrite(
+		meta.Labels,
+		map[string]string{
+			LabelReadyName: time.Now().UTC().String(),
+		})
+}
+
+// DeleteLabelReady deletes "ready" label
+func DeleteLabelReady(meta *meta.ObjectMeta) {
+	if meta == nil {
+		return
+	}
+	util.MapDeleteKeys(meta.Labels, LabelReadyName)
 }
