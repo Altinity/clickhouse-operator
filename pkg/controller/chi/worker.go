@@ -341,18 +341,19 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		func(shard *chop.ChiShard) {
 		},
 		func(host *chop.ChiHost) {
-			if update {
-				w.a.V(1).
-					WithEvent(new, eventActionCreate, eventReasonCreateStarted).
-					WithStatusAction(new).
-					Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
-				if err := w.schemer.HostCreateTables(host); err != nil {
-					w.a.Error("ERROR create tables on host %s. err: %v", host.Name, err)
-				}
-			} else {
-				w.a.V(1).
-					Info("As CHI is just created, not need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-			}
+			//
+			//if update {
+			//	w.a.V(1).
+			//		WithEvent(new, eventActionCreate, eventReasonCreateStarted).
+			//		WithStatusAction(new).
+			//		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
+			//	if err := w.schemer.HostCreateTables(host); err != nil {
+			//		w.a.Error("ERROR create tables on host %s. err: %v", host.Name, err)
+			//	}
+			//} else {
+			//	w.a.V(1).
+			//		Info("As CHI is just created, not need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			//}
 		},
 	)
 
@@ -558,10 +559,15 @@ func (w *worker) excludeHost(host *chop.ChiHost, status StatefulSetStatus) error
 	if w.waitExcludeHost(host, status) {
 		w.a.V(1).
 			Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		w.excludeHostFromService(host)
 		w.excludeHostFromClickHouseCluster(host)
 	}
 
 	return nil
+}
+
+func (w *worker) excludeHostFromService(host *chop.ChiHost) {
+	w.c.deleteLabelReady(host)
 }
 
 // excludeHostFromClickHouseCluster excludes host from all ClickHouse clusters
@@ -581,7 +587,7 @@ func (w *worker) excludeHostFromClickHouseCluster(host *chop.ChiHost) {
 	_ = w.waitHostNotInCluster(host)
 }
 
-// determines whether reconciler should wait for host to be excluded from/included into cluster
+// determines whether reconciler should wait for host to be excluded from cluster
 func (w *worker) waitExcludeHost(host *chop.ChiHost, status StatefulSetStatus) bool {
 	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
 		// No need to wait for new and non-modified StatefulSets
@@ -593,20 +599,19 @@ func (w *worker) waitExcludeHost(host *chop.ChiHost, status StatefulSetStatus) b
 		return false
 	}
 
-	if host.CHI.IsReconcilingPolicyWait() {
+	// Check CHI settings
+	switch {
+	case host.CHI.IsReconcilingPolicyWait():
 		return true
-	} else if host.CHI.IsReconcilingPolicyNoWait() {
+	case host.CHI.IsReconcilingPolicyNoWait():
 		return false
 	}
 
-	if !w.c.chop.Config().ReconcileWaitExclude {
-		return false
-	}
-
-	return true
+	// Fallback to operator's settings
+	return w.c.chop.Config().ReconcileWaitExclude
 }
 
-// determines whether reconciler should wait for host to be excluded from/included into cluster
+// determines whether reconciler should wait for host to be included into cluster
 func (w *worker) waitIncludeHost(host *chop.ChiHost, status StatefulSetStatus) bool {
 	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
 		return false
@@ -617,23 +622,29 @@ func (w *worker) waitIncludeHost(host *chop.ChiHost, status StatefulSetStatus) b
 		return false
 	}
 
-	if host.CHI.IsReconcilingPolicyWait() {
+	// Check CHI settings
+	switch {
+	case host.CHI.IsReconcilingPolicyWait():
 		return true
-	} else if host.CHI.IsReconcilingPolicyNoWait() {
+	case host.CHI.IsReconcilingPolicyNoWait():
 		return false
 	}
 
-	if w.c.chop.Config().ReconcileWaitInclude == false {
-		return false
-	}
-
-	return true
+	// Fallback to operator's settings
+	return w.c.chop.Config().ReconcileWaitInclude
 }
 
 // Include host back to ClickHouse clusters
 func (w *worker) includeHost(host *chop.ChiHost, status StatefulSetStatus) error {
 	w.a.V(1).
 		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+	w.includeHostIntoClickHouseCluster(host, status)
+	w.includeHostIntoService(host)
+
+	return nil
+}
+
+func (w *worker) includeHostIntoClickHouseCluster(host *chop.ChiHost, status StatefulSetStatus) {
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
 		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
 			ExcludeReconcileAttributes(
@@ -644,8 +655,10 @@ func (w *worker) includeHost(host *chop.ChiHost, status StatefulSetStatus) error
 	if w.waitIncludeHost(host, status) {
 		_ = w.waitHostInCluster(host)
 	}
+}
 
-	return nil
+func (w *worker) includeHostIntoService(host *chop.ChiHost) {
+	w.c.appendLabelReady(host)
 }
 
 // waitHostInCluster waits until host is a member of at least one ClickHouse cluster
