@@ -62,7 +62,7 @@ spec:
                 type: DirectoryOrCreate
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:19.3.7
+              image: yandex/clickhouse-server:20.7
               volumeMounts:
                 # Specify reference to volume on local filesystem
                 - name: local-path

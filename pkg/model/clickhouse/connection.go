@@ -16,7 +16,7 @@ package clickhouse
 
 import (
 	"context"
-	sqlmodule "database/sql"
+	databasesql "database/sql"
 	"fmt"
 	"time"
 
@@ -28,7 +28,7 @@ import (
 
 type CHConnection struct {
 	params *CHConnectionParams
-	conn   *sqlmodule.DB
+	conn   *databasesql.DB
 }
 
 func NewConnection(params *CHConnectionParams) *CHConnection {
@@ -41,7 +41,7 @@ func NewConnection(params *CHConnectionParams) *CHConnection {
 func (c *CHConnection) connect() {
 
 	log.V(2).Infof("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
-	dbConnection, err := sqlmodule.Open("clickhouse", c.params.GetDSN())
+	dbConnection, err := databasesql.Open("clickhouse", c.params.GetDSN())
 	if err != nil {
 		log.V(1).Infof("FAILED Open(%s) %v", c.params.GetDSNWithHiddenCredentials(), err)
 		return
@@ -76,7 +76,7 @@ type Query struct {
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 
-	Rows *sqlmodule.Rows
+	Rows *databasesql.Rows
 }
 
 // Close

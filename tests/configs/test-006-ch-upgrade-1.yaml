@@ -1,18 +1,18 @@
 apiVersion: clickhouse.altinity.com/v1
 kind: ClickHouseInstallation
 metadata:
-  name: upgradetest
+  name: test-006
 spec:
   templates:
     podTemplates:
-    - name: clickhouse-v19.11
+    - name: clickhouse-old
       spec:
         containers:
         - name: clickhouse-pod
-          image: yandex/clickhouse-server:19.11
+          image: yandex/clickhouse-server:20.8.6.6
   defaults:
     templates:
-      podTemplate: clickhouse-v19.11
+      podTemplate: clickhouse-old
   configuration:
     clusters:
     - name: shards

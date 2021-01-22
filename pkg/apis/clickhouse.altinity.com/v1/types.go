@@ -15,7 +15,6 @@
 package v1
 
 import (
-	"k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -60,6 +59,8 @@ type ClickHouseOperatorConfiguration struct {
 type ChiSpec struct {
 	Stop                   string           `json:"stop,omitempty"                   yaml:"stop"`
 	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern"`
+	Templating             ChiTemplating    `json:"templating,omitempty"             yaml:"templating"`
+	Reconciling            ChiReconciling   `json:"reconciling,omitempty"            yaml:"reconciling"`
 	Defaults               ChiDefaults      `json:"defaults,omitempty"               yaml:"defaults"`
 	Configuration          Configuration    `json:"configuration"                    yaml:"configuration"`
 	Templates              ChiTemplates     `json:"templates,omitempty"              yaml:"templates"`
@@ -71,6 +72,14 @@ type ChiUseTemplate struct {
 	Name      string `json:"name"      yaml:"name"`
 	Namespace string `json:"namespace" yaml:"namespace"`
 	UseType   string `json:"useType"   yaml:"useType"`
+}
+
+type ChiTemplating struct {
+	Policy string `json:"policy" yaml:"policy"`
+}
+
+type ChiReconciling struct {
+	Policy string `json:"policy" yaml:"policy"`
 }
 
 // ChiDefaults defines defaults section of .spec
@@ -151,25 +160,6 @@ type ChiReplicaAddress struct {
 	ReplicaIndex int    `json:"replicaIndex"`
 }
 
-// ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
-type ChiHost struct {
-	Name string `json:"name,omitempty"`
-	// DEPRECATED - to be removed soon
-	Port                int32            `json:"port,omitempty"`
-	TCPPort             int32            `json:"tcpPort,omitempty"`
-	HTTPPort            int32            `json:"httpPort,omitempty"`
-	InterserverHTTPPort int32            `json:"interserverHTTPPort,omitempty"`
-	Settings            Settings         `json:"settings,omitempty"`
-	Files               Settings         `json:"files,omitempty"`
-	Templates           ChiTemplateNames `json:"templates,omitempty"`
-
-	// Internal data
-	Address     ChiHostAddress          `json:"-"`
-	Config      ChiHostConfig           `json:"-"`
-	StatefulSet *v1.StatefulSet         `json:"-" testdiff:"ignore"`
-	CHI         *ClickHouseInstallation `json:"-" testdiff:"ignore"`
-}
-
 // ChiHostTemplate defines full Host Template
 type ChiHostTemplate struct {
 	Name             string                `json:"name"                       yaml:"name"`
@@ -181,34 +171,99 @@ type ChiPortDistribution struct {
 	Type string `json:"type,omitempty"   yaml:"type"`
 }
 
-// ChiHostAddress defines address of a host within ClickHouseInstallation
-type ChiHostAddress struct {
-	Namespace               string `json:"namespace"`
-	CHIName                 string `json:"chiName"`
-	ClusterName             string `json:"clusterName"`
-	ClusterIndex            int    `json:"clusterIndex"`
-	ShardName               string `json:"shardName,omitempty"`
-	ShardIndex              int    `json:"shardIndex"`
-	ShardScopeIndex         int    `json:"shardScopeIndex"`
-	ReplicaName             string `json:"replicaName,omitempty"`
-	ReplicaIndex            int    `json:"replicaIndex"`
-	ReplicaScopeIndex       int    `json:"replicaScopeIndex"`
-	HostName                string `json:"hostName,omitempty"`
-	CHIScopeIndex           int    `json:"chiScopeIndex"`
-	CHIScopeCycleSize       int    `json:"chiScopeCycleSize"`
-	CHIScopeCycleIndex      int    `json:"chiScopeCycleIndex"`
-	CHIScopeCycleOffset     int    `json:"chiScopeCycleOffset"`
-	ClusterScopeIndex       int    `json:"clusterScopeIndex"`
-	ClusterScopeCycleSize   int    `json:"clusterScopeCycleSize"`
-	ClusterScopeCycleIndex  int    `json:"clusterScopeCycleIndex"`
-	ClusterScopeCycleOffset int    `json:"clusterScopeCycleOffset"`
-}
-
 // ChiHostConfig defines additional data related to a host
 type ChiHostConfig struct {
 	ZookeeperFingerprint string `json:"zookeeperfingerprint"`
 	SettingsFingerprint  string `json:"settingsfingerprint"`
 	FilesFingerprint     string `json:"filesfingerprint"`
+}
+
+// ChiHostReconcileAttributes defines host reconcile status
+type ChiHostReconcileAttributes struct {
+	add     bool
+	remove  bool
+	modify  bool
+	unclear bool
+
+	migrate    bool
+	reconciled bool
+}
+
+func NewChiHostReconcileAttributes() *ChiHostReconcileAttributes {
+	return &ChiHostReconcileAttributes{}
+}
+
+func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
+	if s == nil {
+		return false
+	}
+	return (s.add == to.add) && (s.remove == to.remove) && (s.modify == to.modify) && (s.unclear == to.unclear)
+}
+
+func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
+	if s == nil {
+		return false
+	}
+	return (s.add && to.add) || (s.remove && to.remove) || (s.modify && to.modify) || (s.unclear && to.unclear)
+}
+
+func (s *ChiHostReconcileAttributes) SetAdd() *ChiHostReconcileAttributes {
+	s.add = true
+	return s
+}
+
+func (s *ChiHostReconcileAttributes) UnsetAdd() *ChiHostReconcileAttributes {
+	s.add = false
+	return s
+}
+
+func (s *ChiHostReconcileAttributes) SetRemove() *ChiHostReconcileAttributes {
+	s.remove = true
+	return s
+}
+
+func (s *ChiHostReconcileAttributes) SetModify() *ChiHostReconcileAttributes {
+	s.modify = true
+	return s
+}
+
+func (s *ChiHostReconcileAttributes) SetUnclear() *ChiHostReconcileAttributes {
+	s.unclear = true
+	return s
+}
+
+func (s *ChiHostReconcileAttributes) SetMigrate() *ChiHostReconcileAttributes {
+	s.migrate = true
+	return s
+}
+
+func (s *ChiHostReconcileAttributes) SetReconciled() *ChiHostReconcileAttributes {
+	s.reconciled = true
+	return s
+}
+
+func (s *ChiHostReconcileAttributes) IsAdd() bool {
+	return s.add
+}
+
+func (s *ChiHostReconcileAttributes) IsRemove() bool {
+	return s.remove
+}
+
+func (s *ChiHostReconcileAttributes) IsModify() bool {
+	return s.modify
+}
+
+func (s *ChiHostReconcileAttributes) IsUnclear() bool {
+	return s.unclear
+}
+
+func (s *ChiHostReconcileAttributes) IsMigrate() bool {
+	return s.migrate
+}
+
+func (s *ChiHostReconcileAttributes) IsReconciled() bool {
+	return s.reconciled
 }
 
 // CHITemplates defines templates section of .spec
@@ -234,6 +289,7 @@ type ChiPodTemplate struct {
 	// DEPRECATED - to be removed soon
 	Distribution    string               `json:"distribution"              yaml:"distribution"`
 	PodDistribution []ChiPodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution"`
+	ObjectMeta      metav1.ObjectMeta    `json:"metadata"                  yaml:"metadata"`
 	Spec            corev1.PodSpec       `json:"spec"                      yaml:"spec"`
 }
 

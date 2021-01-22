@@ -4,7 +4,7 @@ import test_operator
 import test_clickhouse
 import util
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE, args
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE, args, Fail, Error
 from testflows.asserts import error
 
 if main():
@@ -36,7 +36,11 @@ if main():
             pass
 
         # python3 tests/test.py --only operator*
-        with Module("operator"):
+        xfails = {
+             "/main/operator/test_022. Test that chi with broken image can be deleted": [(Error, "Not supported yet. Timeout")],
+             "/main/operator/test_024. Test annotations for various template types/PV annotations should be populated": [(Fail, "Not supported yet")],
+        }
+        with Module("operator", xfails = xfails):
             all_tests = [
                 test_operator.test_001,
                 test_operator.test_002,
@@ -45,7 +49,7 @@ if main():
                 test_operator.test_006,
                 test_operator.test_007,
                 test_operator.test_008,
-                (test_operator.test_009, {"version_from": "0.11.0"}),
+                (test_operator.test_009, {"version_from": "0.12.0"}),
                 test_operator.test_010,
                 test_operator.test_011,
                 test_operator.test_011_1,
@@ -55,11 +59,14 @@ if main():
                 test_operator.test_015,
                 test_operator.test_016,
                 test_operator.test_017,
-                test_operator.test_018,
+                # test_operator.test_018, # Obsolete, covered by test_016
                 test_operator.test_019,
                 test_operator.test_020,
                 test_operator.test_021,
                 test_operator.test_022,
+                test_operator.test_023,
+                test_operator.test_024,
+                test_operator.test_025,
             ]
             run_tests = all_tests
 

@@ -16,6 +16,8 @@ package chi
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/juliangruber/go-intersect"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -25,7 +27,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/util/workqueue"
-	"time"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
@@ -190,6 +191,24 @@ func (w *worker) normalize(chi *chop.ClickHouseInstallation) *chop.ClickHouseIns
 	return chi
 }
 
+// ensureFinalizer
+func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) {
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
+
+	// Check whether finalizer is already listed in CHI
+	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
+		w.a.V(2).Info("ensureFinalizer(%s/%s): finalizer already installed", namespace, name)
+	}
+
+	// No finalizer found - need to install it
+
+	if err := w.c.installFinalizer(chi); err != nil {
+		w.a.V(1).Info("ensureFinalizer(%s/%s): unable to install finalizer. err: %v", namespace, name, err)
+	}
+
+	w.a.V(3).Info("ensureFinalizer(%s/%s): finalizer installed", namespace, name)
+}
+
 // updateCHI sync CHI which was already created earlier
 func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	w.a.V(3).Info("updateCHI() - start")
@@ -206,42 +225,10 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	// Check DeletionTimestamp in order to understand, whether the object is being deleted
 	if new.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted
-		if !util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
-			// Install finalizer
-			w.a.V(2).Info("updateCHI(%s/%s): install finalizer", new.Namespace, new.Name)
-
-			if err := w.c.installFinalizer(new); err != nil {
-				w.a.V(1).Info("updateCHI(%s/%s): unable to install finalizer: %v", new.Namespace, new.Name, err)
-			}
-		}
-
-		w.a.V(3).Info("updateCHI(%s/%s): finalizer installed", new.Namespace, new.Name)
+		w.ensureFinalizer(new)
 	} else {
 		// The object is being deleted
-		cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(new.Name, newGetOptions())
-		if (err == nil) && (cur != nil) {
-			if util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
-				// Delete CHI
-				(&new.Status).DeleteStart()
-				if err := w.c.updateCHIObjectStatus(new, true); err != nil {
-					w.a.V(1).Info("UNABLE to write normalized CHI (%s/%s). It can trigger update action again. Error: %q", new.Namespace, new.Name, err)
-					return nil
-				}
-
-				_ = w.deleteCHI(new)
-
-				// Uninstall finalizer
-				w.a.V(2).Info("updateCHI(%s/%s): uninstall finalizer", new.Namespace, new.Name)
-				if err := w.c.uninstallFinalizer(new); err != nil {
-					w.a.V(1).Info("updateCHI(%s/%s): unable to uninstall finalizer: %v", new.Namespace, new.Name, err)
-				}
-			}
-
-			// Object can now be deleted by Kubernetes
-			w.a.V(3).Info("updateCHI(%s/%s): finalizer uninstalled, object can be deleted", new.Namespace, new.Name)
-		}
-
-		return nil
+		return w.finalizeCHI(new)
 	}
 
 	old = w.normalize(old)
@@ -267,6 +254,74 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		WithStatusAction(new).
 		Info("updateCHI(%s/%s) reconcile started", new.Namespace, new.Name)
 	w.a.V(2).Info("updateCHI(%s/%s) - action plan\n%s\n", new.Namespace, new.Name, actionPlan.String())
+
+	if new.IsStopped() {
+		w.a.V(1).
+			WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
+			WithStatusAction(new).
+			Info("updateCHI(%s/%s) exclude CHI from monitoring", new.Namespace, new.Name)
+		w.c.deleteWatch(new.Namespace, new.Name)
+	}
+
+	actionPlan.WalkAdded(
+		func(cluster *chop.ChiCluster) {
+			cluster.WalkHosts(func(host *chop.ChiHost) error {
+				(&host.ReconcileAttributes).SetAdd()
+				return nil
+			})
+		},
+		func(shard *chop.ChiShard) {
+			shard.WalkHosts(func(host *chop.ChiHost) error {
+				(&host.ReconcileAttributes).SetAdd()
+				return nil
+			})
+		},
+		func(host *chop.ChiHost) {
+			(&host.ReconcileAttributes).SetAdd()
+		},
+	)
+
+	actionPlan.WalkModified(
+		func(cluster *chop.ChiCluster) {
+		},
+		func(shard *chop.ChiShard) {
+		},
+		func(host *chop.ChiHost) {
+			(&host.ReconcileAttributes).SetModify()
+		},
+	)
+
+	new.WalkHosts(func(host *chop.ChiHost) error {
+		if update {
+			host.ReconcileAttributes.SetMigrate()
+		}
+		return nil
+	})
+
+	new.WalkHosts(func(host *chop.ChiHost) error {
+		if host.ReconcileAttributes.IsAdd() {
+			// Already added
+		} else if host.ReconcileAttributes.IsModify() {
+			// Already modified
+		} else {
+			// Not clear yet
+			(&host.ReconcileAttributes).SetUnclear()
+		}
+		return nil
+	})
+
+	new.WalkHosts(func(host *chop.ChiHost) error {
+		if host.ReconcileAttributes.IsAdd() {
+			w.a.Info("ADD host: %s", host.Address.ShortString())
+		} else if host.ReconcileAttributes.IsModify() {
+			w.a.Info("MODIFY host: %s", host.Address.ShortString())
+		} else if host.ReconcileAttributes.IsUnclear() {
+			w.a.Info("UNCLEAR host: %s", host.Address.ShortString())
+		} else {
+			w.a.Info("UNTOUCH host: %s", host.Address.ShortString())
+		}
+		return nil
+	})
 
 	if err := w.reconcile(new); err != nil {
 		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
@@ -318,11 +373,13 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		},
 	)
 
-	w.a.V(1).
-		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
-		WithStatusAction(new).
-		Info("updateCHI(%s/%s) update monitoring list", new.Namespace, new.Name)
-	w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfCHI(new))
+	if !new.IsStopped() {
+		w.a.V(1).
+			WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
+			WithStatusAction(new).
+			Info("updateCHI(%s/%s) add CHI to monitoring", new.Namespace, new.Name)
+		w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfCHI(new))
+	}
 
 	// Update CHI object
 	(&new.Status).ReconcileComplete()
@@ -351,19 +408,24 @@ func (w *worker) reconcile(chi *chop.ClickHouseInstallation) error {
 	)
 }
 
-// reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary ensured ConfigMaos are in place
+// reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary in order to ensure that ConfigMaps are in place
 func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallation) error {
 	w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - start")
 	defer w.a.V(2).Info("reconcileCHIAuxObjectsPreliminary() - end")
 
 	// 1. CHI Service
-	service := w.creator.CreateServiceCHI()
-	if err := w.reconcileService(chi, service); err != nil {
-		return err
+	if chi.IsStopped() {
+		// Stopped cluster must have no entry point
+		_ = w.c.deleteServiceCHI(chi)
+	} else {
+		service := w.creator.CreateServiceCHI()
+		if err := w.reconcileService(chi, service); err != nil {
+			return err
+		}
 	}
 
 	// 2. CHI ConfigMaps without update - create only
-	return w.reconcileCHIConfigMaps(chi, false)
+	return w.reconcileCHIConfigMaps(chi, nil, false)
 }
 
 // reconcileCHIAuxObjectsFinal reconciles CHI global objects
@@ -372,15 +434,15 @@ func (w *worker) reconcileCHIAuxObjectsFinal(chi *chop.ClickHouseInstallation) e
 	defer w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - end")
 
 	// CHI ConfigMaps with update
-	return w.reconcileCHIConfigMaps(chi, true)
+	return w.reconcileCHIConfigMaps(chi, nil, true)
 }
 
 // reconcileCHIConfigMaps reconciles all CHI's ConfigMaps
-func (w *worker) reconcileCHIConfigMaps(chi *chop.ClickHouseInstallation, update bool) error {
+func (w *worker) reconcileCHIConfigMaps(chi *chop.ClickHouseInstallation, options *chopmodel.ClickHouseConfigFilesGeneratorOptions, update bool) error {
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.creator.CreateConfigMapCHICommon()
+	configMapCommon := w.creator.CreateConfigMapCHICommon(options)
 	if err := w.reconcileConfigMap(chi, configMapCommon, update); err != nil {
 		return err
 	}
@@ -434,14 +496,22 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		WithStatusAction(host.CHI).
 		Info("Reconcile Host %s started", host.Name)
 
-	// Reconcile host's ConfigMap
+	// Create artifacts
 	configMap := w.creator.CreateConfigMapHost(host)
+	statefulSet := w.creator.CreateStatefulSet(host)
+	service := w.creator.CreateServiceHost(host)
+	status := w.getStatefulSetStatus(host.StatefulSet)
+
+	if err := w.excludeHost(host, status); err != nil {
+		return err
+	}
+
+	// Reconcile host's ConfigMap
 	if err := w.reconcileConfigMap(host.CHI, configMap, true); err != nil {
 		return err
 	}
 
 	// Reconcile host's StatefulSet
-	statefulSet := w.creator.CreateStatefulSet(host)
 	if err := w.reconcileStatefulSet(statefulSet, host); err != nil {
 		return err
 	}
@@ -450,15 +520,168 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	w.reconcilePersistentVolumes(host)
 
 	// Reconcile host's Service
-	service := w.creator.CreateServiceHost(host)
 	if err := w.reconcileService(host.CHI, service); err != nil {
 		return err
 	}
+
+	host.ReconcileAttributes.UnsetAdd()
+
+	if host.ReconcileAttributes.IsMigrate() {
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
+			WithStatusAction(host.CHI).
+			Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
+		if err := w.schemer.HostCreateTables(host); err != nil {
+			w.a.Error("ERROR create tables on host %s. err: %v", host.Name, err)
+		}
+	} else {
+		w.a.V(1).
+			Info("As CHI is just created, not need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+	}
+
+	if err := w.includeHost(host, status); err != nil {
+		// If host is not ready - fallback
+		return err
+	}
+
+	host.ReconcileAttributes.SetReconciled()
 
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
 		WithStatusAction(host.CHI).
 		Info("Reconcile Host %s completed", host.Name)
+
+	return nil
+}
+
+// Exclude host from ClickHouse clusters
+func (w *worker) excludeHost(host *chop.ChiHost, status StatefulSetStatus) error {
+	if w.waitExcludeHost(host, status) {
+		w.a.V(1).
+			Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+
+		options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
+			SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
+				ExcludeHost(host).
+				ExcludeReconcileAttributes(
+					chop.NewChiHostReconcileAttributes().SetAdd(),
+				),
+			)
+
+		_ = w.reconcileCHIConfigMaps(host.CHI, options, true) // remove host from cluster config only if we are going to wait for exclusion
+		_ = w.waitHostNotInCluster(host)
+	}
+
+	return nil
+}
+
+// determines whether reconciler should wait for host to be excluded from/included into cluster
+func (w *worker) waitExcludeHost(host *chop.ChiHost, status StatefulSetStatus) bool {
+	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
+		// No need to wait for new and non-modified StatefulSets
+		return false
+	}
+
+	if host.GetShard().HostsCount() == 1 {
+		// In case shard where current host is located has only one host (means no replication), no need to wait
+		return false
+	}
+
+	if host.CHI.IsReconcilingPolicyWait() {
+		return true
+	} else if host.CHI.IsReconcilingPolicyNoWait() {
+		return false
+	}
+
+	if !w.c.chop.Config().ReconcileWaitExclude {
+		return false
+	}
+
+	return true
+}
+
+// determines whether reconciler should wait for host to be excluded from/included into cluster
+func (w *worker) waitIncludeHost(host *chop.ChiHost, status StatefulSetStatus) bool {
+	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
+		return false
+	}
+
+	if host.GetShard().HostsCount() == 1 {
+		// In case shard where current host is located has only one host (means no replication), no need to wait
+		return false
+	}
+
+	if host.CHI.IsReconcilingPolicyWait() {
+		return true
+	} else if host.CHI.IsReconcilingPolicyNoWait() {
+		return false
+	}
+
+	if w.c.chop.Config().ReconcileWaitInclude == false {
+		return false
+	}
+
+	return true
+}
+
+// Include host back to ClickHouse clusters
+func (w *worker) includeHost(host *chop.ChiHost, status StatefulSetStatus) error {
+	w.a.V(1).
+		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
+		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
+			ExcludeReconcileAttributes(
+				chop.NewChiHostReconcileAttributes().SetAdd(),
+			),
+		)
+	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
+	if w.waitIncludeHost(host, status) {
+		_ = w.waitHostInCluster(host)
+	}
+
+	return nil
+}
+
+func (w *worker) waitHostInCluster(host *chop.ChiHost) error {
+	return w.c.pollHost(host, nil, w.schemer.IsHostInCluster)
+}
+
+func (w *worker) waitHostNotInCluster(host *chop.ChiHost) error {
+	return w.c.pollHost(host, nil, func(host *chop.ChiHost) bool {
+		return !w.schemer.IsHostInCluster(host)
+	})
+}
+
+// finalizeCHI
+func (w *worker) finalizeCHI(chi *chop.ClickHouseInstallation) error {
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
+	w.a.V(3).Info("finalizeCHI(%s/%s) - start", namespace, name)
+	defer w.a.V(3).Info("finalizeCHI(%s/%s) - end", namespace, name)
+
+	cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
+	if (err != nil) || (cur == nil) {
+		return nil
+	}
+
+	if !util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
+		// No finalizer found, unexpected behavior
+		return nil
+	}
+
+	// Delete CHI
+	(&chi.Status).DeleteStart()
+	if err := w.c.updateCHIObjectStatus(chi, true); err != nil {
+		w.a.V(1).Info("UNABLE to write normalized CHI (%s/%s). err:%q", namespace, name, err)
+		return nil
+	}
+
+	_ = w.deleteCHI(chi)
+
+	// Uninstall finalizer
+	w.a.V(2).Info("finalizeCHI(%s/%s): uninstall finalizer", namespace, name)
+	if err := w.c.uninstallFinalizer(chi); err != nil {
+		w.a.V(1).Info("finalizeCHI(%s/%s): unable to uninstall finalizer: err:%v", namespace, name, err)
+	}
 
 	return nil
 }
@@ -483,6 +706,9 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 		return err
 	}
 
+	// Exclude this CHI from monitoring
+	w.c.deleteWatch(chi.Namespace, chi.Name)
+
 	// Delete all clusters
 	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
 		return w.deleteCluster(cluster)
@@ -498,9 +724,6 @@ func (w *worker) deleteCHI(chi *chop.ClickHouseInstallation) error {
 		WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
 		WithStatusAction(chi).
 		Info("Delete CHI %s/%s - completed", chi.Namespace, chi.Name)
-
-	// Exclude this CHI from monitoring
-	w.c.deleteWatch(chi.Namespace, chi.Name)
 
 	return nil
 }
@@ -785,6 +1008,10 @@ func (w *worker) updateService(chi *chop.ClickHouseInstallation, curService, new
 		newService.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
 	}
 
+	newService.ObjectMeta.Labels = util.MergeStringMapsPreserve(newService.ObjectMeta.Labels, curService.ObjectMeta.Labels)
+	newService.ObjectMeta.Annotations = util.MergeStringMapsPreserve(newService.ObjectMeta.Annotations, curService.ObjectMeta.Annotations)
+	newService.ObjectMeta.Finalizers = util.MergeStringArrays(newService.ObjectMeta.Finalizers, curService.ObjectMeta.Finalizers)
+
 	// And only now we are ready to actually update the service with new version of the service
 	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(newService)
 
@@ -851,20 +1078,61 @@ func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *cor
 	return err
 }
 
+type StatefulSetStatus string
+
+const (
+	statefulSetStatusModified StatefulSetStatus = "modified"
+	statefulSetStatusNew      StatefulSetStatus = "new"
+	statefulSetStatusSame     StatefulSetStatus = "same"
+	statefulSetStatusUnknown  StatefulSetStatus = "unknown"
+)
+
+func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) StatefulSetStatus {
+	w.a.V(2).Info("getStatefulSetStatus() - start")
+	defer w.a.V(2).Info("getStatefulSetStatus() - end")
+
+	// Check whether this object already exists in k8s
+	curStatefulSet, err := w.c.getStatefulSet(&statefulSet.ObjectMeta, false)
+
+	if curStatefulSet != nil {
+		if _cur, ok := curStatefulSet.Labels[chopmodel.LabelStatefulSetVersion]; ok {
+			if _new, _ok := statefulSet.Labels[chopmodel.LabelStatefulSetVersion]; _ok {
+				if _cur == _new {
+					w.a.Info("INFO StatefulSet ARE EQUAL no reconcile is actually needed")
+					return statefulSetStatusSame
+				}
+			}
+		}
+		if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
+			w.a.Info("INFO StatefulSet ARE DIFFERENT reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
+			return statefulSetStatusModified
+		}
+	}
+
+	if apierrors.IsNotFound(err) {
+		// StatefulSet not found - even during Update process - try to create it
+		return statefulSetStatusNew
+	}
+
+	return statefulSetStatusUnknown
+}
+
 // reconcileStatefulSet reconciles apps.StatefulSet
 func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	w.a.V(2).Info("reconcileStatefulSet() - start")
 	defer w.a.V(2).Info("reconcileStatefulSet() - end")
+
+	status := w.getStatefulSetStatus(host.StatefulSet)
+	if status == statefulSetStatusSame {
+		defer w.a.V(2).Info("reconcileStatefulSet() - no need to reconcile the same StaetfulSet")
+		return nil
+	}
 
 	// Check whether this object already exists in k8s
 	curStatefulSet, err := w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
 	if curStatefulSet != nil {
 		// We have StatefulSet - try to update it
-		if diff, equal := messagediff.DeepDiff(*curStatefulSet, *newStatefulSet); !equal {
-			_ = diff
-			w.a.V(1).Info("StatefulSet Diffs")
-		}
 		err = w.updateStatefulSet(curStatefulSet, newStatefulSet, host)
 	}
 
@@ -881,14 +1149,6 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 	}
 
 	return err
-}
-
-// reconcilePersistentVolumes
-func (w *worker) reconcilePersistentVolumes(host *chop.ChiHost) {
-	w.c.walkPVs(host, func(pv *core.PersistentVolume) {
-		pv = w.creator.PreparePersistentVolume(pv, host)
-		_ = w.c.updatePersistentVolume(pv)
-	})
 }
 
 // createStatefulSet
@@ -934,7 +1194,7 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 		WithStatusAction(host.CHI).
 		Info("Update StatefulSet(%s/%s) - started", namespace, name)
 
-	err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet)
+	err := w.c.updateStatefulSet(curStatefulSet, newStatefulSet, host)
 	if err == nil {
 		host.CHI.Status.UpdatedHostsCount++
 		_ = w.c.updateCHIObjectStatus(host.CHI, false)
@@ -955,15 +1215,23 @@ func (w *worker) updateStatefulSet(curStatefulSet, newStatefulSet *apps.Stateful
 	w.a.Info(util.MessageDiffString(diff, equal))
 
 	err = w.c.deleteStatefulSet(host)
-	err = w.reconcilePVCs(host)
+	err = w.reconcilePersistentVolumeClaims(host)
 	return w.createStatefulSet(newStatefulSet, host)
 }
 
-// reconcilePVCs
-func (w *worker) reconcilePVCs(host *chop.ChiHost) error {
+// reconcilePersistentVolumes
+func (w *worker) reconcilePersistentVolumes(host *chop.ChiHost) {
+	w.c.walkPVs(host, func(pv *core.PersistentVolume) {
+		pv = w.creator.PreparePersistentVolume(pv, host)
+		_ = w.c.updatePersistentVolume(pv)
+	})
+}
+
+// reconcilePersistentVolumeClaims
+func (w *worker) reconcilePersistentVolumeClaims(host *chop.ChiHost) error {
 	namespace := host.Address.Namespace
-	w.a.V(2).Info("reconcilePVCs for host %s/%s - start", namespace, host.Name)
-	defer w.a.V(2).Info("reconcilePVCs for host %s/%s - end", namespace, host.Name)
+	w.a.V(2).Info("reconcilePersistentVolumeClaims for host %s/%s - start", namespace, host.Name)
+	defer w.a.V(2).Info("reconcilePersistentVolumeClaims for host %s/%s - end", namespace, host.Name)
 
 	host.WalkVolumeMounts(func(volumeMount *core.VolumeMount) {
 		volumeClaimTemplateName := volumeMount.Name

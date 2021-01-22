@@ -16,39 +16,37 @@ package model
 
 import (
 	"fmt"
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	// "net/url"
 
+	log "github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	log "github.com/golang/glog"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	// log "k8s.io/klog"
+
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type Creator struct {
-	chop                      *chop.CHOp
-	chi                       *chiv1.ClickHouseInstallation
-	chConfigGenerator         *ClickHouseConfigGenerator
-	chConfigSectionsGenerator *configSections
-	labeler                   *Labeler
+	chop                   *chop.CHOp
+	chi                    *chiv1.ClickHouseInstallation
+	chConfigFilesGenerator *ClickHouseConfigFilesGenerator
+	labeler                *Labeler
 }
 
 func NewCreator(
 	chop *chop.CHOp,
 	chi *chiv1.ClickHouseInstallation,
 ) *Creator {
-	creator := &Creator{
-		chop:              chop,
-		chi:               chi,
-		chConfigGenerator: NewClickHouseConfigGenerator(chi),
-		labeler:           NewLabeler(chop, chi),
+	return &Creator{
+		chop:                   chop,
+		chi:                    chi,
+		chConfigFilesGenerator: NewClickHouseConfigFilesGenerator(NewClickHouseConfigGenerator(chi), chop.Config()),
+		labeler:                NewLabeler(chop, chi),
 	}
-	creator.chConfigSectionsGenerator = NewConfigSections(creator.chConfigGenerator, creator.chop.Config())
-	return creator
 }
 
 // CreateServiceCHI creates new corev1.Service for specified CHI
@@ -166,19 +164,19 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 						Name:       chDefaultHTTPPortName,
 						Protocol:   corev1.ProtocolTCP,
 						Port:       host.HTTPPort,
-						TargetPort: intstr.FromString(chDefaultHTTPPortName),
+						TargetPort: intstr.FromInt(int(host.HTTPPort)),
 					},
 					{
 						Name:       chDefaultTCPPortName,
 						Protocol:   corev1.ProtocolTCP,
 						Port:       host.TCPPort,
-						TargetPort: intstr.FromString(chDefaultTCPPortName),
+						TargetPort: intstr.FromInt(int(host.TCPPort)),
 					},
 					{
 						Name:       chDefaultInterserverHTTPPortName,
 						Protocol:   corev1.ProtocolTCP,
 						Port:       host.InterserverHTTPPort,
-						TargetPort: intstr.FromString(chDefaultInterserverHTTPPortName),
+						TargetPort: intstr.FromInt(int(host.InterserverHTTPPort)),
 					},
 				},
 				Selector:                 c.labeler.GetSelectorHostScope(host),
@@ -229,17 +227,16 @@ func (c *Creator) createServiceFromTemplate(
 	service.Namespace = namespace
 
 	// Append provided Labels to already specified Labels in template
-	service.Labels = util.MergeStringMaps(service.Labels, labels)
+	service.Labels = util.MergeStringMapsOverwrite(service.Labels, labels)
 
 	// Append provided Selector to already specified Selector in template
-	service.Spec.Selector = util.MergeStringMaps(service.Spec.Selector, selector)
+	service.Spec.Selector = util.MergeStringMapsOverwrite(service.Spec.Selector, selector)
 
 	return service
 }
 
 // CreateConfigMapCHICommon creates new corev1.ConfigMap
-func (c *Creator) CreateConfigMapCHICommon() *corev1.ConfigMap {
-	c.chConfigSectionsGenerator.CreateConfigsCommon()
+func (c *Creator) CreateConfigMapCHICommon(options *ClickHouseConfigFilesGeneratorOptions) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonName(c.chi),
@@ -247,13 +244,12 @@ func (c *Creator) CreateConfigMapCHICommon() *corev1.ConfigMap {
 			Labels:    c.labeler.getLabelsConfigMapCHICommon(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigSectionsGenerator.commonConfigSections,
+		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupCommon(options),
 	}
 }
 
 // CreateConfigMapCHICommonUsers creates new corev1.ConfigMap
 func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
-	c.chConfigSectionsGenerator.CreateConfigsUsers()
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CreateConfigMapCommonUsersName(c.chi),
@@ -261,11 +257,11 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 			Labels:    c.labeler.getLabelsConfigMapCHICommonUsers(),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigSectionsGenerator.commonUsersConfigSections,
+		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupUsers(),
 	}
 }
 
-// createConfigMapHost creates new corev1.ConfigMap
+// CreateConfigMapHost creates new corev1.ConfigMap
 func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -273,17 +269,17 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 			Namespace: host.Address.Namespace,
 			Labels:    c.labeler.getLabelsConfigMapHost(host),
 		},
-		Data: c.chConfigSectionsGenerator.CreateConfigsHost(host),
+		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host),
 	}
 }
 
-// createStatefulSet creates new apps.StatefulSet
+// CreateStatefulSet creates new apps.StatefulSet
 func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(host)
 	serviceName := CreateStatefulSetServiceName(host)
 
 	// Create apps.StatefulSet object
-	replicasNum := host.GetReplicasNum()
+	replicasNum := host.GetStatefulSetReplicasNum()
 	revisionHistoryLimit := int32(10)
 	// StatefulSet has additional label - ZK config fingerprint
 	statefulSet := &apps.StatefulSet{
@@ -318,6 +314,7 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	c.setupStatefulSetPodTemplate(statefulSet, host)
 	c.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
 
+	statefulSet.Labels = util.MergeStringMapsOverwrite(statefulSet.Labels, map[string]string{LabelStatefulSetVersion: util.Fingerprint(statefulSet)})
 	host.StatefulSet = statefulSet
 
 	return statefulSet
@@ -325,42 +322,50 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 
 // PreparePersistentVolume
 func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chiv1.ChiHost) *corev1.PersistentVolume {
-	pv.Labels = util.MergeStringMaps(pv.Labels, c.labeler.getLabelsHostScope(host, false))
+	pv.Labels = util.MergeStringMapsOverwrite(pv.Labels, c.labeler.getLabelsHostScope(host, false))
 	return pv
 }
 
 // setupStatefulSetPodTemplate performs PodTemplate setup of StatefulSet
 func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-
-	// Initial PodTemplateSpec
-	statefulSet.Spec.Template = corev1.PodTemplateSpec{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:      c.labeler.getLabelsHostScope(host, true),
-			Annotations: c.labeler.getAnnotationsHostScope(host),
-		},
-	}
-
 	// Process Pod Template
 	podTemplate := c.getPodTemplate(host)
-	statefulSetApplyPodTemplate(statefulSet, podTemplate)
+	c.statefulSetApplyPodTemplate(statefulSet, podTemplate, host)
 
 	// Post-process StatefulSet
-	c.ensureStatefulSetIntegrity(statefulSet, host)
+	c.ensureStatefulSetTemplateIntegrity(statefulSet, host)
 	c.personalizeStatefulSetTemplate(statefulSet, host)
 }
 
-func (c *Creator) ensureStatefulSetIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	ensureClickHouseContainer(statefulSet, host)
+func (c *Creator) ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	c.ensureClickHouseContainerSpecified(statefulSet, host)
+	c.ensureProbesSpecified(statefulSet)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
-func ensureClickHouseContainer(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
-	if _, ok := getClickHouseContainer(statefulSet); !ok {
-		// No ClickHouse container available
-		addContainer(
-			&statefulSet.Spec.Template.Spec,
-			newDefaultClickHouseContainer(),
-		)
+func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
+	_, ok := getClickHouseContainer(statefulSet)
+	if ok {
+		return
+	}
+
+	// No ClickHouse container available, let's add one
+	addContainer(
+		&statefulSet.Spec.Template.Spec,
+		c.newDefaultClickHouseContainer(),
+	)
+}
+
+func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
+	container, ok := getClickHouseContainer(statefulSet)
+	if !ok {
+		return
+	}
+	if container.LivenessProbe == nil {
+		container.LivenessProbe = newDefaultLivenessProbe()
+	}
+	if container.ReadinessProbe == nil {
+		container.ReadinessProbe = c.newDefaultReadinessProbe()
 	}
 }
 
@@ -380,16 +385,7 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.LogVolumeClaimTemplate != "" {
-		addContainer(&statefulSet.Spec.Template.Spec, corev1.Container{
-			Name:  ClickHouseLogContainerName,
-			Image: defaultBusyBoxDockerImage,
-			Command: []string{
-				"/bin/sh", "-c", "--",
-			},
-			Args: []string{
-				"while true; do sleep 30; done;",
-			},
-		})
+		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
 		log.V(1).Infof("setupStatefulSetPodTemplate() add log container for statefulSet %s", statefulSetName)
 	}
 }
@@ -407,7 +403,7 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 		log.V(1).Infof("getPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
 	} else {
 		// Host references UNKNOWN PodTemplate, will use default one
-		podTemplate = newDefaultPodTemplate(statefulSetName)
+		podTemplate = c.newDefaultPodTemplate(statefulSetName)
 		log.V(1).Infof("getPodTemplate() statefulSet %s use default generated template", statefulSetName)
 	}
 
@@ -421,7 +417,7 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
 func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
-	configMapMacrosName := CreateConfigMapPodName(host)
+	configMapPodName := CreateConfigMapPodName(host)
 	configMapCommonName := CreateConfigMapCommonName(c.chi)
 	configMapCommonUsersName := CreateConfigMapCommonUsersName(c.chi)
 
@@ -430,7 +426,7 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 		statefulSetObject.Spec.Template.Spec.Volumes,
 		newVolumeForConfigMap(configMapCommonName),
 		newVolumeForConfigMap(configMapCommonUsersName),
-		newVolumeForConfigMap(configMapMacrosName),
+		newVolumeForConfigMap(configMapPodName),
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
@@ -443,7 +439,7 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 			container.VolumeMounts,
 			newVolumeMount(configMapCommonName, dirPathCommonConfig),
 			newVolumeMount(configMapCommonUsersName, dirPathUsersConfig),
-			newVolumeMount(configMapMacrosName, dirPathHostConfig),
+			newVolumeMount(configMapPodName, dirPathHostConfig),
 		)
 	}
 }
@@ -485,30 +481,127 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.Statefu
 	c.setupStatefulSetApplyVolumeClaimTemplates(statefulSet, host)
 }
 
-// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided 'src' ChiPodTemplate
-func statefulSetApplyPodTemplate(dst *apps.StatefulSet, template *chiv1.ChiPodTemplate) {
-	// StatefulSet's pod template is not directly compatible with ChiPodTemplate, we need some fields only
-	dst.Spec.Template.Name = template.Name
-	dst.Spec.Template.Spec = template.Spec
+// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided ChiPodTemplate
+func (c *Creator) statefulSetApplyPodTemplate(
+	statefulSet *apps.StatefulSet,
+	template *chiv1.ChiPodTemplate,
+	host *chiv1.ChiHost,
+) {
+	// StatefulSet's pod template is not directly compatible with ChiPodTemplate,
+	// we need to extract some fields from ChiPodTemplate and apply on StatefulSet
+	statefulSet.Spec.Template = corev1.PodTemplateSpec{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: template.Name,
+			Labels: util.MergeStringMapsOverwrite(
+				c.labeler.getLabelsHostScope(host, true),
+				template.ObjectMeta.Labels,
+			),
+			Annotations: util.MergeStringMapsOverwrite(
+				c.labeler.getAnnotationsHostScope(host),
+				template.ObjectMeta.Annotations,
+			),
+		},
+		Spec: *template.Spec.DeepCopy(),
+	}
 }
 
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
+	// Find by name
+	for i := range statefulSet.Spec.Template.Spec.Containers {
+		container := &statefulSet.Spec.Template.Spec.Containers[i]
+		if container.Name == ClickHouseContainerName {
+			return container, true
+		}
+	}
+
+	// Find by index
 	if len(statefulSet.Spec.Template.Spec.Containers) > 0 {
 		return &statefulSet.Spec.Template.Spec.Containers[0], true
-	} else {
-		return nil, false
 	}
+
+	return nil, false
+}
+
+func getClickHouseContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, bool) {
+	// Find by name
+	for i := range pod.Status.ContainerStatuses {
+		status := &pod.Status.ContainerStatuses[i]
+		if status.Name == ClickHouseContainerName {
+			return status, true
+		}
+	}
+
+	// Find by index
+	if len(pod.Status.ContainerStatuses) > 0 {
+		return &pod.Status.ContainerStatuses[0], true
+	}
+
+	return nil, false
+}
+
+// IsStatefulSetGeneration returns whether StatefulSet has requested generation or not
+func IsStatefulSetGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
+	if statefulSet == nil {
+		return false
+	}
+
+	// StatefulSet has .spec generation we are looking for
+	return (statefulSet.Generation == generation) &&
+		// and this .spec generation is being applied to replicas - it is observed right now
+		(statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
+		// and all replicas are of expected generation
+		(statefulSet.Status.CurrentReplicas == *statefulSet.Spec.Replicas) &&
+		// and all replicas are updated - meaning rolling update completed over all replicas
+		(statefulSet.Status.UpdatedReplicas == *statefulSet.Spec.Replicas) &&
+		// and current revision is an updated one - meaning rolling update completed over all replicas
+		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
+}
+
+// IsStatefulSetReady returns whether StatefulSet is ready
+func IsStatefulSetReady(statefulSet *apps.StatefulSet) bool {
+	if statefulSet == nil {
+		return false
+	}
+
+	if statefulSet.Spec.Replicas == nil {
+		return false
+	}
+	// All replicas are in "Ready" status - meaning ready to be used - no failure inside
+	return statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas
+}
+
+// IsStatefulSetNotReady returns whether StatefulSet is not ready
+func IsStatefulSetNotReady(statefulSet *apps.StatefulSet) bool {
+	if statefulSet == nil {
+		return false
+	}
+
+	return !IsStatefulSetReady(statefulSet)
+}
+
+// StrStatefulSetStatus returns human-friendly string representation of StatefulSet status
+func StrStatefulSetStatus(status *apps.StatefulSetStatus) string {
+	return fmt.Sprintf(
+		"ObservedGeneration:%d Replicas:%d ReadyReplicas:%d CurrentReplicas:%d UpdatedReplicas:%d CurrentRevision:%s UpdateRevision:%s",
+		status.ObservedGeneration,
+		status.Replicas,
+		status.ReadyReplicas,
+		status.CurrentReplicas,
+		status.UpdatedReplicas,
+		status.CurrentRevision,
+		status.UpdateRevision,
+	)
 }
 
 func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	// Ensure ClickHouse container has all named ports specified
-	chContainer, ok := getClickHouseContainer(statefulSet)
+	container, ok := getClickHouseContainer(statefulSet)
 	if !ok {
 		return
 	}
-	ensurePortByName(chContainer, chDefaultTCPPortName, host.TCPPort)
-	ensurePortByName(chContainer, chDefaultHTTPPortName, host.HTTPPort)
-	ensurePortByName(chContainer, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
+	ensurePortByName(container, chDefaultTCPPortName, host.TCPPort)
+	ensurePortByName(container, chDefaultHTTPPortName, host.HTTPPort)
+	ensurePortByName(container, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
 }
 
 func ensurePortByName(container *corev1.Container, name string, port int32) {
@@ -693,6 +786,7 @@ func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 	}
 }
 
+// newDefaultHostTemplateForHostNetwork
 func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 	return &chiv1.ChiHostTemplate{
 		Name: name,
@@ -712,7 +806,7 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 }
 
 // newDefaultPodTemplate returns default Pod Template to be used with StatefulSet
-func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
+func (c *Creator) newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 	podTemplate := &chiv1.ChiPodTemplate{
 		Name: name,
 		Spec: corev1.PodSpec{
@@ -723,14 +817,42 @@ func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 
 	addContainer(
 		&podTemplate.Spec,
-		newDefaultClickHouseContainer(),
+		c.newDefaultClickHouseContainer(),
 	)
 
 	return podTemplate
 }
 
+// newDefaultLivenessProbe
+func newDefaultLivenessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/ping",
+				Port: intstr.Parse(chDefaultHTTPPortName),
+			},
+		},
+		InitialDelaySeconds: 10,
+		PeriodSeconds:       3,
+	}
+}
+
+// newDefaultReadinessProbe
+func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
+	return &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/replicas_status",
+				Port: intstr.Parse(chDefaultHTTPPortName),
+			},
+		},
+		InitialDelaySeconds: 10,
+		PeriodSeconds:       3,
+	}
+}
+
 // newDefaultClickHouseContainer returns default ClickHouse Container
-func newDefaultClickHouseContainer() corev1.Container {
+func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 	return corev1.Container{
 		Name:  ClickHouseContainerName,
 		Image: defaultClickHouseDockerImage,
@@ -748,15 +870,21 @@ func newDefaultClickHouseContainer() corev1.Container {
 				ContainerPort: chDefaultInterserverHTTPPortNumber,
 			},
 		},
-		ReadinessProbe: &corev1.Probe{
-			Handler: corev1.Handler{
-				HTTPGet: &corev1.HTTPGetAction{
-					Path: "/ping",
-					Port: intstr.Parse(chDefaultHTTPPortName),
-				},
-			},
-			InitialDelaySeconds: 10,
-			PeriodSeconds:       10,
+		LivenessProbe:  newDefaultLivenessProbe(),
+		ReadinessProbe: c.newDefaultReadinessProbe(),
+	}
+}
+
+// newDefaultLogContainer returns default Log Container
+func newDefaultLogContainer() corev1.Container {
+	return corev1.Container{
+		Name:  ClickHouseLogContainerName,
+		Image: defaultBusyBoxDockerImage,
+		Command: []string{
+			"/bin/sh", "-c", "--",
+		},
+		Args: []string{
+			"while true; do sleep 30; done;",
 		},
 	}
 }

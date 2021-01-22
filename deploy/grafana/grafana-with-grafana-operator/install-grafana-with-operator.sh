@@ -196,7 +196,7 @@ kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
 echo "Install Zookeeper dashboard"
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
     cat ${CUR_DIR}/grafana-dashboard-zookeeper-cr-template.yaml | \
-    GRAFANA_DASHBOARD_NAME="$GRAFANA_ZOOKEEPER_DASHBOARD_NAME" \
+    GRAFANA_ZOOKEEPER_DASHBOARD_NAME="$GRAFANA_ZOOKEEPER_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
     envsubst \
 )

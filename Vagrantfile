@@ -1,3 +1,6 @@
+# ATTENTION please disable WSL2 and Hyper-V `before run vagrant up --provision`
+# bcdedit /set hypervisorlaunchtype off
+# look to https://www.virtualbox.org/ticket/20146
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
 
@@ -8,9 +11,9 @@ end
 
 
 Vagrant.configure(2) do |config|
-  config.vm.box = "ubuntu/bionic64"
+  config.vm.box = "ubuntu/focal64"
   config.vm.box_check_update = false
-  config.vm.synced_folder ".", "/vagrant", type: "nfs"
+  config.vm.synced_folder ".", "/vagrant"
 
   if Vagrant.has_plugin?("vagrant-vbguest")
     config.vbguest.auto_update = false
@@ -18,6 +21,18 @@ Vagrant.configure(2) do |config|
 
   if Vagrant.has_plugin?("vagrant-timezone")
     config.timezone.value = "UTC"
+  end
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.gui = false
+    vb.cpus = total_cpus
+    vb.memory = "6144"
+    vb.default_nic_type = "virtio"
+    vb.customize ["modifyvm", :id, "--uartmode1", "file", File::NULL ]
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+    vb.customize ["modifyvm", :id, "--ioapic", "on"]
+    vb.customize ["guestproperty", "set", :id, "/VirtualBox/GuestAdd/VBoxService/--timesync-set-threshold", 10000]
   end
 
   config.vm.define :clickhouse_operator do |clickhouse_operator|
@@ -37,24 +52,20 @@ Vagrant.configure(2) do |config|
     clickhouse_operator.disksize.size = '50GB'
   end
 
-  config.vm.provider "virtualbox" do |vb|
-    vb.gui = false
-    vb.cpus = total_cpus
-    vb.memory = "6144"
-    vb.default_nic_type = "virtio"
-    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
-    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
-    vb.customize ["modifyvm", :id, "--ioapic", "on"]
-    vb.customize ["guestproperty", "set", :id, "/VirtualBox/GuestAdd/VBoxService/--timesync-set-threshold", 10000]
-  end
-
   config.vm.provision "shell", inline: <<-SHELL
     set -xeuo pipefail
     export DEBIAN_FRONTEND=noninteractive
-
+    if [[ "0" == $(grep "mitigations" /etc/default/grub | wc -l) ]]; then
+        echo 'GRUB_CMDLINE_LINUX="noibrs noibpb nopti nospectre_v2 nospectre_v1 l1tf=off nospec_store_bypass_disable no_stf_barrier mds=off tsx=on tsx_async_abort=off mitigations=off"' >> /etc/default/grub
+        echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash noibrs noibpb nopti nospectre_v2 nospectre_v1 l1tf=off nospec_store_bypass_disable no_stf_barrier mds=off tsx=on tsx_async_abort=off mitigations=off"' >> /etc/default/grub
+        grub-mkconfig
+        reboot
+    fi
+    systemctl enable systemd-timesyncd
+    systemctl start systemd-timesyncd
     apt-get update
     apt-get install --no-install-recommends -y apt-transport-https ca-certificates software-properties-common curl
-    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git ntp
+    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git
 
     # yq
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys CC86BB64
@@ -67,8 +78,8 @@ Vagrant.configure(2) do |config|
     apt-get install --no-install-recommends -y clickhouse-client
 
     # docker
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8D81803C0EBFCD88
-    add-apt-repository "deb https://download.docker.com/linux/ubuntu bionic edge"
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+    add-apt-repository "deb https://download.docker.com/linux/ubuntu $(lsb_release -cs) test"
     apt-get install --no-install-recommends -y docker-ce
 
     # docker compose
@@ -89,7 +100,7 @@ Vagrant.configure(2) do |config|
 
 
     # minikube
-    MINIKUBE_VERSION=1.12.3
+    MINIKUBE_VERSION=1.16.0
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -99,9 +110,10 @@ Vagrant.configure(2) do |config|
 #    export VALIDATE_YAML=false # only for 1.14
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
-#    K8S_VERSION=${K8S_VERSION:-1.17.12}
-#    K8S_VERSION=${K8S_VERSION:-1.18.9}
-    K8S_VERSION=${K8S_VERSION:-1.19.2}
+#    K8S_VERSION=${K8S_VERSION:-1.17.17}
+#    K8S_VERSION=${K8S_VERSION:-1.18.15}
+#    K8S_VERSION=${K8S_VERSION:-1.19.7}
+    K8S_VERSION=${K8S_VERSION:-1.20.2}
     export VALIDATE_YAML=true
 
     killall kubectl || true
@@ -110,27 +122,26 @@ Vagrant.configure(2) do |config|
 
     usermod -a -G docker vagrant
     mkdir -p /home/vagrant/.minikube
-    ln -svf /home/vagrant/.minikube /root/.minikube
+    ln -snvf /home/vagrant/.minikube /root/.minikube
 
     mkdir -p /home/vagrant/.kube
-    ln -svf /home/vagrant/.kube /root/.kube
+    ln -snvf /home/vagrant/.kube /root/.kube
 
     chown vagrant:vagrant -R /home/vagrant/
 
-#    sudo -H -u vagrant minikube config set vm-driver docker
-#    sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
-#    sudo -H -u vagrant minikube start
-#    sudo -H -u vagrant minikube addons enable ingress
-#    sudo -H -u vagrant minikube addons enable ingress-dns
-#    sudo -H -u vagrant minikube addons enable metrics-server
-
-    minikube config set vm-driver none
-    minikube config set kubernetes-version ${K8S_VERSION}
-    minikube start --vm=true
-#    minikube addons enable ingress
-#    minikube addons enable ingress-dns
-    minikube addons enable metrics-server
-    minikube stop
+    sudo -H -u vagrant minikube delete --alsologtostderr --v=5
+    sudo -H -u vagrant minikube config set vm-driver docker
+    sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
+    sudo -H -u vagrant minikube config set cpus $(nproc)
+    sudo -H -u vagrant minikube config set memory 5000Mb
+    sudo -H -u vagrant minikube start --download-only=true
+    sudo -H -u vagrant /home/vagrant/.minikube/cache/linux/v${K8S_VERSION}/kubeadm config images pull
+    sudo -H -u vagrant minikube start --wait-timeout=20m --driver docker kubernetes-version ${K8S_VERSION} --alsologtostderr --v=5
+    sudo -H -u vagrant minikube addons enable ingress
+    sudo -H -u vagrant minikube addons enable ingress-dns
+    sudo -H -u vagrant minikube addons enable metrics-server
+    sudo -H -u vagrant minikube addons enable csi-hostpath-driver
+    sudo -H -u vagrant minikube addons enable volumesnapshots
 
     #krew
     (
@@ -205,8 +216,10 @@ Vagrant.configure(2) do |config|
     # python3 /vagrant/tests/test.py
     # python3 /vagrant/tests/test_examples.py
     # python3 /vagrant/tests/test_metrics_exporter.py
-    # python3 /vagrant/tests/test_metrics_alerts.py
+    python3 /vagrant/tests/test_metrics_alerts.py
 
+    sudo -H -u vagrant minikube stop
+    # minikube stop
     # Circle CI
     # TODO wait when resolve https://github.com/CircleCI-Public/circleci-cli/issues/394
     # curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | bash -x
