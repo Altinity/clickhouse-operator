@@ -17,9 +17,7 @@ package chi
 import (
 	"k8s.io/api/core/v1"
 
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
-
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
@@ -49,7 +47,7 @@ func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Con
 	name := chopmodel.CreatePodName(host)
 	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(name, newGetOptions())
 	if err != nil {
-		log.Errorf("FAIL get pod for host %s/%s err:%v", namespace, host.Name, err)
+		log.Error("FAIL get pod for host %s/%s err:%v", namespace, host.Name, err)
 		return
 	}
 
@@ -64,7 +62,7 @@ func (c *Controller) walkContainerStatuses(host *chop.ChiHost, f func(status *v1
 	name := chopmodel.CreatePodName(host)
 	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(name, newGetOptions())
 	if err != nil {
-		log.Errorf("FAIL get pod for host %s/%s err:%v", namespace, host.Name, err)
+		log.Error("FAIL get pod for host %s/%s err:%v", namespace, host.Name, err)
 		return
 	}
 

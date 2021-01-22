@@ -20,8 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 
 	_ "github.com/mailru/go-clickhouse"
 )
@@ -39,11 +38,10 @@ func NewConnection(params *CHConnectionParams) *CHConnection {
 }
 
 func (c *CHConnection) connect() {
-
-	log.V(2).Infof("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
+	log.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
 	dbConnection, err := databasesql.Open("clickhouse", c.params.GetDSN())
 	if err != nil {
-		log.V(1).Infof("FAILED Open(%s) %v", c.params.GetDSNWithHiddenCredentials(), err)
+		log.V(1).Info("FAILED Open(%s) %v", c.params.GetDSNWithHiddenCredentials(), err)
 		return
 	}
 
@@ -52,7 +50,7 @@ func (c *CHConnection) connect() {
 	defer cancel()
 
 	if err := dbConnection.PingContext(ctx); err != nil {
-		log.V(1).Infof("FAILED Ping(%s) %v", c.params.GetDSNWithHiddenCredentials(), err)
+		log.V(1).Info("FAILED Ping(%s) %v", c.params.GetDSNWithHiddenCredentials(), err)
 		_ = dbConnection.Close()
 		return
 	}
@@ -62,7 +60,7 @@ func (c *CHConnection) connect() {
 
 func (c *CHConnection) ensureConnected() bool {
 	if c.conn != nil {
-		log.V(2).Infof("Already connected: %s", c.params.GetDSNWithHiddenCredentials())
+		log.V(2).Info("Already connected: %s", c.params.GetDSNWithHiddenCredentials())
 		return true
 	}
 
@@ -89,7 +87,7 @@ func (q *Query) Close() {
 		err := q.Rows.Close()
 		q.Rows = nil
 		if err != nil {
-			log.V(1).Infof("UNABLE to close rows. err: %v", err)
+			log.V(1).Info("UNABLE to close rows. err: %v", err)
 		}
 	}
 
@@ -122,7 +120,7 @@ func (c *CHConnection) Query(sql string) (*Query, error) {
 		return nil, err
 	}
 
-	log.V(2).Infof("clickhouse.QueryContext():'%s'", sql)
+	log.V(2).Info("clickhouse.QueryContext():'%s'", sql)
 
 	return &Query{
 		ctx:        ctx,
@@ -149,11 +147,11 @@ func (c *CHConnection) Exec(sql string) error {
 	_, err := c.conn.ExecContext(ctx, sql)
 
 	if err != nil {
-		log.V(1).Infof("FAILED Exec(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
+		log.V(1).Info("FAILED Exec(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
 		return err
 	}
 
-	log.V(2).Infof("clickhouse.Exec():\n", sql)
+	log.V(2).Info("clickhouse.Exec():\n", sql)
 
 	return nil
 }

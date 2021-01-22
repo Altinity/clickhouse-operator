@@ -19,9 +19,8 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -71,18 +70,18 @@ func (s *Schemer) getObjectListFromClickHouse(endpoints []string, sql string) ([
 	// Fetch data from any of specified services
 	var query *clickhouse.Query = nil
 	for _, endpoint := range endpoints {
-		log.V(1).Infof("Run query on: %s of %v", endpoint, endpoints)
+		log.V(1).Info("Run query on: %s of %v", endpoint, endpoints)
 
 		query, err = s.getCHConnection(endpoint).Query(sql)
 		if err == nil {
 			// One of specified services returned result, no need to iterate more
 			break
 		} else {
-			log.V(1).Infof("Run query on: %s of %v FAILED skip to next. err: %v", endpoint, endpoints, err)
+			log.V(1).Info("Run query on: %s of %v FAILED skip to next. err: %v", endpoint, endpoints, err)
 		}
 	}
 	if err != nil {
-		log.V(1).Infof("Run query FAILED on all %v", endpoints)
+		log.V(1).Info("Run query FAILED on all %v", endpoints)
 		return nil, nil, err
 	}
 
@@ -95,7 +94,7 @@ func (s *Schemer) getObjectListFromClickHouse(endpoints []string, sql string) ([
 			names = append(names, name)
 			statements = append(statements, statement)
 		} else {
-			log.V(1).Infof("UNABLE to scan row err: %v", err)
+			log.V(1).Info("UNABLE to scan row err: %v", err)
 		}
 	}
 
@@ -123,7 +122,7 @@ func (s *Schemer) getCreateDistributedObjects(host *chop.ChiHost) ([]string, []s
 	// remove new host from the list. See https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
 	hosts[hostIndex] = hosts[nHosts-1]
 	hosts = hosts[:nHosts-1]
-	log.V(1).Infof("Extracting distributed table definitions from hosts: %v", hosts)
+	log.V(1).Info("Extracting distributed table definitions from hosts: %v", hosts)
 
 	cluster_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
 
@@ -172,28 +171,28 @@ func (s *Schemer) getCreateDistributedObjects(host *chop.ChiHost) ([]string, []s
 		cluster_tables,
 	))
 
-	log.V(1).Infof("fetch dbs list")
-	log.V(1).Infof("dbs sql\n%v", sqlDBs)
+	log.V(1).Info("fetch dbs list")
+	log.V(1).Info("dbs sql\n%v", sqlDBs)
 	names1, sqlStatements1, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
-	log.V(1).Infof("names1:")
+	log.V(1).Info("names1:")
 	for _, v := range names1 {
-		log.V(1).Infof("names1: %s", v)
+		log.V(1).Info("names1: %s", v)
 	}
-	log.V(1).Infof("sql1:")
+	log.V(1).Info("sql1:")
 	for _, v := range sqlStatements1 {
-		log.V(1).Infof("sql1: %s", v)
+		log.V(1).Info("sql1: %s", v)
 	}
 
-	log.V(1).Infof("fetch table list")
-	log.V(1).Infof("tbl sql\n%v", sqlTables)
+	log.V(1).Info("fetch table list")
+	log.V(1).Info("tbl sql\n%v", sqlTables)
 	names2, sqlStatements2, _ := s.getObjectListFromClickHouse(CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
-	log.V(1).Infof("names2:")
+	log.V(1).Info("names2:")
 	for _, v := range names2 {
-		log.V(1).Infof("names2: %s", v)
+		log.V(1).Info("names2: %s", v)
 	}
-	log.V(1).Infof("sql2:")
+	log.V(1).Info("sql2:")
 	for _, v := range sqlStatements2 {
-		log.V(1).Infof("sql2: %s", v)
+		log.V(1).Info("sql2: %s", v)
 	}
 
 	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
@@ -226,7 +225,7 @@ func (s *Schemer) getCreateReplicaObjects(host *chop.ChiHost) ([]string, []strin
 	// remove new replica from the list. See https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
 	replicas[replicaIndex] = replicas[nReplicas-1]
 	replicas = replicas[:nReplicas-1]
-	log.V(1).Infof("Extracting replicated table definitions from %v", replicas)
+	log.V(1).Info("Extracting replicated table definitions from %v", replicas)
 
 	system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(replicas, ","))
 
@@ -274,28 +273,28 @@ func (s *Schemer) hostGetDropTables(host *chop.ChiHost) ([]string, []string, err
 // HostDeleteTables
 func (s *Schemer) HostDeleteTables(host *chop.ChiHost) error {
 	tableNames, dropTableSQLs, _ := s.hostGetDropTables(host)
-	log.V(1).Infof("Drop tables: %v as %v", tableNames, dropTableSQLs)
+	log.V(1).Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
 	return s.hostApplySQLs(host, dropTableSQLs, false)
 }
 
 // HostCreateTables
 func (s *Schemer) HostCreateTables(host *chop.ChiHost) error {
-	log.V(1).Infof("Migrating schema objects to host %s", host.Address.HostName)
+	log.V(1).Info("Migrating schema objects to host %s", host.Address.HostName)
 
 	var err1, err2 error
 
 	if names, createSQLs, err := s.getCreateReplicaObjects(host); err == nil {
 		if len(createSQLs) > 0 {
-			log.V(1).Infof("Creating replica objects at %s: %v", host.Address.HostName, names)
-			log.V(1).Infof("\n%v", createSQLs)
+			log.V(1).Info("Creating replica objects at %s: %v", host.Address.HostName, names)
+			log.V(1).Info("\n%v", createSQLs)
 			err1 = s.hostApplySQLs(host, createSQLs, true)
 		}
 	}
 
 	if names, createSQLs, err := s.getCreateDistributedObjects(host); err == nil {
 		if len(createSQLs) > 0 {
-			log.V(1).Infof("Creating distributed objects at %s: %v", host.Address.HostName, names)
-			log.V(1).Infof("\n%v", createSQLs)
+			log.V(1).Info("Creating distributed objects at %s: %v", host.Address.HostName, names)
+			log.V(1).Info("\n%v", createSQLs)
 			err2 = s.hostApplySQLs(host, createSQLs, true)
 		}
 	}
@@ -362,7 +361,7 @@ func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 	for _, host := range hosts {
 		conn := s.getCHConnection(host)
 		if conn == nil {
-			log.V(1).Infof("Unable to get conn to host %s", host)
+			log.V(1).Info("Unable to get conn to host %s", host)
 			continue
 		}
 		err := util.Retry(maxTries, "Applying sqls", func() error {

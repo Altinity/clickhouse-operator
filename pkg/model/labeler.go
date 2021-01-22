@@ -16,13 +16,15 @@ package model
 
 import (
 	"fmt"
+
+	"k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kublabels "k8s.io/apimachinery/pkg/labels"
+
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kublabels "k8s.io/apimachinery/pkg/labels"
 )
 
 const (

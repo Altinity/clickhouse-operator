@@ -49,7 +49,7 @@ type worker struct {
 func (c *Controller) newWorker(queue workqueue.RateLimitingInterface) *worker {
 	return &worker{
 		c:          c,
-		a:          NewAnnouncer(c),
+		a:          NewAnnouncer().WithController(c),
 		queue:      queue,
 		normalizer: chopmodel.NewNormalizer(c.chop),
 		schemer: chopmodel.NewSchemer(
