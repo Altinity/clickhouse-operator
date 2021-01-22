@@ -24,6 +24,26 @@ import (
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
+func (c *Controller) appendLabelReady(host *chop.ChiHost) error {
+	pod, err := c.getPod(host)
+	if err != nil {
+		return err
+	}
+	chopmodel.AppendLabelReady(&pod.ObjectMeta)
+	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(pod)
+	return err
+}
+
+func (c *Controller) deleteLabelReady(host *chop.ChiHost) error {
+	pod, err := c.getPod(host)
+	if err != nil {
+		return err
+	}
+	chopmodel.DeleteLabelReady(&pod.ObjectMeta)
+	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(pod)
+	return err
+}
+
 func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Container)) {
 	namespace := host.Address.Namespace
 	name := chopmodel.CreatePodName(host)

@@ -61,7 +61,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 			c.chi.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceCHI(),
-			c.labeler.getSelectorCHIScope(),
+			c.labeler.getSelectorCHIScopeReady(),
 		)
 	} else {
 		// Incorrect/unknown .templates.ServiceTemplate specified
@@ -88,7 +88,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 						TargetPort: intstr.FromString(chDefaultTCPPortName),
 					},
 				},
-				Selector:              c.labeler.getSelectorCHIScope(),
+				Selector:              c.labeler.getSelectorCHIScopeReady(),
 				Type:                  corev1.ServiceTypeLoadBalancer,
 				ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
 			},
@@ -108,7 +108,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 			cluster.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceCluster(cluster),
-			c.labeler.getSelectorClusterScope(cluster),
+			c.labeler.getSelectorClusterScopeReady(cluster),
 		)
 	} else {
 		return nil
@@ -127,7 +127,7 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 			shard.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceShard(shard),
-			c.labeler.getSelectorShardScope(shard),
+			c.labeler.getSelectorShardScopeReady(shard),
 		)
 	} else {
 		return nil

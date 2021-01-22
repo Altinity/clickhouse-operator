@@ -23,12 +23,12 @@ import (
 	"k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kublabels "k8s.io/apimachinery/pkg/labels"
-	"time"
 )
 
 const (
 	// Kubernetes labels
 	LabelReadyName                    = clickhousealtinitycom.GroupName + "/ready"
+	LabelReadyValue                   = "yes"
 	LabelAppName                      = clickhousealtinitycom.GroupName + "/app"
 	LabelAppValue                     = "chop"
 	LabelCHOP                         = clickhousealtinitycom.GroupName + "/chop"
@@ -162,6 +162,11 @@ func (l *Labeler) getSelectorCHIScope() map[string]string {
 	}
 }
 
+// getSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
+func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
+	return l.appendReadyLabels(l.getSelectorCHIScope())
+}
+
 // getLabelsClusterScope gets labels for Cluster-scoped object
 func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]string {
 	// Combine generated labels and CHI-provided labels
@@ -182,6 +187,11 @@ func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]st
 		LabelCHIName:     l.namer.getNamePartCHIName(cluster),
 		LabelClusterName: l.namer.getNamePartClusterName(cluster),
 	}
+}
+
+// getSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
+func (l *Labeler) getSelectorClusterScopeReady(cluster *chi.ChiCluster) map[string]string {
+	return l.appendReadyLabels(l.getSelectorClusterScope(cluster))
 }
 
 // getLabelsShardScope gets labels for Shard-scoped object
@@ -206,6 +216,11 @@ func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 		LabelClusterName: l.namer.getNamePartClusterName(shard),
 		LabelShardName:   l.namer.getNamePartShardName(shard),
 	}
+}
+
+// getSelectorShardScope gets labels to select a ready-labelled Shard-scoped object
+func (l *Labeler) getSelectorShardScopeReady(shard *chi.ChiShard) map[string]string {
+	return l.appendReadyLabels(l.getSelectorShardScope(shard))
 }
 
 // getLabelsHostScope gets labels for Host-scoped object
@@ -256,6 +271,13 @@ func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 // appendCHILabels appends CHI-provided labels to labels set
 func (l *Labeler) appendCHILabels(dst map[string]string) map[string]string {
 	return util.MergeStringMapsOverwrite(dst, l.chi.Labels)
+}
+
+// appendReadyLabels appends "Ready" label to labels set
+func (l *Labeler) appendReadyLabels(dst map[string]string) map[string]string {
+	return util.MergeStringMapsOverwrite(dst, map[string]string{
+		LabelReadyName: LabelReadyValue,
+	})
 }
 
 // getAnnotationsHostScope gets annotations for Host-scoped object
@@ -442,15 +464,15 @@ func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	return meta.Labels[LabelClusterName], nil
 }
 
-// AddLabelReady adds "ready" label with value = UTC now
-func AddLabelReady(meta *meta.ObjectMeta) {
+// AppendLabelReady adds "ready" label with value = UTC now
+func AppendLabelReady(meta *meta.ObjectMeta) {
 	if meta == nil {
 		return
 	}
 	util.MergeStringMapsOverwrite(
 		meta.Labels,
 		map[string]string{
-			LabelReadyName: time.Now().UTC().String(),
+			LabelReadyName: LabelReadyValue,
 		})
 }
 
