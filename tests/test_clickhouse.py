@@ -23,6 +23,19 @@ def test_ch_001(self):
     chi = "test-ch-001-insert-quorum"
     host0 = "chi-test-ch-001-insert-quorum-default-0-0"
     host1 = "chi-test-ch-001-insert-quorum-default-0-1"
+    with When('wait when ConfigMap with remote_servers will reload'):
+        out0 = out1 = ''
+        for i in range(10):
+            out0 = kubectl.launch(f"exec {host0}-0 -- clickhouse-client -q \"SELECT host_name, is_local FROM system.clusters WHERE cluster='default'\"")
+            out1 = kubectl.launch(f"exec {host1}-0 -- clickhouse-client -q \"SELECT host_name, is_local FROM system.clusters WHERE cluster='default'\"")
+
+            if host1 in out0 and host0 in out0 and host0 in out1 and host1 in out1:
+                break
+            else:
+                with And(f"Not ready, wait {i*10} seconds"):
+                    time.sleep(i * 10)
+
+        assert host1 in out0 and host0 in out0 and host0 in out1 and host1 in out1, "ConfigMap with <remote_server> sections still not reload"
 
     create_table = """
     create table t1 on cluster default (a Int8, d Date default today())

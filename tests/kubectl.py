@@ -123,7 +123,11 @@ def delete_ns(ns, ok_to_fail=False, timeout=600):
 
 
 def get_count(kind, name="", label="", ns=namespace):
-    out = launch(f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}", ns=ns, ok_to_fail=True)
+    if ns is None:
+        ns = ""
+    if ns != "--all-namespaces":
+        ns = f"--namespace={ns}"
+    out = launch(f"get {ns} {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}", ns=None, ok_to_fail=True)
     if (out is None) or (len(out) == 0):
         return 0
     return len(out.splitlines()) - 1

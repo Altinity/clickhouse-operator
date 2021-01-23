@@ -3,7 +3,7 @@ import time
 import json
 import random
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, Module
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Module, Scenario
 from testflows.asserts import error
 
 import settings

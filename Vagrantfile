@@ -140,8 +140,6 @@ Vagrant.configure(2) do |config|
     sudo -H -u vagrant minikube addons enable ingress
     sudo -H -u vagrant minikube addons enable ingress-dns
     sudo -H -u vagrant minikube addons enable metrics-server
-    sudo -H -u vagrant minikube addons enable csi-hostpath-driver
-    sudo -H -u vagrant minikube addons enable volumesnapshots
 
     #krew
     (
