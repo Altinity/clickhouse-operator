@@ -1282,8 +1282,9 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiv1.Settings) {
 		}
 
 		_, okPasswordSHA256 := (*users)[username+"/password_sha256_hex"]
-		// if SHA256 is not set, initialize it from the password
-		if pass != "" && !okPasswordSHA256 {
+		_, okPasswordDoubleSHA1 := (*users)[username+"/password_double_sha1_hex"]
+		// if SHA256 or DoubleSHA1 are not set, initialize SHA256 from the password
+		if pass != "" && !okPasswordSHA256 && !okPasswordDoubleSHA1 {
 			pass_sha256 := sha256.Sum256([]byte(pass))
 			(*users)[username+"/password_sha256_hex"] = chiv1.NewScalarSetting(hex.EncodeToString(pass_sha256[:]))
 			okPasswordSHA256 = true
