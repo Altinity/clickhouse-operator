@@ -388,7 +388,9 @@ func (s *Schemer) applySQLs(hosts []string, sqls []string, retry bool) error {
 				return errors[0]
 			}
 			return nil
-		})
+		},
+			log.V(1).Info,
+		)
 
 		if err != nil {
 			errors = append(errors, err)

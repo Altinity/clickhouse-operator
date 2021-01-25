@@ -15,7 +15,11 @@
 package announcer
 
 import (
+	"strconv"
+
 	log "github.com/golang/glog"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Announcer handler all log/event/status messages going outside of controller/worker
@@ -24,6 +28,16 @@ type Announcer struct {
 
 	// writeLog specifies whether to write log file
 	writeLog bool
+
+	// file specifies file where logger is called from
+	file string
+	// line specifies line where logger is called from
+	line int
+	// function specifies function where logger is called from
+	function string
+
+	// prefix specifies prefix used by logger
+	prefix string
 }
 
 // announcer which would be used in top-level functions, can be called as default
@@ -33,6 +47,8 @@ var announcer Announcer
 func init() {
 	announcer = New()
 }
+
+const skip = "announcer.go"
 
 // New creates new announcer
 func New() Announcer {
@@ -54,22 +70,109 @@ func V(level log.Level) Announcer {
 	return announcer.V(level)
 }
 
+func (a Announcer) F() Announcer {
+	b := a
+	b.writeLog = true
+	_, _, b.function = util.Caller(skip)
+	return b
+}
+
+func F() Announcer {
+	return announcer.F()
+}
+
+func (a Announcer) L() Announcer {
+	b := a
+	b.writeLog = true
+	_, b.line, _ = util.Caller(skip)
+	return b
+}
+
+func L() Announcer {
+	return announcer.L()
+}
+
+func (a Announcer) FL() Announcer {
+	b := a
+	b.writeLog = true
+	b.file, _, _ = util.Caller(skip)
+	return b
+}
+
+func FL() Announcer {
+	return announcer.FL()
+}
+
+func (a Announcer) A() Announcer {
+	b := a
+	b.writeLog = true
+	b.file, b.line, b.function = util.Caller(skip)
+	return b
+}
+
+func A() Announcer {
+	return announcer.A()
+}
+
+func (a Announcer) S() Announcer {
+	b := a
+	b.writeLog = true
+	b.prefix = "start"
+	b.file, b.line, b.function = util.Caller(skip)
+	return b
+}
+
+func S() Announcer {
+	return announcer.S()
+}
+
+func (a Announcer) E() Announcer {
+	b := a
+	b.writeLog = true
+	b.prefix = "end"
+	b.file, b.line, b.function = util.Caller(skip)
+	return b
+}
+
+func E() Announcer {
+	return announcer.E()
+}
+
+func (a Announcer) prependFormat(format string) string {
+	if a.prefix != "" {
+		format = a.prefix + ":" + format
+	}
+	if a.function != "" {
+		format = a.function + ":" + format
+	}
+	if a.line != 0 {
+		format = strconv.Itoa(a.line) + ":" + format
+	}
+	if a.file != "" {
+		format = a.file + ":" + format
+	}
+	return format
+}
+
 // Info is inspired by log.Infof()
 func (a Announcer) Info(format string, args ...interface{}) {
 	// Produce classic log line
-	if a.writeLog {
-		if a.v > 0 {
-			if len(args) > 0 {
-				log.V(a.v).Infof(format, args...)
-			} else {
-				log.V(a.v).Info(format)
-			}
+	if !a.writeLog {
+		return
+	}
+
+	format = a.prependFormat(format)
+	if a.v > 0 {
+		if len(args) > 0 {
+			log.V(a.v).Infof(format, args...)
 		} else {
-			if len(args) > 0 {
-				log.Infof(format, args...)
-			} else {
-				log.Info(format)
-			}
+			log.V(a.v).Info(format)
+		}
+	} else {
+		if len(args) > 0 {
+			log.Infof(format, args...)
+		} else {
+			log.Info(format)
 		}
 	}
 }
@@ -82,12 +185,15 @@ func Info(format string, args ...interface{}) {
 // Warning is inspired by log.Warningf()
 func (a Announcer) Warning(format string, args ...interface{}) {
 	// Produce classic log line
-	if a.writeLog {
-		if len(args) > 0 {
-			log.Warningf(format, args...)
-		} else {
-			log.Warning(format)
-		}
+	if !a.writeLog {
+		return
+	}
+
+	format = a.prependFormat(format)
+	if len(args) > 0 {
+		log.Warningf(format, args...)
+	} else {
+		log.Warning(format)
 	}
 }
 
@@ -99,12 +205,15 @@ func Warning(format string, args ...interface{}) {
 // Error is inspired by log.Errorf()
 func (a Announcer) Error(format string, args ...interface{}) {
 	// Produce classic log line
-	if a.writeLog {
-		if len(args) > 0 {
-			log.Errorf(format, args...)
-		} else {
-			log.Error(format)
-		}
+	if !a.writeLog {
+		return
+	}
+
+	format = a.prependFormat(format)
+	if len(args) > 0 {
+		log.Errorf(format, args...)
+	} else {
+		log.Error(format)
 	}
 }
 
@@ -115,6 +224,7 @@ func Error(format string, args ...interface{}) {
 
 // Fatal is inspired by log.Fatalf()
 func (a Announcer) Fatal(format string, args ...interface{}) {
+	format = a.prependFormat(format)
 	// Write and exit
 	if len(args) > 0 {
 		log.Fatalf(format, args...)
