@@ -1332,23 +1332,33 @@ def test_025():
             ".status.containerStatuses[0].ready", "true",
             backoff = 1
         )
-        tables_notready_cnt = 0
-        data_notready_cnt = 0
+        start_time = time.time()
+        lb_error_time = start_time
+        distr_lb_error_time = start_time
+        latent_replica_time = start_time
         for i in range(1, 100):
-            cnt_local = clickhouse.query_with_error(chi, "select count() from test_local", "chi-test-025-rescaling-default-0-1.test.svc.cluster.local")
-            cnt_distr = clickhouse.query_with_error(chi, "select count() from test_distr", "chi-test-025-rescaling-default-0-1.test.svc.cluster.local")
-            if "Exception" in cnt_local:
-                tables_notready_cnt = tables_notready_cnt + 1
-                print("Exception. Waiting 1 second.")
-            else:
-                print(f"local: {cnt_local}, distr: {cnt_distr}")
+            cnt_local    = clickhouse.query_with_error(chi, "select count() from test_local", "chi-test-025-rescaling-default-0-1.test.svc.cluster.local")
+            cnt_lb       = clickhouse.query_with_error(chi, "select count() from test_local")
+            cnt_distr_lb = clickhouse.query_with_error(chi, "select count() from test_distr")
+            if "Exception" in cnt_lb or cnt_lb == 0:
+                lb_error_time = time.time()
+            if "Exception" in cnt_distr_lb or cnt_distr_lb == 0:
+                distr_lb_error_time = time.time()
+            print(f"local via loadbalancer: {cnt_lb}, distributed via loadbalancer: {cnt_distr_lb}")
+            if "Exception" not in cnt_local:
+                print(f"local: {cnt_local}, distr: {cnt_distr_lb}")
                 if cnt_local == numbers:
                     break
-                data_notready_cnt = data_notready_cnt + 1
-                print("Replicated table did not catch up. Waiting 1 second.")
+                latent_replica_time = time.time()
+                print("Replicated table did not catch up")
+            print("Waiting 1 second.")
             time.sleep(1)
-        data_notready_cnt += tables_notready_cnt
-        print(f"Tables not ready: {tables_notready_cnt}s, data not ready: {data_notready_cnt}s")
+        print(f"Tables not ready: {round(distr_lb_error_time - start_time)}s, data not ready: {round(latent_replica_time - distr_lb_error_time)}s")
+        
+        with Then("Query to the distributed table via load balancer should never fail"):
+            assert round(distr_lb_error_time - start_time) == 0
+        with And("Query to the local table via load balancer should never fail"):
+            assert round(lb_error_time - start_time) == 0
 
     kubectl.delete_chi(chi)
    
