@@ -234,7 +234,7 @@ def set_operator_version(version, ns=settings.operator_namespace, timeout=60):
     assert kubectl.get_count("pod", ns=ns, label="-l app=clickhouse-operator") > 0, error()
 
 
-def restart_operator(ns=settings.operator_namespace, timeout=60):
+def restart_operator(ns=settings.operator_namespace, timeout=600):
     pod_name = kubectl.get("pod", name="", ns=ns, label="-l app=clickhouse-operator")["items"][0]["metadata"]["name"]
     kubectl.launch(f"delete pod {pod_name}", ns=ns, timeout=timeout)
     kubectl.wait_object("pod", name="", ns=ns, label="-l app=clickhouse-operator")
