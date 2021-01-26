@@ -152,18 +152,22 @@ def test_prometheus_setup(self):
         set_metrics_exporter_version(settings.operator_version)
 
     with Given("prometheus-operator is installed"):
-        assert kubectl.get_count("pod", ns=settings.prometheus_namespace,
-                                 label="-l app.kubernetes.io/component=controller,app.kubernetes.io/name=prometheus-operator") > 0, error(
-            "please run deploy/promehteus/create_prometheus.sh before test run")
-        assert kubectl.get_count("pod", ns=settings.prometheus_namespace,
-                                 label="-l app=prometheus,prometheus=prometheus") > 0, error(
-            "please run deploy/promehteus/create_prometheus.sh before test run")
-        assert kubectl.get_count("pod", ns=settings.prometheus_namespace,
-                                 label="-l app=alertmanager,alertmanager=alertmanager") > 0, error(
-            "please run deploy/promehteus/create_prometheus.sh before test run")
+        error_msg = "please run deploy/promehteus/create_prometheus.sh before test run"
+        assert kubectl.get_count(
+            "pod", ns=settings.prometheus_namespace,
+            label="-l app.kubernetes.io/component=controller,app.kubernetes.io/name=prometheus-operator"
+        ) > 0, error(error_msg)
+        assert kubectl.get_count(
+            "pod", ns=settings.prometheus_namespace,
+            label="-l app=prometheus,prometheus=prometheus"
+        ) > 0, error(error_msg)
+        assert kubectl.get_count(
+            "pod", ns=settings.prometheus_namespace,
+            label="-l app=alertmanager,alertmanager=alertmanager"
+        ) > 0, error(error_msg)
         prometheus_operator_exptected_version = f"quay.io/prometheus-operator/prometheus-operator:v{settings.prometheus_operator_version}"
-        assert prometheus_operator_exptected_version in prometheus_operator_spec["items"][0]["spec"]["containers"][0]["image"], error(
-            f"require {prometheus_operator_exptected_version} image")
+        error_msg = f"require {prometheus_operator_exptected_version} image"
+        assert prometheus_operator_exptected_version in prometheus_operator_spec["items"][0]["spec"]["containers"][0]["image"], error_msg
 
 
 @TestScenario
@@ -263,44 +267,46 @@ def test_distributed_files_to_insert(self):
     delayed_pod, delayed_svc, restarted_pod, restarted_svc = random_pod_choice_for_callbacks()
     create_distributed_table_on_cluster()
 
-    insert_sql = 'INSERT INTO default.test_distr(event_time, test) SELECT now(), number FROM system.numbers LIMIT 1000'
-    clickhouse.query(
-        chi["metadata"]["name"], 'SYSTEM STOP DISTRIBUTED SENDS default.test_distr',
-        pod=delayed_pod, ns=settings.test_namespace
-    )
-
-    files_to_insert_from_metrics = 0
-    files_to_insert_from_disk = 0
-    tries = 0
-    # we need more than 50 delayed files for catch
-    while files_to_insert_from_disk <= 55 and files_to_insert_from_metrics <= 55 and tries < 500:
-        kubectl.launch(
-            f"exec -n {settings.test_namespace} {restarted_pod} -c clickhouse -- kill 1",
-            ok_to_fail=True,
-        )
-        clickhouse.query(chi["metadata"]["name"], insert_sql, pod=delayed_pod, host=delayed_pod, ns=settings.test_namespace)
-        files_to_insert_from_metrics = clickhouse.query(
-            chi["metadata"]["name"], "SELECT value FROM system.metrics WHERE metric='DistributedFilesToInsert'",
+    with When("Stop distributed sends"):
+        insert_sql = 'INSERT INTO default.test_distr(event_time, test) SELECT now(), number FROM system.numbers LIMIT 1000'
+        clickhouse.query(
+            chi["metadata"]["name"], 'SYSTEM STOP DISTRIBUTED SENDS default.test_distr',
             pod=delayed_pod, ns=settings.test_namespace
         )
-        files_to_insert_from_metrics = int(files_to_insert_from_metrics)
 
-        files_to_insert_from_disk = int(kubectl.launch(
-            f"exec -n {settings.test_namespace} {delayed_pod} -c clickhouse -- bash -c 'ls -la /var/lib/clickhouse/data/default/test_distr/*/*.bin 2>/dev/null | wc -l'",
-            ok_to_fail=False,
-        ))
+    with Then("Restart clickhouse pod to get more than 50 delayed files for catch alert"):
+        files_to_insert_from_metrics = 0
+        files_to_insert_from_disk = 0
+        tries = 0
+        #
+        while files_to_insert_from_disk <= 55 and files_to_insert_from_metrics <= 55 and tries < 500:
+            kubectl.launch(
+                f"exec -n {settings.test_namespace} {restarted_pod} -c clickhouse -- kill 1",
+                ok_to_fail=True,
+            )
+            clickhouse.query(chi["metadata"]["name"], insert_sql, pod=delayed_pod, host=delayed_pod, ns=settings.test_namespace)
+            files_to_insert_from_metrics = clickhouse.query(
+                chi["metadata"]["name"], "SELECT value FROM system.metrics WHERE metric='DistributedFilesToInsert'",
+                pod=delayed_pod, ns=settings.test_namespace
+            )
+            files_to_insert_from_metrics = int(files_to_insert_from_metrics)
 
-    with When("reboot clickhouse-server pod"):
-        fired = wait_alert_state("ClickHouseDistributedFilesToInsertHigh", "firing", True,
-                                 labels={"hostname": delayed_svc, "chi": chi["metadata"]["name"]})
-        assert fired, error("can't get ClickHouseDistributedFilesToInsertHigh alert in firing state")
+            files_to_insert_from_disk = int(kubectl.launch(
+                f"exec -n {settings.test_namespace} {delayed_pod} -c clickhouse -- bash -c 'ls -la /var/lib/clickhouse/data/default/test_distr/*/*.bin 2>/dev/null | wc -l'",
+                ok_to_fail=False,
+            ))
 
-    kubectl.wait_pod_status(restarted_pod, "Running", ns=settings.test_namespace)
+            fired = wait_alert_state("ClickHouseDistributedFilesToInsertHigh", "firing", True,
+                                     labels={"hostname": delayed_svc, "chi": chi["metadata"]["name"]})
+            assert fired, error("can't get ClickHouseDistributedFilesToInsertHigh alert in firing state")
 
-    clickhouse.query(
-        chi["metadata"]["name"], 'SYSTEM START DISTRIBUTED SENDS default.test_distr',
-        pod=delayed_pod, ns=settings.test_namespace
-    )
+    with Then("Start distributed sends"):
+        kubectl.wait_pod_status(restarted_pod, "Running", ns=settings.test_namespace)
+
+        clickhouse.query(
+            chi["metadata"]["name"], 'SYSTEM START DISTRIBUTED SENDS default.test_distr',
+            pod=delayed_pod, ns=settings.test_namespace
+        )
 
     with Then("check ClickHouseDistributedFilesToInsertHigh gone away"):
         resolved = wait_alert_state("ClickHouseDistributedFilesToInsertHigh", "firing", False, labels={"hostname": delayed_svc})
@@ -624,12 +630,12 @@ def test_too_much_running_queries(self):
     with Then("check ClickHouseTooMuchRunningQueries firing"):
         fired = wait_alert_state("ClickHouseTooMuchRunningQueries", "firing", True, labels={"hostname": too_many_queries_svc},
                                  callback=make_too_many_queries, time_range="30s", sleep_time=5)
-        assert fired, error("can't get ClickHouseTooManyConnections alert in firing state")
+        assert fired, error("can't get ClickHouseTooMuchRunningQueries alert in firing state")
 
-    with Then("check ClickHouseTooManyConnections gone away"):
+    with Then("check ClickHouseTooMuchRunningQueries gone away"):
         resolved = wait_alert_state("ClickHouseTooMuchRunningQueries", "firing", False, labels={"hostname": too_many_queries_svc},
                                     sleep_time=5)
-        assert resolved, error("can't check ClickHouseTooManyConnections alert is gone away")
+        assert resolved, error("can't check ClickHouseTooMuchRunningQueries alert is gone away")
 
 
 @TestScenario
@@ -657,7 +663,7 @@ def test_system_settings_changed(self):
     with Then("check ClickHouseSystemSettingsChanged firing"):
         fired = wait_alert_state("ClickHouseSystemSettingsChanged", "firing", True, labels={"hostname": changed_svc},
                                  time_range="30s", sleep_time=5)
-        assert fired, error("can't get ClickHouseTooManyConnections alert in firing state")
+        assert fired, error("can't get ClickHouseSystemSettingsChanged alert in firing state")
 
     with When("rollback changed settings"):
         kubectl.create_and_check(
@@ -678,7 +684,7 @@ def test_system_settings_changed(self):
 
     with Then("check ClickHouseSystemSettingsChanged gone away"):
         resolved = wait_alert_state("ClickHouseSystemSettingsChanged", "firing", False, labels={"hostname": changed_svc}, sleep_time=30)
-        assert resolved, error("can't check ClickHouseTooManyConnections alert is gone away")
+        assert resolved, error("can't check ClickHouseSystemSettingsChanged alert is gone away")
 
 
 @TestScenario
