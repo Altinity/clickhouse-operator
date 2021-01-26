@@ -1,5 +1,12 @@
-# ATTENTION please disable WSL2 and Hyper-V `before run vagrant up --provision`
+# !!!!!! ATTENTION VirtualBox !!!!!!
+# please disable WSL2 and Hyper-V `before run vagrant up --provision --provider=virtualbox`
 # bcdedit /set hypervisorlaunchtype off
+# reboot
+# !!!!!! ATTENTION Hyper-V !!!!!!!!!
+# please enable Hyper-V
+# Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All
+# bcdedit /set hypervisorlaunchtype auto
+# reboot
 # look to https://www.virtualbox.org/ticket/20146
 # -*- mode: ruby -*-
 # vi: set ft=ruby :
@@ -10,10 +17,26 @@ def total_cpus
 end
 
 
+
+def get_provider
+    provider='virtualbox'
+    for arg in ARGV
+        if ['hyperv','docker'].include? arg
+            provider=arg
+        end
+    end
+    return provider
+end
+
 Vagrant.configure(2) do |config|
-  config.vm.box = "ubuntu/focal64"
+  config.vm.box = "generic/ubuntu2004"
   config.vm.box_check_update = false
-  config.vm.synced_folder ".", "/vagrant"
+
+  if get_provider == "hyperv"
+    config.vm.synced_folder ".", "/vagrant", type: "smb", mount_options: ["vers=3.0","domain=#{ENV['USERDOMAIN']}", "user=#{ENV['USERNAME']}"]
+  else
+    config.vm.synced_folder ".", "/vagrant"
+  end
 
   if Vagrant.has_plugin?("vagrant-vbguest")
     config.vbguest.auto_update = false
@@ -33,6 +56,19 @@ Vagrant.configure(2) do |config|
     vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
     vb.customize ["modifyvm", :id, "--ioapic", "on"]
     vb.customize ["guestproperty", "set", :id, "/VirtualBox/GuestAdd/VBoxService/--timesync-set-threshold", 10000]
+  end
+
+  config.vm.provider "hyperv" do |hv|
+    # hv.gui = false
+    # hv.default_nic_type = "virtio"
+    hv.cpus = total_cpus
+    hv.maxmemory = "6144"
+    hv.memory = "6144"
+    hv.enable_virtualization_extensions = true
+    hv.linked_clone = true
+    hv.vm_integration_services = {
+        time_synchronization: true,
+    }
   end
 
   config.vm.define :clickhouse_operator do |clickhouse_operator|
@@ -55,11 +91,11 @@ Vagrant.configure(2) do |config|
   config.vm.provision "shell", inline: <<-SHELL
     set -xeuo pipefail
     export DEBIAN_FRONTEND=noninteractive
+    # make linux fast again
     if [[ "0" == $(grep "mitigations" /etc/default/grub | wc -l) ]]; then
         echo 'GRUB_CMDLINE_LINUX="noibrs noibpb nopti nospectre_v2 nospectre_v1 l1tf=off nospec_store_bypass_disable no_stf_barrier mds=off tsx=on tsx_async_abort=off mitigations=off"' >> /etc/default/grub
         echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash noibrs noibpb nopti nospectre_v2 nospectre_v1 l1tf=off nospec_store_bypass_disable no_stf_barrier mds=off tsx=on tsx_async_abort=off mitigations=off"' >> /etc/default/grub
         grub-mkconfig
-        reboot
     fi
     systemctl enable systemd-timesyncd
     systemctl start systemd-timesyncd

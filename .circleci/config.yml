@@ -65,11 +65,11 @@ jobs:
 #      TODO upgrade to paid plan
 #      docker_layer_caching: true
     environment:
-      K8S_VERSION: v1.18.8
+      K8S_VERSION: v1.20.2
       KUBECONFIG: /home/circleci/.kube/config
-      MINIKUBE_VERSION: v1.12.3
-      MINIKUBE_WANTUPDATENOTIFICATION: false
-      MINIKUBE_WANTREPORTERRORPROMPT: false
+      MINIKUBE_VERSION: v1.17.0
+      MINIKUBE_WANTUPDATENOTIFICATION: "false"
+      MINIKUBE_WANTREPORTERRORPROMPT: "false"
       MINIKUBE_HOME: /home/circleci
     steps:
       # TODO fix for local builds https://github.com/CircleCI-Public/circleci-cli/issues/330

@@ -32,7 +32,7 @@ def test_ch_001(self):
             if host1 in out0 and host0 in out0 and host0 in out1 and host1 in out1:
                 break
             else:
-                with And(f"Not ready, wait {i*10} seconds"):
+                with Then(f"Not ready, wait {i*10} seconds"):
                     time.sleep(i * 10)
 
         assert host1 in out0 and host0 in out0 and host0 in out1 and host1 in out1, "ConfigMap with <remote_server> sections still not reload"
