@@ -292,13 +292,6 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 	)
 
 	new.WalkHosts(func(host *chop.ChiHost) error {
-		if update {
-			host.ReconcileAttributes.SetMigrate()
-		}
-		return nil
-	})
-
-	new.WalkHosts(func(host *chop.ChiHost) error {
 		if host.ReconcileAttributes.IsAdd() {
 			// Already added
 		} else if host.ReconcileAttributes.IsModify() {
@@ -318,7 +311,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		} else if host.ReconcileAttributes.IsUnclear() {
 			w.a.Info("UNCLEAR host: %s", host.Address.ShortString())
 		} else {
-			w.a.Info("UNTOUCH host: %s", host.Address.ShortString())
+			w.a.Info("UNTOUCHED host: %s", host.Address.ShortString())
 		}
 		return nil
 	})
@@ -501,9 +494,9 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	configMap := w.creator.CreateConfigMapHost(host)
 	statefulSet := w.creator.CreateStatefulSet(host)
 	service := w.creator.CreateServiceHost(host)
-	status := w.getStatefulSetStatus(host.StatefulSet)
+	(&host.ReconcileAttributes).SetStatus(w.getStatefulSetStatus(statefulSet))
 
-	if err := w.excludeHost(host, status); err != nil {
+	if err := w.excludeHost(host); err != nil {
 		return err
 	}
 
@@ -527,7 +520,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 
 	host.ReconcileAttributes.UnsetAdd()
 
-	if host.ReconcileAttributes.IsMigrate() {
+	if w.migrateTables(host) {
 		w.a.V(1).
 			WithEvent(host.CHI, eventActionCreate, eventReasonCreateStarted).
 			WithStatusAction(host.CHI).
@@ -540,12 +533,10 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 			Info("As CHI is just created, not need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	}
 
-	if err := w.includeHost(host, status); err != nil {
+	if err := w.includeHost(host); err != nil {
 		// If host is not ready - fallback
 		return err
 	}
-
-	host.ReconcileAttributes.SetReconciled()
 
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
@@ -555,8 +546,18 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 	return nil
 }
 
-func (w *worker) excludeHost(host *chop.ChiHost, status StatefulSetStatus) error {
-	if w.waitExcludeHost(host, status) {
+func (w *worker) migrateTables(host *chop.ChiHost) bool {
+	if host.GetCHI().IsStopped() {
+		return false
+	}
+	if host.ReconcileAttributes.GetStatus() == chop.StatefulSetStatusSame {
+		return false
+	}
+	return true
+}
+
+func (w *worker) excludeHost(host *chop.ChiHost) error {
+	if w.waitExcludeHost(host) {
 		w.a.V(1).
 			Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		w.excludeHostFromService(host)
@@ -588,8 +589,9 @@ func (w *worker) excludeHostFromClickHouseCluster(host *chop.ChiHost) {
 }
 
 // determines whether reconciler should wait for host to be excluded from cluster
-func (w *worker) waitExcludeHost(host *chop.ChiHost, status StatefulSetStatus) bool {
-	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
+func (w *worker) waitExcludeHost(host *chop.ChiHost) bool {
+	status := host.ReconcileAttributes.GetStatus()
+	if (status == chop.StatefulSetStatusNew) || (status == chop.StatefulSetStatusSame) {
 		// No need to wait for new and non-modified StatefulSets
 		return false
 	}
@@ -612,8 +614,9 @@ func (w *worker) waitExcludeHost(host *chop.ChiHost, status StatefulSetStatus) b
 }
 
 // determines whether reconciler should wait for host to be included into cluster
-func (w *worker) waitIncludeHost(host *chop.ChiHost, status StatefulSetStatus) bool {
-	if (status == statefulSetStatusNew) || (status == statefulSetStatusSame) {
+func (w *worker) waitIncludeHost(host *chop.ChiHost) bool {
+	status := host.ReconcileAttributes.GetStatus()
+	if (status == chop.StatefulSetStatusNew) || (status == chop.StatefulSetStatusSame) {
 		return false
 	}
 
@@ -635,16 +638,16 @@ func (w *worker) waitIncludeHost(host *chop.ChiHost, status StatefulSetStatus) b
 }
 
 // Include host back to ClickHouse clusters
-func (w *worker) includeHost(host *chop.ChiHost, status StatefulSetStatus) error {
+func (w *worker) includeHost(host *chop.ChiHost) error {
 	w.a.V(1).
 		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-	w.includeHostIntoClickHouseCluster(host, status)
+	w.includeHostIntoClickHouseCluster(host)
 	w.includeHostIntoService(host)
 
 	return nil
 }
 
-func (w *worker) includeHostIntoClickHouseCluster(host *chop.ChiHost, status StatefulSetStatus) {
+func (w *worker) includeHostIntoClickHouseCluster(host *chop.ChiHost) {
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
 		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
 			ExcludeReconcileAttributes(
@@ -652,7 +655,7 @@ func (w *worker) includeHostIntoClickHouseCluster(host *chop.ChiHost, status Sta
 			),
 		)
 	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
-	if w.waitIncludeHost(host, status) {
+	if w.waitIncludeHost(host) {
 		_ = w.waitHostInCluster(host)
 	}
 }
@@ -1099,16 +1102,7 @@ func (w *worker) reconcileService(chi *chop.ClickHouseInstallation, service *cor
 	return err
 }
 
-type StatefulSetStatus string
-
-const (
-	statefulSetStatusModified StatefulSetStatus = "modified"
-	statefulSetStatusNew      StatefulSetStatus = "new"
-	statefulSetStatusSame     StatefulSetStatus = "same"
-	statefulSetStatusUnknown  StatefulSetStatus = "unknown"
-)
-
-func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) StatefulSetStatus {
+func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) chop.StatefulSetStatus {
 	w.a.V(2).Info("getStatefulSetStatus() - start")
 	defer w.a.V(2).Info("getStatefulSetStatus() - end")
 
@@ -1116,26 +1110,48 @@ func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) StatefulSet
 	curStatefulSet, err := w.c.getStatefulSet(&statefulSet.ObjectMeta, false)
 
 	if curStatefulSet != nil {
-		if _cur, ok := curStatefulSet.Labels[chopmodel.LabelStatefulSetVersion]; ok {
-			if _new, _ok := statefulSet.Labels[chopmodel.LabelStatefulSetVersion]; _ok {
-				if _cur == _new {
-					w.a.Info("INFO StatefulSet ARE EQUAL no reconcile is actually needed")
-					return statefulSetStatusSame
-				}
+		// Try to perform label-based comparison
+		curLabel, curHasLabel := curStatefulSet.Labels[chopmodel.LabelStatefulSetVersion]
+		newLabel, newHasLabel := statefulSet.Labels[chopmodel.LabelStatefulSetVersion]
+		if curHasLabel && newHasLabel {
+			if curLabel == newLabel {
+				w.a.Info("INFO StatefulSet ARE EQUAL based on labels no reconcile is actually needed")
+				return chop.StatefulSetStatusSame
+			} else {
+				/*
+					if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
+						w.a.Info("INFO StatefulSet ARE EQUAL based on diff no reconcile is actually needed")
+						//					return chop.StatefulSetStatusSame
+					} else {
+						w.a.Info("INFO StatefulSet ARE DIFFERENT based on diff reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
+						//					return chop.StatefulSetStatusModified
+					}
+
+					w.a.Info("INFO StatefulSet ARE DIFFERENT based on labels reconcile needed")
+					return chop.StatefulSetStatusModified
+
+				*/
 			}
 		}
-		if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
-			w.a.Info("INFO StatefulSet ARE DIFFERENT reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
-			return statefulSetStatusModified
-		}
+		/*
+			// No labels to compare, use spec diff
+			if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
+				w.a.Info("INFO StatefulSet ARE EQUAL based on diff no reconcile is actually needed")
+				return chop.StatefulSetStatusSame
+			} else {
+				w.a.Info("INFO StatefulSet ARE DIFFERENT based on diff reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
+				return chop.StatefulSetStatusModified
+			}
+		*/
 	}
+
+	// No cur StatefulSet available
 
 	if apierrors.IsNotFound(err) {
-		// StatefulSet not found - even during Update process - try to create it
-		return statefulSetStatusNew
+		return chop.StatefulSetStatusNew
 	}
 
-	return statefulSetStatusUnknown
+	return chop.StatefulSetStatusUnknown
 }
 
 // reconcileStatefulSet reconciles apps.StatefulSet
@@ -1143,8 +1159,7 @@ func (w *worker) reconcileStatefulSet(newStatefulSet *apps.StatefulSet, host *ch
 	w.a.V(2).Info("reconcileStatefulSet() - start")
 	defer w.a.V(2).Info("reconcileStatefulSet() - end")
 
-	status := w.getStatefulSetStatus(host.StatefulSet)
-	if status == statefulSetStatusSame {
+	if host.ReconcileAttributes.GetStatus() == chop.StatefulSetStatusSame {
 		defer w.a.V(2).Info("reconcileStatefulSet() - no need to reconcile the same StaetfulSet")
 		return nil
 	}

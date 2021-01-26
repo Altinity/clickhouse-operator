@@ -313,7 +313,12 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	c.setupStatefulSetPodTemplate(statefulSet, host)
 	c.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
 
-	statefulSet.Labels = util.MergeStringMapsOverwrite(statefulSet.Labels, map[string]string{LabelStatefulSetVersion: util.Fingerprint(statefulSet)})
+	statefulSet.Labels = util.MergeStringMapsOverwrite(
+		statefulSet.Labels,
+		map[string]string{
+			LabelStatefulSetVersion: util.Fingerprint(statefulSet),
+		},
+	)
 	host.StatefulSet = statefulSet
 
 	return statefulSet

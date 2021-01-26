@@ -178,15 +178,22 @@ type ChiHostConfig struct {
 	FilesFingerprint     string `json:"filesfingerprint"`
 }
 
+type StatefulSetStatus string
+
+const (
+	StatefulSetStatusModified StatefulSetStatus = "modified"
+	StatefulSetStatusNew      StatefulSetStatus = "new"
+	StatefulSetStatusSame     StatefulSetStatus = "same"
+	StatefulSetStatusUnknown  StatefulSetStatus = "unknown"
+)
+
 // ChiHostReconcileAttributes defines host reconcile status
 type ChiHostReconcileAttributes struct {
+	status  StatefulSetStatus
 	add     bool
 	remove  bool
 	modify  bool
 	unclear bool
-
-	migrate    bool
-	reconciled bool
 }
 
 func NewChiHostReconcileAttributes() *ChiHostReconcileAttributes {
@@ -205,6 +212,15 @@ func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
 		return false
 	}
 	return (s.add && to.add) || (s.remove && to.remove) || (s.modify && to.modify) || (s.unclear && to.unclear)
+}
+
+func (s *ChiHostReconcileAttributes) SetStatus(status StatefulSetStatus) *ChiHostReconcileAttributes {
+	s.status = status
+	return s
+}
+
+func (s *ChiHostReconcileAttributes) GetStatus() StatefulSetStatus {
+	return s.status
 }
 
 func (s *ChiHostReconcileAttributes) SetAdd() *ChiHostReconcileAttributes {
@@ -232,16 +248,6 @@ func (s *ChiHostReconcileAttributes) SetUnclear() *ChiHostReconcileAttributes {
 	return s
 }
 
-func (s *ChiHostReconcileAttributes) SetMigrate() *ChiHostReconcileAttributes {
-	s.migrate = true
-	return s
-}
-
-func (s *ChiHostReconcileAttributes) SetReconciled() *ChiHostReconcileAttributes {
-	s.reconciled = true
-	return s
-}
-
 func (s *ChiHostReconcileAttributes) IsAdd() bool {
 	return s.add
 }
@@ -256,14 +262,6 @@ func (s *ChiHostReconcileAttributes) IsModify() bool {
 
 func (s *ChiHostReconcileAttributes) IsUnclear() bool {
 	return s.unclear
-}
-
-func (s *ChiHostReconcileAttributes) IsMigrate() bool {
-	return s.migrate
-}
-
-func (s *ChiHostReconcileAttributes) IsReconciled() bool {
-	return s.reconciled
 }
 
 // CHITemplates defines templates section of .spec
