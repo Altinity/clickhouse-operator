@@ -139,6 +139,9 @@ func E() Announcer {
 }
 
 func (a Announcer) prependFormat(format string) string {
+	// Format is expected to be 'file:line:function:prefix:_old_format_'
+	// Prepend each component in reverse order
+
 	if a.prefix != "" {
 		format = a.prefix + ":" + format
 	}
