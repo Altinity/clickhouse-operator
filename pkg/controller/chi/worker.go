@@ -418,8 +418,10 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallat
 		}
 	}
 
-	// 2. CHI ConfigMaps without update - create only
-	return w.reconcileCHIConfigMaps(chi, nil, false)
+	// 2. CHI common ConfigMap without update - create only
+	w.reconcileCHIConfigMapCommon(chi, nil, false)
+	// 3. CHI users ConfigMap
+	w.reconcileCHIConfigMapUsers(chi, nil, true) 
 }
 
 // reconcileCHIAuxObjectsFinal reconciles CHI global objects
@@ -428,25 +430,25 @@ func (w *worker) reconcileCHIAuxObjectsFinal(chi *chop.ClickHouseInstallation) e
 	defer w.a.V(2).Info("reconcileCHIAuxObjectsFinal() - end")
 
 	// CHI ConfigMaps with update
-	return w.reconcileCHIConfigMaps(chi, nil, true)
+	return w.reconcileCHIConfigMapCommon(chi, nil, true)
 }
 
-// reconcileCHIConfigMaps reconciles all CHI's ConfigMaps
-func (w *worker) reconcileCHIConfigMaps(chi *chop.ClickHouseInstallation, options *chopmodel.ClickHouseConfigFilesGeneratorOptions, update bool) error {
-	// ConfigMap common for all resources in CHI
-	// contains several sections, mapped as separated chopConfig files,
-	// such as remote servers, zookeeper setup, etc
+// reconcileCHIConfigMapCommon reconciles all CHI's common ConfigMap
+func (w *worker) reconcileCHIConfigMapCommon(chi *chop.ClickHouseInstallation, options *chopmodel.ClickHouseConfigFilesGeneratorOptions, update bool) error {
 	configMapCommon := w.creator.CreateConfigMapCHICommon(options)
 	if err := w.reconcileConfigMap(chi, configMapCommon, update); err != nil {
 		return err
 	}
+	return nil
+}
 
+// reconcileCHIConfigMapUser reconciles all CHI's users ConfigMap
+func (w *worker) reconcileCHIConfigMapCommon(chi *chop.ClickHouseInstallation, options *chopmodel.ClickHouseConfigFilesGeneratorOptions, update bool) error {
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
 	if err := w.reconcileConfigMap(chi, configMapUsers, update); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -556,22 +558,39 @@ func (w *worker) migrateTables(host *chop.ChiHost) bool {
 	return true
 }
 
+// Exclude host from ClickHouse clusters if required
 func (w *worker) excludeHost(host *chop.ChiHost) error {
-	if w.waitExcludeHost(host) {
+	if w.ifExcludeHost(host) {
 		w.a.V(1).
 			Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+
 		w.excludeHostFromService(host)
 		w.excludeHostFromClickHouseCluster(host)
 	}
+	return nil
+}
+
+// Always include host back to ClickHouse clusters
+func (w *worker) includeHost(host *chop.ChiHost) error {
+	w.a.V(1).
+		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+
+	w.includeHostIntoClickHouseCluster(host)
+	w.includeHostIntoService(host)
 
 	return nil
 }
+
 
 func (w *worker) excludeHostFromService(host *chop.ChiHost) {
 	w.c.deleteLabelReady(host)
 }
 
-// excludeHostFromClickHouseCluster excludes host from all ClickHouse clusters
+func (w *worker) includeHostIntoService(host *chop.ChiHost) {
+	w.c.appendLabelReady(host)
+}
+
+// excludeHostFromClickHouseCluster excludes host from ClickHouse configuration
 func (w *worker) excludeHostFromClickHouseCluster(host *chop.ChiHost) {
 	// Specify in options to exclude host from ClickHouse config file
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
@@ -584,23 +603,43 @@ func (w *worker) excludeHostFromClickHouseCluster(host *chop.ChiHost) {
 		)
 
 	// Remove host from cluster config and wait for ClickHouse to pick-up the change
-	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
-	_ = w.waitHostNotInCluster(host)
+	if w.waitExcludeHost(host) {
+		_ = w.reconcileCHIConfigMapCommon(host.CHI, options, true)
+		_ = w.waitHostNotInCluster(host)
+	}
 }
 
-// determines whether reconciler should wait for host to be excluded from cluster
-func (w *worker) waitExcludeHost(host *chop.ChiHost) bool {
+// includeHostIntoClickHouseCluster includes host to ClickHouse configuration
+func (w *worker) includeHostIntoClickHouseCluster(host *chop.ChiHost) {
+	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
+		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
+			ExcludeReconcileAttributes(
+				chop.NewChiHostReconcileAttributes().SetAdd(),
+			),
+		)
+    // Add host to the cluster config (always) and wait for ClickHouse to pick-up the change
+	_ = w.reconcileCHIConfigMapCommon(host.CHI, options, true)
+	if w.waitIncludeHost(host) {
+		_ = w.waitHostInCluster(host)
+	}
+}
+
+// determines whether host to be excluded from cluster
+func (w *worker) ifExcludeHost(host *chop.ChiHost) bool {
 	status := host.ReconcileAttributes.GetStatus()
 	if (status == chop.StatefulSetStatusNew) || (status == chop.StatefulSetStatusSame) {
-		// No need to wait for new and non-modified StatefulSets
+		// No need to exclude for new and non-modified StatefulSets
 		return false
 	}
 
 	if host.GetShard().HostsCount() == 1 {
-		// In case shard where current host is located has only one host (means no replication), no need to wait
+		// In case shard where current host is located has only one host (means no replication), no need to exclude
 		return false
 	}
+}
 
+// determines whether reconciler should wait for host to be excluded from cluster
+func (w *worker) waitExcludeHost(host *chop.ChiHost) bool {
 	// Check CHI settings
 	switch {
 	case host.CHI.IsReconcilingPolicyWait():
@@ -637,32 +676,6 @@ func (w *worker) waitIncludeHost(host *chop.ChiHost) bool {
 	return w.c.chop.Config().ReconcileWaitInclude
 }
 
-// Include host back to ClickHouse clusters
-func (w *worker) includeHost(host *chop.ChiHost) error {
-	w.a.V(1).
-		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-	w.includeHostIntoClickHouseCluster(host)
-	w.includeHostIntoService(host)
-
-	return nil
-}
-
-func (w *worker) includeHostIntoClickHouseCluster(host *chop.ChiHost) {
-	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
-		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
-			ExcludeReconcileAttributes(
-				chop.NewChiHostReconcileAttributes().SetAdd(),
-			),
-		)
-	_ = w.reconcileCHIConfigMaps(host.CHI, options, true)
-	if w.waitIncludeHost(host) {
-		_ = w.waitHostInCluster(host)
-	}
-}
-
-func (w *worker) includeHostIntoService(host *chop.ChiHost) {
-	w.c.appendLabelReady(host)
-}
 
 // waitHostInCluster waits until host is a member of at least one ClickHouse cluster
 func (w *worker) waitHostInCluster(host *chop.ChiHost) error {
