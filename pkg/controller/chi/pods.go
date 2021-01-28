@@ -25,8 +25,10 @@ import (
 func (c *Controller) appendLabelReady(host *chop.ChiHost) error {
 	pod, err := c.getPod(host)
 	if err != nil {
+		log.Error("FAIL get pod for host %s/%s err:%v", host.Address.Namespace, host.Name, err)
 		return err
 	}
+	
 	chopmodel.AppendLabelReady(&pod.ObjectMeta)
 	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(pod)
 	return err
@@ -35,19 +37,19 @@ func (c *Controller) appendLabelReady(host *chop.ChiHost) error {
 func (c *Controller) deleteLabelReady(host *chop.ChiHost) error {
 	pod, err := c.getPod(host)
 	if err != nil {
-		return err
+		log.Error("FAIL get pod for host %s/%s err:%v", host.Address.Namespace, host.Name, err)
+		return
 	}
+	
 	chopmodel.DeleteLabelReady(&pod.ObjectMeta)
 	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(pod)
 	return err
 }
 
 func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Container)) {
-	namespace := host.Address.Namespace
-	name := chopmodel.CreatePodName(host)
-	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(name, newGetOptions())
+	pod, err := c.getPod(host)
 	if err != nil {
-		log.Error("FAIL get pod for host %s/%s err:%v", namespace, host.Name, err)
+		log.Error("FAIL get pod for host %s/%s err:%v", host.Address.Namespace, host.Name, err)
 		return
 	}
 
@@ -58,11 +60,9 @@ func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Con
 }
 
 func (c *Controller) walkContainerStatuses(host *chop.ChiHost, f func(status *v1.ContainerStatus)) {
-	namespace := host.Address.Namespace
-	name := chopmodel.CreatePodName(host)
-	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(name, newGetOptions())
+	pod, err := c.getPod(host)
 	if err != nil {
-		log.Error("FAIL get pod for host %s/%s err:%v", namespace, host.Name, err)
+		log.Error("FAIL get pod for host %s/%s err:%v", host.Address.Namespace, host.Name, err)
 		return
 	}
 
