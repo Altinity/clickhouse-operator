@@ -422,6 +422,8 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallat
 	w.reconcileCHIConfigMapCommon(chi, nil, false)
 	// 3. CHI users ConfigMap
 	w.reconcileCHIConfigMapUsers(chi, nil, true) 
+
+    return nil
 }
 
 // reconcileCHIAuxObjectsFinal reconciles CHI global objects
@@ -442,8 +444,8 @@ func (w *worker) reconcileCHIConfigMapCommon(chi *chop.ClickHouseInstallation, o
 	return nil
 }
 
-// reconcileCHIConfigMapUser reconciles all CHI's users ConfigMap
-func (w *worker) reconcileCHIConfigMapCommon(chi *chop.ClickHouseInstallation, options *chopmodel.ClickHouseConfigFilesGeneratorOptions, update bool) error {
+// reconcileCHIConfigMapUsers reconciles all CHI's users ConfigMap
+func (w *worker) reconcileCHIConfigMapUsers(chi *chop.ClickHouseInstallation, options *chopmodel.ClickHouseConfigFilesGeneratorOptions, update bool) error {
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
 	if err := w.reconcileConfigMap(chi, configMapUsers, update); err != nil {
@@ -636,6 +638,8 @@ func (w *worker) ifExcludeHost(host *chop.ChiHost) bool {
 		// In case shard where current host is located has only one host (means no replication), no need to exclude
 		return false
 	}
+
+    return true
 }
 
 // determines whether reconciler should wait for host to be excluded from cluster
