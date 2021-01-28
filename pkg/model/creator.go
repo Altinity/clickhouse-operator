@@ -312,16 +312,33 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 
 	c.setupStatefulSetPodTemplate(statefulSet, host)
 	c.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
+	c.setupStatefulSetVersion(statefulSet)
 
+	host.StatefulSet = statefulSet
+
+	return statefulSet
+}
+
+// setupStatefulSetVersion
+// TODO property of the labeler?
+func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
 	statefulSet.Labels = util.MergeStringMapsOverwrite(
 		statefulSet.Labels,
 		map[string]string{
 			LabelStatefulSetVersion: util.Fingerprint(statefulSet),
 		},
 	)
-	host.StatefulSet = statefulSet
+	log.V(3).Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
+}
 
-	return statefulSet
+// GetStatefulSetVersion
+// TODO property of the labeler?
+func (c *Creator) GetStatefulSetVersion(statefulSet *apps.StatefulSet) (string, bool) {
+	if statefulSet == nil {
+		return "", false
+	}
+	label, ok := statefulSet.Labels[LabelStatefulSetVersion]
+	return label, ok
 }
 
 // PreparePersistentVolume

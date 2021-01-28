@@ -14,6 +14,8 @@
 
 package util
 
-func Fingerprint(obj interface{}) string {
-	return HashIntoString(serializeRepeatable(obj))
+import "github.com/sanity-io/litter"
+
+func Dump(obj interface{}) string {
+	return litter.Sdump(obj)
 }

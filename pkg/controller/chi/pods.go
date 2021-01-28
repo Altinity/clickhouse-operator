@@ -28,7 +28,7 @@ func (c *Controller) appendLabelReady(host *chop.ChiHost) error {
 		log.Error("FAIL get pod for host %s/%s err:%v", host.Address.Namespace, host.Name, err)
 		return err
 	}
-	
+
 	chopmodel.AppendLabelReady(&pod.ObjectMeta)
 	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(pod)
 	return err
@@ -40,7 +40,7 @@ func (c *Controller) deleteLabelReady(host *chop.ChiHost) error {
 		log.Error("FAIL get pod for host %s/%s err:%v", host.Address.Namespace, host.Name, err)
 		return err
 	}
-	
+
 	chopmodel.DeleteLabelReady(&pod.ObjectMeta)
 	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(pod)
 	return err

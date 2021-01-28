@@ -530,7 +530,7 @@ func (w *worker) reconcileHost(host *chop.ChiHost) error {
 		}
 	} else {
 		w.a.V(1).
-			Info("As CHI is just created, not need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("No need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	}
 
 	if err := w.includeHost(host); err != nil {
@@ -1111,38 +1111,26 @@ func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet) chop.Statef
 
 	if curStatefulSet != nil {
 		// Try to perform label-based comparison
-		curLabel, curHasLabel := curStatefulSet.Labels[chopmodel.LabelStatefulSetVersion]
-		newLabel, newHasLabel := statefulSet.Labels[chopmodel.LabelStatefulSetVersion]
+		curLabel, curHasLabel := w.creator.GetStatefulSetVersion(curStatefulSet)
+		newLabel, newHasLabel := w.creator.GetStatefulSetVersion(statefulSet)
 		if curHasLabel && newHasLabel {
 			if curLabel == newLabel {
 				w.a.Info("INFO StatefulSet ARE EQUAL based on labels no reconcile is actually needed")
 				return chop.StatefulSetStatusSame
 			} else {
-				/*
-					if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
-						w.a.Info("INFO StatefulSet ARE EQUAL based on diff no reconcile is actually needed")
-						//					return chop.StatefulSetStatusSame
-					} else {
-						w.a.Info("INFO StatefulSet ARE DIFFERENT based on diff reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
-						//					return chop.StatefulSetStatusModified
-					}
-
-					w.a.Info("INFO StatefulSet ARE DIFFERENT based on labels reconcile needed")
-					return chop.StatefulSetStatusModified
-
-				*/
-			}
-		}
-		/*
-			// No labels to compare, use spec diff
-			if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
-				w.a.Info("INFO StatefulSet ARE EQUAL based on diff no reconcile is actually needed")
-				return chop.StatefulSetStatusSame
-			} else {
-				w.a.Info("INFO StatefulSet ARE DIFFERENT based on diff reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
+				//if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
+				//	w.a.Info("INFO StatefulSet ARE EQUAL based on diff no reconcile is actually needed")
+				//	//					return chop.StatefulSetStatusSame
+				//} else {
+				//	w.a.Info("INFO StatefulSet ARE DIFFERENT based on diff reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
+				//	//					return chop.StatefulSetStatusModified
+				//}
+				w.a.Info("INFO StatefulSet ARE DIFFERENT based on labels reconcile needed")
 				return chop.StatefulSetStatusModified
 			}
-		*/
+		}
+		// No labels to compare, we can not say for sure what exactly is going on
+		return chop.StatefulSetStatusUnknown
 	}
 
 	// No cur StatefulSet available
