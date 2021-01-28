@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"hash/fnv"
 
-	"github.com/sanity-io/litter"
+	dumper "github.com/sanity-io/litter"
 	//	"github.com/davecgh/go-spew/spew"
 )
 
@@ -40,7 +40,10 @@ func serializeUnrepeatable(obj interface{}) []byte {
 func serializeRepeatable(obj interface{}) []byte {
 	//s := spew.NewDefaultConfig()
 	//s.SortKeys = true
-	return []byte(litter.Sdump(obj))
+	d := dumper.Options{
+		Separator: " ",
+	}
+	return []byte(d.Sdump(obj))
 }
 
 func HashIntoString(b []byte) string {

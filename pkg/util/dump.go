@@ -14,8 +14,11 @@
 
 package util
 
-import "github.com/sanity-io/litter"
+import dumper "github.com/sanity-io/litter"
 
 func Dump(obj interface{}) string {
-	return litter.Sdump(obj)
+	d := dumper.Options{
+		Separator: " ",
+	}
+	return d.Sdump(obj)
 }

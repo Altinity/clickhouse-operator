@@ -328,7 +328,7 @@ func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
 			LabelStatefulSetVersion: util.Fingerprint(statefulSet),
 		},
 	)
-	log.V(3).Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
+	log.V(2).Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
 }
 
 // GetStatefulSetVersion
