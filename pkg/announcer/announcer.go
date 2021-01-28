@@ -172,33 +172,12 @@ func M(m *v1.ObjectMeta) Announcer {
 
 // P triggers log to print line
 func (a Announcer) P() {
-	Info("")
+	a.Info("")
 }
 
 // P triggers log to print line
 func P() {
 	announcer.P()
-}
-
-func (a Announcer) prependFormat(format string) string {
-	// Format is expected to be 'file:line:function:prefix:meta:_old_format_'
-	// Prepend each component in reverse order
-	if a.meta != "" {
-		format = a.meta + ":" + format
-	}
-	if a.prefix != "" {
-		format = a.prefix + ":" + format
-	}
-	if a.function != "" {
-		format = a.function + ":" + format
-	}
-	if a.line != 0 {
-		format = strconv.Itoa(a.line) + ":" + format
-	}
-	if a.file != "" {
-		format = a.file + ":" + format
-	}
-	return format
 }
 
 // Info is inspired by log.Infof()
@@ -283,4 +262,25 @@ func (a Announcer) Fatal(format string, args ...interface{}) {
 // Fatal is inspired by log.Fatalf()
 func Fatal(format string, args ...interface{}) {
 	announcer.Fatal(format, args...)
+}
+
+func (a Announcer) prependFormat(format string) string {
+	// Format is expected to be 'file:line:function:prefix:meta:_old_format_'
+	// Prepend each component in reverse order
+	if a.meta != "" {
+		format = a.meta + ":" + format
+	}
+	if a.prefix != "" {
+		format = a.prefix + ":" + format
+	}
+	if a.function != "" {
+		format = a.function + ":" + format
+	}
+	if a.line != 0 {
+		format = strconv.Itoa(a.line) + ":" + format
+	}
+	if a.file != "" {
+		format = a.file + ":" + format
+	}
+	return format
 }

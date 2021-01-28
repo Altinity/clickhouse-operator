@@ -16,10 +16,11 @@ package chi
 
 import (
 	"fmt"
+	log "github.com/golang/glog"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	a "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	log "github.com/golang/glog"
 )
 
 // Announcer handler all log/event/status messages going outside of controller/worker
@@ -56,13 +57,6 @@ func NewAnnouncer() Announcer {
 	}
 }
 
-// WithController specifies controller to be used in case `chi`-related announces need to be done
-func (a Announcer) WithController(ctrl *Controller) Announcer {
-	b := a
-	b.ctrl = ctrl
-	return b
-}
-
 // V is inspired by log.V()
 func (a Announcer) V(level log.Level) Announcer {
 	b := a
@@ -70,66 +64,58 @@ func (a Announcer) V(level log.Level) Announcer {
 	return b
 }
 
-// WithEvent is used in chained calls in order to produce event into `chi`
-func (a Announcer) WithEvent(
-	chi *chop.ClickHouseInstallation,
-	action string,
-	reason string,
-) Announcer {
+// F adds function name
+func (a Announcer) F() Announcer {
 	b := a
-	if chi == nil {
-		b.writeEvent = false
-		b.chi = nil
-		b.eventAction = ""
-		b.eventReason = ""
-	} else {
-		b.writeEvent = true
-		b.chi = chi
-		b.eventAction = action
-		b.eventReason = reason
-	}
+	b.Announcer = b.Announcer.F()
 	return b
 }
 
-// WithStatusAction is used in chained calls in order to produce action into `ClickHouseInstallation.Status.Action`
-func (a Announcer) WithStatusAction(chi *chop.ClickHouseInstallation) Announcer {
+// L adds line number
+func (a Announcer) L() Announcer {
 	b := a
-	if chi == nil {
-		b.chi = nil
-		b.writeStatusAction = false
-		b.writeStatusActions = false
-	} else {
-		b.chi = chi
-		b.writeStatusAction = true
-		b.writeStatusActions = true
-	}
+	b.Announcer = b.Announcer.L()
 	return b
 }
 
-// WithStatusActions is used in chained calls in order to produce action in ClickHouseInstallation.Status.Actions
-func (a Announcer) WithStatusActions(chi *chop.ClickHouseInstallation) Announcer {
+// FL adds filename
+func (a Announcer) FL() Announcer {
 	b := a
-	if chi == nil {
-		b.chi = nil
-		b.writeStatusActions = false
-	} else {
-		b.chi = chi
-		b.writeStatusActions = true
-	}
+	b.Announcer = b.Announcer.FL()
 	return b
 }
 
-// WithStatusAction is used in chained calls in order to produce error in ClickHouseInstallation.Status.Error
-func (a Announcer) WithStatusError(chi *chop.ClickHouseInstallation) Announcer {
+// A adds full code address as 'file:line:function'
+func (a Announcer) A() Announcer {
 	b := a
-	if chi == nil {
-		b.chi = nil
-		b.writeStatusError = false
-	} else {
-		b.chi = chi
-		b.writeStatusError = true
-	}
+	b.Announcer = b.Announcer.A()
 	return b
+}
+
+// S adds 'start of the function' tag
+func (a Announcer) S() Announcer {
+	b := a
+	b.Announcer = b.Announcer.S()
+	return b
+}
+
+// E adds 'end of the function' tag
+func (a Announcer) E() Announcer {
+	b := a
+	b.Announcer = b.Announcer.E()
+	return b
+}
+
+// M adds object meta as 'namespace/name'
+func (a Announcer) M(m *v1.ObjectMeta) Announcer {
+	b := a
+	b.Announcer = b.Announcer.M(m)
+	return b
+}
+
+// P triggers log to print line
+func (a Announcer) P() {
+	a.Info("")
 }
 
 // Info is inspired by log.Infof()
@@ -202,6 +188,75 @@ func (a Announcer) Fatal(format string, args ...interface{}) {
 
 	// Write and exit
 	a.Announcer.Fatal(format, args...)
+}
+
+// WithController specifies controller to be used in case `chi`-related announces need to be done
+func (a Announcer) WithController(ctrl *Controller) Announcer {
+	b := a
+	b.ctrl = ctrl
+	return b
+}
+
+// WithEvent is used in chained calls in order to produce event into `chi`
+func (a Announcer) WithEvent(
+	chi *chop.ClickHouseInstallation,
+	action string,
+	reason string,
+) Announcer {
+	b := a
+	if chi == nil {
+		b.writeEvent = false
+		b.chi = nil
+		b.eventAction = ""
+		b.eventReason = ""
+	} else {
+		b.writeEvent = true
+		b.chi = chi
+		b.eventAction = action
+		b.eventReason = reason
+	}
+	return b
+}
+
+// WithStatusAction is used in chained calls in order to produce action into `ClickHouseInstallation.Status.Action`
+func (a Announcer) WithStatusAction(chi *chop.ClickHouseInstallation) Announcer {
+	b := a
+	if chi == nil {
+		b.chi = nil
+		b.writeStatusAction = false
+		b.writeStatusActions = false
+	} else {
+		b.chi = chi
+		b.writeStatusAction = true
+		b.writeStatusActions = true
+	}
+	return b
+}
+
+// WithStatusActions is used in chained calls in order to produce action in ClickHouseInstallation.Status.Actions
+func (a Announcer) WithStatusActions(chi *chop.ClickHouseInstallation) Announcer {
+	b := a
+	if chi == nil {
+		b.chi = nil
+		b.writeStatusActions = false
+	} else {
+		b.chi = chi
+		b.writeStatusActions = true
+	}
+	return b
+}
+
+// WithStatusAction is used in chained calls in order to produce error in ClickHouseInstallation.Status.Error
+func (a Announcer) WithStatusError(chi *chop.ClickHouseInstallation) Announcer {
+	b := a
+	if chi == nil {
+		b.chi = nil
+		b.writeStatusError = false
+	} else {
+		b.chi = chi
+		b.writeStatusError = true
+	}
+	return b
 }
 
 // chiCapable checks whether announcer is capable to produce chi-based announcements
