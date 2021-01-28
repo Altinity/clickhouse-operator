@@ -421,9 +421,9 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(chi *chop.ClickHouseInstallat
 	// 2. CHI common ConfigMap without update - create only
 	w.reconcileCHIConfigMapCommon(chi, nil, false)
 	// 3. CHI users ConfigMap
-	w.reconcileCHIConfigMapUsers(chi, nil, true) 
+	w.reconcileCHIConfigMapUsers(chi, nil, true)
 
-    return nil
+	return nil
 }
 
 // reconcileCHIAuxObjectsFinal reconciles CHI global objects
@@ -562,7 +562,7 @@ func (w *worker) migrateTables(host *chop.ChiHost) bool {
 
 // Exclude host from ClickHouse clusters if required
 func (w *worker) excludeHost(host *chop.ChiHost) error {
-	if w.ifExcludeHost(host) {
+	if w.shouldExcludeHost(host) {
 		w.a.V(1).
 			Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
@@ -582,7 +582,6 @@ func (w *worker) includeHost(host *chop.ChiHost) error {
 
 	return nil
 }
-
 
 func (w *worker) excludeHostFromService(host *chop.ChiHost) {
 	w.c.deleteLabelReady(host)
@@ -619,15 +618,15 @@ func (w *worker) includeHostIntoClickHouseCluster(host *chop.ChiHost) {
 				chop.NewChiHostReconcileAttributes().SetAdd(),
 			),
 		)
-    // Add host to the cluster config (always) and wait for ClickHouse to pick-up the change
+		// Add host to the cluster config (always) and wait for ClickHouse to pick-up the change
 	_ = w.reconcileCHIConfigMapCommon(host.CHI, options, true)
 	if w.waitIncludeHost(host) {
 		_ = w.waitHostInCluster(host)
 	}
 }
 
-// determines whether host to be excluded from cluster
-func (w *worker) ifExcludeHost(host *chop.ChiHost) bool {
+// shouldExcludeHost determines whether host to be excluded from cluster
+func (w *worker) shouldExcludeHost(host *chop.ChiHost) bool {
 	status := host.ReconcileAttributes.GetStatus()
 	if (status == chop.StatefulSetStatusNew) || (status == chop.StatefulSetStatusSame) {
 		// No need to exclude for new and non-modified StatefulSets
@@ -639,7 +638,7 @@ func (w *worker) ifExcludeHost(host *chop.ChiHost) bool {
 		return false
 	}
 
-    return true
+	return true
 }
 
 // determines whether reconciler should wait for host to be excluded from cluster
@@ -679,7 +678,6 @@ func (w *worker) waitIncludeHost(host *chop.ChiHost) bool {
 	// Fallback to operator's settings
 	return w.c.chop.Config().ReconcileWaitInclude
 }
-
 
 // waitHostInCluster waits until host is a member of at least one ClickHouse cluster
 func (w *worker) waitHostInCluster(host *chop.ChiHost) error {
