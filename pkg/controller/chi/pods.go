@@ -38,7 +38,7 @@ func (c *Controller) deleteLabelReady(host *chop.ChiHost) error {
 	pod, err := c.getPod(host)
 	if err != nil {
 		log.Error("FAIL get pod for host %s/%s err:%v", host.Address.Namespace, host.Name, err)
-		return
+		return err
 	}
 	
 	chopmodel.DeleteLabelReady(&pod.ObjectMeta)
