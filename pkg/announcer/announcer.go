@@ -15,6 +15,7 @@
 package announcer
 
 import (
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strconv"
 
 	log "github.com/golang/glog"
@@ -38,9 +39,11 @@ type Announcer struct {
 
 	// prefix specifies prefix used by logger
 	prefix string
+	// meta specifies meta-information of the object, if required
+	meta string
 }
 
-// announcer which would be used in top-level functions, can be called as default
+// announcer which would be used in top-level functions, can be called as a 'default announcer'
 var announcer Announcer
 
 // init creates default announcer
@@ -48,6 +51,7 @@ func init() {
 	announcer = New()
 }
 
+// skip specifies file name which to be skipped from address
 const skip = "announcer.go"
 
 // New creates new announcer
@@ -70,6 +74,7 @@ func V(level log.Level) Announcer {
 	return announcer.V(level)
 }
 
+// F adds function name
 func (a Announcer) F() Announcer {
 	b := a
 	b.writeLog = true
@@ -77,10 +82,12 @@ func (a Announcer) F() Announcer {
 	return b
 }
 
+// F adds function name
 func F() Announcer {
 	return announcer.F()
 }
 
+// L adds line number
 func (a Announcer) L() Announcer {
 	b := a
 	b.writeLog = true
@@ -88,10 +95,12 @@ func (a Announcer) L() Announcer {
 	return b
 }
 
+// L adds line number
 func L() Announcer {
 	return announcer.L()
 }
 
+// FL adds filename
 func (a Announcer) FL() Announcer {
 	b := a
 	b.writeLog = true
@@ -99,10 +108,12 @@ func (a Announcer) FL() Announcer {
 	return b
 }
 
+// FL adds filename
 func FL() Announcer {
 	return announcer.FL()
 }
 
+// A adds full code address as 'file:line:function'
 func (a Announcer) A() Announcer {
 	b := a
 	b.writeLog = true
@@ -110,10 +121,12 @@ func (a Announcer) A() Announcer {
 	return b
 }
 
+// A adds full code address as 'file:line:function'
 func A() Announcer {
 	return announcer.A()
 }
 
+// S adds 'start of the function' tag
 func (a Announcer) S() Announcer {
 	b := a
 	b.writeLog = true
@@ -122,10 +135,12 @@ func (a Announcer) S() Announcer {
 	return b
 }
 
+// S adds 'start of the function' tag
 func S() Announcer {
 	return announcer.S()
 }
 
+// E adds 'end of the function' tag
 func (a Announcer) E() Announcer {
 	b := a
 	b.writeLog = true
@@ -134,14 +149,43 @@ func (a Announcer) E() Announcer {
 	return b
 }
 
+// E adds 'end of the function' tag
 func E() Announcer {
 	return announcer.E()
 }
 
-func (a Announcer) prependFormat(format string) string {
-	// Format is expected to be 'file:line:function:prefix:_old_format_'
-	// Prepend each component in reverse order
+// M adds object meta as 'namespace/name'
+func (a Announcer) M(m *v1.ObjectMeta) Announcer {
+	if m == nil {
+		return a
+	}
+	b := a
+	b.writeLog = true
+	b.meta = m.Namespace + "/" + m.Name
+	return b
+}
 
+// M adds object meta as 'namespace/name'
+func M(m *v1.ObjectMeta) Announcer {
+	return announcer.M(m)
+}
+
+// P triggers log to print line
+func (a Announcer) P() {
+	Info("")
+}
+
+// P triggers log to print line
+func P() {
+	announcer.P()
+}
+
+func (a Announcer) prependFormat(format string) string {
+	// Format is expected to be 'file:line:function:prefix:meta:_old_format_'
+	// Prepend each component in reverse order
+	if a.meta != "" {
+		format = a.meta + ":" + format
+	}
 	if a.prefix != "" {
 		format = a.prefix + ":" + format
 	}
