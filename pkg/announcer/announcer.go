@@ -15,10 +15,10 @@
 package announcer
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strconv"
 
 	log "github.com/golang/glog"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -265,7 +265,7 @@ func Fatal(format string, args ...interface{}) {
 }
 
 func (a Announcer) prependFormat(format string) string {
-	// Format is expected to be 'file:line:function:prefix:meta:_old_format_'
+	// Result format is expected to be 'file:line:function:prefix:meta:_start_format_'
 	// Prepend each component in reverse order
 	if a.meta != "" {
 		format = a.meta + ":" + format
