@@ -139,8 +139,7 @@ def test_007(self):
 
 
 def test_operator_upgrade(config, version_from, version_to=settings.operator_version):
-    version_to = settings.operator_version
-    with Given(f"clickhouse-operator {version_from}"):
+    with Given(f"clickhouse-operator FROM {version_from}"):
         set_operator_version(version_from)
         config = util.get_full_path(config)
         chi = manifest.get_chi_name(config)
@@ -156,15 +155,18 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
                 "do_not_delete": 1,
             }
         )
+        kubectl.wait_chi_status(chi, "Completed", retries=20)
         start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
 
-        with When(f"upgrade operator to {version_to}"):
+        with When(f"upgrade operator TO {version_to}"):
             set_operator_version(version_to, timeout=120)
-            time.sleep(5)
-            kubectl.wait_chi_status(chi, "Completed", retries=6)
+            kubectl.wait_chi_status(chi, "Completed", retries=20)
             kubectl.wait_objects(chi, {"statefulset": 1, "pod": 1, "service": 2})
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
-            assert start_time == new_start_time
+            if start_time != new_start_time:
+                kubectl.launch(f"describe chi -n {settings.test_namespace} {chi}")
+                kubectl.launch(f"logs -n {settings.test_namespace} pod/$(kubectl get pods -o name | grep clickhouse-operator) -c clickhouse-operator")
+            assert start_time == new_start_time, error(f"{start_time} != {new_start_time}, pod restarted after operator upgrade")
 
         kubectl.delete_chi(chi)
 
@@ -218,7 +220,7 @@ def test_008(self):
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
-def test_009(self, version_from="0.11.0", version_to=settings.operator_version):
+def test_009(self, version_from, version_to=settings.operator_version):
     with Then("Test simple chi for operator upgrade"):
         test_operator_upgrade("configs/test-009-operator-upgrade-1.yaml", version_from, version_to)
     with Then("Test advanced chi for operator upgrade"):

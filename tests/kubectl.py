@@ -210,6 +210,8 @@ def wait_pod_status(pod, status, ns=namespace):
 
 def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff = 5):
     with Then(f"{kind} {name} {field} should be {value}"):
+        cur_value = ''
+        retries = 2 if retries == 1 else retries
         for i in range(1, retries):
             cur_value = get_field(kind, name, field, ns)
             if cur_value == value:
@@ -221,6 +223,8 @@ def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, back
 
 def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
     with Then(f"{kind} {name} -o jsonpath={field} should be {value}"):
+        cur_value = ''
+        retries = 2 if retries == 1 else retries
         for i in range(1, retries):
             cur_value = get_jsonpath(kind, name, field, ns)
             if cur_value == value:

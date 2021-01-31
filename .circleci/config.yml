@@ -65,9 +65,9 @@ jobs:
 #      TODO upgrade to paid plan
 #      docker_layer_caching: true
     environment:
-      K8S_VERSION: v1.20.2
+      K8S_VERSION: 1.20.2
       KUBECONFIG: /home/circleci/.kube/config
-      MINIKUBE_VERSION: v1.17.0
+      MINIKUBE_VERSION: 1.12.3
       MINIKUBE_WANTUPDATENOTIFICATION: "false"
       MINIKUBE_WANTREPORTERRORPROMPT: "false"
       MINIKUBE_HOME: /home/circleci
@@ -85,6 +85,123 @@ jobs:
               fi
             fi
       - checkout
+      - run:
+          name: Donwload minikube and kubectl
+          command: |
+            set -x
+            # workaround, 1.12.3 doesn't cache properly =(
+            CACHE_DIR=/home/circleci/.minikube/cache/linux/v${K8S_VERSION}
+            mkdir -p ${CACHE_DIR}
+            for file in kubeadm kubelet kubectl; do
+              wget -c -O ${CACHE_DIR}/$file https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/$file
+              wget -c -O ${CACHE_DIR}/$file.sha256 https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/$file.sha256
+              chmod +x ${CACHE_DIR}/$file
+            done
+
+            wget -c --progress=bar:force:noscroll -O /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
+            sudo chmod +x /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION}
+            sudo ln -snvf /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} /usr/local/bin/minikube
+            sudo ln -snvf ${CACHE_DIR}/kubectl /usr/local/bin/kubectl
+      - run:
+          name: Setup minikube params
+          command: |
+            set -x
+            mkdir -p ${HOME}/.kube
+            touch ${HOME}/.kube/config
+            # sudo apt-get install conntrack
+            docker version
+            docker system df
+            minikube delete
+            minikube config set driver docker
+            minikube config set kubernetes-version ${K8S_VERSION}
+            minikube config set cpus $(nproc)
+            free -m -h
+            MEMORY=$(free -m | grep Mem |  tr -s ' ' | cut -d " " -f 2)
+            MEMORY=$(expr $MEMORY - 400)
+            minikube config set memory $MEMORY
+      - run:
+          name: Building Docker image for Integration test
+          command: |
+            export CHO_RELEASE=$(cat release)
+            docker build -f dockerfile/operator/Dockerfile -t clickhouse-operator:e2e .
+            docker build -f dockerfile/metrics-exporter/Dockerfile -t metrics-exporter:e2e .
+
+            echo "Tag builded version as ${CHO_RELEASE}"
+
+            docker tag clickhouse-operator:e2e ${COMPANY_REPO:-altinity}/clickhouse-operator:${CHO_RELEASE}
+            docker tag metrics-exporter:e2e ${COMPANY_REPO:-altinity}/metrics-exporter:${CHO_RELEASE}
+
+            docker save -o /tmp/image-operator.tar ${COMPANY_REPO:-altinity}/clickhouse-operator:${CHO_RELEASE}
+            docker save -o /tmp/image-exporter.tar ${COMPANY_REPO:-altinity}/metrics-exporter:${CHO_RELEASE}
+      - run:
+          name: Start Minikube and import Docker images to Minikube for Integration test
+          command: |
+            set -x
+            cp -rf ./ /tmp/project
+            minikube start --v=2 --cpus $(nproc) --container-runtime=docker --kubernetes-version=${K8S_VERSION} --addons=ingress,ingress-dns --mount=true --mount-string="/tmp/:/project"
+            minikube status
+            while [[ "0" == $(kubectl get nodes | grep "minikube" | grep -v "NotReady" | wc -l) ]]; do
+              echo "minikube is not ready"
+              sleep 1
+            done
+            while [[ "0" == $(ps auxf | grep "minikube mount" | grep -v "grep" | wc -l) ]]; do
+              echo "minikube mount not found"
+              sleep 1
+            done
+            kubectl get nodes
+            ps auxf | grep "minikube mount" | grep -v "grep"
+
+            export CHO_RELEASE=$(cat release)
+            export DOCKER_ID=$(docker ps | grep minikube | cut -d " " -f 1)
+
+            docker exec -it $DOCKER_ID bash -xcue "mv -fv /project/*.tar /tmp/"
+            docker exec -it $DOCKER_ID bash -xcue "docker image import /tmp/image-operator.tar ${COMPANY_REPO:-altinity}/clickhouse-operator:${CHO_RELEASE}"
+            docker exec -it $DOCKER_ID bash -xcue "docker image import /tmp/image-exporter.tar ${COMPANY_REPO:-altinity}/metrics-exporter:${CHO_RELEASE}"
+
+      - run:
+          name: Setup YQ
+          command: |
+            docker pull mikefarah/yq:latest
+      - run:
+          name: Docker Pull inside Minikube required Clickhouse images
+          command: |
+            export DOCKER_ID=$(docker ps | grep minikube | cut -d " " -f 1)
+            for image in $(docker run --rm -v "${PWD}":/workdir mikefarah/yq e ".spec.templates.podTemplates[*].spec.containers[*].image" /workdir/tests/configs/test-017-multi-version.yaml); do
+              docker exec -it $DOCKER_ID bash -xcue "docker pull ${image}"
+            done
+      - run:
+          name: Prepare clickhouse operator installator Environment variables
+          command: |
+            echo 'export OPERATOR_VERSION=$(cat release)' >> $BASH_ENV
+            echo 'export BRANCH=${BRANCH:-$git_branch}' >> $BASH_ENV
+            echo 'export OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-kube-system}' >> $BASH_ENV
+            echo 'export OPERATOR_IMAGE=${COMPANY_REPO}/clickhouse-operator:${OPERATOR_VERSION}' >> $BASH_ENV
+            echo 'export METRICS_EXPORTER_IMAGE=${COMPANY_REPO}/metrics-exporter:${OPERATOR_VERSION}' >> $BASH_ENV
+      - run:
+          name: Install operator
+          command: |
+            sudo apt-get update -y
+            sudo apt-get install -y gettext-base
+            curl -sL https://github.com/Altinity/clickhouse-operator/raw/master/deploy/operator-web-installer/clickhouse-operator-install.sh | bash -xue
+            while [[ "0" == $(kubectl get pods --all-namespaces | grep "clickhouse-operator" | grep "Running" | wc -l) ]]; do
+              echo "clickhouse-operator is not ready"
+              sleep 1
+            done
+      - run:
+          name: Install prometheus
+          command: |
+            if [[ ! -f deploy/prometheus/prometheus-sensitive-data.sh ]]; then
+
+            cat >./deploy/prometheus/prometheus-sensitive-data.sh <<EOF
+              #!/usr/bin/env bash
+              export SLACK_WEBHOOK_URL=https://localhost/services/XXX/YYYY/ZZZZ
+              export SLACK_CHANNEL="#clickhouse-operator-alerts-e2e-tests"
+            EOF
+
+            fi
+            cat deploy/prometheus/prometheus-sensitive-data.sh
+            bash -xe deploy/prometheus/create-prometheus.sh
+            kubectl get --namespace=prometheus pod
       - run:
           name: Install python and testflows
           command: |
@@ -111,69 +228,13 @@ jobs:
             ~/clickhouse-operator/venv/bin/pip3 --version
             ~/clickhouse-operator/venv/bin/pip3 install -U -r ./tests/requirements.txt
       - run:
-          name: Setup minikube and kubectl
-          command: |
-            mkdir -p /home/circleci/.minikube/cache/
-            wget --progress=bar:force:noscroll -O /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} https://github.com/kubernetes/minikube/releases/download/${MINIKUBE_VERSION}/minikube-linux-amd64
-            sudo chmod +x /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION}
-            sudo ln -svf /home/circleci/.minikube/cache/minikube-${MINIKUBE_VERSION} /usr/local/bin/minikube
-            sudo wget --progress=bar:force:noscroll -O /usr/local/bin/kubectl "https://storage.googleapis.com/kubernetes-release/release/${K8S_VERSION}/bin/linux/amd64/kubectl"
-            sudo chmod +x /usr/local/bin/kubectl
-      - run:
-          name: Start minikube
-          command: |
-            mkdir -p ${HOME}/.kube
-            touch ${HOME}/.kube/config
-            sudo apt-get install conntrack
-            minikube delete
-            minikube start --driver=docker --cpus $(nproc) --kubernetes-version=${K8S_VERSION} -v=9 --addons=ingress,ingress-dns
-            kubectl get nodes
-            docker volume ls
-      - run:
-          name: Building Docker image for Integration test
-          command: |
-            export CHO_RELEASE=$(cat release)
-            docker build -f dockerfile/operator/Dockerfile -t clickhouse-operator:e2e .
-            docker build -f dockerfile/metrics-exporter/Dockerfile -t metrics-exporter:e2e .
-
-            echo "Tag builded version as ${CHO_RELEASE}"
-            docker tag clickhouse-operator:e2e ${COMPANY_REPO:-altinity}/clickhouse-operator:${CHO_RELEASE}
-            docker tag metrics-exporter:e2e ${COMPANY_REPO:-altinity}/metrics-exporter:${CHO_RELEASE}
-      - run:
-          name: Setup YQ
-          command: |
-            docker pull mikefarah/yq:latest
-      - run:
-          name: Docker Pull required Clickhouse images
-          command: |
-            for image in $(docker run --rm -v "${PWD}":/workdir mikefarah/yq yq r /workdir/tests/configs/test-017-multi-version.yaml "spec.templates.podTemplates[*].spec.containers[*].image"); do
-              docker pull ${image}
-            done
-      - run:
-          name: Prepare clickhouse operator installator Environment variables
-          command: |
-            echo 'export OPERATOR_VERSION=$(cat release)' >> $BASH_ENV
-            echo 'export BRANCH=${BRANCH:-$git_branch}' >> $BASH_ENV
-            echo 'export OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-test}' >> $BASH_ENV
-            echo 'export OPERATOR_IMAGE=${COMPANY_REPO}/clickhouse-operator:${OPERATOR_VERSION}' >> $BASH_ENV
-            echo 'export METRICS_EXPORTER_IMAGE=${COMPANY_REPO}/metrics-exporter:${OPERATOR_VERSION}' >> $BASH_ENV
-      - run:
-          name: Install operator
-          command: |
-            sudo apt-get install -y gettext-base
-            curl -sL https://github.com/Altinity/clickhouse-operator/raw/master/deploy/operator-web-installer/clickhouse-operator-install.sh | bash -xue
-      - run:
-          name: Install prometheus
-          command: |
-            touch deploy/prometheus/prometheus-sensitive-data.sh
-            bash -xe deploy/prometheus/create-prometheus.sh
-      - run:
           name: Run integration tests
+          no_output_timeout: 60m
           command: |
-            ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_alerts.py --no-colors
             ~/clickhouse-operator/venv/bin/python3 ./tests/test.py --no-colors
             ~/clickhouse-operator/venv/bin/python3 ./tests/test_examples.py --no-colors
             ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_exporter.py --no-colors
+            ~/clickhouse-operator/venv/bin/python3 ./tests/test_metrics_alerts.py --no-colors
 
 
 workflows:

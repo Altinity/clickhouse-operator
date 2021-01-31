@@ -134,6 +134,20 @@ Vagrant.configure(2) do |config|
     sha256sum -c /usr/local/bin/k9s.sha256
     tar --verbose -zxvf /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz -C /usr/local/bin k9s
 
+    # Circle CI
+    # TODO wait when resolve https://github.com/CircleCI-Public/circleci-cli/issues/394
+    # curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | bash -x
+    curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | VERSION=0.1.6893 bash -x
+
+    # circleci optimizations for speedup run
+    mkdir -p /circleci
+    mkdir -v -m 0777 -p /circleci/home/circleci/.minikube /circleci/var/lib/docker /circleci/root/.cache
+
+    # Run tests local with circleci
+    # TODO wait when resolve https://github.com/CircleCI-Public/circleci-cli/issues/402
+    # cd /vagrant
+    # exec < /dev/tty
+    # time circleci local execute -v ${PWD}:/workdir -v /circleci/home/circleci/.minikube:/home/circleci/.minikube -v /circleci/var/lib/docker:/var/lib/docker -v /circleci/root/.cache:/root/.cache -e COMPANY_REPO=${COMPANY_REPO:-altinity} --job=integration_tests
 
     # minikube
     MINIKUBE_VERSION=1.16.0
@@ -165,14 +179,13 @@ Vagrant.configure(2) do |config|
 
     chown vagrant:vagrant -R /home/vagrant/
 
-    sudo -H -u vagrant minikube delete --alsologtostderr --v=5
+    sudo -H -u vagrant minikube delete --alsologtostderr
     sudo -H -u vagrant minikube config set vm-driver docker
     sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
     sudo -H -u vagrant minikube config set cpus $(nproc)
     sudo -H -u vagrant minikube config set memory 5000Mb
     sudo -H -u vagrant minikube start --download-only=true
-    sudo -H -u vagrant /home/vagrant/.minikube/cache/linux/v${K8S_VERSION}/kubeadm config images pull
-    sudo -H -u vagrant minikube start --wait-timeout=20m --driver docker kubernetes-version ${K8S_VERSION} --alsologtostderr --v=5
+    sudo -H -u vagrant minikube start --wait-timeout=20m --driver docker kubernetes-version ${K8S_VERSION} --alsologtostderr
     sudo -H -u vagrant minikube addons enable ingress
     sudo -H -u vagrant minikube addons enable ingress-dns
     sudo -H -u vagrant minikube addons enable metrics-server
@@ -254,19 +267,6 @@ Vagrant.configure(2) do |config|
 
     sudo -H -u vagrant minikube stop
     # minikube stop
-    # Circle CI
-    # TODO wait when resolve https://github.com/CircleCI-Public/circleci-cli/issues/394
-    # curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | bash -x
-    curl -fLSs https://raw.githubusercontent.com/CircleCI-Public/circleci-cli/master/install.sh | VERSION=0.1.6893 bash -x
-
-    # circleci optimizations for speedup run
-    mkdir -p /circleci
-    mkdir -v -m 0777 -p /circleci/home/circleci/.minikube /circleci/var/lib/docker /circleci/root/.cache
-
-    # Run tests local with circleci
-    # TODO wait when resolve https://github.com/CircleCI-Public/circleci-cli/issues/402
-    # exec < /dev/tty
-    # time circleci local execute -v ${PWD}:/workdir -v /circleci/home/circleci/.minikube:/home/circleci/.minikube -v /circleci/var/lib/docker:/var/lib/docker -v /circleci/root/.cache:/root/.cache -e COMPANY_REPO=${COMPANY_REPO:-altinity} --job=integration_tests
 
   SHELL
 end

@@ -1,4 +1,5 @@
 #!/bin/bash
+CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 echo "External value for \$PROMETHEUS_NAMESPACE=$PROMETHEUS_NAMESPACE"
 echo "External value for \$OPERATOR_NAMESPACE=$OPERATOR_NAMESPACE"
@@ -11,7 +12,6 @@ export ALERT_MANAGER_EXTERNAL_URL="${ALERT_MANAGER_EXTERNAL_URL:-http://localhos
 # Possible values for "validate yaml" are values from --validate=XXX kubectl option. They are true/false ATM
 export VALIDATE_YAML="${VALIDATE_YAML:-true}"
 
-CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 echo "OPTIONS"
 echo "Setup Prometheus into \$PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} namespace"
@@ -22,6 +22,45 @@ echo "!!! IMPORTANT !!!"
 echo "If you do not agree with specified options, press ctrl-c now"
 sleep 10
 echo "Apply options now..."
+
+###########################
+##                       ##
+##   Functions Section   ##
+##                       ##
+###########################
+
+##
+##
+##
+function wait_prometheus_to_start() {
+    # Fetch Prometheus's name and namespace from params
+    local namespace=$1
+    local name=$2
+
+    echo -n "Waiting Prometheus '${namespace}/${name}' to start"
+    # Check grafana deployment have all pods ready
+    while [[ $(kubectl get pods --namespace="${namespace}" -l app=prometheus,prometheus=${name} | grep "Running" | wc -l) == "0" ]]; do
+        printf "."
+        sleep 1
+    done
+    echo "...DONE"
+
+}
+
+function wait_alertmanager_to_start() {
+    # Fetch Prometheus's name and namespace from params
+    local namespace=$1
+    local name=$2
+
+    echo -n "Waiting AlertManager '${namespace}/${name}' to start"
+    # Check grafana deployment have all pods ready
+    while [[ $(kubectl get pods --namespace="${namespace}" -l app=alertmanager,alertmanager=${name} | grep "Running" | wc -l) == "0" ]]; do
+        printf "."
+        sleep 1
+    done
+    echo "...DONE"
+
+}
 
 # Let's setup all prometheus-related stuff into dedicated namespace called "prometheus"
 kubectl create namespace "${PROMETHEUS_NAMESPACE}" || true
@@ -84,4 +123,7 @@ else
 
     kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f ${CUR_DIR}/prometheus-alert-rules.yaml
 fi
+
+wait_prometheus_to_start $PROMETHEUS_NAMESPACE prometheus
+wait_alertmanager_to_start $PROMETHEUS_NAMESPACE alertmanager
 echo "Add is done"

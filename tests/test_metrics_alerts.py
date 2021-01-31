@@ -280,6 +280,7 @@ def test_distributed_files_to_insert(self):
         tries = 0
         #
         while files_to_insert_from_disk <= 55 and files_to_insert_from_metrics <= 55 and tries < 500:
+            tries += 1
             kubectl.launch(
                 f"exec -n {settings.test_namespace} {restarted_pod} -c clickhouse -- kill 1",
                 ok_to_fail=True,
@@ -296,9 +297,9 @@ def test_distributed_files_to_insert(self):
                 ok_to_fail=False,
             ))
 
-            fired = wait_alert_state("ClickHouseDistributedFilesToInsertHigh", "firing", True,
-                                     labels={"hostname": delayed_svc, "chi": chi["metadata"]["name"]})
-            assert fired, error("can't get ClickHouseDistributedFilesToInsertHigh alert in firing state")
+        fired = wait_alert_state("ClickHouseDistributedFilesToInsertHigh", "firing", True,
+                                 labels={"hostname": delayed_svc, "chi": chi["metadata"]["name"]})
+        assert fired, error("can't get ClickHouseDistributedFilesToInsertHigh alert in firing state")
 
     with Then("Start distributed sends"):
         kubectl.wait_pod_status(restarted_pod, "Running", ns=settings.test_namespace)

@@ -1,6 +1,9 @@
-vendor/
 docs/
+tests/
+grafana-dashboard/
 .circleci/
 .vagrant/
 .devspace/
+.idea/
 *.log
+*.md
