@@ -15,12 +15,11 @@
 package announcer
 
 import (
+	"reflect"
 	"strconv"
 
-	log "github.com/golang/glog"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	log "github.com/golang/glog"
 )
 
 // Announcer handler all log/event/status messages going outside of controller/worker
@@ -155,18 +154,24 @@ func E() Announcer {
 }
 
 // M adds object meta as 'namespace/name'
-func (a Announcer) M(m *v1.ObjectMeta) Announcer {
+func (a Announcer) M(m interface{}) Announcer {
 	if m == nil {
+		return a
+	}
+	meta := reflect.ValueOf(m)
+	namespace := meta.Elem().FieldByName("Namespace")
+	name := meta.Elem().FieldByName("Name")
+	if !namespace.IsValid() || !name.IsValid() {
 		return a
 	}
 	b := a
 	b.writeLog = true
-	b.meta = m.Namespace + "/" + m.Name
+	b.meta = namespace.String() + "/" + name.String()
 	return b
 }
 
 // M adds object meta as 'namespace/name'
-func M(m *v1.ObjectMeta) Announcer {
+func M(m interface{}) Announcer {
 	return announcer.M(m)
 }
 
