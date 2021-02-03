@@ -43,3 +43,7 @@ type ChiHostAddress struct {
 func (a ChiHostAddress) ShortString() string {
 	return fmt.Sprintf("ns:%s|chi:%s|clu:%s|sha:%s|rep:%s|host:%s", a.Namespace, a.CHIName, a.ClusterName, a.ShardName, a.ReplicaName, a.HostName)
 }
+
+func (a ChiHostAddress) TinyString() string {
+	return fmt.Sprintf("%s/%s", a.ClusterName, a.HostName)
+}
