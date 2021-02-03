@@ -106,9 +106,9 @@ func (a Announcer) E() Announcer {
 }
 
 // M adds object meta as 'namespace/name'
-func (a Announcer) M(m interface{}) Announcer {
+func (a Announcer) M(m ...interface{}) Announcer {
 	b := a
-	b.Announcer = b.Announcer.M(m)
+	b.Announcer = b.Announcer.M(m...)
 	return b
 }
 

@@ -158,25 +158,32 @@ func E() Announcer {
 }
 
 // M adds object meta as 'namespace/name'
-func (a Announcer) M(m interface{}) Announcer {
+func (a Announcer) M(m ...interface{}) Announcer {
 	if m == nil {
-		return a
-	}
-	meta := reflect.ValueOf(m)
-	namespace := meta.Elem().FieldByName("Namespace")
-	name := meta.Elem().FieldByName("Name")
-	if !namespace.IsValid() || !name.IsValid() {
 		return a
 	}
 	b := a
 	b.writeLog = true
-	b.meta = namespace.String() + "/" + name.String()
+	switch len(m) {
+	case 1:
+		meta := reflect.ValueOf(m)
+		namespace := meta.Elem().FieldByName("Namespace")
+		name := meta.Elem().FieldByName("Name")
+		if !namespace.IsValid() || !name.IsValid() {
+			return a
+		}
+		b.meta = namespace.String() + "/" + name.String()
+	case 2:
+		namespace, _ := m[0].(string)
+		name, _ := m[1].(string)
+		b.meta = namespace + "/" + name
+	}
 	return b
 }
 
 // M adds object meta as 'namespace/name'
-func M(m interface{}) Announcer {
-	return announcer.M(m)
+func M(m ...interface{}) Announcer {
+	return announcer.M(m...)
 }
 
 // P triggers log to print line
