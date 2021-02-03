@@ -125,7 +125,8 @@ func A() Announcer {
 	return announcer.A()
 }
 
-// S adds 'start of the function' tag
+// S adds 'start of the function' tag, which includes:
+// file, line, function and start prefix
 func (a Announcer) S() Announcer {
 	b := a
 	b.writeLog = true
@@ -134,12 +135,14 @@ func (a Announcer) S() Announcer {
 	return b
 }
 
-// S adds 'start of the function' tag
+// S adds 'start of the function' tag, which includes:
+// file, line, function and start prefix
 func S() Announcer {
 	return announcer.S()
 }
 
-// E adds 'end of the function' tag
+// E adds 'end of the function' tag, which includes:
+// file, line, function and start prefix
 func (a Announcer) E() Announcer {
 	b := a
 	b.writeLog = true
@@ -148,7 +151,8 @@ func (a Announcer) E() Announcer {
 	return b
 }
 
-// E adds 'end of the function' tag
+// E adds 'end of the function' tag, which includes:
+// file, line, function and start prefix
 func E() Announcer {
 	return announcer.E()
 }
