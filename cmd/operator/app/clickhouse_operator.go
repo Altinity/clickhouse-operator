@@ -84,8 +84,8 @@ func Run() {
 		os.Exit(0)
 	}
 
-	log.S().Info("operator")
-	defer log.E().Info("operator")
+	log.S().P()
+	defer log.E().P()
 
 	if debugRequest {
 		kubeInformerFactoryResyncPeriod = defaultInformerFactoryResyncDebugPeriod
