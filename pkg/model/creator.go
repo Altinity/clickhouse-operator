@@ -853,8 +853,9 @@ func newDefaultLivenessProbe() *corev1.Probe {
 				Port: intstr.Parse(chDefaultHTTPPortName),
 			},
 		},
-		InitialDelaySeconds: 10,
+		InitialDelaySeconds: 60,
 		PeriodSeconds:       3,
+		FailureThreshold:    5,
 	}
 }
 
