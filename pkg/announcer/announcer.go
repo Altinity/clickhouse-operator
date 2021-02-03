@@ -268,19 +268,39 @@ func (a Announcer) prependFormat(format string) string {
 	// Result format is expected to be 'file:line:function:prefix:meta:_start_format_'
 	// Prepend each component in reverse order
 	if a.meta != "" {
-		format = a.meta + ":" + format
+		if format == "" {
+			format = a.meta
+		} else {
+			format = a.meta + ":" + format
+		}
 	}
 	if a.prefix != "" {
-		format = a.prefix + ":" + format
+		if format == "" {
+			format = a.prefix
+		} else {
+			format = a.prefix + ":" + format
+		}
 	}
 	if a.function != "" {
-		format = a.function + ":" + format
+		if format == "" {
+			format = a.function + "()"
+		} else {
+			format = a.function + "()" + ":" + format
+		}
 	}
 	if a.line != 0 {
-		format = strconv.Itoa(a.line) + ":" + format
+		if format == "" {
+			format = strconv.Itoa(a.line)
+		} else {
+			format = strconv.Itoa(a.line) + ":" + format
+		}
 	}
 	if a.file != "" {
-		format = a.file + ":" + format
+		if format == "" {
+			format = a.file
+		} else {
+			format = a.file + ":" + format
+		}
 	}
 	return format
 }
