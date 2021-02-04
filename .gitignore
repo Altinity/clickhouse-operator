@@ -25,6 +25,6 @@ __pycache__
 dev/bin
 dev/log
 
-.vagrant
+/.vagrant
 /.DS_Store
-
+/.devspace

@@ -4,7 +4,7 @@ import time
 import manifest
 import util
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Module
 from testflows.asserts import error
 from testflows.connect import Shell
 
@@ -54,8 +54,8 @@ def delete_chi(chi, ns=namespace):
 
 
 def delete_all_chi(ns=namespace):
-    crds = launch("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
-    if "clickhouseinstallations.clickhouse.altinity.com" in crds:
+    chi_count = get_count("chi", ns=ns)
+    if chi_count:
         chis = get("chi", "", ns=ns)["items"]
         for chi in chis:
             # kubectl(f"patch chi {chi} --type=merge -p '\{\"metadata\":\{\"finalizers\": [null]\}\}'", ns = ns)
@@ -118,12 +118,16 @@ def create_ns(ns):
     launch(f"get ns {ns}", ns=None)
 
 
-def delete_ns(ns, ok_to_fail=False):
-    launch(f"delete ns {ns}", ns=None, ok_to_fail=ok_to_fail)
+def delete_ns(ns, ok_to_fail=False, timeout=600):
+    launch(f"delete ns {ns}", ns=None, ok_to_fail=ok_to_fail, timeout=timeout)
 
 
 def get_count(kind, name="", label="", ns=namespace):
-    out = launch(f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}", ns=ns, ok_to_fail=True)
+    if ns is None:
+        ns = ""
+    if ns != "--all-namespaces":
+        ns = f"--namespace={ns}"
+    out = launch(f"get {ns} {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}", ns=None, ok_to_fail=True)
     if (out is None) or (len(out) == 0):
         return 0
     return len(out.splitlines()) - 1
@@ -206,6 +210,8 @@ def wait_pod_status(pod, status, ns=namespace):
 
 def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff = 5):
     with Then(f"{kind} {name} {field} should be {value}"):
+        cur_value = ''
+        retries = 2 if retries == 1 else retries
         for i in range(1, retries):
             cur_value = get_field(kind, name, field, ns)
             if cur_value == value:
@@ -217,6 +223,8 @@ def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, back
 
 def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
     with Then(f"{kind} {name} -o jsonpath={field} should be {value}"):
+        cur_value = ''
+        retries = 2 if retries == 1 else retries
         for i in range(1, retries):
             cur_value = get_jsonpath(kind, name, field, ns)
             if cur_value == value:
@@ -334,7 +342,7 @@ def check_pod_antiaffinity(chi_name, ns=namespace):
             },
         ],
     }
-    with Then(f"Expect podAntiAffinity to exist and match {expected}"):
+    with Then(f"Expect podAntiAffinity to exist and match {expected}", format_name=False):
         assert "affinity" in pod_spec
         assert "podAntiAffinity" in pod_spec["affinity"]
         assert pod_spec["affinity"]["podAntiAffinity"] == expected

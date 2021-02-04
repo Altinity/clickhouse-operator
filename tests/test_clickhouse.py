@@ -3,13 +3,13 @@ from kubectl import *
 import settings
 from test_operator import require_zookeeper
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
 from testflows.asserts import error
 
 
 @TestScenario
 @Name("test_ch_001. Insert quorum")
-def test_ch_001():
+def test_ch_001(self):
     require_zookeeper()
 
     create_and_check(
@@ -23,6 +23,19 @@ def test_ch_001():
     chi = "test-ch-001-insert-quorum"
     host0 = "chi-test-ch-001-insert-quorum-default-0-0"
     host1 = "chi-test-ch-001-insert-quorum-default-0-1"
+    with When('wait when ConfigMap with remote_servers will reload'):
+        out0 = out1 = ''
+        for i in range(10):
+            out0 = kubectl.launch(f"exec {host0}-0 -- clickhouse-client -q \"SELECT host_name, is_local FROM system.clusters WHERE cluster='default'\"")
+            out1 = kubectl.launch(f"exec {host1}-0 -- clickhouse-client -q \"SELECT host_name, is_local FROM system.clusters WHERE cluster='default'\"")
+
+            if host1 in out0 and host0 in out0 and host0 in out1 and host1 in out1:
+                break
+            else:
+                with Then(f"Not ready, wait {i*10} seconds"):
+                    time.sleep(i * 10)
+
+        assert host1 in out0 and host0 in out0 and host0 in out1 and host1 in out1, "ConfigMap with <remote_server> sections still not reload"
 
     create_table = """
     create table t1 on cluster default (a Int8, d Date default today())
@@ -114,7 +127,7 @@ def test_ch_001():
 
 @TestScenario
 @Name("test_ch_002. Row-level security")
-def test_ch_002():
+def test_ch_002(self):
     create_and_check(
         "configs/test-ch-002-row-level.yaml",
         {

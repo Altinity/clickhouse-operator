@@ -1,63 +1,55 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "adv-layout-mul"
+  name: "adv-layout-multiple-clusters"
 spec:
+  defaults:
+    templates:
+      clusterServiceTemplate: cluster-loadbalancer
+
   configuration:
     clusters:
       - name: c3-2
+        templates:
+          podTemplate: clickhouse:20.3
         layout:
-          shards:
-            - replicas:
-                - templates:
-                    podTemplate: t1
-                - templates:
-                    podTemplate: t1
-            - replicas:
-                - templates:
-                    podTemplate: t1
-                - templates:
-                    podTemplate: t1
-            - replicas:
-                - templates:
-                    podTemplate: t1
-                - templates:
-                    podTemplate: t2
+          shardsCount: 3
+          replicasCount: 2
 
       - name: c2-3
+        templates:
+          podTemplate: clickhouse:20.8
         layout:
-          shards:
-            - replicas:
-                - templates:
-                    podTemplate: t1
-                - templates:
-                    podTemplate: t1
-                - templates:
-                    podTemplate: t1
-            - replicas:
-                - templates:
-                    podTemplate: t1
-                - templates:
-                    podTemplate: t1
-                - templates:
-                    podTemplate: t1
+          shardsCount: 2
+          replicasCount: 3
 
   templates:
+    serviceTemplates:
+      - name: cluster-loadbalancer
+        generateName: chendpoint-{cluster}-{chi}
+        metadata:
+          annotations:
+            cloud.google.com/load-balancer-type: "Internal"
+            service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
+            service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+            service.beta.kubernetes.io/openstack-internal-load-balancer: "true"
+            service.beta.kubernetes.io/cce-load-balancer-internal-vpc: "true"
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: tcp
+              port: 9000
+          type: LoadBalancer
     podTemplates:
-      - name: clickhouse:20.5
+      - name: clickhouse:20.3
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:20.5
+              image: yandex/clickhouse-server:20.3
 
-      - name: clickhouse:20.6
+      - name: clickhouse:20.8
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:20.6
-
-      - name: clickhouse:20.7
-        spec:
-          containers:
-            - name: clickhouse-pod
-              image: yandex/clickhouse-server:20.7
+              image: yandex/clickhouse-server:20.8

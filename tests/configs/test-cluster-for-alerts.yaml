@@ -12,6 +12,7 @@ spec:
   configuration:
     settings:
       mysql_port: 3306
+      database_atomic_delay_before_drop_table_sec: 10
     zookeeper:
       nodes:
         - host: zookeeper
