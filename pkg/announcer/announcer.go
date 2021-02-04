@@ -159,20 +159,26 @@ func E() Announcer {
 
 // M adds object meta as 'namespace/name'
 func (a Announcer) M(m ...interface{}) Announcer {
-	if m == nil {
+	if len(m) == 0 {
 		return a
 	}
+
 	b := a
 	b.writeLog = true
 	switch len(m) {
 	case 1:
-		meta := reflect.ValueOf(m)
-		namespace := meta.Elem().FieldByName("Namespace")
-		name := meta.Elem().FieldByName("Name")
-		if !namespace.IsValid() || !name.IsValid() {
-			return a
+		switch typed := m[0].(type) {
+		case string:
+			b.meta = typed
+		default:
+			meta := reflect.ValueOf(m[0])
+			namespace := meta.Elem().FieldByName("Namespace")
+			name := meta.Elem().FieldByName("Name")
+			if !namespace.IsValid() || !name.IsValid() {
+				return a
+			}
+			b.meta = namespace.String() + "/" + name.String()
 		}
-		b.meta = namespace.String() + "/" + name.String()
 	case 2:
 		namespace, _ := m[0].(string)
 		name, _ := m[1].(string)
