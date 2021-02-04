@@ -562,15 +562,15 @@ func (c *Controller) updateCHIObjectStatus(chi *chi.ClickHouseInstallation, tole
 
 // installFinalizer
 func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
-	namespace, name := util.NamespaceName(chi.ObjectMeta)
-	log.V(2).M(chi).Info("Update CHI status")
+	log.V(2).M(chi).S().P()
+	defer log.V(2).M(chi).E().P()
 
-	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(chi.Name, newGetOptions())
 	if err != nil {
 		return err
 	}
 	if cur == nil {
-		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
+		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
 	if util.InArray(FinalizerName, cur.ObjectMeta.Finalizers) {
@@ -584,15 +584,15 @@ func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
 
 // uninstallFinalizer
 func (c *Controller) uninstallFinalizer(chi *chi.ClickHouseInstallation) error {
-	namespace, name := util.NamespaceName(chi.ObjectMeta)
-	log.V(2).M(chi).Info("Update CHI status")
+	log.V(2).M(chi).S().P()
+	defer log.V(2).M(chi).E().P()
 
-	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(chi.Name, newGetOptions())
 	if err != nil {
 		return err
 	}
 	if cur == nil {
-		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
+		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
 	cur.ObjectMeta.Finalizers = util.RemoveFromArray(FinalizerName, cur.ObjectMeta.Finalizers)
