@@ -305,13 +305,13 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 
 	new.WalkHosts(func(host *chop.ChiHost) error {
 		if host.ReconcileAttributes.IsAdd() {
-			w.a.Info("ADD host: %s", host.Address.ShortString())
+			w.a.Info("ADD host: %s", host.Address.CompactString())
 		} else if host.ReconcileAttributes.IsModify() {
-			w.a.Info("MODIFY host: %s", host.Address.ShortString())
+			w.a.Info("MODIFY host: %s", host.Address.CompactString())
 		} else if host.ReconcileAttributes.IsUnclear() {
-			w.a.Info("UNCLEAR host: %s", host.Address.ShortString())
+			w.a.Info("UNCLEAR host: %s", host.Address.CompactString())
 		} else {
-			w.a.Info("UNTOUCHED host: %s", host.Address.ShortString())
+			w.a.Info("UNTOUCHED host: %s", host.Address.CompactString())
 		}
 		return nil
 	})

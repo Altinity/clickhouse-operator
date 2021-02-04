@@ -36,14 +36,14 @@ func (c *Controller) deleteHost(host *chop.ChiHost) error {
 	// 5. Service
 	// Need to delete all these item
 
-	log.V(1).M(host.GetCHI()).S().Info(host.Address.TinyString())
+	log.V(1).M(host.GetCHI()).S().Info(host.Address.ClusterNameString())
 
 	_ = c.deleteStatefulSet(host)
 	_ = c.deletePVC(host)
 	_ = c.deleteConfigMap(host)
 	_ = c.deleteServiceHost(host)
 
-	log.V(1).M(host.GetCHI()).E().Info(host.Address.TinyString())
+	log.V(1).M(host.GetCHI()).E().Info(host.Address.ClusterNameString())
 
 	return nil
 }
