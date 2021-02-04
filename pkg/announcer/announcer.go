@@ -339,7 +339,13 @@ func (a Announcer) findMeta(m interface{}) (string, bool) {
 }
 
 func (a Announcer) findInObjectMeta(m interface{}) (string, bool) {
+	if m == nil {
+		return "", false
+	}
 	meta := reflect.ValueOf(m)
+	if !meta.IsValid() || meta.IsNil() || meta.IsZero() {
+		return "", false
+	}
 	namespace := meta.Elem().FieldByName("Namespace")
 	if !namespace.IsValid() {
 		return "", false
@@ -352,9 +358,15 @@ func (a Announcer) findInObjectMeta(m interface{}) (string, bool) {
 }
 
 func (a Announcer) findInCHI(m interface{}) (string, bool) {
+	if m == nil {
+		return "", false
+	}
 	object := reflect.ValueOf(m)
+	if !object.IsValid() || object.IsNil() || object.IsZero() {
+		return "", false
+	}
 	chi := object.Elem().FieldByName("CHI")
-	if !chi.IsValid() {
+	if !chi.IsValid() || chi.IsNil() || chi.IsZero() {
 		return "", false
 	}
 	namespace := chi.Elem().FieldByName("Namespace")
@@ -369,7 +381,13 @@ func (a Announcer) findInCHI(m interface{}) (string, bool) {
 }
 
 func (a Announcer) findInAddress(m interface{}) (string, bool) {
+	if m == nil {
+		return "", false
+	}
 	address := reflect.ValueOf(m)
+	if !address.IsValid() || address.IsNil() || address.IsZero() {
+		return "", false
+	}
 	namespace := address.Elem().FieldByName("Namespace")
 	if !namespace.IsValid() {
 		return "", false
