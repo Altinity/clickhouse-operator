@@ -171,13 +171,11 @@ func (a Announcer) M(m ...interface{}) Announcer {
 		case string:
 			b.meta = typed
 		default:
-			meta := reflect.ValueOf(m[0])
-			namespace := meta.Elem().FieldByName("Namespace")
-			name := meta.Elem().FieldByName("Name")
-			if !namespace.IsValid() || !name.IsValid() {
+			if meta, ok := a.findMeta(m[0]); ok {
+				b.meta = meta
+			} else {
 				return a
 			}
-			b.meta = namespace.String() + "/" + name.String()
 		}
 	case 2:
 		namespace, _ := m[0].(string)
@@ -325,4 +323,60 @@ func (a Announcer) prependFormat(format string) string {
 		}
 	}
 	return format
+}
+
+func (a Announcer) findMeta(m interface{}) (string, bool) {
+	if meta, ok := a.findInObjectMeta(m); ok {
+		return meta, ok
+	}
+	if meta, ok := a.findInCHI(m); ok {
+		return meta, ok
+	}
+	if meta, ok := a.findInAddress(m); ok {
+		return meta, ok
+	}
+	return "", false
+}
+
+func (a Announcer) findInObjectMeta(m interface{}) (string, bool) {
+	meta := reflect.ValueOf(m)
+	namespace := meta.Elem().FieldByName("Namespace")
+	if !namespace.IsValid() {
+		return "", false
+	}
+	name := meta.Elem().FieldByName("Name")
+	if !name.IsValid() {
+		return "", false
+	}
+	return namespace.String() + "/" + name.String(), true
+}
+
+func (a Announcer) findInCHI(m interface{}) (string, bool) {
+	object := reflect.ValueOf(m)
+	chi := object.Elem().FieldByName("CHI")
+	if !chi.IsValid() {
+		return "", false
+	}
+	namespace := chi.Elem().FieldByName("Namespace")
+	if !namespace.IsValid() {
+		return "", false
+	}
+	name := chi.Elem().FieldByName("Name")
+	if !name.IsValid() {
+		return "", false
+	}
+	return namespace.String() + "/" + name.String(), true
+}
+
+func (a Announcer) findInAddress(m interface{}) (string, bool) {
+	address := reflect.ValueOf(m)
+	namespace := address.Elem().FieldByName("Namespace")
+	if !namespace.IsValid() {
+		return "", false
+	}
+	name := address.Elem().FieldByName("CHIName")
+	if !name.IsValid() {
+		return "", false
+	}
+	return namespace.String() + "/" + name.String(), true
 }
