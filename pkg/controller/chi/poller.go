@@ -69,24 +69,24 @@ func (c *Controller) waitHostRunning(host *chop.ChiHost) error {
 	for {
 		if c.isHostRunning(host) {
 			// All is good, job done, exit
-			log.V(1).M(host.Address.NamespaceCHINameString()).F().Info("%s/%s-OK", namespace, name)
+			log.V(1).M(host).F().Info("%s/%s-OK", namespace, name)
 			return nil
 		}
 
 		// Object is found, function not positive
 		if time.Since(start) >= (time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second) {
 			// Start bothering with log messages after some time only
-			log.V(1).M(host.Address.NamespaceCHINameString()).F().Info("%s/%s-WAIT", namespace, name)
+			log.V(1).M(host).F().Info("%s/%s-WAIT", namespace, name)
 		}
 
 		if time.Since(start) >= (time.Duration(c.chop.Config().StatefulSetUpdateTimeout) * time.Second) {
 			// Timeout reached, no good result available, time to quit
-			log.V(1).M(host.Address.NamespaceCHINameString()).F().Error("%s/%s-TIMEOUT reached", namespace, name)
+			log.V(1).M(host).F().Error("%s/%s-TIMEOUT reached", namespace, name)
 			return errors.New(fmt.Sprintf("waitHostRunning(%s/%s) - wait timeout", namespace, name))
 		}
 
 		// Wait some more time
-		log.V(2).M(host.Address.NamespaceCHINameString()).F().Info("%s/%s", namespace, name)
+		log.V(2).M(host).F().Info("%s/%s", namespace, name)
 		select {
 		case <-time.After(time.Duration(c.chop.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}
@@ -204,31 +204,30 @@ func (c *Controller) pollHost(host *chop.ChiHost, opts *StatefulSetPollOptions, 
 	}
 	namespace := host.Address.Namespace
 	name := host.Address.HostName
-	m := host.Address.NamespaceCHINameString()
 
 	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
 	start := time.Now()
 	for {
 		if f(host) {
 			// All is good, job done, exit
-			log.V(1).M(m).F().Info("%s/%s-OK", namespace, name)
+			log.V(1).M(host).F().Info("%s/%s-OK", namespace, name)
 			return nil
 		}
 
 		// Object is found, but function is not positive
 		if time.Since(start) >= opts.StartBotheringAfterTimeout {
 			// Start bothering with log messages after some time only
-			log.V(1).M(m).F().Info("%s/%s-WAIT", namespace, name)
+			log.V(1).M(host).F().Info("%s/%s-WAIT", namespace, name)
 		}
 
 		if time.Since(start) >= opts.Timeout {
 			// Timeout reached, no good result available, time to quit
-			log.V(1).M(m).F().Error("%s/%s-TIMEOUT reached", namespace, name)
+			log.V(1).M(host).F().Error("%s/%s-TIMEOUT reached", namespace, name)
 			return errors.New(fmt.Sprintf("pollHost(%s/%s) - wait timeout", namespace, name))
 		}
 
 		// Wait some more time
-		log.V(2).M(m).F().Info("%s/%s", namespace, name)
+		log.V(2).M(host).F().Info("%s/%s", namespace, name)
 		select {
 		case <-time.After(opts.Interval):
 		}
