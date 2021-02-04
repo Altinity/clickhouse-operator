@@ -29,7 +29,7 @@ import (
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
-	log.V(1).M(statefulSet).F().P()
+	log.V(1).M(host).F().P()
 	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
 		// Error call Create()
 		return err
@@ -46,13 +46,13 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
-	log.V(2).M(oldStatefulSet).F().P()
+	log.V(2).M(host).F().P()
 
 	// Apply newStatefulSet and wait for Generation to change
 	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).Update(newStatefulSet)
 	if err != nil {
 		// Update failed
-		log.V(1).M(newStatefulSet).A().Error("%v", err)
+		log.V(1).M(host).A().Error("%v", err)
 		return err
 	}
 
@@ -62,18 +62,18 @@ func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStat
 
 	if updatedStatefulSet.Generation == oldStatefulSet.Generation {
 		// Generation is not updated - no changes in .spec section were made
-		log.V(2).M(oldStatefulSet).F().Info("no generation change")
+		log.V(2).M(host).F().Info("no generation change")
 		return nil
 	}
 
-	log.V(1).M(oldStatefulSet).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
+	log.V(1).M(host).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
 	if err := c.waitHostReady(host); err == nil {
 		// Target generation reached, StatefulSet updated successfully
 		return nil
 	} else {
 		// Unable to run StatefulSet, StatefulSet update failed, time to rollback?
-		return c.onStatefulSetUpdateFailed(oldStatefulSet)
+		return c.onStatefulSetUpdateFailed(oldStatefulSet, host)
 	}
 
 	return fmt.Errorf("unexpected flow")
@@ -101,22 +101,22 @@ func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulS
 	switch c.chop.Config().OnStatefulSetCreateFailureAction {
 	case chop.OnStatefulSetCreateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
-		log.V(1).M(failedStatefulSet).F().Info("abort")
+		log.V(1).M(host).F().Info("abort")
 		return errors.New(fmt.Sprintf("Create failed on %s", util.NamespaceNameString(failedStatefulSet.ObjectMeta)))
 
 	case chop.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully failed StatefulSet
-		log.V(1).M(failedStatefulSet).F().Info("going to DELETE FAILED StatefulSet")
+		log.V(1).M(host).F().Info("going to DELETE FAILED StatefulSet %s", util.NamespaceNameString(failedStatefulSet.ObjectMeta))
 		_ = c.deleteHost(host)
 		return c.shouldContinueOnCreateFailed()
 
 	case chop.OnStatefulSetCreateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
-		log.V(1).M(failedStatefulSet).F().Info("going to ignore error")
+		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(failedStatefulSet.ObjectMeta))
 		return nil
 
 	default:
-		log.V(1).M(failedStatefulSet).A().Error("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", c.chop.Config().OnStatefulSetCreateFailureAction)
+		log.V(1).M(host).A().Error("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", c.chop.Config().OnStatefulSetCreateFailureAction)
 		return nil
 	}
 
@@ -125,7 +125,7 @@ func (c *Controller) onStatefulSetCreateFailed(failedStatefulSet *apps.StatefulS
 
 // onStatefulSetUpdateFailed handles situation when StatefulSet update failed
 // It can try to revert StatefulSet to its previous version, specified in rollbackStatefulSet
-func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.StatefulSet) error {
+func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	// Convenience shortcuts
 	namespace := rollbackStatefulSet.Namespace
 	name := rollbackStatefulSet.Name
@@ -134,12 +134,12 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 	switch c.chop.Config().OnStatefulSetUpdateFailureAction {
 	case chop.OnStatefulSetUpdateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
-		log.V(1).M(rollbackStatefulSet).F().Info("abort")
+		log.V(1).M(host).F().Info("abort StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
 		return errors.New(fmt.Sprintf("Update failed on %s/%s", namespace, name))
 
 	case chop.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
-		log.V(1).M(rollbackStatefulSet).F().Info("going to ROLLBACK FAILED StatefulSet")
+		log.V(1).M(host).F().Info("going to ROLLBACK FAILED StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
 		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err != nil {
 			// Unable to get StatefulSet
 			return err
@@ -151,18 +151,18 @@ func (c *Controller) onStatefulSetUpdateFailed(rollbackStatefulSet *apps.Statefu
 			// This will rollback Pod to previous .spec
 			statefulSet.Spec = *rollbackStatefulSet.Spec.DeepCopy()
 			statefulSet, err = c.kubeClient.AppsV1().StatefulSets(namespace).Update(statefulSet)
-			_ = c.statefulSetDeletePod(statefulSet)
+			_ = c.statefulSetDeletePod(statefulSet, host)
 
 			return c.shouldContinueOnUpdateFailed()
 		}
 
 	case chop.OnStatefulSetUpdateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
-		log.V(1).M(rollbackStatefulSet).F().Info("going to ignore error")
+		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
 		return nil
 
 	default:
-		log.V(1).M(rollbackStatefulSet).A().Error("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", c.chop.Config().OnStatefulSetUpdateFailureAction)
+		log.V(1).M(host).A().Error("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", c.chop.Config().OnStatefulSetUpdateFailureAction)
 		return nil
 	}
 
