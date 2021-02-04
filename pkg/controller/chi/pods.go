@@ -25,7 +25,7 @@ import (
 func (c *Controller) appendLabelReady(host *chop.ChiHost) error {
 	pod, err := c.getPod(host)
 	if err != nil {
-		log.M(host.Address.NamespaceCHINameString()).A().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
+		log.M(host).A().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
 		return err
 	}
 
@@ -37,7 +37,7 @@ func (c *Controller) appendLabelReady(host *chop.ChiHost) error {
 func (c *Controller) deleteLabelReady(host *chop.ChiHost) error {
 	pod, err := c.getPod(host)
 	if err != nil {
-		log.M(host.Address.NamespaceCHINameString()).A().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
+		log.M(host).A().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
 		return err
 	}
 
@@ -49,7 +49,7 @@ func (c *Controller) deleteLabelReady(host *chop.ChiHost) error {
 func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Container)) {
 	pod, err := c.getPod(host)
 	if err != nil {
-		log.M(host.Address.NamespaceCHINameString()).A().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
+		log.M(host).A().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
 		return
 	}
 
@@ -62,7 +62,7 @@ func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Con
 func (c *Controller) walkContainerStatuses(host *chop.ChiHost, f func(status *v1.ContainerStatus)) {
 	pod, err := c.getPod(host)
 	if err != nil {
-		log.M(host.Address.NamespaceCHINameString()).A().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
+		log.M(host).A().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
 		return
 	}
 
