@@ -31,7 +31,7 @@ type CHConnection struct {
 }
 
 func NewConnection(params *CHConnectionParams) *CHConnection {
-	// DO not perform connection immediately, do it in lazy manner
+	// Do not establish connection immediately, do it in a lazy manner
 	return &CHConnection{
 		params: params,
 	}
@@ -69,34 +69,6 @@ func (c *CHConnection) ensureConnected() bool {
 	return c.conn != nil
 }
 
-// Query
-type Query struct {
-	ctx        context.Context
-	cancelFunc context.CancelFunc
-
-	Rows *databasesql.Rows
-}
-
-// Close
-func (q *Query) Close() {
-	if q == nil {
-		return
-	}
-
-	if q.Rows != nil {
-		err := q.Rows.Close()
-		q.Rows = nil
-		if err != nil {
-			log.V(1).Info("UNABLE to close rows. err: %v", err)
-		}
-	}
-
-	if q.cancelFunc != nil {
-		q.cancelFunc()
-		q.cancelFunc = nil
-	}
-}
-
 // Query runs given sql query
 func (c *CHConnection) Query(sql string) (*Query, error) {
 	if len(sql) == 0 {
@@ -122,11 +94,7 @@ func (c *CHConnection) Query(sql string) (*Query, error) {
 
 	log.V(2).Info("clickhouse.QueryContext():'%s'", sql)
 
-	return &Query{
-		ctx:        ctx,
-		cancelFunc: cancel,
-		Rows:       rows,
-	}, nil
+	return NewQuery(ctx, cancel, rows), nil
 }
 
 // Exec runs given sql query
