@@ -1245,7 +1245,6 @@ def test_023():
         check={
             "pod_count": 1,
             "apply_templates": {
-                settings.clickhouse_template,
                 "templates/tpl-clickhouse-auto.yaml",
             },
             # test-001.yaml does not have a template reference but should get correct ClickHouse version
