@@ -31,6 +31,10 @@ func (c *Controller) appendLabelReady(host *chop.ChiHost) error {
 
 	chopmodel.AppendLabelReady(&pod.ObjectMeta)
 	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(pod)
+	if err != nil {
+		log.M(host).A().Error("FAIL setting 'ready' label for host %s err:%v", host.Address.NamespaceNameString(), err)
+		return err
+	}
 	return err
 }
 
