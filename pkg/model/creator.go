@@ -850,27 +850,28 @@ func newDefaultLivenessProbe() *corev1.Probe {
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/ping",
-				Port: intstr.Parse(chDefaultHTTPPortName),
+				Port: intstr.Parse(chDefaultHTTPPortName), // What if it is not a default?
 			},
 		},
 		InitialDelaySeconds: 60,
 		PeriodSeconds:       3,
-		FailureThreshold:    5,
+		FailureThreshold:    10,
 	}
 }
 
 // newDefaultReadinessProbe
 func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
-	return &corev1.Probe{
-		Handler: corev1.Handler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/replicas_status",
-				Port: intstr.Parse(chDefaultHTTPPortName),
-			},
-		},
-		InitialDelaySeconds: 10,
-		PeriodSeconds:       3,
-	}
+	return nil
+//	return &corev1.Probe{
+//		Handler: corev1.Handler{
+//			HTTPGet: &corev1.HTTPGetAction{
+//				Path: "/replicas_status",
+//				Port: intstr.Parse(chDefaultHTTPPortName),
+//			},
+//		},
+//		InitialDelaySeconds: 10,
+//		PeriodSeconds:       3,
+//	}
 }
 
 // newDefaultClickHouseContainer returns default ClickHouse Container
