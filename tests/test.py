@@ -37,6 +37,7 @@ if main():
 
         # python3 tests/test.py --only operator*
         xfails = {
+             "/main/operator/test_009. Test operator upgrade": [(Fail, "May fail due to label changes")],
              "/main/operator/test_022. Test that chi with broken image can be deleted": [(Error, "Not supported yet. Timeout")],
              "/main/operator/test_024. Test annotations for various template types/PV annotations should be populated": [(Fail, "Not supported yet")],
         }
