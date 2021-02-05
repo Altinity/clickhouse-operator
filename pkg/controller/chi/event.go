@@ -138,6 +138,6 @@ func (c *Controller) emitEvent(
 	_, err := c.kubeClient.CoreV1().Events(namespace).Create(event)
 
 	if err != nil {
-		log.V(1).Error("Create Event failed: %v", err)
+		log.M(chi).A().Error("Create Event failed: %v", err)
 	}
 }

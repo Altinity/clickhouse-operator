@@ -69,24 +69,24 @@ func (c *Controller) waitHostRunning(host *chop.ChiHost) error {
 	for {
 		if c.isHostRunning(host) {
 			// All is good, job done, exit
-			log.V(1).Info("waitHostRunning(%s/%s)-OK", namespace, name)
+			log.V(1).M(host).F().Info("%s/%s-OK", namespace, name)
 			return nil
 		}
 
 		// Object is found, function not positive
 		if time.Since(start) >= (time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second) {
 			// Start bothering with log messages after some time only
-			log.V(1).Info("waitHostRunning(%s/%s)-WAIT", namespace, name)
+			log.V(1).M(host).F().Info("%s/%s-WAIT", namespace, name)
 		}
 
 		if time.Since(start) >= (time.Duration(c.chop.Config().StatefulSetUpdateTimeout) * time.Second) {
 			// Timeout reached, no good result available, time to quit
-			log.V(1).Info("ERROR waitHostRunning(%s/%s) - TIMEOUT reached", namespace, name)
+			log.V(1).M(host).F().Error("%s/%s-TIMEOUT reached", namespace, name)
 			return errors.New(fmt.Sprintf("waitHostRunning(%s/%s) - wait timeout", namespace, name))
 		}
 
 		// Wait some more time
-		log.V(2).Info("waithostRunning(%s/%s)", namespace, name)
+		log.V(2).M(host).F().Info("%s/%s", namespace, name)
 		select {
 		case <-time.After(time.Duration(c.chop.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}
@@ -151,31 +151,31 @@ func (c *Controller) pollStatefulSet(entity interface{}, opts *StatefulSetPollOp
 			// Object is found
 			if f(statefulSet) {
 				// All is good, job done, exit
-				log.V(1).Info("pollStatefulSet(%s/%s)-OK  :%s", namespace, name, model.StrStatefulSetStatus(&statefulSet.Status))
+				log.V(1).M(namespace, name).F().Info("OK  :%s", model.StrStatefulSetStatus(&statefulSet.Status))
 				return nil
 			}
 
 			// Object is found, but function is not positive
 			if time.Since(start) >= opts.StartBotheringAfterTimeout {
 				// Start bothering with log messages after some time only
-				log.V(1).Info("pollStatefulSet(%s/%s)-WAIT:%s", namespace, name, model.StrStatefulSetStatus(&statefulSet.Status))
+				log.V(1).M(namespace, name).F().Info("WAIT:%s", model.StrStatefulSetStatus(&statefulSet.Status))
 			}
 		} else if apierrors.IsNotFound(err) {
 			// Object is not found - it either failed to be created or just still not created
 			if time.Since(start) >= opts.CreateTimeout {
 				// No more wait for object to be created. Consider create as failed.
 				if opts.CreateTimeout > 0 {
-					log.V(1).Info("ERROR pollStatefulSet(%s/%s) Get() FAILED - StatefulSet still not found, abort", namespace, name)
+					log.V(1).M(namespace, name).F().Error("Get() FAILED - StatefulSet still not found, abort")
 				} else {
-					log.V(1).Info("pollStatefulSet(%s/%s) Get() NEUTRAL StatefulSet not found and no wait required", namespace, name)
+					log.V(1).M(namespace, name).F().Info("Get() NEUTRAL StatefulSet not found and no wait required")
 				}
 				return err
 			}
 			// Object with such name not found - may be is still being created - wait for it
-			log.V(1).Info("pollStatefulSet(%s/%s)-WAIT: object not found. Not created yet?", namespace, name)
+			log.V(1).M(namespace, name).F().Info("WAIT: object not found. Not created yet?")
 		} else {
 			// Some kind of total error
-			log.Error("ERROR pollStatefulSet(%s/%s) Get() FAILED", namespace, name)
+			log.M(namespace, name).A().Error("%s/%s Get() FAILED", namespace, name)
 			return err
 		}
 
@@ -183,7 +183,7 @@ func (c *Controller) pollStatefulSet(entity interface{}, opts *StatefulSetPollOp
 
 		if time.Since(start) >= opts.Timeout {
 			// Timeout reached, no good result available, time to quit
-			log.V(1).Info("ERROR pollStatefulSet(%s/%s) - TIMEOUT reached", namespace, name)
+			log.V(1).M(namespace, name).F().Info("%s/%s - TIMEOUT reached")
 			return errors.New(fmt.Sprintf("waitStatefulSet(%s/%s) - wait timeout", namespace, name))
 		}
 
@@ -210,24 +210,24 @@ func (c *Controller) pollHost(host *chop.ChiHost, opts *StatefulSetPollOptions, 
 	for {
 		if f(host) {
 			// All is good, job done, exit
-			log.V(1).Info("pollHost(%s/%s)-OK", namespace, name)
+			log.V(1).M(host).F().Info("%s/%s-OK", namespace, name)
 			return nil
 		}
 
 		// Object is found, but function is not positive
 		if time.Since(start) >= opts.StartBotheringAfterTimeout {
 			// Start bothering with log messages after some time only
-			log.V(1).Info("pollHost(%s/%s)-WAIT", namespace, name)
+			log.V(1).M(host).F().Info("%s/%s-WAIT", namespace, name)
 		}
 
 		if time.Since(start) >= opts.Timeout {
 			// Timeout reached, no good result available, time to quit
-			log.V(1).Info("ERROR pollHost(%s/%s) - TIMEOUT reached", namespace, name)
+			log.V(1).M(host).F().Error("%s/%s-TIMEOUT reached", namespace, name)
 			return errors.New(fmt.Sprintf("pollHost(%s/%s) - wait timeout", namespace, name))
 		}
 
 		// Wait some more time
-		log.V(2).Info("pollHost(%s/%s)", namespace, name)
+		log.V(2).M(host).F().Info("%s/%s", namespace, name)
 		select {
 		case <-time.After(opts.Interval):
 		}

@@ -55,21 +55,21 @@ func (c *Controller) labelMyObjectsTree() {
 	namespace, ok2 := c.chop.ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
 
 	if !ok1 || !ok2 {
-		log.V(1).Info("ERROR fetch Pod name out of %s/%s", namespace, podName)
+		log.V(1).M(namespace, podName).A().Error("ERROR fetch Pod name out of %s/%s", namespace, podName)
 		return
 	}
 
 	// Pod namespaced name found, fetch the Pod
 	pod, err := c.podLister.Pods(namespace).Get(podName)
 	if err != nil {
-		log.V(1).Info("ERROR get Pod %s/%s", namespace, podName)
+		log.V(1).M(namespace, podName).A().Error("ERROR get Pod %s/%s", namespace, podName)
 		return
 	}
 
 	// Put label on the Pod
 	c.addLabels(&pod.ObjectMeta)
 	if _, err := c.kubeClient.CoreV1().Pods(namespace).Update(pod); err != nil {
-		log.V(1).Info("ERROR put label on Pod %s/%s %v", namespace, podName, err)
+		log.V(1).M(namespace, podName).A().Error("ERROR put label on Pod %s/%s %v", namespace, podName, err)
 	}
 
 	// Find parent ReplicaSet
@@ -85,21 +85,21 @@ func (c *Controller) labelMyObjectsTree() {
 
 	if replicaSetName == "" {
 		// ReplicaSet not found
-		log.V(1).Info("ERROR ReplicaSet for Pod %s/%s not found", namespace, podName)
+		log.V(1).M(namespace, podName).A().Error("ERROR ReplicaSet for Pod %s/%s not found", namespace, podName)
 		return
 	}
 
 	// ReplicaSet namespaced name found, fetch the ReplicaSet
 	replicaSet, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Get(replicaSetName, v1.GetOptions{})
 	if err != nil {
-		log.V(1).Info("ERROR get ReplicaSet %s/%s %v", namespace, replicaSetName, err)
+		log.V(1).M(namespace, replicaSetName).A().Error("ERROR get ReplicaSet %s/%s %v", namespace, replicaSetName, err)
 		return
 	}
 
 	// Put label on the ReplicaSet
 	c.addLabels(&replicaSet.ObjectMeta)
 	if _, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Update(replicaSet); err != nil {
-		log.V(1).Info("ERROR put label on ReplicaSet %s/%s %v", namespace, replicaSetName, err)
+		log.V(1).M(namespace, replicaSetName).A().Error("ERROR put label on ReplicaSet %s/%s %v", namespace, replicaSetName, err)
 	}
 
 	// Find parent Deployment
@@ -115,21 +115,21 @@ func (c *Controller) labelMyObjectsTree() {
 
 	if deploymentName == "" {
 		// Deployment not found
-		log.V(1).Info("ERROR Deployment for %s Pod %s ReplicaSet %s not found", namespace, podName, replicaSetName)
+		log.V(1).M(namespace, replicaSetName).A().Error("ERROR Deployment for %s Pod %s ReplicaSet %s not found", namespace, podName, replicaSetName)
 		return
 	}
 
 	// Deployment namespaced name found, fetch the Deployment
 	deployment, err := c.kubeClient.AppsV1().Deployments(namespace).Get(deploymentName, v1.GetOptions{})
 	if err != nil {
-		log.V(1).Info("ERROR get Deployment %s/%s", namespace, deploymentName)
+		log.V(1).M(namespace, deploymentName).A().Error("ERROR get Deployment %s/%s", namespace, deploymentName)
 		return
 	}
 
 	// Put label on the Deployment
 	c.addLabels(&deployment.ObjectMeta)
 	if _, err := c.kubeClient.AppsV1().Deployments(namespace).Update(deployment); err != nil {
-		log.V(1).Info("ERROR put label on Deployment %s/%s %v", namespace, deploymentName, err)
+		log.V(1).M(namespace, deploymentName).A().Error("ERROR put label on Deployment %s/%s %v", namespace, deploymentName, err)
 	}
 }
 

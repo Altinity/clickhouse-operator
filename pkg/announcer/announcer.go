@@ -15,12 +15,11 @@
 package announcer
 
 import (
+	"reflect"
 	"strconv"
 
-	log "github.com/golang/glog"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	log "github.com/golang/glog"
 )
 
 // Announcer handler all log/event/status messages going outside of controller/worker
@@ -126,7 +125,8 @@ func A() Announcer {
 	return announcer.A()
 }
 
-// S adds 'start of the function' tag
+// S adds 'start of the function' tag, which includes:
+// file, line, function and start prefix
 func (a Announcer) S() Announcer {
 	b := a
 	b.writeLog = true
@@ -135,12 +135,14 @@ func (a Announcer) S() Announcer {
 	return b
 }
 
-// S adds 'start of the function' tag
+// S adds 'start of the function' tag, which includes:
+// file, line, function and start prefix
 func S() Announcer {
 	return announcer.S()
 }
 
-// E adds 'end of the function' tag
+// E adds 'end of the function' tag, which includes:
+// file, line, function and start prefix
 func (a Announcer) E() Announcer {
 	b := a
 	b.writeLog = true
@@ -149,25 +151,43 @@ func (a Announcer) E() Announcer {
 	return b
 }
 
-// E adds 'end of the function' tag
+// E adds 'end of the function' tag, which includes:
+// file, line, function and start prefix
 func E() Announcer {
 	return announcer.E()
 }
 
 // M adds object meta as 'namespace/name'
-func (a Announcer) M(m *v1.ObjectMeta) Announcer {
-	if m == nil {
+func (a Announcer) M(m ...interface{}) Announcer {
+	if len(m) == 0 {
 		return a
 	}
+
 	b := a
 	b.writeLog = true
-	b.meta = m.Namespace + "/" + m.Name
+	switch len(m) {
+	case 1:
+		switch typed := m[0].(type) {
+		case string:
+			b.meta = typed
+		default:
+			if meta, ok := a.findMeta(m[0]); ok {
+				b.meta = meta
+			} else {
+				return a
+			}
+		}
+	case 2:
+		namespace, _ := m[0].(string)
+		name, _ := m[1].(string)
+		b.meta = namespace + "/" + name
+	}
 	return b
 }
 
 // M adds object meta as 'namespace/name'
-func M(m *v1.ObjectMeta) Announcer {
-	return announcer.M(m)
+func M(m ...interface{}) Announcer {
+	return announcer.M(m...)
 }
 
 // P triggers log to print line
@@ -268,19 +288,113 @@ func (a Announcer) prependFormat(format string) string {
 	// Result format is expected to be 'file:line:function:prefix:meta:_start_format_'
 	// Prepend each component in reverse order
 	if a.meta != "" {
-		format = a.meta + ":" + format
+		if format == "" {
+			format = a.meta
+		} else {
+			format = a.meta + ":" + format
+		}
 	}
 	if a.prefix != "" {
-		format = a.prefix + ":" + format
+		if format == "" {
+			format = a.prefix
+		} else {
+			format = a.prefix + ":" + format
+		}
 	}
 	if a.function != "" {
-		format = a.function + ":" + format
+		if format == "" {
+			format = a.function + "()"
+		} else {
+			format = a.function + "()" + ":" + format
+		}
 	}
 	if a.line != 0 {
-		format = strconv.Itoa(a.line) + ":" + format
+		if format == "" {
+			format = strconv.Itoa(a.line)
+		} else {
+			format = strconv.Itoa(a.line) + ":" + format
+		}
 	}
 	if a.file != "" {
-		format = a.file + ":" + format
+		if format == "" {
+			format = a.file
+		} else {
+			format = a.file + ":" + format
+		}
 	}
 	return format
+}
+
+func (a Announcer) findMeta(m interface{}) (string, bool) {
+	if meta, ok := a.findInObjectMeta(m); ok {
+		return meta, ok
+	}
+	if meta, ok := a.findInCHI(m); ok {
+		return meta, ok
+	}
+	if meta, ok := a.findInAddress(m); ok {
+		return meta, ok
+	}
+	return "", false
+}
+
+func (a Announcer) findInObjectMeta(m interface{}) (string, bool) {
+	if m == nil {
+		return "", false
+	}
+	meta := reflect.ValueOf(m)
+	if !meta.IsValid() || meta.IsNil() || meta.IsZero() {
+		return "", false
+	}
+	namespace := meta.Elem().FieldByName("Namespace")
+	if !namespace.IsValid() {
+		return "", false
+	}
+	name := meta.Elem().FieldByName("Name")
+	if !name.IsValid() {
+		return "", false
+	}
+	return namespace.String() + "/" + name.String(), true
+}
+
+func (a Announcer) findInCHI(m interface{}) (string, bool) {
+	if m == nil {
+		return "", false
+	}
+	object := reflect.ValueOf(m)
+	if !object.IsValid() || object.IsNil() || object.IsZero() {
+		return "", false
+	}
+	chi := object.Elem().FieldByName("CHI")
+	if !chi.IsValid() || chi.IsNil() || chi.IsZero() {
+		return "", false
+	}
+	namespace := chi.Elem().FieldByName("Namespace")
+	if !namespace.IsValid() {
+		return "", false
+	}
+	name := chi.Elem().FieldByName("Name")
+	if !name.IsValid() {
+		return "", false
+	}
+	return namespace.String() + "/" + name.String(), true
+}
+
+func (a Announcer) findInAddress(m interface{}) (string, bool) {
+	if m == nil {
+		return "", false
+	}
+	address := reflect.ValueOf(m)
+	if !address.IsValid() || address.IsNil() || address.IsZero() {
+		return "", false
+	}
+	namespace := address.Elem().FieldByName("Namespace")
+	if !namespace.IsValid() {
+		return "", false
+	}
+	name := address.Elem().FieldByName("CHIName")
+	if !name.IsValid() {
+		return "", false
+	}
+	return namespace.String() + "/" + name.String(), true
 }

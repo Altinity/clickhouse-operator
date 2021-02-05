@@ -17,11 +17,9 @@ package chi
 import (
 	"fmt"
 
-	log "github.com/golang/glog"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	a "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	log "github.com/golang/glog"
 )
 
 // Announcer handler all log/event/status messages going outside of controller/worker
@@ -108,9 +106,9 @@ func (a Announcer) E() Announcer {
 }
 
 // M adds object meta as 'namespace/name'
-func (a Announcer) M(m *v1.ObjectMeta) Announcer {
+func (a Announcer) M(m ...interface{}) Announcer {
 	b := a
-	b.Announcer = b.Announcer.M(m)
+	b.Announcer = b.Announcer.M(m...)
 	return b
 }
 

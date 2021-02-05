@@ -40,6 +40,18 @@ type ChiHostAddress struct {
 	ClusterScopeCycleOffset int    `json:"clusterScopeCycleOffset"`
 }
 
-func (a ChiHostAddress) ShortString() string {
+func (a ChiHostAddress) CompactString() string {
 	return fmt.Sprintf("ns:%s|chi:%s|clu:%s|sha:%s|rep:%s|host:%s", a.Namespace, a.CHIName, a.ClusterName, a.ShardName, a.ReplicaName, a.HostName)
+}
+
+func (a ChiHostAddress) ClusterNameString() string {
+	return fmt.Sprintf("%s/%s", a.ClusterName, a.HostName)
+}
+
+func (a ChiHostAddress) NamespaceNameString() string {
+	return fmt.Sprintf("%s/%s", a.Namespace, a.HostName)
+}
+
+func (a ChiHostAddress) NamespaceCHINameString() string {
+	return fmt.Sprintf("%s/%s", a.Namespace, a.CHIName)
 }
