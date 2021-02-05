@@ -160,11 +160,12 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
 
         with When(f"upgrade operator to {version_to}"):
             set_operator_version(version_to, timeout=120)
-            time.sleep(5)
+            time.sleep(10)
             kubectl.wait_chi_status(chi, "Completed", retries=6)
             kubectl.wait_objects(chi, {"statefulset": 1, "pod": 1, "service": 2})
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
-            assert start_time == new_start_time
+            with Then("ClickHouse pods should not be restarted"):
+                new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
+                assert start_time == new_start_time
 
         kubectl.delete_chi(chi)
 
@@ -1244,7 +1245,6 @@ def test_023():
         check={
             "pod_count": 1,
             "apply_templates": {
-                settings.clickhouse_template,
                 "templates/tpl-clickhouse-auto.yaml",
             },
             # test-001.yaml does not have a template reference but should get correct ClickHouse version
