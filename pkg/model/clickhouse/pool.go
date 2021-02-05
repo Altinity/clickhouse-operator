@@ -31,7 +31,7 @@ func GetPooledDBConnection(params *CHConnectionParams) *CHConnection {
 	key := makePoolKey(params)
 
 	if connection, existed := dbConnectionPool.Load(key); existed {
-		log.V(2).Info("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
+		log.V(2).F().Info("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
 		return connection.(*CHConnection)
 	}
 
@@ -42,16 +42,16 @@ func GetPooledDBConnection(params *CHConnectionParams) *CHConnection {
 
 	// Double check for race condition
 	if connection, existed := dbConnectionPool.Load(key); existed {
-		log.V(2).Info("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
+		log.V(2).F().Info("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
 		return connection.(*CHConnection)
 	}
 
-	log.V(2).Info("Add connection to the pool: %s", params.GetDSNWithHiddenCredentials())
+	log.V(2).F().Info("Add connection to the pool: %s", params.GetDSNWithHiddenCredentials())
 	dbConnectionPool.Store(key, NewConnection(params))
 
 	// Fetch from the pool
 	if connection, existed := dbConnectionPool.Load(key); existed {
-		log.V(2).Info("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
+		log.V(2).F().Info("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
 		return connection.(*CHConnection)
 	}
 

@@ -47,7 +47,7 @@ func (q *Query) Close() {
 		err := q.Rows.Close()
 		q.Rows = nil
 		if err != nil {
-			log.A().Error("UNABLE to close rows. err: %v", err)
+			log.A().Error("UNABLE to close rows. Err: %v", err)
 		}
 	}
 

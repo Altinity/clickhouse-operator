@@ -41,7 +41,7 @@ func (c *CHConnection) connect() {
 	log.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
 	dbConnection, err := databasesql.Open("clickhouse", c.params.GetDSN())
 	if err != nil {
-		log.V(1).Info("FAILED Open(%s) %v", c.params.GetDSNWithHiddenCredentials(), err)
+		log.V(1).A().Error("FAILED Open(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
 		return
 	}
 
@@ -50,7 +50,7 @@ func (c *CHConnection) connect() {
 	defer cancel()
 
 	if err := dbConnection.PingContext(ctx); err != nil {
-		log.V(1).Info("FAILED Ping(%s) %v", c.params.GetDSNWithHiddenCredentials(), err)
+		log.V(1).A().Error("FAILED Ping(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
 		_ = dbConnection.Close()
 		return
 	}
@@ -60,7 +60,7 @@ func (c *CHConnection) connect() {
 
 func (c *CHConnection) ensureConnected() bool {
 	if c.conn != nil {
-		log.V(2).Info("Already connected: %s", c.params.GetDSNWithHiddenCredentials())
+		log.V(2).F().Info("Already connected: %s", c.params.GetDSNWithHiddenCredentials())
 		return true
 	}
 
@@ -80,7 +80,7 @@ func (c *CHConnection) Query(sql string) (*Query, error) {
 	if !c.ensureConnected() {
 		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
-		log.V(1).Info(s)
+		log.V(1).A().Error(s)
 		return nil, fmt.Errorf(s)
 	}
 
@@ -88,7 +88,7 @@ func (c *CHConnection) Query(sql string) (*Query, error) {
 	if err != nil {
 		cancel()
 		s := fmt.Sprintf("FAILED Query(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
-		log.V(1).Info(s)
+		log.V(1).A().Error(s)
 		return nil, err
 	}
 
@@ -108,18 +108,18 @@ func (c *CHConnection) Exec(sql string) error {
 
 	if !c.ensureConnected() {
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
-		log.V(1).Info(s)
+		log.V(1).A().Error(s)
 		return fmt.Errorf(s)
 	}
 
 	_, err := c.conn.ExecContext(ctx, sql)
 
 	if err != nil {
-		log.V(1).Info("FAILED Exec(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
+		log.V(1).A().Error("FAILED Exec(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
 		return err
 	}
 
-	log.V(2).Info("clickhouse.Exec():\n", sql)
+	log.V(2).F().Info("\n%s", sql)
 
 	return nil
 }
