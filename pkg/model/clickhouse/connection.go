@@ -46,7 +46,7 @@ func (c *CHConnection) connect() {
 	}
 
 	// Ping should be deadlined
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(c.params.timeout))
 	defer cancel()
 
 	if err := dbConnection.PingContext(ctx); err != nil {
@@ -75,7 +75,7 @@ func (c *CHConnection) Query(sql string) (*Query, error) {
 		return nil, nil
 	}
 
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(c.params.timeout))
 
 	if !c.ensureConnected() {
 		cancel()
@@ -103,7 +103,7 @@ func (c *CHConnection) Exec(sql string) error {
 		return nil
 	}
 
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(defaultTimeout))
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(c.params.timeout))
 	defer cancel()
 
 	if !c.ensureConnected() {

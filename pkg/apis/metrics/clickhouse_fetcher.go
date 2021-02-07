@@ -24,10 +24,6 @@ import (
 )
 
 const (
-	defaultTimeout = 10 * time.Second
-)
-
-const (
 	querySystemReplicasSQL = `
 		SELECT
 			database,
@@ -135,6 +131,10 @@ func NewClickHouseFetcher(hostname, username, password string, port int) *ClickH
 	return &ClickHouseFetcher{
 		chConnectionParams: clickhouse.NewCHConnectionParams(hostname, username, password, port),
 	}
+}
+
+func (f *ClickHouseFetcher) SetTimeout(timeout time.Duration) {
+	f.chConnectionParams.SetTimeout(timeout)
 }
 
 func (f *ClickHouseFetcher) getCHConnection() *clickhouse.CHConnection {
