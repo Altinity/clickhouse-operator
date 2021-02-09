@@ -206,21 +206,21 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
-			log.V(2).M(service).Info("serviceInformer.AddFunc")
+			log.V(3).M(service).Info("serviceInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldService := old.(*core.Service)
 			if !c.isTrackedObject(&oldService.ObjectMeta) {
 				return
 			}
-			log.V(2).M(oldService).Info("serviceInformer.UpdateFunc")
+			log.V(3).M(oldService).Info("serviceInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
 			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
-			log.V(2).M(service).Info("serviceInformer.DeleteFunc")
+			log.V(3).M(service).Info("serviceInformer.DeleteFunc")
 		},
 	})
 
@@ -230,7 +230,7 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			log.V(2).M(endpoints).Info("endpointsInformer.AddFunc")
+			log.V(3).M(endpoints).Info("endpointsInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldEndpoints := old.(*core.Endpoints)
@@ -283,21 +283,21 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
-			log.V(2).M(configMap).Info("configMapInformer.AddFunc")
+			log.V(3).M(configMap).Info("configMapInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
 			configMap := old.(*core.ConfigMap)
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
-			log.V(2).M(configMap).Info("configMapInformer.UpdateFunc")
+			log.V(3).M(configMap).Info("configMapInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
-			log.V(2).M(configMap).Info("configMapInformer.DeleteFunc")
+			log.V(3).M(configMap).Info("configMapInformer.DeleteFunc")
 		},
 	})
 
@@ -307,7 +307,7 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
-			log.V(2).M(statefulSet).Info("statefulSetInformer.AddFunc")
+			log.V(3).M(statefulSet).Info("statefulSetInformer.AddFunc")
 			//controller.handleObject(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -315,14 +315,14 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
-			log.V(2).M(statefulSet).Info("statefulSetInformer.UpdateFunc")
+			log.V(3).M(statefulSet).Info("statefulSetInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
-			log.V(2).M(statefulSet).Info("statefulSetInformer.DeleteFunc")
+			log.V(3).M(statefulSet).Info("statefulSetInformer.DeleteFunc")
 			//controller.handleObject(obj)
 		},
 	})
@@ -333,21 +333,21 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
-			log.V(2).M(pod).Info("podInformer.AddFunc")
+			log.V(3).M(pod).Info("podInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
 			pod := old.(*core.Pod)
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
-			log.V(2).M(pod).Info("podInformer.UpdateFunc")
+			log.V(3).M(pod).Info("podInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
-			log.V(2).M(pod).Info("podInformer.DeleteFunc")
+			log.V(3).M(pod).Info("podInformer.DeleteFunc")
 		},
 	})
 }
