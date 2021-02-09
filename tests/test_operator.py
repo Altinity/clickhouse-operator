@@ -1313,7 +1313,7 @@ def test_025():
     with Given("Create replicated table and populate it"):
         clickhouse.query(chi, create_table)
         clickhouse.query(chi, "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
-        clickhouse.query(chi, f"INSERT INTO test_local select * from numbers({numbers})")
+        clickhouse.query(chi, f"INSERT INTO test_local select * from numbers({numbers})", timeout=120)
 
     with When("Add one more replica, but do not wait for completion"):
         kubectl.create_and_check(
