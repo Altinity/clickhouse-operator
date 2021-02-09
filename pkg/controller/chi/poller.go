@@ -33,20 +33,9 @@ const (
 	waitStatefulSetGenerationTimeoutToCreateStatefulSet  = 30
 )
 
-// waitStatefulSetReady polls StatefulSet for reaching target generation and Ready state
-func (c *Controller) waitStatefulSetReady(statefulSet *apps.StatefulSet) error {
-	if err := c.pollStatefulSet(statefulSet, nil, func(sts *apps.StatefulSet) bool {
-		return model.IsStatefulSetGeneration(sts, sts.Generation)
-	}); err == nil {
-		return c.pollStatefulSet(statefulSet, nil, model.IsStatefulSetReady)
-	} else {
-		return err
-	}
-}
-
-// waitHostNotReady polls StatefulSet for not exists or not ready
+// waitHostNotReady polls host's StatefulSet for not exists or not ready
 func (c *Controller) waitHostNotReady(host *chop.ChiHost) error {
-	err := c.pollStatefulSet(host, NewStatefulSetPollOptionsConfigNoCreate(c.chop.Config()), model.IsStatefulSetNotReady)
+	err := c.pollStatefulSet(host, NewStatefulSetPollOptionsConfigNoCreate(c.chop.Config()), model.IsStatefulSetNotReady, nil)
 	if apierrors.IsNotFound(err) {
 		err = nil
 	}
@@ -54,9 +43,54 @@ func (c *Controller) waitHostNotReady(host *chop.ChiHost) error {
 	return err
 }
 
-// waitHostReady polls hosts's StatefulSet until it is ready
+// waitHostReady polls host's StatefulSet until it is ready
 func (c *Controller) waitHostReady(host *chop.ChiHost) error {
-	return c.waitStatefulSetReady(host.StatefulSet)
+	// Wait for StatefulSet to reach generation
+	err := c.pollStatefulSet(
+		host.StatefulSet,
+		nil,
+		func(sts *apps.StatefulSet) bool {
+			if sts == nil {
+				return false
+			}
+			_ = c.deleteLabelReady(host)
+			return model.IsStatefulSetGeneration(sts, sts.Generation)
+		},
+		func() {
+			_ = c.deleteLabelReady(host)
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// Wait StatefulSet to reach ready status
+	return c.pollStatefulSet(
+		host.StatefulSet,
+		nil,
+		func(sts *apps.StatefulSet) bool {
+			_ = c.deleteLabelReady(host)
+			return model.IsStatefulSetReady(sts)
+		},
+		func() {
+			_ = c.deleteLabelReady(host)
+		},
+	)
+}
+
+// waitHostDeleted polls host's StatefulSet until it is not available
+func (c *Controller) waitHostDeleted(host *chop.ChiHost) {
+	for {
+		// TODO
+		// Probably there would be better way to wait until k8s reported StatefulSet deleted
+		if _, err := c.getStatefulSet(host); err == nil {
+			log.V(2).Info("cache NOT yet synced")
+			time.Sleep(15 * time.Second)
+		} else {
+			log.V(1).Info("cache synced")
+			return
+		}
+	}
 }
 
 // waitHostRunning polls host for `Running` state
@@ -99,7 +133,8 @@ type StatefulSetPollOptions struct {
 	StartBotheringAfterTimeout time.Duration
 	CreateTimeout              time.Duration
 	Timeout                    time.Duration
-	Interval                   time.Duration
+	MainInterval               time.Duration
+	BackgroundInterval         time.Duration
 }
 
 func NewStatefulSetPollOptions() *StatefulSetPollOptions {
@@ -111,7 +146,8 @@ func NewStatefulSetPollOptionsConfig(config *chop.OperatorConfig) *StatefulSetPo
 		StartBotheringAfterTimeout: time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second,
 		CreateTimeout:              time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second,
 		Timeout:                    time.Duration(config.StatefulSetUpdateTimeout) * time.Second,
-		Interval:                   time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second,
+		MainInterval:               time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second,
+		BackgroundInterval:         1 * time.Second,
 	}
 }
 
@@ -119,13 +155,19 @@ func NewStatefulSetPollOptionsConfigNoCreate(config *chop.OperatorConfig) *State
 	return &StatefulSetPollOptions{
 		StartBotheringAfterTimeout: time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second,
 		//CreateTimeout:              time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second,
-		Timeout:  time.Duration(config.StatefulSetUpdateTimeout) * time.Second,
-		Interval: time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second,
+		Timeout:            time.Duration(config.StatefulSetUpdateTimeout) * time.Second,
+		MainInterval:       time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second,
+		BackgroundInterval: 1 * time.Second,
 	}
 }
 
 // pollStatefulSet polls StatefulSet with poll callback function.
-func (c *Controller) pollStatefulSet(entity interface{}, opts *StatefulSetPollOptions, f func(set *apps.StatefulSet) bool) error {
+func (c *Controller) pollStatefulSet(
+	entity interface{},
+	opts *StatefulSetPollOptions,
+	mainFn func(set *apps.StatefulSet) bool,
+	backFn func(),
+) error {
 	if opts == nil {
 		opts = NewStatefulSetPollOptionsConfig(c.chop.Config())
 	}
@@ -149,7 +191,7 @@ func (c *Controller) pollStatefulSet(entity interface{}, opts *StatefulSetPollOp
 	for {
 		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err == nil {
 			// Object is found
-			if f(statefulSet) {
+			if mainFn(statefulSet) {
 				// All is good, job done, exit
 				log.V(1).M(namespace, name).F().Info("OK  :%s", model.StrStatefulSetStatus(&statefulSet.Status))
 				return nil
@@ -189,12 +231,26 @@ func (c *Controller) pollStatefulSet(entity interface{}, opts *StatefulSetPollOp
 
 		// Wait some more time
 		log.V(2).Info("pollStatefulSet(%s/%s)", namespace, name)
-		select {
-		case <-time.After(opts.Interval):
-		}
+		pollback(opts, backFn)
 	}
 
 	return fmt.Errorf("unexpected flow")
+}
+
+func pollback(opts *StatefulSetPollOptions, fn func()) {
+	main := time.After(opts.MainInterval)
+	run := true
+	for run {
+		back := time.After(opts.BackgroundInterval)
+		select {
+		case <-main:
+			run = false
+		case <-back:
+			if fn != nil {
+				fn()
+			}
+		}
+	}
 }
 
 // pollHost polls host with poll callback function.
@@ -229,7 +285,7 @@ func (c *Controller) pollHost(host *chop.ChiHost, opts *StatefulSetPollOptions, 
 		// Wait some more time
 		log.V(2).M(host).F().Info("%s/%s", namespace, name)
 		select {
-		case <-time.After(opts.Interval):
+		case <-time.After(opts.MainInterval):
 		}
 	}
 
