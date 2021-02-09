@@ -255,6 +255,11 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 	return l.appendCHILabels(labels)
 }
 
+// getLabelsHostScopeReady gets labels for Host-scoped object including Ready label
+func (l *Labeler) getLabelsHostScopeReady(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
+	return l.appendReadyLabels(l.getLabelsHostScope(host, applySupplementaryServiceLabels))
+}
+
 // getSelectorShardScope gets labels to select a Host-scoped object
 func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 	// Do not include CHI-provided labels
