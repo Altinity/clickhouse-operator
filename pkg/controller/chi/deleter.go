@@ -15,8 +15,6 @@
 package chi
 
 import (
-	"time"
-
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -115,28 +113,33 @@ func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
-	statefulSet, err := c.getStatefulSet(host)
-	if err != nil {
+	if sts, err := c.getStatefulSet(host); err == nil {
+		host.StatefulSet = sts
+	} else {
 		if apierrors.IsNotFound(err) {
 			log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
 		} else {
 			log.V(1).M(host).A().Error("FAIL get StatefulSet %s/%s err:%v", namespace, name, err)
 		}
-		return nil
+		return err
 	}
 
 	// Scale StatefulSet down to 0 pods count.
 	// This is the proper and graceful way to delete StatefulSet
 	var zero int32 = 0
-	statefulSet.Spec.Replicas = &zero
-	statefulSet, _ = c.kubeClient.AppsV1().StatefulSets(namespace).Update(statefulSet)
-	_ = c.waitStatefulSetReady(statefulSet)
-	host.StatefulSet = statefulSet
+	host.StatefulSet.Spec.Replicas = &zero
+	if _, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(host.StatefulSet); err != nil {
+		log.V(1).M(host).Error("UNABLE to update StatefulSet %s/%s", namespace, name)
+		return err
+	}
+
+	// Wait until StatefulSet scales down to 0 pods count.
+	_ = c.waitHostReady(host)
 
 	// And now delete empty StatefulSet
 	if err := c.kubeClient.AppsV1().StatefulSets(namespace).Delete(name, newDeleteOptions()); err == nil {
 		log.V(1).M(host).Info("OK delete StatefulSet %s/%s", namespace, name)
-		c.syncStatefulSet(host)
+		c.waitHostDeleted(host)
 	} else if apierrors.IsNotFound(err) {
 		log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
 		err = nil
@@ -146,21 +149,6 @@ func (c *Controller) deleteStatefulSet(host *chop.ChiHost) error {
 	}
 
 	return nil
-}
-
-// syncStatefulSet
-func (c *Controller) syncStatefulSet(host *chop.ChiHost) {
-	for {
-		// TODO
-		// There should be better way to sync cache
-		if _, err := c.getStatefulSet(host); err == nil {
-			log.V(2).Info("cache NOT yet synced")
-			time.Sleep(15 * time.Second)
-		} else {
-			log.V(1).Info("cache synced")
-			return
-		}
-	}
 }
 
 // deletePVC deletes PersistentVolumeClaim
