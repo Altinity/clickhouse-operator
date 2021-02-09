@@ -70,9 +70,9 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withD
 	var useTemplates []chiv1.ChiUseTemplate
 
 	if autoTemplates := n.chop.Config().FindAutoTemplates(); len(autoTemplates) > 0 {
-		log.V(1).Info("Adding %d auto-templates", len(autoTemplates))
+		log.V(2).M(chi).F().Info("Found auto-templates: %d", len(autoTemplates))
 		for _, template := range autoTemplates {
-			log.V(1).Info("Add %s/%s auto-template", template.Name, template.Namespace)
+			log.V(2).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Name, template.Namespace)
 			useTemplates = append(useTemplates, chiv1.ChiUseTemplate{
 				Name:      template.Name,
 				Namespace: template.Namespace,
@@ -93,10 +93,10 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withD
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		if template := n.chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
-			log.V(1).Info("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
+			log.V(1).M(chi).A().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			(&n.chi.Spec).MergeFrom(&template.Spec, chiv1.MergeTypeOverrideByNonEmptyValues)
-			log.V(2).Info("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
+			log.V(2).M(chi).F().Info("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
 		}
 	}
 
