@@ -512,7 +512,7 @@ func (c *Creator) statefulSetApplyPodTemplate(
 		ObjectMeta: metav1.ObjectMeta{
 			Name: template.Name,
 			Labels: util.MergeStringMapsOverwrite(
-				c.labeler.getLabelsHostScope(host, true),
+				c.labeler.getLabelsHostScopeReady(host, true),
 				template.ObjectMeta.Labels,
 			),
 			Annotations: util.MergeStringMapsOverwrite(
