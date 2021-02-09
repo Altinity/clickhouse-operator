@@ -30,18 +30,21 @@ import (
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	log.V(1).M(host).F().P()
-	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
-		// Error call Create()
+
+	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
+		// Unable to create StatefulSet at all
 		return err
-	} else if err := c.waitHostReady(host); err == nil {
-		// Target generation reached, StatefulSet created successfully
-		return nil
-	} else {
-		// Unable to run StatefulSet, StatefulSet create failed, time to rollback?
-		return c.onStatefulSetCreateFailed(statefulSet, host)
 	}
 
-	return fmt.Errorf("unexpected flow")
+	// StatefulSet created, wait until it is ready
+
+	if err := c.waitHostReady(host); err == nil {
+		// Target generation reached, StatefulSet created successfully
+		return nil
+	}
+
+	// Unable to run StatefulSet, StatefulSet create failed, time to rollback?
+	return c.onStatefulSetCreateFailed(statefulSet, host)
 }
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
