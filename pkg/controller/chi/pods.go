@@ -39,6 +39,15 @@ func (c *Controller) appendLabelReady(host *chop.ChiHost) error {
 }
 
 func (c *Controller) deleteLabelReady(host *chop.ChiHost) error {
+	if host == nil {
+		return nil
+	}
+	if host.StatefulSet.Spec.Replicas != nil {
+		if *host.StatefulSet.Spec.Replicas == 0 {
+			return nil
+		}
+	}
+
 	pod, err := c.getPod(host)
 	if err != nil {
 		log.V(1).M(host).F().Info("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
