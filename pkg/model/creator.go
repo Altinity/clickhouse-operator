@@ -323,7 +323,7 @@ func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
 	statefulSet.Labels = util.MergeStringMapsOverwrite(
 		statefulSet.Labels,
 		map[string]string{
-			LabelStatefulSetVersion: util.Fingerprint(statefulSet),
+			LabelObjectVersion: util.Fingerprint(statefulSet),
 		},
 	)
 	c.a.V(2).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
@@ -335,7 +335,7 @@ func (c *Creator) GetStatefulSetVersion(statefulSet *apps.StatefulSet) (string, 
 	if statefulSet == nil {
 		return "", false
 	}
-	label, ok := statefulSet.Labels[LabelStatefulSetVersion]
+	label, ok := statefulSet.Labels[LabelObjectVersion]
 	return label, ok
 }
 
