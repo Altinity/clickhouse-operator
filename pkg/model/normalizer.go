@@ -70,9 +70,9 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withD
 	var useTemplates []chiv1.ChiUseTemplate
 
 	if autoTemplates := n.chop.Config().FindAutoTemplates(); len(autoTemplates) > 0 {
-		log.V(2).M(chi).F().Info("Found auto-templates: %d", len(autoTemplates))
+		log.V(2).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
 		for _, template := range autoTemplates {
-			log.V(2).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Name, template.Namespace)
+			log.V(3).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Name, template.Namespace)
 			useTemplates = append(useTemplates, chiv1.ChiUseTemplate{
 				Name:      template.Name,
 				Namespace: template.Namespace,
@@ -184,7 +184,7 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 	hostTemplate, ok := host.GetHostTemplate()
 	if ok {
 		// Host references known HostTemplate
-		log.V(2).Info("getHostTemplate() statefulSet %s use custom host template %s", statefulSetName, hostTemplate.Name)
+		log.V(2).M(host).F().Info("StatefulSet %s uses custom hostTemplate %s", statefulSetName, hostTemplate.Name)
 		return hostTemplate
 	}
 
@@ -205,7 +205,7 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 		hostTemplate = newDefaultHostTemplate(statefulSetName)
 	}
 
-	log.V(3).Info("getHostTemplate() statefulSet %s use default host template", statefulSetName)
+	log.V(3).M(host).F().Info("StatefulSet %s use default hostTemplate", statefulSetName)
 
 	return hostTemplate
 }
