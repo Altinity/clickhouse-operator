@@ -4,7 +4,7 @@ import test_operator
 import test_clickhouse
 import util
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE, args, Fail, Error
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE, args, Fail, Error
 from testflows.asserts import error
 
 if main():
@@ -77,9 +77,9 @@ if main():
 
             for t in run_tests:
                 if callable(t):
-                    run(test=t)
+                    Scenario(test=t)()
                 else:
-                    run(test=t[0], args=t[1])
+                    Scenario(test=t[0], args=t[1])()
 
         # python3 tests/test.py --only clickhouse*
         with Module("clickhouse"):
@@ -94,4 +94,4 @@ if main():
             # run_test = [test_ch_002]
 
             for t in run_test:
-                run(test=t)
+                Scenario(test=t)()

@@ -6,13 +6,13 @@ import settings
 import util
 import manifest
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
 from testflows.asserts import error
 
 
 @TestScenario
 @Name("test_001. 1 node")
-def test_001():
+def test_001(self):
     kubectl.create_and_check(
         config="configs/test-001.yaml",
         check={
@@ -28,7 +28,7 @@ def test_001():
 
 @TestScenario
 @Name("test_002. useTemplates for pod, volume templates, and distribution")
-def test_002():
+def test_002(self):
     kubectl.create_and_check(
         config="configs/test-002-tpl.yaml",
         check={
@@ -49,7 +49,7 @@ def test_002():
 
 @TestScenario
 @Name("test_003. 4 nodes with custom layout definition")
-def test_003():
+def test_003(self):
     kubectl.create_and_check(
         config="configs/test-003-complex-layout.yaml",
         check={
@@ -64,7 +64,7 @@ def test_003():
 
 @TestScenario
 @Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
-def test_004():
+def test_004(self):
     kubectl.create_and_check(
         config="configs/test-004-tpl.yaml",
         check={
@@ -78,7 +78,7 @@ def test_004():
 
 @TestScenario
 @Name("test_005. Test manifest created by ACM")
-def test_005():
+def test_005(self):
     kubectl.create_and_check(
         config="configs/test-005-acm.yaml",
         check={
@@ -93,7 +93,7 @@ def test_005():
 
 @TestScenario
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
-def test_006():
+def test_006(self):
     old_version = "yandex/clickhouse-server:20.8.6.6"
     new_version = "yandex/clickhouse-server:20.8.7.15"
     with Then("Create initial position"):
@@ -128,7 +128,7 @@ def test_006():
 
 @TestScenario
 @Name("test_007. Test template with custom clickhouse ports")
-def test_007():
+def test_007(self):
     kubectl.create_and_check(
         config="configs/test-007-custom-ports.yaml",
         check={
@@ -210,7 +210,7 @@ def test_operator_restart(config, version=settings.operator_version):
 
 @TestScenario
 @Name("test_008. Test operator restart")
-def test_008():
+def test_008(self):
     with Then("Test simple chi for operator restart"):
         test_operator_restart("configs/test-008-operator-restart-1.yaml")
     with Then("Test advanced chi for operator restart"):
@@ -219,7 +219,7 @@ def test_008():
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
-def test_009(version_from="0.11.0", version_to=settings.operator_version):
+def test_009(self, version_from="0.11.0", version_to=settings.operator_version):
     with Then("Test simple chi for operator upgrade"):
         test_operator_upgrade("configs/test-009-operator-upgrade-1.yaml", version_from, version_to)
     with Then("Test advanced chi for operator upgrade"):
@@ -255,7 +255,7 @@ def require_zookeeper():
 
 @TestScenario
 @Name("test_010. Test zookeeper initialization")
-def test_010():
+def test_010(self):
     set_operator_version(settings.operator_version)
     require_zookeeper()
 
@@ -279,7 +279,7 @@ def test_010():
 
 @TestScenario
 @Name("test_011. Test user security and network isolation")
-def test_011():
+def test_011(self):
     with Given("test-011-secured-cluster.yaml and test-011-insecured-cluster.yaml"):
         kubectl.create_and_check(
             config="configs/test-011-secured-cluster.yaml",
@@ -386,7 +386,7 @@ def test_011():
 
 @TestScenario
 @Name("test_011_1. Test default user security")
-def test_011_1():
+def test_011_1(self):
     with Given("test-011-secured-default.yaml with password_sha256_hex for default user"):
         kubectl.create_and_check(
             config="configs/test-011-secured-default.yaml",
@@ -444,7 +444,7 @@ def test_011_1():
 
 @TestScenario
 @Name("test_012. Test service templates")
-def test_012():
+def test_012(self):
     kubectl.create_and_check(
         config="configs/test-012-service-template.yaml",
         check={
@@ -490,7 +490,7 @@ def test_012():
 
 @TestScenario
 @Name("test_013. Test adding shards and creating local and distributed tables automatically")
-def test_013():
+def test_013(self):
     config = "configs/test-013-add-shards-1.yaml"
     chi = manifest.get_chi_name(util.get_full_path(config))
     cluster = "default"
@@ -625,7 +625,7 @@ def test_013():
 
 @TestScenario
 @Name("test_014. Test that replication works")
-def test_014():
+def test_014(self):
     require_zookeeper()
 
     create_table = """
@@ -785,7 +785,7 @@ def test_014():
 
 @TestScenario
 @Name("test_015. Test circular replication with hostNetwork")
-def test_015():
+def test_015(self):
     kubectl.create_and_check(
         config="configs/test-015-host-network.yaml",
         check={
@@ -825,7 +825,7 @@ def test_015():
 
 @TestScenario
 @Name("test_016. Test advanced settings options")
-def test_016():
+def test_016(self):
     chi = "test-016-settings"
     kubectl.create_and_check(
         config="configs/test-016-settings-01.yaml",
@@ -944,7 +944,7 @@ def test_016():
 
 @TestScenario
 @Name("test_017. Test deployment of multiple versions in a cluster")
-def test_017():
+def test_017(self):
     pod_count = 2
     kubectl.create_and_check(
         config="configs/test-017-multi-version.yaml",
@@ -982,7 +982,7 @@ def test_017():
 
 @TestScenario
 @Name("test_018. Test that configuration is properly updated")
-def test_018(): # Obsolete, covered by test_016
+def test_018(self): # Obsolete, covered by test_016
     kubectl.create_and_check(
         config="configs/test-018-configmap.yaml",
         check={
@@ -1019,7 +1019,7 @@ def test_018(): # Obsolete, covered by test_016
 
 @TestScenario
 @Name("test_019. Test that volume is correctly retained and can be re-attached")
-def test_019():
+def test_019(self):
     require_zookeeper()
 
     config="configs/test-019-retain-volume.yaml"
@@ -1063,7 +1063,7 @@ def test_019():
         )
 
     with Then("PVC should be re-mounted"):
-        with And("Non-replicated table should have data"):
+        with Then("Non-replicated table should have data"):
             out = clickhouse.query(chi, sql="select a from t1")
             assert out == "1"
         with And("Replicated table should have data"):
@@ -1097,7 +1097,7 @@ def test_019():
             )
 
     with Then("Data should be in place"):
-        with And("Non-replicated table should have data"):
+        with Then("Non-replicated table should have data"):
             out = clickhouse.query(chi, sql="select a from t1")
             assert out == "1"
         with And("Replicated table should have data"):
@@ -1110,7 +1110,8 @@ def test_019():
 
 @TestScenario
 @Name("test_020. Test multi-volume configuration")
-def test_020(config="configs/test-020-multi-volume.yaml"):
+def test_020(self):
+    config="configs/test-020-multi-volume.yaml"
     chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
         config=config,
@@ -1144,7 +1145,9 @@ def test_020(config="configs/test-020-multi-volume.yaml"):
 
 @TestScenario
 @Name("test_021. Test rescaling storage")
-def test_021(config="configs/test-021-rescale-volume-01.yaml"):
+def test_021(self):
+    config = "configs/test-021-rescale-volume-01.yaml"
+    
     with Given("Default storage class is expandable"):
         default_storage_class = kubectl.get_default_storage_class()
         assert default_storage_class is not None
@@ -1198,6 +1201,7 @@ def test_021(config="configs/test-021-rescale-volume-01.yaml"):
             size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
             assert size == "200Mi"
             kubectl.wait_object("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0")
+            kubectl.wait_field("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0", ".status.phase", "Bound")
             size = kubectl.get_pvc_size("disk2-chi-test-021-rescale-volume-simple-0-0-0")
             assert size == "50Mi"
 
@@ -1205,8 +1209,12 @@ def test_021(config="configs/test-021-rescale-volume-01.yaml"):
             kubectl.wait_pod_status("chi-test-021-rescale-volume-simple-0-0-0", "Running")
             # ClickHouse requires some time to mount volume. Race conditions.
             # TODO: wait for proper pod state and check the liveness probe probably. This is better than waiting
-            time.sleep(10)
-            out = clickhouse.query(chi, "SELECT count() FROM system.disks")
+            for i in range(8):
+                out = clickhouse.query(chi, "SELECT count() FROM system.disks")                    
+                if out == "2":
+                    break
+                with Then(f"Not ready yet. Wait for {1<<i} seconds"):
+                    time.sleep(1<<i)
             print("SELECT count() FROM system.disks RETURNED:")
             print(out)
             assert out == "2"
@@ -1216,7 +1224,8 @@ def test_021(config="configs/test-021-rescale-volume-01.yaml"):
 
 @TestScenario
 @Name("test_022. Test that chi with broken image can be deleted")
-def test_022(config="configs/test-022-broken-image.yaml"):
+def test_022(self):
+    config="configs/test-022-broken-image.yaml"
     chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
         config=config,
@@ -1239,7 +1248,7 @@ def test_022(config="configs/test-022-broken-image.yaml"):
 
 @TestScenario
 @Name("test_023. Test auto templates")
-def test_023():
+def test_023(self):
     kubectl.create_and_check(
         config="configs/test-001.yaml",
         check={
@@ -1256,7 +1265,8 @@ def test_023():
 
 @TestScenario
 @Name("test_024. Test annotations for various template types")
-def test_024(config="configs/test-024-template-annotations.yaml"):
+def test_024(self):
+    config="configs/test-024-template-annotations.yaml"
     chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
         config=config,
@@ -1277,7 +1287,7 @@ def test_024(config="configs/test-024-template-annotations.yaml"):
     
 @TestScenario
 @Name("test_025. Test that service is available during re-scalaling, upgades etc.")
-def test_025():
+def test_025(self):
     require_zookeeper()
 
     create_table = """

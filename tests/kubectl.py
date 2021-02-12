@@ -4,7 +4,7 @@ import time
 import manifest
 import util
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Module
 from testflows.asserts import error
 from testflows.connect import Shell
 
