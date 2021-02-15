@@ -17,8 +17,6 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"sync"
 
@@ -26,7 +24,9 @@ import (
 	// log "k8s.io/klog"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 )
 

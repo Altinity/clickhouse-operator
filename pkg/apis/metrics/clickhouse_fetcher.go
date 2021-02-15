@@ -16,10 +16,11 @@ package metrics
 
 import (
 	sqlmodule "database/sql"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
+
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
-	"time"
 )
 
 const (

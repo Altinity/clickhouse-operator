@@ -17,6 +17,7 @@ package model
 import (
 	"bytes"
 	"fmt"
+
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	xmlbuilder "github.com/altinity/clickhouse-operator/pkg/model/builder/xml"
 	"github.com/altinity/clickhouse-operator/pkg/util"

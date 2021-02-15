@@ -124,9 +124,26 @@ func (c *Controller) getService(objMeta *meta.ObjectMeta, byNameOnly bool) (*cor
 	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
 }
 
+// getStatefulSet gets StatefulSet. Accepted types:
+//   1. *meta.ObjectMeta
+//   2. *chop.ChiHost
+func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.StatefulSet, error) {
+	switch typedObj := obj.(type) {
+	case *meta.ObjectMeta:
+		var b bool
+		if len(byName) > 0 {
+			b = byName[0]
+		}
+		return c.getStatefulSetByMeta(typedObj, b)
+	case *chop.ChiHost:
+		return c.getStatefulSetByHost(typedObj)
+	}
+	return nil, fmt.Errorf("unknown type")
+}
+
 // getStatefulSet gets StatefulSet either by namespaced name or by labels
 // TODO review byNameOnly params
-func (c *Controller) getStatefulSet(objMeta *meta.ObjectMeta, byNameOnly bool) (*apps.StatefulSet, error) {
+func (c *Controller) getStatefulSetByMeta(objMeta *meta.ObjectMeta, byNameOnly bool) (*apps.StatefulSet, error) {
 	get := c.statefulSetLister.StatefulSets(objMeta.Namespace).Get
 	list := c.statefulSetLister.StatefulSets(objMeta.Namespace).List
 	var objects []*apps.StatefulSet
@@ -179,6 +196,22 @@ func (c *Controller) getStatefulSetByHost(host *chop.ChiHost) (*apps.StatefulSet
 	namespace := host.Address.Namespace
 
 	return c.statefulSetLister.StatefulSets(namespace).Get(name)
+}
+
+// getPod gets pod for host or StatefulSet. Accepted types:
+//   1. *apps.StatefulSet
+//   2. *chop.ChiHost
+func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
+	var name, namespace string
+	switch typedObj := obj.(type) {
+	case *chop.ChiHost:
+		name = chopmodel.CreatePodName(obj)
+		namespace = typedObj.Address.Namespace
+	case *apps.StatefulSet:
+		name = chopmodel.CreatePodName(obj)
+		namespace = typedObj.Namespace
+	}
+	return c.kubeClient.CoreV1().Pods(namespace).Get(name, newGetOptions())
 }
 
 // GetCHIByObjectMeta gets CHI by namespaced name

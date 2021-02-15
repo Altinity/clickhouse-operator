@@ -1,0 +1,8 @@
+<!--  Remove it for ClickHouse versions before 20.4 -->
+<yandex>
+    <profiles>
+        <default>
+            <default_database_engine>Ordinary</default_database_engine>
+        </default>
+    </profiles>
+</yandex>

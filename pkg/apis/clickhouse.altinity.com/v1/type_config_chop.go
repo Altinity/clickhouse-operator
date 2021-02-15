@@ -16,11 +16,11 @@ package v1
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"strings"
 	"time"
 
-	log "github.com/golang/glog"
 	// log "k8s.io/klog"
 
 	"github.com/imdario/mergo"
@@ -151,21 +151,23 @@ type OperatorConfig struct {
 }
 
 // MergeFrom merges
-func (config *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) {
+func (config *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) error {
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if err := mergo.Merge(config, *from); err != nil {
-			log.V(1).Infof("FAIL merge config Error: %q", err)
+			return fmt.Errorf("FAIL merge config Error: %q", err)
 		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if err := mergo.Merge(config, *from, mergo.WithOverride); err != nil {
-			log.V(1).Infof("FAIL merge config Error: %q", err)
+			return fmt.Errorf("FAIL merge config Error: %q", err)
 		}
 	}
+
+	return nil
 }
 
 // readCHITemplates build OperatorConfig.CHITemplate from template files content
-func (config *OperatorConfig) readCHITemplates() {
+func (config *OperatorConfig) readCHITemplates() (errs []error) {
 	// Read CHI template files
 	config.CHITemplateFiles = util.ReadFilesIntoMap(config.CHITemplatesPath, config.isCHITemplateExt)
 
@@ -174,11 +176,13 @@ func (config *OperatorConfig) readCHITemplates() {
 		template := new(ClickHouseInstallation)
 		if err := yaml.Unmarshal([]byte(config.CHITemplateFiles[filename]), template); err != nil {
 			// Unable to unmarshal - skip incorrect template
-			log.V(1).Infof("FAIL readCHITemplates() unable to unmarshal file %s Error: %q", filename, err)
+			errs = append(errs, fmt.Errorf("FAIL readCHITemplates() unable to unmarshal file %s Error: %q", filename, err))
 			continue
 		}
 		config.enlistCHITemplate(template)
 	}
+
+	return
 }
 
 // enlistCHITemplate inserts template into templates catalog
@@ -187,7 +191,6 @@ func (config *OperatorConfig) enlistCHITemplate(template *ClickHouseInstallation
 		config.CHITemplates = make([]*ClickHouseInstallation, 0)
 	}
 	config.CHITemplates = append(config.CHITemplates, template)
-	log.V(1).Infof("enlistCHITemplate(%s/%s)", template.Namespace, template.Name)
 }
 
 // unlistCHITemplate removes template from templates catalog
@@ -196,11 +199,9 @@ func (config *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation
 		return
 	}
 
-	log.V(1).Infof("unlistCHITemplate(%s/%s)", template.Namespace, template.Name)
 	// Nullify found template entry
 	for _, _template := range config.CHITemplates {
 		if (_template.Name == template.Name) && (_template.Namespace == template.Namespace) {
-			log.V(1).Infof("unlistCHITemplate(%s/%s) - found, unlisting", template.Namespace, template.Name)
 			// TODO normalize
 			//config.CHITemplates[i] = nil
 			_template.Name = ""
@@ -226,7 +227,6 @@ func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string
 	if use.Namespace != "" {
 		// With fully-specified use template direct (full name) only match is applicable, and it is not possible
 		// This is strange situation, however
-		log.V(1).Infof("STRANGE FindTemplate(%s/%s) - unexpected position", use.Namespace, use.Name)
 		return nil
 	}
 
@@ -249,7 +249,6 @@ func (config *OperatorConfig) FindAutoTemplates() []*ClickHouseInstallation {
 			res = append(res, _template)
 		}
 	}
-	log.V(3).Infof("Found %d auto templates", len(res))
 	return res
 }
 
@@ -452,10 +451,6 @@ func (config *OperatorConfig) applyDefaultWatchNamespace() {
 
 // readClickHouseCustomConfigFiles reads all extra user-specified ClickHouse config files
 func (config *OperatorConfig) readClickHouseCustomConfigFiles() {
-	log.V(0).Infof("Read Common Config files from folder: %s", config.CHCommonConfigsPath)
-	log.V(0).Infof("Read Host Config files from folder: %s", config.CHHostConfigsPath)
-	log.V(0).Infof("Read Users Config files from folder: %s", config.CHUsersConfigsPath)
-
 	config.CHCommonConfigs = util.ReadFilesIntoMap(config.CHCommonConfigsPath, config.isCHConfigExt)
 	config.CHHostConfigs = util.ReadFilesIntoMap(config.CHHostConfigsPath, config.isCHConfigExt)
 	config.CHUsersConfigs = util.ReadFilesIntoMap(config.CHUsersConfigsPath, config.isCHConfigExt)
@@ -540,11 +535,6 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 	util.Fprintf(b, "ReconcileThreadsNumber: %d\n", config.ReconcileThreadsNumber)
 
 	return b.String()
-}
-
-// WriteToLog writes OperatorConfig into log
-func (config *OperatorConfig) WriteToLog() {
-	log.V(1).Infof("OperatorConfig:\n%s", config.String(true))
 }
 
 // TODO unify with GetInformerNamespace

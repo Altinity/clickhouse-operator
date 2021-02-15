@@ -20,16 +20,14 @@ import (
 	"fmt"
 	"strings"
 
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 
 	"gopkg.in/d4l3k/messagediff.v1"
 	"k8s.io/api/core/v1"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Normalizer
@@ -71,12 +69,16 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withD
 
 	var useTemplates []chiv1.ChiUseTemplate
 
-	for _, template := range n.chop.Config().FindAutoTemplates() {
-		useTemplates = append(useTemplates, chiv1.ChiUseTemplate{
-			Name:      template.Name,
-			Namespace: template.Namespace,
-			UseType:   useTypeMerge,
-		})
+	if autoTemplates := n.chop.Config().FindAutoTemplates(); len(autoTemplates) > 0 {
+		log.V(2).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
+		for _, template := range autoTemplates {
+			log.V(3).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Name, template.Namespace)
+			useTemplates = append(useTemplates, chiv1.ChiUseTemplate{
+				Name:      template.Name,
+				Namespace: template.Namespace,
+				UseType:   useTypeMerge,
+			})
+		}
 	}
 
 	if len(chi.Spec.UseTemplates) > 0 {
@@ -91,10 +93,10 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withD
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		if template := n.chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
-			log.V(1).Infof("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
+			log.V(1).M(chi).A().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			(&n.chi.Spec).MergeFrom(&template.Spec, chiv1.MergeTypeOverrideByNonEmptyValues)
-			log.V(2).Infof("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
+			log.V(2).M(chi).F().Info("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
 		}
 	}
 
@@ -182,7 +184,7 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 	hostTemplate, ok := host.GetHostTemplate()
 	if ok {
 		// Host references known HostTemplate
-		log.V(2).Infof("getHostTemplate() statefulSet %s use custom host template %s", statefulSetName, hostTemplate.Name)
+		log.V(2).M(host).F().Info("StatefulSet %s uses custom hostTemplate %s", statefulSetName, hostTemplate.Name)
 		return hostTemplate
 	}
 
@@ -203,7 +205,7 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 		hostTemplate = newDefaultHostTemplate(statefulSetName)
 	}
 
-	log.V(3).Infof("getHostTemplate() statefulSet %s use default host template", statefulSetName)
+	log.V(3).M(host).F().Info("StatefulSet %s use default hostTemplate", statefulSetName)
 
 	return hostTemplate
 }
@@ -1280,8 +1282,9 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiv1.Settings) {
 		}
 
 		_, okPasswordSHA256 := (*users)[username+"/password_sha256_hex"]
-		// if SHA256 is not set, initialize it from the password
-		if pass != "" && !okPasswordSHA256 {
+		_, okPasswordDoubleSHA1 := (*users)[username+"/password_double_sha1_hex"]
+		// if SHA256 or DoubleSHA1 are not set, initialize SHA256 from the password
+		if pass != "" && !okPasswordSHA256 && !okPasswordDoubleSHA1 {
 			pass_sha256 := sha256.Sum256([]byte(pass))
 			(*users)[username+"/password_sha256_hex"] = chiv1.NewScalarSetting(hex.EncodeToString(pass_sha256[:]))
 			okPasswordSHA256 = true

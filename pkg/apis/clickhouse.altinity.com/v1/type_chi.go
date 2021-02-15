@@ -15,10 +15,11 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"github.com/altinity/clickhouse-operator/pkg/version"
 	"math"
 	"strings"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 // fillStatus fills .Status
