@@ -1,0 +1,313 @@
+import json
+import random
+import time
+
+import alerts
+import settings
+import kubectl
+import clickhouse
+import util
+
+from testflows.core import TestScenario, Name, When, Then, Given, main, run, Module, fail
+from testflows.asserts import error
+
+
+def get_minio_spec():
+    with Given("get information about prometheus installation"):
+        minio_spec = kubectl.get(
+            "pod", ns=settings.minio_namespace, name="",
+            label="-l app=minio"
+        )
+        assert "items" in minio_spec and len(minio_spec["items"]) and "metadata" in minio_spec["items"][0], error(
+            "invalid minio spec, please run install-minio.sh"
+        )
+        return minio_spec
+
+
+def exec_on_backup_container(backup_pod, cmd, ns=settings.test_namespace, ok_to_fail=False, timeout=60, container='clickhouse-backup'):
+    return kubectl.launch(f'exec -n {ns} {backup_pod} -c {container} -- {cmd}', ok_to_fail=ok_to_fail, timeout=timeout)
+
+
+def get_backup_metric_value(backup_pod, metric_name, ns=settings.test_namespace):
+    cmd = f"curl -sL http://127.0.0.1:7171/metrics | grep -E '^({metric_name}) [+-]?[0-9]+([.][0-9]+)?' | cut -d ' ' -f 2"
+    return exec_on_backup_container(backup_pod, cmd=cmd, ns=ns)
+
+
+def wait_backup_command_status(backup_pod, command_name, expected_status='success', err_status='error'):
+    command_is_done = False
+    with Then(f'wait "{command_name}" with status "{expected_status}"'):
+        while command_is_done is False:
+            status_lines = exec_on_backup_container(backup_pod, f'curl -sL "http://127.0.0.1:7171/backup/status"').splitlines()
+            for line in status_lines:
+                st = json.loads(line)
+                if 'command' in st and st['command'] == command_name:
+                    if st['status'] == expected_status:
+                        command_is_done = True
+                        break
+                    elif st['status'] == err_status:
+                        if 'error' in st:
+                            fail(st['error'])
+                        else:
+                            fail(f'unexpected status of {command_name} {st}')
+                    else:
+                        with Then('Not ready, wait 5 sec'):
+                            time.sleep(5)
+
+
+def wait_backup_pod_ready_and_curl_installed(backup_pod):
+    with Then(f"wait {backup_pod} ready"):
+        kubectl.wait_field("pod", backup_pod, ".status.containerStatuses[1].ready", "true")
+        is_curl_installed = False
+        while not is_curl_installed:
+            whereis_curl = kubectl.launch(f'exec {backup_pod} -c clickhouse-backup -- whereis curl')
+            is_curl_installed = whereis_curl.strip("\n\r\t ") == 'curl: /usr/bin/curl'
+            if not is_curl_installed:
+                with Then("is not ready wait 5 seconds"):
+                    time.sleep(5)
+
+def prepare_table_for_backup(backup_pod):
+    backup_name = f'test_backup_{time.strftime("%Y-%m-%d_%H%M%S")}'
+    clickhouse.query(
+        chi['metadata']['name'],
+        "CREATE TABLE IF NOT EXISTS default.test_backup ON CLUSTER 'all-sharded' (i UInt64) ENGINE MergeTree() ORDER BY tuple();"
+        "INSERT INTO default.test_backup SELECT number FROM numbers(1000)",
+        pod=backup_pod
+    )
+    return backup_name
+
+
+@TestScenario
+@Name("Check clickhouse-operator/minio setup")
+def test_minio_setup():
+    with Given("clickhouse-operator is installed"):
+        assert kubectl.get_count(
+            "pod", ns=settings.operator_namespace,
+            label="-l app=clickhouse-operator"
+        ) > 0, error("please run deploy/operator/clickhouse-operator-install.sh before run test")
+        util.set_operator_version(settings.operator_version)
+        util.set_metrics_exporter_version(settings.operator_version)
+
+    with Given("minio-operator is installed"):
+        assert kubectl.get_count(
+            "pod", ns=settings.minio_namespace,
+            label="-l name=minio-operator"
+        ) > 0, error("please run deploy/minio/install-minio-operator.sh before test run")
+        assert kubectl.get_count(
+            "pod", ns=settings.minio_namespace,
+            label="-l app=minio"
+        ) > 0, error("please run deploy/minio/install-minio.sh before test run")
+
+        minio_expected_version = f"minio/minio:{settings.minio_version}"
+        assert minio_expected_version in minio_spec["items"][0]["spec"]["containers"][0]["image"], error(
+            f"require {minio_expected_version} image"
+        )
+
+
+@TestScenario
+def test_backup_is_success():
+    list_pod, _, backup_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
+    backup_name = prepare_table_for_backup(backup_pod)
+    wait_backup_pod_ready_and_curl_installed(backup_pod)
+    wait_backup_pod_ready_and_curl_installed(list_pod)
+
+    with When('Backup is success'):
+        backup_successful_before = get_backup_metric_value(
+            backup_pod, 'clickhouse_backup_successful_backups|clickhouse_backup_successful_creates'
+        )
+        list_before = exec_on_backup_container(list_pod, 'curl -sL http://127.0.0.1:7171/backup/list')
+        exec_on_backup_container(backup_pod, f'curl -X POST -sL "http://127.0.0.1:7171/backup/create?name={backup_name}"')
+        wait_backup_command_status(backup_pod, f'create {backup_name}', expected_status='success')
+
+        exec_on_backup_container(backup_pod, f'curl -X POST -sL "http://127.0.0.1:7171/backup/upload/{backup_name}"')
+
+    with Then('list of backups shall changed'):
+        list_after = exec_on_backup_container(list_pod, 'curl -sL http://127.0.0.1:7171/backup/list')
+        assert list_before != list_after, error("backup is not created")
+
+    with Then('successful backup count shall increased'):
+        backup_successful_after = get_backup_metric_value(
+            backup_pod, 'clickhouse_backup_successful_backups|clickhouse_backup_successful_creates'
+        )
+        assert backup_successful_before != backup_successful_after, error("clickhouse_backup_successful_backups shall increased")
+
+
+@TestScenario
+@Name('test_backup_is_down. ClickHouseBackupDown and ClickHouseBackupRecentlyRestart alerts')
+def test_backup_is_down():
+    reboot_pod, _, _, _ = alerts.random_pod_choice_for_callbacks(chi)
+
+    def reboot_backup_container():
+        kubectl.launch(
+            f"exec -n {settings.test_namespace} {reboot_pod} -c clickhouse-backup -- kill 1",
+            ok_to_fail=True,
+        )
+
+    with When("reboot clickhouse-backup"):
+        fired = alerts.wait_alert_state("ClickHouseBackupDown", "firing", expected_state=True, callback=reboot_backup_container,
+                                        labels={"pod_name": reboot_pod}, time_range='60s')
+        assert fired, error("can't get ClickHouseBackupDown alert in firing state")
+
+    with Then("check ClickHouseBackupDown gone away"):
+        resolved = alerts.wait_alert_state("ClickHouseBackupDown", "firing", expected_state=False, sleep_time=5,
+                                           labels={"pod_name": reboot_pod}, )
+        assert resolved, error("can't get ClickHouseBackupDown alert is gone away")
+
+    with When("reboot clickhouse-backup again"):
+        fired = alerts.wait_alert_state("ClickHouseBackupRecentlyRestart", "firing", expected_state=True, callback=reboot_backup_container,
+                                        labels={"pod_name": reboot_pod}, time_range='60s')
+        assert fired, error("can't get ClickHouseBackupRecentlyRestart alert in firing state")
+
+    with Then("check ClickHouseBackupRecentlyRestart gone away"):
+        resolved = alerts.wait_alert_state("ClickHouseBackupRecentlyRestart", "firing", expected_state=False, time_range='30s',
+                                           labels={"pod_name": reboot_pod}, sleep_time=30)
+        assert resolved, error("can't get ClickHouseBackupRecentlyRestart alert is gone away")
+
+
+@TestScenario
+@Name('test_backup_failed. Check ClickHouseBackupFailed alerts')
+def test_backup_failed():
+    backup_pod, _, _, _ = alerts.random_pod_choice_for_callbacks(chi)
+    backup_prefix = prepare_table_for_backup(backup_pod)
+
+    wait_backup_pod_ready_and_curl_installed(backup_pod)
+
+    def create_fail_backup():
+        backup_name = backup_prefix + "-" + str(random.randint(1, 4096))
+        kubectl.launch(
+            f"exec -n {settings.test_namespace} {backup_pod} -c clickhouse-backup -- mkdir -p /var/lib/clickhouse/backup/{backup_name}/shadow/default/test_backup",
+        )
+
+        kubectl.launch(
+            f"exec -n {settings.test_namespace} {backup_pod} -c clickhouse-backup -- curl -X POST -sL http://127.0.0.1:7171/backup/create?name={backup_name}",
+        )
+        wait_backup_command_status(backup_pod, command_name=f'create {backup_name}', expected_status='error')
+
+    def create_success_backup():
+        backup_name = backup_prefix + "-" + str(random.randint(1, 4096))
+        kubectl.launch(
+            f"exec -n {settings.test_namespace} {backup_pod} -c clickhouse-backup -- curl -X POST -sL http://127.0.0.1:7171/backup/create?name={backup_name}",
+        )
+        wait_backup_command_status(backup_pod, command_name=f'create {backup_name}', expected_status='success')
+
+    with When("clickhouse-backup create failed"):
+        fired = alerts.wait_alert_state("ClickHouseBackupFailed", "firing", expected_state=True, callback=create_fail_backup,
+                                        labels={"pod_name": backup_pod}, time_range='60s')
+        assert fired, error("can't get ClickHouseBackupFailed alert in firing state")
+
+    with Then("check ClickHouseBackupFailed gone away"):
+        resolved = alerts.wait_alert_state("ClickHouseBackupFailed", "firing", expected_state=False, callback=create_success_backup,
+                                           labels={"pod_name": backup_pod}, sleep_time=30)
+        assert resolved, error("can't get ClickHouseBackupFailed alert is gone away")
+
+
+
+
+@TestScenario
+@Name('test_backup_too_short_duration. Check ClickHouseBackupTooShort and ClickHouseBackupTooLong alerts')
+def test_backup_duration():
+    short_pod, _, long_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
+    with Given("prepare fake backup duration metric"):
+        kubectl.create_and_check(
+            config="configs/test-cluster-for-backups-fake.yaml",
+            check={
+                "apply_templates": [
+                    "templates/tpl-clickhouse-backups-fake.yaml",
+                    "templates/tpl-persistent-volume-100Mi.yaml"
+                ],
+                "object_counts": {
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
+                },
+                "do_not_delete": 1
+            }
+        )
+
+    for pod in [short_pod, long_pod]:
+        with Then(f"wait {pod} ready"):
+            kubectl.wait_field("pod", pod, ".spec.containers[1].image", "nginx:latest")
+            kubectl.wait_field("pod", pod, ".status.containerStatuses[1].ready", "true")
+
+            fired = alerts.wait_alert_state("ClickHouseBackupTooLong", "firing", expected_state=True, sleep_time=5,
+                                            labels={"pod_name": pod}, time_range='60s')
+            assert fired, error(f"can't get ClickHouseBackupTooLong alert in firing state for {pod}")
+
+    with Then(f"wait when prometheus will scrape fake data"):
+        time.sleep(70)
+
+    with Then(f"decrease {short_pod} backup duration"):
+        kubectl.launch(
+            f'exec {short_pod} -c clickhouse-backup -- bash -xc \''
+            'echo "# HELP clickhouse_backup_last_backup_duration Backup duration in nanoseconds." > /usr/share/nginx/html/metrics && '
+            'echo "# TYPE clickhouse_backup_last_backup_duration gauge" >> /usr/share/nginx/html/metrics && '
+            'echo "clickhouse_backup_last_backup_duration 7000000000000" >> /usr/share/nginx/html/metrics && '
+            'echo "# HELP clickhouse_backup_last_backup_success Last backup success boolean: 0=failed, 1=success, 2=unknown." >> /usr/share/nginx/html/metrics && '
+            'echo "# TYPE clickhouse_backup_last_backup_success gauge" >> /usr/share/nginx/html/metrics && '
+            'echo "clickhouse_backup_last_backup_success 1" >> /usr/share/nginx/html/metrics'
+            '\''
+        )
+
+        fired = alerts.wait_alert_state("ClickHouseBackupTooShort", "firing", expected_state=True, sleep_time=5,
+                                        labels={"pod_name": short_pod}, time_range='60s')
+        assert fired, error("can't get ClickHouseBackupTooShort alert in firing state")
+
+    with Then("apply back normal backup"):
+        kubectl.create_and_check(
+            config="configs/test-cluster-for-backups.yaml",
+            check={
+                "apply_templates": [
+                    "templates/tpl-clickhouse-backups.yaml",
+                    "templates/tpl-persistent-volume-100Mi.yaml"
+                ],
+                "object_counts": {
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
+                },
+                "do_not_delete": 1
+            }
+        )
+
+    with Then("check ClickHouseBackupTooShort gone away"):
+        resolved = alerts.wait_alert_state("ClickHouseBackupTooShort", "firing", expected_state=False,
+                                           labels={"pod_name": short_pod}, sleep_time=5)
+        assert resolved, error("can't get ClickHouseBackupTooShort alert is gone away")
+
+    with Then("check ClickHouseBackupTooLong gone away"):
+        resolved = alerts.wait_alert_state("ClickHouseBackupTooLong", "firing", expected_state=False,
+                                           labels={"pod_name": long_pod}, sleep_time=5)
+        assert resolved, error("can't get ClickHouseBackupTooLong alert is gone away")
+
+
+@TestScenario
+@Name('test_backup_size_decreased. Check ClickHouseBackupSizeDecreased alerts')
+def test_backup_size_decreased():
+    pass
+
+
+@TestScenario
+@Name('test_backup_size_increased. Check ClickHouseBackupSizeIncreased alerts')
+def test_backup_size_increased():
+    pass
+
+
+if main():
+    with Module("main"):
+        prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi = alerts.initialize(
+            chi_file='configs/test-cluster-for-backups.yaml',
+            chi_template_file='templates/tpl-clickhouse-backups.yaml',
+            chi_name='test-cluster-for-backups',
+        )
+        minio_spec = get_minio_spec()
+
+        with Module("backup_alerts"):
+            test_cases = [
+                test_backup_is_success,
+                test_backup_is_down,
+                test_backup_failed,
+                test_backup_duration,
+                test_backup_size_decreased,
+                test_backup_size_increased,
+            ]
+            for t in test_cases:
+                run(test=t)

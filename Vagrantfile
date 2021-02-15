@@ -8,7 +8,7 @@ end
 
 
 Vagrant.configure(2) do |config|
-  config.vm.box = "ubuntu/focal64"
+  config.vm.box = "generic/ubuntu2004"
   config.vm.box_check_update = false
   config.vm.synced_folder ".", "/vagrant"
 
@@ -70,7 +70,7 @@ Vagrant.configure(2) do |config|
     # docker
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8D81803C0EBFCD88
     add-apt-repository "deb https://download.docker.com/linux/ubuntu focal edge"
-    apt-get install --no-install-recommends -y docker-ce
+    apt-get install --no-install-recommends -y docker-ce pigz
 
     # docker compose
     apt-get install -y --no-install-recommends python3-distutils
@@ -90,7 +90,7 @@ Vagrant.configure(2) do |config|
 
 
     # minikube
-    MINIKUBE_VERSION=1.12.3
+    MINIKUBE_VERSION=1.17.0
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -102,9 +102,10 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
 #    K8S_VERSION=${K8S_VERSION:-1.17.12}
 #    K8S_VERSION=${K8S_VERSION:-1.18.9}
-    K8S_VERSION=${K8S_VERSION:-1.19.2}
+    K8S_VERSION=${K8S_VERSION:-1.20.2}
     export VALIDATE_YAML=true
 
+    killall kubectl || true
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl
     chmod +x /usr/local/bin/kubectl
 
@@ -117,19 +118,25 @@ Vagrant.configure(2) do |config|
 
     chown vagrant:vagrant -R /home/vagrant/
 
-#    sudo -H -u vagrant minikube config set vm-driver docker
-#    sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
-#    sudo -H -u vagrant minikube start
-#    sudo -H -u vagrant minikube addons enable ingress
-#    sudo -H -u vagrant minikube addons enable ingress-dns
-#    sudo -H -u vagrant minikube addons enable metrics-server
+    MEMORY=$(free -m | grep Mem |  tr -s ' ' | cut -d " " -f 2)
+    MEMORY=$(expr $MEMORY - 400)
+    sudo -H -u vagrant minikube delete
+    sudo -H -u vagrant minikube config set memory $MEMORY
+    sudo -H -u vagrant minikube config set vm-driver docker
+    sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
+    sudo -H -u vagrant minikube start
+    sudo -H -u vagrant minikube addons enable ingress
+    sudo -H -u vagrant minikube addons enable ingress-dns
+    sudo -H -u vagrant minikube addons enable metrics-server
 
-    minikube config set vm-driver none
-    minikube config set kubernetes-version ${K8S_VERSION}
-    minikube start --vm=true
-#    minikube addons enable ingress
-#    minikube addons enable ingress-dns
-    minikube addons enable metrics-server
+#     minikube delete
+#     rm -rf /tmp/juju*
+#     minikube config set vm-driver none
+#     minikube config set kubernetes-version ${K8S_VERSION}
+#     minikube start
+#     minikube addons enable ingress
+#     minikube addons enable ingress-dns
+#     minikube addons enable metrics-server
 
     #krew
     (
@@ -146,6 +153,7 @@ Vagrant.configure(2) do |config|
     kubectl krew install debug
     kubectl krew install sniff
     kubectl krew install flame
+    kubectl krew install minio
 
     cd /vagrant/
 
@@ -166,6 +174,17 @@ Vagrant.configure(2) do |config|
     cd /vagrant/deploy/prometheus/
     kubectl delete ns ${PROMETHEUS_NAMESPACE} || true
     bash -xe ./create-prometheus.sh
+    cd /vagrant/
+
+    export MINIO_NAMESPACE=${MINIO_NAMESPACE:-minio}
+    cd /vagrant/deploy/minio/
+    kubectl delete ns ${MINIO_NAMESPACE} || true
+    bash -xe ./install-minio-operator.sh
+    bash -xe ./install-minio.sh
+    # kubectl create ns ${MINIO_NAMESPACE}
+    # kubectl minio init --namespace ${MINIO_NAMESPACE}
+    # kubectl minio tenant create --name minio --namespace ${MINIO_NAMESPACE} --servers 1 --volumes 4 --capacity 10Gi --storage-class standard
+
     cd /vagrant/
 
     export GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE:-grafana}

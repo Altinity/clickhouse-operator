@@ -27,7 +27,7 @@ if main():
                     f"envsubst)",
                     validate=False
                 )
-            test_operator.set_operator_version(settings.operator_version)
+            util.set_operator_version(settings.operator_version)
 
         with Given(f"Install ClickHouse template {settings.clickhouse_template}"):
             kubectl.apply(util.get_full_path(settings.clickhouse_template), settings.test_namespace)

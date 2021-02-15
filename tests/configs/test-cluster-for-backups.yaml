@@ -3,11 +3,11 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 
 metadata:
-  name: test-cluster-for-alerts
+  name: test-cluster-for-backups
 
 spec:
   useTemplates:
-    - name: clickhouse-alerts-latest-version
+    - name: clickhouse-backups-latest-version
     - name: persistent-volume
   configuration:
     settings:

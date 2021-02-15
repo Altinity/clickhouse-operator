@@ -39,5 +39,10 @@ spec:
         #  - type: CircularReplication
         spec:
           hostNetwork: true
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:latest
+
+
           # dnsPolicy: ClusterFirstWithHostNet
 
