@@ -73,7 +73,9 @@ CREATE TABLE events_local on cluster '{cluster}' (
     event_type  Int32,
     article_id  Int32,
     title       String
-) engine=ReplicatedMergeTree('/clickhouse/{installation}/{cluster}/tables/{shard}/{database}/{table}', '{replica}', event_date, (event_type, article_id), 8192);
+) engine=ReplicatedMergeTree('/clickhouse/{installation}/{cluster}/tables/{shard}/{database}/{table}', '{replica}')
+PARTITION BY toYYYYMM(event_date)
+ORDER BY (event_type, article_id);
 ```
 
 ```sql

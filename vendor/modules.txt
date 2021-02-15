@@ -70,6 +70,8 @@ github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
 # github.com/r3labs/diff v0.0.0-20191120142937-b4ed99a31f5a
 github.com/r3labs/diff
+# github.com/sanity-io/litter v1.3.0
+github.com/sanity-io/litter
 # github.com/satori/go.uuid v1.1.0
 github.com/satori/go.uuid
 # github.com/spf13/pflag v1.0.5

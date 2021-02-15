@@ -15,5 +15,5 @@
 package util
 
 func Fingerprint(obj interface{}) string {
-	return HashIntoString(serialize(obj))
+	return HashIntoString(serializeRepeatable(obj))
 }

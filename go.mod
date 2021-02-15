@@ -16,6 +16,7 @@ require (
 	github.com/mailru/go-clickhouse v1.3.0
 	github.com/prometheus/client_golang v1.6.0
 	github.com/r3labs/diff v0.0.0-20191120142937-b4ed99a31f5a
+	github.com/sanity-io/litter v1.3.0
 	github.com/spf13/pflag v1.0.5 // indirect
 	gopkg.in/d4l3k/messagediff.v1 v1.2.1
 	gopkg.in/yaml.v2 v2.2.8

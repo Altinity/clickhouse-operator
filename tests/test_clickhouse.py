@@ -3,13 +3,13 @@ from kubectl import *
 import settings
 from test_operator import require_zookeeper
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
 from testflows.asserts import error
 
 
 @TestScenario
 @Name("test_ch_001. Insert quorum")
-def test_ch_001():
+def test_ch_001(self):
     require_zookeeper()
 
     create_and_check(
@@ -114,7 +114,7 @@ def test_ch_001():
 
 @TestScenario
 @Name("test_ch_002. Row-level security")
-def test_ch_002():
+def test_ch_002(self):
     create_and_check(
         "configs/test-ch-002-row-level.yaml",
         {
