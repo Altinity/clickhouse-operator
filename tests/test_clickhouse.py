@@ -2,6 +2,7 @@ import time
 
 import clickhouse
 import kubectl
+import manifest
 import settings
 import util
 
@@ -13,16 +14,19 @@ from testflows.asserts import error
 @Name("test_ch_001. Insert quorum")
 def test_ch_001(self):
     util.require_zookeeper()
-
+    chit_data = manifest.get_chit_data(util.get_full_path("templates/tpl-clickhouse-19.11.yaml"))
+    kubectl.launch(f"delete chit {chit_data['metadata']['name']}", ns=settings.test_namespace)
     kubectl.create_and_check(
         "configs/test-ch-001-insert-quorum.yaml",
         {
-            "apply_templates": {"templates/tpl-clickhouse-19.11.yaml"},
+            "apply_templates": {"templates/tpl-clickhouse-20.8.yaml"},
             "pod_count": 2,
             "do_not_delete": 1,
         })
+    chi = manifest.get_chi_name(util.get_full_path("configs/test-ch-001-insert-quorum.yaml"))
+    chi_data = kubectl.get("chi", ns=settings.test_namespace, name=chi)
+    util.wait_clickhouse_cluster_ready(chi_data)
 
-    chi = "test-ch-001-insert-quorum"
     host0 = "chi-test-ch-001-insert-quorum-default-0-0"
     host1 = "chi-test-ch-001-insert-quorum-default-0-1"
 

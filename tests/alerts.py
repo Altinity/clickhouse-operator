@@ -102,32 +102,14 @@ def install_clickhouse_and_zookeeper_for_alerts(chi_file, chi_template_file, chi
         clickhouse_operator_spec = kubectl.get(
             "pod", name="", ns=settings.operator_namespace, label="-l app=clickhouse-operator"
         )
-        chi = kubectl.get("chi", ns=kubectl.namespace, name=chi_name)
+        chi = kubectl.get("chi", ns=settings.test_namespace, name=chi_name)
         return clickhouse_operator_spec, chi
 
-
-def wait_clickhouse_cluster_ready(chi):
-    with Given("All expected pods present in system.clusters"):
-        all_pods_ready = False
-        while all_pods_ready is False:
-            all_pods_ready = True
-            for pod in chi['status']['pods']:
-                cluster_response = clickhouse.query(
-                    chi["metadata"]["name"],
-                    "SYSTEM RELOAD CONFIG; SELECT host_name FROM system.clusters WHERE cluster='all-sharded'",
-                    pod=pod
-                )
-                for host in chi['status']['fqdns']:
-                    svc_short_name = host.replace(f'.{settings.test_namespace}.svc.cluster.local', '')
-                    if svc_short_name not in cluster_response:
-                        with Then("Not ready, sleep 5 seconds"):
-                            all_pods_ready = False
-                            time.sleep(5)
 
 
 def initialize(chi_file, chi_template_file, chi_name):
     prometheus_operator_spec, prometheus_spec, alertmanager_spec = get_prometheus_and_alertmanager_spec()
     clickhouse_operator_spec, chi = install_clickhouse_and_zookeeper_for_alerts(chi_file, chi_template_file, chi_name)
-    wait_clickhouse_cluster_ready(chi)
+    util.wait_clickhouse_cluster_ready(chi)
 
     return prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi

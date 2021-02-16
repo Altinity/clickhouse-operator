@@ -1,9 +1,12 @@
 import os
+import time
+
 import settings
 import kubectl
+import clickhouse
 import util
 
-from testflows.core import fail, Given
+from testflows.core import fail, Given, Then
 
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -46,3 +49,22 @@ def require_zookeeper():
             kubectl.apply(config)
             kubectl.wait_object("pod", "zookeeper-0")
             kubectl.wait_pod_status("zookeeper-0", "Running")
+
+
+def wait_clickhouse_cluster_ready(chi):
+    with Given("All expected pods present in system.clusters"):
+        all_pods_ready = False
+        while all_pods_ready is False:
+            all_pods_ready = True
+            for pod in chi['status']['pods']:
+                cluster_response = clickhouse.query(
+                    chi["metadata"]["name"],
+                    "SYSTEM RELOAD CONFIG; SELECT host_name FROM system.clusters WHERE cluster='all-sharded'",
+                    pod=pod
+                )
+                for host in chi['status']['fqdns']:
+                    svc_short_name = host.replace(f'.{settings.test_namespace}.svc.cluster.local', '')
+                    if svc_short_name not in cluster_response:
+                        with Then("Not ready, sleep 5 seconds"):
+                            all_pods_ready = False
+                            time.sleep(5)
