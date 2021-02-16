@@ -91,7 +91,11 @@ def test_ch_001(self):
 
         with When("Resume fetches for t2 at replica1"):
             clickhouse.query(chi, "system start fetches default.t2", host=host1)
-            time.sleep(5)
+            i = 0
+            while "2" != clickhouse.query(chi, "select active_replicas from system.replicas where database='default' and table='t1'", pod=host0) and i < 10:
+                with Then("Not ready, wait 5 seconds"):
+                    time.sleep(5)
+                    i += 1
 
             with Then("Inserts should fail with an error regarding not satisfied quorum"):
                 out = clickhouse.query_with_error(chi, "insert into t1(a) values(3)", host=host0)
