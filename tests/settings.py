@@ -17,7 +17,6 @@ test_namespace = os.getenv('TEST_NAMESPACE') if 'TEST_NAMESPACE' in os.environ e
 # Default value
 operator_version = os.getenv('OPERATOR_VERSION') if 'OPERATOR_VERSION' in os.environ else \
     open(os.path.join(pathlib.Path(__file__).parent.absolute(), "../release")).read(1024)
-operator_version = "0.13.5"
 operator_namespace = os.getenv('OPERATOR_NAMESPACE') if 'OPERATOR_NAMESPACE' in os.environ else \
     'kube-system'
 minio_namespace = os.getenv('MINIO_NAMESPACE') if 'MINIO_NAMESPACE' in os.environ else 'minio'
