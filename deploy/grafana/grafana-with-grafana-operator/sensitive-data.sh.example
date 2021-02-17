@@ -1,0 +1,9 @@
+export OAUTH_CLIENT_ID=XXX
+export OAUTH_CLIENT_SECRET=XXX
+export OAUTH_DOMAIN=yourcompany.auth0.com
+# domain parts from user email
+export OAUTH_ALLOWED_DOMAINS="localhost your-organization-domain.com"
+# organizations from api_url/orgs
+export OAUTH_ALLOWED_ORGANIZATIONS=""
+# teams from api_url/teams
+export OAUTH_ALLOWED_TEAM_IDS=""
