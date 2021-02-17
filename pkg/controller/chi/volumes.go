@@ -17,9 +17,7 @@ package chi
 import (
 	"k8s.io/api/core/v1"
 
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
-
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
@@ -29,7 +27,7 @@ func (c *Controller) walkPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolum
 	name := chopmodel.CreatePodName(host)
 	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(name, newGetOptions())
 	if err != nil {
-		log.Errorf("FAIL get pod for host %s/%s err:%v", namespace, host.Name, err)
+		log.M(host).A().Error("FAIL get pod for host %s/%s err:%v", namespace, host.Name, err)
 		return
 	}
 
@@ -42,7 +40,7 @@ func (c *Controller) walkPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolum
 		pvcName := volume.PersistentVolumeClaim.ClaimName
 		pvc, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(pvcName, newGetOptions())
 		if err != nil {
-			log.Errorf("FAIL get PVC %s/%s err:%v", namespace, pvcName, err)
+			log.M(host).A().Error("FAIL get PVC %s/%s err:%v", namespace, pvcName, err)
 			continue
 		}
 
@@ -56,7 +54,7 @@ func (c *Controller) walkActualPVCs(host *chop.ChiHost, f func(pvc *v1.Persisten
 
 	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newListOptions(labeler.GetSelectorHostScope(host)))
 	if err != nil {
-		log.Errorf("FAIL get list of PVC for host %s/%s err:%v", namespace, host.Name, err)
+		log.M(host).A().Error("FAIL get list of PVC for host %s/%s err:%v", namespace, host.Name, err)
 		return
 	}
 
@@ -72,7 +70,7 @@ func (c *Controller) walkPVs(host *chop.ChiHost, f func(pv *v1.PersistentVolume)
 	c.walkPVCs(host, func(pvc *v1.PersistentVolumeClaim) {
 		pv, err := c.kubeClient.CoreV1().PersistentVolumes().Get(pvc.Spec.VolumeName, newGetOptions())
 		if err != nil {
-			log.Errorf("FAIL get PV %s err:%v", pvc.Spec.VolumeName, err)
+			log.M(host).A().Error("FAIL get PV %s err:%v", pvc.Spec.VolumeName, err)
 			return
 		}
 		f(pv)

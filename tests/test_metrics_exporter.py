@@ -2,7 +2,7 @@ import time
 import re
 import json
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module, TE
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
 from testflows.asserts import error
 
 import kubectl
@@ -17,18 +17,18 @@ def set_metrics_exporter_version(version, ns=settings.operator_namespace):
 
 @TestScenario
 @Name("Check metrics server setup and version")
-def test_metrics_exporter_setup():
+def test_metrics_exporter_setup(self):
     with Given("clickhouse-operator is installed"):
         assert kubectl.get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") > 0, error()
-        with And(f"Set metrics-exporter version {settings.operator_version}"):
+        with Then(f"Set metrics-exporter version {settings.operator_version}"):
             set_metrics_exporter_version(settings.operator_version)
 
 
 @TestScenario
 @Name("Check metrics server state after reboot")
-def test_metrics_exporter_reboot():
+def test_metrics_exporter_reboot(self):
     def check_monitoring_chi(operator_namespace, operator_pod, expect_result, max_retries=10):
-        with And(f"metrics-exporter /chi enpoint result should return {expect_result}"):
+        with Then(f"metrics-exporter /chi enpoint result should return {expect_result}"):
             for i in range(1, max_retries):
                 # check /metrics for try to refresh monitored instances
                 kubectl.launch(
@@ -89,9 +89,9 @@ def test_metrics_exporter_reboot():
 
 @TestScenario
 @Name("Check metrics server help with different clickhouse version")
-def test_metrics_exporter_with_multiple_clickhouse_version():
+def test_metrics_exporter_with_multiple_clickhouse_version(self):
     def check_monitoring_metrics(operator_namespace, operator_pod, expect_result, max_retries=10):
-        with And(f"metrics-exporter /metrics enpoint result should match with {expect_result}"):
+        with Then(f"metrics-exporter /metrics enpoint result should match with {expect_result}"):
             for i in range(1, max_retries):
                 out = kubectl.launch(
                     f"exec {operator_pod} -c metrics-exporter -- wget -O- -q http://127.0.0.1:8888/metrics",
@@ -127,9 +127,9 @@ def test_metrics_exporter_with_multiple_clickhouse_version():
                 config=config,
                 check={
                     "object_counts": {
-                        "statefulset": 4,
-                        "pod": 4,
-                        "service": 5,
+                        "statefulset": 2,
+                        "pod": 2,
+                        "service": 3,
                     },
                     "do_not_delete": True,
                 })
@@ -139,9 +139,6 @@ def test_metrics_exporter_with_multiple_clickhouse_version():
                     '# TYPE chi_clickhouse_metric_VersionInteger gauge': True,
                     'chi_clickhouse_metric_VersionInteger{chi="test-017-multi-version",hostname="chi-test-017-multi-version-default-0-0': True,
                     'chi_clickhouse_metric_VersionInteger{chi="test-017-multi-version",hostname="chi-test-017-multi-version-default-1-0': True,
-                    'chi_clickhouse_metric_VersionInteger{chi="test-017-multi-version",hostname="chi-test-017-multi-version-default-2-0': True,
-                    'chi_clickhouse_metric_VersionInteger{chi="test-017-multi-version",hostname="chi-test-017-multi-version-default-3-0': True,
-
                 })
 
         with Then("check empty /metrics after delete namespace"):
@@ -159,4 +156,4 @@ if main():
             test_metrics_exporter_with_multiple_clickhouse_version,
         ]
         for t in test_cases:
-            run(test=t, flags=TE)
+            Scenario(test=t, flags=TE)()

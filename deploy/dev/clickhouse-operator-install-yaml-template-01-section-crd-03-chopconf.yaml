@@ -84,3 +84,7 @@ spec:
               type: integer
               minimum: 1
               maximum: 65535
+            reconcileWaitExclude:
+              type: string
+            reconcileWaitInclude:
+              type: string

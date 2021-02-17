@@ -21,9 +21,12 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash/fnv"
+
+	dumper "github.com/sanity-io/litter"
+	//	"github.com/davecgh/go-spew/spew"
 )
 
-func serialize(obj interface{}) []byte {
+func serializeUnrepeatable(obj interface{}) []byte {
 	b := bytes.Buffer{}
 	encoder := gob.NewEncoder(&b)
 	err := encoder.Encode(obj)
@@ -32,6 +35,15 @@ func serialize(obj interface{}) []byte {
 	}
 
 	return b.Bytes()
+}
+
+func serializeRepeatable(obj interface{}) []byte {
+	//s := spew.NewDefaultConfig()
+	//s.SortKeys = true
+	d := dumper.Options{
+		Separator: " ",
+	}
+	return []byte(d.Sdump(obj))
 }
 
 func HashIntoString(b []byte) string {

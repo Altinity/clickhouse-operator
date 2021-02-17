@@ -20,9 +20,7 @@ import (
 	"os/user"
 	"path/filepath"
 
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
-
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 
@@ -67,18 +65,18 @@ func getKubeConfig(kubeConfigFile, masterURL string) (*kuberest.Config, error) {
 func GetClientset(kubeConfigFile, masterURL string) (*kube.Clientset, *chopclientset.Clientset) {
 	kubeConfig, err := getKubeConfig(kubeConfigFile, masterURL)
 	if err != nil {
-		log.Fatalf("Unable to build kubeconf: %s", err.Error())
+		log.A().Fatal("Unable to build kubeconf: %s", err.Error())
 		os.Exit(1)
 	}
 
 	kubeClientset, err := kube.NewForConfig(kubeConfig)
 	if err != nil {
-		log.Fatalf("Unable to initialize kubernetes API clientset: %s", err.Error())
+		log.A().Fatal("Unable to initialize kubernetes API clientset: %s", err.Error())
 	}
 
 	chopClientset, err := chopclientset.NewForConfig(kubeConfig)
 	if err != nil {
-		log.Fatalf("Unable to initialize clickhouse-operator API clientset: %s", err.Error())
+		log.A().Fatal("Unable to initialize clickhouse-operator API clientset: %s", err.Error())
 	}
 
 	return kubeClientset, chopClientset
@@ -89,7 +87,7 @@ func GetCHOp(chopClient *chopclientset.Clientset, initCHOpConfigFilePath string)
 	// Create operator instance
 	chop := NewCHOp(version.Version, chopClient, initCHOpConfigFilePath)
 	if err := chop.Init(); err != nil {
-		log.Fatalf("Unable to init CHOP instance %v\n", err)
+		log.A().Fatal("Unable to init CHOP instance %v", err)
 		os.Exit(1)
 	}
 

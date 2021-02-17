@@ -95,7 +95,7 @@ func Run() {
 	// Create operator instance
 	chop := chop.GetCHOp(chopClient, chopConfigFile)
 	chop.SetupLog()
-	chop.Config().WriteToLog()
+	log.Info(chop.Config().String(true))
 
 	exporter := metrics.StartMetricsREST(
 		metrics.NewCHAccessInfo(

@@ -15,6 +15,7 @@
         <clickhouse_operator>
             <log_queries>0</log_queries>
             <skip_unavailable_shards>1</skip_unavailable_shards>
+            <http_connection_timeout>10</http_connection_timeout>
         </clickhouse_operator>
     </profiles>
 </yandex>

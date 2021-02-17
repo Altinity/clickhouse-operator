@@ -43,12 +43,14 @@ type ChiClusterLayout struct {
 	ShardsCount   int    `json:"shardsCount,omitempty"`
 	ReplicasCount int    `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiShard
-	Shards            []ChiShard   `json:"shards,omitempty"`
-	Replicas          []ChiReplica `json:"replicas,omitempty"`
-	ShardsSpecified   bool         `json:"-" testdiff:"ignore"`
-	ReplicasSpecified bool         `json:"-" testdiff:"ignore"`
+	Shards   []ChiShard   `json:"shards,omitempty"`
+	Replicas []ChiReplica `json:"replicas,omitempty"`
 
-	HostsField *HostsField `json:"-" testdiff:"ignore"`
+	// Internal data
+	// Whether shards or replicas are explicitly specified as Shards []ChiShard or Replicas []ChiReplica
+	ShardsSpecified   bool        `json:"-" testdiff:"ignore"`
+	ReplicasSpecified bool        `json:"-" testdiff:"ignore"`
+	HostsField        *HostsField `json:"-" testdiff:"ignore"`
 }
 
 func (cluster *ChiCluster) FillShardReplicaSpecified() {
@@ -119,6 +121,24 @@ func (cluster *ChiCluster) GetShard(shard int) *ChiShard {
 
 func (cluster *ChiCluster) GetReplica(replica int) *ChiReplica {
 	return &cluster.Layout.Replicas[replica]
+}
+
+func (cluster *ChiCluster) FindShard(needle interface{}) *ChiShard {
+	var resultShard *ChiShard
+	cluster.WalkShards(func(index int, shard *ChiShard) error {
+		switch v := needle.(type) {
+		case string:
+			if shard.Name == v {
+				resultShard = shard
+			}
+		case int:
+			if index == v {
+				resultShard = shard
+			}
+		}
+		return nil
+	})
+	return resultShard
 }
 
 func (cluster *ChiCluster) WalkShards(

@@ -16,7 +16,9 @@ package v1
 
 import (
 	"math"
+	"strings"
 
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
@@ -35,8 +37,7 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.Status.NormalizedCHI = chi.Spec
 }
 
-// FillAddressInfo
-func (chi *ClickHouseInstallation) FillAddressInfo() {
+func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 	// What is the max number of Pods allowed per Node
 	// TODO need to support multi-cluster
 	maxNumberOfPodsPerNode := 0
@@ -130,6 +131,8 @@ func (chi *ClickHouseInstallation) FillAddressInfo() {
 		replica.Address.ReplicaIndex = replicaIndex
 
 		host.Address.Namespace = chi.Namespace
+		// Skip StatefulSet as impossible to self-calculate
+		// host.Address.StatefulSet = CreateStatefulSetName(host)
 		host.Address.CHIName = chi.Name
 		host.Address.ClusterName = cluster.Name
 		host.Address.ClusterIndex = clusterIndex
@@ -487,15 +490,30 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 }
 
 // FindCluster
-func (chi *ClickHouseInstallation) FindCluster(name string) *ChiCluster {
-	var cluster *ChiCluster
-	chi.WalkClusters(func(c *ChiCluster) error {
-		if c.Name == name {
-			cluster = c
+func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *ChiCluster {
+	var resultCluster *ChiCluster
+	chi.WalkClustersFullPath(func(chi *ClickHouseInstallation, clusterIndex int, cluster *ChiCluster) error {
+		switch v := needle.(type) {
+		case string:
+			if cluster.Name == v {
+				resultCluster = cluster
+			}
+		case int:
+			if clusterIndex == v {
+				resultCluster = cluster
+			}
 		}
 		return nil
 	})
-	return cluster
+	return resultCluster
+}
+
+// FindShard
+func (chi *ClickHouseInstallation) FindShard(needleCluster interface{}, needleShard interface{}) *ChiShard {
+	if cluster := chi.FindCluster(needleCluster); cluster != nil {
+		return cluster.FindShard(needleShard)
+	}
+	return nil
 }
 
 // ClustersCount
@@ -523,6 +541,18 @@ func (chi *ClickHouseInstallation) HostsCount() int {
 	count := 0
 	chi.WalkHosts(func(host *ChiHost) error {
 		count++
+		return nil
+	})
+	return count
+}
+
+// HostsCountAttributes
+func (chi *ClickHouseInstallation) HostsCountAttributes(a ChiHostReconcileAttributes) int {
+	count := 0
+	chi.WalkHosts(func(host *ChiHost) error {
+		if host.ReconcileAttributes.Any(a) {
+			count++
+		}
 		return nil
 	})
 	return count
@@ -605,4 +635,45 @@ func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 		return false
 	}
 	return (chi.Namespace == namespace) && (chi.Name == name)
+}
+
+const TemplatingPolicyManual = "manual"
+const TemplatingPolicyAuto = "auto"
+
+func (chi *ClickHouseInstallation) IsAuto() bool {
+	if chi == nil {
+		return false
+	}
+	if (chi.Namespace == "") && (chi.Name == "") {
+		return false
+	}
+	return strings.ToLower(chi.Spec.Templating.Policy) == TemplatingPolicyAuto
+}
+
+const ReconcilingPolicyUnspecified = "unspecified"
+const ReconcilingPolicyWait = "wait"
+const ReconcilingPolicyNoWait = "nowait"
+
+func (chi *ClickHouseInstallation) IsReconcilingPolicyWait() bool {
+	if chi == nil {
+		return false
+	}
+	if (chi.Namespace == "") && (chi.Name == "") {
+		return false
+	}
+	return strings.ToLower(chi.Spec.Reconciling.Policy) == ReconcilingPolicyWait
+}
+
+func (chi *ClickHouseInstallation) IsReconcilingPolicyNoWait() bool {
+	if chi == nil {
+		return false
+	}
+	if (chi.Namespace == "") && (chi.Name == "") {
+		return false
+	}
+	return strings.ToLower(chi.Spec.Reconciling.Policy) == ReconcilingPolicyNoWait
+}
+
+func (chi *ClickHouseInstallation) IsStopped() bool {
+	return util.IsStringBoolTrue(chi.Spec.Stop)
 }

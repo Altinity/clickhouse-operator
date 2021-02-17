@@ -4,7 +4,7 @@ import time
 import manifest
 import util
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Module
 from testflows.asserts import error
 from testflows.connect import Shell
 
@@ -41,7 +41,7 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=60):
 
 def delete_chi(chi, ns=namespace):
     with When(f"Delete chi {chi}"):
-        launch(f"delete chi {chi}", ns=ns, timeout=900)
+        launch(f"delete chi {chi}", ns=ns, timeout=180)
         wait_objects(
             chi,
             {
@@ -62,7 +62,7 @@ def delete_all_chi(ns=namespace):
             delete_chi(chi["metadata"]["name"], ns)
 
 
-def create_and_check(config, check, ns=namespace, timeout=30):
+def create_and_check(config, check, ns=namespace, timeout=600):
     config = util.get_full_path(config)
     chi_name = manifest.get_chi_name(config)
 
@@ -170,15 +170,26 @@ def wait_objects(chi, object_counts, ns=namespace):
         assert cur_object_counts == object_counts, error()
 
 
-def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries):
+def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries, backoff = 5):
     with Then(f"{count} {kind}(s) {name} should be created"):
         for i in range(1, retries):
             cur_count = get_count(kind, ns=ns, name=name, label=label)
             if cur_count >= count:
                 break
+            with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
+                time.sleep(i * backoff)
+        assert cur_count >= count, error()
+
+
+def wait_command(command, result, count=1, ns=namespace, retries=max_retries):
+    with Then(f"{command} should return {result}"):
+        for i in range(1, retries):
+            res = launch(command, ok_to_fail=True, ns=ns)
+            if res == result:
+                break
             with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                 time.sleep(i * 5)
-        assert cur_count >= count, error()
+        assert res == result, error()
 
 
 def wait_chi_status(chi, status, ns=namespace, retries=max_retries):
@@ -193,14 +204,14 @@ def wait_pod_status(pod, status, ns=namespace):
     wait_field("pod", pod, ".status.phase", status, ns)
 
 
-def wait_field(kind, name, field, value, ns=namespace, retries=max_retries):
+def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff = 5):
     with Then(f"{kind} {name} {field} should be {value}"):
         for i in range(1, retries):
             cur_value = get_field(kind, name, field, ns)
             if cur_value == value:
                 break
-            with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
-                time.sleep(i * 5)
+            with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
+                time.sleep(i * backoff)
         assert cur_value == value, error()
 
 

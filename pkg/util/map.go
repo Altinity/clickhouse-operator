@@ -32,15 +32,17 @@ func IncludeNonEmpty(dst map[string]string, key, src string) {
 	return
 }
 
-// MergeStringMaps inserts (and overwrites) data into dst map object from src
-func MergeStringMaps(dst, src map[string]string, keys ...string) map[string]string {
-	if src == nil {
+// MergeStringMapsOverwrite inserts (and overwrites) data into dst map object from src
+func MergeStringMapsOverwrite(dst, src map[string]string, keys ...string) map[string]string {
+	if len(src) == 0 {
 		// Nothing to merge from
 		return dst
 	}
 
+	var created bool
 	if dst == nil {
 		dst = make(map[string]string)
+		created = true
 	}
 
 	// Place key->value pair from src into dst
@@ -59,7 +61,93 @@ func MergeStringMaps(dst, src map[string]string, keys ...string) map[string]stri
 		}
 	}
 
-	return dst
+	if created && (len(dst) == 0) {
+		return nil
+	} else {
+		return dst
+	}
+}
+
+// MergeStringMapsPreserve inserts (and preserved existing) data into dst map object from src
+func MergeStringMapsPreserve(dst, src map[string]string, keys ...string) map[string]string {
+	if len(src) == 0 {
+		// Nothing to merge from
+		return dst
+	}
+
+	var created bool
+	if dst == nil {
+		dst = make(map[string]string)
+		created = true
+	}
+
+	// Place key->value pair from src into dst
+
+	if len(keys) == 0 {
+		// No explicitly specified keys to merge, just merge the whole src
+		for key := range src {
+			if _, ok := dst[key]; !ok {
+				dst[key] = src[key]
+			}
+		}
+	} else {
+		// We have explicitly specified list of keys to merge from src
+		for _, key := range keys {
+			if value, ok := src[key]; ok {
+				if _, ok := dst[key]; !ok {
+					dst[key] = value
+				}
+			}
+		}
+	}
+
+	if created && (len(dst) == 0) {
+		return nil
+	} else {
+		return dst
+	}
+}
+
+// SubtractStringMaps subtracts "delta" from "base" by keys
+func SubtractStringMaps(base, delta map[string]string) map[string]string {
+	if len(delta) == 0 {
+		// Nothing to delete
+		return base
+	}
+	if len(base) == 0 {
+		// Nowhere to delete from
+		return base
+	}
+
+	// Extract keys from delta and delete them from base
+	for _, key := range delta {
+		if _, ok := base[key]; ok {
+			delete(base, key)
+		}
+	}
+
+	return base
+}
+
+// MapDeleteKeys deletes multiple keys from the map
+func MapDeleteKeys(base map[string]string, keys ...string) map[string]string {
+	if len(keys) == 0 {
+		// Nothing to delete
+		return base
+	}
+	if len(base) == 0 {
+		// Nowhere to delete from
+		return base
+	}
+
+	// Extract delete keys from base
+	for _, key := range keys {
+		if _, ok := base[key]; ok {
+			delete(base, key)
+		}
+	}
+
+	return base
 }
 
 // MapHasKeys checks whether map has all keys from specified list

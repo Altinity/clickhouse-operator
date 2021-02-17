@@ -16,17 +16,21 @@ package model
 
 import (
 	"fmt"
+
+	"k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kublabels "k8s.io/apimachinery/pkg/labels"
+
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kublabels "k8s.io/apimachinery/pkg/labels"
 )
 
 const (
 	// Kubernetes labels
+	LabelReadyName                    = clickhousealtinitycom.GroupName + "/ready"
+	LabelReadyValue                   = "yes"
 	LabelAppName                      = clickhousealtinitycom.GroupName + "/app"
 	LabelAppValue                     = "chop"
 	LabelCHOP                         = clickhousealtinitycom.GroupName + "/chop"
@@ -58,6 +62,7 @@ const (
 	// Supplementary service labels - used to cooperate with k8s
 	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/zookeeper-version"
 	LabelSettingsConfigVersion  = clickhousealtinitycom.GroupName + "/settings-version"
+	LabelObjectVersion          = clickhousealtinitycom.GroupName + "/object-version"
 )
 
 // Labeler is an entity which can label CHI artifacts
@@ -78,7 +83,7 @@ func NewLabeler(chop *chop.CHOp, chi *chi.ClickHouseInstallation) *Labeler {
 
 // getLabelsConfigMapCHICommon
 func (l *Labeler) getLabelsConfigMapCHICommon() map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsCHIScope(),
 		map[string]string{
 			LabelConfigMap: labelConfigMapValueCHICommon,
@@ -87,7 +92,7 @@ func (l *Labeler) getLabelsConfigMapCHICommon() map[string]string {
 
 // getLabelsConfigMapCHICommonUsers
 func (l *Labeler) getLabelsConfigMapCHICommonUsers() map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsCHIScope(),
 		map[string]string{
 			LabelConfigMap: labelConfigMapValueCHICommonUsers,
@@ -96,7 +101,7 @@ func (l *Labeler) getLabelsConfigMapCHICommonUsers() map[string]string {
 
 // getLabelsConfigMapHost
 func (l *Labeler) getLabelsConfigMapHost(host *chi.ChiHost) map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsHostScope(host, false),
 		map[string]string{
 			LabelConfigMap: labelConfigMapValueHost,
@@ -105,7 +110,7 @@ func (l *Labeler) getLabelsConfigMapHost(host *chi.ChiHost) map[string]string {
 
 // getLabelsServiceCHI
 func (l *Labeler) getLabelsServiceCHI() map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsCHIScope(),
 		map[string]string{
 			LabelService: labelServiceValueCHI,
@@ -114,7 +119,7 @@ func (l *Labeler) getLabelsServiceCHI() map[string]string {
 
 // getLabelsServiceCluster
 func (l *Labeler) getLabelsServiceCluster(cluster *chi.ChiCluster) map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsClusterScope(cluster),
 		map[string]string{
 			LabelService: labelServiceValueCluster,
@@ -123,7 +128,7 @@ func (l *Labeler) getLabelsServiceCluster(cluster *chi.ChiCluster) map[string]st
 
 // getLabelsServiceShard
 func (l *Labeler) getLabelsServiceShard(shard *chi.ChiShard) map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsShardScope(shard),
 		map[string]string{
 			LabelService: labelServiceValueShard,
@@ -132,7 +137,7 @@ func (l *Labeler) getLabelsServiceShard(shard *chi.ChiShard) map[string]string {
 
 // getLabelsServiceHost
 func (l *Labeler) getLabelsServiceHost(host *chi.ChiHost) map[string]string {
-	return util.MergeStringMaps(
+	return util.MergeStringMapsOverwrite(
 		l.getLabelsHostScope(host, false),
 		map[string]string{
 			LabelService: labelServiceValueHost,
@@ -159,6 +164,11 @@ func (l *Labeler) getSelectorCHIScope() map[string]string {
 	}
 }
 
+// getSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
+func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
+	return l.appendReadyLabels(l.getSelectorCHIScope())
+}
+
 // getLabelsClusterScope gets labels for Cluster-scoped object
 func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]string {
 	// Combine generated labels and CHI-provided labels
@@ -179,6 +189,11 @@ func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]st
 		LabelCHIName:     l.namer.getNamePartCHIName(cluster),
 		LabelClusterName: l.namer.getNamePartClusterName(cluster),
 	}
+}
+
+// getSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
+func (l *Labeler) getSelectorClusterScopeReady(cluster *chi.ChiCluster) map[string]string {
+	return l.appendReadyLabels(l.getSelectorClusterScope(cluster))
 }
 
 // getLabelsShardScope gets labels for Shard-scoped object
@@ -203,6 +218,11 @@ func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 		LabelClusterName: l.namer.getNamePartClusterName(shard),
 		LabelShardName:   l.namer.getNamePartShardName(shard),
 	}
+}
+
+// getSelectorShardScope gets labels to select a ready-labelled Shard-scoped object
+func (l *Labeler) getSelectorShardScopeReady(shard *chi.ChiShard) map[string]string {
+	return l.appendReadyLabels(l.getSelectorShardScope(shard))
 }
 
 // getLabelsHostScope gets labels for Host-scoped object
@@ -235,6 +255,11 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 	return l.appendCHILabels(labels)
 }
 
+// getLabelsHostScopeReady gets labels for Host-scoped object including Ready label
+func (l *Labeler) getLabelsHostScopeReady(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
+	return l.appendReadyLabels(l.getLabelsHostScope(host, applySupplementaryServiceLabels))
+}
+
 // getSelectorShardScope gets labels to select a Host-scoped object
 func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 	// Do not include CHI-provided labels
@@ -252,7 +277,14 @@ func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 
 // appendCHILabels appends CHI-provided labels to labels set
 func (l *Labeler) appendCHILabels(dst map[string]string) map[string]string {
-	return util.MergeStringMaps(dst, l.chi.Labels)
+	return util.MergeStringMapsOverwrite(dst, l.chi.Labels)
+}
+
+// appendReadyLabels appends "Ready" label to labels set
+func (l *Labeler) appendReadyLabels(dst map[string]string) map[string]string {
+	return util.MergeStringMapsOverwrite(dst, map[string]string{
+		LabelReadyName: LabelReadyValue,
+	})
 }
 
 // getAnnotationsHostScope gets annotations for Host-scoped object
@@ -397,7 +429,7 @@ func makeSetFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Set, error) {
 	}
 
 	set := kublabels.Set{}
-	util.MergeStringMaps(set, objMeta.Labels, labels...)
+	util.MergeStringMapsOverwrite(set, objMeta.Labels, labels...)
 
 	// skip StatefulSet
 	// skip Zookeeper
@@ -437,4 +469,24 @@ func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 		return "", fmt.Errorf("can not find %s label in meta", LabelClusterName)
 	}
 	return meta.Labels[LabelClusterName], nil
+}
+
+// AppendLabelReady adds "ready" label with value = UTC now
+func AppendLabelReady(meta *meta.ObjectMeta) {
+	if meta == nil {
+		return
+	}
+	util.MergeStringMapsOverwrite(
+		meta.Labels,
+		map[string]string{
+			LabelReadyName: LabelReadyValue,
+		})
+}
+
+// DeleteLabelReady deletes "ready" label
+func DeleteLabelReady(meta *meta.ObjectMeta) {
+	if meta == nil {
+		return
+	}
+	util.MapDeleteKeys(meta.Labels, LabelReadyName)
 }

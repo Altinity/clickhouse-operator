@@ -101,6 +101,16 @@ spec:
                 - "enabled"
             namespaceDomainPattern:
               type: string
+            templating:
+              type: object
+              properties:
+                policy:
+                  type: string
+            reconcilling:
+              type: object
+              properties:
+                policy:
+                  type: string
             defaults:
               type: object
               properties:

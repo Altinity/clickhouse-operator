@@ -30,6 +30,15 @@ func InArray(needle string, haystack []string) bool {
 	return false
 }
 
+func MergeStringArrays(dst []string, src []string) []string {
+	for _, str := range src {
+		if !InArray(str, dst) {
+			dst = append(dst, str)
+		}
+	}
+	return dst
+}
+
 // RemoveFromArray removes needle from array
 func RemoveFromArray(needle string, haystack []string) []string {
 	result := []string{}

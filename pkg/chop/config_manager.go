@@ -15,19 +15,18 @@
 package chop
 
 import (
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
-
-	"github.com/kubernetes-sigs/yaml"
 	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
 	"sort"
 
+	"github.com/kubernetes-sigs/yaml"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type ConfigManager struct {
@@ -77,7 +76,7 @@ func (cm *ConfigManager) Init() error {
 		return err
 	}
 	log.V(1).Info("File-based ClickHouseOperatorConfigurations")
-	cm.fileConfig.WriteToLog()
+	log.V(1).Info(cm.fileConfig.String(true))
 
 	// Get configs from all config Custom Resources
 	watchedNamespace := cm.fileConfig.GetInformerNamespace()
@@ -89,14 +88,14 @@ func (cm *ConfigManager) Init() error {
 
 	// From now on we have one unified CHOP config
 	log.V(1).Info("Unified (but not post-processed yet) CHOP config")
-	cm.config.WriteToLog()
+	log.V(1).Info(cm.config.String(true))
 
 	// Finalize config by post-processing
 	cm.config.Postprocess()
 
 	// OperatorConfig is ready
 	log.V(1).Info("Final CHOP config")
-	cm.config.WriteToLog()
+	log.V(1).Info(cm.config.String(true))
 
 	return nil
 }
@@ -116,7 +115,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 	// Get list of ClickHouseOperatorConfiguration objects
 	var err error
 	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(metav1.ListOptions{}); err != nil {
-		log.V(1).Infof("Error read ClickHouseOperatorConfigurations %v", err)
+		log.V(1).A().Error("Error read ClickHouseOperatorConfigurations %v", err)
 		return
 	}
 
@@ -152,8 +151,8 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 // logCRBasedConfigs writes all ClickHouseOperatorConfiguration objects into log
 func (cm *ConfigManager) logCRBasedConfigs() {
 	for _, chOperatorConfiguration := range cm.crConfigs {
-		log.V(1).Infof("chop config %s/%s :", chOperatorConfiguration.ConfigFolderPath, chOperatorConfiguration.ConfigFilePath)
-		chOperatorConfiguration.WriteToLog()
+		log.V(1).Info("chop config %s/%s :", chOperatorConfiguration.ConfigFolderPath, chOperatorConfiguration.ConfigFilePath)
+		log.V(1).Info(chOperatorConfiguration.String(true))
 	}
 }
 
@@ -305,9 +304,9 @@ func (cm *ConfigManager) logEnvVarParams() {
 	sort.Strings(keys)
 
 	// Walk over sorted names aka keys
-	log.V(1).Infof("Parameters num: %d\n", len(cm.runtimeParams))
+	log.V(1).Info("Parameters num: %d", len(cm.runtimeParams))
 	for _, k := range keys {
-		log.V(1).Infof("%s=%s\n", k, cm.runtimeParams[k])
+		log.V(1).Info("%s=%s", k, cm.runtimeParams[k])
 	}
 }
 
