@@ -8,7 +8,7 @@ end
 
 
 Vagrant.configure(2) do |config|
-  config.vm.box = "ubuntu/focal64"
+  config.vm.box = "generic/ubuntu2004"
   config.vm.box_check_update = false
   config.vm.synced_folder ".", "/vagrant"
 
@@ -69,8 +69,8 @@ Vagrant.configure(2) do |config|
 
     # docker
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8D81803C0EBFCD88
-    add-apt-repository "deb https://download.docker.com/linux/ubuntu focal edge"
-    apt-get install --no-install-recommends -y docker-ce
+    add-apt-repository "deb https://download.docker.com/linux/ubuntu focal testing"
+    apt-get install --no-install-recommends -y docker-ce pigz
 
     # docker compose
     apt-get install -y --no-install-recommends python3-distutils
@@ -90,7 +90,7 @@ Vagrant.configure(2) do |config|
 
 
     # minikube
-    MINIKUBE_VERSION=1.14.0
+    MINIKUBE_VERSION=1.17.1
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -102,9 +102,11 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
 #    K8S_VERSION=${K8S_VERSION:-1.17.14}
 #    K8S_VERSION=${K8S_VERSION:-1.18.12}
-    K8S_VERSION=${K8S_VERSION:-1.19.4}
+#    K8S_VERSION=${K8S_VERSION:-1.19.7}
+    K8S_VERSION=${K8S_VERSION:-1.20.2}
     export VALIDATE_YAML=true
 
+    killall kubectl || true
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl
     chmod +x /usr/local/bin/kubectl
 
@@ -117,19 +119,21 @@ Vagrant.configure(2) do |config|
 
     chown vagrant:vagrant -R /home/vagrant/
 
-#     sudo -H -u vagrant minikube config set vm-driver docker
-#     sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
-#     sudo -H -u vagrant minikube start --cpus=$(nproc) --memory=5G
-#     sudo -H -u vagrant minikube addons enable ingress
-#     sudo -H -u vagrant minikube addons enable ingress-dns
-#     sudo -H -u vagrant minikube addons enable metrics-server
+    sudo -H -u vagrant minikube delete
+    sudo -H -u vagrant minikube config set memory 5G
+    sudo -H -u vagrant minikube config set driver docker
+    sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
+    sudo -H -u vagrant minikube start
+    sudo -H -u vagrant minikube addons enable ingress
+    sudo -H -u vagrant minikube addons enable ingress-dns
+    sudo -H -u vagrant minikube addons enable metrics-server
 
-    minikube config set vm-driver none
-    minikube config set kubernetes-version ${K8S_VERSION}
-    minikube start --vm=true
+#     minikube config set vm-driver none
+#     minikube config set kubernetes-version ${K8S_VERSION}
+#     minikube start --vm=true
 #     minikube addons enable ingress
 #     minikube addons enable ingress-dns
-    minikube addons enable metrics-server
+#     minikube addons enable metrics-server
 
     #krew
     (

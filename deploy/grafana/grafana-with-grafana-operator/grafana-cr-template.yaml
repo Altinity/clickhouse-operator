@@ -1,21 +1,9 @@
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: grafana-env-vars
-data:
-  GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: vertamedia-clickhouse-datasource
-
----
 apiVersion: integreatly.org/v1alpha1
 kind: Grafana
 metadata:
   name: "$GRAFANA_NAME"
 spec:
-  deployment:
-    envFrom:
-      - configMapRef:
-          name: grafana-env-vars
   ingress:
     enabled: False
   client:
