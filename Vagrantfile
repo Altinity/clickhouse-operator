@@ -36,13 +36,13 @@ Vagrant.configure(2) do |config|
     clickhouse_operator.vm.network "private_network", ip: "172.16.2.99", nic_type: "virtio"
     # port forwarding works only when pair with kubectl port-forward
     # grafana
-    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 3000, host_ip: "127.0.0.1", host: 3000
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 3000, host_ip: "127.0.0.1", host: 3000
     # mertics-exporter
-    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 8888, host_ip: "127.0.0.1", host: 8888
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 8888, host_ip: "127.0.0.1", host: 8888
     # prometheus
-    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 9090, host_ip: "127.0.0.1", host: 9090
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 9090, host_ip: "127.0.0.1", host: 9090
     # alertmanager
-    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 9093, host_ip: "127.0.0.1", host: 9093
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 9093, host_ip: "127.0.0.1", host: 9093
 
     clickhouse_operator.vm.host_name = "local-altinity-clickhouse-operator"
     # vagrant plugin install vagrant-disksize
@@ -69,7 +69,7 @@ Vagrant.configure(2) do |config|
 
     # docker
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8D81803C0EBFCD88
-    add-apt-repository "deb https://download.docker.com/linux/ubuntu focal edge"
+    add-apt-repository "deb https://download.docker.com/linux/ubuntu focal testing"
     apt-get install --no-install-recommends -y docker-ce pigz
 
     # docker compose
@@ -90,7 +90,7 @@ Vagrant.configure(2) do |config|
 
 
     # minikube
-    MINIKUBE_VERSION=1.17.0
+    MINIKUBE_VERSION=1.17.1
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -100,8 +100,9 @@ Vagrant.configure(2) do |config|
 #    export VALIDATE_YAML=false # only for 1.14
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
-#    K8S_VERSION=${K8S_VERSION:-1.17.12}
-#    K8S_VERSION=${K8S_VERSION:-1.18.9}
+#    K8S_VERSION=${K8S_VERSION:-1.17.14}
+#    K8S_VERSION=${K8S_VERSION:-1.18.12}
+#    K8S_VERSION=${K8S_VERSION:-1.19.7}
     K8S_VERSION=${K8S_VERSION:-1.20.2}
     export VALIDATE_YAML=true
 
@@ -118,11 +119,9 @@ Vagrant.configure(2) do |config|
 
     chown vagrant:vagrant -R /home/vagrant/
 
-    MEMORY=$(free -m | grep Mem |  tr -s ' ' | cut -d " " -f 2)
-    MEMORY=$(expr $MEMORY - 400)
     sudo -H -u vagrant minikube delete
-    sudo -H -u vagrant minikube config set memory $MEMORY
-    sudo -H -u vagrant minikube config set vm-driver docker
+    sudo -H -u vagrant minikube config set memory 5G
+    sudo -H -u vagrant minikube config set driver docker
     sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
     sudo -H -u vagrant minikube start
     sudo -H -u vagrant minikube addons enable ingress
