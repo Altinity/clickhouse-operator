@@ -77,7 +77,7 @@ def test_metrics_exporter_reboot(self):
                                    ns=settings.operator_namespace)
                 with Then("check metrics exporter still contains chi objects"):
                     check_monitoring_chi(operator_namespace, operator_pod, expected_chi)
-                    kubectl.delete(config)
+                    kubectl.delete(config, timeout=600)
                     check_monitoring_chi(operator_namespace, operator_pod, [])
 
 
