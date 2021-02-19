@@ -14,10 +14,14 @@
 
 package metrics
 
+import "time"
+
 type CHAccessInfo struct {
 	Username string
 	Password string
 	Port     int
+
+	Timeout time.Duration
 }
 
 func NewCHAccessInfo(username, password string, port int) *CHAccessInfo {

@@ -64,6 +64,10 @@ func NewCHConnectionParams(hostname, username, password string, port int) *CHCon
 	return params
 }
 
+func (c *CHConnectionParams) SetTimeout(timeout time.Duration) {
+	c.timeout = timeout
+}
+
 // makeUsernamePassword makes "username:password" pair for connection
 func (c *CHConnectionParams) makeUsernamePassword(hidden bool) string {
 
