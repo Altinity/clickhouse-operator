@@ -13,7 +13,6 @@ spec:
   # TODO remove this plugin definition after resolve https://github.com/integr8ly/grafana-operator/issues/155
   plugins:
     - name: "vertamedia-clickhouse-datasource"
-      # update to 2.1.0 when next grafana-operator release
-      version: "1.9.5"
+      version: "2.2.3"
     - name: "grafana-piechart-panel"
       version: "1.6.1"

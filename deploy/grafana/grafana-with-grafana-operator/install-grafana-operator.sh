@@ -4,7 +4,7 @@ echo "External value for \$GRAFANA_NAMESPACE=$GRAFANA_NAMESPACE"
 echo "External value for \$GRAFANA_OPERATOR_VERSION=$GRAFANA_OPERATOR_VERSION"
 
 GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-grafana}"
-GRAFANA_OPERATOR_VERSION="${GRAFANA_OPERATOR_VERSION:-v3.5.0}"
+GRAFANA_OPERATOR_VERSION="${GRAFANA_OPERATOR_VERSION:-v3.9.0}"
 
 echo "Setup Grafana"
 echo "OPTIONS"
@@ -71,7 +71,7 @@ kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/dep
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/deploy/cluster_roles"
 # 4. Deploy the operator of explicitly specified version
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
-    cat "${GRAFANA_OPERATOR_DIR}/deploy/operator.yaml" | sed -e "s/:latest/:${GRAFANA_OPERATOR_VERSION}/g" \
+    cat "${GRAFANA_OPERATOR_DIR}/deploy/operatorMasterImage.yaml" | sed -e "s/:master/:${GRAFANA_OPERATOR_VERSION}/g" \
 )
 
 # Remove downloaded sources

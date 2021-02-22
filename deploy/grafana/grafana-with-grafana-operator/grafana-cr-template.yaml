@@ -1,3 +1,4 @@
+---
 apiVersion: integreatly.org/v1alpha1
 kind: Grafana
 metadata:
@@ -23,6 +24,22 @@ spec:
       enabled: True
     auth.anonymous:
       enabled: True
+# look to https://grafana.com/docs/grafana/latest/auth/generic-oauth/
+#    server:
+#      root_url: $GRAFANA_ROOT_URL
+#    auth.generic_oauth:
+#      enabled: True
+#      name: OAuth
+#      allow_sign_up: True
+#      allowed_domains: $OAUTH_ALLOWED_DOMAINS
+#      team_ids: $OAUTH_ALLOWED_TEAM_IDS
+#      allowed_organizations: $OAUTH_ALLOWED_ORGANIZATIONS
+#      client_id: $OAUTH_CLIENT_ID
+#      client_secret: $OAUTH_CLIENT_SECRET
+#      scopes: openid profile email
+#      auth_url: https://$OAUTH_DOMAIN/authorize
+#      token_url: https://$OAUTH_DOMAIN/oauth/token
+#      api_url: https://$OAUTH_DOMAIN/userinfo
   dashboardLabelSelector:
   - matchExpressions:
     - {key: app, operator: In, values: [grafana]}
