@@ -19,6 +19,7 @@ require (
 	github.com/mailru/go-clickhouse v1.3.0
 	github.com/prometheus/client_golang v1.6.0
 	github.com/r3labs/diff v0.0.0-20191120142937-b4ed99a31f5a
+	github.com/sanity-io/litter v1.3.0
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.6.1 // indirect
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
