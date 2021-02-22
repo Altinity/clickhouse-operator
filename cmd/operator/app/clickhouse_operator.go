@@ -24,16 +24,13 @@ import (
 	"syscall"
 	"time"
 
+	kubeinformers "k8s.io/client-go/informers"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
 	"github.com/altinity/clickhouse-operator/pkg/version"
-
-	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
-
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
-
-	kubeinformers "k8s.io/client-go/informers"
 )
 
 // Prometheus exporter defaults
@@ -87,12 +84,15 @@ func Run() {
 		os.Exit(0)
 	}
 
+	log.S().P()
+	defer log.E().P()
+
 	if debugRequest {
 		kubeInformerFactoryResyncPeriod = defaultInformerFactoryResyncDebugPeriod
 		chopInformerFactoryResyncPeriod = defaultInformerFactoryResyncDebugPeriod
 	}
 
-	log.Infof("Starting clickhouse-operator. Version:%s GitSHA:%s BuiltAt:%s\n", version.Version, version.GitSHA, version.BuiltAt)
+	log.A().Info("Starting clickhouse-operator. Version:%s GitSHA:%s BuiltAt:%s", version.Version, version.GitSHA, version.BuiltAt)
 
 	// Initialize k8s API clients
 	kubeClient, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
@@ -100,9 +100,8 @@ func Run() {
 	// Create operator instance
 	chop := chop.GetCHOp(chopClient, chopConfigFile)
 	chop.SetupLog()
-	chop.Config().WriteToLog()
-
-	log.V(1).Infof("Log options parsed\n")
+	log.V(1).A().Info("Log options parsed")
+	log.Info(chop.Config().String(true))
 
 	// Create Informers
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
@@ -145,7 +144,7 @@ func Run() {
 	//
 	// Start Controller
 	//
-	log.V(1).Info("Starting CHI controller\n")
+	log.V(1).A().Info("Starting CHI controller")
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
