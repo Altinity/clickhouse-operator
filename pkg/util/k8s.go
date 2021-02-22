@@ -20,6 +20,10 @@ func NamespaceName(meta v1.ObjectMeta) (string, string) {
 	return meta.Namespace, meta.Name
 }
 
+func NamespaceNameString(meta v1.ObjectMeta) string {
+	return meta.Namespace + "/" + meta.Name
+}
+
 // IsAnnotationToBeSkipped checks whether an annotation should be skipped
 func IsAnnotationToBeSkipped(annotation string) bool {
 	switch annotation {
