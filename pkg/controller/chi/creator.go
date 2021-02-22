@@ -19,37 +19,38 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	apps "k8s.io/api/apps/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) createStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+	log.V(1).M(host).F().P()
+
 	if util.IsContextDone(ctx) {
-		log.V(2).Infof("ctx is done")
+		log.V(2).Info("ctx is done")
 		return nil
 	}
 
-	log.V(1).Infof("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
-
-	if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
-		// Error call Create()
+	log.V(1).Info("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
+	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
+		// Unable to create StatefulSet at all
 		return err
-	} else if err := c.waitHostReady(ctx, host); err == nil {
+	}
+
+	// StatefulSet created, wait until host is ready
+	if err := c.waitHostReady(ctx, host); err == nil {
 		// Target generation reached, StatefulSet created successfully
 		return nil
-	} else {
-		// Unable to run StatefulSet, StatefulSet create failed, time to rollback?
-		return c.onStatefulSetCreateFailed(ctx, statefulSet, host)
 	}
 
-	return fmt.Errorf("unexpected flow")
+	// StatefulSet create failed, time to rollback?
+	return c.onStatefulSetCreateFailed(ctx, statefulSet, host)
 }
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
@@ -59,21 +60,18 @@ func (c *Controller) updateStatefulSet(
 	newStatefulSet *apps.StatefulSet,
 	host *chop.ChiHost,
 ) error {
+	log.V(2).M(host).F().P()
+
 	if util.IsContextDone(ctx) {
-		log.V(2).Infof("ctx is done")
+		log.V(2).Info("ctx is done")
 		return nil
 	}
 
-	// Convenience shortcuts
-	namespace := newStatefulSet.Namespace
-	name := newStatefulSet.Name
-	log.V(2).Infof("updateStatefulSet(%s/%s)", namespace, name)
-
 	// Apply newStatefulSet and wait for Generation to change
-	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(newStatefulSet)
+	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).Update(newStatefulSet)
 	if err != nil {
 		// Update failed
-		log.V(1).Infof("updateStatefulSet(%s/%s) - git err: %v", namespace, name, err)
+		log.V(1).M(host).A().Error("%v", err)
 		return err
 	}
 
@@ -83,40 +81,33 @@ func (c *Controller) updateStatefulSet(
 
 	if updatedStatefulSet.Generation == oldStatefulSet.Generation {
 		// Generation is not updated - no changes in .spec section were made
-		log.V(2).Infof("updateStatefulSet(%s/%s) - no generation change", namespace, name)
+		log.V(2).M(host).F().Info("no generation change")
 		return nil
 	}
 
-	log.V(1).Infof("updateStatefulSet(%s/%s) - generation change %d=>%d", namespace, name, oldStatefulSet.Generation, updatedStatefulSet.Generation)
+	log.V(1).M(host).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
 	if err := c.waitHostReady(ctx, host); err == nil {
 		// Target generation reached, StatefulSet updated successfully
 		return nil
-	} else {
-		// Unable to run StatefulSet, StatefulSet update failed, time to rollback?
-		return c.onStatefulSetUpdateFailed(ctx, oldStatefulSet)
 	}
-
-	return fmt.Errorf("unexpected flow")
+	// Unable to run StatefulSet, StatefulSet update failed, time to rollback?
+	return c.onStatefulSetUpdateFailed(ctx, oldStatefulSet, host)
 }
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) error {
+	log.V(2).M(pv).F().P()
 	if util.IsContextDone(ctx) {
-		log.V(2).Infof("ctx is done")
+		log.V(2).Info("ctx is done")
 		return nil
 	}
-
-	// Convenience shortcuts
-	namespace := pv.Namespace
-	name := pv.Name
-	log.V(2).Infof("updatePersistentVolume(%s/%s)", namespace, name)
 
 	// Apply newStatefulSet and wait for Generation to change
 	_, err := c.kubeClient.CoreV1().PersistentVolumes().Update(pv)
 	if err != nil {
 		// Update failed
-		log.V(1).Infof("updatePersistentVolume(%s/%s) - git err: %v", namespace, name, err)
+		log.V(1).M(pv).A().Error("%v", err)
 		return err
 	}
 
@@ -127,34 +118,30 @@ func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.Persiste
 // It can just delete failed StatefulSet or do nothing
 func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Infof("ctx is done")
+		log.V(2).Info("ctx is done")
 		return nil
 	}
-
-	// Convenience shortcuts
-	namespace := failedStatefulSet.Namespace
-	name := failedStatefulSet.Name
 
 	// What to do with StatefulSet - look into chop configuration settings
 	switch c.chop.Config().OnStatefulSetCreateFailureAction {
 	case chop.OnStatefulSetCreateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
-		log.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - abort", namespace, name)
-		return errors.New(fmt.Sprintf("Create failed on %s/%s", namespace, name))
+		log.V(1).M(host).F().Info("abort")
+		return errors.New(fmt.Sprintf("Create failed on %s", util.NamespaceNameString(failedStatefulSet.ObjectMeta)))
 
 	case chop.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully failed StatefulSet
-		log.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to DELETE FAILED StatefulSet", namespace, name)
+		log.V(1).M(host).F().Info("going to DELETE FAILED StatefulSet %s", util.NamespaceNameString(failedStatefulSet.ObjectMeta))
 		_ = c.deleteHost(ctx, host)
 		return c.shouldContinueOnCreateFailed()
 
 	case chop.OnStatefulSetCreateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
-		log.V(1).Infof("onStatefulSetCreateFailed(%s/%s) - going to ignore error", namespace, name)
+		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(failedStatefulSet.ObjectMeta))
 		return nil
 
 	default:
-		log.V(1).Infof("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", c.chop.Config().OnStatefulSetCreateFailureAction)
+		log.V(1).M(host).A().Error("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", c.chop.Config().OnStatefulSetCreateFailureAction)
 		return nil
 	}
 
@@ -163,9 +150,9 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatef
 
 // onStatefulSetUpdateFailed handles situation when StatefulSet update failed
 // It can try to revert StatefulSet to its previous version, specified in rollbackStatefulSet
-func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *apps.StatefulSet) error {
+func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Infof("ctx is done")
+		log.V(2).Info("ctx is done")
 		return nil
 	}
 
@@ -177,16 +164,13 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	switch c.chop.Config().OnStatefulSetUpdateFailureAction {
 	case chop.OnStatefulSetUpdateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
-		log.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - abort", namespace, name)
+		log.V(1).M(host).F().Info("abort StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
 		return errors.New(fmt.Sprintf("Update failed on %s/%s", namespace, name))
 
 	case chop.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
-		log.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - going to ROLLBACK FAILED StatefulSet", namespace, name)
+		log.V(1).M(host).F().Info("going to ROLLBACK FAILED StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
 		if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(name, newGetOptions()); err != nil {
-			// Unable to get StatefulSet
-			return err
-		} else {
 			// Make copy of "previous" .Spec just to be sure nothing gets corrupted
 			// Update StatefulSet to its 'previous' oldStatefulSet - this is expected to rollback inapplicable changes
 			// Having StatefulSet .spec in rolled back status we need to delete current Pod - because in case of Pod being seriously broken,
@@ -194,18 +178,18 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 			// This will rollback Pod to previous .spec
 			statefulSet.Spec = *rollbackStatefulSet.Spec.DeepCopy()
 			statefulSet, err = c.kubeClient.AppsV1().StatefulSets(namespace).Update(statefulSet)
-			_ = c.statefulSetDeletePod(ctx, statefulSet)
+			_ = c.statefulSetDeletePod(ctx, statefulSet, host)
 
 			return c.shouldContinueOnUpdateFailed()
 		}
 
 	case chop.OnStatefulSetUpdateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
-		log.V(1).Infof("onStatefulSetUpdateFailed(%s/%s) - going to ignore error", namespace, name)
+		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
 		return nil
 
 	default:
-		log.V(1).Infof("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", c.chop.Config().OnStatefulSetUpdateFailureAction)
+		log.V(1).M(host).A().Error("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", c.chop.Config().OnStatefulSetUpdateFailureAction)
 		return nil
 	}
 
