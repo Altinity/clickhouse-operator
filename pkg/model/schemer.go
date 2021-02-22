@@ -20,9 +20,8 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -60,7 +59,7 @@ func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
 // getObjectListFromClickHouse
 func (s *Schemer) getObjectListFromClickHouseContext(ctx context.Context, endpoints []string, sql string) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Infof("ctx is done")
+		log.V(2).Info("ctx is done")
 		return nil, nil, nil
 	}
 
@@ -78,21 +77,21 @@ func (s *Schemer) getObjectListFromClickHouseContext(ctx context.Context, endpoi
 	var query *clickhouse.Query = nil
 	for _, endpoint := range endpoints {
 		if util.IsContextDone(ctx) {
-			log.V(2).Infof("ctx is done")
+			log.V(2).Info("ctx is done")
 			return nil, nil, nil
 		}
-		log.V(1).Infof("Run query on: %s of %v", endpoint, endpoints)
+		log.V(1).Info("Run query on: %s of %v", endpoint, endpoints)
 
 		query, err = s.getCHConnection(endpoint).QueryContext(ctx, sql)
 		if err == nil {
 			// One of specified services returned result, no need to iterate more
 			break
 		} else {
-			log.V(1).Infof("Run query on: %s of %v FAILED skip to next. err: %v", endpoint, endpoints, err)
+			log.V(1).A().Warning("FAILED to run query on: %s of %v skip to next. err: %v", endpoint, endpoints, err)
 		}
 	}
 	if err != nil {
-		log.V(1).Infof("Run query FAILED on all %v", endpoints)
+		log.V(1).A().Error("FAILED to run query on all endpoints %v", endpoints)
 		return nil, nil, err
 	}
 
@@ -113,7 +112,7 @@ func (s *Schemer) getObjectListFromClickHouseContext(ctx context.Context, endpoi
 			names = append(names, name)
 			statements = append(statements, statement)
 		} else {
-			log.V(1).Infof("UNABLE to scan row err: %v", err)
+			log.V(1).A().Error("UNABLE to scan row err: %v", err)
 		}
 	}
 
@@ -124,14 +123,14 @@ func (s *Schemer) getObjectListFromClickHouseContext(ctx context.Context, endpoi
 // That includes all Distributed tables, corresponding local tables, and databases, if necessary
 func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Infof("ctx is done")
+		log.V(2).Info("ctx is done")
 		return nil, nil, nil
 	}
 
 	hosts := CreatePodFQDNsOfCluster(host.GetCluster())
 	nHosts := len(hosts)
 	if nHosts <= 1 {
-		log.V(1).Info("Single host in a cluster. Nothing to create a schema from.")
+		log.V(1).M(host).F().Info("Single host in a cluster. Nothing to create a schema from.")
 		return nil, nil, nil
 	}
 
@@ -146,7 +145,7 @@ func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *
 	// remove new host from the list. See https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
 	hosts[hostIndex] = hosts[nHosts-1]
 	hosts = hosts[:nHosts-1]
-	log.V(1).Infof("Extracting distributed table definitions from hosts: %v", hosts)
+	log.V(1).M(host).F().Info("Extracting distributed table definitions from hosts: %v", hosts)
 
 	cluster_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
 
@@ -195,28 +194,28 @@ func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *
 		cluster_tables,
 	))
 
-	log.V(1).Infof("fetch dbs list")
-	log.V(1).Infof("dbs sql\n%v", sqlDBs)
+	log.V(1).M(host).F().Info("fetch dbs list")
+	log.V(1).M(host).F().Info("dbs sql\n%v", sqlDBs)
 	names1, sqlStatements1, _ := s.getObjectListFromClickHouseContext(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
-	log.V(1).Infof("names1:")
+	log.V(1).M(host).F().Info("names1:")
 	for _, v := range names1 {
-		log.V(1).Infof("names1: %s", v)
+		log.V(1).M(host).F().Info("names1: %s", v)
 	}
-	log.V(1).Infof("sql1:")
+	log.V(1).M(host).F().Info("sql1:")
 	for _, v := range sqlStatements1 {
-		log.V(1).Infof("sql1: %s", v)
+		log.V(1).M(host).F().Info("sql1: %s", v)
 	}
 
-	log.V(1).Infof("fetch table list")
-	log.V(1).Infof("tbl sql\n%v", sqlTables)
+	log.V(1).M(host).F().Info("fetch table list")
+	log.V(1).M(host).F().Info("tbl sql\n%v", sqlTables)
 	names2, sqlStatements2, _ := s.getObjectListFromClickHouseContext(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
-	log.V(1).Infof("names2:")
+	log.V(1).M(host).F().Info("names2:")
 	for _, v := range names2 {
-		log.V(1).Infof("names2: %s", v)
+		log.V(1).M(host).F().Info("names2: %s", v)
 	}
-	log.V(1).Infof("sql2:")
+	log.V(1).M(host).F().Info("sql2:")
 	for _, v := range sqlStatements2 {
-		log.V(1).Infof("sql2: %s", v)
+		log.V(1).M(host).F().Info("sql2: %s", v)
 	}
 
 	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
@@ -225,7 +224,7 @@ func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *
 // getCreateReplicaObjectsContext returns a list of objects that needs to be created on a host in a cluster
 func (s *Schemer) getCreateReplicaObjectsContext(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Infof("ctx is done")
+		log.V(2).Info("ctx is done")
 		return nil, nil, nil
 	}
 
@@ -241,19 +240,19 @@ func (s *Schemer) getCreateReplicaObjectsContext(ctx context.Context, host *chop
 		}
 	}
 	if shard == nil {
-		log.V(1).Info("Can not find shard for replica")
+		log.V(1).M(host).F().Info("Can not find shard for replica")
 		return nil, nil, nil
 	}
 	replicas := CreatePodFQDNsOfShard(shard)
 	nReplicas := len(replicas)
 	if nReplicas <= 1 {
-		log.V(1).Info("Single replica in a shard. Nothing to create a schema from.")
+		log.V(1).M(host).F().Info("Single replica in a shard. Nothing to create a schema from.")
 		return nil, nil, nil
 	}
 	// remove new replica from the list. See https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
 	replicas[replicaIndex] = replicas[nReplicas-1]
 	replicas = replicas[:nReplicas-1]
-	log.V(1).Infof("Extracting replicated table definitions from %v", replicas)
+	log.V(1).M(host).F().Info("Extracting replicated table definitions from %v", replicas)
 
 	system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(replicas, ","))
 
@@ -301,33 +300,33 @@ func (s *Schemer) hostGetDropTablesContext(ctx context.Context, host *chop.ChiHo
 // HostDeleteTables
 func (s *Schemer) HostDeleteTables(ctx context.Context, host *chop.ChiHost) error {
 	tableNames, dropTableSQLs, _ := s.hostGetDropTablesContext(ctx, host)
-	log.V(1).Infof("Drop tables: %v as %v", tableNames, dropTableSQLs)
+	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
 	return s.hostApplySQLsContext(ctx, host, dropTableSQLs, false)
 }
 
 // HostCreateTables
 func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Infof("ctx is done")
+		log.V(2).Info("ctx is done")
 		return nil
 	}
 
-	log.V(1).Infof("Migrating schema objects to host %s", host.Address.HostName)
+	log.V(1).M(host).F().Info("Migrating schema objects to host %s", host.Address.HostName)
 
 	var err1, err2 error
 
 	if names, createSQLs, err := s.getCreateReplicaObjectsContext(ctx, host); err == nil {
 		if len(createSQLs) > 0 {
-			log.V(1).Infof("Creating replica objects at %s: %v", host.Address.HostName, names)
-			log.V(1).Infof("\n%v", createSQLs)
+			log.V(1).M(host).F().Info("Creating replica objects at %s: %v", host.Address.HostName, names)
+			log.V(1).M(host).F().Info("\n%v", createSQLs)
 			err1 = s.hostApplySQLsContext(ctx, host, createSQLs, true)
 		}
 	}
 
 	if names, createSQLs, err := s.getCreateDistributedObjectsContext(ctx, host); err == nil {
 		if len(createSQLs) > 0 {
-			log.V(1).Infof("Creating distributed objects at %s: %v", host.Address.HostName, names)
-			log.V(1).Infof("\n%v", createSQLs)
+			log.V(1).M(host).F().Info("Creating distributed objects at %s: %v", host.Address.HostName, names)
+			log.V(1).M(host).F().Info("\n%v", createSQLs)
 			err2 = s.hostApplySQLsContext(ctx, host, createSQLs, true)
 		}
 	}
@@ -342,13 +341,14 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 	return nil
 }
 
-// IsHostInCluster
+// IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
 func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool {
 	sqls := []string{
 		heredoc.Docf(
 			`SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local`,
 			allShardsOneReplicaClusterName,
-		)}
+		),
+	}
 	//TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
 	return s.hostApplySQLsContext(ctx, host, sqls, false) == nil
 }
@@ -386,7 +386,7 @@ func (s *Schemer) shardApplySQLsContext(ctx context.Context, shard *chop.ChiShar
 // Retry logic traverses the list of SQLs multiple times until all SQLs succeed
 func (s *Schemer) applySQLsContext(ctx context.Context, hosts []string, queries []string, retry bool) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Infof("ctx is done")
+		log.V(2).Info("ctx is done")
 		return nil
 	}
 
@@ -399,19 +399,19 @@ func (s *Schemer) applySQLsContext(ctx context.Context, hosts []string, queries 
 	// For each host in the list run all SQL queries
 	for _, host := range hosts {
 		if util.IsContextDone(ctx) {
-			log.V(2).Infof("ctx is done")
+			log.V(2).Info("ctx is done")
 			return nil
 		}
 		conn := s.getCHConnection(host)
 		if conn == nil {
-			log.V(1).Infof("Unable to get conn to host %s", host)
+			log.V(1).M(host).F().Warning("Unable to get conn to host %s", host)
 			continue
 		}
 		err := util.RetryContext(ctx, maxTries, "Applying sqls", func() error {
 			var errors []error
 			for i, sql := range queries {
 				if util.IsContextDone(ctx) {
-					log.V(2).Infof("ctx is done")
+					log.V(2).Info("ctx is done")
 					return nil
 				}
 				if len(sql) == 0 {
@@ -420,7 +420,7 @@ func (s *Schemer) applySQLsContext(ctx context.Context, hosts []string, queries 
 				}
 				err := conn.ExecContext(ctx, sql)
 				if err != nil && strings.Contains(err.Error(), "Code: 253,") && strings.Contains(sql, "CREATE TABLE") {
-					log.V(1).Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
+					log.V(1).M(host).F().Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
 					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
 					err = conn.ExecContext(ctx, sqlAttach)
 				}
@@ -435,7 +435,9 @@ func (s *Schemer) applySQLsContext(ctx context.Context, hosts []string, queries 
 				return errors[0]
 			}
 			return nil
-		})
+		},
+			log.V(1).M(host).F().Info,
+		)
 
 		if util.ErrIsNotCanceled(err) {
 			errors = append(errors, err)
