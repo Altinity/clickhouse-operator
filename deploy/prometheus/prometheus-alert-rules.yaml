@@ -164,7 +164,7 @@ spec:
               Clickhouse team recommends inserting data in packets of at least 1000 rows or no more than a single request per second.
 
               Please use Buffer table
-              https://clickhouse.tech/docs/en/operations/table_engines/buffer/&#13;
+              https://clickhouse.tech/docs/en/operations/table_engines/buffer/
               or
               https://github.com/nikepan/clickhouse-bulk
               or

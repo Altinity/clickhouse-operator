@@ -15,22 +15,26 @@
 package util
 
 import (
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
-
+	"context"
 	"time"
 )
 
-// Retry
-func Retry(tries int, desc string, f func() error) error {
+// RetryContext
+func RetryContext(ctx context.Context, tries int, desc string, f func() error, log func(format string, args ...interface{})) error {
 	var err error
 	for try := 1; try <= tries; try++ {
+		if IsContextDone(ctx) {
+			log("ctx is done")
+			return nil
+		}
+		// Do useful things
 		err = f()
+
 		if err == nil {
 			// All ok, no need to retry more
 			if try > 1 {
 				// Done, but after some retries, this is not 'clean'
-				log.V(1).Infof("DONE attempt %d of %d: %s", try, tries, desc)
+				log("DONE attempt %d of %d: %s", try, tries, desc)
 			}
 			return nil
 		}
@@ -38,16 +42,14 @@ func Retry(tries int, desc string, f func() error) error {
 		if try < tries {
 			// Try failed, need to sleep and retry
 			seconds := try * 5
-			log.V(1).Infof("FAILED attempt %d of %d, sleep %d sec and retry: %s", try, tries, seconds, desc)
-			select {
-			case <-time.After(time.Duration(seconds) * time.Second):
-			}
+			log("FAILED attempt %d of %d, sleep %d sec and retry: %s", try, tries, seconds, desc)
+			WaitContextDoneOrTimeout(ctx, time.Duration(seconds)*time.Second)
 		} else if tries == 1 {
 			// On single try do not put so much emotion. It just failed and user is not intended to retry
-			log.V(1).Infof("FAILED single try. No retries will be made for %s", desc)
+			log("FAILED single try. No retries will be made for %s", desc)
 		} else {
 			// On last try no need to wait more
-			log.V(1).Infof("FAILED AND ABORT. All %d attempts: %s", tries, desc)
+			log("FAILED AND ABORT. All %d attempts: %s", tries, desc)
 		}
 	}
 

@@ -17,17 +17,22 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"sync"
+	"time"
 
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+)
+
+const (
+	defaultTimeout = 10 * time.Second
 )
 
 // Exporter implements prometheus.Collector interface
@@ -35,6 +40,7 @@ type Exporter struct {
 	// chInstallations maps CHI name to list of hostnames (of string type) of this installation
 	chInstallations chInstallationsIndex
 	chAccessInfo    *CHAccessInfo
+	timeout         time.Duration
 
 	mutex               sync.RWMutex
 	toRemoveFromWatched sync.Map
@@ -54,9 +60,15 @@ func (i chInstallationsIndex) Slice() []*WatchedCHI {
 
 // NewExporter returns a new instance of Exporter type
 func NewExporter(chAccess *CHAccessInfo) *Exporter {
+	timeout := chAccess.Timeout
+	if timeout == 0 {
+		timeout = defaultTimeout
+	}
+
 	return &Exporter{
 		chInstallations: make(map[string]*WatchedCHI),
 		chAccessInfo:    chAccess,
+		timeout:         chAccess.Timeout,
 	}
 }
 
@@ -150,7 +162,11 @@ func (e *Exporter) updateWatched(chi *WatchedCHI) {
 
 // newFetcher returns new Metrics Fetcher for specified host
 func (e *Exporter) newFetcher(hostname string) *ClickHouseFetcher {
-	return NewClickHouseFetcher(hostname, e.chAccessInfo.Username, e.chAccessInfo.Password, e.chAccessInfo.Port)
+	f := NewClickHouseFetcher(hostname, e.chAccessInfo.Username, e.chAccessInfo.Password, e.chAccessInfo.Port)
+
+	f.SetTimeout(e.timeout)
+
+	return f
 }
 
 // Ensure hostnames of the Pods from CHI object included into chopmetrics.Exporter state

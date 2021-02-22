@@ -108,6 +108,48 @@ func MergeStringMapsPreserve(dst, src map[string]string, keys ...string) map[str
 	}
 }
 
+// SubtractStringMaps subtracts "delta" from "base" by keys
+func SubtractStringMaps(base, delta map[string]string) map[string]string {
+	if len(delta) == 0 {
+		// Nothing to delete
+		return base
+	}
+	if len(base) == 0 {
+		// Nowhere to delete from
+		return base
+	}
+
+	// Extract keys from delta and delete them from base
+	for _, key := range delta {
+		if _, ok := base[key]; ok {
+			delete(base, key)
+		}
+	}
+
+	return base
+}
+
+// MapDeleteKeys deletes multiple keys from the map
+func MapDeleteKeys(base map[string]string, keys ...string) map[string]string {
+	if len(keys) == 0 {
+		// Nothing to delete
+		return base
+	}
+	if len(base) == 0 {
+		// Nowhere to delete from
+		return base
+	}
+
+	// Extract delete keys from base
+	for _, key := range keys {
+		if _, ok := base[key]; ok {
+			delete(base, key)
+		}
+	}
+
+	return base
+}
+
 // MapHasKeys checks whether map has all keys from specified list
 func MapHasKeys(m map[string]string, keys ...string) bool {
 	for _, needle := range keys {

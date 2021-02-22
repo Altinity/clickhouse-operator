@@ -16,6 +16,7 @@ package chi
 
 import (
 	"gopkg.in/d4l3k/messagediff.v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -31,6 +32,8 @@ type ActionPlan struct {
 
 	labelsDiff  *messagediff.Diff
 	labelsEqual bool
+
+	deletionTimestampEqual bool
 }
 
 // NewActionPlan makes new ActionPlan out of two CHIs
@@ -43,12 +46,15 @@ func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
 	if (old != nil) && (new != nil) {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.Spec, ap.new.Spec)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.Labels, ap.new.Labels)
+		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, ap.new.DeletionTimestamp)
 	} else if old == nil {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(nil, ap.new.Spec)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(nil, ap.new.Labels)
+		ap.deletionTimestampEqual = ap.timestampEqual(nil, ap.new.DeletionTimestamp)
 	} else if new == nil {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.Spec, nil)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.Labels, nil)
+		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, nil)
 	} else {
 		// Both are nil
 		ap.specDiff = nil
@@ -56,11 +62,28 @@ func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
 
 		ap.labelsDiff = nil
 		ap.labelsEqual = true
+
+		ap.deletionTimestampEqual = true
 	}
 
 	ap.excludePaths()
 
 	return ap
+}
+
+func (ap *ActionPlan) timestampEqual(old, new *metav1.Time) bool {
+	switch {
+	case (old == nil) && (new == nil):
+		// Both are useless
+		return true
+	case (old == nil) && (new != nil):
+		// Timestamp assigned
+		return false
+	case (old != nil) && (new == nil):
+		// Timestamp unassigned
+		return false
+	}
+	return old.Equal(new)
 }
 
 // excludePaths - sanitize diff - do not pay attention to changes in some paths, such as
@@ -113,51 +136,48 @@ func (ap *ActionPlan) isExcludedPath(prev, cur string) bool {
 // HasActionsToDo checks whether there are any actions to do - meaning changes between states to reconcile
 func (ap *ActionPlan) HasActionsToDo() bool {
 
-	if ap.specEqual && ap.labelsEqual {
-		// Already checked - equal - no actions to do
+	if ap.specEqual && ap.labelsEqual && ap.deletionTimestampEqual {
+		// All is equal - no actions to do
 		return false
 	}
 
 	if (ap.specDiff == nil) && (ap.labelsDiff == nil) {
-		// No diff to check with - no actions to do
-		return false
+		return !ap.deletionTimestampEqual
 	}
 
-	// Looks like have some changes
+	// Looks like have some changes in diffs
 
-	if len(ap.specDiff.Added) > 0 {
-		// Something added
-		return true
+	if ap.specDiff != nil {
+		if len(ap.specDiff.Added) > 0 {
+			// Something added
+			return true
+		}
+		if len(ap.specDiff.Removed) > 0 {
+			// Something removed
+			return true
+		}
+		if len(ap.specDiff.Modified) > 0 {
+			// Something modified
+			return true
+		}
 	}
 
-	if len(ap.specDiff.Removed) > 0 {
-		// Something removed
-		return true
+	if ap.labelsDiff != nil {
+		if len(ap.labelsDiff.Added) > 0 {
+			// Something added
+			return true
+		}
+		if len(ap.labelsDiff.Removed) > 0 {
+			// Something removed
+			return true
+		}
+		if len(ap.labelsDiff.Modified) > 0 {
+			// Something modified
+			return true
+		}
 	}
 
-	if len(ap.specDiff.Modified) > 0 {
-		// Something modified
-		return true
-	}
-
-	if len(ap.labelsDiff.Added) > 0 {
-		// Something added
-		return true
-	}
-
-	if len(ap.labelsDiff.Removed) > 0 {
-		// Something removed
-		return true
-	}
-
-	if len(ap.labelsDiff.Modified) > 0 {
-		// Something modified
-		return true
-	}
-
-	// We should not be here, actually, because this means that there are some changes (diff is not empty),
-	// but we were unable to find out what exactly changed
-	return false
+	return !ap.deletionTimestampEqual
 }
 
 // String stringifies ActionPlan

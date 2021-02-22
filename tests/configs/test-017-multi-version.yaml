@@ -25,7 +25,7 @@ spec:
          - templates:
              podTemplate: v20.8
     files:
-      remove_database_ordinary.xml: |
+      users.d/remove_database_ordinary.xml: |
         <yandex>
           <profiles>
              <default>

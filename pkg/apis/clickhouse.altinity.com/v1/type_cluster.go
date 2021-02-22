@@ -16,15 +16,15 @@ package v1
 
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
-	Name      string             `json:"name"`
+	Name      string             `json:"name,omitempty"`
 	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty"`
 	Settings  Settings           `json:"settings,omitempty"`
 	Files     Settings           `json:"files,omitempty"`
 	Templates ChiTemplateNames   `json:"templates,omitempty"`
-	Layout    ChiClusterLayout   `json:"layout"`
+	Layout    ChiClusterLayout   `json:"layout,omitempty"`
 
 	// Internal data
-	Address ChiClusterAddress       `json:"address,omitempty"`
+	Address ChiClusterAddress       `json:"-"`
 	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
 }
 

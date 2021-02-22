@@ -12,5 +12,4 @@ spec:
       datasourceName: "$GRAFANA_PROMETHEUS_DATASOURCE_NAME"
   plugins:
     - name: "vertamedia-clickhouse-datasource"
-      # update to 2.0.4 when resolve https://github.com/grafana/grafana-plugin-repository/pull/690
-      version: "1.9.5"
+      version: "2.2.3"
