@@ -16,11 +16,10 @@ package chop
 
 import (
 	"flag"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
 )
 
 type CHOp struct {
@@ -50,31 +49,31 @@ func (c *CHOp) Config() *v1.OperatorConfig {
 func (c *CHOp) SetupLog() {
 	updated := false
 	if c.Config().Logtostderr != "" {
-		log.V(1).Infof("Log option cur value %s=%s\n", "logtostderr", flag.Lookup("logtostderr").Value)
-		log.V(1).Infof("Log option new value %s=%s\n", "logtostderr", c.Config().Logtostderr)
+		c.logUpdate("logtostderr", c.Config().Logtostderr)
 		updated = true
 		_ = flag.Set("logtostderr", c.Config().Logtostderr)
 	}
 	if c.Config().Alsologtostderr != "" {
-		log.V(1).Infof("Log option cur value %s=%s\n", "alsologtostderr", flag.Lookup("alsologtostderr").Value)
-		log.V(1).Infof("Log option new value %s=%s\n", "alsologtostderr", c.Config().Alsologtostderr)
+		c.logUpdate("alsologtostderr", c.Config().Alsologtostderr)
 		updated = true
 		_ = flag.Set("alsologtostderr", c.Config().Alsologtostderr)
 	}
 	if c.Config().Stderrthreshold != "" {
-		log.V(1).Infof("Log option cur value %s=%s\n", "stderrthreshold", flag.Lookup("stderrthreshold").Value)
-		log.V(1).Infof("Log option new value %s=%s\n", "stderrthreshold", c.Config().Stderrthreshold)
+		c.logUpdate("stderrthreshold", c.Config().Stderrthreshold)
 		updated = true
 		_ = flag.Set("stderrthreshold", c.Config().Stderrthreshold)
 	}
 	if c.Config().V != "" {
-		log.V(1).Infof("Log option cur value %s=%s\n", "v", flag.Lookup("v").Value)
-		log.V(1).Infof("Log option new value %s=%s\n", "v", c.Config().V)
+		c.logUpdate("v", c.Config().V)
 		updated = true
 		_ = flag.Set("v", c.Config().V)
 	}
 
 	if updated {
-		log.V(1).Infof("Additional log options applied\n")
+		log.V(1).Info("Additional log options applied")
 	}
+}
+
+func (c *CHOp) logUpdate(name, value string) {
+	log.V(1).Info("Log option '%s' change value from '%s' to '%s'", name, flag.Lookup(name).Value, value)
 }
