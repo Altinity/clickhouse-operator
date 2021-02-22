@@ -18,13 +18,12 @@ import (
 	"fmt"
 	// "net/url"
 
-	log "github.com/golang/glog"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	// log "k8s.io/klog"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -35,17 +34,16 @@ type Creator struct {
 	chi                    *chiv1.ClickHouseInstallation
 	chConfigFilesGenerator *ClickHouseConfigFilesGenerator
 	labeler                *Labeler
+	a                      log.Announcer
 }
 
-func NewCreator(
-	chop *chop.CHOp,
-	chi *chiv1.ClickHouseInstallation,
-) *Creator {
+func NewCreator(chop *chop.CHOp, chi *chiv1.ClickHouseInstallation) *Creator {
 	return &Creator{
 		chop:                   chop,
 		chi:                    chi,
 		chConfigFilesGenerator: NewClickHouseConfigFilesGenerator(NewClickHouseConfigGenerator(chi), chop.Config()),
 		labeler:                NewLabeler(chop, chi),
+		a:                      log.M(chi),
 	}
 }
 
@@ -53,7 +51,7 @@ func NewCreator(
 func (c *Creator) CreateServiceCHI() *corev1.Service {
 	serviceName := CreateCHIServiceName(c.chi)
 
-	log.V(1).Infof("CreateServiceCHI(%s/%s)", c.chi.Namespace, serviceName)
+	c.a.V(1).F().Info("%s/%s", c.chi.Namespace, serviceName)
 	if template, ok := c.chi.GetCHIServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -61,7 +59,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 			c.chi.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceCHI(),
-			c.labeler.getSelectorCHIScope(),
+			c.labeler.getSelectorCHIScopeReady(),
 		)
 	}
 
@@ -89,7 +87,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 					TargetPort: intstr.FromString(chDefaultTCPPortName),
 				},
 			},
-			Selector:              c.labeler.getSelectorCHIScope(),
+			Selector:              c.labeler.getSelectorCHIScopeReady(),
 			Type:                  corev1.ServiceTypeLoadBalancer,
 			ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
 		},
@@ -102,7 +100,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
 	serviceName := CreateClusterServiceName(cluster)
 
-	log.V(1).Infof("CreateServiceCluster(%s/%s)", cluster.Address.Namespace, serviceName)
+	c.a.V(1).F().Info("%s/%s", cluster.Address.Namespace, serviceName)
 	if template, ok := cluster.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -110,7 +108,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 			cluster.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceCluster(cluster),
-			c.labeler.getSelectorClusterScope(cluster),
+			c.labeler.getSelectorClusterScopeReady(cluster),
 		)
 	}
 	// No template specified, no need to create service
@@ -121,7 +119,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 	serviceName := CreateShardServiceName(shard)
 
-	log.V(1).Infof("CreateServiceShard(%s/%s)", shard.Address.Namespace, serviceName)
+	c.a.V(1).F().Info("%s/%s", shard.Address.Namespace, serviceName)
 	if template, ok := shard.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -129,7 +127,7 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 			shard.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceShard(shard),
-			c.labeler.getSelectorShardScope(shard),
+			c.labeler.getSelectorShardScopeReady(shard),
 		)
 	}
 	// No template specified, no need to create service
@@ -141,7 +139,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(host)
 	statefulSetName := CreateStatefulSetName(host)
 
-	log.V(1).Infof("CreateServiceHost(%s/%s) for Set %s", host.Address.Namespace, serviceName, statefulSetName)
+	c.a.V(1).F().Info("%s/%s for Set %s", host.Address.Namespace, serviceName, statefulSetName)
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -197,12 +195,11 @@ func (c *Creator) verifyServiceTemplatePorts(template *chiv1.ChiServiceTemplate)
 	for i := range template.Spec.Ports {
 		servicePort := &template.Spec.Ports[i]
 		if (servicePort.Port < 1) || (servicePort.Port > 65535) {
-			msg := fmt.Sprintf("verifyServiceTemplatePorts(%s) INCORRECT PORT: %d ", template.Name, servicePort.Port)
-			log.V(1).Infof(msg)
+			msg := fmt.Sprintf("template:%s INCORRECT PORT:%d", template.Name, servicePort.Port)
+			c.a.V(1).F().Warning(msg)
 			return fmt.Errorf(msg)
 		}
 	}
-
 	return nil
 }
 
@@ -329,12 +326,33 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 
 	c.setupStatefulSetPodTemplate(statefulSet, host)
 	c.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
-	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&statefulSet.ObjectMeta, statefulSet)
+	c.setupStatefulSetVersion(statefulSet)
 
 	host.StatefulSet = statefulSet
 
 	return statefulSet
+}
+
+// setupStatefulSetVersion
+// TODO property of the labeler?
+func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
+	statefulSet.Labels = util.MergeStringMapsOverwrite(
+		statefulSet.Labels,
+		map[string]string{
+			LabelObjectVersion: util.Fingerprint(statefulSet),
+		},
+	)
+	c.a.V(2).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
+}
+
+// GetStatefulSetVersion
+// TODO property of the labeler?
+func (c *Creator) GetStatefulSetVersion(statefulSet *apps.StatefulSet) (string, bool) {
+	if statefulSet == nil {
+		return "", false
+	}
+	label, ok := statefulSet.Labels[LabelObjectVersion]
+	return label, ok
 }
 
 // PreparePersistentVolume
@@ -405,7 +423,7 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.LogVolumeClaimTemplate != "" {
 		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
-		log.V(1).Infof("setupStatefulSetPodTemplate() add log container for statefulSet %s", statefulSetName)
+		c.a.V(1).F().Info("add log container for statefulSet %s", statefulSetName)
 	}
 }
 
@@ -419,11 +437,11 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 		// Host references known PodTemplate
 		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
 		podTemplate = podTemplate.DeepCopy()
-		log.V(1).Infof("getPodTemplate() statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
+		c.a.V(1).F().Info("statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
 	} else {
 		// Host references UNKNOWN PodTemplate, will use default one
 		podTemplate = c.newDefaultPodTemplate(statefulSetName)
-		log.V(1).Infof("getPodTemplate() statefulSet %s use default generated template", statefulSetName)
+		c.a.V(1).F().Info("statefulSet %s use default generated template", statefulSetName)
 	}
 
 	// Here we have local copy of Pod Template, to be used to create StatefulSet
@@ -512,7 +530,7 @@ func (c *Creator) statefulSetApplyPodTemplate(
 		ObjectMeta: metav1.ObjectMeta{
 			Name: template.Name,
 			Labels: util.MergeStringMapsOverwrite(
-				c.labeler.getLabelsHostScope(host, true),
+				c.labeler.getLabelsHostScopeReady(host, true),
 				template.ObjectMeta.Labels,
 			),
 			Annotations: util.MergeStringMapsOverwrite(
@@ -668,14 +686,14 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 	// 3. Specified (by volumeClaimTemplateName) VolumeClaimTemplate has to be available as well
 	if _, ok := c.chi.GetVolumeClaimTemplate(volumeClaimTemplateName); !ok {
 		// Incorrect/unknown .templates.VolumeClaimTemplate specified
-		log.V(1).Infof("Can not find volumeClaimTemplate %s. Volume claim can not be mounted", volumeClaimTemplateName)
+		c.a.V(1).F().Warning("Can not find volumeClaimTemplate %s. Volume claim can not be mounted", volumeClaimTemplateName)
 		return nil
 	}
 
 	// 4. Specified container has to be available
 	container := getContainerByName(statefulSet, containerName)
 	if container == nil {
-		log.V(1).Infof("Can not find container %s. Volume claim can not be mounted", containerName)
+		c.a.V(1).F().Warning("Can not find container %s. Volume claim can not be mounted", containerName)
 		return nil
 	}
 
@@ -694,8 +712,8 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 		// 1. Check whether this VolumeClaimTemplate is already listed in VolumeMount of this container
 		if volumeMount.Name == existingVolumeMount.Name {
 			// This .templates.VolumeClaimTemplate is already used in VolumeMount
-			log.V(1).Infof(
-				"setupStatefulSetApplyVolumeClaim(%s) container %s volumeClaimTemplateName %s already used",
+			c.a.V(1).F().Warning(
+				"StatefulSet:%s container:%s volumeClaimTemplateName:%s already used",
 				statefulSet.Name,
 				container.Name,
 				volumeMount.Name,
@@ -706,8 +724,8 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 		// 2. Check whether `mountPath` (say '/var/lib/clickhouse') is already mounted
 		if volumeMount.MountPath == existingVolumeMount.MountPath {
 			// `mountPath` (say /var/lib/clickhouse) is already mounted
-			log.V(1).Infof(
-				"setupStatefulSetApplyVolumeClaim(%s) container %s mountPath %s already used",
+			c.a.V(1).F().Warning(
+				"StatefulSet:%s container:%s mountPath:%s already used",
 				statefulSet.Name,
 				container.Name,
 				volumeMount.MountPath,
@@ -728,7 +746,8 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 		)
 	}
 
-	log.V(1).Infof("setupStatefulSetApplyVolumeClaim(%s) container %s mounted %s on %s",
+	c.a.V(1).F().Info(
+		"StatefulSet:%s container:%s mounted %s on %s",
 		statefulSet.Name,
 		container.Name,
 		volumeMount.Name,
@@ -848,26 +867,28 @@ func newDefaultLivenessProbe() *corev1.Probe {
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
 				Path: "/ping",
-				Port: intstr.Parse(chDefaultHTTPPortName),
+				Port: intstr.Parse(chDefaultHTTPPortName), // What if it is not a default?
 			},
 		},
-		InitialDelaySeconds: 10,
+		InitialDelaySeconds: 60,
 		PeriodSeconds:       3,
+		FailureThreshold:    10,
 	}
 }
 
 // newDefaultReadinessProbe
 func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
-	return &corev1.Probe{
-		Handler: corev1.Handler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/replicas_status",
-				Port: intstr.Parse(chDefaultHTTPPortName),
-			},
-		},
-		InitialDelaySeconds: 10,
-		PeriodSeconds:       3,
-	}
+	return nil
+	//	return &corev1.Probe{
+	//		Handler: corev1.Handler{
+	//			HTTPGet: &corev1.HTTPGetAction{
+	//				Path: "/replicas_status",
+	//				Port: intstr.Parse(chDefaultHTTPPortName),
+	//			},
+	//		},
+	//		InitialDelaySeconds: 10,
+	//		PeriodSeconds:       3,
+	//	}
 }
 
 // newDefaultClickHouseContainer returns default ClickHouse Container
