@@ -91,7 +91,7 @@ func normalizePath(prefix, path string) string {
 	}
 }
 
-// addBranch ensures branch esists and assign value to the last tagged node
+// addBranch ensures branch exists and assign value to the last tagged node
 func (n *xmlNode) addBranch(tags []string, setting *chiv1.Setting) {
 	node := n
 	for _, tag := range tags {
