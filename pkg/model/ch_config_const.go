@@ -85,6 +85,7 @@ const (
 	chDefaultInterserverHTTPPortName   = "interserver"
 	chDefaultInterserverHTTPPortNumber = int32(9009)
 )
+
 const (
 	zkDefaultPort = 2181
 	// zkDefaultRootTemplate specifies default ZK root - /clickhouse/{namespace}/{chi name}
