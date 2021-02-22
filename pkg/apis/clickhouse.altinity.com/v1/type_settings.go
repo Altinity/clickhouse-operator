@@ -23,9 +23,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
 )
 
 const (
@@ -185,7 +182,6 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 	typeOf := reflect.TypeOf(untyped)
 	if typeOf == nil {
 		// Unable to determine type of the value
-		log.V(3).Infof("unmarshalScalar() typeOf==nil")
 		return "", false
 	}
 
@@ -228,12 +224,9 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 		knownType = true
 	}
 
-	str := typeOf.String()
 	if knownType {
-		log.V(3).Infof("unmarshalScalar() type=%v value=%s", str, res)
 		return res, true
 	} else {
-		log.V(3).Infof("unmarshalScalar() type=%v - UNABLE to unmarshal", str)
 		return "", false
 	}
 }
@@ -246,7 +239,6 @@ func unmarshalVector(untyped interface{}) ([]string, bool) {
 	typeOf := reflect.TypeOf(untyped)
 	if typeOf == nil {
 		// Unable to determine type of the value
-		log.V(3).Infof("unmarshalVector() typeOf==nil")
 		return nil, false
 	}
 
@@ -261,12 +253,9 @@ func unmarshalVector(untyped interface{}) ([]string, bool) {
 		knownType = true
 	}
 
-	str := typeOf.String()
 	if knownType {
-		log.V(3).Infof("unmarshalVector() type=%v value=%s", str, res)
 		return res, true
 	} else {
-		log.V(3).Infof("unmarshalVector type=%v - UNABLE to unmarshal", str)
 		return nil, false
 	}
 }
@@ -542,8 +531,6 @@ func string2Section(section string) (SettingsSection, error) {
 	if strings.EqualFold(section, string(SectionHost)) || strings.EqualFold(section, HostConfigDir) {
 		return SectionHost, nil
 	}
-
-	log.V(1).Infof("unknown section specified %v", section)
 
 	return SectionEmpty, fmt.Errorf("unknown section specified %v", section)
 }
