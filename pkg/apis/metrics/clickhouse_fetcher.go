@@ -16,14 +16,11 @@ package metrics
 
 import (
 	sqlmodule "database/sql"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
-	"time"
-)
 
-const (
-	defaultTimeout = 10 * time.Second
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 )
 
 const (
@@ -134,6 +131,10 @@ func NewClickHouseFetcher(hostname, username, password string, port int) *ClickH
 	return &ClickHouseFetcher{
 		chConnectionParams: clickhouse.NewCHConnectionParams(hostname, username, password, port),
 	}
+}
+
+func (f *ClickHouseFetcher) SetTimeout(timeout time.Duration) {
+	f.chConnectionParams.SetTimeout(timeout)
 }
 
 func (f *ClickHouseFetcher) getCHConnection() *clickhouse.CHConnection {
