@@ -19,17 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
-	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
-	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"github.com/altinity/queue"
 
-	log "github.com/golang/glog"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -42,8 +32,17 @@ import (
 	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	//"k8s.io/client-go/util/workqueue"
-	// log "k8s.io/klog"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
+	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
+	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/queue"
 )
 
 // NewController creates instance of Controller
@@ -60,7 +59,7 @@ func NewController(
 
 	// Setup events
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(log.Infof)
+	eventBroadcaster.StartLogging(log.Info)
 	eventBroadcaster.StartRecordingToSink(
 		&typedcore.EventSinkImpl{
 			Interface: kubeClient.CoreV1().Events(""),
@@ -125,7 +124,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
-			log.V(2).Infof("chiInformer.AddFunc - %s/%s added", chi.Namespace, chi.Name)
+			log.V(2).M(chi).Info("chiInformer.AddFunc")
 			c.enqueueObject(NewReconcileCHI(reconcileAdd, nil, chi))
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -134,7 +133,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(newChi.Namespace) {
 				return
 			}
-			log.V(2).Info("chiInformer.UpdateFunc")
+			log.V(2).M(newChi).Info("chiInformer.UpdateFunc")
 			c.enqueueObject(NewReconcileCHI(reconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -142,7 +141,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
-			log.V(2).Infof("chiInformer.DeleteFunc - CHI %s/%s deleted", chi.Namespace, chi.Name)
+			log.V(2).M(chi).Info("chiInformer.DeleteFunc")
 			c.enqueueObject(NewReconcileCHI(reconcileDelete, chi, nil))
 		},
 	})
@@ -153,7 +152,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
-			log.V(2).Infof("chitInformer.AddFunc - %s/%s added", chit.Namespace, chit.Name)
+			log.V(2).M(chit).Info("chitInformer.AddFunc")
 			c.enqueueObject(NewReconcileCHIT(reconcileAdd, nil, chit))
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -162,7 +161,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(newChit.Namespace) {
 				return
 			}
-			log.V(2).Infof("chitInformer.UpdateFunc - %s/%s", newChit.Namespace, newChit.Name)
+			log.V(2).M(newChit).Info("chitInformer.UpdateFunc")
 			c.enqueueObject(NewReconcileCHIT(reconcileUpdate, oldChit, newChit))
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -170,7 +169,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
-			log.V(2).Infof("chitInformer.DeleteFunc - %s/%s deleted", chit.Namespace, chit.Name)
+			log.V(2).M(chit).Info("chitInformer.DeleteFunc")
 			c.enqueueObject(NewReconcileCHIT(reconcileDelete, chit, nil))
 		},
 	})
@@ -181,7 +180,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
-			log.V(2).Infof("chopInformer.AddFunc - %s/%s added", chopConfig.Namespace, chopConfig.Name)
+			log.V(2).M(chopConfig).Info("chopInformer.AddFunc")
 			c.enqueueObject(NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -190,7 +189,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(newChopConfig.Namespace) {
 				return
 			}
-			log.V(2).Infof("chopInformer.UpdateFunc - %s/%s", newChopConfig.Namespace, newChopConfig.Name)
+			log.V(2).M(newChopConfig).Info("chopInformer.UpdateFunc")
 			c.enqueueObject(NewReconcileChopConfig(reconcileUpdate, oldChopConfig, newChopConfig))
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -198,7 +197,7 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
-			log.V(2).Infof("chopInformer.DeleteFunc - %s/%s deleted", chopConfig.Namespace, chopConfig.Name)
+			log.V(2).M(chopConfig).Info("chopInformer.DeleteFunc")
 			c.enqueueObject(NewReconcileChopConfig(reconcileDelete, chopConfig, nil))
 		},
 	})
@@ -209,20 +208,21 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("serviceInformer AddFunc %s/%s", service.Namespace, service.Name)
+			log.V(3).M(service).Info("serviceInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldService := old.(*core.Service)
 			if !c.isTrackedObject(&oldService.ObjectMeta) {
 				return
 			}
+			log.V(3).M(oldService).Info("serviceInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
 			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("serviceInformer DeleteFunc %s/%s", service.Namespace, service.Name)
+			log.V(3).M(service).Info("serviceInformer.DeleteFunc")
 		},
 	})
 
@@ -232,7 +232,7 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("endpointsInformer AddFunc %s/%s", endpoints.Namespace, endpoints.Name)
+			log.V(3).M(endpoints).Info("endpointsInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldEndpoints := old.(*core.Endpoints)
@@ -243,14 +243,14 @@ func (c *Controller) addEventHandlers(
 
 			diff, equal := messagediff.DeepDiff(oldEndpoints, newEndpoints)
 			if equal {
-				log.V(2).Infof("onUpdateEndpoints(%s/%s): no changes found", oldEndpoints.Namespace, oldEndpoints.Name)
+				log.V(2).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: no changes found")
 				// No need to react
 				return
 			}
 
 			added := false
 			for path := range diff.Added {
-				log.V(2).Infof("onUpdateEndpoints(%s/%s): added %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
+				log.V(2).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: added %v", path)
 				for _, pathnode := range *path {
 					s := pathnode.String()
 					if s == ".Addresses" {
@@ -259,14 +259,14 @@ func (c *Controller) addEventHandlers(
 				}
 			}
 			for path := range diff.Removed {
-				log.V(2).Infof("onUpdateEndpoints(%s/%s): removed %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
+				log.V(2).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: removed %v", path)
 			}
 			for path := range diff.Modified {
-				log.V(2).Infof("onUpdateEndpoints(%s/%s): modified %v", oldEndpoints.Namespace, oldEndpoints.Name, path)
+				log.V(2).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: modified %v", path)
 			}
 
 			if added {
-				log.V(1).Infof("endpointsInformer UpdateFunc(%s/%s) IP ASSIGNED %v", newEndpoints.Namespace, newEndpoints.Name, newEndpoints.Subsets)
+				log.V(1).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: IP ASSIGNED %v", newEndpoints.Subsets)
 				c.enqueueObject(NewDropDns(&newEndpoints.ObjectMeta))
 			}
 		},
@@ -275,7 +275,7 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("endpointsInformer DeleteFunc %s/%s", endpoints.Namespace, endpoints.Name)
+			log.V(2).M(endpoints).Info("endpointsInformer.DeleteFunc")
 		},
 	})
 
@@ -285,21 +285,21 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("configMapInformer AddFunc %s/%s", configMap.Namespace, configMap.Name)
+			log.V(3).M(configMap).Info("configMapInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
 			configMap := old.(*core.ConfigMap)
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("configMapInformer UpdateFunc %s/%s", configMap.Namespace, configMap.Name)
+			log.V(3).M(configMap).Info("configMapInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("configMapInformer DeleteFunc %s/%s", configMap.Namespace, configMap.Name)
+			log.V(3).M(configMap).Info("configMapInformer.DeleteFunc")
 		},
 	})
 
@@ -309,7 +309,7 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("statefulSetInformer AddFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			log.V(3).M(statefulSet).Info("statefulSetInformer.AddFunc")
 			//controller.handleObject(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -317,14 +317,14 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("statefulSetInformer UpdateFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			log.V(3).M(statefulSet).Info("statefulSetInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("statefulSetInformer DeleteFunc %s/%s", statefulSet.Namespace, statefulSet.Name)
+			log.V(3).M(statefulSet).Info("statefulSetInformer.DeleteFunc")
 			//controller.handleObject(obj)
 		},
 	})
@@ -335,21 +335,21 @@ func (c *Controller) addEventHandlers(
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("podInformer AddFunc %s/%s", pod.Namespace, pod.Name)
+			log.V(3).M(pod).Info("podInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
 			pod := old.(*core.Pod)
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("podInformer UpdateFunc %s/%s", pod.Namespace, pod.Name)
+			log.V(3).M(pod).Info("podInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
-			log.V(2).Infof("podInformer DeleteFunc %s/%s", pod.Namespace, pod.Name)
+			log.V(3).M(pod).Info("podInformer.DeleteFunc")
 		},
 	})
 }
@@ -389,15 +389,15 @@ func (c *Controller) Run(ctx context.Context) {
 	// Start threads
 	//
 	workersNum := len(c.queues)
-	log.V(1).Infof("ClickHouseInstallation controller: starting workers number: %d", workersNum)
+	log.V(1).A().Info("ClickHouseInstallation controller: starting workers number: %d", workersNum)
 	for i := 0; i < workersNum; i++ {
-		log.V(1).Infof("ClickHouseInstallation controller: starting worker %d out of %d", i+1, workersNum)
+		log.V(1).A().Info("ClickHouseInstallation controller: starting worker %d out of %d", i+1, workersNum)
 		worker := c.newWorker(c.queues[i])
 		go wait.Until(worker.run, runWorkerPeriod, ctx.Done())
 	}
-	defer log.V(1).Info("ClickHouseInstallation controller: shutting down workers")
+	defer log.V(1).A().Info("ClickHouseInstallation controller: shutting down workers")
 
-	log.V(1).Info("ClickHouseInstallation controller: workers started")
+	log.V(1).A().Info("ClickHouseInstallation controller: workers started")
 	<-ctx.Done()
 }
 
@@ -430,14 +430,14 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 					if command.old.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
 						command.old.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
 						command.old.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
-						log.V(1).Infof("ERROR CHI: NON-EMPTY CHI OLD")
+						log.V(1).Error("ERROR CHI: NON-EMPTY CHI OLD")
 					}
 				}
 				if len(command.new.Spec.Configuration.Clusters) > 0 {
 					if command.new.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
 						command.new.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
 						command.new.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
-						log.V(1).Infof("ERROR CHI: NON-EMPTY CHI NEW")
+						log.V(1).Error("ERROR CHI: NON-EMPTY CHI NEW")
 					}
 				}
 
@@ -462,7 +462,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 				namespace = command.old.Namespace
 				name = command.old.Name
 			}
-			log.V(1).Infof("ENQUEUE new ReconcileCHI cmd=%s for %s/%s", command.cmd, namespace, name)
+			log.V(1).Info("ENQUEUE new ReconcileCHI cmd=%s for %s/%s", command.cmd, namespace, name)
 		}
 
 	case
@@ -486,9 +486,9 @@ func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
 // updateWatchAsync
 func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string) {
 	if err := metrics.InformMetricsExporterAboutWatchedCHI(namespace, name, hostnames); err != nil {
-		log.V(1).Infof("FAIL update watch (%s/%s): %q", namespace, name, err)
+		log.V(1).A().Info("FAIL update watch (%s/%s): %q", namespace, name, err)
 	} else {
-		log.V(2).Infof("OK update watch (%s/%s)", namespace, name)
+		log.V(2).Info("OK update watch (%s/%s)", namespace, name)
 	}
 }
 
@@ -500,15 +500,15 @@ func (c *Controller) deleteWatch(namespace, name string) {
 // deleteWatchAsync
 func (c *Controller) deleteWatchAsync(namespace, name string) {
 	if err := metrics.InformMetricsExporterToDeleteWatchedCHI(namespace, name); err != nil {
-		log.V(1).Infof("FAIL delete watch (%s/%s): %q", namespace, name, err)
+		log.V(1).A().Info("FAIL delete watch (%s/%s): %q", namespace, name, err)
 	} else {
-		log.V(2).Infof("OK delete watch (%s/%s)", namespace, name)
+		log.V(2).Info("OK delete watch (%s/%s)", namespace, name)
 	}
 }
 
 // addChit sync new CHIT - creates all its resources
 func (c *Controller) addChit(chit *chi.ClickHouseInstallationTemplate) error {
-	log.V(1).Infof("addChit(%s/%s)", chit.Namespace, chit.Name)
+	log.V(1).M(chit).F().P()
 	c.chop.Config().AddCHITemplate((*chi.ClickHouseInstallation)(chit))
 	return nil
 }
@@ -516,19 +516,19 @@ func (c *Controller) addChit(chit *chi.ClickHouseInstallationTemplate) error {
 // updateChit sync CHIT which was already created earlier
 func (c *Controller) updateChit(old, new *chi.ClickHouseInstallationTemplate) error {
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		log.V(2).Infof("updateChit(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.ObjectMeta.ResourceVersion)
 		// No need to react
 		return nil
 	}
 
-	log.V(2).Infof("updateChit(%s/%s):", new.Namespace, new.Name)
+	log.V(2).M(new).F().Info("ResourceVersion change: %s to %s", old.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
 	c.chop.Config().UpdateCHITemplate((*chi.ClickHouseInstallation)(new))
 	return nil
 }
 
 // deleteChit deletes CHIT
 func (c *Controller) deleteChit(chit *chi.ClickHouseInstallationTemplate) error {
-	log.V(2).Infof("deleteChit(%s/%s):", chit.Namespace, chit.Name)
+	log.V(2).M(chit).F().P()
 	c.chop.Config().DeleteCHITemplate((*chi.ClickHouseInstallation)(chit))
 	return nil
 }
@@ -536,9 +536,9 @@ func (c *Controller) deleteChit(chit *chi.ClickHouseInstallationTemplate) error 
 // addChopConfig
 func (c *Controller) addChopConfig(chopConfig *chi.ClickHouseOperatorConfiguration) error {
 	if c.chop.ConfigManager.IsConfigListed(chopConfig) {
-		log.V(1).Infof("addChopConfig(%s/%s) already known config - do nothing", chopConfig.Namespace, chopConfig.Name)
+		log.V(1).M(chopConfig).F().Info("already known config - do nothing")
 	} else {
-		log.V(1).Infof("addChopConfig(%s/%s) new, previously unknown config, need to apply", chopConfig.Namespace, chopConfig.Name)
+		log.V(1).M(chopConfig).F().Info("new, previously unknown config, need to apply")
 		// TODO
 		// NEED REFACTORING
 		// os.Exit(0)
@@ -550,12 +550,12 @@ func (c *Controller) addChopConfig(chopConfig *chi.ClickHouseOperatorConfigurati
 // updateChopConfig
 func (c *Controller) updateChopConfig(old, new *chi.ClickHouseOperatorConfiguration) error {
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		log.V(2).Infof("updateChopConfig(%s/%s): ResourceVersion did not change: %s", old.Namespace, old.Name, old.ObjectMeta.ResourceVersion)
+		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.ObjectMeta.ResourceVersion)
 		// No need to react
 		return nil
 	}
 
-	log.V(2).Infof("updateChopConfig(%s/%s):", new.Namespace, new.Name)
+	log.V(2).M(new).F().Info("ResourceVersion change: %s to %s", old.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
 	// TODO
 	// NEED REFACTORING
 	//os.Exit(0)
@@ -565,7 +565,7 @@ func (c *Controller) updateChopConfig(old, new *chi.ClickHouseOperatorConfigurat
 
 // deleteChit deletes CHIT
 func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfiguration) error {
-	log.V(2).Infof("deleteChopConfig(%s/%s):", chopConfig.Namespace, chopConfig.Name)
+	log.V(2).M(chopConfig).F().P()
 	// TODO
 	// NEED REFACTORING
 	//os.Exit(0)
@@ -575,41 +575,37 @@ func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfigur
 
 // updateCHIObject updates ClickHouseInstallation object
 func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
-	namespace, name := util.NamespaceName(chi.ObjectMeta)
-
 	js, _ := json.MarshalIndent(chi, "", "  ")
-	log.V(3).Infof("updateCHIObject(%s/%s)\n%s\n", namespace, name, js)
+	log.V(3).M(chi).F().Info("\n%s\n", js)
 
 	if len(chi.Spec.Configuration.Clusters) > 0 {
 		if chi.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
 			chi.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
 			chi.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
-			log.V(1).Infof("ERROR update CHI (%s/%s): NON-EMPTY CHI OLD ", namespace, name)
+			log.V(1).M(chi).A().Error("ERROR update CHI: NON-EMPTY CHI OLD ")
 		}
 	}
 
-	new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Update(chi)
+	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
 
 	if err != nil {
 		// Error update
-		log.V(1).Infof("ERROR update CHI (%s/%s): %q", namespace, name, err)
+		log.V(1).M(chi).A().Error("%q", err)
 		return err
 	}
 
-	if len(new.Spec.Configuration.Clusters) > 0 {
-		if new.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
-			new.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
-			new.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
-			log.V(1).Infof("ERROR update CHI (%s/%s): NON-EMPTY CHI NEW ", namespace, name)
+	if len(_new.Spec.Configuration.Clusters) > 0 {
+		if _new.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
+			_new.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
+			_new.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
+			log.V(1).M(chi).A().Error("ERROR update CHI: NON-EMPTY CHI NEW ")
 		}
 	}
 
-	if chi.ObjectMeta.ResourceVersion != new.ObjectMeta.ResourceVersion {
+	if chi.ObjectMeta.ResourceVersion != _new.ObjectMeta.ResourceVersion {
 		// Updated
-		log.V(2).Infof("updateCHIObject(%s/%s): ResourceVersion bump %s=>%s",
-			namespace, name, chi.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion,
-		)
-		chi.ObjectMeta.ResourceVersion = new.ObjectMeta.ResourceVersion
+		log.V(2).M(chi).F().Info("ResourceVersion change: %s to %s", chi.ObjectMeta.ResourceVersion, _new.ObjectMeta.ResourceVersion)
+		chi.ObjectMeta.ResourceVersion = _new.ObjectMeta.ResourceVersion
 		return nil
 	}
 
@@ -621,26 +617,26 @@ func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
 func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Infof("ctx is done")
+		log.V(2).Info("ctx is done")
 		return nil
 	}
 
 	namespace, name := util.NamespaceName(chi.ObjectMeta)
-	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
+	log.V(2).M(chi).F().Info("Update CHI status")
 
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
 	if err != nil {
 		if tolerateAbsence {
 			return nil
 		}
-		log.V(1).Infof("ERROR GetCHI (%s/%s): %q", namespace, name, err)
+		log.V(1).M(chi).A().Error("%q", err)
 		return err
 	}
 	if cur == nil {
 		if tolerateAbsence {
 			return nil
 		}
-		log.V(1).Infof("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
+		log.V(1).M(chi).A().Error("NULL returned")
 		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
 	}
 
@@ -652,22 +648,22 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 
 // installFinalizer
 func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
-	namespace, name := util.NamespaceName(chi.ObjectMeta)
-	log.V(2).Infof("InstallFinalizer(%s/%s)", namespace, name)
+	log.V(2).M(chi).S().P()
+	defer log.V(2).M(chi).E().P()
 
-	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(chi.Name, newGetOptions())
 	if err != nil {
 		return err
 	}
 	if cur == nil {
-		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
+		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
 	if util.InArray(FinalizerName, cur.ObjectMeta.Finalizers) {
 		// Already installed
 		return nil
 	}
-	log.V(2).Infof("InstallFinalizer(%s/%s) - no finalizer found, need to install one", namespace, name)
+	log.V(3).M(chi).F().Info("no finalizer found, need to install one")
 
 	cur.ObjectMeta.Finalizers = append(cur.ObjectMeta.Finalizers, FinalizerName)
 	return c.updateCHIObject(cur)
@@ -675,15 +671,15 @@ func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
 
 // uninstallFinalizer
 func (c *Controller) uninstallFinalizer(chi *chi.ClickHouseInstallation) error {
-	namespace, name := util.NamespaceName(chi.ObjectMeta)
-	log.V(2).Infof("Update CHI status (%s/%s)", namespace, name)
+	log.V(2).M(chi).S().P()
+	defer log.V(2).M(chi).E().P()
 
-	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(chi.Name, newGetOptions())
 	if err != nil {
 		return err
 	}
 	if cur == nil {
-		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
+		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
 	cur.ObjectMeta.Finalizers = util.RemoveFromArray(FinalizerName, cur.ObjectMeta.Finalizers)
@@ -722,7 +718,7 @@ func (c *Controller) handleObject(obj interface{}) {
 		return
 	}
 
-	log.V(1).Infof("Processing object: %s", object.GetName())
+	log.V(1).Info("Processing object: %s", object.GetName())
 
 	// Get owner - it is expected to be CHI
 	// TODO chi, err := c.chi.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
@@ -739,11 +735,11 @@ func (c *Controller) handleObject(obj interface{}) {
 
 // waitForCacheSync is a logger-wrapper over cache.WaitForCacheSync() and it waits for caches to populate
 func waitForCacheSync(name string, ctx context.Context, cacheSyncs ...cache.InformerSynced) bool {
-	log.V(1).Infof("Syncing caches for %s controller", name)
+	log.V(1).F().Info("Syncing caches for %s controller", name)
 	if !cache.WaitForCacheSync(ctx.Done(), cacheSyncs...) {
 		utilruntime.HandleError(fmt.Errorf(messageUnableToSync, name))
 		return false
 	}
-	log.V(1).Infof("Caches are synced for %s controller", name)
+	log.V(1).F().Info("Caches are synced for %s controller", name)
 	return true
 }
