@@ -3385,13 +3385,13 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "chi_clickhouse_table_mutations{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "mutations {{database}} {{table}} {{hostname}}",
+          "expr": "sum by (hostname) (chi_clickhouse_table_mutations{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "legendFormat": "mutations {{hostname}}",
           "refId": "A"
         },
         {
-          "expr": "chi_clickhouse_table_mutations_parts_to_do{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "parts_to_do {{database}} {{table}} {{hostname}}",
+          "expr": "sum by (hostname) (chi_clickhouse_table_mutations_parts_to_do{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "legendFormat": "parts_to_do {{hostname}}",
           "refId": "B"
         }
       ],
