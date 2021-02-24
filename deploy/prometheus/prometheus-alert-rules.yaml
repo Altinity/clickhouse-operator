@@ -470,7 +470,7 @@ spec:
             description: |-
               `chi_clickhouse_table_mutations` = {{ with printf "chi_clickhouse_table_mutations{hostname='%s',exported_namespace='%s',database='%s',table='%s'}" .Labels.hostname .Labels.exported_namespace .Labels.database .Labels.table | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
               `chi_clickhouse_table_mutations_parts_to_do` = {{ with printf "chi_clickhouse_table_mutations_parts_to_do{hostname='%s',exported_namespace='%s',database='%s',table='%s'}" .Labels.hostname .Labels.exported_namespace .Labels.database .Labels.table | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
-              `system.mutations` show too much incomplete mutation.
+              `system.mutations` show too much active mutations.
               It mean something wrong with ALTER TABLE DELETE/UPDATE queries.
               Please check mutations errors ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- clickhouse-client -q "SELECT * FROM system.mutations WHERE is_done=0 FORMAT Vertical"```
               Read about how to run KILL MUTATION

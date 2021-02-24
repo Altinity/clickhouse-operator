@@ -3332,7 +3332,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "Number of mutations (ALTER DELETE/ALTER UPDATE) which not complete and how much parts should be mutate",
+      "description": "Number of active mutations (ALTER DELETE/ALTER UPDATE) and how much parts should be mutate",
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
