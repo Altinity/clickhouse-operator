@@ -69,7 +69,7 @@ Vagrant.configure(2) do |config|
 
     # docker
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8D81803C0EBFCD88
-    add-apt-repository "deb https://download.docker.com/linux/ubuntu focal testing"
+    add-apt-repository "deb https://download.docker.com/linux/ubuntu focal test"
     apt-get install --no-install-recommends -y docker-ce pigz
 
     # docker compose

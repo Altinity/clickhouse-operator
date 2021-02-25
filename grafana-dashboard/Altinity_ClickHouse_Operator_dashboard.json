@@ -3231,12 +3231,12 @@
         {
           "targetBlank": true,
           "title": "FETCH PARTITION",
-          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_fetch-partition"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/partition/#alter_fetch-partition"
         },
         {
           "targetBlank": true,
           "title": "Mutations of data",
-          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter-mutations"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#mutations"
         },
         {
           "targetBlank": true,
@@ -3246,7 +3246,7 @@
         {
           "targetBlank": true,
           "title": "MOVE PARTITION",
-          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_move-partition"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/partition/#alter_move-partition"
         }
       ],
       "nullPointMode": "null",
@@ -3332,7 +3332,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "Number of mutations (ALTER DELETE/ALTER UPDATE)",
+      "description": "Number of active mutations (ALTER DELETE/ALTER UPDATE) and parts to mutate",
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -3358,10 +3358,20 @@
         {
           "targetBlank": true,
           "title": "Mutations",
-          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter-mutations"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#mutations"
+        },
+        {
+          "targetBlank": true,
+          "title": "system.mutations",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/mutations/"
+        },
+        {
+          "targetBlank": true,
+          "title": "KILL MUTATION",
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/kill/#kill-mutation"
         }
       ],
-      "nullPointMode": "null",
+      "nullPointMode": "null as zero",
       "options": {
         "dataLinks": []
       },
@@ -3372,12 +3382,17 @@
       "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
-      "steppedLine": false,
+      "steppedLine": true,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_PartMutation{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "{{hostname}}",
+          "expr": "sum by (hostname) (chi_clickhouse_table_mutations{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "legendFormat": "mutations {{hostname}}",
           "refId": "A"
+        },
+        {
+          "expr": "sum by (hostname) (chi_clickhouse_table_mutations_parts_to_do{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "legendFormat": "parts_to_do {{hostname}}",
+          "refId": "B"
         }
       ],
       "thresholds": [],

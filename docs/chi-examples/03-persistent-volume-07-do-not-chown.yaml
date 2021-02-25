@@ -1,0 +1,46 @@
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "pv-do-not-chown"
+spec:
+  configuration:
+    clusters:
+      - name: "pv-do-not-chown"
+        templates:
+          podTemplate: pod-template-with-volumes-do-not-chown
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+
+  templates:
+    podTemplates:
+      - name: pod-template-with-volumes-do-not-chown
+        spec:
+          securityContext:
+            runAsUser: 101
+            runAsGroup: 101
+            fsGroup: 101
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:latest
+              volumeMounts:
+                - name: data-storage-vc-template-1
+                  mountPath: /var/lib/clickhouse
+#              command:
+#                - /bin/bash
+#                - -c
+#                - chown clickhouse /var/lib/clickhouse && /entrypoint.sh
+              env:
+                - name: CLICKHOUSE_DO_NOT_CHOWN
+                  value: "1"
+
+    volumeClaimTemplates:
+      - name: data-storage-vc-template-1
+        spec:
+          storageClassName: standard
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

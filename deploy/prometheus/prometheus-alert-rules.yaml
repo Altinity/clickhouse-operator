@@ -460,6 +460,22 @@ spec:
               System will reduce the number of threads which used for processing queries.
               Check you disks utilization and hardware failures.
 
+        - alert: ClickHouseTooMuchMutations
+          expr: chi_clickhouse_table_mutations > 100
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Too much incomplete system.mutations"
+            description: |-
+              `chi_clickhouse_table_mutations` = {{ with printf "chi_clickhouse_table_mutations{hostname='%s',exported_namespace='%s',database='%s',table='%s'}" .Labels.hostname .Labels.exported_namespace .Labels.database .Labels.table | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `chi_clickhouse_table_mutations_parts_to_do` = {{ with printf "chi_clickhouse_table_mutations_parts_to_do{hostname='%s',exported_namespace='%s',database='%s',table='%s'}" .Labels.hostname .Labels.exported_namespace .Labels.database .Labels.table | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `system.mutations` show too much active mutations.
+              It mean something wrong with ALTER TABLE DELETE/UPDATE queries.
+              Please check mutations errors ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- clickhouse-client -q "SELECT * FROM system.mutations WHERE is_done=0 FORMAT Vertical"```
+              Read about how to run KILL MUTATION
+              https://clickhouse.tech/docs/en/sql-reference/statements/kill/#kill-mutation
+
     # based on https://blog.serverdensity.com/how-to-monitor-zookeeper/
     # and https://github.com/apache/zookeeper/blob/master/zookeeper-contrib/zookeeper-contrib-monitoring/nagios/services.cfg
     - name: ZookeeperRules
