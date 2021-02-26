@@ -21,11 +21,11 @@ import (
 
 type EntityType string
 
-const statefulSet EntityType = "StatefulSet"
-const configMap EntityType = "ConfigMap"
-const service EntityType = "Service"
-const pvc EntityType = "PVC"
-const pv EntityType = "PV"
+const StatefulSet EntityType = "StatefulSet"
+const ConfigMap EntityType = "ConfigMap"
+const Service EntityType = "Service"
+const PVC EntityType = "PVC"
+const PV EntityType = "PV"
 
 type Registry struct {
 	r map[EntityType][]v1.ObjectMeta
@@ -83,23 +83,23 @@ func (r *Registry) registerEntity(entityType EntityType, meta v1.ObjectMeta) {
 }
 
 func (r *Registry) RegisterStatefulSet(meta v1.ObjectMeta) {
-	r.registerEntity(statefulSet, meta)
+	r.registerEntity(StatefulSet, meta)
 }
 
 func (r *Registry) RegisterConfigMap(meta v1.ObjectMeta) {
-	r.registerEntity(configMap, meta)
+	r.registerEntity(ConfigMap, meta)
 }
 
 func (r *Registry) RegisterService(meta v1.ObjectMeta) {
-	r.registerEntity(service, meta)
+	r.registerEntity(Service, meta)
 }
 
 func (r *Registry) RegisterPVC(meta v1.ObjectMeta) {
-	r.registerEntity(pvc, meta)
+	r.registerEntity(PVC, meta)
 }
 
 func (r *Registry) RegisterPV(meta v1.ObjectMeta) {
-	r.registerEntity(pv, meta)
+	r.registerEntity(PV, meta)
 }
 
 func (r *Registry) hasEntity(entityType EntityType, meta v1.ObjectMeta) bool {
