@@ -120,7 +120,7 @@ func SubtractStringMaps(base, delta map[string]string) map[string]string {
 	}
 
 	// Extract keys from delta and delete them from base
-	for _, key := range delta {
+	for key := range delta {
 		if _, ok := base[key]; ok {
 			delete(base, key)
 		}
