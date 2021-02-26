@@ -5,8 +5,12 @@ metadata:
 spec:
   templates:
     podTemplates:
-    - name: clickhouse-v20.3
+    - name: clickhouse-replica-1
       spec:
+        securityContext:
+          runAsUser: 101
+          runAsGroup: 101
+          fsGroup: 101
         containers:
         - name: clickhouse-pod
           image: yandex/clickhouse-server:20.8.7.15
@@ -24,7 +28,7 @@ spec:
           command:
           - /bin/bash
           - -c
-          - /entrypoint.sh; while true; do sleep 600; done
+          - /usr/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml
           resources:
             requests:
               memory: 300Mi
@@ -32,11 +36,22 @@ spec:
             limits:
               memory: 300Mi
               cpu: "1"
+          volumeMounts:
+            - mountPath: /var/lib/clickhouse
+              name: default-gp2
+        - image: altinity/clickhouse-backup:0.20
+          name: clickhouse-backup
+          ports:
+            - containerPort: 7171
+              name: backup
+          volumeMounts:
+            - mountPath: /var/lib/clickhouse
+              name: default-gp2
       podDistribution:
       - scope: ClickHouseInstallation
         type: ClickHouseAntiAffinity
     volumeClaimTemplates:
-    - name: default-volumeclaim-template
+    - name: default-gp2
       reclaimPolicy: Delete
       spec:
         accessModes:
@@ -57,8 +72,8 @@ spec:
         externalTrafficPolicy: Local
   defaults:
     templates:
-      podTemplate: clickhouse-v20.3
-      volumeClaimTemplate: default-volumeclaim-template
+      podTemplate: clickhouse-replica-1
+      volumeClaimTemplate: default-gp2
       serviceTemplate: default-service-template
   configuration:
     files:
@@ -79,6 +94,6 @@ spec:
     - name: t1
       layout:
         shardsCount: 1
-        replicasCount: 1
-      templates:
-        podTemplate: clickhouse-v20.3
+        replicas:
+          - templates:
+              podTemplate: clickhouse-replica-1
