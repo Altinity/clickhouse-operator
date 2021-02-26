@@ -96,7 +96,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 	return svc
 }
 
-// createServiceCluster creates new corev1.Service for specified Cluster
+// CreateServiceCluster creates new corev1.Service for specified Cluster
 func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
 	serviceName := CreateClusterServiceName(cluster)
 
@@ -115,7 +115,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 	return nil
 }
 
-// createServiceShard creates new corev1.Service for specified Shard
+// CreateServiceShard creates new corev1.Service for specified Shard
 func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 	serviceName := CreateShardServiceName(shard)
 
@@ -134,7 +134,7 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 	return nil
 }
 
-// createServiceHost creates new corev1.Service for specified host
+// CreateServiceHost creates new corev1.Service for specified host
 func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(host)
 	statefulSetName := CreateStatefulSetName(host)

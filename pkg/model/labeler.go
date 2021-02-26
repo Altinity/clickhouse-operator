@@ -154,8 +154,8 @@ func (l *Labeler) getLabelsCHIScope() map[string]string {
 	})
 }
 
-// getSelectorCHIScope gets labels to select a CHI-scoped object
-func (l *Labeler) getSelectorCHIScope() map[string]string {
+// GetSelectorCHIScope gets labels to select a CHI-scoped object
+func (l *Labeler) GetSelectorCHIScope() map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace: l.namer.getNamePartNamespace(l.chi),
@@ -166,7 +166,7 @@ func (l *Labeler) getSelectorCHIScope() map[string]string {
 
 // getSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
 func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
-	return l.appendReadyLabels(l.getSelectorCHIScope())
+	return l.appendReadyLabels(l.GetSelectorCHIScope())
 }
 
 // getLabelsClusterScope gets labels for Cluster-scoped object
