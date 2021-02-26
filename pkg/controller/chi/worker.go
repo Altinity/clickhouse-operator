@@ -398,6 +398,17 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 		)
 	*/
 
+	objs.Walk(func(entityType chopmodel.EntityType, m meta.ObjectMeta) {
+		switch entityType {
+		case chopmodel.StatefulSet:
+			w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(m.Name, newDeleteOptions())
+		case chopmodel.ConfigMap:
+			w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(m.Name, newDeleteOptions())
+		case chopmodel.Service:
+			w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(m.Name, newDeleteOptions())
+		}
+	})
+
 	if !new.IsStopped() {
 		w.a.V(1).
 			WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
