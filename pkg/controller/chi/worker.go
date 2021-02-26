@@ -226,6 +226,8 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 		return nil
 	}
 
+	ctx = chopmodel.NewReconcileContext(ctx)
+
 	// Check DeletionTimestamp in order to understand, whether the object is being deleted
 	if new.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted
@@ -375,17 +377,26 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 		WithStatusAction(new).
 		M(new).F().
 		Info("remove items scheduled for deletion")
-	actionPlan.WalkRemoved(
-		func(cluster *chop.ChiCluster) {
-			_ = w.deleteCluster(ctx, new, cluster)
-		},
-		func(shard *chop.ChiShard) {
-			_ = w.deleteShard(ctx, new, shard)
-		},
-		func(host *chop.ChiHost) {
-			_ = w.deleteHost(ctx, new, host)
-		},
-	)
+
+	objs := w.c.discovery(new)
+	w.a.V(1).M(new).F().Info("Reconciled objects:\n%s", chopmodel.ReconcileContextGetRegistry(ctx))
+	w.a.V(1).M(new).F().Info("Existing objects:\n%s", objs)
+	objs.Subtract(chopmodel.ReconcileContextGetRegistry(ctx))
+	w.a.V(1).M(new).F().Info("Delete objects:\n%s", objs)
+
+	/*
+		actionPlan.WalkRemoved(
+			func(cluster *chop.ChiCluster) {
+				_ = w.deleteCluster(ctx, new, cluster)
+			},
+			func(shard *chop.ChiShard) {
+				_ = w.deleteShard(ctx, new, shard)
+			},
+			func(host *chop.ChiHost) {
+				_ = w.deleteHost(ctx, new, host)
+			},
+		)
+	*/
 
 	if !new.IsStopped() {
 		w.a.V(1).
@@ -445,9 +456,11 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *cho
 		// Stopped cluster must have no entry point
 		_ = w.c.deleteServiceCHI(ctx, chi)
 	} else {
-		service := w.creator.CreateServiceCHI()
-		if err := w.reconcileService(ctx, chi, service); err != nil {
-			return err
+		if service := w.creator.CreateServiceCHI(); service != nil {
+			if err := w.reconcileService(ctx, chi, service); err != nil {
+				return err
+			}
+			chopmodel.ReconcileContextGetRegistry(ctx).RegisterService(service.ObjectMeta)
 		}
 	}
 
@@ -501,7 +514,11 @@ func (w *worker) reconcileCHIConfigMapCommon(ctx context.Context, chi *chop.Clic
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
 	configMapCommon := w.creator.CreateConfigMapCHICommon(options)
-	return w.reconcileConfigMap(ctx, chi, configMapCommon, update)
+	err := w.reconcileConfigMap(ctx, chi, configMapCommon, update)
+	if err == nil {
+		chopmodel.ReconcileContextGetRegistry(ctx).RegisterConfigMap(configMapCommon.ObjectMeta)
+	}
+	return err
 }
 
 // reconcileCHIConfigMapUsers reconciles all CHI's users ConfigMap
@@ -509,7 +526,11 @@ func (w *worker) reconcileCHIConfigMapCommon(ctx context.Context, chi *chop.Clic
 func (w *worker) reconcileCHIConfigMapUsers(ctx context.Context, chi *chop.ClickHouseInstallation, options *chopmodel.ClickHouseConfigFilesGeneratorOptions, update bool) error {
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
-	return w.reconcileConfigMap(ctx, chi, configMapUsers, update)
+	err := w.reconcileConfigMap(ctx, chi, configMapUsers, update)
+	if err == nil {
+		chopmodel.ReconcileContextGetRegistry(ctx).RegisterConfigMap(configMapUsers.ObjectMeta)
+	}
+	return err
 }
 
 // reconcileCluster reconciles Cluster, excluding nested shards
@@ -525,11 +546,14 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chop.ChiCluster)
 	// Add Cluster's Service
 	service := w.creator.CreateServiceCluster(cluster)
 	if service == nil {
-		// TODO
-		// For somewhat reason Service is not created, this is an error, but not clear what to do about it
+		// This is not a problem, ServiceCluster may be omitted
 		return nil
 	}
-	return w.reconcileService(ctx, cluster.CHI, service)
+	err := w.reconcileService(ctx, cluster.CHI, service)
+	if err == nil {
+		chopmodel.ReconcileContextGetRegistry(ctx).RegisterService(service.ObjectMeta)
+	}
+	return err
 }
 
 // reconcileShard reconciles Shard, excluding nested replicas
@@ -545,11 +569,14 @@ func (w *worker) reconcileShard(ctx context.Context, shard *chop.ChiShard) error
 	// Add Shard's Service
 	service := w.creator.CreateServiceShard(shard)
 	if service == nil {
-		// TODO
-		// For somewhat reason Service is not created, this is an error, but not clear what to do about it
+		// This is not a problem, ServiceShard may be omitted
 		return nil
 	}
-	return w.reconcileService(ctx, shard.CHI, service)
+	err := w.reconcileService(ctx, shard.CHI, service)
+	if err == nil {
+		chopmodel.ReconcileContextGetRegistry(ctx).RegisterService(service.ObjectMeta)
+	}
+	return err
 }
 
 // reconcileHost reconciles ClickHouse host
@@ -582,18 +609,23 @@ func (w *worker) reconcileHost(ctx context.Context, host *chop.ChiHost) error {
 	if err := w.reconcileConfigMap(ctx, host.CHI, configMap, true); err != nil {
 		return err
 	}
+	chopmodel.ReconcileContextGetRegistry(ctx).RegisterConfigMap(configMap.ObjectMeta)
 
 	// Reconcile host's StatefulSet
 	if err := w.reconcileStatefulSet(ctx, statefulSet, host); err != nil {
 		return err
 	}
+	chopmodel.ReconcileContextGetRegistry(ctx).RegisterStatefulSet(statefulSet.ObjectMeta)
 
 	// Reconcile host's Persistent Volumes
 	w.reconcilePersistentVolumes(ctx, host)
 
-	// Reconcile host's Service
-	if err := w.reconcileService(ctx, host.CHI, service); err != nil {
-		return err
+	if service != nil {
+		// Reconcile host's Service
+		if err := w.reconcileService(ctx, host.CHI, service); err != nil {
+			return err
+		}
+		chopmodel.ReconcileContextGetRegistry(ctx).RegisterService(service.ObjectMeta)
 	}
 
 	host.ReconcileAttributes.UnsetAdd()
