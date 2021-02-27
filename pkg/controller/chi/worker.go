@@ -379,9 +379,10 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 		Info("remove items scheduled for deletion")
 
 	objs := w.c.discovery(new)
+	need := chopmodel.ReconcileContextGetRegistry(ctx)
 	w.a.V(1).M(new).F().Info("Reconciled objects:\n%s", chopmodel.ReconcileContextGetRegistry(ctx))
 	w.a.V(1).M(new).F().Info("Existing objects:\n%s", objs)
-	objs.Subtract(chopmodel.ReconcileContextGetRegistry(ctx))
+	objs.Subtract(need)
 	w.a.V(1).M(new).F().Info("Delete objects:\n%s", objs)
 
 	/*
