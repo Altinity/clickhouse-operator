@@ -111,7 +111,8 @@ func (r *Registry) hasEntity(entityType EntityType, meta v1.ObjectMeta) bool {
 		if et == entityType {
 			// This is searched entityType
 			for _, m := range r.r[et] {
-				if (m.Namespace == meta.Namespace) && (m.Name == meta.Name) {
+				if r.isEqual(m, meta) {
+					// This is the element which is looked for.
 					return true
 				}
 			}
@@ -120,6 +121,10 @@ func (r *Registry) hasEntity(entityType EntityType, meta v1.ObjectMeta) bool {
 	}
 
 	return false
+}
+
+func (r *Registry) isEqual(a, b v1.ObjectMeta) bool {
+	return (a.Namespace == b.Namespace) && (a.Name == b.Name)
 }
 
 func (r *Registry) deleteEntity(entityType EntityType, meta v1.ObjectMeta) bool {
@@ -131,10 +136,16 @@ func (r *Registry) deleteEntity(entityType EntityType, meta v1.ObjectMeta) bool 
 		if et == entityType {
 			// This is searched entityType
 			for i, m := range r.r[et] {
-				if (m.Namespace == meta.Namespace) && (m.Name == meta.Name) {
+				if r.isEqual(m, meta) {
+					// This is the element which is looked for.
 					// Remove the element at index i
-					r.r[et][i] = r.r[et][len(r.r[et])-1] // Copy last element to index i.
-					r.r[et] = r.r[et][:len(r.r[et])-1]   // Truncate slice.
+					//
+					// Copy last element to index i.
+					r.r[et][i] = r.r[et][len(r.r[et])-1]
+					// Erase last element - help GC to collect
+					r.r[et][len(r.r[et])-1] = v1.ObjectMeta{}
+					// Truncate slice.
+					r.r[et] = r.r[et][:len(r.r[et])-1]
 					return true
 				}
 			}
@@ -155,17 +166,9 @@ func (r *Registry) Subtract(sub *Registry) *Registry {
 		return r
 	}
 
-	for entityType := range sub.r {
-		entities, ok := r.r[entityType]
-		if !ok {
-			// There is no such entities in registry, nothing to subtract
-			continue
-		}
-
-		for _, entity := range entities {
-			r.deleteEntity(entityType, entity)
-		}
-	}
+	sub.Walk(func(entityType EntityType, entity v1.ObjectMeta) {
+		r.deleteEntity(entityType, entity)
+	})
 
 	return r
 }
