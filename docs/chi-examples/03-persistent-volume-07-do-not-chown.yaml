@@ -57,7 +57,7 @@ spec:
               command:
                 - /bin/bash
                 - -c
-                - "if [[ -f /bin/clickhouse-backup ]]; then /bin/clickhouse-backup -c /etc/clickhouse-server/config.d/ch-backup.yaml server; else /clickhouse-backup -c /etc/clickhouse-server/config.d/ch-backup.yaml server; fi"
+                - "/bin/clickhouse-backup -c /etc/clickhouse-server/config.d/ch-backup.yaml server || /clickhouse-backup -c /etc/clickhouse-server/config.d/ch-backup.yaml server"
 
     volumeClaimTemplates:
       - name: data-storage-vc-template-1
