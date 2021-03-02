@@ -28,7 +28,7 @@ spec:
             - system.*
           timeout: 5m
         api:
-          listen_addr: "0.0.0.0:7171"
+          listen: "0.0.0.0:7171"
           enable_metrics: true
   templates:
     podTemplates:
@@ -57,7 +57,7 @@ spec:
               command:
                 - /bin/bash
                 - -c
-                - "mkdir -p /var/lib/clickhouse/backup && if [[ -f /bin/clickhouse-backup ]]; then /bin/clickhouse-backup -c /etc/clickhouse-server/config.d/ch-backup.yaml server; else /clickhouse-backup -c /etc/clickhouse-server/config.d/ch-backup.yaml server; fi"
+                - "if [[ -f /bin/clickhouse-backup ]]; then /bin/clickhouse-backup -c /etc/clickhouse-server/config.d/ch-backup.yaml server; else /clickhouse-backup -c /etc/clickhouse-server/config.d/ch-backup.yaml server; fi"
 
     volumeClaimTemplates:
       - name: data-storage-vc-template-1
