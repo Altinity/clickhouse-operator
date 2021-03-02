@@ -52,7 +52,7 @@ spec:
                 - name: CLICKHOUSE_DO_NOT_CHOWN
                   value: "1"
             - name: clickhouse-backup
-              image: altinity/clickhouse-backup:0.21
+              image: altinity/clickhouse-backup:0.21.0
               imagePullPolicy: Always
               command:
                 - /bin/bash
