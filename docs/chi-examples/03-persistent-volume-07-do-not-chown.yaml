@@ -12,7 +12,26 @@ spec:
         layout:
           shardsCount: 1
           replicasCount: 1
-
+    files:
+      ch-backup.yaml: |
+        general:
+          remote_storage: "none"
+          disable_progress_bar: false
+          backup_to_keep_local: 1
+          backups_to_keep_remote: 0
+        clickhouse:
+          username: default
+          password: ""
+          host: localhost
+          data_path: /var/lib/clickhouse
+          disk_mapping:
+            default: /var/lib/clickhouse
+          skip_tables:
+            - system.*
+          timeout: 5m
+        api:
+          listen: "0.0.0.0:7171"
+          enable_metrics: true
   templates:
     podTemplates:
       - name: pod-template-with-volumes-do-not-chown
@@ -22,18 +41,25 @@ spec:
             runAsGroup: 101
             fsGroup: 101
           containers:
-            - name: clickhouse
-              image: yandex/clickhouse-server:latest
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:20.8
+              imagePullPolicy: IfNotPresent
               volumeMounts:
                 - name: data-storage-vc-template-1
                   mountPath: /var/lib/clickhouse
-#              command:
-#                - /bin/bash
-#                - -c
-#                - chown clickhouse /var/lib/clickhouse && /entrypoint.sh
+              command:
+                - clickhouse-server
+                - --config-file=/etc/clickhouse-server/config.xml
               env:
                 - name: CLICKHOUSE_DO_NOT_CHOWN
                   value: "1"
+            - name: clickhouse-backup
+              image: altinity/clickhouse-backup:0.21.0
+              imagePullPolicy: Always
+              command:
+                - /bin/bash
+                - -c
+                - "/bin/clickhouse-backup -c /etc/clickhouse-server/config.d/ch-backup.yaml server || /clickhouse-backup -c /etc/clickhouse-server/config.d/ch-backup.yaml server"
 
     volumeClaimTemplates:
       - name: data-storage-vc-template-1
