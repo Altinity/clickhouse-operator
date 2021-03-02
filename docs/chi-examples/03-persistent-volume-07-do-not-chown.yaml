@@ -24,6 +24,8 @@ spec:
           password: ""
           host: localhost
           data_path: /var/lib/clickhouse
+          disk_mapping:
+            default: /var/lib/clickhouse
           skip_tables:
             - system.*
           timeout: 5m
