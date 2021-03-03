@@ -689,6 +689,11 @@ func (w *worker) reconcileHost(ctx context.Context, host *chop.ChiHost) error {
 }
 
 func (w *worker) migrateTables(ctx context.Context, host *chop.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	if !w.shouldMigrateTables(host) {
 		w.a.V(1).
 			M(host).F().
@@ -732,7 +737,7 @@ func (w *worker) excludeHost(ctx context.Context, host *chop.ChiHost) error {
 			M(host).F().
 			Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
-		w.excludeHostFromService(host)
+		w.excludeHostFromService(ctx, host)
 		w.excludeHostFromClickHouseCluster(ctx, host)
 	}
 	return nil
@@ -740,26 +745,46 @@ func (w *worker) excludeHost(ctx context.Context, host *chop.ChiHost) error {
 
 // Always include host back to ClickHouse clusters
 func (w *worker) includeHost(ctx context.Context, host *chop.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	w.a.V(1).
 		M(host).F().
 		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
 	w.includeHostIntoClickHouseCluster(ctx, host)
-	w.includeHostIntoService(host)
+	w.includeHostIntoService(ctx, host)
 
 	return nil
 }
 
-func (w *worker) excludeHostFromService(host *chop.ChiHost) {
-	w.c.deleteLabelReady(host)
+func (w *worker) excludeHostFromService(ctx context.Context, host *chop.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	return w.c.deleteLabelReady(host)
 }
 
-func (w *worker) includeHostIntoService(host *chop.ChiHost) {
-	w.c.appendLabelReady(host)
+func (w *worker) includeHostIntoService(ctx context.Context, host *chop.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	return w.c.appendLabelReady(host)
 }
 
 // excludeHostFromClickHouseCluster excludes host from ClickHouse configuration
 func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *chop.ChiHost) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return
+	}
+
 	// Specify in options to exclude host from ClickHouse config file
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
 		SetRemoteServersGeneratorOptions(
@@ -771,7 +796,7 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *cho
 		)
 
 	// Remove host from cluster config and wait for ClickHouse to pick-up the change
-	if w.waitExcludeHost(host) {
+	if w.shouldWaitExcludeHost(host) {
 		_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options, true)
 		_ = w.waitHostNotInCluster(ctx, host)
 	}
@@ -779,6 +804,11 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *cho
 
 // includeHostIntoClickHouseCluster includes host to ClickHouse configuration
 func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chop.ChiHost) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return
+	}
+
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
 		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
 			ExcludeReconcileAttributes(
@@ -787,7 +817,7 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *cho
 		)
 		// Add host to the cluster config (always) and wait for ClickHouse to pick-up the change
 	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options, true)
-	if w.waitIncludeHost(host) {
+	if w.shouldWaitIncludeHost(host) {
 		_ = w.waitHostInCluster(ctx, host)
 	}
 }
@@ -809,7 +839,7 @@ func (w *worker) shouldExcludeHost(host *chop.ChiHost) bool {
 }
 
 // determines whether reconciler should wait for host to be excluded from cluster
-func (w *worker) waitExcludeHost(host *chop.ChiHost) bool {
+func (w *worker) shouldWaitExcludeHost(host *chop.ChiHost) bool {
 	// Check CHI settings
 	switch {
 	case host.GetCHI().IsReconcilingPolicyWait():
@@ -823,7 +853,7 @@ func (w *worker) waitExcludeHost(host *chop.ChiHost) bool {
 }
 
 // determines whether reconciler should wait for host to be included into cluster
-func (w *worker) waitIncludeHost(host *chop.ChiHost) bool {
+func (w *worker) shouldWaitIncludeHost(host *chop.ChiHost) bool {
 	status := host.ReconcileAttributes.GetStatus()
 	if (status == chop.StatefulSetStatusNew) || (status == chop.StatefulSetStatusSame) {
 		return false
@@ -1151,8 +1181,8 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *chop.ClickHouseInstal
 		log.V(2).Info("ctx is done")
 		return nil
 	}
-	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
 
+	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
@@ -1178,7 +1208,6 @@ func (w *worker) createConfigMap(ctx context.Context, chi *chop.ClickHouseInstal
 	}
 
 	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
-
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
@@ -1305,7 +1334,6 @@ func (w *worker) updateService(
 		return nil
 	}
 	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(newService)
-
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
@@ -1331,7 +1359,6 @@ func (w *worker) createService(ctx context.Context, chi *chop.ClickHouseInstalla
 	}
 
 	_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
-
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
@@ -1407,7 +1434,7 @@ func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet, host *chop.
 				//	w.a.Info("INFO StatefulSet ARE DIFFERENT based on diff reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
 				//	//					return chop.StatefulSetStatusModified
 				//}
-				w.a.M(host).F().Info("INFO StatefulSet ARE DIFFERENT based on labels reconcile needed %s", util.NamespaceNameString(statefulSet.ObjectMeta))
+				w.a.M(host).F().Info("INFO StatefulSet ARE DIFFERENT based on labels. Reconcile is required for %s", util.NamespaceNameString(statefulSet.ObjectMeta))
 				return chop.StatefulSetStatusModified
 			}
 		}
