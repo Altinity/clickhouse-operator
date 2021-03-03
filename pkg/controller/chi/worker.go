@@ -672,20 +672,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chop.ChiHost) error {
 
 	host.ReconcileAttributes.UnsetAdd()
 
-	if w.migrateTables(host) {
-		w.a.V(1).
-			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateStarted).
-			WithStatusAction(host.GetCHI()).
-			M(host).F().
-			Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
-		if err := w.schemer.HostCreateTables(ctx, host); err != nil {
-			w.a.M(host).A().Error("ERROR create tables on host %s. err: %v", host.Name, err)
-		}
-	} else {
-		w.a.V(1).
-			M(host).F().
-			Info("No need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-	}
+	_ = w.migrateTables(ctx, host)
 
 	if err := w.includeHost(ctx, host); err != nil {
 		// If host is not ready - fallback
@@ -701,7 +688,29 @@ func (w *worker) reconcileHost(ctx context.Context, host *chop.ChiHost) error {
 	return nil
 }
 
-func (w *worker) migrateTables(host *chop.ChiHost) bool {
+func (w *worker) migrateTables(ctx context.Context, host *chop.ChiHost) error {
+	if !w.shouldMigrateTables(host) {
+		w.a.V(1).
+			M(host).F().
+			Info("No need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		return nil
+	}
+
+	// Need to migrate tables
+
+	w.a.V(1).
+		WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateStarted).
+		WithStatusAction(host.GetCHI()).
+		M(host).F().
+		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
+	err := w.schemer.HostCreateTables(ctx, host)
+	if err != nil {
+		w.a.M(host).A().Error("ERROR create tables on host %s. err: %v", host.Name, err)
+	}
+	return err
+}
+
+func (w *worker) shouldMigrateTables(host *chop.ChiHost) bool {
 	if host.GetCHI().IsStopped() {
 		return false
 	}
