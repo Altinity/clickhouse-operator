@@ -420,6 +420,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 			actionPlan := NewActionPlan(command.old, command.new)
 			enqueue = actionPlan.HasActionsToDo()
 			if enqueue {
+				log.V(2).Info("actionPlan:\n%s", actionPlan)
 				//oldjson, _ := json.MarshalIndent(command.old, "", "  ")
 				//newjson, _ := json.MarshalIndent(command.new, "", "  ")
 				//log.V(3).Infof("AP---------------------------------------------:\n%s\n", actionPlan)
