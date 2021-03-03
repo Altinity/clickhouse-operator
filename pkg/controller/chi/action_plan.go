@@ -34,6 +34,7 @@ type ActionPlan struct {
 	labelsEqual bool
 
 	deletionTimestampEqual bool
+	finalizersEqual bool
 }
 
 // NewActionPlan makes new ActionPlan out of two CHIs
@@ -47,14 +48,17 @@ func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.Spec, ap.new.Spec)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.Labels, ap.new.Labels)
 		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, ap.new.DeletionTimestamp)
+		_, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, ap.new.Finalizers)
 	} else if old == nil {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(nil, ap.new.Spec)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(nil, ap.new.Labels)
 		ap.deletionTimestampEqual = ap.timestampEqual(nil, ap.new.DeletionTimestamp)
+		_, ap.finalizersEqual = messagediff.DeepDiff(nil, ap.new.Finalizers)
 	} else if new == nil {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.Spec, nil)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.Labels, nil)
 		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, nil)
+		_, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, nil)
 	} else {
 		// Both are nil
 		ap.specDiff = nil
@@ -64,6 +68,8 @@ func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
 		ap.labelsEqual = true
 
 		ap.deletionTimestampEqual = true
+		ap.finalizersEqual = true
+
 	}
 
 	ap.excludePaths()
@@ -136,13 +142,13 @@ func (ap *ActionPlan) isExcludedPath(prev, cur string) bool {
 // HasActionsToDo checks whether there are any actions to do - meaning changes between states to reconcile
 func (ap *ActionPlan) HasActionsToDo() bool {
 
-	if ap.specEqual && ap.labelsEqual && ap.deletionTimestampEqual {
+	if ap.specEqual && ap.labelsEqual && ap.deletionTimestampEqual && ap.finalizersEqual {
 		// All is equal - no actions to do
 		return false
 	}
 
 	if (ap.specDiff == nil) && (ap.labelsDiff == nil) {
-		return !ap.deletionTimestampEqual
+		return !ap.deletionTimestampEqual || !ap.finalizersEqual
 	}
 
 	// Looks like have some changes in diffs
@@ -177,7 +183,7 @@ func (ap *ActionPlan) HasActionsToDo() bool {
 		}
 	}
 
-	return !ap.deletionTimestampEqual
+	return !ap.deletionTimestampEqual || !ap.finalizersEqual
 }
 
 // String stringifies ActionPlan
@@ -216,6 +222,14 @@ func (ap *ActionPlan) String() string {
 	if len(ap.labelsDiff.Modified) > 0 {
 		// Something modified
 		str += "modified labels\n"
+	}
+
+	if !ap.deletionTimestampEqual {
+		str += "modified deletion timestamp\n"
+	}
+
+	if !ap.finalizersEqual {
+		str += "modified finalizer\n"
 	}
 
 	return str
