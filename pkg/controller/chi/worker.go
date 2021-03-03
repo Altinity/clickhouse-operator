@@ -197,20 +197,22 @@ func (w *worker) normalize(c *chop.ClickHouseInstallation) *chop.ClickHouseInsta
 }
 
 // ensureFinalizer
-func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) {
+func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) bool {
 	// Check whether finalizer is already listed in CHI
 	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
 		w.a.V(2).M(chi).F().Info("finalizer already installed")
-		return
+		return false
 	}
 
 	// No finalizer found - need to install it
 
 	if err := w.c.installFinalizer(chi); err != nil {
 		w.a.V(1).M(chi).A().Error("unable to install finalizer. err: %v", err)
+		return false
 	}
 
 	w.a.V(3).M(chi).F().Info("finalizer installed")
+	return true
 }
 
 // updateCHI sync CHI which was already created earlier
@@ -231,7 +233,11 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 	// Check DeletionTimestamp in order to understand, whether the object is being deleted
 	if new.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted
-		w.ensureFinalizer(new)
+		// Need to ensure finalizer is in place
+		if w.ensureFinalizer(new) {
+			// Finalizer installed, let's restart reconcile cycle
+			return nil
+		}
 	} else {
 		// The object is being deleted
 		return w.finalizeCHI(ctx, new)
