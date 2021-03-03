@@ -1411,6 +1411,7 @@ func (w *worker) reconcileService(ctx context.Context, chi *chop.ClickHouseInsta
 	return err
 }
 
+// getStatefulSetStatus
 func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet, host *chop.ChiHost) chop.StatefulSetStatus {
 	w.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
