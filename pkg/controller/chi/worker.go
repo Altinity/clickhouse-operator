@@ -483,9 +483,13 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *cho
 	}
 
 	// 2. CHI common ConfigMap without update - create only
-	w.reconcileCHIConfigMapCommon(ctx, chi, nil, false)
+	if err := w.reconcileCHIConfigMapCommon(ctx, chi, nil, false); err != nil {
+		w.a.A().Error("failed to reconcile config map common. err: %v", err)
+	}
 	// 3. CHI users ConfigMap
-	w.reconcileCHIConfigMapUsers(ctx, chi, nil, true)
+	if err := w.reconcileCHIConfigMapUsers(ctx, chi, nil, true); err != nil {
+		w.a.A().Error("failed to reconcile config map users. err: %v", err)
+	}
 
 	return nil
 }
@@ -527,7 +531,17 @@ func (w *worker) reconcileCHIConfigMaps(
 }
 
 // reconcileCHIConfigMapCommon reconciles all CHI's common ConfigMap
-func (w *worker) reconcileCHIConfigMapCommon(ctx context.Context, chi *chop.ClickHouseInstallation, options *chopmodel.ClickHouseConfigFilesGeneratorOptions, update bool) error {
+func (w *worker) reconcileCHIConfigMapCommon(
+	ctx context.Context,
+	chi *chop.ClickHouseInstallation,
+	options *chopmodel.ClickHouseConfigFilesGeneratorOptions,
+	update bool,
+) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
@@ -541,7 +555,17 @@ func (w *worker) reconcileCHIConfigMapCommon(ctx context.Context, chi *chop.Clic
 
 // reconcileCHIConfigMapUsers reconciles all CHI's users ConfigMap
 // ConfigMap common for all users resources in CHI
-func (w *worker) reconcileCHIConfigMapUsers(ctx context.Context, chi *chop.ClickHouseInstallation, options *chopmodel.ClickHouseConfigFilesGeneratorOptions, update bool) error {
+func (w *worker) reconcileCHIConfigMapUsers(
+	ctx context.Context,
+	chi *chop.ClickHouseInstallation,
+	options *chopmodel.ClickHouseConfigFilesGeneratorOptions,
+	update bool,
+) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
 	err := w.reconcileConfigMap(ctx, chi, configMapUsers, update)
