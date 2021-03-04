@@ -58,6 +58,7 @@ const (
 	labelServiceValueCluster          = "cluster"
 	labelServiceValueShard            = "shard"
 	labelServiceValueHost             = "host"
+	LabelPVCReclaimPolicyName         = clickhousealtinitycom.GroupName + "/reclaimPolicy"
 
 	// Supplementary service labels - used to cooperate with k8s
 	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/zookeeper-version"
@@ -258,6 +259,12 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 // getLabelsHostScopeReady gets labels for Host-scoped object including Ready label
 func (l *Labeler) getLabelsHostScopeReady(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	return l.appendReadyLabels(l.getLabelsHostScope(host, applySupplementaryServiceLabels))
+}
+
+func (l *Labeler) getLabelsHostScopeReclaimPolicy(host *chi.ChiHost, template *chi.ChiVolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
+	return util.MergeStringMapsOverwrite(l.getLabelsHostScope(host, applySupplementaryServiceLabels), map[string]string{
+		LabelPVCReclaimPolicyName: string(template.PVCReclaimPolicy),
+	})
 }
 
 // getSelectorShardScope gets labels to select a Host-scoped object
