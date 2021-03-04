@@ -34,7 +34,7 @@ type ActionPlan struct {
 	labelsEqual bool
 
 	deletionTimestampEqual bool
-	finalizersEqual bool
+	finalizersEqual        bool
 }
 
 // NewActionPlan makes new ActionPlan out of two CHIs
