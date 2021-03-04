@@ -316,7 +316,12 @@ const (
 	PVCReclaimPolicyDelete PVCReclaimPolicy = "Delete"
 )
 
-// isValid checks whether PVCReclaimPolicy is valid
+// NewPVCReclaimPolicyFromString creates new PVCReclaimPolicy from string
+func NewPVCReclaimPolicyFromString(s string) PVCReclaimPolicy {
+	return PVCReclaimPolicy(s)
+}
+
+// IsValid checks whether PVCReclaimPolicy is valid
 func (v PVCReclaimPolicy) IsValid() bool {
 	switch v {
 	case PVCReclaimPolicyRetain:
@@ -325,6 +330,11 @@ func (v PVCReclaimPolicy) IsValid() bool {
 		return true
 	}
 	return false
+}
+
+// String returns string value for PVCReclaimPolicy
+func (v PVCReclaimPolicy) String() string {
+	return string(v)
 }
 
 type ChiServiceTemplate struct {
