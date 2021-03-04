@@ -410,7 +410,9 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 		case chopmodel.StatefulSet:
 			w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(m.Name, newDeleteOptions())
 		case chopmodel.PVC:
-
+			if w.creator.GetReclaimPolicy(m) == chop.PVCReclaimPolicyDelete {
+				w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(m.Name, newDeleteOptions())
+			}
 		case chopmodel.ConfigMap:
 			w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(m.Name, newDeleteOptions())
 		case chopmodel.Service:
