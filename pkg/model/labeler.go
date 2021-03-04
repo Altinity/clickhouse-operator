@@ -263,7 +263,7 @@ func (l *Labeler) getLabelsHostScopeReady(host *chi.ChiHost, applySupplementaryS
 
 func (l *Labeler) getLabelsHostScopeReclaimPolicy(host *chi.ChiHost, template *chi.ChiVolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
 	return util.MergeStringMapsOverwrite(l.getLabelsHostScope(host, applySupplementaryServiceLabels), map[string]string{
-		LabelPVCReclaimPolicyName: string(template.PVCReclaimPolicy),
+		LabelPVCReclaimPolicyName: template.PVCReclaimPolicy.String(),
 	})
 }
 
