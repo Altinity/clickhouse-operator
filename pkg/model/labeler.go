@@ -267,6 +267,19 @@ func (l *Labeler) getLabelsHostScopeReclaimPolicy(host *chi.ChiHost, template *c
 	})
 }
 
+func (l *Labeler) getReclaimPolicy(meta meta.ObjectMeta) chi.PVCReclaimPolicy {
+	defaultReclaimPolicy := chi.PVCReclaimPolicyDelete
+
+	if value, ok := meta.Labels[LabelPVCReclaimPolicyName]; ok {
+		reclaimPolicy := chi.NewPVCReclaimPolicyFromString(value)
+		if reclaimPolicy.IsValid() {
+			return reclaimPolicy
+		}
+	}
+
+	return defaultReclaimPolicy
+}
+
 // getSelectorShardScope gets labels to select a Host-scoped object
 func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 	// Do not include CHI-provided labels

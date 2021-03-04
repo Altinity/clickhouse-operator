@@ -816,6 +816,10 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	statefulSet.Spec.VolumeClaimTemplates = append(statefulSet.Spec.VolumeClaimTemplates, persistentVolumeClaim)
 }
 
+func (c *Creator) GetReclaimPolicy(meta metav1.ObjectMeta) chiv1.PVCReclaimPolicy {
+	return c.labeler.getReclaimPolicy(meta)
+}
+
 // newDefaultHostTemplate returns default Host Template to be used with StatefulSet
 func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 	return &chiv1.ChiHostTemplate{
