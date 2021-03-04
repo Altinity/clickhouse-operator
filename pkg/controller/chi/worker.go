@@ -409,6 +409,8 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 		switch entityType {
 		case chopmodel.StatefulSet:
 			w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(m.Name, newDeleteOptions())
+		case chopmodel.PVC:
+
 		case chopmodel.ConfigMap:
 			w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(m.Name, newDeleteOptions())
 		case chopmodel.Service:
@@ -1625,6 +1627,7 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chop.ChiHost) error {
 		}
 		pvc, _ = w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
 		pvc, _ = w.reconcilePVCResources(ctx, pvc, volumeClaimTemplate)
+		chopmodel.ReconcileContextGetRegistry(ctx).RegisterPVC(pvc.ObjectMeta)
 	})
 
 	return nil
