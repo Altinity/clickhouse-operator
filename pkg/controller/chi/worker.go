@@ -661,6 +661,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chop.ChiHost) error {
 
 	// Reconcile host's Persistent Volumes
 	w.reconcilePersistentVolumes(ctx, host)
+	w.reconcilePVCs(ctx, host)
 
 	if service != nil {
 		// Reconcile host's Service
@@ -1571,7 +1572,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, curStatefulSet, newState
 	w.a.M(host).Info(util.MessageDiffString(diff, equal))
 
 	err = w.c.deleteStatefulSet(ctx, host)
-	err = w.reconcilePersistentVolumeClaims(ctx, host)
+	err = w.reconcilePVCs(ctx, host)
 	return w.createStatefulSet(ctx, newStatefulSet, host)
 }
 
@@ -1583,12 +1584,12 @@ func (w *worker) reconcilePersistentVolumes(ctx context.Context, host *chop.ChiH
 
 	w.c.walkPVs(host, func(pv *core.PersistentVolume) {
 		pv = w.creator.PreparePersistentVolume(pv, host)
-		_ = w.c.updatePersistentVolume(ctx, pv)
+		_, _ = w.c.updatePersistentVolume(ctx, pv)
 	})
 }
 
 // reconcilePersistentVolumeClaims
-func (w *worker) reconcilePersistentVolumeClaims(ctx context.Context, host *chop.ChiHost) error {
+func (w *worker) reconcilePVCs(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		return nil
 	}
@@ -1622,14 +1623,25 @@ func (w *worker) reconcilePersistentVolumeClaims(ctx context.Context, host *chop
 			}
 			return
 		}
-		pvc, _ = w.reconcileResources(ctx, pvc, volumeClaimTemplate)
+		pvc, _ = w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
+		pvc, _ = w.reconcilePVCResources(ctx, pvc, volumeClaimTemplate)
 	})
 
 	return nil
 }
 
+func (w *worker) reconcilePVC(
+	ctx context.Context,
+	pvc *core.PersistentVolumeClaim,
+	host *chop.ChiHost,
+	template *chop.ChiVolumeClaimTemplate,
+) (*core.PersistentVolumeClaim, error) {
+	pvc = w.creator.PreparePersistentVolumeClaim(pvc, host, template)
+	return w.c.updatePersistentVolumeClaim(ctx, pvc)
+}
+
 // reconcileResources
-func (w *worker) reconcileResources(
+func (w *worker) reconcilePVCResources(
 	ctx context.Context,
 	pvc *core.PersistentVolumeClaim,
 	template *chop.ChiVolumeClaimTemplate,
@@ -1638,11 +1650,11 @@ func (w *worker) reconcileResources(
 		log.V(2).Info("ctx is done")
 		return nil, fmt.Errorf("ctx is done")
 	}
-	return w.reconcileResourcesList(ctx, pvc, pvc.Spec.Resources.Requests, template.Spec.Resources.Requests)
+	return w.reconcilePVCResourcesList(ctx, pvc, pvc.Spec.Resources.Requests, template.Spec.Resources.Requests)
 }
 
 // reconcileResourcesList
-func (w *worker) reconcileResourcesList(
+func (w *worker) reconcilePVCResourcesList(
 	ctx context.Context,
 	pvc *core.PersistentVolumeClaim,
 	pvcResourceList core.ResourceList,
@@ -1667,7 +1679,7 @@ func (w *worker) reconcileResourcesList(
 	resourceNames := intersect.Simple(pvcResourceNames, desiredResourceNames)
 	for _, resourceName := range resourceNames.([]interface{}) {
 		var err error
-		if pvc, err = w.reconcileResource(ctx, pvc, pvcResourceList, desiredResourceList, resourceName.(core.ResourceName)); err != nil {
+		if pvc, err = w.reconcilePVCResource(ctx, pvc, pvcResourceList, desiredResourceList, resourceName.(core.ResourceName)); err != nil {
 			return nil, err
 		}
 	}
@@ -1676,7 +1688,7 @@ func (w *worker) reconcileResourcesList(
 }
 
 // reconcileResources
-func (w *worker) reconcileResource(
+func (w *worker) reconcilePVCResource(
 	ctx context.Context,
 	pvc *core.PersistentVolumeClaim,
 	pvcResourceList core.ResourceList,
@@ -1711,10 +1723,5 @@ func (w *worker) reconcileResource(
 
 	w.a.V(2).M(pvc).F().Info("%s/%s/%s - unequal requests, want to update", pvc.Namespace, pvc.Name, resourceName)
 	pvcResourceList[resourceName] = desiredResourceList[resourceName]
-	if pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(pvc); err != nil {
-		w.a.M(pvc).A().Error("unable to reconcile resource %s/%s/%s err: %v", pvc.Namespace, pvc.Name, resourceName, err)
-		return nil, err
-	} else {
-		return pvc, nil
-	}
+	return w.c.updatePersistentVolumeClaim(ctx, pvc)
 }
