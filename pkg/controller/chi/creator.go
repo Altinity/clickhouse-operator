@@ -96,22 +96,40 @@ func (c *Controller) updateStatefulSet(
 }
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
-func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) error {
+func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	log.V(2).M(pv).F().P()
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
-		return nil
+		return nil, fmt.Errorf("ctx is done")
 	}
 
-	// Apply newStatefulSet and wait for Generation to change
-	_, err := c.kubeClient.CoreV1().PersistentVolumes().Update(pv)
+	var err error
+	pv, err = c.kubeClient.CoreV1().PersistentVolumes().Update(pv)
 	if err != nil {
 		// Update failed
 		log.V(1).M(pv).A().Error("%v", err)
-		return err
+		return nil, err
 	}
 
-	return nil
+	return pv, err
+}
+
+func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	log.V(2).M(pvc).F().P()
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil, fmt.Errorf("ctx is done")
+	}
+
+	var err error
+	pvc, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(pvc)
+	if err != nil {
+		// Update failed
+		log.V(1).M(pvc).A().Error("%v", err)
+		return nil, err
+	}
+
+	return pvc, err
 }
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed
