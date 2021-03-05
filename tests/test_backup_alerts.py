@@ -67,12 +67,12 @@ def wait_backup_pod_ready_and_curl_installed(backup_pod):
         kubectl.launch(f'exec {backup_pod} -c clickhouse-backup -- curl --version')
 
 
-def prepare_table_for_backup(backup_pod):
+def prepare_table_for_backup(backup_pod, rows=1000):
     backup_name = f'test_backup_{time.strftime("%Y-%m-%d_%H%M%S")}'
     clickhouse.query(
         chi['metadata']['name'],
         "CREATE TABLE IF NOT EXISTS default.test_backup ON CLUSTER 'all-sharded' (i UInt64) ENGINE MergeTree() ORDER BY tuple();"
-        "INSERT INTO default.test_backup SELECT number FROM numbers(1000)",
+        f"INSERT INTO default.test_backup SELECT number FROM numbers({rows})",
         pod=backup_pod
     )
     return backup_name
@@ -175,8 +175,9 @@ def test_backup_failed(self):
 
     def create_fail_backup():
         backup_name = backup_prefix + "-" + str(random.randint(1, 4096))
+        backup_dir = f"/var/lib/clickhouse/backup/{backup_name}/shadow/default/test_backup"
         kubectl.launch(
-            f"exec -n {settings.test_namespace} {backup_pod} -c clickhouse-backup -- mkdir -p /var/lib/clickhouse/backup/{backup_name}/shadow/default/test_backup",
+            f"exec -n {settings.test_namespace} {backup_pod} -c clickhouse-backup -- bash -c 'mkdir -v -m 0400 -p {backup_dir}'",
         )
 
         kubectl.launch(
@@ -280,15 +281,39 @@ def test_backup_duration(self):
 
 
 @TestScenario
-@Name('test_backup_size_decreased. Check ClickHouseBackupSizeDecreased alerts')
-def test_backup_size_decreased(self):
-    pass
+@Name('test_backup_size. Check ClickHouseBackupSizeChanged alerts')
+def test_backup_size(self):
+    decrease_pod, _, increase_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
 
+    backup_cases = {
+        decrease_pod: {
+            'rows': (10000, 1000),
+            'truncate': True,
+        },
+        increase_pod: {
+            'rows': (1000, 10000),
+            'truncate': False,
+        },
+    }
+    for backup_pod in backup_cases:
+        for backup_rows in backup_cases[backup_pod]['rows']:
+            backup_name = prepare_table_for_backup(backup_pod, rows=backup_rows)
+            exec_on_backup_container(backup_pod, f'curl -X POST -sL "http://127.0.0.1:7171/backup/create?name={backup_name}"')
+            wait_backup_command_status(backup_pod, f'create {backup_name}', expected_status='success')
+            if backup_cases[backup_pod]['truncate']:
+                clickhouse.query(
+                    chi['metadata']['name'],
+                    f"TRUNCATE TABLE default.test_backup",
+                    pod=backup_pod
+                )
+        fired = alerts.wait_alert_state("ClickHouseBackupSizeChanged", "firing", expected_state=True, sleep_time=5,
+                                        labels={"pod_name": backup_pod}, time_range='60s')
+        assert fired, error("can't get ClickHouseBackupSizeChanged alert in firing state")
 
-@TestScenario
-@Name('test_backup_size_increased. Check ClickHouseBackupSizeIncreased alerts')
-def test_backup_size_increased(self):
-    pass
+        with Then("check ClickHouseBackupSizeChanged gone away"):
+            resolved = alerts.wait_alert_state("ClickHouseBackupSizeChanged", "firing", expected_state=False,
+                                               labels={"pod_name": backup_pod}, sleep_time=5)
+            assert resolved, error("can't get ClickHouseBackupSizeChanged alert is gone away")
 
 
 if main():
@@ -306,8 +331,7 @@ if main():
                 test_backup_is_down,
                 test_backup_failed,
                 test_backup_duration,
-                test_backup_size_decreased,
-                test_backup_size_increased,
+                test_backup_size,
             ]
             for t in test_cases:
                 Scenario(test=t)()
