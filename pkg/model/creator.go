@@ -329,6 +329,7 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	c.setupStatefulSetVersion(statefulSet)
 
 	host.StatefulSet = statefulSet
+	host.DesiredStatefulSet = statefulSet
 
 	return statefulSet
 }
