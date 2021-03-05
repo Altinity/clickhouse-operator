@@ -132,6 +132,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) 
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
 	if sts, err := c.getStatefulSet(host); err == nil {
+		// We need to set cur StatefulSet to a deletable one temporary
 		host.StatefulSet = sts
 	} else {
 		if apierrors.IsNotFound(err) {
