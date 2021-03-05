@@ -38,6 +38,8 @@ type ChiHost struct {
 	Config              ChiHostConfig              `json:"-"`
 	ReconcileAttributes ChiHostReconcileAttributes `json:"-" testdiff:"ignore"`
 	StatefulSet         *appsv1.StatefulSet        `json:"-" testdiff:"ignore"`
+	CurStatefulSet      *appsv1.StatefulSet        `json:"-" testdiff:"ignore"`
+	DesiredStatefulSet  *appsv1.StatefulSet        `json:"-" testdiff:"ignore"`
 	CHI                 *ClickHouseInstallation    `json:"-" testdiff:"ignore"`
 }
 
