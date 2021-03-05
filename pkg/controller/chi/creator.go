@@ -19,9 +19,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -50,9 +50,19 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	log.V(2).M(host).F().P()
+	// update labels
+	diffLabelsBytes := DiffLabels(oldStatefulSet, newStatefulSet)
+	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).
+		Patch(oldStatefulSet.GetName(), types.JSONPatchType, diffLabelsBytes)
+	if err == nil {
+		log.V(1).M(host).F().Info("labels change")
+	} else {
+		log.V(1).M(host).A().Error("%v", err)
+		return err
+	}
 
 	// Apply newStatefulSet and wait for Generation to change
-	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).Update(newStatefulSet)
+	updatedStatefulSet, err = c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).Update(updatedStatefulSet)
 	if err != nil {
 		// Update failed
 		log.V(1).M(host).A().Error("%v", err)

@@ -15,7 +15,11 @@
 package chi
 
 import (
+	"encoding/json"
+	"gopkg.in/d4l3k/messagediff.v1"
+	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -143,4 +147,39 @@ func (c *Controller) addLabels(meta *v1.ObjectMeta) {
 			model.LabelCHOP:    c.chop.Version,
 		},
 	)
+}
+
+
+type patchStringValue struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value string `json:"value"`
+}
+
+func DiffLabels(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet) []byte {
+	var newLabels []patchStringValue
+	labelsDiff, _ := messagediff.DeepDiff(oldStatefulSet.Labels, newStatefulSet.Labels)
+	for path, value := range labelsDiff.Added {
+		newLabels = append(newLabels, patchStringValue{
+			Op:    "add",
+			Path:  "/metadata/labels/" + strings.Replace(strings.Trim((*path)[0].String(), "[\"]"), "/", "~1", -1),
+			Value: value.(string),
+		})
+	}
+	for path, value := range labelsDiff.Modified {
+		newLabels = append(newLabels, patchStringValue{
+			Op:    "replace",
+			Path:  "/metadata/labels/" + strings.Replace(strings.Trim((*path)[0].String(), "[\"]"), "/", "~1", -1),
+			Value: value.(string),
+		})
+	}
+	for path, value := range labelsDiff.Removed {
+		newLabels = append(newLabels, patchStringValue{
+			Op:    "remove",
+			Path:  "/metadata/labels/" + strings.Replace(strings.Trim((*path)[0].String(), "[\"]"), "/", "~1", -1),
+			Value: value.(string),
+		})
+	}
+	labelsBytes, _ := json.Marshal(newLabels)
+	return labelsBytes
 }

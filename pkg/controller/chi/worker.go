@@ -253,7 +253,7 @@ func (w *worker) updateCHI(old, new *chop.ClickHouseInstallation) error {
 		WithStatusAction(new).
 		M(new).F().
 		Info("reconcile started")
-	w.a.V(2).M(new).F().Info("action plan\n%s\n", actionPlan.String())
+	//w.a.V(2).M(new).F().Info("action plan\n%s\n", actionPlan.String())
 
 	if new.IsStopped() {
 		w.a.V(1).
