@@ -1679,54 +1679,53 @@ func (w *worker) reconcilePVCResourcesList(
 		desiredResourceNames = append(desiredResourceNames, resourceName)
 	}
 
-	//diff, equal := messagediff.DeepDiff(pvcResourceNames, desiredResourceNames)
-
 	resourceNames := intersect.Simple(pvcResourceNames, desiredResourceNames)
+	update := false
 	for _, resourceName := range resourceNames.([]interface{}) {
-		var err error
-		if pvc, err = w.reconcilePVCResource(ctx, pvc, pvcResourceList, desiredResourceList, resourceName.(core.ResourceName)); err != nil {
-			return nil, err
+		if w.applyPVCResource(pvcResourceList, desiredResourceList, resourceName.(core.ResourceName)) {
+			w.a.V(2).M(pvc).F().Info("%s/%s/%s - unequal requests, want to update", pvc.Namespace, pvc.Name, resourceName)
+			update = true
 		}
 	}
 
-	return pvc, nil
+	if update {
+		return w.c.updatePersistentVolumeClaim(ctx, pvc)
+	} else {
+		return pvc, nil
+	}
 }
 
-// reconcileResources
-func (w *worker) reconcilePVCResource(
-	ctx context.Context,
-	pvc *core.PersistentVolumeClaim,
-	pvcResourceList core.ResourceList,
+// applyPVCResource
+func (w *worker) applyPVCResource(
+	curResourceList core.ResourceList,
 	desiredResourceList core.ResourceList,
 	resourceName core.ResourceName,
-) (*core.PersistentVolumeClaim, error) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
-		return nil, fmt.Errorf("ctx is done")
+) bool {
+	if (curResourceList == nil) || (desiredResourceList == nil) {
+		// Nowhere or nothing to apply
+		return false
 	}
-
-	w.a.V(2).M(pvc).F().S().Info("%s/%s/%s", pvc.Namespace, pvc.Name, resourceName)
-	defer w.a.V(2).M(pvc).F().E().Info("%s/%s/%s", pvc.Namespace, pvc.Name, resourceName)
 
 	var ok bool
-	if (pvcResourceList == nil) || (desiredResourceList == nil) {
-		return pvc, nil
-	}
-
-	var pvcResourceQuantity resource.Quantity
+	var curResourceQuantity resource.Quantity
 	var desiredResourceQuantity resource.Quantity
-	if pvcResourceQuantity, ok = pvcResourceList[resourceName]; !ok {
-		return pvc, nil
+
+	if curResourceQuantity, ok = curResourceList[resourceName]; !ok {
+		// No such resource in target list
+		return false
 	}
+
 	if desiredResourceQuantity, ok = desiredResourceList[resourceName]; !ok {
-		return pvc, nil
+		// No such resource in desired list
+		return false
 	}
 
-	if pvcResourceQuantity.Equal(desiredResourceQuantity) {
-		return pvc, nil
+	if curResourceQuantity.Equal(desiredResourceQuantity) {
+		// No need to apply
+		return false
 	}
 
-	w.a.V(2).M(pvc).F().Info("%s/%s/%s - unequal requests, want to update", pvc.Namespace, pvc.Name, resourceName)
-	pvcResourceList[resourceName] = desiredResourceList[resourceName]
-	return w.c.updatePersistentVolumeClaim(ctx, pvc)
+	// Update resource
+	curResourceList[resourceName] = desiredResourceList[resourceName]
+	return true
 }
