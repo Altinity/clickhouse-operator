@@ -21,7 +21,6 @@ import (
 
 	"github.com/juliangruber/go-intersect"
 	"gopkg.in/d4l3k/messagediff.v1"
-	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -645,7 +644,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chop.ChiHost) error {
 	configMap := w.creator.CreateConfigMapHost(host)
 	statefulSet := w.creator.CreateStatefulSet(host)
 	service := w.creator.CreateServiceHost(host)
-	(&host.ReconcileAttributes).SetStatus(w.getStatefulSetStatus(statefulSet, host))
+	(&host.ReconcileAttributes).SetStatus(w.getStatefulSetStatus(host))
 
 	if err := w.excludeHost(ctx, host); err != nil {
 		return err
@@ -658,7 +657,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chop.ChiHost) error {
 	chopmodel.ReconcileContextGetRegistry(ctx).RegisterConfigMap(configMap.ObjectMeta)
 
 	// Reconcile host's StatefulSet
-	if err := w.reconcileStatefulSet(ctx, statefulSet, host); err != nil {
+	if err := w.reconcileStatefulSet(ctx, host); err != nil {
 		return err
 	}
 	chopmodel.ReconcileContextGetRegistry(ctx).RegisterStatefulSet(statefulSet.ObjectMeta)
@@ -1417,7 +1416,8 @@ func (w *worker) reconcileService(ctx context.Context, chi *chop.ClickHouseInsta
 }
 
 // getStatefulSetStatus
-func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet, host *chop.ChiHost) chop.StatefulSetStatus {
+func (w *worker) getStatefulSetStatus(host *chop.ChiHost) chop.StatefulSetStatus {
+	statefulSet := host.StatefulSet
 	w.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
 
@@ -1458,11 +1458,13 @@ func (w *worker) getStatefulSetStatus(statefulSet *apps.StatefulSet, host *chop.
 }
 
 // reconcileStatefulSet reconciles apps.StatefulSet
-func (w *worker) reconcileStatefulSet(ctx context.Context, newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+func (w *worker) reconcileStatefulSet(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
 	}
+
+	newStatefulSet := host.StatefulSet
 
 	w.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
@@ -1474,15 +1476,16 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, newStatefulSet *apps.
 
 	// Check whether this object already exists in k8s
 	curStatefulSet, err := w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
+	host.CurStatefulSet = curStatefulSet
 
-	if curStatefulSet != nil {
+	if host.CurStatefulSet != nil {
 		// We have StatefulSet - try to update it
-		err = w.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
+		err = w.updateStatefulSet(ctx, host)
 	}
 
 	if apierrors.IsNotFound(err) {
 		// StatefulSet not found - even during Update process - try to create it
-		err = w.createStatefulSet(ctx, newStatefulSet, host)
+		err = w.createStatefulSet(ctx, host)
 	}
 
 	if err != nil {
@@ -1497,11 +1500,13 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, newStatefulSet *apps.
 }
 
 // createStatefulSet
-func (w *worker) createStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+func (w *worker) createStatefulSet(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
 	}
+
+	statefulSet := host.StatefulSet
 
 	w.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
@@ -1535,11 +1540,15 @@ func (w *worker) createStatefulSet(ctx context.Context, statefulSet *apps.Statef
 }
 
 // updateStatefulSet
-func (w *worker) updateStatefulSet(ctx context.Context, curStatefulSet, newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+func (w *worker) updateStatefulSet(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
 	}
+
+	// Helpers
+	newStatefulSet := host.StatefulSet
+	curStatefulSet := host.CurStatefulSet
 
 	w.a.V(2).M(host).S().Info(newStatefulSet.Name)
 	defer w.a.V(2).M(host).E().Info(newStatefulSet.Name)
@@ -1577,7 +1586,8 @@ func (w *worker) updateStatefulSet(ctx context.Context, curStatefulSet, newState
 
 	err = w.c.deleteStatefulSet(ctx, host)
 	err = w.reconcilePVCs(ctx, host)
-	return w.createStatefulSet(ctx, newStatefulSet, host)
+	host.StatefulSet = host.DesiredStatefulSet
+	return w.createStatefulSet(ctx, host)
 }
 
 // reconcilePersistentVolumes
@@ -1627,76 +1637,66 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chop.ChiHost) error {
 			}
 			return
 		}
-		pvc, _ = w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
-		pvc, _ = w.reconcilePVCResources(ctx, pvc, volumeClaimTemplate)
+		pvc, err = w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
+		if err != nil {
+			w.a.M(host).A().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvcName, err)
+		}
 		chopmodel.ReconcileContextGetRegistry(ctx).RegisterPVC(pvc.ObjectMeta)
 	})
 
 	return nil
 }
 
+// reconcilePVC
 func (w *worker) reconcilePVC(
 	ctx context.Context,
 	pvc *core.PersistentVolumeClaim,
 	host *chop.ChiHost,
 	template *chop.ChiVolumeClaimTemplate,
 ) (*core.PersistentVolumeClaim, error) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil, fmt.Errorf("ctx is done")
+	}
+
 	pvc = w.creator.PreparePersistentVolumeClaim(pvc, host, template)
+	w.applyPVCResourcesRequests(pvc, template)
 	return w.c.updatePersistentVolumeClaim(ctx, pvc)
 }
 
-// reconcileResources
-func (w *worker) reconcilePVCResources(
-	ctx context.Context,
+// applyPVCResourcesRequests
+func (w *worker) applyPVCResourcesRequests(
 	pvc *core.PersistentVolumeClaim,
 	template *chop.ChiVolumeClaimTemplate,
-) (*core.PersistentVolumeClaim, error) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
-		return nil, fmt.Errorf("ctx is done")
-	}
-	return w.reconcilePVCResourcesList(ctx, pvc, pvc.Spec.Resources.Requests, template.Spec.Resources.Requests)
+) bool {
+	return w.applyResourcesList(pvc.Spec.Resources.Requests, template.Spec.Resources.Requests)
 }
 
-// reconcileResourcesList
-func (w *worker) reconcilePVCResourcesList(
-	ctx context.Context,
-	pvc *core.PersistentVolumeClaim,
-	pvcResourceList core.ResourceList,
+// applyResourcesList
+func (w *worker) applyResourcesList(
+	curResourceList core.ResourceList,
 	desiredResourceList core.ResourceList,
-) (*core.PersistentVolumeClaim, error) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
-		return nil, fmt.Errorf("ctx is done")
-	}
-
-	var pvcResourceNames []core.ResourceName
-	for resourceName := range pvcResourceList {
-		pvcResourceNames = append(pvcResourceNames, resourceName)
+) bool {
+	// Prepare lists of resource names
+	var curResourceNames []core.ResourceName
+	for resourceName := range curResourceList {
+		curResourceNames = append(curResourceNames, resourceName)
 	}
 	var desiredResourceNames []core.ResourceName
 	for resourceName := range desiredResourceList {
 		desiredResourceNames = append(desiredResourceNames, resourceName)
 	}
 
-	resourceNames := intersect.Simple(pvcResourceNames, desiredResourceNames)
-	update := false
+	resourceNames := intersect.Simple(curResourceNames, desiredResourceNames)
+	updated := false
 	for _, resourceName := range resourceNames.([]interface{}) {
-		if w.applyPVCResource(pvcResourceList, desiredResourceList, resourceName.(core.ResourceName)) {
-			w.a.V(2).M(pvc).F().Info("%s/%s/%s - unequal requests, want to update", pvc.Namespace, pvc.Name, resourceName)
-			update = true
-		}
+		updated = updated || w.applyResource(curResourceList, desiredResourceList, resourceName.(core.ResourceName))
 	}
-
-	if update {
-		return w.c.updatePersistentVolumeClaim(ctx, pvc)
-	} else {
-		return pvc, nil
-	}
+	return updated
 }
 
-// applyPVCResource
-func (w *worker) applyPVCResource(
+// applyResource
+func (w *worker) applyResource(
 	curResourceList core.ResourceList,
 	desiredResourceList core.ResourceList,
 	resourceName core.ResourceName,
