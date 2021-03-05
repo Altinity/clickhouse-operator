@@ -6,11 +6,26 @@ def total_cpus
   Etc.nprocessors
 end
 
+def get_provider
+    provider='virtualbox'
+    for arg in ARGV
+        if ['hyperv','docker'].include? arg
+            provider=arg
+        end
+    end
+    return provider
+end
+
 
 Vagrant.configure(2) do |config|
   config.vm.box = "generic/ubuntu2004"
   config.vm.box_check_update = false
-  config.vm.synced_folder ".", "/vagrant"
+
+  if get_provider == "hyperv"
+    config.vm.synced_folder ".", "/vagrant", type: "smb", smb_user: "#{ENV['USERNAME']}@#{ENV['USERDOMAIN']}", smb_password: ENV['PASSWORD'], mount_options: ["vers=3.0","domain=#{ENV['USERDOMAIN']}", "user=#{ENV['USERNAME']}","username=#{ENV['USERDOMAIN']}@#{ENV['USERNAME']}","password=#{ENV['PASSWORD']}"]
+  else
+    config.vm.synced_folder ".", "/vagrant"
+  end
 
   if Vagrant.has_plugin?("vagrant-vbguest")
     config.vbguest.auto_update = false
@@ -19,6 +34,7 @@ Vagrant.configure(2) do |config|
   if Vagrant.has_plugin?("vagrant-timezone")
     config.timezone.value = "UTC"
   end
+
 
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
@@ -30,6 +46,19 @@ Vagrant.configure(2) do |config|
     vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
     vb.customize ["modifyvm", :id, "--ioapic", "on"]
     vb.customize ["guestproperty", "set", :id, "/VirtualBox/GuestAdd/VBoxService/--timesync-set-threshold", 10000]
+  end
+
+  config.vm.provider "hyperv" do |hv|
+    # hv.gui = false
+    # hv.default_nic_type = "virtio"
+    hv.cpus = total_cpus
+    hv.maxmemory = "6144"
+    hv.memory = "2048"
+    hv.enable_virtualization_extensions = true
+    hv.linked_clone = true
+    hv.vm_integration_services = {
+        time_synchronization: true,
+    }
   end
 
   config.vm.define :clickhouse_operator do |clickhouse_operator|
@@ -52,10 +81,18 @@ Vagrant.configure(2) do |config|
   config.vm.provision "shell", inline: <<-SHELL
     set -xeuo pipefail
     export DEBIAN_FRONTEND=noninteractive
+    # make linux fast again
+    if [[ "0" == $(grep "mitigations" /etc/default/grub | wc -l) ]]; then
+        echo 'GRUB_CMDLINE_LINUX="noibrs noibpb nopti nospectre_v2 nospectre_v1 l1tf=off nospec_store_bypass_disable no_stf_barrier mds=off tsx=on tsx_async_abort=off mitigations=off"' >> /etc/default/grub
+        echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash noibrs noibpb nopti nospectre_v2 nospectre_v1 l1tf=off nospec_store_bypass_disable no_stf_barrier mds=off tsx=on tsx_async_abort=off mitigations=off"' >> /etc/default/grub
+        grub-mkconfig
+    fi
+    systemctl enable systemd-timesyncd
+    systemctl start systemd-timesyncd
 
     apt-get update
     apt-get install --no-install-recommends -y apt-transport-https ca-certificates software-properties-common curl
-    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git ntp
+    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git
 
     # yq
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys CC86BB64
@@ -68,8 +105,8 @@ Vagrant.configure(2) do |config|
     apt-get install --no-install-recommends -y clickhouse-client
 
     # docker
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8D81803C0EBFCD88
-    add-apt-repository "deb https://download.docker.com/linux/ubuntu focal test"
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+    add-apt-repository "deb https://download.docker.com/linux/ubuntu $(lsb_release -cs) test"
     apt-get install --no-install-recommends -y docker-ce pigz
 
     # docker compose
@@ -100,10 +137,10 @@ Vagrant.configure(2) do |config|
 #    export VALIDATE_YAML=false # only for 1.14
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
-#    K8S_VERSION=${K8S_VERSION:-1.17.14}
-#    K8S_VERSION=${K8S_VERSION:-1.18.12}
-#    K8S_VERSION=${K8S_VERSION:-1.19.7}
-    K8S_VERSION=${K8S_VERSION:-1.20.2}
+#    K8S_VERSION=${K8S_VERSION:-1.17.17}
+#    K8S_VERSION=${K8S_VERSION:-1.18.16}
+#    K8S_VERSION=${K8S_VERSION:-1.19.8}
+    K8S_VERSION=${K8S_VERSION:-1.20.4}
     export VALIDATE_YAML=true
 
     killall kubectl || true
@@ -222,5 +259,7 @@ Vagrant.configure(2) do |config|
     python3 /vagrant/tests/test_examples.py
     python3 /vagrant/tests/test_metrics_exporter.py
     python3 /vagrant/tests/test_metrics_alerts.py
+    python3 /vagrant/tests/test_backup_alerts.py
+
   SHELL
 end

@@ -26,11 +26,11 @@ def check_alert_state(alert_name, prometheus_pod, alert_state="firing", labels=N
         if not ("status" in out and out["status"] == "success"):
             fail("wrong response from prometheus query API")
         if len(out["data"]["result"]) == 0:
-            with And("not present, empty result"):
+            with Then("not present, empty result"):
                 return False
         result_labels = out["data"]["result"][0]["metric"].items()
         exists = all(item in result_labels for item in labels.items())
-        with And("got result and contains labels" if exists else "got result, but doesn't contain labels"):
+        with Then("got result and contains labels" if exists else "got result, but doesn't contain labels"):
             return exists
 
 
@@ -43,7 +43,7 @@ def wait_alert_state(alert_name, alert_state, expected_state, prometheus_pod='pr
         if expected_state == check_alert_state(alert_name, prometheus_pod, alert_state, labels, time_range):
             catched = True
             break
-        with And(f"not ready, wait {sleep_time}s"):
+        with Then(f"not ready, wait {sleep_time}s"):
             time.sleep(sleep_time)
     return catched
 

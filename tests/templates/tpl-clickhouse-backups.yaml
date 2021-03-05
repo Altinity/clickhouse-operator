@@ -24,17 +24,12 @@ spec:
               image: yandex/clickhouse-server:20.8
 
             - name: clickhouse-backup
-              image: altinity/clickhouse-backup:0.20
+              image: altinity/clickhouse-backup:0.21.0
+              imagePullPolicy: Always
               command:
                 - bash
                 - -xc
-                - "mkdir -p /var/lib/clickhouse/backup && apt-get update && apt-get install --no-install-recommends -y curl && /clickhouse-backup server"
-#              image: alexakulov/clickhouse-backup:dev
-#              imagePullPolicy: Always
-#              command:
-#                - sh
-#                - -xc
-#                - "mkdir -p /var/lib/clickhouse/backup && apk add curl && /bin/clickhouse-backup server"
+                - "/bin/clickhouse-backup server"
               env:
                 - name: API_LISTEN
                   value: "0.0.0.0:7171"

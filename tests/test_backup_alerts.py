@@ -8,7 +8,7 @@ import kubectl
 import clickhouse
 import util
 
-from testflows.core import TestScenario, Name, When, Then, Given, main, run, Module, fail
+from testflows.core import TestScenario, Name, When, Then, Given, main, Scenario, Module, fail
 from testflows.asserts import error
 
 
@@ -33,6 +33,22 @@ def get_backup_metric_value(backup_pod, metric_name, ns=settings.test_namespace)
     return exec_on_backup_container(backup_pod, cmd=cmd, ns=ns)
 
 
+def is_expected_backup_status(command_name, command_is_done, st, expected_status, err_status):
+    if 'command' in st and st['command'] == command_name:
+        if st['status'] == expected_status:
+            command_is_done = True
+            return True,  command_is_done
+        elif st['status'] == err_status:
+            if 'error' in st:
+                fail(st['error'])
+            else:
+                fail(f'unexpected status of {command_name} {st}')
+        else:
+            with Then('Not ready, wait 5 sec'):
+                time.sleep(5)
+    return False, command_is_done
+
+
 def wait_backup_command_status(backup_pod, command_name, expected_status='success', err_status='error'):
     command_is_done = False
     with Then(f'wait "{command_name}" with status "{expected_status}"'):
@@ -40,30 +56,16 @@ def wait_backup_command_status(backup_pod, command_name, expected_status='succes
             status_lines = exec_on_backup_container(backup_pod, f'curl -sL "http://127.0.0.1:7171/backup/status"').splitlines()
             for line in status_lines:
                 st = json.loads(line)
-                if 'command' in st and st['command'] == command_name:
-                    if st['status'] == expected_status:
-                        command_is_done = True
-                        break
-                    elif st['status'] == err_status:
-                        if 'error' in st:
-                            fail(st['error'])
-                        else:
-                            fail(f'unexpected status of {command_name} {st}')
-                    else:
-                        with Then('Not ready, wait 5 sec'):
-                            time.sleep(5)
+                is_break, command_is_done = is_expected_backup_status(command_name, command_is_done, st, expected_status, err_status)
+                if is_break:
+                    break
 
 
 def wait_backup_pod_ready_and_curl_installed(backup_pod):
     with Then(f"wait {backup_pod} ready"):
         kubectl.wait_field("pod", backup_pod, ".status.containerStatuses[1].ready", "true")
-        is_curl_installed = False
-        while not is_curl_installed:
-            whereis_curl = kubectl.launch(f'exec {backup_pod} -c clickhouse-backup -- whereis curl')
-            is_curl_installed = whereis_curl.strip("\n\r\t ") == 'curl: /usr/bin/curl'
-            if not is_curl_installed:
-                with Then("is not ready wait 5 seconds"):
-                    time.sleep(5)
+        kubectl.launch(f'exec {backup_pod} -c clickhouse-backup -- curl --version')
+
 
 def prepare_table_for_backup(backup_pod):
     backup_name = f'test_backup_{time.strftime("%Y-%m-%d_%H%M%S")}'
@@ -78,7 +80,7 @@ def prepare_table_for_backup(backup_pod):
 
 @TestScenario
 @Name("Check clickhouse-operator/minio setup")
-def test_minio_setup():
+def test_minio_setup(self):
     with Given("clickhouse-operator is installed"):
         assert kubectl.get_count(
             "pod", ns=settings.operator_namespace,
@@ -104,24 +106,24 @@ def test_minio_setup():
 
 
 @TestScenario
-def test_backup_is_success():
-    list_pod, _, backup_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
+@Name('test_backup_is_success. Basic backup scenario')
+def test_backup_is_success(self):
+    _, _, backup_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
     backup_name = prepare_table_for_backup(backup_pod)
     wait_backup_pod_ready_and_curl_installed(backup_pod)
-    wait_backup_pod_ready_and_curl_installed(list_pod)
 
     with When('Backup is success'):
         backup_successful_before = get_backup_metric_value(
             backup_pod, 'clickhouse_backup_successful_backups|clickhouse_backup_successful_creates'
         )
-        list_before = exec_on_backup_container(list_pod, 'curl -sL http://127.0.0.1:7171/backup/list')
+        list_before = exec_on_backup_container(backup_pod, 'curl -sL http://127.0.0.1:7171/backup/list')
         exec_on_backup_container(backup_pod, f'curl -X POST -sL "http://127.0.0.1:7171/backup/create?name={backup_name}"')
         wait_backup_command_status(backup_pod, f'create {backup_name}', expected_status='success')
 
         exec_on_backup_container(backup_pod, f'curl -X POST -sL "http://127.0.0.1:7171/backup/upload/{backup_name}"')
 
     with Then('list of backups shall changed'):
-        list_after = exec_on_backup_container(list_pod, 'curl -sL http://127.0.0.1:7171/backup/list')
+        list_after = exec_on_backup_container(backup_pod, 'curl -sL http://127.0.0.1:7171/backup/list')
         assert list_before != list_after, error("backup is not created")
 
     with Then('successful backup count shall increased'):
@@ -133,7 +135,7 @@ def test_backup_is_success():
 
 @TestScenario
 @Name('test_backup_is_down. ClickHouseBackupDown and ClickHouseBackupRecentlyRestart alerts')
-def test_backup_is_down():
+def test_backup_is_down(self):
     reboot_pod, _, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
     def reboot_backup_container():
@@ -165,7 +167,7 @@ def test_backup_is_down():
 
 @TestScenario
 @Name('test_backup_failed. Check ClickHouseBackupFailed alerts')
-def test_backup_failed():
+def test_backup_failed(self):
     backup_pod, _, _, _ = alerts.random_pod_choice_for_callbacks(chi)
     backup_prefix = prepare_table_for_backup(backup_pod)
 
@@ -200,11 +202,9 @@ def test_backup_failed():
         assert resolved, error("can't get ClickHouseBackupFailed alert is gone away")
 
 
-
-
 @TestScenario
 @Name('test_backup_too_short_duration. Check ClickHouseBackupTooShort and ClickHouseBackupTooLong alerts')
-def test_backup_duration():
+def test_backup_duration(self):
     short_pod, _, long_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
     with Given("prepare fake backup duration metric"):
         kubectl.create_and_check(
@@ -281,13 +281,13 @@ def test_backup_duration():
 
 @TestScenario
 @Name('test_backup_size_decreased. Check ClickHouseBackupSizeDecreased alerts')
-def test_backup_size_decreased():
+def test_backup_size_decreased(self):
     pass
 
 
 @TestScenario
 @Name('test_backup_size_increased. Check ClickHouseBackupSizeIncreased alerts')
-def test_backup_size_increased():
+def test_backup_size_increased(self):
     pass
 
 
@@ -310,4 +310,4 @@ if main():
                 test_backup_size_increased,
             ]
             for t in test_cases:
-                run(test=t)
+                Scenario(test=t)()
