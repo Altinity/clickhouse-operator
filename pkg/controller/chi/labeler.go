@@ -149,37 +149,39 @@ func (c *Controller) addLabels(meta *v1.ObjectMeta) {
 	)
 }
 
-
-type patchStringValue struct {
+type PatchStringValue struct {
 	Op    string `json:"op"`
 	Path  string `json:"path"`
 	Value string `json:"value"`
 }
 
-func DiffLabels(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet) []byte {
-	var newLabels []patchStringValue
+func DiffLabels(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet) ([]byte, error) {
+	var labels []PatchStringValue
 	labelsDiff, _ := messagediff.DeepDiff(oldStatefulSet.Labels, newStatefulSet.Labels)
 	for path, value := range labelsDiff.Added {
-		newLabels = append(newLabels, patchStringValue{
-			Op:    "add",
-			Path:  "/metadata/labels/" + strings.Replace(strings.Trim((*path)[0].String(), "[\"]"), "/", "~1", -1),
+		labels = append(labels, PatchStringValue{
+			Op:    labelAdd,
+			Path:  labelPath + strings.Replace(strings.Trim((*path)[0].String(), "[\"]"), "/", "~1", -1),
 			Value: value.(string),
 		})
 	}
 	for path, value := range labelsDiff.Modified {
-		newLabels = append(newLabels, patchStringValue{
-			Op:    "replace",
-			Path:  "/metadata/labels/" + strings.Replace(strings.Trim((*path)[0].String(), "[\"]"), "/", "~1", -1),
+		labels = append(labels, PatchStringValue{
+			Op:    labelReplace,
+			Path:  labelPath + strings.Replace(strings.Trim((*path)[0].String(), "[\"]"), "/", "~1", -1),
 			Value: value.(string),
 		})
 	}
 	for path, value := range labelsDiff.Removed {
-		newLabels = append(newLabels, patchStringValue{
-			Op:    "remove",
-			Path:  "/metadata/labels/" + strings.Replace(strings.Trim((*path)[0].String(), "[\"]"), "/", "~1", -1),
+		labels = append(labels, PatchStringValue{
+			Op:    labelRemove,
+			Path:  labelPath + strings.Replace(strings.Trim((*path)[0].String(), "[\"]"), "/", "~1", -1),
 			Value: value.(string),
 		})
 	}
-	labelsBytes, _ := json.Marshal(newLabels)
-	return labelsBytes
+	labelsBytes, err := json.Marshal(labels)
+	if err != nil {
+		return nil, err
+	}
+	return labelsBytes, nil
 }

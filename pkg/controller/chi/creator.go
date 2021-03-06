@@ -50,12 +50,18 @@ func (c *Controller) createStatefulSet(statefulSet *apps.StatefulSet, host *chop
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) updateStatefulSet(oldStatefulSet *apps.StatefulSet, newStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	log.V(2).M(host).F().P()
-	// update labels
-	diffLabelsBytes := DiffLabels(oldStatefulSet, newStatefulSet)
+
+	// diff labels
+	diffLabelsBytes, err := DiffLabels(oldStatefulSet, newStatefulSet)
+	if err != nil {
+		log.V(1).M(host).A().Error("%v", err)
+		return err
+	}
+	// Patch labels
 	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).
 		Patch(oldStatefulSet.GetName(), types.JSONPatchType, diffLabelsBytes)
 	if err == nil {
-		log.V(1).M(host).F().Info("labels change")
+		log.V(2).M(host).F().Info("labels changed")
 	} else {
 		log.V(1).M(host).A().Error("%v", err)
 		return err

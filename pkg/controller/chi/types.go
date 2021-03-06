@@ -92,6 +92,14 @@ const (
 	reconcileDelete = "delete"
 )
 
+const (
+	labelAdd = "add"
+	labelReplace = "replace"
+	labelRemove = "remove"
+)
+
+const labelPath = "/metadata/labels/"
+
 type ReconcileChi struct {
 	cmd string
 	old *chi.ClickHouseInstallation
