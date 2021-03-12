@@ -427,20 +427,20 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 				//log.V(3).Infof("old--------------------------------------------:\n%s\n", string(oldjson))
 				//log.V(3).Infof("new--------------------------------------------:\n%s\n", string(newjson))
 
-				if len(command.old.Spec.Configuration.Clusters) > 0 {
-					if command.old.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
-						command.old.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
-						command.old.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
-						log.V(1).Error("ERROR CHI: NON-EMPTY CHI OLD")
-					}
-				}
-				if len(command.new.Spec.Configuration.Clusters) > 0 {
-					if command.new.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
-						command.new.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
-						command.new.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
-						log.V(1).Error("ERROR CHI: NON-EMPTY CHI NEW")
-					}
-				}
+				//if len(command.old.Spec.Configuration.Clusters) > 0 {
+				//	if command.old.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
+				//		command.old.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
+				//		command.old.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
+				//		log.V(1).Error("ERROR CHI: NON-EMPTY CHI OLD")
+				//	}
+				//}
+				//if len(command.new.Spec.Configuration.Clusters) > 0 {
+				//	if command.new.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
+				//		command.new.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
+				//		command.new.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
+				//		log.V(1).Error("ERROR CHI: NON-EMPTY CHI NEW")
+				//	}
+				//}
 
 				oldjs, _ := json.Marshal(command.old)
 				newjs, _ := json.Marshal(command.new)
@@ -576,32 +576,36 @@ func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfigur
 
 // updateCHIObject updates ClickHouseInstallation object
 func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
-	js, _ := json.MarshalIndent(chi, "", "  ")
-	log.V(3).M(chi).F().Info("\n%s\n", js)
-
-	if len(chi.Spec.Configuration.Clusters) > 0 {
-		if chi.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
-			chi.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
-			chi.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
-			log.V(1).M(chi).A().Error("ERROR update CHI: NON-EMPTY CHI OLD ")
-		}
+	// Start Debug object
+	js, err := json.MarshalIndent(chi, "", "  ")
+	if err != nil {
+		log.V(1).M(chi).A().Error("%q", err)
 	}
+	log.V(3).M(chi).F().Info("\n%s\n", js)
+	// End Debug object
+
+	//if len(chi.Spec.Configuration.Clusters) > 0 {
+	//	if chi.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
+	//		chi.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
+	//		chi.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
+	//		log.V(1).M(chi).A().Error("ERROR update CHI: NON-EMPTY CHI OLD ")
+	//	}
+	//}
 
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
-
 	if err != nil {
 		// Error update
 		log.V(1).M(chi).A().Error("%q", err)
 		return err
 	}
 
-	if len(_new.Spec.Configuration.Clusters) > 0 {
-		if _new.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
-			_new.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
-			_new.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
-			log.V(1).M(chi).A().Error("ERROR update CHI: NON-EMPTY CHI NEW ")
-		}
-	}
+	//if len(_new.Spec.Configuration.Clusters) > 0 {
+	//	if _new.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
+	//		_new.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
+	//		_new.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
+	//		log.V(1).M(chi).A().Error("ERROR update CHI: NON-EMPTY CHI NEW ")
+	//	}
+	//}
 
 	if chi.ObjectMeta.ResourceVersion != _new.ObjectMeta.ResourceVersion {
 		// Updated
