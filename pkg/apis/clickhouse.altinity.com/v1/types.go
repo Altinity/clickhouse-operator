@@ -74,20 +74,55 @@ type ChiUseTemplate struct {
 	UseType   string `json:"useType"   yaml:"useType"`
 }
 
+// ChiTemplating
 type ChiTemplating struct {
 	Policy string `json:"policy" yaml:"policy"`
 }
 
+// NewChiTemplating
 func NewChiTemplating() *ChiTemplating {
 	return new(ChiTemplating)
 }
 
+// GetPolicy
+func (t *ChiTemplating) GetPolicy() string {
+	if t == nil {
+		return ""
+	}
+	return t.Policy
+}
+
+// SetPolicy
+func (t *ChiTemplating) SetPolicy(p string) {
+	if t == nil {
+		return
+	}
+	t.Policy = p
+}
+
+// ChiReconciling
 type ChiReconciling struct {
 	Policy string `json:"policy" yaml:"policy"`
 }
 
 func NewChiReconciling() *ChiReconciling {
 	return new(ChiReconciling)
+}
+
+// GetPolicy
+func (t *ChiReconciling) GetPolicy() string {
+	if t == nil {
+		return ""
+	}
+	return t.Policy
+}
+
+// SetPolicy
+func (t *ChiReconciling) SetPolicy(p string) {
+	if t == nil {
+		return
+	}
+	t.Policy = p
 }
 
 // ChiDefaults defines defaults section of .spec

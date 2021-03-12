@@ -648,7 +648,7 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 	if (chi.Namespace == "") && (chi.Name == "") {
 		return false
 	}
-	return strings.ToLower(chi.Spec.Templating.Policy) == TemplatingPolicyAuto
+	return strings.ToLower(chi.Spec.Templating.GetPolicy()) == TemplatingPolicyAuto
 }
 
 const ReconcilingPolicyUnspecified = "unspecified"
@@ -662,7 +662,7 @@ func (chi *ClickHouseInstallation) IsReconcilingPolicyWait() bool {
 	if (chi.Namespace == "") && (chi.Name == "") {
 		return false
 	}
-	return strings.ToLower(chi.Spec.Reconciling.Policy) == ReconcilingPolicyWait
+	return strings.ToLower(chi.Spec.Reconciling.GetPolicy()) == ReconcilingPolicyWait
 }
 
 func (chi *ClickHouseInstallation) IsReconcilingPolicyNoWait() bool {
@@ -672,7 +672,7 @@ func (chi *ClickHouseInstallation) IsReconcilingPolicyNoWait() bool {
 	if (chi.Namespace == "") && (chi.Name == "") {
 		return false
 	}
-	return strings.ToLower(chi.Spec.Reconciling.Policy) == ReconcilingPolicyNoWait
+	return strings.ToLower(chi.Spec.Reconciling.GetPolicy()) == ReconcilingPolicyNoWait
 }
 
 func (chi *ClickHouseInstallation) IsStopped() bool {

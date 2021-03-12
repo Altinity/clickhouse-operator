@@ -388,13 +388,13 @@ func (n *Normalizer) normalizeTemplating(templating *chiv1.ChiTemplating) *chiv1
 	if templating == nil {
 		templating = chiv1.NewChiTemplating()
 	}
-	switch strings.ToLower(templating.Policy) {
+	switch strings.ToLower(templating.GetPolicy()) {
 	case
 		chiv1.TemplatingPolicyManual,
 		chiv1.TemplatingPolicyAuto:
-		templating.Policy = strings.ToLower(templating.Policy)
+		templating.SetPolicy(strings.ToLower(templating.GetPolicy()))
 	default:
-		templating.Policy = strings.ToLower(chiv1.TemplatingPolicyManual)
+		templating.SetPolicy(strings.ToLower(chiv1.TemplatingPolicyManual))
 	}
 	return templating
 }
@@ -404,13 +404,13 @@ func (n *Normalizer) normalizeReconciling(reconciling *chiv1.ChiReconciling) *ch
 	if reconciling == nil {
 		reconciling = chiv1.NewChiReconciling()
 	}
-	switch strings.ToLower(reconciling.Policy) {
+	switch strings.ToLower(reconciling.GetPolicy()) {
 	case
 		chiv1.ReconcilingPolicyWait,
 		chiv1.ReconcilingPolicyNoWait:
-		reconciling.Policy = strings.ToLower(reconciling.Policy)
+		reconciling.SetPolicy(strings.ToLower(reconciling.GetPolicy()))
 	default:
-		reconciling.Policy = strings.ToLower(chiv1.ReconcilingPolicyUnspecified)
+		reconciling.SetPolicy(strings.ToLower(chiv1.ReconcilingPolicyUnspecified))
 	}
 	return reconciling
 }
