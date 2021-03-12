@@ -14,13 +14,25 @@
 
 package v1
 
+func NewChiZookeeperConfig() *ChiZookeeperConfig {
+	return new(ChiZookeeperConfig)
+}
+
 func (zkc *ChiZookeeperConfig) IsEmpty() bool {
+	if zkc == nil {
+		return true
+	}
+
 	return len(zkc.Nodes) == 0
 }
 
-func (zkc *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeType) {
+func (zkc *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeType) *ChiZookeeperConfig {
 	if from == nil {
-		return
+		return zkc
+	}
+
+	if zkc == nil {
+		zkc = NewChiZookeeperConfig()
 	}
 
 	if !from.IsEmpty() {
@@ -61,4 +73,6 @@ func (zkc *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeTy
 	if from.Identity != "" {
 		zkc.Identity = from.Identity
 	}
+
+	return zkc
 }
