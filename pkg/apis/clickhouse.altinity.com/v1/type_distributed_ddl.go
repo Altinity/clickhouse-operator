@@ -14,9 +14,17 @@
 
 package v1
 
-func (d *ChiDistributedDDL) MergeFrom(from *ChiDistributedDDL, _type MergeType) {
+func NewChiDistributedDDL() *ChiDistributedDDL {
+	return new(ChiDistributedDDL)
+}
+
+func (d *ChiDistributedDDL) MergeFrom(from *ChiDistributedDDL, _type MergeType) *ChiDistributedDDL {
 	if from == nil {
-		return
+		return d
+	}
+
+	if d == nil {
+		d = NewChiDistributedDDL()
 	}
 
 	switch _type {
@@ -30,4 +38,6 @@ func (d *ChiDistributedDDL) MergeFrom(from *ChiDistributedDDL, _type MergeType) 
 			d.Profile = from.Profile
 		}
 	}
+
+	return d
 }
