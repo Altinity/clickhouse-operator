@@ -333,8 +333,14 @@ func (n *Normalizer) normalizeDefaults(defaults *chiv1.ChiDefaults) *chiv1.ChiDe
 	}
 	// Set defaults for CHI object properties
 	defaults.ReplicasUseFQDN = util.CastStringBoolToStringTrueFalse(defaults.ReplicasUseFQDN, false)
-	defaults.DistributedDDL = chiv1.NewChiDistributedDDL()
-	defaults.Templates = chiv1.NewChiTemplateNames()
+	// Ensure field
+	if defaults.DistributedDDL == nil {
+		defaults.DistributedDDL = chiv1.NewChiDistributedDDL()
+	}
+	// Ensure field
+	if defaults.Templates == nil {
+		defaults.Templates = chiv1.NewChiTemplateNames()
+	}
 	defaults.Templates.HandleDeprecatedFields()
 	return defaults
 }
