@@ -25,13 +25,13 @@ import (
 type ChiHost struct {
 	Name string `json:"name,omitempty"`
 	// DEPRECATED - to be removed soon
-	Port                int32            `json:"port,omitempty"`
-	TCPPort             int32            `json:"tcpPort,omitempty"`
-	HTTPPort            int32            `json:"httpPort,omitempty"`
-	InterserverHTTPPort int32            `json:"interserverHTTPPort,omitempty"`
-	Settings            Settings         `json:"settings,omitempty"`
-	Files               Settings         `json:"files,omitempty"`
-	Templates           ChiTemplateNames `json:"templates,omitempty"`
+	Port                int32             `json:"port,omitempty"`
+	TCPPort             int32             `json:"tcpPort,omitempty"`
+	HTTPPort            int32             `json:"httpPort,omitempty"`
+	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty"`
+	Settings            *Settings         `json:"settings,omitempty"`
+	Files               *Settings         `json:"files,omitempty"`
+	Templates           *ChiTemplateNames `json:"templates,omitempty"`
 
 	// Internal data
 	Address             ChiHostAddress             `json:"-"`
@@ -45,37 +45,38 @@ type ChiHost struct {
 
 func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
-		(&host.Settings).MergeFrom(shard.Settings)
+		host.Settings = host.Settings.MergeFrom(shard.Settings)
 	}
 
 	if replica != nil {
-		(&host.Settings).MergeFrom(replica.Settings)
+		host.Settings = host.Settings.MergeFrom(replica.Settings)
 	}
 }
 
 func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
-		(&host.Files).MergeFrom(shard.Files)
+		host.Files = host.Files.MergeFrom(shard.Files)
 	}
 
 	if replica != nil {
-		(&host.Files).MergeFrom(replica.Files)
+		host.Files = host.Files.MergeFrom(replica.Files)
 	}
 }
 
 func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *ChiHostTemplate) {
 	if shard != nil {
-		(&host.Templates).MergeFrom(&shard.Templates, MergeTypeFillEmptyValues)
+		host.Templates = host.Templates.MergeFrom(shard.Templates, MergeTypeFillEmptyValues)
 	}
 
 	if replica != nil {
-		(&host.Templates).MergeFrom(&replica.Templates, MergeTypeFillEmptyValues)
+		host.Templates = host.Templates.MergeFrom(replica.Templates, MergeTypeFillEmptyValues)
 	}
 
 	if template != nil {
-		(&host.Templates).MergeFrom(&template.Spec.Templates, MergeTypeFillEmptyValues)
+		host.Templates = host.Templates.MergeFrom(template.Spec.Templates, MergeTypeFillEmptyValues)
 	}
-	(&host.Templates).HandleDeprecatedFields()
+
+	host.Templates.HandleDeprecatedFields()
 }
 
 func (host *ChiHost) MergeFrom(from *ChiHost) {
@@ -95,8 +96,8 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 	if host.InterserverHTTPPort == 0 {
 		host.InterserverHTTPPort = from.InterserverHTTPPort
 	}
-	(&host.Templates).MergeFrom(&from.Templates, MergeTypeFillEmptyValues)
-	(&host.Templates).HandleDeprecatedFields()
+	host.Templates = host.Templates.MergeFrom(from.Templates, MergeTypeFillEmptyValues)
+	host.Templates.HandleDeprecatedFields()
 }
 
 func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
@@ -125,13 +126,13 @@ func (host *ChiHost) GetStatefulSetReplicasNum() int32 {
 	}
 }
 
-func (host *ChiHost) GetSettings() Settings {
+func (host *ChiHost) GetSettings() *Settings {
 	return host.Settings
 }
 
 func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
 	cluster := host.GetCluster()
-	return &cluster.Zookeeper
+	return cluster.Zookeeper
 }
 
 func (host *ChiHost) GetCHI() *ClickHouseInstallation {

@@ -33,7 +33,8 @@ type ChiStatus struct {
 	Pods              []string `json:"pods"`
 	FQDNs             []string `json:"fqdns"`
 	Endpoint          string   `json:"endpoint"`
-	NormalizedCHI     ChiSpec  `json:"normalized"`
+	Generation        int64    `json:"generation"`
+	NormalizedCHI     *ChiSpec `json:"normalized"`
 }
 
 const (
