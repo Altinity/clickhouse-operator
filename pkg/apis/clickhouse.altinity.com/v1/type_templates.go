@@ -15,14 +15,32 @@
 package v1
 
 import (
-	"fmt"
-
 	"github.com/imdario/mergo"
 )
 
-func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) (errs []error) {
-	if from == nil {
-		return
+func NewChiTemplates() *ChiTemplates {
+	return new(ChiTemplates)
+}
+
+func (templates *ChiTemplates) Len() int {
+	if templates == nil {
+		return 0
+	}
+
+	return 0 +
+		len(templates.HostTemplates) +
+		len(templates.PodTemplates) +
+		len(templates.VolumeClaimTemplates) +
+		len(templates.ServiceTemplates)
+}
+
+func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) *ChiTemplates {
+	if from.Len() == 0 {
+		return templates
+	}
+
+	if templates == nil {
+		templates = NewChiTemplates()
 	}
 
 	if len(from.HostTemplates) > 0 {
@@ -45,7 +63,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) (e
 					// Override `to` template with `from` template
 					//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
 					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-						errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
+						//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
 					}
 					break
 				}
@@ -79,7 +97,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) (e
 					// Override `to` template with `from` template
 					//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
 					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-						errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
+						//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
 					}
 					break
 				}
@@ -113,7 +131,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) (e
 					// Override `to` template with `from` template
 					//templates.VolumeClaimTemplates[toIndex] = *fromTemplate.DeepCopy()
 					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-						errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
+						//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
 					}
 					break
 				}
@@ -147,7 +165,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) (e
 					// Override `to` template with `from` template
 					//templates.ServiceTemplates[toIndex] = *fromTemplate.DeepCopy()
 					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-						errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
+						//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
 					}
 					break
 				}
@@ -161,5 +179,5 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) (e
 		}
 	}
 
-	return
+	return templates
 }
