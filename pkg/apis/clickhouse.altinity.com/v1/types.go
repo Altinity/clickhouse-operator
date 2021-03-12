@@ -59,11 +59,11 @@ type ClickHouseOperatorConfiguration struct {
 type ChiSpec struct {
 	Stop                   string           `json:"stop,omitempty"                   yaml:"stop"`
 	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern"`
-	Templating             ChiTemplating    `json:"templating,omitempty"             yaml:"templating"`
-	Reconciling            ChiReconciling   `json:"reconciling,omitempty"            yaml:"reconciling"`
-	Defaults               ChiDefaults      `json:"defaults,omitempty"               yaml:"defaults"`
-	Configuration          Configuration    `json:"configuration"                    yaml:"configuration"`
-	Templates              ChiTemplates     `json:"templates,omitempty"              yaml:"templates"`
+	Templating             *ChiTemplating   `json:"templating,omitempty"             yaml:"templating"`
+	Reconciling            *ChiReconciling  `json:"reconciling,omitempty"            yaml:"reconciling"`
+	Defaults               *ChiDefaults     `json:"defaults,omitempty"               yaml:"defaults"`
+	Configuration          *Configuration   `json:"configuration,omitempty"          yaml:"configuration"`
+	Templates              *ChiTemplates    `json:"templates,omitempty"              yaml:"templates"`
 	UseTemplates           []ChiUseTemplate `json:"useTemplates,omitempty"           yaml:"useTemplates"`
 }
 
@@ -78,15 +78,23 @@ type ChiTemplating struct {
 	Policy string `json:"policy" yaml:"policy"`
 }
 
+func NewChiTemplating() *ChiTemplating {
+	return new(ChiTemplating)
+}
+
 type ChiReconciling struct {
 	Policy string `json:"policy" yaml:"policy"`
 }
 
+func NewChiReconciling() *ChiReconciling {
+	return new(ChiReconciling)
+}
+
 // ChiDefaults defines defaults section of .spec
 type ChiDefaults struct {
-	ReplicasUseFQDN string            `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN"`
-	DistributedDDL  ChiDistributedDDL `json:"distributedDDL,omitempty"  yaml:"distributedDDL"`
-	Templates       ChiTemplateNames  `json:"templates,omitempty"       yaml:"templates"`
+	ReplicasUseFQDN string             `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN"`
+	DistributedDDL  *ChiDistributedDDL `json:"distributedDDL,omitempty"  yaml:"distributedDDL"`
+	Templates       *ChiTemplateNames  `json:"templates,omitempty"       yaml:"templates"`
 }
 
 // ChiTemplateNames defines references to .spec.templates to be used on current level of cluster
@@ -95,43 +103,44 @@ type ChiTemplateNames struct {
 	PodTemplate             string `json:"podTemplate,omitempty"             yaml:"podTemplate"`
 	DataVolumeClaimTemplate string `json:"dataVolumeClaimTemplate,omitempty" yaml:"dataVolumeClaimTemplate"`
 	LogVolumeClaimTemplate  string `json:"logVolumeClaimTemplate,omitempty"  yaml:"logVolumeClaimTemplate"`
+	ServiceTemplate         string `json:"serviceTemplate,omitempty"         yaml:"serviceTemplate"`
+	ClusterServiceTemplate  string `json:"clusterServiceTemplate,omitempty"  yaml:"clusterServiceTemplate"`
+	ShardServiceTemplate    string `json:"shardServiceTemplate,omitempty"    yaml:"shardServiceTemplate"`
+	ReplicaServiceTemplate  string `json:"replicaServiceTemplate,omitempty"  yaml:"replicaServiceTemplate"`
+
 	// DEPRECATED!!!  VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate
-	VolumeClaimTemplate    string `json:"volumeClaimTemplate,omitempty"     yaml:"volumeClaimTemplate"`
-	ServiceTemplate        string `json:"serviceTemplate,omitempty"         yaml:"serviceTemplate"`
-	ClusterServiceTemplate string `json:"clusterServiceTemplate,omitempty"  yaml:"clusterServiceTemplate"`
-	ShardServiceTemplate   string `json:"shardServiceTemplate,omitempty"    yaml:"shardServiceTemplate"`
-	ReplicaServiceTemplate string `json:"replicaServiceTemplate,omitempty"  yaml:"replicaServiceTemplate"`
+	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty"     yaml:"volumeClaimTemplate"`
 }
 
 // ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
 // TODO unify with ChiReplica based on HostsSet
 type ChiShard struct {
-	// DEPRECATED - to be removed soon
-	DefinitionType string `json:"definitionType,omitempty"`
-
-	Name                string           `json:"name,omitempty"`
-	Weight              int              `json:"weight,omitempty"`
-	InternalReplication string           `json:"internalReplication,omitempty"`
-	Settings            Settings         `json:"settings,omitempty"`
-	Files               Settings         `json:"files,omitempty"`
-	Templates           ChiTemplateNames `json:"templates,omitempty"`
-	ReplicasCount       int              `json:"replicasCount,omitempty"`
+	Name                string            `json:"name,omitempty"`
+	Weight              int               `json:"weight,omitempty"`
+	InternalReplication string            `json:"internalReplication,omitempty"`
+	Settings            *Settings         `json:"settings,omitempty"`
+	Files               *Settings         `json:"files,omitempty"`
+	Templates           *ChiTemplateNames `json:"templates,omitempty"`
+	ReplicasCount       int               `json:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiHost
 	Hosts []*ChiHost `json:"replicas,omitempty"`
 
 	// Internal data
 	Address ChiShardAddress         `json:"-"`
 	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+
+	// DEPRECATED - to be removed soon
+	DefinitionType string `json:"definitionType,omitempty"`
 }
 
 // ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
 // TODO unify with ChiShard based on HostsSet
 type ChiReplica struct {
-	Name        string           `json:"name,omitempty"`
-	Settings    Settings         `json:"settings,omitempty"`
-	Files       Settings         `json:"files,omitempty"`
-	Templates   ChiTemplateNames `json:"templates,omitempty"`
-	ShardsCount int              `json:"shardsCount,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	Settings    *Settings         `json:"settings,omitempty"`
+	Files       *Settings         `json:"files,omitempty"`
+	Templates   *ChiTemplateNames `json:"templates,omitempty"`
+	ShardsCount int               `json:"shardsCount,omitempty"`
 	// TODO refactor into map[string]ChiHost
 	Hosts []*ChiHost `json:"shards,omitempty"`
 
