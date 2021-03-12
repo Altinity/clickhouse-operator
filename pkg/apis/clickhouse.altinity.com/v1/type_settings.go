@@ -138,6 +138,11 @@ func makeM() map[string]*Setting {
 	return make(map[string]*Setting)
 }
 
+// IsZero
+func (settings *Settings) IsZero() bool {
+	return settings.Len() == 0
+}
+
 // Walk
 func (settings *Settings) Walk(f func(name string, setting *Setting)) {
 	if settings.Len() == 0 {
@@ -227,7 +232,7 @@ func (settings *Settings) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON
 func (settings *Settings) MarshalJSON() ([]byte, error) {
-	if settings.Len() == 0 {
+	if settings == nil {
 		return json.Marshal(nil)
 	}
 

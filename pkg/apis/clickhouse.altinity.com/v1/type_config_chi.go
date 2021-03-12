@@ -30,14 +30,14 @@ const (
 
 // Configuration defines configuration section of .spec
 type Configuration struct {
-	Zookeeper *ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper"`
-	Users     *Settings           `json:"users,omitempty"     yaml:"users"`
-	Profiles  *Settings           `json:"profiles,omitempty"  yaml:"profiles"`
-	Quotas    *Settings           `json:"quotas,omitempty"    yaml:"quotas"`
-	Settings  *Settings           `json:"settings,omitempty"  yaml:"settings"`
-	Files     *Settings           `json:"files,omitempty"     yaml:"files"`
+	Zookeeper *ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper,omitempty"`
+	Users     *Settings           `json:"users,omitempty"     yaml:"users,omitempty"`
+	Profiles  *Settings           `json:"profiles,omitempty"  yaml:"profiles,omitempty"`
+	Quotas    *Settings           `json:"quotas,omitempty"    yaml:"quotas,omitempty"`
+	Settings  *Settings           `json:"settings,omitempty"  yaml:"settings,omitempty"`
+	Files     *Settings           `json:"files,omitempty"     yaml:"files,omitempty"`
 	// TODO refactor into map[string]ChiCluster
-	Clusters []*ChiCluster `json:"clusters,omitempty"  yaml:"clusters"`
+	Clusters []*ChiCluster `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
 }
 
 func NewConfiguration() *Configuration {

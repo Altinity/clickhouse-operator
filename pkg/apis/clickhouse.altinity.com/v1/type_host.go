@@ -23,24 +23,24 @@ import (
 
 // ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
 type ChiHost struct {
-	Name string `json:"name,omitempty"`
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 	// DEPRECATED - to be removed soon
-	Port                int32             `json:"port,omitempty"`
-	TCPPort             int32             `json:"tcpPort,omitempty"`
-	HTTPPort            int32             `json:"httpPort,omitempty"`
-	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty"`
-	Settings            *Settings         `json:"settings,omitempty"`
-	Files               *Settings         `json:"files,omitempty"`
-	Templates           *ChiTemplateNames `json:"templates,omitempty"`
+	Port                int32             `json:"port,omitempty"                yaml:"port,omitempty"`
+	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
+	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
+	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
+	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
+	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
+	Templates           *ChiTemplateNames `json:"templates,omitempty"           yaml:"templates,omitempty"`
 
 	// Internal data
-	Address             ChiHostAddress             `json:"-"`
-	Config              ChiHostConfig              `json:"-"`
-	ReconcileAttributes ChiHostReconcileAttributes `json:"-" testdiff:"ignore"`
-	StatefulSet         *appsv1.StatefulSet        `json:"-" testdiff:"ignore"`
-	CurStatefulSet      *appsv1.StatefulSet        `json:"-" testdiff:"ignore"`
-	DesiredStatefulSet  *appsv1.StatefulSet        `json:"-" testdiff:"ignore"`
-	CHI                 *ClickHouseInstallation    `json:"-" testdiff:"ignore"`
+	Address             ChiHostAddress             `json:"-" yaml:"-"`
+	Config              ChiHostConfig              `json:"-" yaml:"-"`
+	ReconcileAttributes ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
+	StatefulSet         *appsv1.StatefulSet        `json:"-" yaml:"-" testdiff:"ignore"`
+	CurStatefulSet      *appsv1.StatefulSet        `json:"-" yaml:"-" testdiff:"ignore"`
+	DesiredStatefulSet  *appsv1.StatefulSet        `json:"-" yaml:"-" testdiff:"ignore"`
+	CHI                 *ClickHouseInstallation    `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {

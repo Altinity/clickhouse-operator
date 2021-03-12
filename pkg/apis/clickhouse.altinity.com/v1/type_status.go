@@ -16,25 +16,25 @@ package v1
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	Version           string   `json:"version"`
-	ClustersCount     int      `json:"clusters"`
-	ShardsCount       int      `json:"shards"`
-	ReplicasCount     int      `json:"replicas"`
-	HostsCount        int      `json:"hosts"`
-	Status            string   `json:"status"`
-	Action            string   `json:"action"`
-	Actions           []string `json:"actions"`
-	Error             string   `json:"error"`
-	Errors            []string `json:"errors"`
-	UpdatedHostsCount int      `json:"updated"`
-	AddedHostsCount   int      `json:"added"`
-	DeletedHostsCount int      `json:"deleted"`
-	DeleteHostsCount  int      `json:"delete"`
-	Pods              []string `json:"pods"`
-	FQDNs             []string `json:"fqdns"`
-	Endpoint          string   `json:"endpoint"`
-	Generation        int64    `json:"generation"`
-	NormalizedCHI     *ChiSpec `json:"normalized"`
+	Version           string   `json:"version"    yaml:"version"`
+	ClustersCount     int      `json:"clusters"   yaml:"clusters"`
+	ShardsCount       int      `json:"shards"     yaml:"shards"`
+	ReplicasCount     int      `json:"replicas"   yaml:"replicas"`
+	HostsCount        int      `json:"hosts"      yaml:"hosts"`
+	Status            string   `json:"status"     yaml:"status"`
+	Action            string   `json:"action"     yaml:"action"`
+	Actions           []string `json:"actions"    yaml:"actions"`
+	Error             string   `json:"error"      yaml:"error"`
+	Errors            []string `json:"errors"     yaml:"errors"`
+	UpdatedHostsCount int      `json:"updated"    yaml:"updated"`
+	AddedHostsCount   int      `json:"added"      yaml:"added"`
+	DeletedHostsCount int      `json:"deleted"    yaml:"deleted"`
+	DeleteHostsCount  int      `json:"delete"     yaml:"delete"`
+	Pods              []string `json:"pods"       yaml:"pods"`
+	FQDNs             []string `json:"fqdns"      yaml:"fqdns"`
+	Endpoint          string   `json:"endpoint"   yaml:"endpoint"`
+	Generation        int64    `json:"generation" yaml:"generation"`
+	NormalizedCHI     *ChiSpec `json:"normalized" yaml:"normalized"`
 }
 
 const (

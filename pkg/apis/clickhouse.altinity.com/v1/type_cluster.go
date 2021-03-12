@@ -16,41 +16,41 @@ package v1
 
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
-	Name      string              `json:"name,omitempty"`
-	Zookeeper *ChiZookeeperConfig `json:"zookeeper,omitempty"`
-	Settings  *Settings           `json:"settings,omitempty"`
-	Files     *Settings           `json:"files,omitempty"`
-	Templates *ChiTemplateNames   `json:"templates,omitempty"`
-	Layout    *ChiClusterLayout   `json:"layout,omitempty"`
+	Name      string              `json:"name,omitempty"      yaml:"name,omitempty"`
+	Zookeeper *ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper,omitempty"`
+	Settings  *Settings           `json:"settings,omitempty"  yaml:"settings,omitempty"`
+	Files     *Settings           `json:"files,omitempty"     yaml:"files,omitempty"`
+	Templates *ChiTemplateNames   `json:"templates,omitempty" yaml:"templates,omitempty"`
+	Layout    *ChiClusterLayout   `json:"layout,omitempty"    yaml:"layout,omitempty"`
 
 	// Internal data
-	Address ChiClusterAddress       `json:"-"`
-	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+	Address ChiClusterAddress       `json:"-" yaml:"-"`
+	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 // ChiClusterAddress defines address of a cluster within ClickHouseInstallation
 type ChiClusterAddress struct {
-	Namespace    string `json:"namespace,omitempty"`
-	CHIName      string `json:"chiName,omitempty"`
-	ClusterName  string `json:"clusterName,omitempty"`
-	ClusterIndex int    `json:"clusterIndex,omitempty"`
+	Namespace    string `json:"namespace,omitempty"    yaml:"namespace,omitempty"`
+	CHIName      string `json:"chiName,omitempty"      yaml:"chiName,omitempty"`
+	ClusterName  string `json:"clusterName,omitempty"  yaml:"clusterName,omitempty"`
+	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
 }
 
 // ChiClusterLayout defines layout section of .spec.configuration.clusters
 type ChiClusterLayout struct {
 	// DEPRECATED - to be removed soon
-	Type          string `json:"type,omitempty"`
-	ShardsCount   int    `json:"shardsCount,omitempty"`
-	ReplicasCount int    `json:"replicasCount,omitempty"`
+	Type          string `json:"type,omitempty"          yaml:"type,omitempty"`
+	ShardsCount   int    `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
+	ReplicasCount int    `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiShard
-	Shards   []ChiShard   `json:"shards,omitempty"`
-	Replicas []ChiReplica `json:"replicas,omitempty"`
+	Shards   []ChiShard   `json:"shards,omitempty"   yaml:"shards,omitempty"`
+	Replicas []ChiReplica `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 
 	// Internal data
 	// Whether shards or replicas are explicitly specified as Shards []ChiShard or Replicas []ChiReplica
-	ShardsSpecified   bool        `json:"-" testdiff:"ignore"`
-	ReplicasSpecified bool        `json:"-" testdiff:"ignore"`
-	HostsField        *HostsField `json:"-" testdiff:"ignore"`
+	ShardsSpecified   bool        `json:"-" yaml:"-" testdiff:"ignore"`
+	ReplicasSpecified bool        `json:"-" yaml:"-" testdiff:"ignore"`
+	HostsField        *HostsField `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 func NewChiClusterLayout() *ChiClusterLayout {
