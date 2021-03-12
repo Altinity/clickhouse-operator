@@ -835,7 +835,7 @@ func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 			TCPPort:             chPortNumberMustBeAssignedLater,
 			HTTPPort:            chPortNumberMustBeAssignedLater,
 			InterserverHTTPPort: chPortNumberMustBeAssignedLater,
-			Templates:           chiv1.ChiTemplateNames{},
+			Templates:           chiv1.NewChiTemplateNames(),
 		},
 	}
 }
@@ -854,7 +854,7 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 			TCPPort:             chPortNumberMustBeAssignedLater,
 			HTTPPort:            chPortNumberMustBeAssignedLater,
 			InterserverHTTPPort: chPortNumberMustBeAssignedLater,
-			Templates:           chiv1.ChiTemplateNames{},
+			Templates:           chiv1.NewChiTemplateNames(),
 		},
 	}
 }
