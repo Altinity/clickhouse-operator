@@ -1333,6 +1333,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiv1.Settings) *chiv1.S
 			// ClickHouse does not start if both password and sha256 are defined
 			if username == "default" {
 				// Set remove password flag for default user that is empty in stock ClickHouse users.xml
+				// TODO fix it
 				users.Set(username+"/password", chiv1.NewSettingScalar("_removed_"))
 			} else {
 				users.Delete(username + "/password")

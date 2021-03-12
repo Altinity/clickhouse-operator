@@ -165,6 +165,7 @@ func (n *xmlNode) writeTagNoValue(w io.Writer, indent, tabsize uint8) {
 // <tag>value</tag>
 func (n *xmlNode) writeTagWithValue(w io.Writer, value string, indent, tabsize uint8) {
 	if value == "_removed_" {
+		// TODO fix it
 		// Special case
 		var removeTag xmlNode
 		removeTag.tag = n.tag + " remove=\"1\""
