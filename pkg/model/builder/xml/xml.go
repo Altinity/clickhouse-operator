@@ -170,7 +170,7 @@ func (n *xmlNode) writeTagWithValue(w io.Writer, value string, indent, tabsize u
 		var removeTag xmlNode
 		removeTag.tag = n.tag + " remove=\"1\""
 		removeTag.writeTag(w, indent, true, noEol)
-		removeTag.writeTag(w, 0, false, eol)
+		n.writeTag(w, 0, false, eol)
 		return
 	}
 
