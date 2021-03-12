@@ -30,31 +30,40 @@ const (
 
 // Configuration defines configuration section of .spec
 type Configuration struct {
-	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper"`
-	Users     Settings           `json:"users,omitempty"     yaml:"users"`
-	Profiles  Settings           `json:"profiles,omitempty"  yaml:"profiles"`
-	Quotas    Settings           `json:"quotas,omitempty"    yaml:"quotas"`
-	Settings  Settings           `json:"settings,omitempty"  yaml:"settings"`
-	Files     Settings           `json:"files,omitempty"     yaml:"files"`
-
+	Zookeeper *ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper"`
+	Users     *Settings           `json:"users,omitempty"     yaml:"users"`
+	Profiles  *Settings           `json:"profiles,omitempty"  yaml:"profiles"`
+	Quotas    *Settings           `json:"quotas,omitempty"    yaml:"quotas"`
+	Settings  *Settings           `json:"settings,omitempty"  yaml:"settings"`
+	Files     *Settings           `json:"files,omitempty"     yaml:"files"`
 	// TODO refactor into map[string]ChiCluster
-	Clusters []ChiCluster `json:"clusters,omitempty"`
+	Clusters []*ChiCluster `json:"clusters,omitempty"  yaml:"clusters"`
+}
+
+func NewConfiguration() *Configuration {
+	return new(Configuration)
 }
 
 // MergeFrom merges from specified source
-func (configuration *Configuration) MergeFrom(from *Configuration, _type MergeType) {
+func (configuration *Configuration) MergeFrom(from *Configuration, _type MergeType) *Configuration {
 	if from == nil {
-		return
+		return configuration
 	}
 
-	(&configuration.Zookeeper).MergeFrom(&from.Zookeeper, _type)
-	(&configuration.Users).MergeFrom(from.Users)
-	(&configuration.Profiles).MergeFrom(from.Profiles)
-	(&configuration.Quotas).MergeFrom(from.Quotas)
-	(&configuration.Settings).MergeFrom(from.Settings)
-	(&configuration.Files).MergeFrom(from.Files)
+	if configuration == nil {
+		configuration = NewConfiguration()
+	}
+
+	configuration.Zookeeper = configuration.Zookeeper.MergeFrom(from.Zookeeper, _type)
+	configuration.Users = configuration.Users.MergeFrom(from.Users)
+	configuration.Profiles = configuration.Profiles.MergeFrom(from.Profiles)
+	configuration.Quotas = configuration.Quotas.MergeFrom(from.Quotas)
+	configuration.Settings = configuration.Settings.MergeFrom(from.Settings)
+	configuration.Files = configuration.Files.MergeFrom(from.Files)
 
 	// TODO merge clusters
 	// Copy Clusters for now
 	configuration.Clusters = from.Clusters
+
+	return configuration
 }

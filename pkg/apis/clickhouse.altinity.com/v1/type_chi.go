@@ -35,8 +35,8 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.Status.Pods = pods
 	chi.Status.FQDNs = fqdns
 	chi.Status.Endpoint = endpoint
-	// TODO do not copy here
-	chi.Status.NormalizedCHI = chi.Spec
+	chi.Status.Generation = chi.Generation
+	chi.Status.NormalizedCHI = &chi.Spec
 }
 
 func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
@@ -199,8 +199,7 @@ func (chi *ClickHouseInstallation) WalkClustersFullPath(
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
-		res = append(res, f(chi, clusterIndex, cluster))
+		res = append(res, f(chi, clusterIndex, chi.Spec.Configuration.Clusters[clusterIndex]))
 	}
 
 	return res
@@ -213,8 +212,7 @@ func (chi *ClickHouseInstallation) WalkClusters(
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
-		res = append(res, f(cluster))
+		res = append(res, f(chi.Spec.Configuration.Clusters[clusterIndex]))
 	}
 
 	return res
@@ -234,7 +232,7 @@ func (chi *ClickHouseInstallation) WalkShardsFullPath(
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			res = append(res, f(chi, clusterIndex, cluster, shardIndex, shard))
@@ -254,7 +252,7 @@ func (chi *ClickHouseInstallation) WalkShards(
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			res = append(res, f(shard))
@@ -305,7 +303,7 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 	clusterScopeCycleOffset := 0
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
 
 		clusterScopeIndex = 0
 		clusterScopeCycleIndex = 0
@@ -371,7 +369,7 @@ func (chi *ClickHouseInstallation) WalkHosts(
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Hosts {
@@ -389,7 +387,7 @@ func (chi *ClickHouseInstallation) WalkHostsTillError(
 	f func(host *ChiHost) error,
 ) error {
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Hosts {
@@ -419,7 +417,7 @@ func (chi *ClickHouseInstallation) WalkTillError(
 	}
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
 		if err := fCluster(ctx, cluster); err != nil {
 			return err
 		}
@@ -485,9 +483,9 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		}
 	}
 
-	(&spec.Defaults).MergeFrom(&from.Defaults, _type)
-	(&spec.Configuration).MergeFrom(&from.Configuration, _type)
-	(&spec.Templates).MergeFrom(&from.Templates, _type)
+	spec.Defaults = spec.Defaults.MergeFrom(from.Defaults, _type)
+	spec.Configuration = spec.Configuration.MergeFrom(from.Configuration, _type)
+	spec.Templates = spec.Templates.MergeFrom(from.Templates, _type)
 	// TODO may be it would be wiser to make more intelligent merge
 	spec.UseTemplates = append(spec.UseTemplates, from.UseTemplates...)
 }

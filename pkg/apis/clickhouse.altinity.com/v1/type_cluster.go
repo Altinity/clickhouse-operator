@@ -16,12 +16,12 @@ package v1
 
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
-	Name      string             `json:"name,omitempty"`
-	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty"`
-	Settings  Settings           `json:"settings,omitempty"`
-	Files     Settings           `json:"files,omitempty"`
-	Templates ChiTemplateNames   `json:"templates,omitempty"`
-	Layout    ChiClusterLayout   `json:"layout,omitempty"`
+	Name      string              `json:"name,omitempty"`
+	Zookeeper *ChiZookeeperConfig `json:"zookeeper,omitempty"`
+	Settings  *Settings           `json:"settings,omitempty"`
+	Files     *Settings           `json:"files,omitempty"`
+	Templates *ChiTemplateNames   `json:"templates,omitempty"`
+	Layout    *ChiClusterLayout   `json:"layout,omitempty"`
 
 	// Internal data
 	Address ChiClusterAddress       `json:"-"`
@@ -53,6 +53,10 @@ type ChiClusterLayout struct {
 	HostsField        *HostsField `json:"-" testdiff:"ignore"`
 }
 
+func NewChiClusterLayout() *ChiClusterLayout {
+	return new(ChiClusterLayout)
+}
+
 func (cluster *ChiCluster) FillShardReplicaSpecified() {
 	if len(cluster.Layout.Shards) > 0 {
 		cluster.Layout.ShardsSpecified = true
@@ -80,16 +84,16 @@ func (cluster *ChiCluster) IsShardSpecified() bool {
 
 func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 	if cluster.Zookeeper.IsEmpty() {
-		(&cluster.Zookeeper).MergeFrom(&chi.Spec.Configuration.Zookeeper, MergeTypeFillEmptyValues)
+		cluster.Zookeeper = cluster.Zookeeper.MergeFrom(chi.Spec.Configuration.Zookeeper, MergeTypeFillEmptyValues)
 	}
 }
 
 func (cluster *ChiCluster) InheritSettingsFrom(chi *ClickHouseInstallation) {
-	(&cluster.Settings).MergeFrom(chi.Spec.Configuration.Settings)
+	cluster.Settings = cluster.Settings.MergeFrom(chi.Spec.Configuration.Settings)
 }
 
 func (cluster *ChiCluster) InheritFilesFrom(chi *ClickHouseInstallation) {
-	(&cluster.Files).MergeFromCB(chi.Spec.Configuration.Files, func(path string, _ *Setting) bool {
+	cluster.Files = cluster.Files.MergeFromCB(chi.Spec.Configuration.Files, func(path string, _ *Setting) bool {
 		if section, err := getSectionFromPath(path); err == nil {
 			if section == SectionHost {
 				return true
@@ -101,8 +105,8 @@ func (cluster *ChiCluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 }
 
 func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
-	(&cluster.Templates).MergeFrom(&chi.Spec.Defaults.Templates, MergeTypeFillEmptyValues)
-	(&cluster.Templates).HandleDeprecatedFields()
+	cluster.Templates = cluster.Templates.MergeFrom(chi.Spec.Defaults.Templates, MergeTypeFillEmptyValues)
+	cluster.Templates.HandleDeprecatedFields()
 }
 
 func (cluster *ChiCluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {
@@ -117,6 +121,10 @@ func (cluster *ChiCluster) GetCHI() *ClickHouseInstallation {
 
 func (cluster *ChiCluster) GetShard(shard int) *ChiShard {
 	return &cluster.Layout.Shards[shard]
+}
+
+func (cluster *ChiCluster) GetOrCreateHost(shard, replica int) *ChiHost {
+	return cluster.Layout.HostsField.GetOrCreate(shard, replica)
 }
 
 func (cluster *ChiCluster) GetReplica(replica int) *ChiReplica {
