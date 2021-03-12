@@ -164,16 +164,18 @@ func (n *xmlNode) writeTagNoValue(w io.Writer, indent, tabsize uint8) {
 // and children are not printed
 // <tag>value</tag>
 func (n *xmlNode) writeTagWithValue(w io.Writer, value string, indent, tabsize uint8) {
-	if value != "_removed_" {
-		n.writeTag(w, indent, true, noEol)
-		n.writeValue(w, value)
-		n.writeTag(w, 0, false, eol)
-	} else {
+	if value == "_removed_" {
+		// Special case
 		var removeTag xmlNode
 		removeTag.tag = n.tag + " remove=\"1\""
 		removeTag.writeTag(w, indent, true, noEol)
-		n.writeTag(w, 0, false, eol)
+		removeTag.writeTag(w, 0, false, eol)
+		return
 	}
+
+	n.writeTag(w, indent, true, noEol)
+	n.writeValue(w, value)
+	n.writeTag(w, 0, false, eol)
 }
 
 // writeTag prints XML tag into io.Writer
