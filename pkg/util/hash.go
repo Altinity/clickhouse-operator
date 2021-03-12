@@ -47,12 +47,18 @@ func serializeRepeatable(obj interface{}) []byte {
 }
 
 func HashIntoString(b []byte) string {
+	if len(b) == 0 {
+		return ""
+	}
 	hasher := sha1.New()
 	hasher.Write(b)
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
 func HashIntoInt(b []byte) int {
+	if len(b) == 0 {
+		return 0
+	}
 	h := fnv.New32a()
 	h.Write(b)
 	return int(h.Sum32())
