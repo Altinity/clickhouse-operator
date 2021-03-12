@@ -14,13 +14,23 @@
 
 package v1
 
+func NewChiTemplateNames() *ChiTemplateNames {
+	return new(ChiTemplateNames)
+}
+
 func (templateNames *ChiTemplateNames) HandleDeprecatedFields() {
 	if templateNames.DataVolumeClaimTemplate == "" {
 		templateNames.DataVolumeClaimTemplate = templateNames.VolumeClaimTemplate
 	}
 }
 
-func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type MergeType) {
+func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type MergeType) *ChiTemplateNames {
+	if from == nil {
+		return templateNames
+	}
+	if templateNames == nil {
+		templateNames = NewChiTemplateNames()
+	}
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if templateNames.HostTemplate == "" {
@@ -80,4 +90,6 @@ func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type M
 			templateNames.ReplicaServiceTemplate = from.ReplicaServiceTemplate
 		}
 	}
+
+	return templateNames
 }
