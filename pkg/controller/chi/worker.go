@@ -389,35 +389,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 	w.a.V(1).M(new).F().Info("Existing objects:\n%s", objs)
 	objs.Subtract(need)
 	w.a.V(1).M(new).F().Info("Delete objects:\n%s", objs)
-
-	/*
-		actionPlan.WalkRemoved(
-			func(cluster *chop.ChiCluster) {
-				_ = w.deleteCluster(ctx, new, cluster)
-			},
-			func(shard *chop.ChiShard) {
-				_ = w.deleteShard(ctx, new, shard)
-			},
-			func(host *chop.ChiHost) {
-				_ = w.deleteHost(ctx, new, host)
-			},
-		)
-	*/
-
-	objs.Walk(func(entityType chopmodel.EntityType, m meta.ObjectMeta) {
-		switch entityType {
-		case chopmodel.StatefulSet:
-			w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(m.Name, newDeleteOptions())
-		case chopmodel.PVC:
-			if w.creator.GetReclaimPolicy(m) == chop.PVCReclaimPolicyDelete {
-				w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(m.Name, newDeleteOptions())
-			}
-		case chopmodel.ConfigMap:
-			w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(m.Name, newDeleteOptions())
-		case chopmodel.Service:
-			w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(m.Name, newDeleteOptions())
-		}
-	})
+	w.purge(objs)
 
 	if !new.IsStopped() {
 		w.a.V(1).
@@ -439,6 +411,25 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 		Info("reconcile completed")
 
 	return nil
+}
+
+// purge
+func (w *worker) purge(reg *chopmodel.Registry) {
+	reg.Walk(func(entityType chopmodel.EntityType, m meta.ObjectMeta) {
+		switch entityType {
+		case chopmodel.StatefulSet:
+			w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(m.Name, newDeleteOptions())
+		case chopmodel.PVC:
+			if w.creator.GetReclaimPolicy(m) == chop.PVCReclaimPolicyDelete {
+				w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(m.Name, newDeleteOptions())
+			}
+		case chopmodel.ConfigMap:
+			w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(m.Name, newDeleteOptions())
+		case chopmodel.Service:
+			w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(m.Name, newDeleteOptions())
+		}
+	})
+
 }
 
 // reconcile reconciles ClickHouseInstallation
@@ -917,7 +908,7 @@ func (w *worker) finalizeCHI(ctx context.Context, chi *chop.ClickHouseInstallati
 		return nil
 	}
 
-	_ = w.deleteCHI(ctx, chi)
+	_ = w.removeCHI(ctx, chi)
 
 	// Uninstall finalizer
 	w.a.V(2).M(chi).F().Info("uninstall finalizer")
@@ -930,6 +921,18 @@ func (w *worker) finalizeCHI(ctx context.Context, chi *chop.ClickHouseInstallati
 
 // deleteCHI deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
 func (w *worker) deleteCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	objs := w.c.discovery(chi)
+	w.purge(objs)
+	return nil
+}
+
+// removeCHI deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
+func (w *worker) removeCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
