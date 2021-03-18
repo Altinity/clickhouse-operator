@@ -90,10 +90,10 @@ func Run() {
 	log.Infof("Starting metrics exporter. Version:%s GitSHA:%s BuiltAt:%s\n", version.Version, version.GitSHA, version.BuiltAt)
 
 	// Initialize k8s API clients
-	_, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
+	kubeClient, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
 
 	// Create operator instance
-	chop := chop.GetCHOp(chopClient, chopConfigFile)
+	chop := chop.GetCHOp(kubeClient, chopClient, chopConfigFile)
 	chop.SetupLog()
 	log.Info(chop.Config().String(true))
 
