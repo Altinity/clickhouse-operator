@@ -389,7 +389,9 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 	w.a.V(1).M(new).F().Info("Existing objects:\n%s", objs)
 	objs.Subtract(need)
 	w.a.V(1).M(new).F().Info("Delete objects:\n%s", objs)
-	w.purge(objs)
+	if w.purge(objs) > 0 {
+		w.c.enqueueObject(NewDropDns(&new.ObjectMeta))
+	}
 
 	if !new.IsStopped() {
 		w.a.V(1).
@@ -414,11 +416,12 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 }
 
 // purge
-func (w *worker) purge(reg *chopmodel.Registry) {
+func (w *worker) purge(reg *chopmodel.Registry) (cnt int) {
 	reg.Walk(func(entityType chopmodel.EntityType, m meta.ObjectMeta) {
 		switch entityType {
 		case chopmodel.StatefulSet:
 			w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(m.Name, newDeleteOptions())
+			cnt++
 		case chopmodel.PVC:
 			if w.creator.GetReclaimPolicy(m) == chop.PVCReclaimPolicyDelete {
 				w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(m.Name, newDeleteOptions())
@@ -429,7 +432,7 @@ func (w *worker) purge(reg *chopmodel.Registry) {
 			w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(m.Name, newDeleteOptions())
 		}
 	})
-
+	return cnt
 }
 
 // reconcile reconciles ClickHouseInstallation
