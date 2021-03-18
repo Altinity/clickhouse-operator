@@ -83,9 +83,9 @@ func GetClientset(kubeConfigFile, masterURL string) (*kube.Clientset, *chopclien
 }
 
 // chopClient can be nil, in this case CHOp will not be able to use any ConfigMap(s) with configuration
-func GetCHOp(chopClient *chopclientset.Clientset, initCHOpConfigFilePath string) *CHOp {
+func GetCHOp(kubeClient *kube.Clientset, chopClient *chopclientset.Clientset, initCHOpConfigFilePath string) *CHOp {
 	// Create operator instance
-	chop := NewCHOp(version.Version, chopClient, initCHOpConfigFilePath)
+	chop := NewCHOp(version.Version, kubeClient, chopClient, initCHOpConfigFilePath)
 	if err := chop.Init(); err != nil {
 		log.A().Fatal("Unable to init CHOP instance %v", err)
 		os.Exit(1)
