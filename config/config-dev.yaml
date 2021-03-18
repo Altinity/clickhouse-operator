@@ -94,6 +94,13 @@ chConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi
 # located in `chUsersConfigsPath` folder
 chUsername: clickhouse_operator
 chPassword: clickhouse_operator_password
+
+# Location of k8s Secret with username and password to be used by operator to connect to ClickHouse instances
+# Can be used instead of explicitly specified username and password
+chCredentialsSecretNamespace: "dev"
+chCredentialsSecretName: "chop-clickhouse-credentials"
+
+# Port where to connect to ClickHouse instances to
 chPort: 8123
 
 ################################################
