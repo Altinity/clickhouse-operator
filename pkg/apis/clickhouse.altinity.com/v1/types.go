@@ -350,6 +350,7 @@ type ChiPodDistribution struct {
 type ChiVolumeClaimTemplate struct {
 	Name             string                           `json:"name"          yaml:"name"`
 	PVCReclaimPolicy PVCReclaimPolicy                 `json:"reclaimPolicy" yaml:"reclaimPolicy"`
+	ObjectMeta       metav1.ObjectMeta                `json:"metadata"      yaml:"metadata"`
 	Spec             corev1.PersistentVolumeClaimSpec `json:"spec"          yaml:"spec"`
 }
 
