@@ -648,8 +648,12 @@ func (w *worker) reconcileHost(ctx context.Context, host *chop.ChiHost) error {
 	chopmodel.ReconcileContextGetRegistry(ctx).RegisterConfigMap(configMap.ObjectMeta)
 
 	// Reconcile host's StatefulSet
+	var errStatefulSet error
 	if err := w.reconcileStatefulSet(ctx, host); err != nil {
-		return err
+		if err != errIgnore {
+			return err
+		}
+		errStatefulSet = err
 	}
 	chopmodel.ReconcileContextGetRegistry(ctx).RegisterStatefulSet(statefulSet.ObjectMeta)
 
@@ -667,7 +671,10 @@ func (w *worker) reconcileHost(ctx context.Context, host *chop.ChiHost) error {
 
 	host.ReconcileAttributes.UnsetAdd()
 
-	_ = w.migrateTables(ctx, host)
+	if errStatefulSet == nil {
+		// Migrate table only in case no errors during StatefulSet reconcile
+		_ = w.migrateTables(ctx, host)
+	}
 
 	if err := w.includeHost(ctx, host); err != nil {
 		// If host is not ready - fallback
@@ -1531,6 +1538,11 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chop.ChiHost) erro
 			WithStatusAction(host.CHI).
 			M(host).F().
 			Info("Create StatefulSet %s/%s - completed", statefulSet.Namespace, statefulSet.Name)
+	} else if err == errIgnore {
+		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(host.CHI).
+			M(host).A().
+			Warning("Create StatefulSet %s/%s - error ignored", statefulSet.Namespace, statefulSet.Name)
 	} else {
 		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
 			WithStatusAction(host.CHI).
