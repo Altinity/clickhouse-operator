@@ -16,6 +16,7 @@ package model
 
 import (
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -76,8 +77,10 @@ func (r *Registry) registerEntity(entityType EntityType, meta v1.ObjectMeta) {
 	}
 	// Does not have such an entity
 	m := v1.ObjectMeta{
-		Namespace: meta.Namespace,
-		Name:      meta.Name,
+		Namespace:   meta.Namespace,
+		Name:        meta.Name,
+		Labels:      util.MergeStringMapsOverwrite(nil, meta.Labels),
+		Annotations: util.MergeStringMapsOverwrite(nil, meta.Annotations),
 	}
 	r.r[entityType] = append(r.r[entityType], m)
 }
