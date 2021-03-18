@@ -369,7 +369,9 @@ func (c *Creator) PreparePersistentVolumeClaim(
 	host *chiv1.ChiHost,
 	template *chiv1.ChiVolumeClaimTemplate,
 ) *corev1.PersistentVolumeClaim {
+	pvc.Labels = util.MergeStringMapsOverwrite(pvc.Labels, template.ObjectMeta.Labels)
 	pvc.Labels = util.MergeStringMapsOverwrite(pvc.Labels, c.labeler.getLabelsHostScopeReclaimPolicy(host, template, false))
+	pvc.Annotations = util.MergeStringMapsOverwrite(pvc.Annotations, template.ObjectMeta.Annotations)
 	// And after the object is ready we can put version label
 	MakeObjectVersionLabel(&pvc.ObjectMeta, pvc)
 	return pvc
