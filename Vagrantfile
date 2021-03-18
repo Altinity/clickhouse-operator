@@ -100,7 +100,7 @@ Vagrant.configure(2) do |config|
     apt-get install --no-install-recommends -y yq
 
     # clickhouse
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E0C56BD4
+    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv E0C56BD4
     add-apt-repository "deb http://repo.clickhouse.tech/deb/stable/ main/"
     apt-get install --no-install-recommends -y clickhouse-client
 
@@ -262,4 +262,5 @@ Vagrant.configure(2) do |config|
     python3 /vagrant/tests/test_backup_alerts.py
 
   SHELL
+
 end

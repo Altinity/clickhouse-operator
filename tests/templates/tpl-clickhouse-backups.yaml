@@ -24,7 +24,7 @@ spec:
               image: yandex/clickhouse-server:20.8
 
             - name: clickhouse-backup
-              image: altinity/clickhouse-backup:1.0.1
+              image: altinity/clickhouse-backup:1.0.2
               imagePullPolicy: Always
               command:
                 - bash

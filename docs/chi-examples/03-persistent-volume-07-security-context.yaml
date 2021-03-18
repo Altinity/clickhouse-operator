@@ -50,11 +50,8 @@ spec:
               command:
                 - clickhouse-server
                 - --config-file=/etc/clickhouse-server/config.xml
-              env:
-                - name: CLICKHOUSE_DO_NOT_CHOWN
-                  value: "1"
             - name: clickhouse-backup
-              image: altinity/clickhouse-backup:0.21.0
+              image: altinity/clickhouse-backup:1.0.2
               imagePullPolicy: Always
               command:
                 - /bin/bash
