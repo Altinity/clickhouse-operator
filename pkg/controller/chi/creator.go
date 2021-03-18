@@ -132,12 +132,17 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *v1.Pe
 	return pvc, err
 }
 
+var errAbort = errors.New("onStatefulSetCreateFailed - abort")
+var errStop = errors.New("onStatefulSetCreateFailed - stop")
+var errIgnore = errors.New("onStatefulSetCreateFailed - ignore")
+var errUnexpectedFlow = errors.New("unexpected flow")
+
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed
 // It can just delete failed StatefulSet or do nothing
 func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
-		return nil
+		return errIgnore
 	}
 
 	// What to do with StatefulSet - look into chop configuration settings
@@ -145,7 +150,7 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatef
 	case chop.OnStatefulSetCreateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
 		log.V(1).M(host).F().Info("abort")
-		return errors.New(fmt.Sprintf("Create failed on %s", util.NamespaceNameString(failedStatefulSet.ObjectMeta)))
+		return errAbort
 
 	case chop.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully failed StatefulSet
@@ -156,14 +161,14 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatef
 	case chop.OnStatefulSetCreateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
 		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(failedStatefulSet.ObjectMeta))
-		return nil
+		return errIgnore
 
 	default:
 		log.V(1).M(host).A().Error("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", c.chop.Config().OnStatefulSetCreateFailureAction)
-		return nil
+		return errIgnore
 	}
 
-	return fmt.Errorf("unexpected flow")
+	return errUnexpectedFlow
 }
 
 // onStatefulSetUpdateFailed handles situation when StatefulSet update failed
@@ -171,7 +176,7 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatef
 func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
-		return nil
+		return errIgnore
 	}
 
 	// Convenience shortcuts
@@ -183,7 +188,7 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	case chop.OnStatefulSetUpdateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
 		log.V(1).M(host).F().Info("abort StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
-		return errors.New(fmt.Sprintf("Update failed on %s/%s", namespace, name))
+		return errAbort
 
 	case chop.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
@@ -204,14 +209,14 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	case chop.OnStatefulSetUpdateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
 		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
-		return nil
+		return errIgnore
 
 	default:
 		log.V(1).M(host).A().Error("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", c.chop.Config().OnStatefulSetUpdateFailureAction)
-		return nil
+		return errIgnore
 	}
 
-	return fmt.Errorf("unexpected flow")
+	return errUnexpectedFlow
 }
 
 // shouldContinueOnCreateFailed return nil in case 'continue' or error in case 'do not continue'
@@ -221,11 +226,11 @@ func (c *Controller) shouldContinueOnCreateFailed() error {
 	var continueUpdate = false
 	if continueUpdate {
 		// Continue update
-		return nil
+		return errIgnore
 	}
 
 	// Do not continue update
-	return fmt.Errorf("create stopped due to previous errors")
+	return errStop
 }
 
 // shouldContinueOnUpdateFailed return nil in case 'continue' or error in case 'do not continue'
@@ -235,9 +240,9 @@ func (c *Controller) shouldContinueOnUpdateFailed() error {
 	var continueUpdate = false
 	if continueUpdate {
 		// Continue update
-		return nil
+		return errIgnore
 	}
 
 	// Do not continue update
-	return fmt.Errorf("update stopped due to previous errors")
+	return errStop
 }
