@@ -1280,8 +1280,8 @@ def test_024(self):
         assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", ".metadata.annotations.test") == "test"
     with And("Service annotations should be populated"):
         assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.test") == "test"
-    with And("PV annotations should be populated"):
-        assert kubectl.get_field("pv", "-l clickhouse.altinity.com/chi=test-024", ".metadata.annotations.test") == "test"
+    with And("PVC annotations should be populated"):
+        assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", ".metadata.annotations.test") == "test"
         
     kubectl.delete_chi(chi)
     
