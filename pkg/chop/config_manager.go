@@ -112,7 +112,7 @@ func (cm *ConfigManager) Init() error {
 	return nil
 }
 
-// OperatorConfig is an access wrapper
+// Config is an access wrapper
 func (cm *ConfigManager) Config() *chiv1.OperatorConfig {
 	return cm.config
 }
@@ -336,18 +336,20 @@ func (cm *ConfigManager) GetRuntimeParam(name string) (string, bool) {
 	return value, ok
 }
 
-// fillCredentials
+// fetchSecretCredentials
 func (cm *ConfigManager) fetchSecretCredentials() {
+	// Secret name where to look for credentials
+	name := cm.config.CHCredentialsSecretName
+
 	// Do we need to fetch credentials from the secret?
-	if cm.config.CHCredentialsSecretName == "" {
+	if name == "" {
 		// No name specified, no need to read secret
 		return
 	}
 
-	name := cm.config.CHCredentialsSecretName
+	// We have secret name specified, let's move on and read credentials
 
-	// We have secret name specified, let's read credentials
-	// Figure out namespace where to look for secret
+	// Figure out namespace where to look for the secret
 	namespace := cm.config.CHCredentialsSecretNamespace
 	if namespace == "" {
 		// No namespace explicitly specified, let's look into namespace where pod is running

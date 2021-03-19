@@ -82,6 +82,7 @@ func GetClientset(kubeConfigFile, masterURL string) (*kube.Clientset, *chopclien
 	return kubeClientset, chopClientset
 }
 
+// GetCHOp gets chop instance
 // chopClient can be nil, in this case CHOp will not be able to use any ConfigMap(s) with configuration
 func GetCHOp(kubeClient *kube.Clientset, chopClient *chopclientset.Clientset, initCHOpConfigFilePath string) *CHOp {
 	// Create operator instance
