@@ -52,7 +52,7 @@ type ConfigManager struct {
 	crConfigs []*chiv1.OperatorConfig
 
 	// config is the final config, built as merge of all available configs.
-	// This this config is ready to use/be consumed by users
+	// This config is ready to use/be consumed by users
 	config *chiv1.OperatorConfig
 
 	// runtimeParams is set/map of runtime params, influencing configuration
