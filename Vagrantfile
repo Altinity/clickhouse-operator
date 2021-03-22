@@ -95,7 +95,7 @@ Vagrant.configure(2) do |config|
     apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git
 
     # yq
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys CC86BB64
+    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys CC86BB64
     add-apt-repository ppa:rmescandon/yq
     apt-get install --no-install-recommends -y yq
 
@@ -127,7 +127,7 @@ Vagrant.configure(2) do |config|
 
 
     # minikube
-    MINIKUBE_VERSION=1.17.1
+    MINIKUBE_VERSION=1.18.1
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -138,9 +138,9 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
 #    K8S_VERSION=${K8S_VERSION:-1.17.17}
-#    K8S_VERSION=${K8S_VERSION:-1.18.16}
-#    K8S_VERSION=${K8S_VERSION:-1.19.8}
-    K8S_VERSION=${K8S_VERSION:-1.20.4}
+#    K8S_VERSION=${K8S_VERSION:-1.18.17}
+#    K8S_VERSION=${K8S_VERSION:-1.19.9}
+    K8S_VERSION=${K8S_VERSION:-1.20.5}
     export VALIDATE_YAML=true
 
     killall kubectl || true
@@ -255,11 +255,11 @@ Vagrant.configure(2) do |config|
 
     pip3 install -r /vagrant/tests/requirements.txt
 
+    python3 /vagrant/tests/test_backup_alerts.py
     python3 /vagrant/tests/test.py --only=operator/*
     python3 /vagrant/tests/test_examples.py
     python3 /vagrant/tests/test_metrics_exporter.py
     python3 /vagrant/tests/test_metrics_alerts.py
-    python3 /vagrant/tests/test_backup_alerts.py
 
   SHELL
 

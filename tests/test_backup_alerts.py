@@ -1,7 +1,7 @@
 import json
 import random
 import time
-
+import datetime
 import alerts
 import settings
 import kubectl
@@ -77,6 +77,43 @@ def prepare_table_for_backup(backup_pod, rows=1000):
     )
     return backup_name
 
+def apply_fake_backup(message):
+    with Given(message):
+        kubectl.create_and_check(
+            config="configs/test-cluster-for-backups-fake.yaml",
+            check={
+                "apply_templates": [
+                    "templates/tpl-clickhouse-backups-fake.yaml",
+                    "templates/tpl-persistent-volume-100Mi.yaml"
+                ],
+                "object_counts": {
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
+                },
+                "do_not_delete": 1
+            }
+        )
+
+
+def apply_normal_backup():
+    with Then("apply back normal backup"):
+        kubectl.create_and_check(
+            config="configs/test-cluster-for-backups.yaml",
+            check={
+                "apply_templates": [
+                    "templates/tpl-clickhouse-backups.yaml",
+                    "templates/tpl-persistent-volume-100Mi.yaml"
+                ],
+                "object_counts": {
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
+                },
+                "do_not_delete": 1
+            }
+        )
+
 
 @TestScenario
 @Name("Check clickhouse-operator/minio setup")
@@ -121,6 +158,7 @@ def test_backup_is_success(self):
         wait_backup_command_status(backup_pod, f'create {backup_name}', expected_status='success')
 
         exec_on_backup_container(backup_pod, f'curl -X POST -sL "http://127.0.0.1:7171/backup/upload/{backup_name}"')
+        wait_backup_command_status(backup_pod, f'upload {backup_name}', expected_status='success')
 
     with Then('list of backups shall changed'):
         list_after = exec_on_backup_container(backup_pod, 'curl -sL http://127.0.0.1:7171/backup/list')
@@ -204,25 +242,10 @@ def test_backup_failed(self):
 
 
 @TestScenario
-@Name('test_backup_too_short_duration. Check ClickHouseBackupTooShort and ClickHouseBackupTooLong alerts')
+@Name('test_backup_duration. Check ClickHouseBackupTooShort and ClickHouseBackupTooLong alerts')
 def test_backup_duration(self):
     short_pod, _, long_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
-    with Given("prepare fake backup duration metric"):
-        kubectl.create_and_check(
-            config="configs/test-cluster-for-backups-fake.yaml",
-            check={
-                "apply_templates": [
-                    "templates/tpl-clickhouse-backups-fake.yaml",
-                    "templates/tpl-persistent-volume-100Mi.yaml"
-                ],
-                "object_counts": {
-                    "statefulset": 2,
-                    "pod": 2,
-                    "service": 3,
-                },
-                "do_not_delete": 1
-            }
-        )
+    apply_fake_backup("prepare fake backup duration metric")
 
     for pod in [short_pod, long_pod]:
         with Then(f"wait {pod} ready"):
@@ -239,9 +262,9 @@ def test_backup_duration(self):
     with Then(f"decrease {short_pod} backup duration"):
         kubectl.launch(
             f'exec {short_pod} -c clickhouse-backup -- bash -xc \''
-            'echo "# HELP clickhouse_backup_last_backup_duration Backup duration in nanoseconds." > /usr/share/nginx/html/metrics && '
-            'echo "# TYPE clickhouse_backup_last_backup_duration gauge" >> /usr/share/nginx/html/metrics && '
-            'echo "clickhouse_backup_last_backup_duration 7000000000000" >> /usr/share/nginx/html/metrics && '
+            'echo "# HELP clickhouse_backup_last_create_duration Backup create duration in nanoseconds" > /usr/share/nginx/html/metrics && '
+            'echo "# TYPE clickhouse_backup_last_create_duration gauge" >> /usr/share/nginx/html/metrics && '
+            'echo "clickhouse_backup_last_create_duration 7000000000000" >> /usr/share/nginx/html/metrics && '
             'echo "# HELP clickhouse_backup_last_backup_success Last backup success boolean: 0=failed, 1=success, 2=unknown." >> /usr/share/nginx/html/metrics && '
             'echo "# TYPE clickhouse_backup_last_backup_success gauge" >> /usr/share/nginx/html/metrics && '
             'echo "clickhouse_backup_last_backup_success 1" >> /usr/share/nginx/html/metrics'
@@ -252,22 +275,7 @@ def test_backup_duration(self):
                                         labels={"pod_name": short_pod}, time_range='60s')
         assert fired, error("can't get ClickHouseBackupTooShort alert in firing state")
 
-    with Then("apply back normal backup"):
-        kubectl.create_and_check(
-            config="configs/test-cluster-for-backups.yaml",
-            check={
-                "apply_templates": [
-                    "templates/tpl-clickhouse-backups.yaml",
-                    "templates/tpl-persistent-volume-100Mi.yaml"
-                ],
-                "object_counts": {
-                    "statefulset": 2,
-                    "pod": 2,
-                    "service": 3,
-                },
-                "do_not_delete": 1
-            }
-        )
+    apply_normal_backup()
 
     with Then("check ClickHouseBackupTooShort gone away"):
         resolved = alerts.wait_alert_state("ClickHouseBackupTooShort", "firing", expected_state=False,
@@ -316,6 +324,47 @@ def test_backup_size(self):
             assert resolved, error("can't get ClickHouseBackupSizeChanged alert is gone away")
 
 
+@TestScenario
+@Name('test_backup_not_run. Check ClickhouseDoesntRunTooLong alert')
+def test_backup_not_run(self):
+    not_run_pod, _, _, _ = alerts.random_pod_choice_for_callbacks(chi)
+    apply_fake_backup("prepare fake backup for time metric")
+
+    with Then(f"wait {not_run_pod} ready"):
+        kubectl.wait_field("pod", not_run_pod, ".spec.containers[1].image", "nginx:latest")
+        kubectl.wait_field("pod", not_run_pod, ".status.containerStatuses[1].ready", "true")
+
+    with Then(f"setup {not_run_pod} backup create end time"):
+        kubectl.launch(
+            f'exec {not_run_pod} -c clickhouse-backup -- bash -xc \''
+            'echo "# HELP clickhouse_backup_last_create_finish Last backup create finish timestamp" > /usr/share/nginx/html/metrics && '
+            'echo "# TYPE clickhouse_backup_last_create_finish gauge" >> /usr/share/nginx/html/metrics && '
+            f'echo "clickhouse_backup_last_create_finish {int((datetime.datetime.now() - datetime.timedelta(days=2)).timestamp())}" >> /usr/share/nginx/html/metrics '
+            '\''
+        )
+
+        fired = alerts.wait_alert_state("ClickhouseDoesntRunTooLong", "firing", expected_state=True, sleep_time=5,
+                                        labels={"pod_name": not_run_pod}, time_range='60s')
+        assert fired, error("can't get ClickhouseDoesntRunTooLong alert in firing state")
+
+    apply_normal_backup()
+
+    backup_name = prepare_table_for_backup(not_run_pod)
+    wait_backup_pod_ready_and_curl_installed(not_run_pod)
+
+    with When('Backup is success'):
+        exec_on_backup_container(not_run_pod, f'curl -X POST -sL "http://127.0.0.1:7171/backup/create?name={backup_name}"')
+        wait_backup_command_status(not_run_pod, f'create {backup_name}', expected_status='success')
+
+        exec_on_backup_container(not_run_pod, f'curl -X POST -sL "http://127.0.0.1:7171/backup/upload/{backup_name}"')
+        wait_backup_command_status(not_run_pod, f'upload {backup_name}', expected_status='success')
+
+    with Then("check ClickhouseDoesntRunTooLong gone away"):
+        resolved = alerts.wait_alert_state("ClickhouseDoesntRunTooLong", "firing", expected_state=False,
+                                           labels={"pod_name": not_run_pod}, sleep_time=5)
+        assert resolved, error("can't get ClickhouseDoesntRunTooLong alert is gone away")
+
+
 if main():
     with Module("main"):
         prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi = alerts.initialize(
@@ -332,6 +381,7 @@ if main():
                 test_backup_failed,
                 test_backup_duration,
                 test_backup_size,
+                test_backup_not_run,
             ]
             for t in test_cases:
                 Scenario(test=t)()

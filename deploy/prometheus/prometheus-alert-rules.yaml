@@ -963,3 +963,21 @@ spec:
 
               ClickHouse data size
               ```kubectl exec -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }}-- wget -qO- "http://127.0.0.1:8123/?query=SELECT+formatReadableSize(sum(total_bytes))+FROM+system.tables+WHERE+database!='system'"`
+
+        - alert: ClickhouseDoesntRunTooLong
+          expr: |-
+            (clickhouse_backup_last_backup_end{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_backup_end{container_name='clickhouse-backup'} > 86400)
+            or (clickhouse_backup_last_create_finish{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_create_finish{container_name='clickhouse-backup'} > 86400)
+            or (clickhouse_backup_last_upload_finish{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_upload_finish{container_name='clickhouse-backup'} > 86400)
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "clickhouse-backup didn't run last 24h"
+            description: |-
+              `time() - clickhouse_backup_last_backup_end{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "time() - clickhouse_backup_last_backup_end{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanizeDuration }}{{ end }}
+              `time() - clickhouse_backup_last_create_finish{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "time() - clickhouse_backup_last_create_finish{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanizeDuration }}{{ end }}
+              `time() - clickhouse_backup_last_backup_finish{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "time() - clickhouse_backup_last_backup_finish{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanizeDuration }}{{ end }}
+
+              Check clickhouse-backup logs
+              ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=48h```
