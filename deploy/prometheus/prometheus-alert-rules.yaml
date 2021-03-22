@@ -964,7 +964,7 @@ spec:
               ClickHouse data size
               ```kubectl exec -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }}-- wget -qO- "http://127.0.0.1:8123/?query=SELECT+formatReadableSize(sum(total_bytes))+FROM+system.tables+WHERE+database!='system'"`
 
-        - alert: ClickhouseDoesntRunTooLong
+        - alert: ClickhouseBackupDoesntRunTooLong
           expr: |-
             (clickhouse_backup_last_backup_end{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_backup_end{container_name='clickhouse-backup'} > 86400)
             or (clickhouse_backup_last_create_finish{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_create_finish{container_name='clickhouse-backup'} > 86400)

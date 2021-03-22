@@ -325,7 +325,7 @@ def test_backup_size(self):
 
 
 @TestScenario
-@Name('test_backup_not_run. Check ClickhouseDoesntRunTooLong alert')
+@Name('test_backup_not_run. Check ClickhouseBackupDoesntRunTooLong alert')
 def test_backup_not_run(self):
     not_run_pod, _, _, _ = alerts.random_pod_choice_for_callbacks(chi)
     apply_fake_backup("prepare fake backup for time metric")
@@ -343,9 +343,9 @@ def test_backup_not_run(self):
             '\''
         )
 
-        fired = alerts.wait_alert_state("ClickhouseDoesntRunTooLong", "firing", expected_state=True, sleep_time=5,
+        fired = alerts.wait_alert_state("ClickhouseBackupDoesntRunTooLong", "firing", expected_state=True, sleep_time=5,
                                         labels={"pod_name": not_run_pod}, time_range='60s')
-        assert fired, error("can't get ClickhouseDoesntRunTooLong alert in firing state")
+        assert fired, error("can't get ClickhouseBackupDoesntRunTooLong alert in firing state")
 
     apply_normal_backup()
 
@@ -359,10 +359,10 @@ def test_backup_not_run(self):
         exec_on_backup_container(not_run_pod, f'curl -X POST -sL "http://127.0.0.1:7171/backup/upload/{backup_name}"')
         wait_backup_command_status(not_run_pod, f'upload {backup_name}', expected_status='success')
 
-    with Then("check ClickhouseDoesntRunTooLong gone away"):
-        resolved = alerts.wait_alert_state("ClickhouseDoesntRunTooLong", "firing", expected_state=False,
+    with Then("check ClickhouseBackupDoesntRunTooLong gone away"):
+        resolved = alerts.wait_alert_state("ClickhouseBackupDoesntRunTooLong", "firing", expected_state=False,
                                            labels={"pod_name": not_run_pod}, sleep_time=5)
-        assert resolved, error("can't get ClickhouseDoesntRunTooLong alert is gone away")
+        assert resolved, error("can't get ClickhouseBackupDoesntRunTooLong alert is gone away")
 
 
 if main():
