@@ -3496,7 +3496,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_MarkCacheHits[1m]) / (irate(chi_clickhouse_event_MarkCacheHits[1m]) + irate(chi_clickhouse_event_MarkCacheMisses[1m]))",
+          "expr": "irate(chi_clickhouse_event_MarkCacheHits{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) / (irate(chi_clickhouse_event_MarkCacheHits{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) + irate(chi_clickhouse_event_MarkCacheMisses{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]))",
           "hide": false,
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
