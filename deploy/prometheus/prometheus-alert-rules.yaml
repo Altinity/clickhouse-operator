@@ -908,11 +908,11 @@ spec:
 
         - alert: ClickHouseBackupTooShort
           expr: |-
-            (clickhouse_backup_last_backup_success{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_backup_duration{container_name='clickhouse-backup'} <= clickhouse_backup_last_backup_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
-            or (clickhouse_backup_last_create_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_create_duration{container_name='clickhouse-backup'} <= clickhouse_backup_last_create_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
-            or (clickhouse_backup_last_download_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_download_duration{container_name='clickhouse-backup'} <= clickhouse_backup_last_download_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
-            or (clickhouse_backup_last_restore_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_restore_duration{container_name='clickhouse-backup'} <= clickhouse_backup_last_restore_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
-            or (clickhouse_backup_last_upload_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_upload_duration{container_name='clickhouse-backup'} <= clickhouse_backup_last_upload_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
+            (clickhouse_backup_last_backup_success{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_backup_duration{container_name='clickhouse-backup'} < clickhouse_backup_last_backup_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
+            or (clickhouse_backup_last_create_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_create_duration{container_name='clickhouse-backup'} < clickhouse_backup_last_create_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
+            or (clickhouse_backup_last_download_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_download_duration{container_name='clickhouse-backup'} < clickhouse_backup_last_download_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
+            or (clickhouse_backup_last_restore_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_restore_duration{container_name='clickhouse-backup'} < clickhouse_backup_last_restore_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
+            or (clickhouse_backup_last_upload_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_upload_duration{container_name='clickhouse-backup'} < clickhouse_backup_last_upload_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
           labels:
             severity: warning
           annotations:
@@ -938,7 +938,7 @@ spec:
               ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=24h```
 
               ClickHouse data size
-              ```kubectl exec -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }}-- wget -qO- "http://127.0.0.1:8123/?query=SELECT+formatReadableSize(sum(total_bytes))+FROM+system.tables+WHERE+database!='system'"`
+              ```kubectl exec -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }}-- wget -qO- "http://127.0.0.1:8123/?query=SELECT+formatReadableSize(sum(total_bytes))+FROM+system.tables+WHERE+database!='system'"```
 
         - alert: ClickHouseBackupSizeChanged
           expr: |-
@@ -962,7 +962,7 @@ spec:
               ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=24h```
 
               ClickHouse data size
-              ```kubectl exec -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }}-- wget -qO- "http://127.0.0.1:8123/?query=SELECT+formatReadableSize(sum(total_bytes))+FROM+system.tables+WHERE+database!='system'"`
+              ```kubectl exec -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }}-- wget -qO- "http://127.0.0.1:8123/?query=SELECT+formatReadableSize(sum(total_bytes))+FROM+system.tables+WHERE+database!='system'"```
 
         - alert: ClickhouseBackupDoesntRunTooLong
           expr: |-
