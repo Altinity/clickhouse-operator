@@ -383,7 +383,7 @@ func (c *Controller) Run(ctx context.Context) {
 	}
 
 	// Label controller runtime objects with proper labels
-	c.labelMyObjectsTree()
+	c.labelMyObjectsTree(ctx)
 
 	//
 	// Start threads
@@ -575,7 +575,12 @@ func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfigur
 }
 
 // updateCHIObject updates ClickHouseInstallation object
-func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
+func (c *Controller) updateCHIObject(ctx context.Context, chi *chi.ClickHouseInstallation) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	// Start Debug object
 	js, err := json.MarshalIndent(chi, "", "  ")
 	if err != nil {
@@ -592,7 +597,7 @@ func (c *Controller) updateCHIObject(chi *chi.ClickHouseInstallation) error {
 	//	}
 	//}
 
-	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chi)
+	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(ctx, chi, newUpdateOptions())
 	if err != nil {
 		// Error update
 		log.V(1).M(chi).A().Error("%q", err)
@@ -629,7 +634,7 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	log.V(2).M(chi).F().Info("Update CHI status")
 
-	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(name, newGetOptions())
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, newGetOptions())
 	if err != nil {
 		if tolerateAbsence {
 			return nil
@@ -648,15 +653,20 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 	// Update status of a real object.
 	// TODO DeepCopy depletes stack here
 	cur.Status = chi.Status
-	return c.updateCHIObject(cur)
+	return c.updateCHIObject(ctx, cur)
 }
 
 // installFinalizer
-func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
+func (c *Controller) installFinalizer(ctx context.Context, chi *chi.ClickHouseInstallation) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	log.V(2).M(chi).S().P()
 	defer log.V(2).M(chi).E().P()
 
-	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(chi.Name, newGetOptions())
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(ctx, chi.Name, newGetOptions())
 	if err != nil {
 		return err
 	}
@@ -671,15 +681,20 @@ func (c *Controller) installFinalizer(chi *chi.ClickHouseInstallation) error {
 	log.V(3).M(chi).F().Info("no finalizer found, need to install one")
 
 	cur.ObjectMeta.Finalizers = append(cur.ObjectMeta.Finalizers, FinalizerName)
-	return c.updateCHIObject(cur)
+	return c.updateCHIObject(ctx, cur)
 }
 
 // uninstallFinalizer
-func (c *Controller) uninstallFinalizer(chi *chi.ClickHouseInstallation) error {
+func (c *Controller) uninstallFinalizer(ctx context.Context, chi *chi.ClickHouseInstallation) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	log.V(2).M(chi).S().P()
 	defer log.V(2).M(chi).E().P()
 
-	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(chi.Name, newGetOptions())
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(ctx, chi.Name, newGetOptions())
 	if err != nil {
 		return err
 	}
@@ -689,7 +704,7 @@ func (c *Controller) uninstallFinalizer(chi *chi.ClickHouseInstallation) error {
 
 	cur.ObjectMeta.Finalizers = util.RemoveFromArray(FinalizerName, cur.ObjectMeta.Finalizers)
 
-	return c.updateCHIObject(cur)
+	return c.updateCHIObject(ctx, cur)
 }
 
 // handleObject enqueues CHI which is owner of `obj` into reconcile loop

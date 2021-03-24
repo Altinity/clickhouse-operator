@@ -15,6 +15,8 @@
 package chi
 
 import (
+	"context"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"k8s.io/api/core/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -22,7 +24,12 @@ import (
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
-func (c *Controller) appendLabelReady(host *chop.ChiHost) error {
+func (c *Controller) appendLabelReady(ctx context.Context, host *chop.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	pod, err := c.getPod(host)
 	if err != nil {
 		log.M(host).A().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
@@ -30,7 +37,7 @@ func (c *Controller) appendLabelReady(host *chop.ChiHost) error {
 	}
 
 	chopmodel.AppendLabelReady(&pod.ObjectMeta)
-	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(pod)
+	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
 	if err != nil {
 		log.M(host).A().Error("FAIL setting 'ready' label for host %s err:%v", host.Address.NamespaceNameString(), err)
 		return err
@@ -38,7 +45,12 @@ func (c *Controller) appendLabelReady(host *chop.ChiHost) error {
 	return err
 }
 
-func (c *Controller) deleteLabelReady(host *chop.ChiHost) error {
+func (c *Controller) deleteLabelReady(ctx context.Context, host *chop.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	if host == nil {
 		return nil
 	}
@@ -55,7 +67,7 @@ func (c *Controller) deleteLabelReady(host *chop.ChiHost) error {
 	}
 
 	chopmodel.DeleteLabelReady(&pod.ObjectMeta)
-	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(pod)
+	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
 	return err
 }
 

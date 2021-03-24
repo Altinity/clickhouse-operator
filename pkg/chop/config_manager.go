@@ -15,6 +15,7 @@
 package chop
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -126,7 +127,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 
 	// Get list of ClickHouseOperatorConfiguration objects
 	var err error
-	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(metav1.ListOptions{}); err != nil {
+	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(context.TODO(), metav1.ListOptions{}); err != nil {
 		log.V(1).A().Error("Error read ClickHouseOperatorConfigurations %v", err)
 		return
 	}
@@ -365,7 +366,7 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 		return
 	}
 
-	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(name, metav1.GetOptions{})
+	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return
 	}

@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	clickhousealtinitycomv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var clickhouseinstallationtemplatesResource = schema.GroupVersionResource{Group:
 var clickhouseinstallationtemplatesKind = schema.GroupVersionKind{Group: "clickhouse.altinity.com", Version: "v1", Kind: "ClickHouseInstallationTemplate"}
 
 // Get takes name of the clickHouseInstallationTemplate, and returns the corresponding clickHouseInstallationTemplate object, and an error if there is any.
-func (c *FakeClickHouseInstallationTemplates) Get(name string, options v1.GetOptions) (result *clickhousealtinitycomv1.ClickHouseInstallationTemplate, err error) {
+func (c *FakeClickHouseInstallationTemplates) Get(ctx context.Context, name string, options v1.GetOptions) (result *clickhousealtinitycomv1.ClickHouseInstallationTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(clickhouseinstallationtemplatesResource, c.ns, name), &clickhousealtinitycomv1.ClickHouseInstallationTemplate{})
 
@@ -50,7 +52,7 @@ func (c *FakeClickHouseInstallationTemplates) Get(name string, options v1.GetOpt
 }
 
 // List takes label and field selectors, and returns the list of ClickHouseInstallationTemplates that match those selectors.
-func (c *FakeClickHouseInstallationTemplates) List(opts v1.ListOptions) (result *clickhousealtinitycomv1.ClickHouseInstallationTemplateList, err error) {
+func (c *FakeClickHouseInstallationTemplates) List(ctx context.Context, opts v1.ListOptions) (result *clickhousealtinitycomv1.ClickHouseInstallationTemplateList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(clickhouseinstallationtemplatesResource, clickhouseinstallationtemplatesKind, c.ns, opts), &clickhousealtinitycomv1.ClickHouseInstallationTemplateList{})
 
@@ -72,14 +74,14 @@ func (c *FakeClickHouseInstallationTemplates) List(opts v1.ListOptions) (result 
 }
 
 // Watch returns a watch.Interface that watches the requested clickHouseInstallationTemplates.
-func (c *FakeClickHouseInstallationTemplates) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClickHouseInstallationTemplates) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(clickhouseinstallationtemplatesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a clickHouseInstallationTemplate and creates it.  Returns the server's representation of the clickHouseInstallationTemplate, and an error, if there is any.
-func (c *FakeClickHouseInstallationTemplates) Create(clickHouseInstallationTemplate *clickhousealtinitycomv1.ClickHouseInstallationTemplate) (result *clickhousealtinitycomv1.ClickHouseInstallationTemplate, err error) {
+func (c *FakeClickHouseInstallationTemplates) Create(ctx context.Context, clickHouseInstallationTemplate *clickhousealtinitycomv1.ClickHouseInstallationTemplate, opts v1.CreateOptions) (result *clickhousealtinitycomv1.ClickHouseInstallationTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(clickhouseinstallationtemplatesResource, c.ns, clickHouseInstallationTemplate), &clickhousealtinitycomv1.ClickHouseInstallationTemplate{})
 
@@ -90,7 +92,7 @@ func (c *FakeClickHouseInstallationTemplates) Create(clickHouseInstallationTempl
 }
 
 // Update takes the representation of a clickHouseInstallationTemplate and updates it. Returns the server's representation of the clickHouseInstallationTemplate, and an error, if there is any.
-func (c *FakeClickHouseInstallationTemplates) Update(clickHouseInstallationTemplate *clickhousealtinitycomv1.ClickHouseInstallationTemplate) (result *clickhousealtinitycomv1.ClickHouseInstallationTemplate, err error) {
+func (c *FakeClickHouseInstallationTemplates) Update(ctx context.Context, clickHouseInstallationTemplate *clickhousealtinitycomv1.ClickHouseInstallationTemplate, opts v1.UpdateOptions) (result *clickhousealtinitycomv1.ClickHouseInstallationTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(clickhouseinstallationtemplatesResource, c.ns, clickHouseInstallationTemplate), &clickhousealtinitycomv1.ClickHouseInstallationTemplate{})
 
@@ -101,7 +103,7 @@ func (c *FakeClickHouseInstallationTemplates) Update(clickHouseInstallationTempl
 }
 
 // Delete takes name of the clickHouseInstallationTemplate and deletes it. Returns an error if one occurs.
-func (c *FakeClickHouseInstallationTemplates) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeClickHouseInstallationTemplates) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(clickhouseinstallationtemplatesResource, c.ns, name), &clickhousealtinitycomv1.ClickHouseInstallationTemplate{})
 
@@ -109,15 +111,15 @@ func (c *FakeClickHouseInstallationTemplates) Delete(name string, options *v1.De
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClickHouseInstallationTemplates) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(clickhouseinstallationtemplatesResource, c.ns, listOptions)
+func (c *FakeClickHouseInstallationTemplates) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(clickhouseinstallationtemplatesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &clickhousealtinitycomv1.ClickHouseInstallationTemplateList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched clickHouseInstallationTemplate.
-func (c *FakeClickHouseInstallationTemplates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *clickhousealtinitycomv1.ClickHouseInstallationTemplate, err error) {
+func (c *FakeClickHouseInstallationTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *clickhousealtinitycomv1.ClickHouseInstallationTemplate, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(clickhouseinstallationtemplatesResource, c.ns, name, pt, data, subresources...), &clickhousealtinitycomv1.ClickHouseInstallationTemplate{})
 

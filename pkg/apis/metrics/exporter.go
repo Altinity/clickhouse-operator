@@ -15,6 +15,7 @@
 package metrics
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -293,7 +294,7 @@ func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
 func (e *Exporter) DiscoveryWatchedCHIs(chop *chop.CHOp, chopClient *chopclientset.Clientset) {
 	// Get all CHI objects from watched namespace(s)
 	watchedNamespace := chop.Config().GetInformerNamespace()
-	list, err := chopClient.ClickhouseV1().ClickHouseInstallations(watchedNamespace).List(v1.ListOptions{})
+	list, err := chopClient.ClickhouseV1().ClickHouseInstallations(watchedNamespace).List(context.TODO(), v1.ListOptions{})
 	if err != nil {
 		log.V(1).Infof("Error read ClickHouseInstallations %v", err)
 		return

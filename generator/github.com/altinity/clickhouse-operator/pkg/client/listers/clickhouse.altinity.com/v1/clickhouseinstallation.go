@@ -26,8 +26,10 @@ import (
 )
 
 // ClickHouseInstallationLister helps list ClickHouseInstallations.
+// All objects returned here must be treated as read-only.
 type ClickHouseInstallationLister interface {
 	// List lists all ClickHouseInstallations in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClickHouseInstallation, err error)
 	// ClickHouseInstallations returns an object that can list and get ClickHouseInstallations.
 	ClickHouseInstallations(namespace string) ClickHouseInstallationNamespaceLister
@@ -58,10 +60,13 @@ func (s *clickHouseInstallationLister) ClickHouseInstallations(namespace string)
 }
 
 // ClickHouseInstallationNamespaceLister helps list and get ClickHouseInstallations.
+// All objects returned here must be treated as read-only.
 type ClickHouseInstallationNamespaceLister interface {
 	// List lists all ClickHouseInstallations in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ClickHouseInstallation, err error)
 	// Get retrieves the ClickHouseInstallation from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ClickHouseInstallation, error)
 	ClickHouseInstallationNamespaceListerExpansion
 }

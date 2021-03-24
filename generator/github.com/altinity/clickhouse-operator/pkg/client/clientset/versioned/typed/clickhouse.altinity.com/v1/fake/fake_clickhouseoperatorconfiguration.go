@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	clickhousealtinitycomv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var clickhouseoperatorconfigurationsResource = schema.GroupVersionResource{Group
 var clickhouseoperatorconfigurationsKind = schema.GroupVersionKind{Group: "clickhouse.altinity.com", Version: "v1", Kind: "ClickHouseOperatorConfiguration"}
 
 // Get takes name of the clickHouseOperatorConfiguration, and returns the corresponding clickHouseOperatorConfiguration object, and an error if there is any.
-func (c *FakeClickHouseOperatorConfigurations) Get(name string, options v1.GetOptions) (result *clickhousealtinitycomv1.ClickHouseOperatorConfiguration, err error) {
+func (c *FakeClickHouseOperatorConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *clickhousealtinitycomv1.ClickHouseOperatorConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(clickhouseoperatorconfigurationsResource, c.ns, name), &clickhousealtinitycomv1.ClickHouseOperatorConfiguration{})
 
@@ -50,7 +52,7 @@ func (c *FakeClickHouseOperatorConfigurations) Get(name string, options v1.GetOp
 }
 
 // List takes label and field selectors, and returns the list of ClickHouseOperatorConfigurations that match those selectors.
-func (c *FakeClickHouseOperatorConfigurations) List(opts v1.ListOptions) (result *clickhousealtinitycomv1.ClickHouseOperatorConfigurationList, err error) {
+func (c *FakeClickHouseOperatorConfigurations) List(ctx context.Context, opts v1.ListOptions) (result *clickhousealtinitycomv1.ClickHouseOperatorConfigurationList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(clickhouseoperatorconfigurationsResource, clickhouseoperatorconfigurationsKind, c.ns, opts), &clickhousealtinitycomv1.ClickHouseOperatorConfigurationList{})
 
@@ -72,14 +74,14 @@ func (c *FakeClickHouseOperatorConfigurations) List(opts v1.ListOptions) (result
 }
 
 // Watch returns a watch.Interface that watches the requested clickHouseOperatorConfigurations.
-func (c *FakeClickHouseOperatorConfigurations) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeClickHouseOperatorConfigurations) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(clickhouseoperatorconfigurationsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a clickHouseOperatorConfiguration and creates it.  Returns the server's representation of the clickHouseOperatorConfiguration, and an error, if there is any.
-func (c *FakeClickHouseOperatorConfigurations) Create(clickHouseOperatorConfiguration *clickhousealtinitycomv1.ClickHouseOperatorConfiguration) (result *clickhousealtinitycomv1.ClickHouseOperatorConfiguration, err error) {
+func (c *FakeClickHouseOperatorConfigurations) Create(ctx context.Context, clickHouseOperatorConfiguration *clickhousealtinitycomv1.ClickHouseOperatorConfiguration, opts v1.CreateOptions) (result *clickhousealtinitycomv1.ClickHouseOperatorConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(clickhouseoperatorconfigurationsResource, c.ns, clickHouseOperatorConfiguration), &clickhousealtinitycomv1.ClickHouseOperatorConfiguration{})
 
@@ -90,7 +92,7 @@ func (c *FakeClickHouseOperatorConfigurations) Create(clickHouseOperatorConfigur
 }
 
 // Update takes the representation of a clickHouseOperatorConfiguration and updates it. Returns the server's representation of the clickHouseOperatorConfiguration, and an error, if there is any.
-func (c *FakeClickHouseOperatorConfigurations) Update(clickHouseOperatorConfiguration *clickhousealtinitycomv1.ClickHouseOperatorConfiguration) (result *clickhousealtinitycomv1.ClickHouseOperatorConfiguration, err error) {
+func (c *FakeClickHouseOperatorConfigurations) Update(ctx context.Context, clickHouseOperatorConfiguration *clickhousealtinitycomv1.ClickHouseOperatorConfiguration, opts v1.UpdateOptions) (result *clickhousealtinitycomv1.ClickHouseOperatorConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(clickhouseoperatorconfigurationsResource, c.ns, clickHouseOperatorConfiguration), &clickhousealtinitycomv1.ClickHouseOperatorConfiguration{})
 
@@ -101,7 +103,7 @@ func (c *FakeClickHouseOperatorConfigurations) Update(clickHouseOperatorConfigur
 }
 
 // Delete takes name of the clickHouseOperatorConfiguration and deletes it. Returns an error if one occurs.
-func (c *FakeClickHouseOperatorConfigurations) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeClickHouseOperatorConfigurations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(clickhouseoperatorconfigurationsResource, c.ns, name), &clickhousealtinitycomv1.ClickHouseOperatorConfiguration{})
 
@@ -109,15 +111,15 @@ func (c *FakeClickHouseOperatorConfigurations) Delete(name string, options *v1.D
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeClickHouseOperatorConfigurations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(clickhouseoperatorconfigurationsResource, c.ns, listOptions)
+func (c *FakeClickHouseOperatorConfigurations) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(clickhouseoperatorconfigurationsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &clickhousealtinitycomv1.ClickHouseOperatorConfigurationList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched clickHouseOperatorConfiguration.
-func (c *FakeClickHouseOperatorConfigurations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *clickhousealtinitycomv1.ClickHouseOperatorConfiguration, err error) {
+func (c *FakeClickHouseOperatorConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *clickhousealtinitycomv1.ClickHouseOperatorConfiguration, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(clickhouseoperatorconfigurationsResource, c.ns, name, pt, data, subresources...), &clickhousealtinitycomv1.ClickHouseOperatorConfiguration{})
 

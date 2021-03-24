@@ -56,11 +56,11 @@ func (c *Controller) waitHostReady(ctx context.Context, host *chop.ChiHost) erro
 			if sts == nil {
 				return false
 			}
-			_ = c.deleteLabelReady(host)
+			_ = c.deleteLabelReady(ctx, host)
 			return model.IsStatefulSetGeneration(sts, sts.Generation)
 		},
 		func() {
-			_ = c.deleteLabelReady(host)
+			_ = c.deleteLabelReady(ctx, host)
 		},
 	)
 	if err != nil {
@@ -73,11 +73,11 @@ func (c *Controller) waitHostReady(ctx context.Context, host *chop.ChiHost) erro
 		host.StatefulSet,
 		nil,
 		func(sts *apps.StatefulSet) bool {
-			_ = c.deleteLabelReady(host)
+			_ = c.deleteLabelReady(ctx, host)
 			return model.IsStatefulSetReady(sts)
 		},
 		func() {
-			_ = c.deleteLabelReady(host)
+			_ = c.deleteLabelReady(ctx, host)
 		},
 	)
 }
@@ -203,7 +203,7 @@ func (c *Controller) pollStatefulSet(
 			return nil
 		}
 
-		if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(name, newGetOptions()); err == nil {
+		if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, newGetOptions()); err == nil {
 			// Object is found
 			if mainFn(statefulSet) {
 				// All is good, job done, exit

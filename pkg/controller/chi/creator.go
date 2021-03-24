@@ -38,7 +38,7 @@ func (c *Controller) createStatefulSet(ctx context.Context, statefulSet *apps.St
 	}
 
 	log.V(1).Info("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
-	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(statefulSet); err != nil {
+	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, newCreateOptions()); err != nil {
 		// Unable to create StatefulSet at all
 		return err
 	}
@@ -68,7 +68,7 @@ func (c *Controller) updateStatefulSet(
 	}
 
 	// Apply newStatefulSet and wait for Generation to change
-	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).Update(newStatefulSet)
+	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).Update(ctx, newStatefulSet, newUpdateOptions())
 	if err != nil {
 		// Update failed
 		log.V(1).M(host).A().Error("%v", err)
@@ -104,7 +104,7 @@ func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.Persiste
 	}
 
 	var err error
-	pv, err = c.kubeClient.CoreV1().PersistentVolumes().Update(pv)
+	pv, err = c.kubeClient.CoreV1().PersistentVolumes().Update(ctx, pv, newUpdateOptions())
 	if err != nil {
 		// Update failed
 		log.V(1).M(pv).A().Error("%v", err)
@@ -122,7 +122,7 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *v1.Pe
 	}
 
 	var err error
-	pvc, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(pvc)
+	pvc, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, newUpdateOptions())
 	if err != nil {
 		// Update failed
 		log.V(1).M(pvc).A().Error("%v", err)
@@ -193,14 +193,14 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	case chop.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
 		log.V(1).M(host).F().Info("going to ROLLBACK FAILED StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
-		if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(name, newGetOptions()); err != nil {
+		if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, newGetOptions()); err != nil {
 			// Make copy of "previous" .Spec just to be sure nothing gets corrupted
 			// Update StatefulSet to its 'previous' oldStatefulSet - this is expected to rollback inapplicable changes
 			// Having StatefulSet .spec in rolled back status we need to delete current Pod - because in case of Pod being seriously broken,
 			// it is the only way to go. Just delete Pod and StatefulSet will recreated Pod with current .spec
 			// This will rollback Pod to previous .spec
 			statefulSet.Spec = *rollbackStatefulSet.Spec.DeepCopy()
-			statefulSet, err = c.kubeClient.AppsV1().StatefulSets(namespace).Update(statefulSet)
+			statefulSet, err = c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, statefulSet, newUpdateOptions())
 			_ = c.statefulSetDeletePod(ctx, statefulSet, host)
 
 			return c.shouldContinueOnUpdateFailed()

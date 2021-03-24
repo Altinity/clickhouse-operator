@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"context"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -23,7 +24,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (c *Controller) labelMyObjectsTree() {
+func (c *Controller) labelMyObjectsTree(ctx context.Context) {
 
 	// Operator is running in the Pod. We need to label this Pod
 	// Pod is owned by ReplicaSet. We need to label this ReplicaSet also.
@@ -50,6 +51,11 @@ func (c *Controller) labelMyObjectsTree() {
 	//    name: clickhouse-operator
 	//    uid: a275a8a0-83ae-11e9-b92d-0208b778ea1a
 
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return
+	}
+
 	// Label operator's Pod with version label
 	podName, ok1 := c.chop.ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAME)
 	namespace, ok2 := c.chop.ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
@@ -60,7 +66,7 @@ func (c *Controller) labelMyObjectsTree() {
 	}
 
 	// Pod namespaced name found, fetch the Pod
-	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(podName, newGetOptions())
+	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, newGetOptions())
 	if err != nil {
 		log.V(1).M(namespace, podName).A().Error("ERROR get Pod %s/%s", namespace, podName)
 		return
@@ -68,7 +74,7 @@ func (c *Controller) labelMyObjectsTree() {
 
 	// Put label on the Pod
 	c.addLabels(&pod.ObjectMeta)
-	if _, err := c.kubeClient.CoreV1().Pods(namespace).Update(pod); err != nil {
+	if _, err := c.kubeClient.CoreV1().Pods(namespace).Update(ctx, pod, newUpdateOptions()); err != nil {
 		log.V(1).M(namespace, podName).A().Error("ERROR put label on Pod %s/%s %v", namespace, podName, err)
 	}
 
@@ -90,7 +96,7 @@ func (c *Controller) labelMyObjectsTree() {
 	}
 
 	// ReplicaSet namespaced name found, fetch the ReplicaSet
-	replicaSet, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Get(replicaSetName, v1.GetOptions{})
+	replicaSet, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Get(ctx, replicaSetName, newGetOptions())
 	if err != nil {
 		log.V(1).M(namespace, replicaSetName).A().Error("ERROR get ReplicaSet %s/%s %v", namespace, replicaSetName, err)
 		return
@@ -98,7 +104,7 @@ func (c *Controller) labelMyObjectsTree() {
 
 	// Put label on the ReplicaSet
 	c.addLabels(&replicaSet.ObjectMeta)
-	if _, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Update(replicaSet); err != nil {
+	if _, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Update(ctx, replicaSet, newUpdateOptions()); err != nil {
 		log.V(1).M(namespace, replicaSetName).A().Error("ERROR put label on ReplicaSet %s/%s %v", namespace, replicaSetName, err)
 	}
 
@@ -120,7 +126,7 @@ func (c *Controller) labelMyObjectsTree() {
 	}
 
 	// Deployment namespaced name found, fetch the Deployment
-	deployment, err := c.kubeClient.AppsV1().Deployments(namespace).Get(deploymentName, v1.GetOptions{})
+	deployment, err := c.kubeClient.AppsV1().Deployments(namespace).Get(ctx, deploymentName, newGetOptions())
 	if err != nil {
 		log.V(1).M(namespace, deploymentName).A().Error("ERROR get Deployment %s/%s", namespace, deploymentName)
 		return
@@ -128,7 +134,7 @@ func (c *Controller) labelMyObjectsTree() {
 
 	// Put label on the Deployment
 	c.addLabels(&deployment.ObjectMeta)
-	if _, err := c.kubeClient.AppsV1().Deployments(namespace).Update(deployment); err != nil {
+	if _, err := c.kubeClient.AppsV1().Deployments(namespace).Update(ctx, deployment, newUpdateOptions()); err != nil {
 		log.V(1).M(namespace, deploymentName).A().Error("ERROR put label on Deployment %s/%s %v", namespace, deploymentName, err)
 	}
 }

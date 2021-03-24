@@ -196,7 +196,12 @@ func (w *worker) normalize(c *chop.ClickHouseInstallation) *chop.ClickHouseInsta
 }
 
 // ensureFinalizer
-func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) bool {
+func (w *worker) ensureFinalizer(ctx context.Context, chi *chop.ClickHouseInstallation) bool {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return false
+	}
+
 	// Check whether finalizer is already listed in CHI
 	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
 		w.a.V(2).M(chi).F().Info("finalizer already installed")
@@ -205,7 +210,7 @@ func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) bool {
 
 	// No finalizer found - need to install it
 
-	if err := w.c.installFinalizer(chi); err != nil {
+	if err := w.c.installFinalizer(ctx, chi); err != nil {
 		w.a.V(1).M(chi).A().Error("unable to install finalizer. err: %v", err)
 		return false
 	}
@@ -216,6 +221,11 @@ func (w *worker) ensureFinalizer(chi *chop.ClickHouseInstallation) bool {
 
 // updateCHI sync CHI which was already created earlier
 func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstallation) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	w.a.V(3).M(new).S().P()
 	defer w.a.V(3).M(new).E().P()
 
@@ -233,7 +243,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 	if new.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted
 		// Need to ensure finalizer is in place
-		if w.ensureFinalizer(new) {
+		if w.ensureFinalizer(ctx, new) {
 			// Finalizer installed, let's restart reconcile cycle
 			return nil
 		}
@@ -383,13 +393,13 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 		M(new).F().
 		Info("remove items scheduled for deletion")
 
-	objs := w.c.discovery(new)
+	objs := w.c.discovery(ctx, new)
 	need := chopmodel.ReconcileContextGetRegistry(ctx)
 	w.a.V(1).M(new).F().Info("Reconciled objects:\n%s", chopmodel.ReconcileContextGetRegistry(ctx))
 	w.a.V(1).M(new).F().Info("Existing objects:\n%s", objs)
 	objs.Subtract(need)
 	w.a.V(1).M(new).F().Info("Delete objects:\n%s", objs)
-	if w.purge(objs) > 0 {
+	if w.purge(ctx, objs) > 0 {
 		w.c.enqueueObject(NewDropDns(&new.ObjectMeta))
 	}
 
@@ -416,20 +426,25 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 }
 
 // purge
-func (w *worker) purge(reg *chopmodel.Registry) (cnt int) {
+func (w *worker) purge(ctx context.Context, reg *chopmodel.Registry) (cnt int) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return cnt
+	}
+
 	reg.Walk(func(entityType chopmodel.EntityType, m meta.ObjectMeta) {
 		switch entityType {
 		case chopmodel.StatefulSet:
-			w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(m.Name, newDeleteOptions())
+			w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 			cnt++
 		case chopmodel.PVC:
 			if w.creator.GetReclaimPolicy(m) == chop.PVCReclaimPolicyDelete {
-				w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(m.Name, newDeleteOptions())
+				w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 			}
 		case chopmodel.ConfigMap:
-			w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(m.Name, newDeleteOptions())
+			w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 		case chopmodel.Service:
-			w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(m.Name, newDeleteOptions())
+			w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 		}
 	})
 	return cnt
@@ -771,7 +786,7 @@ func (w *worker) excludeHostFromService(ctx context.Context, host *chop.ChiHost)
 		return nil
 	}
 
-	return w.c.deleteLabelReady(host)
+	return w.c.deleteLabelReady(ctx, host)
 }
 
 func (w *worker) includeHostIntoService(ctx context.Context, host *chop.ChiHost) error {
@@ -780,7 +795,7 @@ func (w *worker) includeHostIntoService(ctx context.Context, host *chop.ChiHost)
 		return nil
 	}
 
-	return w.c.appendLabelReady(host)
+	return w.c.appendLabelReady(ctx, host)
 }
 
 // excludeHostFromClickHouseCluster excludes host from ClickHouse configuration
@@ -901,7 +916,7 @@ func (w *worker) finalizeCHI(ctx context.Context, chi *chop.ClickHouseInstallati
 	w.a.V(3).M(chi).S().P()
 	defer w.a.V(3).M(chi).E().P()
 
-	cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(chi.Name, newGetOptions())
+	cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(ctx, chi.Name, newGetOptions())
 	if (err != nil) || (cur == nil) {
 		return nil
 	}
@@ -922,7 +937,7 @@ func (w *worker) finalizeCHI(ctx context.Context, chi *chop.ClickHouseInstallati
 
 	// Uninstall finalizer
 	w.a.V(2).M(chi).F().Info("uninstall finalizer")
-	if err := w.c.uninstallFinalizer(chi); err != nil {
+	if err := w.c.uninstallFinalizer(ctx, chi); err != nil {
 		w.a.V(1).M(chi).A().Error("unable to uninstall finalizer: err:%v", err)
 	}
 
@@ -936,8 +951,8 @@ func (w *worker) deleteCHI(ctx context.Context, chi *chop.ClickHouseInstallation
 		return nil
 	}
 
-	objs := w.c.discovery(chi)
-	w.purge(objs)
+	objs := w.c.discovery(ctx, chi)
+	w.purge(ctx, objs)
 	return nil
 }
 
@@ -1199,7 +1214,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *chop.ClickHouseInstal
 		return nil
 	}
 
-	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(configMap)
+	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(ctx, configMap, newUpdateOptions())
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
@@ -1224,7 +1239,7 @@ func (w *worker) createConfigMap(ctx context.Context, chi *chop.ClickHouseInstal
 		return nil
 	}
 
-	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(configMap)
+	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(ctx, configMap, newCreateOptions())
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
@@ -1350,7 +1365,7 @@ func (w *worker) updateService(
 		log.V(2).Info("ctx is done")
 		return nil
 	}
-	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(newService)
+	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(ctx, newService, newUpdateOptions())
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
@@ -1375,7 +1390,7 @@ func (w *worker) createService(ctx context.Context, chi *chop.ClickHouseInstalla
 		return nil
 	}
 
-	_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(service)
+	_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(ctx, service, newCreateOptions())
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
@@ -1646,7 +1661,7 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chop.ChiHost) error {
 		w.a.V(2).M(host).Info("reconcile volumeMount (%s/%s/%s/%s) - start", namespace, host.Name, volumeMount.Name, pvcName)
 		defer w.a.V(2).M(host).Info("reconcile volumeMount (%s/%s/%s/%s) - end", namespace, host.Name, volumeMount.Name, pvcName)
 
-		pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(pvcName, newGetOptions())
+		pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, newGetOptions())
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				// This is not an error per se, means PVC is not created (yet)?
