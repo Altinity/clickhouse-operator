@@ -331,8 +331,8 @@ type ChiPodTemplate struct {
 	// DEPRECATED - to be removed soon
 	Distribution    string               `json:"distribution"              yaml:"distribution"`
 	PodDistribution []ChiPodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution,omitempty"`
-	ObjectMeta      metav1.ObjectMeta    `json:"metadata"                  yaml:"metadata"`
-	Spec            corev1.PodSpec       `json:"spec"                      yaml:"spec"`
+	ObjectMeta      metav1.ObjectMeta    `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
+	Spec            corev1.PodSpec       `json:"spec,omitempty"            yaml:"spec,omitempty"`
 }
 
 type ChiPodTemplateZone struct {
@@ -348,10 +348,10 @@ type ChiPodDistribution struct {
 
 // ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
 type ChiVolumeClaimTemplate struct {
-	Name             string                           `json:"name"          yaml:"name"`
-	PVCReclaimPolicy PVCReclaimPolicy                 `json:"reclaimPolicy" yaml:"reclaimPolicy"`
-	ObjectMeta       metav1.ObjectMeta                `json:"metadata"      yaml:"metadata"`
-	Spec             corev1.PersistentVolumeClaimSpec `json:"spec"          yaml:"spec"`
+	Name             string                           `json:"name"                    yaml:"name"`
+	PVCReclaimPolicy PVCReclaimPolicy                 `json:"reclaimPolicy,omitempty" yaml:"reclaimPolicy,omitempty"`
+	ObjectMeta       metav1.ObjectMeta                `json:"metadata,omitempty"      yaml:"metadata,omitempty"`
+	Spec             corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"          yaml:"spec,omitempty"`
 }
 
 type PVCReclaimPolicy string
@@ -383,10 +383,10 @@ func (v PVCReclaimPolicy) String() string {
 }
 
 type ChiServiceTemplate struct {
-	Name         string             `json:"name"         yaml:"name"`
-	GenerateName string             `json:"generateName" yaml:"generateName"`
-	ObjectMeta   metav1.ObjectMeta  `json:"metadata"     yaml:"metadata"`
-	Spec         corev1.ServiceSpec `json:"spec"         yaml:"spec"`
+	Name         string             `json:"name"                   yaml:"name"`
+	GenerateName string             `json:"generateName,omitempty" yaml:"generateName,omitempty"`
+	ObjectMeta   metav1.ObjectMeta  `json:"metadata,omitempty"     yaml:"metadata,omitempty"`
+	Spec         corev1.ServiceSpec `json:"spec,omitempty"         yaml:"spec,omitempty"`
 }
 
 // ChiDistributedDDL defines distributedDDL section of .spec.defaults
