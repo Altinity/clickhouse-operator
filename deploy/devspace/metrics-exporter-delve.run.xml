@@ -1,0 +1,5 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="metrics-exporter-delve" type="GoRemoteDebugConfigurationType" factoryName="Go Remote" port="40002">
+    <method v="2" />
+  </configuration>
+</component>

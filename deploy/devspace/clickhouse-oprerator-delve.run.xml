@@ -1,0 +1,5 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="clickhouse-oprerator-delve" type="GoRemoteDebugConfigurationType" factoryName="Go Remote" port="40001">
+    <method v="2" />
+  </configuration>
+</component>

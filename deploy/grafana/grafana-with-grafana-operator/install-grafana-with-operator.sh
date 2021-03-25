@@ -48,7 +48,7 @@ echo "\$GRAFANA_ROOT_URL=$GRAFANA_ROOT_URL"
 echo ""
 echo "!!! IMPORTANT !!!"
 echo "If you do not agree with specified options, press ctrl-c now"
-sleep 10
+sleep ${SLEEP_BEFORE_RUN:-10}
 echo "Apply options now..."
 
 ###########################

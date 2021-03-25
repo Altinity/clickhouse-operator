@@ -13,7 +13,7 @@ echo "\$GRAFANA_OPERATOR_VERSION=${GRAFANA_OPERATOR_VERSION}"
 echo ""
 echo "!!! IMPORTANT !!!"
 echo "If you do not agree with specified options, press ctrl-c now"
-sleep 10
+sleep ${SLEEP_BEFORE_RUN:-10}
 echo "Apply options now..."
 
 ##

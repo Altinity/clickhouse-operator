@@ -44,6 +44,13 @@ Vagrant.configure(2) do |config|
     # alertmanager
     clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 9093, host_ip: "127.0.0.1", host: 9093
 
+    # devspace UI
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 8090, host_ip: "127.0.0.1", host: 8090
+
+    # delve for devspace
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 40001, host_ip: "127.0.0.1", host: 40001
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 40002, host_ip: "127.0.0.1", host: 40002
+
     clickhouse_operator.vm.host_name = "local-altinity-clickhouse-operator"
     # vagrant plugin install vagrant-disksize
     clickhouse_operator.disksize.size = '50GB'
@@ -52,6 +59,7 @@ Vagrant.configure(2) do |config|
   config.vm.provision "shell", inline: <<-SHELL
     set -xeuo pipefail
     export DEBIAN_FRONTEND=noninteractive
+    export SLEEP_BEFORE_RUN=0
 
     apt-get update
     apt-get install --no-install-recommends -y apt-transport-https ca-certificates software-properties-common curl
@@ -160,18 +168,36 @@ Vagrant.configure(2) do |config|
     export OPERATOR_IMAGE=altinity/clickhouse-operator:${OPERATOR_RELEASE}
     export METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:${OPERATOR_RELEASE}
 
+    # devspace
+    DEVSPACE_VERSION=$(curl -sL https://github.com/devspace-cloud/devspace/releases/latest -H "Accept: application/json" | jq -r .tag_name)
+    wget -c --progress=bar:force:noscroll -O /usr/local/bin/${DEVSPACE_VERSION}-devspace-linux-amd64 "https://github.com/devspace-cloud/devspace/releases/download/${DEVSPACE_VERSION}/devspace-linux-amd64"
+    wget -c --progress=bar:force:noscroll -O /usr/local/bin/${DEVSPACE_VERSION}-devspace-linux-amd64.sha256 "https://github.com/devspace-cloud/devspace/releases/download/${DEVSPACE_VERSION}/devspace-linux-amd64.sha256"
+    sed -i -E "s/\\/Users.+devspace\\-linux\\-amd64/\\/usr\\/local\\/bin\\/${DEVSPACE_VERSION}-devspace-linux-amd64/g" /usr/local/bin/${DEVSPACE_VERSION}-devspace-linux-amd64.sha256
+    sha256sum -c /usr/local/bin/${DEVSPACE_VERSION}-devspace-linux-amd64.sha256
+    cp -fv /usr/local/bin/${DEVSPACE_VERSION}-devspace-linux-amd64 /usr/local/bin/devspace
+    chmod +x /usr/local/bin/devspace
+
+    # docker build
+    export COMPANY_REPO=${COMPANY_REPO:-altinity}
+    time docker build -f dockerfile/operator/Dockerfile --target operator -t $COMPANY_REPO/clickhouse-operator:$OPERATOR_RELEASE .
+    time docker build -f dockerfile/metrics-exporter/Dockerfile --target metrics-exporter -t $COMPANY_REPO/metrics-exporter:$OPERATOR_RELEASE .
+
+
+    # install clickhouse-operator
     if ! kubectl get deployment clickhouse-operator -n "${OPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
         cd /vagrant/deploy/operator/
         bash -x ./clickhouse-operator-install.sh
         cd /vagrant
     fi
 
+    # install prometheus-operator + prometheus instance + ServiceMonitor for clickhouse
     export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-prometheus}
     cd /vagrant/deploy/prometheus/
     kubectl delete ns ${PROMETHEUS_NAMESPACE} || true
     bash -xe ./create-prometheus.sh
     cd /vagrant/
 
+    # install grafana-operator + grafana instance + GrafanaDashboard, GrafanaDatasource for clickhouse
     export GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE:-grafana}
     cd /vagrant/deploy/grafana/grafana-with-grafana-operator/
     kubectl delete ns ${GRAFANA_NAMESPACE} || true

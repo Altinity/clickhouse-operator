@@ -1,4 +1,8 @@
-vendor/
 docs/
+.devspace/
 .vagrant/
+.idea/
+tests/
+hack/
 *.log
+devspace.yaml
