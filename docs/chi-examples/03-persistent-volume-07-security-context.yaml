@@ -2,11 +2,11 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "pv-do-not-chown"
+  name: "security-context"
 spec:
   configuration:
     clusters:
-      - name: "pv-do-not-chown"
+      - name: "cluster"
         templates:
           podTemplate: pod-template-with-volumes-do-not-chown
         layout:
@@ -61,7 +61,7 @@ spec:
     volumeClaimTemplates:
       - name: data-storage-vc-template-1
         spec:
-          storageClassName: standard
+          # storageClassName: standard
           accessModes:
             - ReadWriteOnce
           resources:

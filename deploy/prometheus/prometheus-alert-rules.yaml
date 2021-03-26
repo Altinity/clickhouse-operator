@@ -942,21 +942,35 @@ spec:
 
         - alert: ClickHouseBackupSizeChanged
           expr: |-
-            (clickhouse_backup_last_create_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} < clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} offset 1m * 0.60)
-            or (clickhouse_backup_last_create_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} > clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} offset 1m * 1.40)
-            or (clickhouse_backup_last_upload_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} < clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} offset 1m * 0.60)
-            or (clickhouse_backup_last_upload_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} > clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} offset 1m * 1.40)
+            (
+              clickhouse_backup_last_create_status{container_name='clickhouse-backup'} == 1
+              and clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} offset 1m > 0
+              and clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} < clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} offset 1m * 0.60
+            ) or (
+              clickhouse_backup_last_create_status{container_name='clickhouse-backup'} == 1
+              and clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} offset 1m > 0
+              and clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} > clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} offset 1m * 1.40)
+            or (
+              clickhouse_backup_last_upload_status{container_name='clickhouse-backup'} == 1
+              and clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} offset 1m > 0
+              and clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} < clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} offset 1m * 0.60
+            )
+            or (
+              clickhouse_backup_last_upload_status{container_name='clickhouse-backup'} == 1
+              and clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} offset 1m > 0
+              and clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} > clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} offset 1m * 1.40
+            )
           labels:
             severity: warning
           annotations:
             identifier: "{{ $labels.pod_name }}"
             summary: "clickhouse-backup last backup size is changed more than 40% than the size of the previous one"
             description: |-
-              `clickhouse_backup_last_backup_size_local{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s'} / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
-              `clickhouse_backup_last_backup_size_local{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"} offset 1m` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s'} offset 1m / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
+              `clickhouse_backup_last_backup_size_local{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s',container_name='clickhouse-backup'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
+              `clickhouse_backup_last_backup_size_local{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"} offset 1m` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s',container_name='clickhouse-backup'} offset 1m" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
 
-              `clickhouse_backup_last_backup_size_remote{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s'} / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
-              `clickhouse_backup_last_backup_size_remote{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"} offset 1m` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s'} offset 1m / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
+              `clickhouse_backup_last_backup_size_remote{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s',container_name='clickhouse-backup'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
+              `clickhouse_backup_last_backup_size_remote{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"} offset 1m` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s',container_name='clickhouse-backup'} offset 1m" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
 
               Check clickhouse-backup logs
               ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=24h```
