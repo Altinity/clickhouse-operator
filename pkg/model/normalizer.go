@@ -365,7 +365,8 @@ func (n *Normalizer) normalizeConfiguration(conf *chiV1.Configuration) *chiV1.Co
 // normalizeTemplates normalizes .spec.templates
 func (n *Normalizer) normalizeTemplates(templates *chiV1.ChiTemplates) *chiV1.ChiTemplates {
 	if templates == nil {
-		templates = chiV1.NewChiTemplates()
+		//templates = chiV1.NewChiTemplates()
+		return nil
 	}
 
 	for i := range templates.HostTemplates {
@@ -453,12 +454,7 @@ func (n *Normalizer) normalizeHostTemplate(template *chiV1.ChiHostTemplate) {
 	n.normalizeHostTemplateSpec(&template.Spec)
 
 	// Introduce HostTemplate into Index
-	// Ensure map is in place
-	if n.chi.Spec.Templates.HostTemplatesIndex == nil {
-		n.chi.Spec.Templates.HostTemplatesIndex = make(map[string]*chiV1.ChiHostTemplate)
-	}
-
-	n.chi.Spec.Templates.HostTemplatesIndex[template.Name] = template
+	n.chi.Spec.Templates.EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
@@ -578,12 +574,7 @@ func (n *Normalizer) normalizePodTemplate(template *chiV1.ChiPodTemplate) {
 	}
 
 	// Introduce PodTemplate into Index
-	// Ensure map is in place
-	if n.chi.Spec.Templates.PodTemplatesIndex == nil {
-		n.chi.Spec.Templates.PodTemplatesIndex = make(map[string]*chiV1.ChiPodTemplate)
-	}
-
-	n.chi.Spec.Templates.PodTemplatesIndex[template.Name] = template
+	n.chi.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
 // newAffinity
@@ -1136,11 +1127,8 @@ func (n *Normalizer) normalizeVolumeClaimTemplate(template *chiV1.ChiVolumeClaim
 	}
 	// Check Spec
 
-	// Ensure map is in place
-	if n.chi.Spec.Templates.VolumeClaimTemplatesIndex == nil {
-		n.chi.Spec.Templates.VolumeClaimTemplatesIndex = make(map[string]*chiV1.ChiVolumeClaimTemplate)
-	}
-	n.chi.Spec.Templates.VolumeClaimTemplatesIndex[template.Name] = template
+	// Introduce VolumeClaimTemplate into Index
+	n.chi.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
@@ -1150,11 +1138,8 @@ func (n *Normalizer) normalizeServiceTemplate(template *chiV1.ChiServiceTemplate
 	// Check ObjectMeta
 	// Check Spec
 
-	// Ensure map is in place
-	if n.chi.Spec.Templates.ServiceTemplatesIndex == nil {
-		n.chi.Spec.Templates.ServiceTemplatesIndex = make(map[string]*chiV1.ChiServiceTemplate)
-	}
-	n.chi.Spec.Templates.ServiceTemplatesIndex[template.Name] = template
+	// Introduce ServiceClaimTemplate into Index
+	n.chi.Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeUseTemplates normalizes .spec.useTemplates

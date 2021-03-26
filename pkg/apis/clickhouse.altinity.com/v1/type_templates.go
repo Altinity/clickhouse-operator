@@ -18,10 +18,12 @@ import (
 	"github.com/imdario/mergo"
 )
 
+// NewChiTemplates
 func NewChiTemplates() *ChiTemplates {
 	return new(ChiTemplates)
 }
 
+// Len
 func (templates *ChiTemplates) Len() int {
 	if templates == nil {
 		return 0
@@ -34,6 +36,7 @@ func (templates *ChiTemplates) Len() int {
 		len(templates.ServiceTemplates)
 }
 
+// MergeFrom
 func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) *ChiTemplates {
 	if from.Len() == 0 {
 		return templates
@@ -180,4 +183,296 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) *C
 	}
 
 	return templates
+}
+
+// GetHostTemplatesIndex
+func (templates *ChiTemplates) GetHostTemplatesIndex() *HostTemplatesIndex {
+	if templates == nil {
+		return nil
+	}
+	return templates.HostTemplatesIndex
+}
+
+// EnsureHostTemplatesIndex
+func (templates *ChiTemplates) EnsureHostTemplatesIndex() *HostTemplatesIndex {
+	if templates == nil {
+		return nil
+	}
+	if templates.HostTemplatesIndex != nil {
+		return templates.HostTemplatesIndex
+	}
+	templates.HostTemplatesIndex = NewHostTemplatesIndex()
+	return templates.HostTemplatesIndex
+}
+
+// GetPodTemplatesIndex
+func (templates *ChiTemplates) GetPodTemplatesIndex() *PodTemplatesIndex {
+	if templates == nil {
+		return nil
+	}
+	return templates.PodTemplatesIndex
+}
+
+// EnsurePodTemplatesIndex
+func (templates *ChiTemplates) EnsurePodTemplatesIndex() *PodTemplatesIndex {
+	if templates == nil {
+		return nil
+	}
+	if templates.PodTemplatesIndex != nil {
+		return templates.PodTemplatesIndex
+	}
+	templates.PodTemplatesIndex = NewPodTemplatesIndex()
+	return templates.PodTemplatesIndex
+}
+
+// GetVolumeClaimTemplatesIndex
+func (templates *ChiTemplates) GetVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
+	if templates == nil {
+		return nil
+	}
+	return templates.VolumeClaimTemplatesIndex
+}
+
+// EnsureVolumeClaimTemplatesIndex
+func (templates *ChiTemplates) EnsureVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
+	if templates == nil {
+		return nil
+	}
+	if templates.VolumeClaimTemplatesIndex != nil {
+		return templates.VolumeClaimTemplatesIndex
+	}
+	templates.VolumeClaimTemplatesIndex = NewVolumeClaimTemplatesIndex()
+	return templates.VolumeClaimTemplatesIndex
+}
+
+// GetServiceTemplatesIndex
+func (templates *ChiTemplates) GetServiceTemplatesIndex() *ServiceTemplatesIndex {
+	if templates == nil {
+		return nil
+	}
+	return templates.ServiceTemplatesIndex
+}
+
+// EnsureServiceTemplatesIndex
+func (templates *ChiTemplates) EnsureServiceTemplatesIndex() *ServiceTemplatesIndex {
+	if templates == nil {
+		return nil
+	}
+	if templates.ServiceTemplatesIndex != nil {
+		return templates.ServiceTemplatesIndex
+	}
+	templates.ServiceTemplatesIndex = NewServiceTemplatesIndex()
+	return templates.ServiceTemplatesIndex
+}
+
+// HostTemplatesIndex
+type HostTemplatesIndex struct {
+	v map[string]*ChiHostTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+}
+
+// NewHostTemplatesIndex
+func NewHostTemplatesIndex() *HostTemplatesIndex {
+	return &HostTemplatesIndex{
+		v: make(map[string]*ChiHostTemplate),
+	}
+}
+
+// Has
+func (i *HostTemplatesIndex) Has(name string) bool {
+	if i == nil {
+		return false
+	}
+	if i.v == nil {
+		return false
+	}
+	_, ok := i.v[name]
+	return ok
+}
+
+// Get
+func (i *HostTemplatesIndex) Get(name string) *ChiHostTemplate {
+	if !i.Has(name) {
+		return nil
+	}
+	return i.v[name]
+}
+
+// Set
+func (i *HostTemplatesIndex) Set(name string, entry *ChiHostTemplate) {
+	if i == nil {
+		return
+	}
+	if i.v == nil {
+		return
+	}
+	i.v[name] = entry
+}
+
+// Walk
+func (i *HostTemplatesIndex) Walk(f func(template *ChiHostTemplate)) {
+	if i == nil {
+		return
+	}
+	for _, entry := range i.v {
+		f(entry)
+	}
+}
+
+// PodTemplatesIndex
+type PodTemplatesIndex struct {
+	v map[string]*ChiPodTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+}
+
+// NewPodTemplatesIndex
+func NewPodTemplatesIndex() *PodTemplatesIndex {
+	return &PodTemplatesIndex{
+		v: make(map[string]*ChiPodTemplate),
+	}
+}
+
+// Has
+func (i *PodTemplatesIndex) Has(name string) bool {
+	if i == nil {
+		return false
+	}
+	if i.v == nil {
+		return false
+	}
+	_, ok := i.v[name]
+	return ok
+}
+
+// Get
+func (i *PodTemplatesIndex) Get(name string) *ChiPodTemplate {
+	if !i.Has(name) {
+		return nil
+	}
+	return i.v[name]
+}
+
+// Set
+func (i *PodTemplatesIndex) Set(name string, entry *ChiPodTemplate) {
+	if i == nil {
+		return
+	}
+	if i.v == nil {
+		return
+	}
+	i.v[name] = entry
+}
+
+// Walk
+func (i *PodTemplatesIndex) Walk(f func(template *ChiPodTemplate)) {
+	if i == nil {
+		return
+	}
+	for _, entry := range i.v {
+		f(entry)
+	}
+}
+
+// VolumeClaimTemplatesIndex
+type VolumeClaimTemplatesIndex struct {
+	v map[string]*ChiVolumeClaimTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+}
+
+// NewVolumeClaimTemplatesIndex
+func NewVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
+	return &VolumeClaimTemplatesIndex{
+		v: make(map[string]*ChiVolumeClaimTemplate),
+	}
+}
+
+// Has
+func (i *VolumeClaimTemplatesIndex) Has(name string) bool {
+	if i == nil {
+		return false
+	}
+	if i.v == nil {
+		return false
+	}
+	_, ok := i.v[name]
+	return ok
+}
+
+// Get
+func (i *VolumeClaimTemplatesIndex) Get(name string) *ChiVolumeClaimTemplate {
+	if !i.Has(name) {
+		return nil
+	}
+	return i.v[name]
+}
+
+// Set
+func (i *VolumeClaimTemplatesIndex) Set(name string, entry *ChiVolumeClaimTemplate) {
+	if i == nil {
+		return
+	}
+	if i.v == nil {
+		return
+	}
+	i.v[name] = entry
+}
+
+// Walk
+func (i *VolumeClaimTemplatesIndex) Walk(f func(template *ChiVolumeClaimTemplate)) {
+	if i == nil {
+		return
+	}
+	for _, entry := range i.v {
+		f(entry)
+	}
+}
+
+// ServiceTemplatesIndex
+type ServiceTemplatesIndex struct {
+	v map[string]*ChiServiceTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+}
+
+// NewServiceTemplatesIndex
+func NewServiceTemplatesIndex() *ServiceTemplatesIndex {
+	return &ServiceTemplatesIndex{
+		v: make(map[string]*ChiServiceTemplate),
+	}
+}
+
+// Has
+func (i *ServiceTemplatesIndex) Has(name string) bool {
+	if i == nil {
+		return false
+	}
+	if i.v == nil {
+		return false
+	}
+	_, ok := i.v[name]
+	return ok
+}
+
+// Get
+func (i *ServiceTemplatesIndex) Get(name string) *ChiServiceTemplate {
+	if !i.Has(name) {
+		return nil
+	}
+	return i.v[name]
+}
+
+// Set
+func (i *ServiceTemplatesIndex) Set(name string, entry *ChiServiceTemplate) {
+	if i == nil {
+		return
+	}
+	if i.v == nil {
+		return
+	}
+	i.v[name] = entry
+}
+
+// Walk
+func (i *ServiceTemplatesIndex) Walk(f func(template *ChiServiceTemplate)) {
+	if i == nil {
+		return
+	}
+	for _, entry := range i.v {
+		f(entry)
+	}
 }

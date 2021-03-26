@@ -565,66 +565,44 @@ func (chi *ClickHouseInstallation) HostsCountAttributes(a ChiHostReconcileAttrib
 
 // GetHostTemplate gets ChiHostTemplate by name
 func (chi *ClickHouseInstallation) GetHostTemplate(name string) (*ChiHostTemplate, bool) {
-	if chi.Spec.Templates.HostTemplatesIndex == nil {
+	if !chi.Spec.Templates.GetHostTemplatesIndex().Has(name) {
 		return nil, false
-	} else {
-		template, ok := chi.Spec.Templates.HostTemplatesIndex[name]
-		return template, ok
 	}
+	return chi.Spec.Templates.GetHostTemplatesIndex().Get(name), true
 }
 
 // GetPodTemplate gets ChiPodTemplate by name
 func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate, bool) {
-	if chi.Spec.Templates.PodTemplatesIndex == nil {
+	if !chi.Spec.Templates.GetPodTemplatesIndex().Has(name) {
 		return nil, false
-	} else {
-		template, ok := chi.Spec.Templates.PodTemplatesIndex[name]
-		return template, ok
 	}
+	return chi.Spec.Templates.GetPodTemplatesIndex().Get(name), true
 }
 
 // WalkPodTemplates walks over all PodTemplates
 func (chi *ClickHouseInstallation) WalkPodTemplates(f func(template *ChiPodTemplate)) {
-	if chi.Spec.Templates.PodTemplatesIndex == nil {
-		return
-	}
-
-	for name := range chi.Spec.Templates.PodTemplatesIndex {
-		template, _ := chi.Spec.Templates.PodTemplatesIndex[name]
-		f(template)
-	}
+	chi.Spec.Templates.GetPodTemplatesIndex().Walk(f)
 }
 
 // GetVolumeClaimTemplate gets ChiVolumeClaimTemplate by name
 func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolumeClaimTemplate, bool) {
-	if chi.Spec.Templates.VolumeClaimTemplatesIndex == nil {
-		return nil, false
-	} else {
-		template, ok := chi.Spec.Templates.VolumeClaimTemplatesIndex[name]
-		return template, ok
+	if chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Has(name) {
+		return chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Get(name), true
 	}
+	return nil, false
 }
 
 // WalkVolumeClaimTemplates walks over all VolumeClaimTemplates
 func (chi *ClickHouseInstallation) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
-	if chi.Spec.Templates.VolumeClaimTemplatesIndex == nil {
-		return
-	}
-
-	for name := range chi.Spec.Templates.VolumeClaimTemplatesIndex {
-		template, _ := chi.Spec.Templates.VolumeClaimTemplatesIndex[name]
-		f(template)
-	}
+	chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Walk(f)
 }
 
 // GetServiceTemplate gets ChiServiceTemplate by name
 func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceTemplate, bool) {
-	if chi.Spec.Templates.ServiceTemplatesIndex == nil {
+	if !chi.Spec.Templates.GetServiceTemplatesIndex().Has(name) {
 		return nil, false
-	} else {
-		template, ok := chi.Spec.Templates.ServiceTemplatesIndex[name]
-		return template, ok
 	}
+	return chi.Spec.Templates.GetServiceTemplatesIndex().Get(name), true
 }
 
 // GetServiceTemplate gets ChiServiceTemplate of a CHI

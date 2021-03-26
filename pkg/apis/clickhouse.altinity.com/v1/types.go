@@ -317,10 +317,10 @@ type ChiTemplates struct {
 	ServiceTemplates     []ChiServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`
 
 	// Index maps template name to template itself
-	HostTemplatesIndex        map[string]*ChiHostTemplate        `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
-	PodTemplatesIndex         map[string]*ChiPodTemplate         `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
-	VolumeClaimTemplatesIndex map[string]*ChiVolumeClaimTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
-	ServiceTemplatesIndex     map[string]*ChiServiceTemplate     `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	HostTemplatesIndex        *HostTemplatesIndex        `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	PodTemplatesIndex         *PodTemplatesIndex         `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	VolumeClaimTemplatesIndex *VolumeClaimTemplatesIndex `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	ServiceTemplatesIndex     *ServiceTemplatesIndex     `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet
