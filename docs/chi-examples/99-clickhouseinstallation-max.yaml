@@ -15,6 +15,12 @@ metadata:
 spec:
 
   stop: "no"
+
+  namespaceDomainPattern:  "%s.svc.my.test"
+
+  templating:
+    policy: "manual"
+
   reconciling:
     policy: "nowait"
 
@@ -31,10 +37,14 @@ spec:
     distributedDDL:
       profile: default
     templates:
+      hostTemplate: host-template-custom-ports
       podTemplate: clickhouse-v20.6
       dataVolumeClaimTemplate: default-volume-claim
       logVolumeClaimTemplate: default-volume-claim
       serviceTemplate: chi-service-template
+      clusterServiceTemplate: cluster-service-template
+      shardServiceTemplate: shard-service-template
+      replicaServiceTemplate: replica-service-template
 
   configuration:
     zookeeper:
@@ -178,6 +188,13 @@ spec:
                     replicaServiceTemplate: replica-service-template
 
   templates:
+    hostTemplates:
+      - name: host-template-custom-ports
+        spec:
+          tcpPort: 7000
+          httpPort: 7001
+          interserverHTTPPort: 7002
+
     serviceTemplates:
       - name: chi-service-template
         # generateName understands different sets of macroses,
