@@ -119,9 +119,6 @@ func (n *Normalizer) normalize(chi *chiV1.ClickHouseInstallation) (*chiV1.ClickH
 		n.chi = chi
 	}
 
-	if n.chi.Spec.Configuration == nil {
-		n.chi.Spec.Configuration = chiV1.NewConfiguration()
-	}
 	// Walk over ChiSpec datatype fields
 	n.chi.Spec.UseTemplates = n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
 	n.chi.Spec.Stop = n.normalizeStop(n.chi.Spec.Stop)
@@ -1357,7 +1354,8 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
 func (n *Normalizer) normalizeConfigurationProfiles(profiles *chiV1.Settings) *chiV1.Settings {
 	if profiles == nil {
-		profiles = chiV1.NewSettings()
+		//profiles = chiV1.NewSettings()
+		return nil
 	}
 	profiles.Normalize()
 	return profiles
@@ -1366,7 +1364,8 @@ func (n *Normalizer) normalizeConfigurationProfiles(profiles *chiV1.Settings) *c
 // normalizeConfigurationQuotas normalizes .spec.configuration.quotas
 func (n *Normalizer) normalizeConfigurationQuotas(quotas *chiV1.Settings) *chiV1.Settings {
 	if quotas == nil {
-		quotas = chiV1.NewSettings()
+		//quotas = chiV1.NewSettings()
+		return nil
 	}
 	quotas.Normalize()
 	return quotas
@@ -1375,7 +1374,8 @@ func (n *Normalizer) normalizeConfigurationQuotas(quotas *chiV1.Settings) *chiV1
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
 func (n *Normalizer) normalizeConfigurationSettings(settings *chiV1.Settings) *chiV1.Settings {
 	if settings == nil {
-		settings = chiV1.NewSettings()
+		//settings = chiV1.NewSettings()
+		return nil
 	}
 	settings.Normalize()
 	return settings
@@ -1384,7 +1384,8 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *chiV1.Settings) *c
 // normalizeConfigurationFiles normalizes .spec.configuration.files
 func (n *Normalizer) normalizeConfigurationFiles(files *chiV1.Settings) *chiV1.Settings {
 	if files == nil {
-		files = chiV1.NewSettings()
+		//files = chiV1.NewSettings()
+		return nil
 	}
 	files.Normalize()
 	return files
