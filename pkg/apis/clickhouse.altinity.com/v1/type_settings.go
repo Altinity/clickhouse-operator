@@ -138,6 +138,14 @@ func makeM() map[string]*Setting {
 	return make(map[string]*Setting)
 }
 
+// Len gets length of the settings
+func (settings *Settings) Len() int {
+	if settings == nil {
+		return 0
+	}
+	return len(settings.m)
+}
+
 // IsZero
 func (settings *Settings) IsZero() bool {
 	return settings.Len() == 0
@@ -197,27 +205,19 @@ func (settings *Settings) Delete(name string) {
 	delete(settings.m, name)
 }
 
-// Len gets length of the settings
-func (settings *Settings) Len() int {
-	if settings == nil {
-		return 0
-	}
-	return len(settings.m)
-}
-
 // UnmarshalJSON
 func (settings *Settings) UnmarshalJSON(data []byte) error {
-	type rawType map[string]interface{}
-	var raw rawType
-	if err := json.Unmarshal(data, &raw); err != nil {
+	type untypedMapType map[string]interface{}
+	var untypedMap untypedMapType
+	if err := json.Unmarshal(data, &untypedMap); err != nil {
 		return err
 	}
 
-	if len(raw) == 0 {
+	if len(untypedMap) == 0 {
 		return nil
 	}
 
-	for name, untyped := range raw {
+	for name, untyped := range untypedMap {
 		if scalar, ok := unmarshalScalar(untyped); ok {
 			settings.Set(name, NewSettingScalar(scalar))
 		} else if vector, ok := unmarshalVector(untyped); ok {
