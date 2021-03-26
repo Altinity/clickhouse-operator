@@ -303,7 +303,7 @@ func (n *Normalizer) fillStatus() {
 	})
 	// Spam normalized config in high-verbose modes only
 	normalized := false
-	if v, err := n.chop.Config().GetLogLevel(); (err == nil) && (v >= 3) {
+	if v, err := n.chop.Config().GetLogLevel(); (err == nil) && (v >= 1) {
 		normalized = true
 	}
 	n.chi.FillStatus(endpoint, pods, fqdns, normalized)
