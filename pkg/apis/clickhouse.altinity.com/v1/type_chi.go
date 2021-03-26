@@ -629,9 +629,11 @@ func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceT
 
 // GetServiceTemplate gets ChiServiceTemplate of a CHI
 func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ChiServiceTemplate, bool) {
-	name := chi.Spec.Defaults.Templates.ServiceTemplate
-	template, ok := chi.GetServiceTemplate(name)
-	return template, ok
+	if !chi.Spec.Defaults.Templates.HasServiceTemplate() {
+		return nil, false
+	}
+	name := chi.Spec.Defaults.Templates.GetServiceTemplate()
+	return chi.GetServiceTemplate(name)
 }
 
 // MatchFullName

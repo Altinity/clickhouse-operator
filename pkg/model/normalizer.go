@@ -341,7 +341,7 @@ func (n *Normalizer) normalizeDefaults(defaults *chiV1.ChiDefaults) *chiV1.ChiDe
 	}
 	// Ensure field
 	if defaults.Templates == nil {
-		defaults.Templates = chiV1.NewChiTemplateNames()
+		//defaults.Templates = chiV1.NewChiTemplateNames()
 	}
 	defaults.Templates.HandleDeprecatedFields()
 	return defaults

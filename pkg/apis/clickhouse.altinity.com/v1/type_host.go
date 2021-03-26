@@ -101,21 +101,27 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 }
 
 func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
-	name := host.Templates.HostTemplate
-	template, ok := host.CHI.GetHostTemplate(name)
-	return template, ok
+	if !host.Templates.HasHostTemplate() {
+		return nil, false
+	}
+	name := host.Templates.GetHostTemplate()
+	return host.CHI.GetHostTemplate(name)
 }
 
 func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
-	name := host.Templates.PodTemplate
-	template, ok := host.CHI.GetPodTemplate(name)
-	return template, ok
+	if !host.Templates.HasPodTemplate() {
+		return nil, false
+	}
+	name := host.Templates.GetPodTemplate()
+	return host.CHI.GetPodTemplate(name)
 }
 
 func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
-	name := host.Templates.ReplicaServiceTemplate
-	template, ok := host.CHI.GetServiceTemplate(name)
-	return template, ok
+	if !host.Templates.HasReplicaServiceTemplate() {
+		return nil, false
+	}
+	name := host.Templates.GetReplicaServiceTemplate()
+	return host.CHI.GetServiceTemplate(name)
 }
 
 func (host *ChiHost) GetStatefulSetReplicasNum() int32 {

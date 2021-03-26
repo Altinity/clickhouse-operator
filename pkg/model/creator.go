@@ -435,7 +435,7 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 	c.setupConfigMapVolumes(statefulSet, host)
 
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
-	if host.Templates.LogVolumeClaimTemplate != "" {
+	if host.Templates.HasLogVolumeClaimTemplate() {
 		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
 		c.a.V(1).F().Info("add log container for statefulSet %s", statefulSetName)
 	}
@@ -521,8 +521,8 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplates(statefulSet *apps.St
 	for i := range statefulSet.Spec.Template.Spec.Containers {
 		// Convenience wrapper
 		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		_ = c.setupStatefulSetApplyVolumeMount(host, statefulSet, container.Name, newVolumeMount(host.Templates.DataVolumeClaimTemplate, dirPathClickHouseData))
-		_ = c.setupStatefulSetApplyVolumeMount(host, statefulSet, container.Name, newVolumeMount(host.Templates.LogVolumeClaimTemplate, dirPathClickHouseLog))
+		_ = c.setupStatefulSetApplyVolumeMount(host, statefulSet, container.Name, newVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), dirPathClickHouseData))
+		_ = c.setupStatefulSetApplyVolumeMount(host, statefulSet, container.Name, newVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), dirPathClickHouseLog))
 	}
 }
 
@@ -837,7 +837,7 @@ func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 			TCPPort:             chPortNumberMustBeAssignedLater,
 			HTTPPort:            chPortNumberMustBeAssignedLater,
 			InterserverHTTPPort: chPortNumberMustBeAssignedLater,
-			Templates:           chiv1.NewChiTemplateNames(),
+			Templates:           nil,
 		},
 	}
 }
@@ -856,7 +856,7 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 			TCPPort:             chPortNumberMustBeAssignedLater,
 			HTTPPort:            chPortNumberMustBeAssignedLater,
 			InterserverHTTPPort: chPortNumberMustBeAssignedLater,
-			Templates:           chiv1.NewChiTemplateNames(),
+			Templates:           nil,
 		},
 	}
 }
