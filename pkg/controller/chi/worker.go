@@ -125,7 +125,7 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 		case reconcileUpdate:
 			return w.updateCHI(ctx, command.old, command.new)
 		case reconcileDelete:
-			return w.deleteCHI(ctx, command.old)
+			return w.discoveryAndDeleteCHI(ctx, command.old)
 		}
 
 		// Unknown item type, don't know what to do with it
@@ -239,7 +239,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 		}
 	} else {
 		// The object is being deleted
-		return w.finalizeCHI(ctx, new)
+		return w.deleteCHI(ctx, new)
 	}
 
 	//time.Sleep(5 * time.Second)
@@ -891,8 +891,8 @@ func (w *worker) waitHostNotInCluster(ctx context.Context, host *chop.ChiHost) e
 	})
 }
 
-// finalizeCHI
-func (w *worker) finalizeCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
+// deleteCHI
+func (w *worker) deleteCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -929,8 +929,8 @@ func (w *worker) finalizeCHI(ctx context.Context, chi *chop.ClickHouseInstallati
 	return nil
 }
 
-// deleteCHI deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
-func (w *worker) deleteCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
+// discoveryAndDeleteCHI deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
+func (w *worker) discoveryAndDeleteCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
