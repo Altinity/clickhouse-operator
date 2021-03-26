@@ -1655,10 +1655,14 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chop.ChiHost) error {
 			}
 			return
 		}
+
 		pvc, err = w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
 		if err != nil {
 			w.a.M(host).A().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvcName, err)
+			return
 		}
+
+		// Register pvc as reconciled
 		chopmodel.ReconcileContextGetRegistry(ctx).RegisterPVC(pvc.ObjectMeta)
 	})
 
