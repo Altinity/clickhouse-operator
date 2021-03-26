@@ -144,8 +144,8 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string
 	//      <profile>X</profile>
 	util.Iline(b, 4, "<distributed_ddl>")
 	util.Iline(b, 4, "    <path>%s</path>", c.getDistributedDDLPath())
-	if c.chi.Spec.Defaults.DistributedDDL.Profile != "" {
-		util.Iline(b, 4, "    <profile>%s</profile>", c.chi.Spec.Defaults.DistributedDDL.Profile)
+	if c.chi.Spec.Defaults.DistributedDDL.HasProfile() {
+		util.Iline(b, 4, "    <profile>%s</profile>", c.chi.Spec.Defaults.DistributedDDL.GetProfile())
 	}
 	//		</distributed_ddl>
 	// </yandex>

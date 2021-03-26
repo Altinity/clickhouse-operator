@@ -337,7 +337,7 @@ func (n *Normalizer) normalizeDefaults(defaults *chiV1.ChiDefaults) *chiV1.ChiDe
 	defaults.ReplicasUseFQDN = util.CastStringBoolToStringTrueFalse(defaults.ReplicasUseFQDN, false)
 	// Ensure field
 	if defaults.DistributedDDL == nil {
-		defaults.DistributedDDL = chiV1.NewChiDistributedDDL()
+		//defaults.DistributedDDL = chiV1.NewChiDistributedDDL()
 	}
 	// Ensure field
 	if defaults.Templates == nil {

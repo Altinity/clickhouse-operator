@@ -18,6 +18,20 @@ func NewChiDistributedDDL() *ChiDistributedDDL {
 	return new(ChiDistributedDDL)
 }
 
+func (d *ChiDistributedDDL) HasProfile() bool {
+	if d == nil {
+		return false
+	}
+	return len(d.Profile) > 0
+}
+
+func (d *ChiDistributedDDL) GetProfile() string {
+	if d == nil {
+		return ""
+	}
+	return d.Profile
+}
+
 func (d *ChiDistributedDDL) MergeFrom(from *ChiDistributedDDL, _type MergeType) *ChiDistributedDDL {
 	if from == nil {
 		return d
