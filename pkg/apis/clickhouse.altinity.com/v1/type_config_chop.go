@@ -18,11 +18,12 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	// log "k8s.io/klog"
-
+	log "github.com/golang/glog"
 	"github.com/imdario/mergo"
 	"github.com/kubernetes-sigs/yaml"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -607,4 +608,12 @@ func (config *OperatorConfig) GetInformerNamespace() string {
 	}
 
 	return namespace
+}
+
+// GetLogLevel
+func (config *OperatorConfig) GetLogLevel() (log.Level, error) {
+	if i, err := strconv.Atoi(config.V); err == nil {
+		return log.Level(i), nil
+	}
+	return 0, fmt.Errorf("incorreect V value")
 }

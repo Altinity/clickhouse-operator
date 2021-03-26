@@ -304,7 +304,12 @@ func (n *Normalizer) fillStatus() {
 		fqdns = append(fqdns, CreatePodFQDN(host))
 		return nil
 	})
-	n.chi.FillStatus(endpoint, pods, fqdns)
+	// Spam normalized config in high-verbose modes only
+	normalized := false
+	if v, err := n.chop.Config().GetLogLevel(); (err == nil) && (v >= 3) {
+		normalized = true
+	}
+	n.chi.FillStatus(endpoint, pods, fqdns, normalized)
 }
 
 // normalizeStop normalizes .spec.stop

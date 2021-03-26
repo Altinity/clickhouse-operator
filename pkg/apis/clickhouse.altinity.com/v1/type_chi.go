@@ -24,7 +24,7 @@ import (
 )
 
 // fillStatus fills .Status
-func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string) {
+func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, normalized bool) {
 	chi.Status.Version = version.Version
 	chi.Status.ClustersCount = chi.ClustersCount()
 	chi.Status.ShardsCount = chi.ShardsCount()
@@ -36,7 +36,11 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.Status.FQDNs = fqdns
 	chi.Status.Endpoint = endpoint
 	chi.Status.Generation = chi.Generation
-	chi.Status.NormalizedCHI = &chi.Spec
+	if normalized {
+		chi.Status.NormalizedCHI = &chi.Spec
+	} else {
+		chi.Status.NormalizedCHI = nil
+	}
 }
 
 func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
