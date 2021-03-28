@@ -980,9 +980,9 @@ spec:
 
         - alert: ClickhouseBackupDoesntRunTooLong
           expr: |-
-            (clickhouse_backup_last_backup_end{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_backup_end{container_name='clickhouse-backup'} > 86400)
-            or (clickhouse_backup_last_create_finish{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_create_finish{container_name='clickhouse-backup'} > 86400)
-            or (clickhouse_backup_last_upload_finish{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_upload_finish{container_name='clickhouse-backup'} > 86400)
+            (clickhouse_backup_last_backup_end{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_backup_end{container_name='clickhouse-backup'} > 129600)
+            or (clickhouse_backup_last_create_finish{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_create_finish{container_name='clickhouse-backup'} > 129600)
+            or (clickhouse_backup_last_upload_finish{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_upload_finish{container_name='clickhouse-backup'} > 129600)
           labels:
             severity: warning
           annotations:
