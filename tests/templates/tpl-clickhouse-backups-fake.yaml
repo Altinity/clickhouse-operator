@@ -50,6 +50,9 @@ spec:
                 echo "# HELP clickhouse_backup_last_upload_duration Backup upload duration in nanoseconds" >> /usr/share/nginx/html/metrics &&
                 echo "# TYPE clickhouse_backup_last_upload_duration gauge" >> /usr/share/nginx/html/metrics &&
                 echo "clickhouse_backup_last_upload_duration 0" >> /usr/share/nginx/html/metrics &&
+                echo "# HELP clickhouse_backup_last_create_status Last backup create status: 0=failed, 1=success, 2=unknown" >> /usr/share/nginx/html/metrics &&
+                echo "# TYPE clickhouse_backup_last_create_status gauge" >> /usr/share/nginx/html/metrics &&
+                echo "clickhouse_backup_last_create_status 1" >> /usr/share/nginx/html/metrics &&
                 echo "# HELP clickhouse_backup_last_backup_success Last backup success boolean: 0=failed, 1=success, 2=unknown." >> /usr/share/nginx/html/metrics &&
                 echo "# TYPE clickhouse_backup_last_backup_success gauge" >> /usr/share/nginx/html/metrics &&
                 echo "clickhouse_backup_last_backup_success 1" >> /usr/share/nginx/html/metrics &&
