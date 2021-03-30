@@ -22,7 +22,7 @@ Vagrant.configure(2) do |config|
   config.vm.box_check_update = false
 
   if get_provider == "hyperv"
-    config.vm.synced_folder ".", "/vagrant", type: "smb", smb_user: "#{ENV['USERNAME']}@#{ENV['USERDOMAIN']}", smb_password: ENV['PASSWORD'], mount_options: ["vers=3.0","domain=#{ENV['USERDOMAIN']}", "user=#{ENV['USERNAME']}","username=#{ENV['USERDOMAIN']}@#{ENV['USERNAME']}","password=#{ENV['PASSWORD']}"]
+    config.vm.synced_folder ".", "/vagrant", type: "smb", smb_username: ENV['USERNAME'], smb_password: ENV['PASSWORD'], mount_options: ["vers=3.0"]
   else
     config.vm.synced_folder ".", "/vagrant"
   end

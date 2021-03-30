@@ -265,9 +265,9 @@ def test_backup_duration(self):
             'echo "# HELP clickhouse_backup_last_create_duration Backup create duration in nanoseconds" > /usr/share/nginx/html/metrics && '
             'echo "# TYPE clickhouse_backup_last_create_duration gauge" >> /usr/share/nginx/html/metrics && '
             'echo "clickhouse_backup_last_create_duration 7000000000000" >> /usr/share/nginx/html/metrics && '
-            'echo "# HELP clickhouse_backup_last_backup_success Last backup success boolean: 0=failed, 1=success, 2=unknown." >> /usr/share/nginx/html/metrics && '
-            'echo "# TYPE clickhouse_backup_last_backup_success gauge" >> /usr/share/nginx/html/metrics && '
-            'echo "clickhouse_backup_last_backup_success 1" >> /usr/share/nginx/html/metrics'
+            'echo "# HELP clickhouse_backup_last_create_status Last backup create status: 0=failed, 1=success, 2=unknown" >> /usr/share/nginx/html/metrics && '
+            'echo "# TYPE clickhouse_backup_last_create_status gauge" >> /usr/share/nginx/html/metrics && '
+            'echo "clickhouse_backup_last_create_status 1" >> /usr/share/nginx/html/metrics'            
             '\''
         )
 
@@ -296,11 +296,11 @@ def test_backup_size(self):
     backup_cases = {
         decrease_pod: {
             'rows': (10000, 1000),
-            'truncate': True,
+            'decrease': True,
         },
         increase_pod: {
             'rows': (1000, 10000),
-            'truncate': False,
+            'decrease': False,
         },
     }
     for backup_pod in backup_cases:
@@ -308,7 +308,7 @@ def test_backup_size(self):
             backup_name = prepare_table_for_backup(backup_pod, rows=backup_rows)
             exec_on_backup_container(backup_pod, f'curl -X POST -sL "http://127.0.0.1:7171/backup/create?name={backup_name}"')
             wait_backup_command_status(backup_pod, f'create {backup_name}', expected_status='success')
-            if backup_cases[backup_pod]['truncate']:
+            if backup_cases[backup_pod]['decrease']:
                 clickhouse.query(
                     chi['metadata']['name'],
                     f"TRUNCATE TABLE default.test_backup",
@@ -316,12 +316,12 @@ def test_backup_size(self):
                 )
         fired = alerts.wait_alert_state("ClickHouseBackupSizeChanged", "firing", expected_state=True, sleep_time=5,
                                         labels={"pod_name": backup_pod}, time_range='60s')
-        assert fired, error("can't get ClickHouseBackupSizeChanged alert in firing state")
+        assert fired, error(f"can't get ClickHouseBackupSizeChanged alert in firing state, decrease={backup_cases[backup_pod]['decrease']}")
 
         with Then("check ClickHouseBackupSizeChanged gone away"):
             resolved = alerts.wait_alert_state("ClickHouseBackupSizeChanged", "firing", expected_state=False,
                                                labels={"pod_name": backup_pod}, sleep_time=5)
-            assert resolved, error("can't get ClickHouseBackupSizeChanged alert is gone away")
+            assert resolved, error(f"can't get ClickHouseBackupSizeChanged alert is gone away, decrease={backup_cases[backup_pod]['decrease']}")
 
 
 @TestScenario
