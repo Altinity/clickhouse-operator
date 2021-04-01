@@ -17,6 +17,7 @@ package metrics
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
@@ -27,6 +28,11 @@ import (
 const (
 	namespace = "chi"
 	subsystem = "clickhouse"
+)
+
+const (
+	// writeMetricWaitTimeout specifies how long to wait for metric being accepted by prometheus writer
+	writeMetricWaitTimeout = 10 * time.Second
 )
 
 type PrometheusWriter struct {
@@ -157,8 +163,7 @@ func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, de
 	}
 	select {
 	case out <- m:
-
-	default:
+	case <-time.After(writeMetricWaitTimeout):
 		log.Infof("Error sending metric to the channel %s", name)
 	}
 }
