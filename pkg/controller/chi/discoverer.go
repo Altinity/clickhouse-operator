@@ -15,18 +15,26 @@
 package chi
 
 import (
+	"context"
+	"github.com/altinity/clickhouse-operator/pkg/util"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
-func (c *Controller) discovery(chi *chop.ClickHouseInstallation) *chopmodel.Registry {
+func (c *Controller) discovery(ctx context.Context, chi *chop.ClickHouseInstallation) *chopmodel.Registry {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	r := chopmodel.NewRegistry()
 
 	labeler := chopmodel.NewLabeler(c.chop, chi)
 	opts := newListOptions(labeler.GetSelectorCHIScope())
 
-	if list, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).List(opts); err != nil {
+	if list, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).List(ctx, opts); err != nil {
 		log.M(chi).A().Error("FAIL list StatefulSet err:%v", err)
 	} else if list != nil {
 		for _, obj := range list.Items {
@@ -36,7 +44,7 @@ func (c *Controller) discovery(chi *chop.ClickHouseInstallation) *chopmodel.Regi
 		log.M(chi).A().Error("FAIL list StatefulSet list is nil")
 	}
 
-	if list, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).List(opts); err != nil {
+	if list, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).List(ctx, opts); err != nil {
 		log.M(chi).A().Error("FAIL list ConfigMap err:%v", err)
 	} else if list != nil {
 		for _, obj := range list.Items {
@@ -46,7 +54,7 @@ func (c *Controller) discovery(chi *chop.ClickHouseInstallation) *chopmodel.Regi
 		log.M(chi).A().Error("FAIL list ConfigMap list is nil")
 	}
 
-	if list, err := c.kubeClient.CoreV1().Services(chi.Namespace).List(opts); err != nil {
+	if list, err := c.kubeClient.CoreV1().Services(chi.Namespace).List(ctx, opts); err != nil {
 		log.M(chi).A().Error("FAIL list Service err:%v", err)
 	} else if list != nil {
 		for _, obj := range list.Items {
@@ -56,7 +64,7 @@ func (c *Controller) discovery(chi *chop.ClickHouseInstallation) *chopmodel.Regi
 		log.M(chi).A().Error("FAIL list Service list is nil")
 	}
 
-	if list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(chi.Namespace).List(opts); err != nil {
+	if list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(chi.Namespace).List(ctx, opts); err != nil {
 		log.M(chi).A().Error("FAIL list PVC err:%v", err)
 	} else if list != nil {
 		for _, obj := range list.Items {
@@ -66,7 +74,7 @@ func (c *Controller) discovery(chi *chop.ClickHouseInstallation) *chopmodel.Regi
 		log.M(chi).A().Error("FAIL list PVC list is nil")
 	}
 
-	if list, err := c.kubeClient.CoreV1().PersistentVolumes().List(opts); err != nil {
+	if list, err := c.kubeClient.CoreV1().PersistentVolumes().List(ctx, opts); err != nil {
 		log.M(chi).A().Error("FAIL list PV err:%v", err)
 	} else if list != nil {
 		for _, obj := range list.Items {

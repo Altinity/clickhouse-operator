@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
 	clickhousealtinitycomv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -61,13 +62,13 @@ func NewFilteredClickHouseOperatorConfigurationInformer(client versioned.Interfa
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(options)
+				return client.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).Watch(options)
+				return client.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&clickhousealtinitycomv1.ClickHouseOperatorConfiguration{},

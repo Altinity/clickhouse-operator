@@ -2,19 +2,22 @@
 
 module k8s.io/code-generator
 
-go 1.12
+go 1.15
 
 require (
-	github.com/gogo/protobuf v0.0.0-20171007142547-342cbe0a0415
-	github.com/spf13/pflag v1.0.1
-	golang.org/x/tools v0.0.0-20190328211700-ab21143f2384 // indirect
-	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
-	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
-	k8s.io/gengo v0.0.0-20190116091435-f8a0810f38af
-	k8s.io/klog v0.3.1
-)
-
-replace (
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
-	golang.org/x/tools => golang.org/x/tools v0.0.0-20190313210603-aa82965741a9
+	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
+	github.com/gogo/protobuf v1.3.1
+	github.com/google/go-cmp v0.5.2 // indirect
+	github.com/json-iterator/go v1.1.10 // indirect
+	github.com/mailru/easyjson v0.7.0 // indirect
+	github.com/spf13/pflag v1.0.5
+	github.com/stretchr/testify v1.6.1 // indirect
+	golang.org/x/mod v0.3.0 // indirect
+	golang.org/x/net v0.0.0-20201110031124-69a78807bb2b // indirect
+	golang.org/x/text v0.3.4 // indirect
+	golang.org/x/tools v0.0.0-20200616133436-c1934b75d054 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	k8s.io/gengo v0.0.0-20201113003025-83324d819ded
+	k8s.io/klog/v2 v2.4.0
+	k8s.io/kube-openapi v0.0.0-20201113171705-d219536bb9fd
 )

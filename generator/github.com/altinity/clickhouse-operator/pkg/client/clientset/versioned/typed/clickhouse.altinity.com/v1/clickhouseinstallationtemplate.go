@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	"time"
 
 	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -37,14 +38,14 @@ type ClickHouseInstallationTemplatesGetter interface {
 
 // ClickHouseInstallationTemplateInterface has methods to work with ClickHouseInstallationTemplate resources.
 type ClickHouseInstallationTemplateInterface interface {
-	Create(*v1.ClickHouseInstallationTemplate) (*v1.ClickHouseInstallationTemplate, error)
-	Update(*v1.ClickHouseInstallationTemplate) (*v1.ClickHouseInstallationTemplate, error)
-	Delete(name string, options *metav1.DeleteOptions) error
-	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
-	Get(name string, options metav1.GetOptions) (*v1.ClickHouseInstallationTemplate, error)
-	List(opts metav1.ListOptions) (*v1.ClickHouseInstallationTemplateList, error)
-	Watch(opts metav1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClickHouseInstallationTemplate, err error)
+	Create(ctx context.Context, clickHouseInstallationTemplate *v1.ClickHouseInstallationTemplate, opts metav1.CreateOptions) (*v1.ClickHouseInstallationTemplate, error)
+	Update(ctx context.Context, clickHouseInstallationTemplate *v1.ClickHouseInstallationTemplate, opts metav1.UpdateOptions) (*v1.ClickHouseInstallationTemplate, error)
+	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ClickHouseInstallationTemplate, error)
+	List(ctx context.Context, opts metav1.ListOptions) (*v1.ClickHouseInstallationTemplateList, error)
+	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClickHouseInstallationTemplate, err error)
 	ClickHouseInstallationTemplateExpansion
 }
 
@@ -63,20 +64,20 @@ func newClickHouseInstallationTemplates(c *ClickhouseV1Client, namespace string)
 }
 
 // Get takes name of the clickHouseInstallationTemplate, and returns the corresponding clickHouseInstallationTemplate object, and an error if there is any.
-func (c *clickHouseInstallationTemplates) Get(name string, options metav1.GetOptions) (result *v1.ClickHouseInstallationTemplate, err error) {
+func (c *clickHouseInstallationTemplates) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ClickHouseInstallationTemplate, err error) {
 	result = &v1.ClickHouseInstallationTemplate{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("clickhouseinstallationtemplates").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of ClickHouseInstallationTemplates that match those selectors.
-func (c *clickHouseInstallationTemplates) List(opts metav1.ListOptions) (result *v1.ClickHouseInstallationTemplateList, err error) {
+func (c *clickHouseInstallationTemplates) List(ctx context.Context, opts metav1.ListOptions) (result *v1.ClickHouseInstallationTemplateList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -87,13 +88,13 @@ func (c *clickHouseInstallationTemplates) List(opts metav1.ListOptions) (result 
 		Resource("clickhouseinstallationtemplates").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested clickHouseInstallationTemplates.
-func (c *clickHouseInstallationTemplates) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+func (c *clickHouseInstallationTemplates) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -104,71 +105,74 @@ func (c *clickHouseInstallationTemplates) Watch(opts metav1.ListOptions) (watch.
 		Resource("clickhouseinstallationtemplates").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a clickHouseInstallationTemplate and creates it.  Returns the server's representation of the clickHouseInstallationTemplate, and an error, if there is any.
-func (c *clickHouseInstallationTemplates) Create(clickHouseInstallationTemplate *v1.ClickHouseInstallationTemplate) (result *v1.ClickHouseInstallationTemplate, err error) {
+func (c *clickHouseInstallationTemplates) Create(ctx context.Context, clickHouseInstallationTemplate *v1.ClickHouseInstallationTemplate, opts metav1.CreateOptions) (result *v1.ClickHouseInstallationTemplate, err error) {
 	result = &v1.ClickHouseInstallationTemplate{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("clickhouseinstallationtemplates").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clickHouseInstallationTemplate).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a clickHouseInstallationTemplate and updates it. Returns the server's representation of the clickHouseInstallationTemplate, and an error, if there is any.
-func (c *clickHouseInstallationTemplates) Update(clickHouseInstallationTemplate *v1.ClickHouseInstallationTemplate) (result *v1.ClickHouseInstallationTemplate, err error) {
+func (c *clickHouseInstallationTemplates) Update(ctx context.Context, clickHouseInstallationTemplate *v1.ClickHouseInstallationTemplate, opts metav1.UpdateOptions) (result *v1.ClickHouseInstallationTemplate, err error) {
 	result = &v1.ClickHouseInstallationTemplate{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("clickhouseinstallationtemplates").
 		Name(clickHouseInstallationTemplate.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clickHouseInstallationTemplate).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the clickHouseInstallationTemplate and deletes it. Returns an error if one occurs.
-func (c *clickHouseInstallationTemplates) Delete(name string, options *metav1.DeleteOptions) error {
+func (c *clickHouseInstallationTemplates) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("clickhouseinstallationtemplates").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *clickHouseInstallationTemplates) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+func (c *clickHouseInstallationTemplates) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("clickhouseinstallationtemplates").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched clickHouseInstallationTemplate.
-func (c *clickHouseInstallationTemplates) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ClickHouseInstallationTemplate, err error) {
+func (c *clickHouseInstallationTemplates) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ClickHouseInstallationTemplate, err error) {
 	result = &v1.ClickHouseInstallationTemplate{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("clickhouseinstallationtemplates").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
