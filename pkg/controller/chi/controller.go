@@ -181,8 +181,8 @@ func (c *Controller) addEventHandlers(
 			if !c.chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
-			log.V(2).Infof("chopInformer.AddFunc - %s/%s added", chopConfig.Namespace, chopConfig.Name)
-			c.enqueueObject(chopConfig.Namespace, chopConfig.Name, NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
+			log.V(2).M(chopConfig).Info("chopInformer.AddFunc")
+			c.enqueueObject(NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			newChopConfig := new.(*chi.ClickHouseOperatorConfiguration)
