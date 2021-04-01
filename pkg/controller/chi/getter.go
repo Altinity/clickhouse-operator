@@ -214,22 +214,6 @@ func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 	return c.kubeClient.CoreV1().Pods(namespace).Get(newContext(), name, newGetOptions())
 }
 
-// getPod gets pod for host or StatefulSet. Accepted types:
-//   1. *apps.StatefulSet
-//   2. *chop.ChiHost
-func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
-	var name, namespace string
-	switch typedObj := obj.(type) {
-	case *chop.ChiHost:
-		name = chopmodel.CreatePodName(obj)
-		namespace = typedObj.Address.Namespace
-	case *apps.StatefulSet:
-		name = chopmodel.CreatePodName(obj)
-		namespace = typedObj.Namespace
-	}
-	return c.kubeClient.CoreV1().Pods(namespace).Get(name, newGetOptions())
-}
-
 // GetCHIByObjectMeta gets CHI by namespaced name
 func (c *Controller) GetCHIByObjectMeta(objectMeta *meta.ObjectMeta) (*chiv1.ClickHouseInstallation, error) {
 	chiName, err := chopmodel.GetCHINameFromObjectMeta(objectMeta)
