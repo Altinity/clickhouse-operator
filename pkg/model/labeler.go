@@ -58,6 +58,7 @@ const (
 	labelServiceValueCluster          = "cluster"
 	labelServiceValueShard            = "shard"
 	labelServiceValueHost             = "host"
+	LabelPVCReclaimPolicyName         = clickhousealtinitycom.GroupName + "/reclaimPolicy"
 
 	// Supplementary service labels - used to cooperate with k8s
 	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/zookeeper-version"
@@ -154,8 +155,8 @@ func (l *Labeler) getLabelsCHIScope() map[string]string {
 	})
 }
 
-// getSelectorCHIScope gets labels to select a CHI-scoped object
-func (l *Labeler) getSelectorCHIScope() map[string]string {
+// GetSelectorCHIScope gets labels to select a CHI-scoped object
+func (l *Labeler) GetSelectorCHIScope() map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace: l.namer.getNamePartNamespace(l.chi),
@@ -166,7 +167,7 @@ func (l *Labeler) getSelectorCHIScope() map[string]string {
 
 // getSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
 func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
-	return l.appendReadyLabels(l.getSelectorCHIScope())
+	return l.appendReadyLabels(l.GetSelectorCHIScope())
 }
 
 // getLabelsClusterScope gets labels for Cluster-scoped object
@@ -258,6 +259,25 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 // getLabelsHostScopeReady gets labels for Host-scoped object including Ready label
 func (l *Labeler) getLabelsHostScopeReady(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	return l.appendReadyLabels(l.getLabelsHostScope(host, applySupplementaryServiceLabels))
+}
+
+func (l *Labeler) getLabelsHostScopeReclaimPolicy(host *chi.ChiHost, template *chi.ChiVolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
+	return util.MergeStringMapsOverwrite(l.getLabelsHostScope(host, applySupplementaryServiceLabels), map[string]string{
+		LabelPVCReclaimPolicyName: template.PVCReclaimPolicy.String(),
+	})
+}
+
+func (l *Labeler) getReclaimPolicy(meta meta.ObjectMeta) chi.PVCReclaimPolicy {
+	defaultReclaimPolicy := chi.PVCReclaimPolicyDelete
+
+	if value, ok := meta.Labels[LabelPVCReclaimPolicyName]; ok {
+		reclaimPolicy := chi.NewPVCReclaimPolicyFromString(value)
+		if reclaimPolicy.IsValid() {
+			return reclaimPolicy
+		}
+	}
+
+	return defaultReclaimPolicy
 }
 
 // getSelectorShardScope gets labels to select a Host-scoped object
@@ -469,6 +489,48 @@ func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 		return "", fmt.Errorf("can not find %s label in meta", LabelClusterName)
 	}
 	return meta.Labels[LabelClusterName], nil
+}
+
+// MakeObjectVersionLabel
+func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
+	meta.Labels = util.MergeStringMapsOverwrite(
+		meta.Labels,
+		map[string]string{
+			LabelObjectVersion: util.Fingerprint(obj),
+		},
+	)
+}
+
+func isObjectVersionLabelTheSame(meta *meta.ObjectMeta, value string) bool {
+	if meta == nil {
+		return false
+	}
+
+	l, ok := meta.Labels[LabelObjectVersion]
+	if !ok {
+		return false
+	}
+
+	return l == value
+}
+
+func IsObjectTheSame(meta1, meta2 *meta.ObjectMeta) bool {
+	if (meta1 == nil) && (meta2 == nil) {
+		return true
+	}
+	if (meta1 != nil) && (meta2 == nil) {
+		return false
+	}
+	if (meta1 == nil) && (meta2 != nil) {
+		return false
+	}
+
+	l, ok := meta2.Labels[LabelObjectVersion]
+	if !ok {
+		return false
+	}
+
+	return isObjectVersionLabelTheSame(meta1, l)
 }
 
 // AppendLabelReady adds "ready" label with value = UTC now

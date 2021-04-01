@@ -15,22 +15,24 @@
 package v1
 
 func (shard *ChiShard) InheritSettingsFrom(cluster *ChiCluster) {
-	(&shard.Settings).MergeFrom(cluster.Settings)
+	shard.Settings = shard.Settings.MergeFrom(cluster.Settings)
 }
 
 func (shard *ChiShard) InheritFilesFrom(cluster *ChiCluster) {
-	(&shard.Files).MergeFrom(cluster.Files)
+	shard.Files = shard.Files.MergeFrom(cluster.Files)
 }
 
 func (shard *ChiShard) InheritTemplatesFrom(cluster *ChiCluster) {
-	(&shard.Templates).MergeFrom(&cluster.Templates, MergeTypeFillEmptyValues)
-	(&shard.Templates).HandleDeprecatedFields()
+	shard.Templates = shard.Templates.MergeFrom(cluster.Templates, MergeTypeFillEmptyValues)
+	shard.Templates.HandleDeprecatedFields()
 }
 
 func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
-	name := shard.Templates.ShardServiceTemplate
-	template, ok := shard.CHI.GetServiceTemplate(name)
-	return template, ok
+	if !shard.Templates.HasShardServiceTemplate() {
+		return nil, false
+	}
+	name := shard.Templates.GetShardServiceTemplate()
+	return shard.CHI.GetServiceTemplate(name)
 }
 
 func (shard *ChiShard) WalkHosts(
@@ -60,5 +62,5 @@ func (shard *ChiShard) GetCHI() *ClickHouseInstallation {
 }
 
 func (shard *ChiShard) GetCluster() *ChiCluster {
-	return &shard.CHI.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
+	return shard.CHI.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
 }

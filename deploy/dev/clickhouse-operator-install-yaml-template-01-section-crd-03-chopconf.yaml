@@ -60,9 +60,15 @@ spec:
                 type: string
             chConfigUserDefaultPassword:
               type: string
+            chConfigNetworksHostRegexpTemplate:
+              type: string
             chUsername:
               type: string
             chPassword:
+              type: string
+            chCredentialsSecretNamespace:
+              type: string
+            chCredentialsSecretName:
               type: string
             chPort:
               type: integer

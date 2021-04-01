@@ -14,13 +14,138 @@
 
 package v1
 
+func NewChiTemplateNames() *ChiTemplateNames {
+	return new(ChiTemplateNames)
+}
+
+func (templateNames *ChiTemplateNames) HasHostTemplate() bool {
+	if templateNames == nil {
+		return false
+	}
+	return len(templateNames.HostTemplate) > 0
+}
+
+func (templateNames *ChiTemplateNames) GetHostTemplate() string {
+	if templateNames == nil {
+		return ""
+	}
+	return templateNames.HostTemplate
+}
+
+func (templateNames *ChiTemplateNames) HasPodTemplate() bool {
+	if templateNames == nil {
+		return false
+	}
+	return len(templateNames.PodTemplate) > 0
+}
+
+func (templateNames *ChiTemplateNames) GetPodTemplate() string {
+	if templateNames == nil {
+		return ""
+	}
+	return templateNames.PodTemplate
+}
+
+func (templateNames *ChiTemplateNames) HasDataVolumeClaimTemplate() bool {
+	if templateNames == nil {
+		return false
+	}
+	return len(templateNames.DataVolumeClaimTemplate) > 0
+}
+
+func (templateNames *ChiTemplateNames) GetDataVolumeClaimTemplate() string {
+	if templateNames == nil {
+		return ""
+	}
+	return templateNames.DataVolumeClaimTemplate
+}
+
+func (templateNames *ChiTemplateNames) HasLogVolumeClaimTemplate() bool {
+	if templateNames == nil {
+		return false
+	}
+	return len(templateNames.LogVolumeClaimTemplate) > 0
+}
+
+func (templateNames *ChiTemplateNames) GetLogVolumeClaimTemplate() string {
+	if templateNames == nil {
+		return ""
+	}
+	return templateNames.LogVolumeClaimTemplate
+}
+
+func (templateNames *ChiTemplateNames) HasServiceTemplate() bool {
+	if templateNames == nil {
+		return false
+	}
+	return len(templateNames.ServiceTemplate) > 0
+}
+
+func (templateNames *ChiTemplateNames) GetServiceTemplate() string {
+	if templateNames == nil {
+		return ""
+	}
+	return templateNames.ServiceTemplate
+}
+
+func (templateNames *ChiTemplateNames) HasClusterServiceTemplate() bool {
+	if templateNames == nil {
+		return false
+	}
+	return len(templateNames.ClusterServiceTemplate) > 0
+}
+
+func (templateNames *ChiTemplateNames) GetClusterServiceTemplate() string {
+	if templateNames == nil {
+		return ""
+	}
+	return templateNames.ClusterServiceTemplate
+}
+
+func (templateNames *ChiTemplateNames) HasShardServiceTemplate() bool {
+	if templateNames == nil {
+		return false
+	}
+	return len(templateNames.ShardServiceTemplate) > 0
+}
+
+func (templateNames *ChiTemplateNames) GetShardServiceTemplate() string {
+	if templateNames == nil {
+		return ""
+	}
+	return templateNames.ShardServiceTemplate
+}
+
+func (templateNames *ChiTemplateNames) HasReplicaServiceTemplate() bool {
+	if templateNames == nil {
+		return false
+	}
+	return len(templateNames.ReplicaServiceTemplate) > 0
+}
+
+func (templateNames *ChiTemplateNames) GetReplicaServiceTemplate() string {
+	if templateNames == nil {
+		return ""
+	}
+	return templateNames.ReplicaServiceTemplate
+}
+
 func (templateNames *ChiTemplateNames) HandleDeprecatedFields() {
+	if templateNames == nil {
+		return
+	}
 	if templateNames.DataVolumeClaimTemplate == "" {
 		templateNames.DataVolumeClaimTemplate = templateNames.VolumeClaimTemplate
 	}
 }
 
-func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type MergeType) {
+func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type MergeType) *ChiTemplateNames {
+	if from == nil {
+		return templateNames
+	}
+	if templateNames == nil {
+		templateNames = NewChiTemplateNames()
+	}
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if templateNames.HostTemplate == "" {
@@ -80,4 +205,6 @@ func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type M
 			templateNames.ReplicaServiceTemplate = from.ReplicaServiceTemplate
 		}
 	}
+
+	return templateNames
 }

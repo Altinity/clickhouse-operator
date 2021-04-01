@@ -32,11 +32,21 @@ func newGetOptions() metav1.GetOptions {
 	return metav1.GetOptions{}
 }
 
+// newCreateOptions returns filled metav1.CreateOptions
+func newCreateOptions() metav1.CreateOptions {
+	return metav1.CreateOptions{}
+}
+
+// newUpdateOptions returns filled metav1.UpdateOptions
+func newUpdateOptions() metav1.UpdateOptions {
+	return metav1.UpdateOptions{}
+}
+
 // newDeleteOptions returns filled *metav1.DeleteOptions
-func newDeleteOptions() *metav1.DeleteOptions {
+func newDeleteOptions() metav1.DeleteOptions {
 	gracePeriodSeconds := int64(0)
 	propagationPolicy := metav1.DeletePropagationForeground
-	return &metav1.DeleteOptions{
+	return metav1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriodSeconds,
 		PropagationPolicy:  &propagationPolicy,
 	}

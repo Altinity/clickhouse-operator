@@ -5,6 +5,7 @@ metadata:
   labels:
     test: test
 spec:
+
   useTemplates:
     - name: clickhouse-version
   configuration:

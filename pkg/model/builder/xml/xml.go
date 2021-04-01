@@ -36,25 +36,29 @@ const (
 )
 
 // GenerateXML creates XML representation from the provided input
-func GenerateXML(w io.Writer, settings chiv1.Settings, prefix string) {
-	// paths is sorted set of normalized paths (maps keys) from 'input'
-	paths := make([]string, 0, len(settings))
+func GenerateXML(w io.Writer, settings *chiv1.Settings, prefix string) {
+	if settings.Len() == 0 {
+		return
+	}
 
-	// data is copy of 'input' with:
+	// paths is a sorted set of normalized paths (maps keys) from settings
+	paths := make([]string, 0, settings.Len())
+
+	// data is copy of settings with:
 	// 1. paths (map keys) are normalized in terms of trimmed '/'
 	// 2. all map keys listed in 'excludes' are excluded
 	data := make(map[string]string)
 	// Skip excluded paths
-	for name := range settings {
-		// 'key' may be non-normalized, and may have starting or trailing '/'
+	settings.Walk(func(name string, setting *chiv1.Setting) {
+		// 'name' may be non-normalized, and may have starting or trailing '/'
 		// 'path' is normalized path without starting and trailing '/', ex.: 'test/quotas'
 		path := normalizePath(prefix, name)
 		if path == "" {
-			continue
+			return
 		}
 		paths = append(paths, path)
 		data[path] = name
-	}
+	})
 	sort.Strings(paths)
 
 	// xmlTreeRoot - root of the XML tree data structure
@@ -69,7 +73,7 @@ func GenerateXML(w io.Writer, settings chiv1.Settings, prefix string) {
 			continue
 		}
 		name := data[path]
-		xmlTreeRoot.addBranch(tags, settings[name])
+		xmlTreeRoot.addBranch(tags, settings.Get(name))
 	}
 
 	// return XML
@@ -160,16 +164,19 @@ func (n *xmlNode) writeTagNoValue(w io.Writer, indent, tabsize uint8) {
 // and children are not printed
 // <tag>value</tag>
 func (n *xmlNode) writeTagWithValue(w io.Writer, value string, indent, tabsize uint8) {
-	if value != "_removed_" {
-		n.writeTag(w, indent, true, noEol)
-		n.writeValue(w, value)
-		n.writeTag(w, 0, false, eol)
-	} else {
+	if value == "_removed_" {
+		// TODO fix it
+		// Special case
 		var removeTag xmlNode
 		removeTag.tag = n.tag + " remove=\"1\""
 		removeTag.writeTag(w, indent, true, noEol)
 		n.writeTag(w, 0, false, eol)
+		return
 	}
+
+	n.writeTag(w, indent, true, noEol)
+	n.writeValue(w, value)
+	n.writeTag(w, 0, false, eol)
 }
 
 // writeTag prints XML tag into io.Writer
@@ -201,7 +208,7 @@ func (n *xmlNode) writeTag(w io.Writer, indent uint8, openTag bool, eol string) 
 	}
 }
 
-// writeTag prints XML value into io.Writer
+// writeValue prints XML value into io.Writer
 func (n *xmlNode) writeValue(w io.Writer, value string) {
 	_, _ = fmt.Fprintf(w, "%s", value)
 }

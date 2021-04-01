@@ -15,11 +15,13 @@
 package chi
 
 import (
+	"context"
 	"fmt"
+
+	log "github.com/golang/glog"
 
 	a "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	log "github.com/golang/glog"
 )
 
 // Announcer handler all log/event/status messages going outside of controller/worker
@@ -293,6 +295,6 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 
 	// Propagate status updates into object
 	if a.writeStatusAction || a.writeStatusActions || a.writeStatusError {
-		_ = a.ctrl.updateCHIObjectStatus(a.chi, true)
+		_ = a.ctrl.updateCHIObjectStatus(context.Background(), a.chi, true)
 	}
 }

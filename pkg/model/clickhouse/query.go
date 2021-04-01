@@ -23,9 +23,11 @@ import (
 
 // Query
 type Query struct {
+	// Query execution context
 	ctx        context.Context
 	cancelFunc context.CancelFunc
-	Rows       *databasesql.Rows
+	// Query result rows
+	Rows *databasesql.Rows
 }
 
 // NewQuery

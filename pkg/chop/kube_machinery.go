@@ -20,13 +20,13 @@ import (
 	"os/user"
 	"path/filepath"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-	"github.com/altinity/clickhouse-operator/pkg/version"
-
 	kube "k8s.io/client-go/kubernetes"
 	kuberest "k8s.io/client-go/rest"
 	kubeclientcmd "k8s.io/client-go/tools/clientcmd"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 // getKubeConfig creates kuberest.Config object based on current environment
@@ -82,10 +82,11 @@ func GetClientset(kubeConfigFile, masterURL string) (*kube.Clientset, *chopclien
 	return kubeClientset, chopClientset
 }
 
+// GetCHOp gets chop instance
 // chopClient can be nil, in this case CHOp will not be able to use any ConfigMap(s) with configuration
-func GetCHOp(chopClient *chopclientset.Clientset, initCHOpConfigFilePath string) *CHOp {
+func GetCHOp(kubeClient *kube.Clientset, chopClient *chopclientset.Clientset, initCHOpConfigFilePath string) *CHOp {
 	// Create operator instance
-	chop := NewCHOp(version.Version, chopClient, initCHOpConfigFilePath)
+	chop := NewCHOp(version.Version, kubeClient, chopClient, initCHOpConfigFilePath)
 	if err := chop.Init(); err != nil {
 		log.A().Fatal("Unable to init CHOP instance %v", err)
 		os.Exit(1)

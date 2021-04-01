@@ -135,7 +135,7 @@ func (c *Controller) emitEvent(
 		// ID of the controller instance, e.g. `kubelet-xyzf`.
 		// ReportingInstance:
 	}
-	_, err := c.kubeClient.CoreV1().Events(namespace).Create(event)
+	_, err := c.kubeClient.CoreV1().Events(namespace).Create(newContext(), event, newCreateOptions())
 
 	if err != nil {
 		log.M(chi).A().Error("Create Event failed: %v", err)

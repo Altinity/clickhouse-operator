@@ -195,7 +195,23 @@ func (c *Controller) getStatefulSetByHost(host *chop.ChiHost) (*apps.StatefulSet
 	name := chopmodel.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
 
-	return c.statefulSetLister.StatefulSets(namespace).Get(name)
+	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(newContext(), name, newGetOptions())
+}
+
+// getPod gets pod for host or StatefulSet. Accepted types:
+//   1. *apps.StatefulSet
+//   2. *chop.ChiHost
+func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
+	var name, namespace string
+	switch typedObj := obj.(type) {
+	case *chop.ChiHost:
+		name = chopmodel.CreatePodName(obj)
+		namespace = typedObj.Address.Namespace
+	case *apps.StatefulSet:
+		name = chopmodel.CreatePodName(obj)
+		namespace = typedObj.Namespace
+	}
+	return c.kubeClient.CoreV1().Pods(namespace).Get(newContext(), name, newGetOptions())
 }
 
 // getPod gets pod for host or StatefulSet. Accepted types:
@@ -221,5 +237,5 @@ func (c *Controller) GetCHIByObjectMeta(objectMeta *meta.ObjectMeta) (*chiv1.Cli
 		return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", objectMeta.Name, err)
 	}
 
-	return c.chiLister.ClickHouseInstallations(objectMeta.Namespace).Get(chiName)
+	return c.chopClient.ClickhouseV1().ClickHouseInstallations(objectMeta.Namespace).Get(newContext(), chiName, newGetOptions())
 }

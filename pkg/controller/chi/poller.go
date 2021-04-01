@@ -16,6 +16,7 @@
 package chi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -26,6 +27,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 const (
@@ -34,8 +36,8 @@ const (
 )
 
 // waitHostNotReady polls host's StatefulSet for not exists or not ready
-func (c *Controller) waitHostNotReady(host *chop.ChiHost) error {
-	err := c.pollStatefulSet(host, NewStatefulSetPollOptionsConfigNoCreate(c.chop.Config()), model.IsStatefulSetNotReady, nil)
+func (c *Controller) waitHostNotReady(ctx context.Context, host *chop.ChiHost) error {
+	err := c.pollStatefulSet(ctx, host, NewStatefulSetPollOptionsConfigNoCreate(c.chop.Config()), model.IsStatefulSetNotReady, nil)
 	if apierrors.IsNotFound(err) {
 		err = nil
 	}
@@ -44,20 +46,21 @@ func (c *Controller) waitHostNotReady(host *chop.ChiHost) error {
 }
 
 // waitHostReady polls host's StatefulSet until it is ready
-func (c *Controller) waitHostReady(host *chop.ChiHost) error {
+func (c *Controller) waitHostReady(ctx context.Context, host *chop.ChiHost) error {
 	// Wait for StatefulSet to reach generation
 	err := c.pollStatefulSet(
+		ctx,
 		host.StatefulSet,
 		nil,
 		func(sts *apps.StatefulSet) bool {
 			if sts == nil {
 				return false
 			}
-			_ = c.deleteLabelReady(host)
+			_ = c.deleteLabelReady(ctx, host)
 			return model.IsStatefulSetGeneration(sts, sts.Generation)
 		},
 		func() {
-			_ = c.deleteLabelReady(host)
+			_ = c.deleteLabelReady(ctx, host)
 		},
 	)
 	if err != nil {
@@ -66,14 +69,15 @@ func (c *Controller) waitHostReady(host *chop.ChiHost) error {
 
 	// Wait StatefulSet to reach ready status
 	return c.pollStatefulSet(
+		ctx,
 		host.StatefulSet,
 		nil,
 		func(sts *apps.StatefulSet) bool {
-			_ = c.deleteLabelReady(host)
+			_ = c.deleteLabelReady(ctx, host)
 			return model.IsStatefulSetReady(sts)
 		},
 		func() {
-			_ = c.deleteLabelReady(host)
+			_ = c.deleteLabelReady(ctx, host)
 		},
 	)
 }
@@ -163,11 +167,16 @@ func NewStatefulSetPollOptionsConfigNoCreate(config *chop.OperatorConfig) *State
 
 // pollStatefulSet polls StatefulSet with poll callback function.
 func (c *Controller) pollStatefulSet(
+	ctx context.Context,
 	entity interface{},
 	opts *StatefulSetPollOptions,
 	mainFn func(set *apps.StatefulSet) bool,
 	backFn func(),
 ) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
 	if opts == nil {
 		opts = NewStatefulSetPollOptionsConfig(c.chop.Config())
 	}
@@ -189,7 +198,12 @@ func (c *Controller) pollStatefulSet(
 	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
 	start := time.Now()
 	for {
-		if statefulSet, err := c.statefulSetLister.StatefulSets(namespace).Get(name); err == nil {
+		if util.IsContextDone(ctx) {
+			log.V(2).Info("ctx is done")
+			return nil
+		}
+
+		if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, newGetOptions()); err == nil {
 			// Object is found
 			if mainFn(statefulSet) {
 				// All is good, job done, exit
@@ -230,22 +244,30 @@ func (c *Controller) pollStatefulSet(
 		}
 
 		// Wait some more time
-		log.V(2).Info("pollStatefulSet(%s/%s)", namespace, name)
-		pollback(opts, backFn)
+		log.V(2).M(namespace, name).F().P()
+		pollback(ctx, opts, backFn)
 	}
 
 	return fmt.Errorf("unexpected flow")
 }
 
-func pollback(opts *StatefulSetPollOptions, fn func()) {
-	main := time.After(opts.MainInterval)
+func pollback(ctx context.Context, opts *StatefulSetPollOptions, fn func()) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	mainIntervalTimeout := time.After(opts.MainInterval)
 	run := true
 	for run {
-		back := time.After(opts.BackgroundInterval)
+		backgroundIntervalTimeout := time.After(opts.BackgroundInterval)
 		select {
-		case <-main:
+		case <-ctx.Done():
+			// Context is done, nothing to do here more
 			run = false
-		case <-back:
+		case <-mainIntervalTimeout:
+			// Timeout reached, nothing to do here more
+			run = false
+		case <-backgroundIntervalTimeout:
+			// Function interval reached, time to call the func
 			if fn != nil {
 				fn()
 			}
@@ -254,7 +276,17 @@ func pollback(opts *StatefulSetPollOptions, fn func()) {
 }
 
 // pollHost polls host with poll callback function.
-func (c *Controller) pollHost(host *chop.ChiHost, opts *StatefulSetPollOptions, f func(host *chop.ChiHost) bool) error {
+func (c *Controller) pollHostContext(
+	ctx context.Context,
+	host *chop.ChiHost,
+	opts *StatefulSetPollOptions,
+	f func(ctx context.Context, host *chop.ChiHost) bool,
+) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	if opts == nil {
 		opts = NewStatefulSetPollOptionsConfig(c.chop.Config())
 	}
@@ -264,9 +296,19 @@ func (c *Controller) pollHost(host *chop.ChiHost, opts *StatefulSetPollOptions, 
 	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
 	start := time.Now()
 	for {
-		if f(host) {
+		if util.IsContextDone(ctx) {
+			log.V(2).Info("ctx is done")
+			return nil
+		}
+
+		if f(ctx, host) {
 			// All is good, job done, exit
 			log.V(1).M(host).F().Info("%s/%s-OK", namespace, name)
+			return nil
+		}
+
+		if util.IsContextDone(ctx) {
+			log.V(2).Info("ctx is done")
 			return nil
 		}
 
@@ -284,9 +326,7 @@ func (c *Controller) pollHost(host *chop.ChiHost, opts *StatefulSetPollOptions, 
 
 		// Wait some more time
 		log.V(2).M(host).F().Info("%s/%s", namespace, name)
-		select {
-		case <-time.After(opts.MainInterval):
-		}
+		util.WaitContextDoneOrTimeout(ctx, opts.MainInterval)
 	}
 
 	return fmt.Errorf("unexpected flow")

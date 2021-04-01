@@ -18,11 +18,12 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	// log "k8s.io/klog"
-
+	log "github.com/golang/glog"
 	"github.com/imdario/mergo"
 	"github.com/kubernetes-sigs/yaml"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -118,14 +119,27 @@ type OperatorConfig struct {
 	CHConfigUserDefaultPassword   string   `json:"chConfigUserDefaultPassword"   yaml:"chConfigUserDefaultPassword"`
 
 	CHConfigNetworksHostRegexpTemplate string `json:"chConfigNetworksHostRegexpTemplate" yaml:"chConfigNetworksHostRegexpTemplate"`
-	// Username and Password to be used by operator to connect to ClickHouse instances for
+
+	// Username and Password to be used by operator to connect to ClickHouse instances
+	// for
 	// 1. Metrics requests
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
 	CHUsername string `json:"chUsername" yaml:"chUsername"`
 	CHPassword string `json:"chPassword" yaml:"chPassword"`
-	CHPort     int    `json:"chPort"     yaml:"chPort"`
+	// Location of k8s Secret with username and password to be used by operator to connect to ClickHouse instances
+	// Can be used instead of explicitly specified username and password
+	CHCredentialsSecretNamespace string `json:"chCredentialsSecretNamespace" yaml:"chCredentialsSecretNamespace"`
+	CHCredentialsSecretName      string `json:"chCredentialsSecretName"      yaml:"chCredentialsSecretName"`
+	// Username and Password to be used by operator to connect to ClickHouse instances
+	// extracted from k8s secret specified above
+	CHCredentialsSecretUsername string
+	CHCredentialsSecretPassword string
 
+	// Port where to connect to ClickHouse instances to
+	CHPort int `json:"chPort"     yaml:"chPort"`
+
+	// Logger section
 	Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
 	Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`
 	V                string `json:"v"                yaml:"v"`
@@ -242,6 +256,7 @@ func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string
 	return nil
 }
 
+// FindAutoTemplates
 func (config *OperatorConfig) FindAutoTemplates() []*ClickHouseInstallation {
 	var res []*ClickHouseInstallation
 	for _, _template := range config.CHITemplates {
@@ -387,6 +402,16 @@ func (config *OperatorConfig) normalize() {
 	if config.CHPassword == "" {
 		config.CHPassword = defaultChPassword
 	}
+
+	// config.CHCredentialsSecretNamespace
+	// config.CHCredentialsSecretName
+
+	// Overwrite credentials with data from secret
+	if (config.CHCredentialsSecretUsername != "") && (config.CHCredentialsSecretPassword != "") {
+		config.CHUsername = config.CHCredentialsSecretUsername
+		config.CHPassword = config.CHCredentialsSecretPassword
+	}
+
 	if config.CHPort == 0 {
 		config.CHPort = defaultChPort
 	}
@@ -523,6 +548,19 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 	}
 	util.Fprintf(b, "CHUsername: %s\n", username)
 	util.Fprintf(b, "CHPassword: %s\n", password)
+
+	util.Fprintf(b, "CHCredentialsSecretNamespace: %s\n", config.CHCredentialsSecretNamespace)
+	util.Fprintf(b, "CHCredentialsSecretName: %s\n", config.CHCredentialsSecretName)
+
+	username = config.CHCredentialsSecretUsername
+	password = config.CHCredentialsSecretPassword
+	if hideCredentials {
+		username = UsernameReplacer
+		password = PasswordReplacer
+	}
+	util.Fprintf(b, "CHCredentialsSecretUsername: %s\n", username)
+	util.Fprintf(b, "CHCredentialsSecretPassword: %s\n", password)
+
 	util.Fprintf(b, "CHPort: %d\n", config.CHPort)
 
 	util.Fprintf(b, "Logtostderr: %s\n", config.Logtostderr)
@@ -570,4 +608,12 @@ func (config *OperatorConfig) GetInformerNamespace() string {
 	}
 
 	return namespace
+}
+
+// GetLogLevel
+func (config *OperatorConfig) GetLogLevel() (log.Level, error) {
+	if i, err := strconv.Atoi(config.V); err == nil {
+		return log.Level(i), nil
+	}
+	return 0, fmt.Errorf("incorreect V value")
 }
