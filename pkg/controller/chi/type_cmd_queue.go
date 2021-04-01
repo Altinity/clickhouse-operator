@@ -15,9 +15,11 @@
 package chi
 
 import (
-	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/queue"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/altinity/queue"
+
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 const (

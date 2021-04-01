@@ -16,10 +16,10 @@ package chi
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	"k8s.io/api/core/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )

@@ -16,8 +16,8 @@ package chi
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"

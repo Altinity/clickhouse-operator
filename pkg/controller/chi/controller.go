@@ -33,6 +33,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
+	"github.com/altinity/queue"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
@@ -42,7 +44,7 @@ import (
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"github.com/altinity/queue"
+
 )
 
 // NewController creates instance of Controller
