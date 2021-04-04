@@ -1555,6 +1555,118 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clickhouse-operator-kube-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumes
+  - pods
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - patch
+  - update
+- apiGroups:
+  - clickhouse.altinity.com
+  resources:
+  - clickhouseinstallations
+  verbs:
+  - delete
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps
+  resourceNames:
+  - clickhouse-operator
+  resources:
+  - deployments
+  verbs:
+  - get
+  - patch
+  - update
+  - delete
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  verbs:
+  - delete
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - endpoints
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - clickhouse.altinity.com
+  resources:
+  - clickhouseinstallations
+  - clickhouseinstallationtemplates
+  - clickhouseoperatorconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+---
 # Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
 # ClusterRoleBinding is namespace-less and must have unique name
 apiVersion: rbac.authorization.k8s.io/v1
@@ -1564,11 +1676,11 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: cluster-admin
+  name: clickhouse-operator-kube-system
 subjects:
-  - kind: ServiceAccount
-    name: clickhouse-operator
-    namespace: kube-system
+- kind: ServiceAccount
+  name: clickhouse-operator
+  namespace: kube-system
 ---
 # Possible Template Parameters:
 #

@@ -88,9 +88,12 @@ Vagrant.configure(2) do |config|
     sha256sum -c /usr/local/bin/k9s.sha256
     tar --verbose -zxvf /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz -C /usr/local/bin k9s
 
+    # audit2rbac
+    AUDIT2RBAC_VERSION=0.8.0
+    curl -sL https://github.com/liggitt/audit2rbac/releases/download/v${AUDIT2RBAC_VERSION}/audit2rbac-linux-amd64.tar.gz | tar -zxvf - -C /usr/local/bin
 
     # minikube
-    MINIKUBE_VERSION=1.17.1
+    MINIKUBE_VERSION=1.18.1
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -103,7 +106,7 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.17.14}
 #    K8S_VERSION=${K8S_VERSION:-1.18.12}
 #    K8S_VERSION=${K8S_VERSION:-1.19.7}
-    K8S_VERSION=${K8S_VERSION:-1.20.2}
+    K8S_VERSION=${K8S_VERSION:-1.20.5}
     export VALIDATE_YAML=true
 
     killall kubectl || true
@@ -114,6 +117,16 @@ Vagrant.configure(2) do |config|
     mkdir -p /home/vagrant/.minikube
     ln -svf /home/vagrant/.minikube /root/.minikube
 
+    mkdir -p /root/.minikube/files/etc/ssl/certs
+
+cat <<EOF >/root/.minikube/files/etc/ssl/certs/audit-policy.yaml
+    # Log all requests at the Metadata level.
+    apiVersion: audit.k8s.io/v1
+    kind: Policy
+    rules:
+    - level: Metadata
+EOF
+
     mkdir -p /home/vagrant/.kube
     ln -svf /home/vagrant/.kube /root/.kube
 
@@ -123,7 +136,7 @@ Vagrant.configure(2) do |config|
     sudo -H -u vagrant minikube config set memory 5G
     sudo -H -u vagrant minikube config set driver docker
     sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
-    sudo -H -u vagrant minikube start
+    sudo -H -u vagrant minikube start --extra-config=apiserver.audit-policy-file=/etc/ssl/certs/audit-policy.yaml --extra-config=apiserver.audit-log-path=-
     sudo -H -u vagrant minikube addons enable ingress
     sudo -H -u vagrant minikube addons enable ingress-dns
     sudo -H -u vagrant minikube addons enable metrics-server
@@ -205,6 +218,11 @@ Vagrant.configure(2) do |config|
     pip3 install -r /vagrant/tests/requirements.txt
 
     python3 /vagrant/tests/test.py --only=operator/*
+
+    kubectl logs kube-apiserver-minikube -n kube-system | grep audit.k8s.io/v1 > /tmp/audit2rbac.log
+    audit2rbac -f /tmp/audit2rbac.log --serviceaccount kube-system:clickhouse-operator > /tmp/audit2rbac.yaml
+    # cp -fv /tmp/audit2rbac.yaml /vagrant/deploy/dev/clickhouse-operator-install-yaml-template-02-section-rbac-restricted.yaml
+
     python3 /vagrant/tests/test_examples.py
     python3 /vagrant/tests/test_metrics_exporter.py
     python3 /vagrant/tests/test_metrics_alerts.py
