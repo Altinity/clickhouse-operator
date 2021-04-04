@@ -304,11 +304,12 @@ def test_backup_size(self):
         },
     }
     for backup_pod in backup_cases:
+        decrease = backup_cases[backup_pod]['decrease']
         for backup_rows in backup_cases[backup_pod]['rows']:
             backup_name = prepare_table_for_backup(backup_pod, rows=backup_rows)
             exec_on_backup_container(backup_pod, f'curl -X POST -sL "http://127.0.0.1:7171/backup/create?name={backup_name}"')
             wait_backup_command_status(backup_pod, f'create {backup_name}', expected_status='success')
-            if backup_cases[backup_pod]['decrease']:
+            if decrease:
                 clickhouse.query(
                     chi['metadata']['name'],
                     f"TRUNCATE TABLE default.test_backup",
@@ -316,12 +317,12 @@ def test_backup_size(self):
                 )
         fired = alerts.wait_alert_state("ClickHouseBackupSizeChanged", "firing", expected_state=True, sleep_time=5,
                                         labels={"pod_name": backup_pod}, time_range='60s')
-        assert fired, error(f"can't get ClickHouseBackupSizeChanged alert in firing state, decrease={backup_cases[backup_pod]['decrease']}")
+        assert fired, error(f"can't get ClickHouseBackupSizeChanged alert in firing state, decrease={decrease}")
 
         with Then("check ClickHouseBackupSizeChanged gone away"):
             resolved = alerts.wait_alert_state("ClickHouseBackupSizeChanged", "firing", expected_state=False,
                                                labels={"pod_name": backup_pod}, sleep_time=5)
-            assert resolved, error(f"can't get ClickHouseBackupSizeChanged alert is gone away, decrease={backup_cases[backup_pod]['decrease']}")
+            assert resolved, error(f"can't get ClickHouseBackupSizeChanged alert is gone away, decrease={decrease}")
 
 
 @TestScenario

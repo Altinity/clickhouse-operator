@@ -31,7 +31,7 @@ spec:
                 - --config-file=/etc/clickhouse-server/config.xml
 
             - name: clickhouse-backup
-              image: altinity/clickhouse-backup:1.0.4
+              image: altinity/clickhouse-backup:1.0.5
               imagePullPolicy: Always
               command:
                 - bash
@@ -41,6 +41,8 @@ spec:
                 - name: API_LISTEN
                   value: "0.0.0.0:7171"
                 - name: API_ENABLE_METRICS
+                  value: "true"
+                - name: API_CREATE_INTEGRATION_TABLES
                   value: "true"
                 - name: REMOTE_STORAGE
                   value: "s3"
