@@ -157,12 +157,22 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
             }
         )
         start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
+        
+        with Then("Create a table"):
+            clickhouse.query(chi, "CREATE TABLE test_local Engine = Log as SELECT 1")
 
         with When(f"upgrade operator to {version_to}"):
             set_operator_version(version_to, timeout=120)
             time.sleep(10)
             kubectl.wait_chi_status(chi, "Completed", retries=6)
             kubectl.wait_objects(chi, {"statefulset": 1, "pod": 1, "service": 2})
+
+            with Then("Check that table is here"):
+                tables = clickhouse.query(chi, "SHOW TABLES")
+                assert "test_local" in tables
+                out = clickhouse.query(chi, "SELECT * FROM test_local")
+                assert "1" == out
+
             with Then("ClickHouse pods should not be restarted"):
                 new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
                 assert start_time == new_start_time
@@ -202,8 +212,10 @@ def test_operator_restart(config, version=settings.operator_version):
                     "service": 2,
                 })
             time.sleep(10)
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-            assert start_time == new_start_time
+            
+            with Then("ClickHouse pods should not be restarted"):
+                new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+                assert start_time == new_start_time
 
         kubectl.delete_chi(chi)
 
