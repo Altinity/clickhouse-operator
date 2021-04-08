@@ -926,13 +926,6 @@ func (w *worker) deleteCHI(ctx context.Context, chi *chop.ClickHouseInstallation
 		return nil
 	}
 
-	// Delete CHI
-	(&chi.Status).DeleteStart()
-	if err := w.c.updateCHIObjectStatus(ctx, chi, true); err != nil {
-		w.a.V(1).M(chi).A().Error("UNABLE to write normalized CHI. err:%q", err)
-		return nil
-	}
-
 	_ = w.removeCHI(ctx, chi)
 
 	// Uninstall finalizer
@@ -967,13 +960,6 @@ func (w *worker) removeCHI(ctx context.Context, chi *chop.ClickHouseInstallation
 	defer w.a.V(2).M(chi).E().P()
 
 	var err error
-
-	w.a.V(1).
-		WithEvent(chi, eventActionDelete, eventReasonDeleteStarted).
-		WithStatusAction(chi).
-		M(chi).F().
-		Info("Delete CHI started")
-
 	chi, err = w.normalizer.CreateTemplatedCHI(chi)
 	if err != nil {
 		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteFailed).
@@ -982,6 +968,21 @@ func (w *worker) removeCHI(ctx context.Context, chi *chop.ClickHouseInstallation
 			Error("Delete CHI failed - unable to normalize: %q", err)
 		return err
 	}
+
+	// Announce delete procedure
+	w.a.V(1).
+		WithEvent(chi, eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(chi).
+		M(chi).F().
+		Info("Delete CHI started")
+
+	(&chi.Status).DeleteStart()
+	if err := w.c.updateCHIObjectStatus(ctx, chi, true); err != nil {
+		w.a.V(1).M(chi).A().Error("UNABLE to write normalized CHI. err:%q", err)
+		return nil
+	}
+
+	// Start delete procedure
 
 	// Exclude this CHI from monitoring
 	w.c.deleteWatch(chi.Namespace, chi.Name)
