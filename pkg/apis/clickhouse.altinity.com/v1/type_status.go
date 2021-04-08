@@ -42,6 +42,7 @@ type ChiStatus struct {
 const (
 	maxActions = 100
 	maxErrors  = 100
+	maxTaskIDs = 100
 )
 
 func (s *ChiStatus) PushAction(action string) {
@@ -59,12 +60,20 @@ func (s *ChiStatus) SetAndPushError(error string) {
 	}
 }
 
+func (s *ChiStatus) PushTaskID() {
+	s.TaskIDs = append([]string{s.TaskID}, s.TaskIDs...)
+	if len(s.TaskIDs) > maxTaskIDs {
+		s.TaskIDs = s.TaskIDs[:maxTaskIDs]
+	}
+}
+
 func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
 	s.Status = StatusInProgress
 	s.UpdatedHostsCount = 0
 	s.AddedHostsCount = 0
 	s.DeletedHostsCount = 0
 	s.DeleteHostsCount = DeleteHostsCount
+	s.PushTaskID()
 }
 
 func (s *ChiStatus) ReconcileComplete() {
@@ -78,4 +87,5 @@ func (s *ChiStatus) DeleteStart() {
 	s.AddedHostsCount = 0
 	s.DeletedHostsCount = 0
 	s.DeleteHostsCount = 0
+	s.PushTaskID()
 }
