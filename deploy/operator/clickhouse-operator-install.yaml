@@ -33,6 +33,11 @@ spec:
       description: Hosts count
       priority: 0 # show in standard view
       JSONPath: .status.hosts
+    - name: taskID
+      type: string
+      description: TaskID
+      priority: 1 # show in wide view
+      JSONPath: .status.taskID
     - name: status
       type: string
       description: CHI status
@@ -75,6 +80,8 @@ spec:
           type: object
           x-kubernetes-preserve-unknown-fields: true
           properties:
+            taskID:
+              type: string
             # Need to be StringBool
             stop:
               type: string
@@ -757,6 +764,11 @@ spec:
       description: Hosts count
       priority: 0 # show in standard view
       JSONPath: .status.hosts
+    - name: taskID
+      type: string
+      description: TaskID
+      priority: 1 # show in wide view
+      JSONPath: .status.taskID
     - name: status
       type: string
       description: CHI status
@@ -799,6 +811,8 @@ spec:
           type: object
           x-kubernetes-preserve-unknown-fields: true
           properties:
+            taskID:
+              type: string
             # Need to be StringBool
             stop:
               type: string
