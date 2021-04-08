@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"gopkg.in/d4l3k/messagediff.v1"
 	"k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -109,17 +110,15 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 	// After all templates applied, place provided CHI on top of the whole stack
 	n.chi.MergeFrom(chi, chiV1.MergeTypeOverrideByNonEmptyValues)
 
-	return n.normalize(nil)
+	return n.normalize()
 }
 
 // NormalizeCHI normalizes CHI.
 // Returns normalized CHI
-func (n *Normalizer) normalize(chi *chiV1.ClickHouseInstallation) (*chiV1.ClickHouseInstallation, error) {
-	if chi != nil {
-		n.chi = chi
-	}
+func (n *Normalizer) normalize() (*chiV1.ClickHouseInstallation, error) {
 
 	// Walk over ChiSpec datatype fields
+	n.chi.Spec.TaskID = n.normalizeTaskID(n.chi.Spec.TaskID)
 	n.chi.Spec.UseTemplates = n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
 	n.chi.Spec.Stop = n.normalizeStop(n.chi.Spec.Stop)
 	n.chi.Spec.NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.chi.Spec.NamespaceDomainPattern)
@@ -307,6 +306,18 @@ func (n *Normalizer) fillStatus() {
 		normalized = true
 	}
 	n.chi.FillStatus(endpoint, pods, fqdns, normalized)
+}
+
+// normalizeTaskID normalizes .spec.taskID
+func (n *Normalizer) normalizeTaskID(taskID *string) *string {
+	if taskID != nil {
+		if len(*taskID) > 0 {
+			return taskID
+		}
+	}
+
+	id := uuid.New().String()
+	return &id
 }
 
 // normalizeStop normalizes .spec.stop
