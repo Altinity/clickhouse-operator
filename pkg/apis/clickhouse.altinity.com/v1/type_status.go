@@ -22,6 +22,8 @@ type ChiStatus struct {
 	ReplicasCount     int      `json:"replicas"             yaml:"replicas"`
 	HostsCount        int      `json:"hosts"                yaml:"hosts"`
 	Status            string   `json:"status"               yaml:"status"`
+	TaskID            string   `json:"taskID,omitempty"     yaml:"taskID,omitempty"`
+	TaskIDs           []string `json:"taskIDs,omitempty"    yaml:"taskIDs,omitempty"`
 	Action            string   `json:"action,omitempty"     yaml:"action,omitempty"`
 	Actions           []string `json:"actions,omitempty"    yaml:"actions,omitempty"`
 	Error             string   `json:"error,omitempty"      yaml:"error,omitempty"`
@@ -43,17 +45,17 @@ const (
 )
 
 func (s *ChiStatus) PushAction(action string) {
-	s.Actions = append(s.Actions, action)
+	s.Actions = append([]string{action}, s.Actions...)
 	if len(s.Actions) > maxActions {
-		s.Actions = s.Actions[1:]
+		s.Actions = s.Actions[:maxActions]
 	}
 }
 
 func (s *ChiStatus) SetAndPushError(error string) {
 	s.Error = error
-	s.Errors = append(s.Errors, error)
+	s.Errors = append([]string{error}, s.Errors...)
 	if len(s.Errors) > maxErrors {
-		s.Errors = s.Errors[1:]
+		s.Errors = s.Errors[:maxErrors]
 	}
 }
 
