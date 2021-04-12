@@ -1556,6 +1556,10 @@ spec:
               type: string
             reconcileWaitInclude:
               type: string
+            labelsIgnore:
+              type: array
+              items:
+                type: string
 ---
 # Possible Template Parameters:
 #
