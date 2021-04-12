@@ -152,6 +152,9 @@ type OperatorConfig struct {
 	ReconcileWaitExclude   bool `json:"reconcileWaitExclude"   yaml:"reconcileWaitExclude"`
 	ReconcileWaitInclude   bool `json:"reconcileWaitInclude"   yaml:"reconcileWaitInclude"`
 
+	// When transferring labels from the CRD, ignore these labels.
+	LabelsIgnore []string `json:"labelsIgnore" yaml:"labelsIgnore"`
+
 	//
 	// The end of OperatorConfig
 	//
@@ -571,6 +574,8 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 	util.Fprintf(b, "Log_backtrace_at string: %s\n", config.Log_backtrace_at)
 
 	util.Fprintf(b, "ReconcileThreadsNumber: %d\n", config.ReconcileThreadsNumber)
+
+	util.Fprintf(b, "%s", util.Slice2String("LabelsIgnore", config.LabelsIgnore))
 
 	return b.String()
 }
