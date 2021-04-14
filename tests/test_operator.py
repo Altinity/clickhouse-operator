@@ -1383,4 +1383,42 @@ def test_025(self):
             assert round(lb_error_time - start_time) == 0
 
     kubectl.delete_chi(chi)
+    
+@TestScenario
+@Name("test_026. Test mixed single and multi-volume configuration in one cluster")
+def test_026(self):
+    require_zookeeper()
+    
+    config="configs/test-026-mixed-replicas.yaml"
+    chi = manifest.get_chi_name(util.get_full_path(config))
+    kubectl.create_and_check(
+        config=config,
+        check={
+            "pod_count": 2,
+            "do_not_delete": 1,
+        },
+    )
+    
+    with When("Check that second replica has two disks"):
+        out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-1", sql = "select count() from system.disks")
+        assert out == "2"
+
+    with Then("Create a table and generate several inserts"):
+        clickhouse.query(chi, "create table test_disks ON CLUSTER '{cluster}' (a Int64) Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}') partition by (a%10) order by a")
+        clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", sql = "insert into test_disks select * from numbers(100) settings max_block_size=1")
+        clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", sql = "insert into test_disks select * from numbers(100) settings max_block_size=1")
+        time.sleep(5)
+
+        with Then("Data should be placed on a single disk on a first replica"):
+            out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", 
+                                         sql = "select arraySort(groupUniqArray(disk_name)) from system.parts where table='test_disks'")
+            assert out == "['default']"
+
+        with And("Data should be placed on a second disk on a second replica"):
+            out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-1", 
+                                         sql = "select arraySort(groupUniqArray(disk_name)) from system.parts where table='test_disks'")
+            assert out == "['disk2']"
+            
+    kubectl.delete_chi(chi)
+
    
