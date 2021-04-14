@@ -1399,11 +1399,16 @@ def test_026(self):
         },
     )
     
-    with When("Check that second replica has two disks"):
-        out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-1", sql = "select count() from system.disks")
-        assert out == "2"
+    with When("Cluster is ready"):
+        with Then("Check that first replica has one disk"):
+            out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", sql = "select count() from system.disks")
+            assert out == "1"
+    
+        with And("Check that second replica has two disks"):
+            out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-1", sql = "select count() from system.disks")
+            assert out == "2"
 
-    with Then("Create a table and generate several inserts"):
+    with When("Create a table and generate several inserts"):
         clickhouse.query(chi, "create table test_disks ON CLUSTER '{cluster}' (a Int64) Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}') partition by (a%10) order by a")
         clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", sql = "insert into test_disks select * from numbers(100) settings max_block_size=1")
         clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", sql = "insert into test_disks select * from numbers(100) settings max_block_size=1")
