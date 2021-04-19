@@ -133,8 +133,9 @@ func NewClickHouseFetcher(hostname, username, password string, port int) *ClickH
 	}
 }
 
-func (f *ClickHouseFetcher) SetTimeout(timeout time.Duration) {
+func (f *ClickHouseFetcher) SetTimeout(timeout time.Duration) *ClickHouseFetcher {
 	f.chConnectionParams.SetTimeout(timeout)
+	return f
 }
 
 func (f *ClickHouseFetcher) getCHConnection() *clickhouse.CHConnection {

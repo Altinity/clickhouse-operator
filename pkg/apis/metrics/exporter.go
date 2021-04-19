@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	defaultTimeout = 10 * time.Second
+	defaultTimeout = 30 * time.Second
 )
 
 // Exporter implements prometheus.Collector interface
@@ -51,6 +51,7 @@ var exporter *Exporter
 
 type chInstallationsIndex map[string]*WatchedCHI
 
+// Slice
 func (i chInstallationsIndex) Slice() []*WatchedCHI {
 	res := make([]*WatchedCHI, 0)
 	for _, chi := range i {
@@ -61,18 +62,14 @@ func (i chInstallationsIndex) Slice() []*WatchedCHI {
 
 // NewExporter returns a new instance of Exporter type
 func NewExporter(chAccess *CHAccessInfo) *Exporter {
-	timeout := chAccess.Timeout
-	if timeout == 0 {
-		timeout = defaultTimeout
-	}
-
 	return &Exporter{
 		chInstallations: make(map[string]*WatchedCHI),
 		chAccessInfo:    chAccess,
-		timeout:         chAccess.Timeout,
+		timeout:         defaultTimeout,
 	}
 }
 
+// getWatchedCHIs
 func (e *Exporter) getWatchedCHIs() []*WatchedCHI {
 	return e.chInstallations.Slice()
 }
@@ -111,10 +108,12 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	log.V(2).Info("Finished Collect")
 }
 
+// enqueueToRemoveFromWatched
 func (e *Exporter) enqueueToRemoveFromWatched(chi *WatchedCHI) {
 	e.toRemoveFromWatched.Store(chi, struct{}{})
 }
 
+// WalkWatchedChi
 func (e *Exporter) WalkWatchedChi(f func(chi *WatchedCHI, hostname string)) {
 	// Loop over ClickHouseInstallations
 	for _, chi := range e.chInstallations {
@@ -163,14 +162,15 @@ func (e *Exporter) updateWatched(chi *WatchedCHI) {
 
 // newFetcher returns new Metrics Fetcher for specified host
 func (e *Exporter) newFetcher(hostname string) *ClickHouseFetcher {
-	f := NewClickHouseFetcher(hostname, e.chAccessInfo.Username, e.chAccessInfo.Password, e.chAccessInfo.Port)
-
-	f.SetTimeout(e.timeout)
-
-	return f
+	return NewClickHouseFetcher(
+		hostname,
+		e.chAccessInfo.Username,
+		e.chAccessInfo.Password,
+		e.chAccessInfo.Port,
+	).SetTimeout(e.timeout)
 }
 
-// Ensure hostnames of the Pods from CHI object included into chopmetrics.Exporter state
+// UpdateWatch ensures hostnames of the Pods from CHI object included into metrics.Exporter state
 func (e *Exporter) UpdateWatch(namespace, chiName string, hostnames []string) {
 	chi := &WatchedCHI{
 		Namespace: namespace,
