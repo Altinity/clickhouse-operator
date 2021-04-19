@@ -896,17 +896,16 @@ func newDefaultLivenessProbe() *corev1.Probe {
 
 // newDefaultReadinessProbe
 func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
-	return nil
-	//	return &corev1.Probe{
-	//		Handler: corev1.Handler{
-	//			HTTPGet: &corev1.HTTPGetAction{
-	//				Path: "/replicas_status",
-	//				Port: intstr.Parse(chDefaultHTTPPortName),
-	//			},
-	//		},
-	//		InitialDelaySeconds: 10,
-	//		PeriodSeconds:       3,
-	//	}
+	return &corev1.Probe{
+		Handler: corev1.Handler{
+			HTTPGet: &corev1.HTTPGetAction{
+				Path: "/ping",
+				Port: intstr.Parse(chDefaultHTTPPortName), // What if it is not a default?
+			},
+		},
+		InitialDelaySeconds: 10,
+		PeriodSeconds:       3,
+	}
 }
 
 // newDefaultClickHouseContainer returns default ClickHouse Container
