@@ -306,12 +306,16 @@ func (e *Exporter) DiscoveryWatchedCHIs(chop *chop.CHOp, chopClient *chopclients
 	// Walk over the list of ClickHouseInstallation objects and add them as watched
 	for i := range list.Items {
 		chi := &list.Items[i]
-		log.V(1).Infof("Adding explicitly found CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.FQDNs))
-		watchedCHI := &WatchedCHI{
-			Namespace: chi.Namespace,
-			Name:      chi.Name,
-			Hostnames: chi.Status.FQDNs,
+		if chi.IsStopped() {
+			log.V(1).Infof("Skip stopped CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.FQDNs))
+		} else {
+			log.V(1).Infof("Add explicitly found CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.FQDNs))
+			watchedCHI := &WatchedCHI{
+				Namespace: chi.Namespace,
+				Name:      chi.Name,
+				Hostnames: chi.Status.FQDNs,
+			}
+			e.updateWatched(watchedCHI)
 		}
-		e.updateWatched(watchedCHI)
 	}
 }

@@ -409,7 +409,7 @@ func (config *OperatorConfig) normalize() {
 	// config.CHCredentialsSecretNamespace
 	// config.CHCredentialsSecretName
 
-	// Overwrite credentials with data from secret
+	// Overwrite credentials with data from the secret (if both username and password provided)
 	if (config.CHCredentialsSecretUsername != "") && (config.CHCredentialsSecretPassword != "") {
 		config.CHUsername = config.CHCredentialsSecretUsername
 		config.CHPassword = config.CHCredentialsSecretPassword
