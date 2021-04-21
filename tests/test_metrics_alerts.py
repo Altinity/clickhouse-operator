@@ -542,7 +542,7 @@ def test_too_many_connections():
 
 
 @TestScenario
-@Name("Check ClickHouseTooMuchRunningQueries")
+@Name("Check ClickHouseTooManyRunningQueries")
 def test_too_much_running_queries():
     _, _, too_many_queries_pod, too_many_queries_svc = random_pod_choice_for_callbacks()
     cmd = "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y mysql-client"
@@ -574,13 +574,13 @@ def test_too_much_running_queries():
             timeout=70,
         )
 
-    with Then("check ClickHouseTooMuchRunningQueries firing"):
-        fired = wait_alert_state("ClickHouseTooMuchRunningQueries", "firing", True, labels={"hostname": too_many_queries_svc},
+    with Then("check ClickHouseTooManyRunningQueries firing"):
+        fired = wait_alert_state("ClickHouseTooManyRunningQueries", "firing", True, labels={"hostname": too_many_queries_svc},
                                  callback=make_too_many_queries, time_range="30s", sleep_time=5)
         assert fired, error("can't get ClickHouseTooManyConnections alert in firing state")
 
     with Then("check ClickHouseTooManyConnections gone away"):
-        resolved = wait_alert_state("ClickHouseTooMuchRunningQueries", "firing", False, labels={"hostname": too_many_queries_svc},
+        resolved = wait_alert_state("ClickHouseTooManyRunningQueries", "firing", False, labels={"hostname": too_many_queries_svc},
                                     sleep_time=5)
         assert resolved, error("can't check ClickHouseTooManyConnections alert is gone away")
 
