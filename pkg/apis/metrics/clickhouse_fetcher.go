@@ -121,6 +121,21 @@ const (
 			toString(total_space) AS total_space			
         FROM system.disks
 	`
+
+	queryDetachedPartsSQL = `
+		SELECT 
+			count() AS detached_parts,
+			database,
+			table,
+			disk,
+			if(coalesce(reason,'unknown')='','detached_by_user',coalesce(reason,'unknown')) AS detach_reason
+		FROM system.detached_parts
+		GROUP BY
+			database,
+			table,
+			disk,
+			reason
+    `
 )
 
 type ClickHouseFetcher struct {
@@ -211,6 +226,21 @@ func (f *ClickHouseFetcher) getClickHouseQuerySystemDisks() ([][]string, error) 
 		},
 	)
 }
+
+// getClickHouseQueryDetachedParts requests detached parts reasons from ClickHouse
+func (f *ClickHouseFetcher) getClickHouseQueryDetachedParts() ([][]string, error) {
+	return f.clickHouseQueryScanRows(
+		queryDetachedPartsSQL,
+		func(rows *sqlmodule.Rows, data *[][]string) error {
+			var detachedParts, database, table, disk, reason string
+			if err := rows.Scan(&detachedParts, &database, &table, &disk, &reason); err == nil {
+				*data = append(*data, []string{detachedParts, database, table, disk, reason})
+			}
+			return nil
+		},
+	)
+}
+
 
 // clickHouseQueryScanRows scan all rows by external scan function
 func (f *ClickHouseFetcher) clickHouseQueryScanRows(

@@ -476,6 +476,20 @@ spec:
               Read about how to run KILL MUTATION
               https://clickhouse.tech/docs/en/sql-reference/statements/kill/#kill-mutation
 
+        - alert: ClickHouseDetachedParts
+          expr: chi_clickhouse_DeatchedParts > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Detached parts in system.detached_parts"
+            description: |-
+              `chi_clickhouse_metric_DetachedParts{reason="{{ $labels.reason}}"}` = {{ with printf "chi_clickhouse_metric_DetachedParts{hostname='%s',exported_namespace='%s',database='%s',table='%s',disk='%s',reason='%s'}" .Labels.hostname .Labels.exported_namespace .Labels.database .Labels.table .Labels.disk .Labels.reason | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `system.detached_parts` show have detached parts.
+              Please check detached parts in log ```kubectl logs -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -c clickhouse-pod --since=1h | grep -i detach```
+              Read about how ATTACH / DROP detached parts
+              https://clickhouse.tech/docs/en/operations/system-tables/detached_parts/
+
     # based on https://blog.serverdensity.com/how-to-monitor-zookeeper/
     # and https://github.com/apache/zookeeper/blob/master/zookeeper-contrib/zookeeper-contrib-monitoring/nagios/services.cfg
     - name: ZookeeperRules

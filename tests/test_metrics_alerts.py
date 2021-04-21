@@ -747,6 +747,10 @@ def test_distributed_sync_insertion_timeout():
 
     drop_distributed_table_on_cluster()
 
+@TestScenario
+@Name("Check ClickHouseDetachedParts")
+def test_detached_parts():
+    pass
 
 @TestScenario
 @Name("Check ZookeeperDown, ZookeeperRestartRecently")
@@ -852,6 +856,7 @@ if main():
                 test_distributed_sync_insertion_timeout,
                 test_distributed_files_to_insert,
                 test_clickhouse_server_reboot,
+                test_detached_parts,
                 test_zookeeper_alerts,
             ]
             for t in test_cases:
