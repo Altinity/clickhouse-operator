@@ -6,11 +6,26 @@ def total_cpus
   Etc.nprocessors
 end
 
+def get_provider
+    provider='virtualbox'
+    for arg in ARGV
+        if ['hyperv','docker'].include? arg
+            provider=arg
+        end
+    end
+    return provider
+end
+
 
 Vagrant.configure(2) do |config|
   config.vm.box = "generic/ubuntu2004"
   config.vm.box_check_update = false
-  config.vm.synced_folder ".", "/vagrant"
+
+  if get_provider == "hyperv"
+    config.vm.synced_folder ".", "/vagrant", type: "smb", smb_username: ENV['USERNAME'], smb_password: ENV['PASSWORD'], mount_options: ["domain="+ENV['USERDOMAIN'], "user="+ENV['USERNAME'], "vers=3.0"," mfsymlinks"]
+  else
+    config.vm.synced_folder ".", "/vagrant"
+  end
 
   if Vagrant.has_plugin?("vagrant-vbguest")
     config.vbguest.auto_update = false
@@ -19,6 +34,7 @@ Vagrant.configure(2) do |config|
   if Vagrant.has_plugin?("vagrant-timezone")
     config.timezone.value = "UTC"
   end
+
 
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
@@ -30,6 +46,19 @@ Vagrant.configure(2) do |config|
     vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
     vb.customize ["modifyvm", :id, "--ioapic", "on"]
     vb.customize ["guestproperty", "set", :id, "/VirtualBox/GuestAdd/VBoxService/--timesync-set-threshold", 10000]
+  end
+
+  config.vm.provider "hyperv" do |hv|
+    # hv.gui = false
+    # hv.default_nic_type = "virtio"
+    hv.cpus = total_cpus
+    hv.maxmemory = "6144"
+    hv.memory = "2048"
+    hv.enable_virtualization_extensions = true
+    hv.linked_clone = true
+    hv.vm_integration_services = {
+        time_synchronization: true,
+    }
   end
 
   config.vm.define :clickhouse_operator do |clickhouse_operator|
@@ -52,24 +81,40 @@ Vagrant.configure(2) do |config|
   config.vm.provision "shell", inline: <<-SHELL
     set -xeuo pipefail
     export DEBIAN_FRONTEND=noninteractive
+    # make linux fast again
+    if [[ "0" == $(grep "mitigations" /etc/default/grub | wc -l) ]]; then
+        echo 'GRUB_CMDLINE_LINUX="noibrs noibpb nopti nospectre_v2 nospectre_v1 l1tf=off nospec_store_bypass_disable no_stf_barrier mds=off tsx=on tsx_async_abort=off mitigations=off"' >> /etc/default/grub
+        echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash noibrs noibpb nopti nospectre_v2 nospectre_v1 l1tf=off nospec_store_bypass_disable no_stf_barrier mds=off tsx=on tsx_async_abort=off mitigations=off"' >> /etc/default/grub
+        grub-mkconfig
+    fi
+    systemctl enable systemd-timesyncd
+    systemctl start systemd-timesyncd
 
     apt-get update
     apt-get install --no-install-recommends -y apt-transport-https ca-certificates software-properties-common curl
-    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git ntp
+    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git
 
     # yq
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys CC86BB64
+    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys CC86BB64
     add-apt-repository ppa:rmescandon/yq
     apt-get install --no-install-recommends -y yq
 
     # clickhouse
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E0C56BD4
+    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv E0C56BD4
     add-apt-repository "deb http://repo.clickhouse.tech/deb/stable/ main/"
     apt-get install --no-install-recommends -y clickhouse-client
 
+    # golang
+    export GOLANG_VERSION=1.16
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F6BC817356A3D45E
+    add-apt-repository ppa:longsleep/golang-backports
+    apt-get install --no-install-recommends -y golang-${GOLANG_VERSION}-go
+    ln -nvsf /usr/lib/go-${GOLANG_VERSION}/bin/go /bin/go
+    ln -nvsf /usr/lib/go-${GOLANG_VERSION}/bin/gofmt /bin/gofmt
+
     # docker
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8D81803C0EBFCD88
-    add-apt-repository "deb https://download.docker.com/linux/ubuntu focal test"
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+    add-apt-repository "deb https://download.docker.com/linux/ubuntu $(lsb_release -cs) test"
     apt-get install --no-install-recommends -y docker-ce pigz
 
     # docker compose
@@ -88,12 +133,9 @@ Vagrant.configure(2) do |config|
     sha256sum -c /usr/local/bin/k9s.sha256
     tar --verbose -zxvf /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz -C /usr/local/bin k9s
 
-    # audit2rbac
-    AUDIT2RBAC_VERSION=0.8.0
-    curl -sL https://github.com/liggitt/audit2rbac/releases/download/v${AUDIT2RBAC_VERSION}/audit2rbac-linux-amd64.tar.gz | tar -zxvf - -C /usr/local/bin
 
     # minikube
-    MINIKUBE_VERSION=1.18.1
+    MINIKUBE_VERSION=1.19.0
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -103,10 +145,10 @@ Vagrant.configure(2) do |config|
 #    export VALIDATE_YAML=false # only for 1.14
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
-#    K8S_VERSION=${K8S_VERSION:-1.17.14}
-#    K8S_VERSION=${K8S_VERSION:-1.18.12}
-#    K8S_VERSION=${K8S_VERSION:-1.19.7}
-    K8S_VERSION=${K8S_VERSION:-1.20.5}
+#    K8S_VERSION=${K8S_VERSION:-1.17.17}
+#    K8S_VERSION=${K8S_VERSION:-1.18.18}
+#    K8S_VERSION=${K8S_VERSION:-1.19.10}
+    K8S_VERSION=${K8S_VERSION:-1.20.6}
     export VALIDATE_YAML=true
 
     killall kubectl || true
@@ -117,16 +159,6 @@ Vagrant.configure(2) do |config|
     mkdir -p /home/vagrant/.minikube
     ln -svf /home/vagrant/.minikube /root/.minikube
 
-    mkdir -p /root/.minikube/files/etc/ssl/certs
-
-cat <<EOF >/root/.minikube/files/etc/ssl/certs/audit-policy.yaml
-    # Log all requests at the Metadata level.
-    apiVersion: audit.k8s.io/v1
-    kind: Policy
-    rules:
-    - level: Metadata
-EOF
-
     mkdir -p /home/vagrant/.kube
     ln -svf /home/vagrant/.kube /root/.kube
 
@@ -136,14 +168,16 @@ EOF
     sudo -H -u vagrant minikube config set memory 5G
     sudo -H -u vagrant minikube config set driver docker
     sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
-    sudo -H -u vagrant minikube start --extra-config=apiserver.audit-policy-file=/etc/ssl/certs/audit-policy.yaml --extra-config=apiserver.audit-log-path=-
+    sudo -H -u vagrant minikube start
     sudo -H -u vagrant minikube addons enable ingress
     sudo -H -u vagrant minikube addons enable ingress-dns
     sudo -H -u vagrant minikube addons enable metrics-server
 
+#     minikube delete
+#     rm -rf /tmp/juju*
 #     minikube config set vm-driver none
 #     minikube config set kubernetes-version ${K8S_VERSION}
-#     minikube start --vm=true
+#     minikube start
 #     minikube addons enable ingress
 #     minikube addons enable ingress-dns
 #     minikube addons enable metrics-server
@@ -160,13 +194,16 @@ EOF
     source $HOME/.bashrc
     export KREW_ROOT=/home/vagrant/.krew
     kubectl krew install tap
-    kubectl krew install debug
     kubectl krew install sniff
     kubectl krew install flame
+    kubectl krew install minio
+    # loook to https://kubernetes.io/docs/tasks/debug-application-cluster/debug-running-pod/#ephemeral-container
+    # kubectl krew install debug
 
     cd /vagrant/
-
-    git_branch=$(git rev-parse --abbrev-ref HEAD)
+    export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
+    pwd
+    git_branch=$(git rev-parse --abbrev-ref HEAD /vagrant/)
     export OPERATOR_RELEASE=$(cat release)
     export BRANCH=${BRANCH:-$git_branch}
     export OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-kube-system}
@@ -217,14 +254,11 @@ EOF
 
     pip3 install -r /vagrant/tests/requirements.txt
 
+    python3 /vagrant/tests/test_metrics_alerts.py
     python3 /vagrant/tests/test.py --only=operator/*
-
-    kubectl logs kube-apiserver-minikube -n kube-system | grep audit.k8s.io/v1 > /tmp/audit2rbac.log
-    audit2rbac -f /tmp/audit2rbac.log --serviceaccount kube-system:clickhouse-operator > /tmp/audit2rbac.yaml
-    # cp -fv /tmp/audit2rbac.yaml /vagrant/deploy/dev/clickhouse-operator-install-yaml-template-02-section-rbac-restricted.yaml
-
     python3 /vagrant/tests/test_examples.py
     python3 /vagrant/tests/test_metrics_exporter.py
-    python3 /vagrant/tests/test_metrics_alerts.py
+
   SHELL
+
 end
