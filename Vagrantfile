@@ -133,6 +133,9 @@ Vagrant.configure(2) do |config|
     sha256sum -c /usr/local/bin/k9s.sha256
     tar --verbose -zxvf /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz -C /usr/local/bin k9s
 
+    # audit2rbac
+    AUDIT2RBAC_VERSION=0.8.0
+    curl -sL https://github.com/liggitt/audit2rbac/releases/download/v${AUDIT2RBAC_VERSION}/audit2rbac-linux-amd64.tar.gz | tar -zxvf - -C /usr/local/bin
 
     # minikube
     MINIKUBE_VERSION=1.19.0
@@ -159,6 +162,16 @@ Vagrant.configure(2) do |config|
     mkdir -p /home/vagrant/.minikube
     ln -svf /home/vagrant/.minikube /root/.minikube
 
+    mkdir -p /root/.minikube/files/etc/ssl/certs
+
+cat <<EOF >/root/.minikube/files/etc/ssl/certs/audit-policy.yaml
+    # Log all requests at the Metadata level.
+    apiVersion: audit.k8s.io/v1
+    kind: Policy
+    rules:
+    - level: Metadata
+EOF
+
     mkdir -p /home/vagrant/.kube
     ln -svf /home/vagrant/.kube /root/.kube
 
@@ -168,7 +181,7 @@ Vagrant.configure(2) do |config|
     sudo -H -u vagrant minikube config set memory 5G
     sudo -H -u vagrant minikube config set driver docker
     sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
-    sudo -H -u vagrant minikube start
+    sudo -H -u vagrant minikube start --extra-config=apiserver.audit-policy-file=/etc/ssl/certs/audit-policy.yaml --extra-config=apiserver.audit-log-path=-
     sudo -H -u vagrant minikube addons enable ingress
     sudo -H -u vagrant minikube addons enable ingress-dns
     sudo -H -u vagrant minikube addons enable metrics-server
@@ -197,12 +210,10 @@ Vagrant.configure(2) do |config|
     kubectl krew install sniff
     kubectl krew install flame
     kubectl krew install minio
-    # loook to https://kubernetes.io/docs/tasks/debug-application-cluster/debug-running-pod/#ephemeral-container
+    # look to https://kubernetes.io/docs/tasks/debug-application-cluster/debug-running-pod/#ephemeral-container
     # kubectl krew install debug
 
     cd /vagrant/
-    export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
-    pwd
     git_branch=$(git rev-parse --abbrev-ref HEAD /vagrant/)
     export OPERATOR_RELEASE=$(cat release)
     export BRANCH=${BRANCH:-$git_branch}
@@ -258,6 +269,11 @@ Vagrant.configure(2) do |config|
     python3 /vagrant/tests/test.py --only=operator/*
     python3 /vagrant/tests/test_examples.py
     python3 /vagrant/tests/test_metrics_exporter.py
+
+    # audit2rbac
+    kubectl logs kube-apiserver-minikube -n kube-system | grep audit.k8s.io/v1 > /tmp/audit2rbac.log
+    audit2rbac -f /tmp/audit2rbac.log --serviceaccount kube-system:clickhouse-operator > /tmp/audit2rbac.yaml
+    # cp -fv /tmp/audit2rbac.yaml /vagrant/deploy/dev/clickhouse-operator-install-yaml-template-02-section-rbac-restricted.yaml
 
   SHELL
 
