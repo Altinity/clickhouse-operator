@@ -3,7 +3,7 @@ import time
 import json
 import random
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, run, Module
+from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module
 from testflows.asserts import error
 
 import settings
@@ -37,11 +37,11 @@ def check_alert_state(alert_name, alert_state="firing", labels=None, time_range=
         out = json.loads(out)
         assert "status" in out and out["status"] == "success", error("wrong response from prometheus query API")
         if len(out["data"]["result"]) == 0:
-            with And("not present, empty result"):
+            with Then("not present, empty result"):
                 return False
         result_labels = out["data"]["result"][0]["metric"].items()
         exists = all(item in result_labels for item in labels.items())
-        with And("got result and contains labels" if exists else "got result, but doesn't contain labels"):
+        with Then("got result and contains labels" if exists else "got result, but doesn't contain labels"):
             return exists
 
 
@@ -54,7 +54,7 @@ def wait_alert_state(alert_name, alert_state, expected_state, labels=None, callb
         if expected_state == check_alert_state(alert_name, alert_state, labels, time_range):
             catched = True
             break
-        with And(f"not ready, wait {sleep_time}s"):
+        with Then(f"not ready, wait {sleep_time}s"):
             time.sleep(sleep_time)
     return catched
 
@@ -141,7 +141,7 @@ def test_metrics_exporter_down():
 
 @TestScenario
 @Name("Check ClickHouseServerDown, ClickHouseServerRestartRecently")
-def test_clickhouse_server_reboot():
+def test_clickhouse_server_reboot(self):
     random_idx = random.randint(0, 1)
     clickhouse_pod = chi["status"]["pods"][random_idx]
     clickhouse_svc = chi["status"]["fqdns"][random_idx]
@@ -177,7 +177,7 @@ def test_clickhouse_server_reboot():
 
 @TestScenario
 @Name("Check ClickHouseDNSErrors")
-def test_clickhouse_dns_errors():
+def test_clickhouse_dns_errors(self):
     random_idx = random.randint(0, 1)
     clickhouse_pod = chi["status"]["pods"][random_idx]
     clickhouse_svc = chi["status"]["fqdns"][random_idx]
@@ -212,7 +212,7 @@ def test_clickhouse_dns_errors():
 
 @TestScenario
 @Name("Check ClickHouseDistributedFilesToInsertHigh")
-def test_distributed_files_to_insert():
+def test_distributed_files_to_insert(self):
     delayed_pod, delayed_svc, restarted_pod, restarted_svc = random_pod_choice_for_callbacks()
     create_distributed_table_on_cluster()
 
@@ -264,7 +264,7 @@ def test_distributed_files_to_insert():
 
 @TestScenario
 @Name("Check ClickHouseDistributedConnectionExceptions")
-def test_distributed_connection_exceptions():
+def test_distributed_connection_exceptions(self):
     delayed_pod, delayed_svc, restarted_pod, restarted_svc = random_pod_choice_for_callbacks()
     create_distributed_table_on_cluster()
 
@@ -302,7 +302,7 @@ def test_distributed_connection_exceptions():
 
 @TestScenario
 @Name("Check ClickHouseRejectedInsert, ClickHouseDelayedInsertThrottling, ClickHouseMaxPartCountForPartition, ClickHouseLowInsertedRowsPerQuery")
-def test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_inserted_rows_per_query():
+def test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_inserted_rows_per_query(self):
     create_table_on_cluster()
     delayed_pod, delayed_svc, rejected_pod, rejected_svc = random_pod_choice_for_callbacks()
 
@@ -377,7 +377,7 @@ def test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_in
 
 @TestScenario
 @Name("Check ClickHouseLongestRunningQuery")
-def test_longest_running_query():
+def test_longest_running_query(self):
     long_running_pod, long_running_svc, _, _ = random_pod_choice_for_callbacks()
     # 600s trigger + 2*30s - double prometheus scraping interval
     clickhouse.query(chi["metadata"]["name"], "SELECT now(),sleepEachRow(1),number FROM system.numbers LIMIT 660",
@@ -393,7 +393,7 @@ def test_longest_running_query():
 
 @TestScenario
 @Name("Check ClickHouseQueryPreempted")
-def test_query_preempted():
+def test_query_preempted(self):
     priority_pod, priority_svc, _, _ = random_pod_choice_for_callbacks()
 
     def run_queries_with_priority():
@@ -419,7 +419,7 @@ def test_query_preempted():
 
 @TestScenario
 @Name("Check ClickHouseReadonlyReplica")
-def test_read_only_replica():
+def test_read_only_replica(self):
     read_only_pod, read_only_svc, other_pod, other_svc = random_pod_choice_for_callbacks()
     chi_name = chi["metadata"]["name"]
     create_table_on_cluster('all-replicated', 'default.test_repl',
@@ -458,7 +458,7 @@ def test_read_only_replica():
 
 @TestScenario
 @Name("Check ClickHouseReplicasMaxAbsoluteDelay")
-def test_replicas_max_abosulute_delay():
+def test_replicas_max_abosulute_delay(self):
     stop_replica_pod, stop_replica_svc, insert_pod, insert_svc = random_pod_choice_for_callbacks()
     create_table_on_cluster('all-replicated', 'default.test_repl',
                             '(event_time DateTime, test UInt64) ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/{uuid}/test_repl\', \'{replica}\') ORDER BY tuple()')
@@ -496,7 +496,7 @@ def test_replicas_max_abosulute_delay():
 
 @TestScenario
 @Name("Check ClickHouseTooManyConnections")
-def test_too_many_connections():
+def test_too_many_connections(self):
     too_many_connection_pod, too_many_connection_svc, _, _ = random_pod_choice_for_callbacks()
     cmd = "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y netcat mysql-client"
     kubectl.launch(
@@ -543,7 +543,7 @@ def test_too_many_connections():
 
 @TestScenario
 @Name("Check ClickHouseTooManyRunningQueries")
-def test_too_much_running_queries():
+def test_too_much_running_queries(self):
     _, _, too_many_queries_pod, too_many_queries_svc = random_pod_choice_for_callbacks()
     cmd = "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y mysql-client"
     kubectl.launch(
@@ -587,7 +587,7 @@ def test_too_much_running_queries():
 
 @TestScenario
 @Name("Check ClickHouseSystemSettingsChanged")
-def test_system_settings_changed():
+def test_system_settings_changed(self):
     changed_pod, changed_svc, _, _ = random_pod_choice_for_callbacks()
 
     with When("apply changed settings"):
@@ -636,7 +636,7 @@ def test_system_settings_changed():
 
 @TestScenario
 @Name("Check ClickHouseVersionChanged")
-def test_version_changed():
+def test_version_changed(self):
     changed_pod, changed_svc, _, _ = random_pod_choice_for_callbacks()
 
     with When("apply changed settings"):
@@ -688,7 +688,7 @@ def test_version_changed():
 
 @TestScenario
 @Name("Check ClickHouseZooKeeperHardwareExceptions")
-def test_zookeeper_hardware_exceptions():
+def test_zookeeper_hardware_exceptions(self):
     pod1, svc1, pod2, svc2 = random_pod_choice_for_callbacks()
     chi_name = chi["metadata"]["name"]
 
@@ -718,7 +718,7 @@ def test_zookeeper_hardware_exceptions():
 
 @TestScenario
 @Name("Check ClickHouseDistributedSyncInsertionTimeoutExceeded")
-def test_distributed_sync_insertion_timeout():
+def test_distributed_sync_insertion_timeout(self):
     sync_pod, sync_svc, restarted_pod, restarted_svc = random_pod_choice_for_callbacks()
     create_distributed_table_on_cluster(local_engine='ENGINE Null()')
 
@@ -747,10 +747,44 @@ def test_distributed_sync_insertion_timeout():
 
     drop_distributed_table_on_cluster()
 
+@TestScenario
+@Name("Check ClickHouseDetachedParts")
+def test_detached_parts(self):
+    create_table_on_cluster()
+    detached_pod, detached_svc, _, _ = random_pod_choice_for_callbacks()
+
+    def create_part_and_detach():
+        clickhouse.query(chi["metadata"]["name"], "INSERT INTO default.test SELECT now(), number FROM numbers(100)", pod=detached_pod)
+        part_name = clickhouse.query(
+            chi["metadata"]["name"],
+            sql="SELECT name FROM system.parts WHERE database='default' AND table='test' ORDER BY modification_time DESC LIMIT 1",
+            pod=detached_pod
+        )
+        clickhouse.query(chi["metadata"]["name"], f"ALTER TABLE default.test DETACH PART '{part_name}'", pod=detached_pod)
+
+    def attach_all_parts():
+        detached_parts = clickhouse.query(chi["metadata"]["name"], "SELECT name FROM system.detached_parts WHERE database='default' AND table='test' AND reason=''", pod=detached_pod)
+        all_parts = ""
+        for part in detached_parts.splitlines():
+            all_parts += f"ALTER TABLE default.test ATTACH PART '{part}';"
+        clickhouse.query(chi["metadata"]["name"], all_parts, pod=detached_pod)
+
+    with When("check ClickHouseDetachedParts firing"):
+        fired = wait_alert_state("ClickHouseDetachedParts", "firing", True,
+                                 labels={"hostname": detached_svc, "chi": chi["metadata"]["name"]}, time_range='30s',
+                                 callback=create_part_and_detach)
+        assert fired, error("can't get ClickHouseDistributedSyncInsertionTimeoutExceeded alert in firing state")
+
+    with Then("check ClickHouseDistributedSyncInsertionTimeoutExceeded gone away"):
+        resolved = wait_alert_state("ClickHouseDistributedSyncInsertionTimeoutExceeded", "firing", False,
+                                    labels={"hostname": detached_svc}, callback=attach_all_parts)
+        assert resolved, error("can't check ClickHouseDistributedSyncInsertionTimeoutExceeded alert is gone away")
+
+    drop_table_on_cluster()
 
 @TestScenario
 @Name("Check ZookeeperDown, ZookeeperRestartRecently")
-def test_zookeeper_alerts():
+def test_zookeeper_alerts(self):
     zookeeper_spec = kubectl.get("endpoints", "zookeeper")
     zookeeper_pod = random.choice(zookeeper_spec["subsets"][0]["addresses"])["targetRef"]["name"]
 
@@ -852,7 +886,8 @@ if main():
                 test_distributed_sync_insertion_timeout,
                 test_distributed_files_to_insert,
                 test_clickhouse_server_reboot,
+                test_detached_parts,
                 test_zookeeper_alerts,
             ]
             for t in test_cases:
-                run(test=t)
+                Scenario(test=t)()

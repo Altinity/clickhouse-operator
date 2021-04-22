@@ -250,6 +250,18 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		return
 	}
 
+	log.V(2).Infof("Querying detached parts for %s\n", hostname)
+	if detachedParts, err := fetcher.getClickHouseQueryDetachedParts(); err == nil {
+		log.V(2).Infof("Extracted %d detached parts info for %s\n", len(detachedParts), hostname)
+		writer.WriteDetachedParts(detachedParts)
+		writer.WriteOKFetch("system.detached_parts")
+	} else {
+		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
+		log.V(2).Infof("Error querying detached parts for %s: %s\n", hostname, err)
+		writer.WriteErrorFetch("system.detached_parts")
+		//e.enqueueToRemoveFromWatched(chi)
+		return
+	}
 }
 
 // getWatchedCHI serves HTTP request to get list of watched CHIs
