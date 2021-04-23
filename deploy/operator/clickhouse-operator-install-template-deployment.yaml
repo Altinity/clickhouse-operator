@@ -149,8 +149,9 @@ data:
     ##
     ################################################
     
-    # When transferring labels from the chi's `metadata.labels` section to child objects' `metadata.labels`, ignore these labels.
-    #ignoreOnPropagationLabels:
+    # When propagating labels from the chi's `metadata.labels` section to child objects' `metadata.labels`,
+    # exclude labels from the following list:
+    #excludeFromPropagationLabels:
     #  - "labelA"
     #  - "labelB"
     
