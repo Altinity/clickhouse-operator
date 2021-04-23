@@ -100,3 +100,24 @@ spec:
                 type: string
             appendScopeLabels:
               type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - ""
+                - "0"
+                - "1"
+                - "False"
+                - "false"
+                - "True"
+                - "true"
+                - "No"
+                - "no"
+                - "Yes"
+                - "yes"
+                - "Off"
+                - "off"
+                - "On"
+                - "on"
+                - "Disabled"
+                - "disabled"
+                - "Enabled"
+                - "enabled"

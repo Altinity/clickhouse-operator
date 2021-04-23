@@ -150,4 +150,4 @@ reconcileWaitInclude: false
 #  LabelClusterScopeCycleSize
 #  LabelClusterScopeCycleIndex
 #  LabelClusterScopeCycleOffset
-appendScopeLabels: yes
+appendScopeLabels: "yes"
