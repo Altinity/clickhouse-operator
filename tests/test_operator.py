@@ -674,6 +674,7 @@ def test_014(self):
         'test_local',
         'test_view',
         'test_mv',
+        'test_buffer',
         'a_view'
     ]
     with Given("Create schema objects"):
@@ -696,6 +697,10 @@ def test_014(self):
         clickhouse.query(
             chi,
             "CREATE DICTIONARY test_dict (a Int8, b Int8) PRIMARY KEY a SOURCE(CLICKHOUSE(host 'localhost' port 9000 table 'test_local' user 'default')) LAYOUT(FLAT()) LIFETIME(0)",
+            host=f"chi-{chi}-{cluster}-0-0")
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_buffer(a Int8) Engine = Buffer(default, test_local, 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
             host=f"chi-{chi}-{cluster}-0-0")
 
     with Given("Replicated table is created on a first replica and data is inserted"):
