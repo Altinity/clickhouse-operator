@@ -1556,7 +1556,7 @@ spec:
               type: string
             reconcileWaitInclude:
               type: string
-            labelsIgnore:
+            ignoreOnPropagationLabels:
               type: array
               items:
                 type: string
@@ -1846,6 +1846,17 @@ data:
     reconcileThreadsNumber: 10
     reconcileWaitExclude: false
     reconcileWaitInclude: false
+    
+    ################################################
+    ##
+    ## Labels management parameters
+    ##
+    ################################################
+    
+    # When transferring labels from the chi's `metadata.labels` section to child objects' `metadata.labels`, ignore these labels.
+    #ignoreOnPropagationLabels:
+    #  - "labelA"
+    #  - "labelB"
     
     # Whether to append *Scope* labels to StatefulSet and Pod.
     # Full list of available *scope* labels check in labeler.go

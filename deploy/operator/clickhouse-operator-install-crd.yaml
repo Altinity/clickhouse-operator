@@ -1556,7 +1556,7 @@ spec:
               type: string
             reconcileWaitInclude:
               type: string
-            labelsIgnore:
+            ignoreOnPropagationLabels:
               type: array
               items:
                 type: string
