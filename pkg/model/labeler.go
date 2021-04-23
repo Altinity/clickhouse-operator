@@ -38,17 +38,7 @@ const (
 	LabelCHIName                      = clickhousealtinitycom.GroupName + "/chi"
 	LabelClusterName                  = clickhousealtinitycom.GroupName + "/cluster"
 	LabelShardName                    = clickhousealtinitycom.GroupName + "/shard"
-	LabelShardScopeIndex              = clickhousealtinitycom.GroupName + "/shardScopeIndex"
 	LabelReplicaName                  = clickhousealtinitycom.GroupName + "/replica"
-	LabelReplicaScopeIndex            = clickhousealtinitycom.GroupName + "/replicaScopeIndex"
-	LabelCHIScopeIndex                = clickhousealtinitycom.GroupName + "/chiScopeIndex"
-	LabelCHIScopeCycleSize            = clickhousealtinitycom.GroupName + "/chiScopeCycleSize"
-	LabelCHIScopeCycleIndex           = clickhousealtinitycom.GroupName + "/chiScopeCycleIndex"
-	LabelCHIScopeCycleOffset          = clickhousealtinitycom.GroupName + "/chiScopeCycleOffset"
-	LabelClusterScopeIndex            = clickhousealtinitycom.GroupName + "/clusterScopeIndex"
-	LabelClusterScopeCycleSize        = clickhousealtinitycom.GroupName + "/clusterScopeCycleSize"
-	LabelClusterScopeCycleIndex       = clickhousealtinitycom.GroupName + "/clusterScopeCycleIndex"
-	LabelClusterScopeCycleOffset      = clickhousealtinitycom.GroupName + "/clusterScopeCycleOffset"
 	LabelConfigMap                    = clickhousealtinitycom.GroupName + "/ConfigMap"
 	labelConfigMapValueCHICommon      = "ChiCommon"
 	labelConfigMapValueCHICommonUsers = "ChiCommonUsers"
@@ -64,6 +54,18 @@ const (
 	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/zookeeper-version"
 	LabelSettingsConfigVersion  = clickhousealtinitycom.GroupName + "/settings-version"
 	LabelObjectVersion          = clickhousealtinitycom.GroupName + "/object-version"
+
+	// Optional labels
+	LabelShardScopeIndex         = clickhousealtinitycom.GroupName + "/shardScopeIndex"
+	LabelReplicaScopeIndex       = clickhousealtinitycom.GroupName + "/replicaScopeIndex"
+	LabelCHIScopeIndex           = clickhousealtinitycom.GroupName + "/chiScopeIndex"
+	LabelCHIScopeCycleSize       = clickhousealtinitycom.GroupName + "/chiScopeCycleSize"
+	LabelCHIScopeCycleIndex      = clickhousealtinitycom.GroupName + "/chiScopeCycleIndex"
+	LabelCHIScopeCycleOffset     = clickhousealtinitycom.GroupName + "/chiScopeCycleOffset"
+	LabelClusterScopeIndex       = clickhousealtinitycom.GroupName + "/clusterScopeIndex"
+	LabelClusterScopeCycleSize   = clickhousealtinitycom.GroupName + "/clusterScopeCycleSize"
+	LabelClusterScopeCycleIndex  = clickhousealtinitycom.GroupName + "/clusterScopeCycleIndex"
+	LabelClusterScopeCycleOffset = clickhousealtinitycom.GroupName + "/clusterScopeCycleOffset"
 )
 
 // Labeler is an entity which can label CHI artifacts
@@ -230,24 +232,29 @@ func (l *Labeler) getSelectorShardScopeReady(shard *chi.ChiShard) map[string]str
 func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	labels := map[string]string{
-		LabelNamespace:               l.namer.getNamePartNamespace(host),
-		LabelAppName:                 LabelAppValue,
-		LabelCHIName:                 l.namer.getNamePartCHIName(host),
-		LabelClusterName:             l.namer.getNamePartClusterName(host),
-		LabelShardName:               l.namer.getNamePartShardName(host),
-		LabelShardScopeIndex:         l.namer.getNamePartShardScopeIndex(host),
-		LabelReplicaName:             l.namer.getNamePartReplicaName(host),
-		LabelReplicaScopeIndex:       l.namer.getNamePartReplicaScopeIndex(host),
-		LabelCHIScopeIndex:           l.namer.getNamePartCHIScopeIndex(host),
-		LabelCHIScopeCycleSize:       l.namer.getNamePartCHIScopeCycleSize(host),
-		LabelCHIScopeCycleIndex:      l.namer.getNamePartCHIScopeCycleIndex(host),
-		LabelCHIScopeCycleOffset:     l.namer.getNamePartCHIScopeCycleOffset(host),
-		LabelClusterScopeIndex:       l.namer.getNamePartClusterScopeIndex(host),
-		LabelClusterScopeCycleSize:   l.namer.getNamePartClusterScopeCycleSize(host),
-		LabelClusterScopeCycleIndex:  l.namer.getNamePartClusterScopeCycleIndex(host),
-		LabelClusterScopeCycleOffset: l.namer.getNamePartClusterScopeCycleOffset(host),
+		// Mandatory labels
+		LabelNamespace:   l.namer.getNamePartNamespace(host),
+		LabelAppName:     LabelAppValue,
+		LabelCHIName:     l.namer.getNamePartCHIName(host),
+		LabelClusterName: l.namer.getNamePartClusterName(host),
+		LabelShardName:   l.namer.getNamePartShardName(host),
+		LabelReplicaName: l.namer.getNamePartReplicaName(host),
+	}
+	if l.chop.Config().AppendScopeLabels {
+		// Optional labels
+		labels[LabelShardScopeIndex] = l.namer.getNamePartShardScopeIndex(host)
+		labels[LabelReplicaScopeIndex] = l.namer.getNamePartReplicaScopeIndex(host)
+		labels[LabelCHIScopeIndex] = l.namer.getNamePartCHIScopeIndex(host)
+		labels[LabelCHIScopeCycleSize] = l.namer.getNamePartCHIScopeCycleSize(host)
+		labels[LabelCHIScopeCycleIndex] = l.namer.getNamePartCHIScopeCycleIndex(host)
+		labels[LabelCHIScopeCycleOffset] = l.namer.getNamePartCHIScopeCycleOffset(host)
+		labels[LabelClusterScopeIndex] = l.namer.getNamePartClusterScopeIndex(host)
+		labels[LabelClusterScopeCycleSize] = l.namer.getNamePartClusterScopeCycleSize(host)
+		labels[LabelClusterScopeCycleIndex] = l.namer.getNamePartClusterScopeCycleIndex(host)
+		labels[LabelClusterScopeCycleOffset] = l.namer.getNamePartClusterScopeCycleOffset(host)
 	}
 	if applySupplementaryServiceLabels {
+		// Optional labels
 		// TODO
 		// When we'll have Cluster Discovery functionality we can refactor this properly
 		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint

@@ -155,6 +155,10 @@ type OperatorConfig struct {
 	// When transferring labels from the CRD, ignore these labels.
 	LabelsIgnore []string `json:"labelsIgnore" yaml:"labelsIgnore"`
 
+	// Whether to append *Scope* labels to StatefulSet and Pod.
+	AppendScopeLabelsString string `json:"appendScopeLabels" yaml:"appendScopeLabels"`
+	AppendScopeLabels       bool
+
 	//
 	// The end of OperatorConfig
 	//
@@ -429,6 +433,9 @@ func (config *OperatorConfig) normalize() {
 	if config.ReconcileThreadsNumber == 0 {
 		config.ReconcileThreadsNumber = defaultReconcileThreadsNumber
 	}
+
+	// Whether to append *Scope* labels to StatefulSet and Pod.
+	config.AppendScopeLabels = util.IsStringBoolTrue(config.AppendScopeLabelsString)
 }
 
 // applyEnvVarParams applies ENV VARS over config
@@ -576,6 +583,7 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 	util.Fprintf(b, "ReconcileThreadsNumber: %d\n", config.ReconcileThreadsNumber)
 
 	util.Fprintf(b, "%s", util.Slice2String("LabelsIgnore", config.LabelsIgnore))
+	util.Fprintf(b, "appendScopeLabels: %s (%t)\n", config.AppendScopeLabelsString, config.AppendScopeLabels)
 
 	return b.String()
 }

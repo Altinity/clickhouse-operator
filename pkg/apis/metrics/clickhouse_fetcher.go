@@ -241,7 +241,6 @@ func (f *ClickHouseFetcher) getClickHouseQueryDetachedParts() ([][]string, error
 	)
 }
 
-
 // clickHouseQueryScanRows scan all rows by external scan function
 func (f *ClickHouseFetcher) clickHouseQueryScanRows(
 	sql string,
