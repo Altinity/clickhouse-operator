@@ -1560,6 +1560,8 @@ spec:
               type: array
               items:
                 type: string
+            appendScopeLabels:
+              type: string
 ---
 # Possible Template Parameters:
 #
