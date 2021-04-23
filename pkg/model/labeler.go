@@ -304,7 +304,7 @@ func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 
 // appendCHILabels appends CHI-provided labels to labels set
 func (l *Labeler) appendCHILabels(dst map[string]string) map[string]string {
-	sourceLabels := util.CopyMapExcept(l.chi.Labels, l.chop.Config().IgnoreOnPropagationLabels...)
+	sourceLabels := util.CopyMapExcept(l.chi.Labels, l.chop.Config().ExcludeFromPropagationLabels...)
 	return util.MergeStringMapsOverwrite(dst, sourceLabels)
 }
 
