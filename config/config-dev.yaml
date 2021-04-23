@@ -126,3 +126,17 @@ log_backtrace_at: ""
 reconcileThreadsNumber: 1
 reconcileWaitExclude: false
 reconcileWaitInclude: false
+
+# Whether to append *Scope* labels to StatefulSet and Pod.
+# Full list of available *scope* labels check in labeler.go
+#  LabelShardScopeIndex
+#  LabelReplicaScopeIndex
+#  LabelCHIScopeIndex
+#  LabelCHIScopeCycleSize
+#  LabelCHIScopeCycleIndex
+#  LabelCHIScopeCycleOffset
+#  LabelClusterScopeIndex
+#  LabelClusterScopeCycleSize
+#  LabelClusterScopeCycleIndex
+#  LabelClusterScopeCycleOffset
+appendScopeLabels: yes
