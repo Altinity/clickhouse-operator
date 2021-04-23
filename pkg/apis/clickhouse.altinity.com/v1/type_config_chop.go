@@ -152,8 +152,8 @@ type OperatorConfig struct {
 	ReconcileWaitExclude   bool `json:"reconcileWaitExclude"   yaml:"reconcileWaitExclude"`
 	ReconcileWaitInclude   bool `json:"reconcileWaitInclude"   yaml:"reconcileWaitInclude"`
 
-	// When transferring labels from the CRD, ignore these labels.
-	LabelsIgnore []string `json:"labelsIgnore" yaml:"labelsIgnore"`
+	// When transferring labels from the chi.metadata.labels section to child objects, ignore these labels.
+	IgnoreOnPropagationLabels []string `json:"ignoreOnPropagationLabels" yaml:"ignoreOnPropagationLabels"`
 
 	// Whether to append *Scope* labels to StatefulSet and Pod.
 	AppendScopeLabelsString string `json:"appendScopeLabels" yaml:"appendScopeLabels"`
@@ -582,7 +582,7 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 
 	util.Fprintf(b, "ReconcileThreadsNumber: %d\n", config.ReconcileThreadsNumber)
 
-	util.Fprintf(b, "%s", util.Slice2String("LabelsIgnore", config.LabelsIgnore))
+	util.Fprintf(b, "%s", util.Slice2String("IgnoreOnPropagationLabels", config.IgnoreOnPropagationLabels))
 	util.Fprintf(b, "appendScopeLabels: %s (%t)\n", config.AppendScopeLabelsString, config.AppendScopeLabels)
 
 	return b.String()
