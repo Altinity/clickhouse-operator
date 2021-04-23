@@ -165,7 +165,7 @@ data:
     #  LabelClusterScopeCycleSize
     #  LabelClusterScopeCycleIndex
     #  LabelClusterScopeCycleOffset
-    appendScopeLabels: no
+    appendScopeLabels: "no"
 
 ---
 # Possible Template Parameters:
