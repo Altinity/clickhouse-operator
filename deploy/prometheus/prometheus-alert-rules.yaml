@@ -489,6 +489,13 @@ spec:
               Please check detached parts in log ```kubectl logs -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -c clickhouse-pod --since=1h | grep -i detach```
               Read about how ATTACH / DROP detached parts
               https://clickhouse.tech/docs/en/operations/system-tables/detached_parts/
+              Legend for reason:
+              "detached_by_user" - part was detached via ALTER TABLE ... DETACH ... query.
+              "clone" - old part was detached during clone replica (see `detach_old_local_parts_when_cloning_replica` system.settings)
+              "ignored" - part was unexpected with Zookeeper during restart clickhouse-server
+              "broken" - part was marks as broken during startup or merging (check disk, memory, network hardware faillures), look to clickhouse-server.log for details
+              "unexpected" - during replica startup, part was found in local file system, modification of part was less than 5 minutes, but not found in ZK
+              "noquorum" - part was detached, cause  part was created during insert into Distributed table with quorum, but quorum was failed.
 
     # based on https://blog.serverdensity.com/how-to-monitor-zookeeper/
     # and https://github.com/apache/zookeeper/blob/master/zookeeper-contrib/zookeeper-contrib-monitoring/nagios/services.cfg
