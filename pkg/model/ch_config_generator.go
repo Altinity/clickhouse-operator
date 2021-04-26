@@ -24,12 +24,12 @@ import (
 )
 
 const (
+	// Pattern for string path used in <distributed_ddl><path>XXX</path></distributed_ddl>
 	distributedDDLPathPattern = "/clickhouse/%s/task_queue/ddl"
 
 	// Special auto-generated clusters. Each of these clusters lay over all replicas in CHI
 	// 1. Cluster with one shard and all replicas. Used to duplicate data over all replicas.
 	// 2. Cluster with all shards (1 replica). Used to gather/scatter data over all replicas.
-
 	oneShardAllReplicasClusterName = "all-replicated"
 	allShardsOneReplicaClusterName = "all-sharded"
 )
@@ -74,7 +74,7 @@ func (c *ClickHouseConfigGenerator) GetSettings(host *chiv1.ChiHost) string {
 
 // GetFiles creates data for custom common config files
 func (c *ClickHouseConfigGenerator) GetFiles(section chiv1.SettingsSection, includeUnspecified bool, host *chiv1.ChiHost) map[string]string {
-	var files chiv1.Settings
+	var files *chiv1.Settings
 	if host == nil {
 		// We are looking into Common files
 		files = c.chi.Spec.Configuration.Files
@@ -144,8 +144,8 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string
 	//      <profile>X</profile>
 	util.Iline(b, 4, "<distributed_ddl>")
 	util.Iline(b, 4, "    <path>%s</path>", c.getDistributedDDLPath())
-	if c.chi.Spec.Defaults.DistributedDDL.Profile != "" {
-		util.Iline(b, 4, "    <profile>%s</profile>", c.chi.Spec.Defaults.DistributedDDL.Profile)
+	if c.chi.Spec.Defaults.DistributedDDL.HasProfile() {
+		util.Iline(b, 4, "    <profile>%s</profile>", c.chi.Spec.Defaults.DistributedDDL.GetProfile())
 	}
 	//		</distributed_ddl>
 	// </yandex>
@@ -477,8 +477,8 @@ func (c *ClickHouseConfigGenerator) GetHostPorts(host *chiv1.ChiHost) string {
 }
 
 // generateXMLConfig creates XML using map[string]string definitions
-func (c *ClickHouseConfigGenerator) generateXMLConfig(settings chiv1.Settings, prefix string) string {
-	if len(settings) == 0 {
+func (c *ClickHouseConfigGenerator) generateXMLConfig(settings *chiv1.Settings, prefix string) string {
+	if settings.Len() == 0 {
 		return ""
 	}
 

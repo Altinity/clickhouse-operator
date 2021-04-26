@@ -37,7 +37,8 @@ func NewConnection(params *CHConnectionParams) *CHConnection {
 	}
 }
 
-func (c *CHConnection) connect() {
+// connectContext
+func (c *CHConnection) connectContext(ctx context.Context) {
 	log.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
 	dbConnection, err := databasesql.Open("clickhouse", c.params.GetDSN())
 	if err != nil {
@@ -46,10 +47,16 @@ func (c *CHConnection) connect() {
 	}
 
 	// Ping should be deadlined
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(c.params.timeout))
+	var parentCtx context.Context
+	if ctx == nil {
+		parentCtx = context.Background()
+	} else {
+		parentCtx = ctx
+	}
+	contxt, cancel := context.WithDeadline(parentCtx, time.Now().Add(defaultTimeout))
 	defer cancel()
 
-	if err := dbConnection.PingContext(ctx); err != nil {
+	if err := dbConnection.PingContext(contxt); err != nil {
 		log.V(1).A().Error("FAILED Ping(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
 		_ = dbConnection.Close()
 		return
@@ -58,33 +65,40 @@ func (c *CHConnection) connect() {
 	c.conn = dbConnection
 }
 
-func (c *CHConnection) ensureConnected() bool {
+// ensureConnectedContext
+func (c *CHConnection) ensureConnectedContext(ctx context.Context) bool {
 	if c.conn != nil {
 		log.V(2).F().Info("Already connected: %s", c.params.GetDSNWithHiddenCredentials())
 		return true
 	}
 
-	c.connect()
+	c.connectContext(ctx)
 
 	return c.conn != nil
 }
 
-// Query runs given sql query
-func (c *CHConnection) Query(sql string) (*Query, error) {
+// QueryContext runs given sql query on behalf of specified context
+func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*Query, error) {
 	if len(sql) == 0 {
 		return nil, nil
 	}
 
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(c.params.timeout))
+	var parentCtx context.Context
+	if ctx == nil {
+		parentCtx = context.Background()
+	} else {
+		parentCtx = ctx
+	}
+	contxt, cancel := context.WithDeadline(parentCtx, time.Now().Add(c.params.timeout))
 
-	if !c.ensureConnected() {
+	if !c.ensureConnectedContext(contxt) {
 		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
 		log.V(1).A().Error(s)
 		return nil, fmt.Errorf(s)
 	}
 
-	rows, err := c.conn.QueryContext(ctx, sql)
+	rows, err := c.conn.QueryContext(contxt, sql)
 	if err != nil {
 		cancel()
 		s := fmt.Sprintf("FAILED Query(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
@@ -94,27 +108,40 @@ func (c *CHConnection) Query(sql string) (*Query, error) {
 
 	log.V(2).Info("clickhouse.QueryContext():'%s'", sql)
 
-	return NewQuery(ctx, cancel, rows), nil
+	return NewQuery(contxt, cancel, rows), nil
 }
 
-// Exec runs given sql query
-func (c *CHConnection) Exec(sql string) error {
+// Query runs given sql query
+func (c *CHConnection) Query(sql string) (*Query, error) {
+	return c.QueryContext(nil, sql)
+}
+
+// ExecContext runs given sql query
+func (c *CHConnection) ExecContext(ctx context.Context, sql string) error {
 	if len(sql) == 0 {
 		return nil
 	}
 
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(c.params.timeout))
+	var parentCtx context.Context
+	if ctx == nil {
+		parentCtx = context.Background()
+	} else {
+		parentCtx = ctx
+	}
+	contxt, cancel := context.WithDeadline(parentCtx, time.Now().Add(defaultTimeout))
 	defer cancel()
 
-	if !c.ensureConnected() {
+	if !c.ensureConnectedContext(contxt) {
+		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
 		log.V(1).A().Error(s)
 		return fmt.Errorf(s)
 	}
 
-	_, err := c.conn.ExecContext(ctx, sql)
+	_, err := c.conn.ExecContext(contxt, sql)
 
 	if err != nil {
+		cancel()
 		log.V(1).A().Error("FAILED Exec(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
 		return err
 	}

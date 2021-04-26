@@ -15,6 +15,7 @@
 package chop
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -23,17 +24,25 @@ import (
 
 	"github.com/kubernetes-sigs/yaml"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 )
 
+// ConfigManager specifies configuration manager in charge of operator's configuration
 type ConfigManager struct {
-	chopClient     *chopclientset.Clientset
+	// kubeClient is a k8s client
+	kubeClient *kube.Clientset
+
+	// chopClient is a k8s client able to communicate with operator's Custom Resources
+	chopClient *chopclientset.Clientset
+
+	// chopConfigList is a list of available operator configurations
 	chopConfigList *chiv1.ClickHouseOperatorConfigurationList
 
-	// initConfigFilePath is path to the configuration file, which will be used as initial/seed
+	// initConfigFilePath is a path to the configuration file, which will be used as initial/seed
 	// to build final config, which will be used/consumed by users
 	initConfigFilePath string
 
@@ -43,8 +52,8 @@ type ConfigManager struct {
 	// crConfigs is a slice of prepared Custom Resource based configs
 	crConfigs []*chiv1.OperatorConfig
 
-	// config is the final config,
-	// built as merge of all available configs and it is ready to use/be consumed by users
+	// config is the final config, built as merge of all available configs.
+	// This config is ready to use/be consumed by users
 	config *chiv1.OperatorConfig
 
 	// runtimeParams is set/map of runtime params, influencing configuration
@@ -53,10 +62,12 @@ type ConfigManager struct {
 
 // NewConfigManager creates new ConfigManager
 func NewConfigManager(
+	kubeClient *kube.Clientset,
 	chopClient *chopclientset.Clientset,
 	initConfigFilePath string,
 ) *ConfigManager {
 	return &ConfigManager{
+		kubeClient:         kubeClient,
 		chopClient:         chopClient,
 		initConfigFilePath: initConfigFilePath,
 	}
@@ -86,12 +97,14 @@ func (cm *ConfigManager) Init() error {
 	// Prepare one unified config from all available config pieces
 	cm.buildUnifiedConfig()
 
+	cm.fetchSecretCredentials()
+
 	// From now on we have one unified CHOP config
 	log.V(1).Info("Unified (but not post-processed yet) CHOP config")
 	log.V(1).Info(cm.config.String(true))
 
 	// Finalize config by post-processing
-	cm.config.Postprocess()
+	cm.Postprocess()
 
 	// OperatorConfig is ready
 	log.V(1).Info("Final CHOP config")
@@ -100,7 +113,7 @@ func (cm *ConfigManager) Init() error {
 	return nil
 }
 
-// OperatorConfig is an access wrapper
+// Config is an access wrapper
 func (cm *ConfigManager) Config() *chiv1.OperatorConfig {
 	return cm.config
 }
@@ -114,7 +127,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 
 	// Get list of ClickHouseOperatorConfiguration objects
 	var err error
-	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(metav1.ListOptions{}); err != nil {
+	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(context.TODO(), metav1.ListOptions{}); err != nil {
 		log.V(1).A().Error("Error read ClickHouseOperatorConfigurations %v", err)
 		return
 	}
@@ -310,9 +323,66 @@ func (cm *ConfigManager) logEnvVarParams() {
 	}
 }
 
+// HasRuntimeParam checks whether specified runtime param exists
+func (cm *ConfigManager) HasRuntimeParam(name string) bool {
+	_map := cm.getEnvVarParams()
+	_, ok := _map[name]
+	return ok
+}
+
 // GetRuntimeParam gets specified runtime param
 func (cm *ConfigManager) GetRuntimeParam(name string) (string, bool) {
 	_map := cm.getEnvVarParams()
 	value, ok := _map[name]
 	return value, ok
+}
+
+// fetchSecretCredentials
+func (cm *ConfigManager) fetchSecretCredentials() {
+	// Secret name where to look for credentials
+	name := cm.config.CHCredentialsSecretName
+
+	// Do we need to fetch credentials from the secret?
+	if name == "" {
+		// No name specified, no need to read secret
+		return
+	}
+
+	// We have secret name specified, let's move on and read credentials
+
+	// Figure out namespace where to look for the secret
+	namespace := cm.config.CHCredentialsSecretNamespace
+	if namespace == "" {
+		// No namespace explicitly specified, let's look into namespace where pod is running
+		if cm.HasRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE) {
+			// Unable to figure out namespace where pod is running, can not continue
+			return
+		}
+		namespace, _ = cm.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
+	}
+
+	// Sanity check
+	if (namespace == "") || (name == "") {
+		return
+	}
+
+	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return
+	}
+
+	// Find username and password from credentials
+	for key, value := range secret.Data {
+		switch key {
+		case "username":
+			cm.config.CHCredentialsSecretUsername = string(value)
+		case "password":
+			cm.config.CHCredentialsSecretPassword = string(value)
+		}
+	}
+}
+
+// Postprocess
+func (cm *ConfigManager) Postprocess() {
+	cm.config.Postprocess()
 }

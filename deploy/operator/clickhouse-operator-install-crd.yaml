@@ -33,6 +33,11 @@ spec:
       description: Hosts count
       priority: 0 # show in standard view
       JSONPath: .status.hosts
+    - name: taskID
+      type: string
+      description: TaskID
+      priority: 1 # show in wide view
+      JSONPath: .status.taskID
     - name: status
       type: string
       description: CHI status
@@ -75,6 +80,8 @@ spec:
           type: object
           x-kubernetes-preserve-unknown-fields: true
           properties:
+            taskID:
+              type: string
             # Need to be StringBool
             stop:
               type: string
@@ -103,16 +110,19 @@ spec:
               type: string
             templating:
               type: object
+              nullable: true
               properties:
                 policy:
                   type: string
-            reconcilling:
+            reconciling:
               type: object
+              nullable: true
               properties:
                 policy:
                   type: string
             defaults:
               type: object
+              nullable: true
               properties:
                 # Need to be StringBool
                 replicasUseFQDN:
@@ -140,11 +150,13 @@ spec:
                     - "enabled"
                 distributedDDL:
                   type: object
+                  nullable: true
                   properties:
                     profile:
                       type: string
                 templates:
                   type: object
+                  nullable: true
                   properties:
                     hostTemplate:
                       type: string
@@ -164,9 +176,11 @@ spec:
                       type: string
             configuration:
               type: object
+              nullable: true
               properties:
                 zookeeper:
                   type: object
+                  nullable: true
                   properties:
                     nodes:
                       type: array
@@ -192,14 +206,19 @@ spec:
                       type: string
                 users:
                   type: object
+                  nullable: true
                 profiles:
                   type: object
+                  nullable: true
                 quotas:
                   type: object
+                  nullable: true
                 settings:
                   type: object
+                  nullable: true
                 files:
                   type: object
+                  nullable: true
                 clusters:
                   type: array
                   nullable: true
@@ -216,6 +235,7 @@ spec:
                         pattern: "^[a-zA-Z0-9-]{0,15}$"
                       zookeeper:
                         type: object
+                        nullable: true
                         properties:
                           nodes:
                             type: array
@@ -239,8 +259,35 @@ spec:
                             type: string
                           identity:
                             type: string
+                      settings:
+                        type: object
+                        nullable: true
+                      files:
+                        type: object
+                        nullable: true
+                      templates:
+                        type: object
+                        nullable: true
+                        properties:
+                          hostTemplate:
+                            type: string
+                          podTemplate:
+                            type: string
+                          dataVolumeClaimTemplate:
+                            type: string
+                          logVolumeClaimTemplate:
+                            type: string
+                          serviceTemplate:
+                            type: string
+                          clusterServiceTemplate:
+                            type: string
+                          shardServiceTemplate:
+                            type: string
+                          replicaServiceTemplate:
+                            type: string
                       layout:
                         type: object
+                        nullable: true
                         properties:
                           # DEPRECATED - to be removed soon
                           type:
@@ -292,10 +339,13 @@ spec:
                                     - "enabled"
                                 settings:
                                   type: object
+                                  nullable: true
                                 files:
                                   type: object
+                                  nullable: true
                                 templates:
                                   type: object
+                                  nullable: true
                                   properties:
                                     hostTemplate:
                                       type: string
@@ -343,10 +393,13 @@ spec:
                                         maximum: 65535
                                       settings:
                                         type: object
+                                        nullable: true
                                       files:
                                         type: object
+                                        nullable: true
                                       templates:
                                         type: object
+                                        nullable: true
                                         properties:
                                           hostTemplate:
                                             type: string
@@ -378,10 +431,13 @@ spec:
                                   pattern: "^[a-zA-Z0-9-]{0,15}$"
                                 settings:
                                   type: object
+                                  nullable: true
                                 files:
                                   type: object
+                                  nullable: true
                                 templates:
                                   type: object
+                                  nullable: true
                                   properties:
                                     hostTeampate:
                                       type: string
@@ -429,10 +485,13 @@ spec:
                                         maximum: 65535
                                       settings:
                                         type: object
+                                        nullable: true
                                       files:
                                         type: object
+                                        nullable: true
                                       templates:
                                         type: object
+                                        nullable: true
                                         properties:
                                           hostTemplate:
                                             type: string
@@ -450,27 +509,9 @@ spec:
                                             type: string
                                           replicaServiceTemplate:
                                             type: string
-                      templates:
-                        type: object
-                        properties:
-                          hostTemplate:
-                            type: string
-                          podTemplate:
-                            type: string
-                          dataVolumeClaimTemplate:
-                            type: string
-                          logVolumeClaimTemplate:
-                            type: string
-                          serviceTemplate:
-                            type: string
-                          clusterServiceTemplate:
-                            type: string
-                          shardServiceTemplate:
-                            type: string
-                          replicaServiceTemplate:
-                            type: string
             templates:
               type: object
+              nullable: true
               properties:
                 hostTemplates:
                   type: array
@@ -519,8 +560,15 @@ spec:
                             type: integer
                             minimum: 1
                             maximum: 65535
+                          settings:
+                            type: object
+                            nullable: true
+                          files:
+                            type: object
+                            nullable: true
                           templates:
                             type: object
+                            nullable: true
                             properties:
                               hostTemplate:
                                 type: string
@@ -616,6 +664,7 @@ spec:
                       spec:
                         # TODO specify PodSpec
                         type: object
+                        nullable: true
                 volumeClaimTemplates:
                   type: array
                   nullable: true
@@ -633,9 +682,13 @@ spec:
                           - ""
                           - "Retain"
                           - "Delete"
+                      metadata:
+                        type: object
+                        nullable: true
                       spec:
                         # TODO specify PersistentVolumeClaimSpec
                         type: object
+                        nullable: true
                 serviceTemplates:
                   type: array
                   nullable: true
@@ -652,9 +705,11 @@ spec:
                       metadata:
                         # TODO specify ObjectMeta
                         type: object
+                        nullable: true
                       spec:
                         # TODO specify ServiceSpec
                         type: object
+                        nullable: true
             useTemplates:
               type: array
               nullable: true
@@ -673,7 +728,6 @@ spec:
                       # List useTypeXXX constants from model
                       - ""
                       - "merge"
-
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -710,6 +764,11 @@ spec:
       description: Hosts count
       priority: 0 # show in standard view
       JSONPath: .status.hosts
+    - name: taskID
+      type: string
+      description: TaskID
+      priority: 1 # show in wide view
+      JSONPath: .status.taskID
     - name: status
       type: string
       description: CHI status
@@ -752,6 +811,8 @@ spec:
           type: object
           x-kubernetes-preserve-unknown-fields: true
           properties:
+            taskID:
+              type: string
             # Need to be StringBool
             stop:
               type: string
@@ -780,16 +841,19 @@ spec:
               type: string
             templating:
               type: object
+              nullable: true
               properties:
                 policy:
                   type: string
-            reconcilling:
+            reconciling:
               type: object
+              nullable: true
               properties:
                 policy:
                   type: string
             defaults:
               type: object
+              nullable: true
               properties:
                 # Need to be StringBool
                 replicasUseFQDN:
@@ -817,11 +881,13 @@ spec:
                     - "enabled"
                 distributedDDL:
                   type: object
+                  nullable: true
                   properties:
                     profile:
                       type: string
                 templates:
                   type: object
+                  nullable: true
                   properties:
                     hostTemplate:
                       type: string
@@ -841,9 +907,11 @@ spec:
                       type: string
             configuration:
               type: object
+              nullable: true
               properties:
                 zookeeper:
                   type: object
+                  nullable: true
                   properties:
                     nodes:
                       type: array
@@ -869,14 +937,19 @@ spec:
                       type: string
                 users:
                   type: object
+                  nullable: true
                 profiles:
                   type: object
+                  nullable: true
                 quotas:
                   type: object
+                  nullable: true
                 settings:
                   type: object
+                  nullable: true
                 files:
                   type: object
+                  nullable: true
                 clusters:
                   type: array
                   nullable: true
@@ -893,6 +966,7 @@ spec:
                         pattern: "^[a-zA-Z0-9-]{0,15}$"
                       zookeeper:
                         type: object
+                        nullable: true
                         properties:
                           nodes:
                             type: array
@@ -916,8 +990,35 @@ spec:
                             type: string
                           identity:
                             type: string
+                      settings:
+                        type: object
+                        nullable: true
+                      files:
+                        type: object
+                        nullable: true
+                      templates:
+                        type: object
+                        nullable: true
+                        properties:
+                          hostTemplate:
+                            type: string
+                          podTemplate:
+                            type: string
+                          dataVolumeClaimTemplate:
+                            type: string
+                          logVolumeClaimTemplate:
+                            type: string
+                          serviceTemplate:
+                            type: string
+                          clusterServiceTemplate:
+                            type: string
+                          shardServiceTemplate:
+                            type: string
+                          replicaServiceTemplate:
+                            type: string
                       layout:
                         type: object
+                        nullable: true
                         properties:
                           # DEPRECATED - to be removed soon
                           type:
@@ -969,10 +1070,13 @@ spec:
                                     - "enabled"
                                 settings:
                                   type: object
+                                  nullable: true
                                 files:
                                   type: object
+                                  nullable: true
                                 templates:
                                   type: object
+                                  nullable: true
                                   properties:
                                     hostTemplate:
                                       type: string
@@ -1020,10 +1124,13 @@ spec:
                                         maximum: 65535
                                       settings:
                                         type: object
+                                        nullable: true
                                       files:
                                         type: object
+                                        nullable: true
                                       templates:
                                         type: object
+                                        nullable: true
                                         properties:
                                           hostTemplate:
                                             type: string
@@ -1055,10 +1162,13 @@ spec:
                                   pattern: "^[a-zA-Z0-9-]{0,15}$"
                                 settings:
                                   type: object
+                                  nullable: true
                                 files:
                                   type: object
+                                  nullable: true
                                 templates:
                                   type: object
+                                  nullable: true
                                   properties:
                                     hostTeampate:
                                       type: string
@@ -1106,10 +1216,13 @@ spec:
                                         maximum: 65535
                                       settings:
                                         type: object
+                                        nullable: true
                                       files:
                                         type: object
+                                        nullable: true
                                       templates:
                                         type: object
+                                        nullable: true
                                         properties:
                                           hostTemplate:
                                             type: string
@@ -1127,27 +1240,9 @@ spec:
                                             type: string
                                           replicaServiceTemplate:
                                             type: string
-                      templates:
-                        type: object
-                        properties:
-                          hostTemplate:
-                            type: string
-                          podTemplate:
-                            type: string
-                          dataVolumeClaimTemplate:
-                            type: string
-                          logVolumeClaimTemplate:
-                            type: string
-                          serviceTemplate:
-                            type: string
-                          clusterServiceTemplate:
-                            type: string
-                          shardServiceTemplate:
-                            type: string
-                          replicaServiceTemplate:
-                            type: string
             templates:
               type: object
+              nullable: true
               properties:
                 hostTemplates:
                   type: array
@@ -1196,8 +1291,15 @@ spec:
                             type: integer
                             minimum: 1
                             maximum: 65535
+                          settings:
+                            type: object
+                            nullable: true
+                          files:
+                            type: object
+                            nullable: true
                           templates:
                             type: object
+                            nullable: true
                             properties:
                               hostTemplate:
                                 type: string
@@ -1293,6 +1395,7 @@ spec:
                       spec:
                         # TODO specify PodSpec
                         type: object
+                        nullable: true
                 volumeClaimTemplates:
                   type: array
                   nullable: true
@@ -1310,9 +1413,13 @@ spec:
                           - ""
                           - "Retain"
                           - "Delete"
+                      metadata:
+                        type: object
+                        nullable: true
                       spec:
                         # TODO specify PersistentVolumeClaimSpec
                         type: object
+                        nullable: true
                 serviceTemplates:
                   type: array
                   nullable: true
@@ -1329,9 +1436,11 @@ spec:
                       metadata:
                         # TODO specify ObjectMeta
                         type: object
+                        nullable: true
                       spec:
                         # TODO specify ServiceSpec
                         type: object
+                        nullable: true
             useTemplates:
               type: array
               nullable: true
@@ -1350,7 +1459,6 @@ spec:
                       # List useTypeXXX constants from model
                       - ""
                       - "merge"
-
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -1414,9 +1522,15 @@ spec:
                 type: string
             chConfigUserDefaultPassword:
               type: string
+            chConfigNetworksHostRegexpTemplate:
+              type: string
             chUsername:
               type: string
             chPassword:
+              type: string
+            chCredentialsSecretNamespace:
+              type: string
+            chCredentialsSecretName:
               type: string
             chPort:
               type: integer
@@ -1442,3 +1556,30 @@ spec:
               type: string
             reconcileWaitInclude:
               type: string
+            excludeFromPropagationLabels:
+              type: array
+              items:
+                type: string
+            appendScopeLabels:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - ""
+                - "0"
+                - "1"
+                - "False"
+                - "false"
+                - "True"
+                - "true"
+                - "No"
+                - "no"
+                - "Yes"
+                - "yes"
+                - "Off"
+                - "off"
+                - "On"
+                - "on"
+                - "Disabled"
+                - "disabled"
+                - "Enabled"
+                - "enabled"

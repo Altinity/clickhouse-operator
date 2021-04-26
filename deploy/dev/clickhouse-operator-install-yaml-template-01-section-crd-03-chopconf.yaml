@@ -60,9 +60,15 @@ spec:
                 type: string
             chConfigUserDefaultPassword:
               type: string
+            chConfigNetworksHostRegexpTemplate:
+              type: string
             chUsername:
               type: string
             chPassword:
+              type: string
+            chCredentialsSecretNamespace:
+              type: string
+            chCredentialsSecretName:
               type: string
             chPort:
               type: integer
@@ -88,3 +94,30 @@ spec:
               type: string
             reconcileWaitInclude:
               type: string
+            excludeFromPropagationLabels:
+              type: array
+              items:
+                type: string
+            appendScopeLabels:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - ""
+                - "0"
+                - "1"
+                - "False"
+                - "false"
+                - "True"
+                - "true"
+                - "No"
+                - "no"
+                - "Yes"
+                - "yes"
+                - "Off"
+                - "off"
+                - "On"
+                - "on"
+                - "Disabled"
+                - "disabled"
+                - "Enabled"
+                - "enabled"

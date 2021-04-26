@@ -49,7 +49,7 @@ if [[ ! -z "$(ls -A "${GRAFANA_OPERATOR_DIR}")" ]]; then
 fi
 
 # Temp dir is empty, will clear it upon script termination
-trap "clean_dir ${TMP_DIR}" SIGHUP SIGINT SIGQUIT SIGFPE SIGKILL SIGALRM SIGTERM
+trap "clean_dir ${TMP_DIR}" SIGHUP SIGINT SIGQUIT SIGFPE SIGALRM SIGTERM
 
 # Continue with sources
 echo "Download Grafana operator sources into ${GRAFANA_OPERATOR_DIR}"

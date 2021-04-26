@@ -23,57 +23,60 @@ import (
 
 // ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
 type ChiHost struct {
-	Name string `json:"name,omitempty"`
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 	// DEPRECATED - to be removed soon
-	Port                int32            `json:"port,omitempty"`
-	TCPPort             int32            `json:"tcpPort,omitempty"`
-	HTTPPort            int32            `json:"httpPort,omitempty"`
-	InterserverHTTPPort int32            `json:"interserverHTTPPort,omitempty"`
-	Settings            Settings         `json:"settings,omitempty"`
-	Files               Settings         `json:"files,omitempty"`
-	Templates           ChiTemplateNames `json:"templates,omitempty"`
+	Port                int32             `json:"port,omitempty"                yaml:"port,omitempty"`
+	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
+	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
+	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
+	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
+	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
+	Templates           *ChiTemplateNames `json:"templates,omitempty"           yaml:"templates,omitempty"`
 
 	// Internal data
-	Address             ChiHostAddress             `json:"-"`
-	Config              ChiHostConfig              `json:"-"`
-	ReconcileAttributes ChiHostReconcileAttributes `json:"-" testdiff:"ignore"`
-	StatefulSet         *appsv1.StatefulSet        `json:"-" testdiff:"ignore"`
-	CHI                 *ClickHouseInstallation    `json:"-" testdiff:"ignore"`
+	Address             ChiHostAddress             `json:"-" yaml:"-"`
+	Config              ChiHostConfig              `json:"-" yaml:"-"`
+	ReconcileAttributes ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
+	StatefulSet         *appsv1.StatefulSet        `json:"-" yaml:"-" testdiff:"ignore"`
+	CurStatefulSet      *appsv1.StatefulSet        `json:"-" yaml:"-" testdiff:"ignore"`
+	DesiredStatefulSet  *appsv1.StatefulSet        `json:"-" yaml:"-" testdiff:"ignore"`
+	CHI                 *ClickHouseInstallation    `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
-		(&host.Settings).MergeFrom(shard.Settings)
+		host.Settings = host.Settings.MergeFrom(shard.Settings)
 	}
 
 	if replica != nil {
-		(&host.Settings).MergeFrom(replica.Settings)
+		host.Settings = host.Settings.MergeFrom(replica.Settings)
 	}
 }
 
 func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
-		(&host.Files).MergeFrom(shard.Files)
+		host.Files = host.Files.MergeFrom(shard.Files)
 	}
 
 	if replica != nil {
-		(&host.Files).MergeFrom(replica.Files)
+		host.Files = host.Files.MergeFrom(replica.Files)
 	}
 }
 
 func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *ChiHostTemplate) {
 	if shard != nil {
-		(&host.Templates).MergeFrom(&shard.Templates, MergeTypeFillEmptyValues)
+		host.Templates = host.Templates.MergeFrom(shard.Templates, MergeTypeFillEmptyValues)
 	}
 
 	if replica != nil {
-		(&host.Templates).MergeFrom(&replica.Templates, MergeTypeFillEmptyValues)
+		host.Templates = host.Templates.MergeFrom(replica.Templates, MergeTypeFillEmptyValues)
 	}
 
 	if template != nil {
-		(&host.Templates).MergeFrom(&template.Spec.Templates, MergeTypeFillEmptyValues)
+		host.Templates = host.Templates.MergeFrom(template.Spec.Templates, MergeTypeFillEmptyValues)
 	}
-	(&host.Templates).HandleDeprecatedFields()
+
+	host.Templates.HandleDeprecatedFields()
 }
 
 func (host *ChiHost) MergeFrom(from *ChiHost) {
@@ -93,26 +96,32 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 	if host.InterserverHTTPPort == 0 {
 		host.InterserverHTTPPort = from.InterserverHTTPPort
 	}
-	(&host.Templates).MergeFrom(&from.Templates, MergeTypeFillEmptyValues)
-	(&host.Templates).HandleDeprecatedFields()
+	host.Templates = host.Templates.MergeFrom(from.Templates, MergeTypeFillEmptyValues)
+	host.Templates.HandleDeprecatedFields()
 }
 
 func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
-	name := host.Templates.HostTemplate
-	template, ok := host.CHI.GetHostTemplate(name)
-	return template, ok
+	if !host.Templates.HasHostTemplate() {
+		return nil, false
+	}
+	name := host.Templates.GetHostTemplate()
+	return host.CHI.GetHostTemplate(name)
 }
 
 func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
-	name := host.Templates.PodTemplate
-	template, ok := host.CHI.GetPodTemplate(name)
-	return template, ok
+	if !host.Templates.HasPodTemplate() {
+		return nil, false
+	}
+	name := host.Templates.GetPodTemplate()
+	return host.CHI.GetPodTemplate(name)
 }
 
 func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
-	name := host.Templates.ReplicaServiceTemplate
-	template, ok := host.CHI.GetServiceTemplate(name)
-	return template, ok
+	if !host.Templates.HasReplicaServiceTemplate() {
+		return nil, false
+	}
+	name := host.Templates.GetReplicaServiceTemplate()
+	return host.CHI.GetServiceTemplate(name)
 }
 
 func (host *ChiHost) GetStatefulSetReplicasNum() int32 {
@@ -123,13 +132,13 @@ func (host *ChiHost) GetStatefulSetReplicasNum() int32 {
 	}
 }
 
-func (host *ChiHost) GetSettings() Settings {
+func (host *ChiHost) GetSettings() *Settings {
 	return host.Settings
 }
 
 func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
 	cluster := host.GetCluster()
-	return &cluster.Zookeeper
+	return cluster.Zookeeper
 }
 
 func (host *ChiHost) GetCHI() *ClickHouseInstallation {

@@ -20,20 +20,21 @@ import (
 	"fmt"
 	"strings"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/util"
-
+	"github.com/google/uuid"
 	"gopkg.in/d4l3k/messagediff.v1"
 	"k8s.io/api/core/v1"
-	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Normalizer
 type Normalizer struct {
 	chop *chop.CHOp
-	chi  *chiv1.ClickHouseInstallation
+	chi  *chiV1.ClickHouseInstallation
 	// Whether should insert default cluster if no cluster specified
 	withDefaultCluster bool
 }
@@ -46,14 +47,20 @@ func NewNormalizer(chop *chop.CHOp) *Normalizer {
 }
 
 // CreateTemplatedCHI produces ready-to-use CHI object
-func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withDefaultCluster bool) (*chiv1.ClickHouseInstallation, error) {
-	// Whether should insert default cluster if no cluster specified
-	n.withDefaultCluster = withDefaultCluster
+func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chiV1.ClickHouseInstallation, error) {
+	if chi == nil {
+		// No CHI specified - meaning we are building 'empty' CHI with no clusters inside
+		chi = new(chiV1.ClickHouseInstallation)
+		n.withDefaultCluster = false
+	} else {
+		// Insert default cluster in case no clusters specified in this CHI
+		n.withDefaultCluster = true
+	}
 
 	// What base should be used to create CHI
 	if n.chop.Config().CHITemplate == nil {
 		// No template specified - start with clear page
-		n.chi = new(chiv1.ClickHouseInstallation)
+		n.chi = new(chiV1.ClickHouseInstallation)
 	} else {
 		// Template specified - start with template
 		n.chi = n.chop.Config().CHITemplate.DeepCopy()
@@ -67,13 +74,13 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withD
 
 	// Apply CHI-specified templates
 
-	var useTemplates []chiv1.ChiUseTemplate
+	var useTemplates []chiV1.ChiUseTemplate
 
 	if autoTemplates := n.chop.Config().FindAutoTemplates(); len(autoTemplates) > 0 {
 		log.V(2).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
 		for _, template := range autoTemplates {
 			log.V(3).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Name, template.Namespace)
-			useTemplates = append(useTemplates, chiv1.ChiUseTemplate{
+			useTemplates = append(useTemplates, chiV1.ChiUseTemplate{
 				Name:      template.Name,
 				Namespace: template.Namespace,
 				UseType:   useTypeMerge,
@@ -95,33 +102,31 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiv1.ClickHouseInstallation, withD
 		if template := n.chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
 			log.V(1).M(chi).A().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
 		} else {
-			(&n.chi.Spec).MergeFrom(&template.Spec, chiv1.MergeTypeOverrideByNonEmptyValues)
+			(&n.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
 			log.V(2).M(chi).F().Info("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
 		}
 	}
 
 	// After all templates applied, place provided CHI on top of the whole stack
-	n.chi.MergeFrom(chi, chiv1.MergeTypeOverrideByNonEmptyValues)
+	n.chi.MergeFrom(chi, chiV1.MergeTypeOverrideByNonEmptyValues)
 
-	return n.NormalizeCHI(nil)
+	return n.normalize()
 }
 
 // NormalizeCHI normalizes CHI.
 // Returns normalized CHI
-func (n *Normalizer) NormalizeCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.ClickHouseInstallation, error) {
-	if chi != nil {
-		n.chi = chi
-	}
+func (n *Normalizer) normalize() (*chiV1.ClickHouseInstallation, error) {
 
 	// Walk over ChiSpec datatype fields
-	n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
-	n.normalizeStop(&n.chi.Spec.Stop)
-	n.normalizeNamespaceDomainPattern(&n.chi.Spec.NamespaceDomainPattern)
-	n.normalizeTemplating(&n.chi.Spec.Templating)
-	n.normalizeReconciling(&n.chi.Spec.Reconciling)
-	n.normalizeDefaults(&n.chi.Spec.Defaults)
-	n.normalizeConfiguration(&n.chi.Spec.Configuration)
-	n.normalizeTemplates(&n.chi.Spec.Templates)
+	n.chi.Spec.TaskID = n.normalizeTaskID(n.chi.Spec.TaskID)
+	n.chi.Spec.UseTemplates = n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
+	n.chi.Spec.Stop = n.normalizeStop(n.chi.Spec.Stop)
+	n.chi.Spec.NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.chi.Spec.NamespaceDomainPattern)
+	n.chi.Spec.Templating = n.normalizeTemplating(n.chi.Spec.Templating)
+	n.chi.Spec.Reconciling = n.normalizeReconciling(n.chi.Spec.Reconciling)
+	n.chi.Spec.Defaults = n.normalizeDefaults(n.chi.Spec.Defaults)
+	n.chi.Spec.Configuration = n.normalizeConfiguration(n.chi.Spec.Configuration)
+	n.chi.Spec.Templates = n.normalizeTemplates(n.chi.Spec.Templates)
 	// UseTemplates already done
 
 	n.finalizeCHI()
@@ -134,20 +139,20 @@ func (n *Normalizer) NormalizeCHI(chi *chiv1.ClickHouseInstallation) (*chiv1.Cli
 func (n *Normalizer) finalizeCHI() {
 	n.chi.FillSelfCalculatedAddressInfo()
 	n.chi.FillCHIPointer()
-	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
+	n.chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		hostTemplate := n.getHostTemplate(host)
 		hostApplyHostTemplate(host, hostTemplate)
 		return nil
 	})
-	n.FillCHIAddressInfo()
-	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
+	n.fillCHIAddressInfo()
+	n.chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		return n.calcFingerprints(host)
 	})
 }
 
-func (n *Normalizer) FillCHIAddressInfo() {
+func (n *Normalizer) fillCHIAddressInfo() {
 	n.chi.WalkHostsFullPath(0, 0, func(
-		chi *chiv1.ClickHouseInstallation,
+		chi *chiV1.ClickHouseInstallation,
 
 		chiScopeIndex int,
 		chiScopeCycleSize int,
@@ -160,15 +165,15 @@ func (n *Normalizer) FillCHIAddressInfo() {
 		clusterScopeCycleOffset int,
 
 		clusterIndex int,
-		cluster *chiv1.ChiCluster,
+		cluster *chiV1.ChiCluster,
 
 		shardIndex int,
-		shard *chiv1.ChiShard,
+		shard *chiV1.ChiShard,
 
 		replicaIndex int,
-		replica *chiv1.ChiReplica,
+		replica *chiV1.ChiReplica,
 
-		host *chiv1.ChiHost,
+		host *chiV1.ChiHost,
 	) error {
 		host.Address.StatefulSet = CreateStatefulSetName(host)
 
@@ -177,7 +182,7 @@ func (n *Normalizer) FillCHIAddressInfo() {
 }
 
 // getHostTemplate gets Host Template to be used to normalize Host
-func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate {
+func (n *Normalizer) getHostTemplate(host *chiV1.ChiHost) *chiV1.ChiHostTemplate {
 	statefulSetName := CreateStatefulSetName(host)
 
 	// Which host template would be used - either explicitly defined in or a default one
@@ -211,14 +216,14 @@ func (n *Normalizer) getHostTemplate(host *chiv1.ChiHost) *chiv1.ChiHostTemplate
 }
 
 // hostApplyHostTemplate
-func hostApplyHostTemplate(host *chiv1.ChiHost, template *chiv1.ChiHostTemplate) {
+func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate) {
 	if host.Name == "" {
 		host.Name = template.Spec.Name
 	}
 
 	for _, portDistribution := range template.PortDistribution {
 		switch portDistribution.Type {
-		case chiv1.PortDistributionUnspecified:
+		case chiV1.PortDistributionUnspecified:
 			if host.TCPPort == chPortNumberMustBeAssignedLater {
 				host.TCPPort = template.Spec.TCPPort
 			}
@@ -228,7 +233,7 @@ func hostApplyHostTemplate(host *chiv1.ChiHost, template *chiv1.ChiHostTemplate)
 			if host.InterserverHTTPPort == chPortNumberMustBeAssignedLater {
 				host.InterserverHTTPPort = template.Spec.InterserverHTTPPort
 			}
-		case chiv1.PortDistributionClusterScopeIndex:
+		case chiV1.PortDistributionClusterScopeIndex:
 			if host.TCPPort == chPortNumberMustBeAssignedLater {
 				base := chDefaultTCPPortNumber
 				if template.Spec.TCPPort != chPortNumberMustBeAssignedLater {
@@ -259,7 +264,7 @@ func hostApplyHostTemplate(host *chiv1.ChiHost, template *chiv1.ChiHostTemplate)
 }
 
 // hostApplyPortsFromSettings
-func hostApplyPortsFromSettings(host *chiv1.ChiHost) {
+func hostApplyPortsFromSettings(host *chiV1.ChiHost) {
 	settings := host.GetSettings()
 	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), chDefaultTCPPortNumber)
 	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), chDefaultHTTPPortNumber)
@@ -290,54 +295,91 @@ func (n *Normalizer) fillStatus() {
 	endpoint := CreateCHIServiceFQDN(n.chi)
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
-	n.chi.WalkHosts(func(host *chiv1.ChiHost) error {
+	n.chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		pods = append(pods, CreatePodName(host))
 		fqdns = append(fqdns, CreatePodFQDN(host))
 		return nil
 	})
-	n.chi.FillStatus(endpoint, pods, fqdns)
+	// Spam normalized config in high-verbose modes only
+	normalized := false
+	if v, err := n.chop.Config().GetLogLevel(); (err == nil) && (v >= 1) {
+		normalized = true
+	}
+	n.chi.FillStatus(endpoint, pods, fqdns, normalized)
+}
+
+// normalizeTaskID normalizes .spec.taskID
+func (n *Normalizer) normalizeTaskID(taskID *string) *string {
+	if taskID != nil {
+		if len(*taskID) > 0 {
+			return taskID
+		}
+	}
+
+	id := uuid.New().String()
+	return &id
 }
 
 // normalizeStop normalizes .spec.stop
-func (n *Normalizer) normalizeStop(stop *string) {
-	// Set defaults for CHI object properties
-	if !util.IsStringBool(*stop) {
-		// In case it is unknown value - just use set it to false
-		*stop = util.StringBoolFalseLowercase
+func (n *Normalizer) normalizeStop(stop string) string {
+	if util.IsStringBool(stop) {
+		// It is bool, use as it is
+		return stop
 	}
+
+	// In case it is unknown value - just use set it to false
+	return util.StringBoolFalseLowercase
 }
 
 // normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
-func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern *string) {
-	count := strings.Count(*namespaceDomainPattern, "%s")
-	if count > 1 {
-		*namespaceDomainPattern = ""
+func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern string) string {
+	if strings.Count(namespaceDomainPattern, "%s") > 1 {
+		return ""
 	}
+	return namespaceDomainPattern
 }
 
 // normalizeDefaults normalizes .spec.defaults
-func (n *Normalizer) normalizeDefaults(defaults *chiv1.ChiDefaults) {
+func (n *Normalizer) normalizeDefaults(defaults *chiV1.ChiDefaults) *chiV1.ChiDefaults {
+	if defaults == nil {
+		defaults = chiV1.NewChiDefaults()
+	}
 	// Set defaults for CHI object properties
-	n.normalizeDefaultsReplicasUseFQDN(defaults)
-	n.normalizeDefaultsTemplates(defaults)
+	defaults.ReplicasUseFQDN = util.CastStringBoolToStringTrueFalse(defaults.ReplicasUseFQDN, false)
+	// Ensure field
+	if defaults.DistributedDDL == nil {
+		//defaults.DistributedDDL = chiV1.NewChiDistributedDDL()
+	}
+	// Ensure field
+	if defaults.Templates == nil {
+		//defaults.Templates = chiV1.NewChiTemplateNames()
+	}
+	defaults.Templates.HandleDeprecatedFields()
+	return defaults
 }
 
 // normalizeConfiguration normalizes .spec.configuration
-func (n *Normalizer) normalizeConfiguration(conf *chiv1.Configuration) {
-	n.normalizeConfigurationZookeeper(&conf.Zookeeper)
-
-	n.normalizeConfigurationUsers(&conf.Users)
-	n.normalizeConfigurationProfiles(&conf.Profiles)
-	n.normalizeConfigurationQuotas(&conf.Quotas)
-	n.normalizeConfigurationSettings(&conf.Settings)
-	n.normalizeConfigurationFiles(&conf.Files)
-
-	// Configuration.Clusters
-	n.normalizeClusters()
+func (n *Normalizer) normalizeConfiguration(conf *chiV1.Configuration) *chiV1.Configuration {
+	if conf == nil {
+		conf = chiV1.NewConfiguration()
+	}
+	conf.Zookeeper = n.normalizeConfigurationZookeeper(conf.Zookeeper)
+	conf.Users = n.normalizeConfigurationUsers(conf.Users)
+	conf.Profiles = n.normalizeConfigurationProfiles(conf.Profiles)
+	conf.Quotas = n.normalizeConfigurationQuotas(conf.Quotas)
+	conf.Settings = n.normalizeConfigurationSettings(conf.Settings)
+	conf.Files = n.normalizeConfigurationFiles(conf.Files)
+	conf.Clusters = n.normalizeClusters(conf.Clusters)
+	return conf
 }
 
 // normalizeTemplates normalizes .spec.templates
-func (n *Normalizer) normalizeTemplates(templates *chiv1.ChiTemplates) {
+func (n *Normalizer) normalizeTemplates(templates *chiV1.ChiTemplates) *chiV1.ChiTemplates {
+	if templates == nil {
+		//templates = chiV1.NewChiTemplates()
+		return nil
+	}
+
 	for i := range templates.HostTemplates {
 		hostTemplate := &templates.HostTemplates[i]
 		n.normalizeHostTemplate(hostTemplate)
@@ -357,38 +399,52 @@ func (n *Normalizer) normalizeTemplates(templates *chiv1.ChiTemplates) {
 		serviceTemplate := &templates.ServiceTemplates[i]
 		n.normalizeServiceTemplate(serviceTemplate)
 	}
+
+	return templates
 }
 
 // normalizeTemplating normalizes .spec.templating
-func (n *Normalizer) normalizeTemplating(templating *chiv1.ChiTemplating) {
-	switch strings.ToLower(templating.Policy) {
-	case chiv1.TemplatingPolicyManual, chiv1.TemplatingPolicyAuto:
-		templating.Policy = strings.ToLower(templating.Policy)
-	default:
-		templating.Policy = strings.ToLower(chiv1.TemplatingPolicyManual)
+func (n *Normalizer) normalizeTemplating(templating *chiV1.ChiTemplating) *chiV1.ChiTemplating {
+	if templating == nil {
+		templating = chiV1.NewChiTemplating()
 	}
+	switch strings.ToLower(templating.GetPolicy()) {
+	case
+		chiV1.TemplatingPolicyManual,
+		chiV1.TemplatingPolicyAuto:
+		templating.SetPolicy(strings.ToLower(templating.GetPolicy()))
+	default:
+		templating.SetPolicy(strings.ToLower(chiV1.TemplatingPolicyManual))
+	}
+	return templating
 }
 
 // normalizeReconciling normalizes .spec.reconciling
-func (n *Normalizer) normalizeReconciling(reconciling *chiv1.ChiReconciling) {
-	switch strings.ToLower(reconciling.Policy) {
-	case chiv1.ReconcilingPolicyWait, chiv1.ReconcilingPolicyNoWait:
-		reconciling.Policy = strings.ToLower(reconciling.Policy)
-	default:
-		reconciling.Policy = strings.ToLower(chiv1.ReconcilingPolicyUnspecified)
+func (n *Normalizer) normalizeReconciling(reconciling *chiV1.ChiReconciling) *chiV1.ChiReconciling {
+	if reconciling == nil {
+		reconciling = chiV1.NewChiReconciling()
 	}
+	switch strings.ToLower(reconciling.GetPolicy()) {
+	case
+		chiV1.ReconcilingPolicyWait,
+		chiV1.ReconcilingPolicyNoWait:
+		reconciling.SetPolicy(strings.ToLower(reconciling.GetPolicy()))
+	default:
+		reconciling.SetPolicy(strings.ToLower(chiV1.ReconcilingPolicyUnspecified))
+	}
+	return reconciling
 }
 
 // normalizeHostTemplate normalizes .spec.templates.hostTemplates
-func (n *Normalizer) normalizeHostTemplate(template *chiv1.ChiHostTemplate) {
+func (n *Normalizer) normalizeHostTemplate(template *chiV1.ChiHostTemplate) {
 	// Name
 
 	// PortDistribution
 
 	if template.PortDistribution == nil {
 		// In case no PortDistribution provided - setup default one
-		template.PortDistribution = []chiv1.ChiPortDistribution{
-			{Type: chiv1.PortDistributionUnspecified},
+		template.PortDistribution = []chiV1.ChiPortDistribution{
+			{Type: chiV1.PortDistributionUnspecified},
 		}
 	}
 	// Normalize PortDistribution
@@ -396,12 +452,12 @@ func (n *Normalizer) normalizeHostTemplate(template *chiv1.ChiHostTemplate) {
 		portDistribution := &template.PortDistribution[i]
 		switch portDistribution.Type {
 		case
-			chiv1.PortDistributionUnspecified,
-			chiv1.PortDistributionClusterScopeIndex:
+			chiV1.PortDistributionUnspecified,
+			chiV1.PortDistributionClusterScopeIndex:
 			// distribution is known
 		default:
 			// distribution is not known
-			portDistribution.Type = chiv1.PortDistributionUnspecified
+			portDistribution.Type = chiV1.PortDistributionUnspecified
 		}
 	}
 
@@ -409,16 +465,11 @@ func (n *Normalizer) normalizeHostTemplate(template *chiv1.ChiHostTemplate) {
 	n.normalizeHostTemplateSpec(&template.Spec)
 
 	// Introduce HostTemplate into Index
-	// Ensure map is in place
-	if n.chi.Spec.Templates.HostTemplatesIndex == nil {
-		n.chi.Spec.Templates.HostTemplatesIndex = make(map[string]*chiv1.ChiHostTemplate)
-	}
-
-	n.chi.Spec.Templates.HostTemplatesIndex[template.Name] = template
+	n.chi.Spec.Templates.EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
-func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
+func (n *Normalizer) normalizePodTemplate(template *chiV1.ChiPodTemplate) {
 	// Name
 
 	// Zone
@@ -434,11 +485,11 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 	}
 
 	// Distribution
-	if template.Distribution == chiv1.PodDistributionOnePerHost {
+	if template.Distribution == chiV1.PodDistributionOnePerHost {
 		// Known distribution, all is fine
 	} else {
 		// Default Pod Distribution
-		template.Distribution = chiv1.PodDistributionUnspecified
+		template.Distribution = chiV1.PodDistributionUnspecified
 	}
 
 	// PodDistribution
@@ -446,80 +497,80 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
 		case
-			chiv1.PodDistributionUnspecified,
+			chiV1.PodDistributionUnspecified,
 
 			// AntiAffinity section
-			chiv1.PodDistributionClickHouseAntiAffinity,
-			chiv1.PodDistributionShardAntiAffinity,
-			chiv1.PodDistributionReplicaAntiAffinity:
+			chiV1.PodDistributionClickHouseAntiAffinity,
+			chiV1.PodDistributionShardAntiAffinity,
+			chiV1.PodDistributionReplicaAntiAffinity:
 			if podDistribution.Scope == "" {
-				podDistribution.Scope = chiv1.PodDistributionScopeCluster
+				podDistribution.Scope = chiV1.PodDistributionScopeCluster
 			}
 		case
-			chiv1.PodDistributionAnotherNamespaceAntiAffinity,
-			chiv1.PodDistributionAnotherClickHouseInstallationAntiAffinity,
-			chiv1.PodDistributionAnotherClusterAntiAffinity:
+			chiV1.PodDistributionAnotherNamespaceAntiAffinity,
+			chiV1.PodDistributionAnotherClickHouseInstallationAntiAffinity,
+			chiV1.PodDistributionAnotherClusterAntiAffinity:
 			// PodDistribution is known
 		case
-			chiv1.PodDistributionMaxNumberPerNode:
+			chiV1.PodDistributionMaxNumberPerNode:
 			// PodDistribution is known
 			if podDistribution.Number < 0 {
 				podDistribution.Number = 0
 			}
 		case
 			// Affinity section
-			chiv1.PodDistributionNamespaceAffinity,
-			chiv1.PodDistributionClickHouseInstallationAffinity,
-			chiv1.PodDistributionClusterAffinity,
-			chiv1.PodDistributionShardAffinity,
-			chiv1.PodDistributionReplicaAffinity,
-			chiv1.PodDistributionPreviousTailAffinity:
+			chiV1.PodDistributionNamespaceAffinity,
+			chiV1.PodDistributionClickHouseInstallationAffinity,
+			chiV1.PodDistributionClusterAffinity,
+			chiV1.PodDistributionShardAffinity,
+			chiV1.PodDistributionReplicaAffinity,
+			chiV1.PodDistributionPreviousTailAffinity:
 			// PodDistribution is known
 
-		case chiv1.PodDistributionCircularReplication:
+		case chiV1.PodDistributionCircularReplication:
 			// Shortcut section
 			// All shortcuts have to be expanded
 
 			// PodDistribution is known
 
 			if podDistribution.Scope == "" {
-				podDistribution.Scope = chiv1.PodDistributionScopeCluster
+				podDistribution.Scope = chiV1.PodDistributionScopeCluster
 			}
 
 			// TODO need to support multi-cluster
-			cluster := &n.chi.Spec.Configuration.Clusters[0]
+			cluster := n.chi.Spec.Configuration.Clusters[0]
 
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
-				Type:  chiv1.PodDistributionShardAntiAffinity,
+			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
+				Type:  chiV1.PodDistributionShardAntiAffinity,
 				Scope: podDistribution.Scope,
 			})
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
-				Type:  chiv1.PodDistributionReplicaAntiAffinity,
+			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
+				Type:  chiV1.PodDistributionReplicaAntiAffinity,
 				Scope: podDistribution.Scope,
 			})
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
-				Type:   chiv1.PodDistributionMaxNumberPerNode,
+			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
+				Type:   chiV1.PodDistributionMaxNumberPerNode,
 				Scope:  podDistribution.Scope,
 				Number: cluster.Layout.ReplicasCount,
 			})
 
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
-				Type: chiv1.PodDistributionPreviousTailAffinity,
+			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
+				Type: chiV1.PodDistributionPreviousTailAffinity,
 			})
 
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
-				Type: chiv1.PodDistributionNamespaceAffinity,
+			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
+				Type: chiV1.PodDistributionNamespaceAffinity,
 			})
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
-				Type: chiv1.PodDistributionClickHouseInstallationAffinity,
+			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
+				Type: chiV1.PodDistributionClickHouseInstallationAffinity,
 			})
-			template.PodDistribution = append(template.PodDistribution, chiv1.ChiPodDistribution{
-				Type: chiv1.PodDistributionClusterAffinity,
+			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
+				Type: chiV1.PodDistributionClusterAffinity,
 			})
 
 		default:
 			// PodDistribution is not known
-			podDistribution.Type = chiv1.PodDistributionUnspecified
+			podDistribution.Type = chiV1.PodDistributionUnspecified
 		}
 	}
 
@@ -534,16 +585,11 @@ func (n *Normalizer) normalizePodTemplate(template *chiv1.ChiPodTemplate) {
 	}
 
 	// Introduce PodTemplate into Index
-	// Ensure map is in place
-	if n.chi.Spec.Templates.PodTemplatesIndex == nil {
-		n.chi.Spec.Templates.PodTemplatesIndex = make(map[string]*chiv1.ChiPodTemplate)
-	}
-
-	n.chi.Spec.Templates.PodTemplatesIndex[template.Name] = template
+	n.chi.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
 // newAffinity
-func (n *Normalizer) newAffinity(template *chiv1.ChiPodTemplate) *v1.Affinity {
+func (n *Normalizer) newAffinity(template *chiV1.ChiPodTemplate) *v1.Affinity {
 	nodeAffinity := n.newNodeAffinity(template)
 	podAffinity := n.newPodAffinity(template)
 	podAntiAffinity := n.newPodAntiAffinity(template)
@@ -580,7 +626,7 @@ func (n *Normalizer) mergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affin
 }
 
 // newNodeAffinity
-func (n *Normalizer) newNodeAffinity(template *chiv1.ChiPodTemplate) *v1.NodeAffinity {
+func (n *Normalizer) newNodeAffinity(template *chiV1.ChiPodTemplate) *v1.NodeAffinity {
 	if template.Zone.Key == "" {
 		return nil
 	}
@@ -666,13 +712,13 @@ func (n *Normalizer) mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinit
 }
 
 // newPodAffinity
-func (n *Normalizer) newPodAffinity(template *chiv1.ChiPodTemplate) *v1.PodAffinity {
+func (n *Normalizer) newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 	podAffinity := &v1.PodAffinity{}
 
 	for i := range template.PodDistribution {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
-		case chiv1.PodDistributionNamespaceAffinity:
+		case chiV1.PodDistributionNamespaceAffinity:
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
@@ -680,7 +726,7 @@ func (n *Normalizer) newPodAffinity(template *chiv1.ChiPodTemplate) *v1.PodAffin
 					LabelNamespace: macrosNamespace,
 				},
 			)
-		case chiv1.PodDistributionClickHouseInstallationAffinity:
+		case chiV1.PodDistributionClickHouseInstallationAffinity:
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
@@ -688,7 +734,7 @@ func (n *Normalizer) newPodAffinity(template *chiv1.ChiPodTemplate) *v1.PodAffin
 					LabelCHIName: macrosChiName,
 				},
 			)
-		case chiv1.PodDistributionClusterAffinity:
+		case chiV1.PodDistributionClusterAffinity:
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
@@ -696,7 +742,7 @@ func (n *Normalizer) newPodAffinity(template *chiv1.ChiPodTemplate) *v1.PodAffin
 					LabelClusterName: macrosClusterName,
 				},
 			)
-		case chiv1.PodDistributionShardAffinity:
+		case chiV1.PodDistributionShardAffinity:
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
@@ -704,7 +750,7 @@ func (n *Normalizer) newPodAffinity(template *chiv1.ChiPodTemplate) *v1.PodAffin
 					LabelShardName: macrosShardName,
 				},
 			)
-		case chiv1.PodDistributionReplicaAffinity:
+		case chiV1.PodDistributionReplicaAffinity:
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
@@ -712,7 +758,7 @@ func (n *Normalizer) newPodAffinity(template *chiv1.ChiPodTemplate) *v1.PodAffin
 					LabelReplicaName: macrosReplicaName,
 				},
 			)
-		case chiv1.PodDistributionPreviousTailAffinity:
+		case chiV1.PodDistributionPreviousTailAffinity:
 			// Newer k8s insists on Required for this Affinity
 			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
@@ -794,42 +840,42 @@ func (n *Normalizer) mergePodAffinity(dst *v1.PodAffinity, src *v1.PodAffinity) 
 
 // newMatchLabels
 func (n *Normalizer) newMatchLabels(
-	podDistribution *chiv1.ChiPodDistribution,
+	podDistribution *chiV1.ChiPodDistribution,
 	matchLabels map[string]string,
 ) map[string]string {
 	var scopeLabels map[string]string
 
 	switch podDistribution.Scope {
-	case chiv1.PodDistributionScopeShard:
+	case chiV1.PodDistributionScopeShard:
 		scopeLabels = map[string]string{
 			LabelNamespace:   macrosNamespace,
 			LabelCHIName:     macrosChiName,
 			LabelClusterName: macrosClusterName,
 			LabelShardName:   macrosShardName,
 		}
-	case chiv1.PodDistributionScopeReplica:
+	case chiV1.PodDistributionScopeReplica:
 		scopeLabels = map[string]string{
 			LabelNamespace:   macrosNamespace,
 			LabelCHIName:     macrosChiName,
 			LabelClusterName: macrosClusterName,
 			LabelReplicaName: macrosReplicaName,
 		}
-	case chiv1.PodDistributionScopeCluster:
+	case chiV1.PodDistributionScopeCluster:
 		scopeLabels = map[string]string{
 			LabelNamespace:   macrosNamespace,
 			LabelCHIName:     macrosChiName,
 			LabelClusterName: macrosClusterName,
 		}
-	case chiv1.PodDistributionScopeClickHouseInstallation:
+	case chiV1.PodDistributionScopeClickHouseInstallation:
 		scopeLabels = map[string]string{
 			LabelNamespace: macrosNamespace,
 			LabelCHIName:   macrosChiName,
 		}
-	case chiv1.PodDistributionScopeNamespace:
+	case chiV1.PodDistributionScopeNamespace:
 		scopeLabels = map[string]string{
 			LabelNamespace: macrosNamespace,
 		}
-	case chiv1.PodDistributionScopeGlobal:
+	case chiV1.PodDistributionScopeGlobal:
 		scopeLabels = map[string]string{}
 	}
 
@@ -837,12 +883,12 @@ func (n *Normalizer) newMatchLabels(
 }
 
 // newPodAntiAffinity
-func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodAntiAffinity {
+func (n *Normalizer) newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 	podAntiAffinity := &v1.PodAntiAffinity{}
 
 	// Distribution
 	// DEPRECATED
-	if template.Distribution == chiv1.PodDistributionOnePerHost {
+	if template.Distribution == chiV1.PodDistributionOnePerHost {
 		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 			map[string]string{
@@ -855,7 +901,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 	for i := range template.PodDistribution {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
-		case chiv1.PodDistributionClickHouseAntiAffinity:
+		case chiV1.PodDistributionClickHouseAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				n.newMatchLabels(
@@ -865,7 +911,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 					},
 				),
 			)
-		case chiv1.PodDistributionMaxNumberPerNode:
+		case chiV1.PodDistributionMaxNumberPerNode:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				n.newMatchLabels(
@@ -875,7 +921,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 					},
 				),
 			)
-		case chiv1.PodDistributionShardAntiAffinity:
+		case chiV1.PodDistributionShardAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				n.newMatchLabels(
@@ -885,7 +931,7 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 					},
 				),
 			)
-		case chiv1.PodDistributionReplicaAntiAffinity:
+		case chiV1.PodDistributionReplicaAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				n.newMatchLabels(
@@ -895,39 +941,39 @@ func (n *Normalizer) newPodAntiAffinity(template *chiv1.ChiPodTemplate) *v1.PodA
 					},
 				),
 			)
-		case chiv1.PodDistributionAnotherNamespaceAntiAffinity:
+		case chiV1.PodDistributionAnotherNamespaceAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchExpressions(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				[]v12.LabelSelectorRequirement{
+				[]metaV1.LabelSelectorRequirement{
 					{
 						Key:      LabelNamespace,
-						Operator: v12.LabelSelectorOpNotIn,
+						Operator: metaV1.LabelSelectorOpNotIn,
 						Values: []string{
 							macrosNamespace,
 						},
 					},
 				},
 			)
-		case chiv1.PodDistributionAnotherClickHouseInstallationAntiAffinity:
+		case chiV1.PodDistributionAnotherClickHouseInstallationAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchExpressions(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				[]v12.LabelSelectorRequirement{
+				[]metaV1.LabelSelectorRequirement{
 					{
 						Key:      LabelCHIName,
-						Operator: v12.LabelSelectorOpNotIn,
+						Operator: metaV1.LabelSelectorOpNotIn,
 						Values: []string{
 							macrosChiName,
 						},
 					},
 				},
 			)
-		case chiv1.PodDistributionAnotherClusterAntiAffinity:
+		case chiV1.PodDistributionAnotherClusterAntiAffinity:
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchExpressions(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				[]v12.LabelSelectorRequirement{
+				[]metaV1.LabelSelectorRequirement{
 					{
 						Key:      LabelClusterName,
-						Operator: v12.LabelSelectorOpNotIn,
+						Operator: metaV1.LabelSelectorOpNotIn,
 						Values: []string{
 							macrosClusterName,
 						},
@@ -1003,17 +1049,17 @@ func (n *Normalizer) mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAn
 func (n *Normalizer) addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTerm, matchLabels map[string]string) []v1.PodAffinityTerm {
 	return append(terms,
 		v1.PodAffinityTerm{
-			LabelSelector: &v12.LabelSelector{
+			LabelSelector: &metaV1.LabelSelector{
 				// A list of node selector requirements by node's labels.
 				//MatchLabels: map[string]string{
 				//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
 				//},
 				MatchLabels: matchLabels,
 				// Switch to MatchLabels
-				//MatchExpressions: []v12.LabelSelectorRequirement{
+				//MatchExpressions: []metaV1.LabelSelectorRequirement{
 				//	{
 				//		Key:      LabelAppName,
-				//		Operator: v12.LabelSelectorOpIn,
+				//		Operator: metaV1.LabelSelectorOpIn,
 				//		Values: []string{
 				//			LabelAppValue,
 				//		},
@@ -1026,18 +1072,18 @@ func (n *Normalizer) addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTer
 }
 
 // addPodAffinityTermWithMatchExpressions
-func (n *Normalizer) addPodAffinityTermWithMatchExpressions(terms []v1.PodAffinityTerm, matchExpressions []v12.LabelSelectorRequirement) []v1.PodAffinityTerm {
+func (n *Normalizer) addPodAffinityTermWithMatchExpressions(terms []v1.PodAffinityTerm, matchExpressions []metaV1.LabelSelectorRequirement) []v1.PodAffinityTerm {
 	return append(terms,
 		v1.PodAffinityTerm{
-			LabelSelector: &v12.LabelSelector{
+			LabelSelector: &metaV1.LabelSelector{
 				// A list of node selector requirements by node's labels.
 				//MatchLabels: map[string]string{
 				//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
 				//},
-				//MatchExpressions: []v12.LabelSelectorRequirement{
+				//MatchExpressions: []metaV1.LabelSelectorRequirement{
 				//	{
 				//		Key:      LabelAppName,
-				//		Operator: v12.LabelSelectorOpIn,
+				//		Operator: metaV1.LabelSelectorOpIn,
 				//		Values: []string{
 				//			LabelAppValue,
 				//		},
@@ -1060,17 +1106,17 @@ func (n *Normalizer) addWeightedPodAffinityTermWithMatchLabels(
 		v1.WeightedPodAffinityTerm{
 			Weight: weight,
 			PodAffinityTerm: v1.PodAffinityTerm{
-				LabelSelector: &v12.LabelSelector{
+				LabelSelector: &metaV1.LabelSelector{
 					// A list of node selector requirements by node's labels.
 					//MatchLabels: map[string]string{
 					//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
 					//},
 					MatchLabels: matchLabels,
 					// Switch to MatchLabels
-					//MatchExpressions: []v12.LabelSelectorRequirement{
+					//MatchExpressions: []metaV1.LabelSelectorRequirement{
 					//	{
 					//		Key:      LabelAppName,
-					//		Operator: v12.LabelSelectorOpIn,
+					//		Operator: metaV1.LabelSelectorOpIn,
 					//		Values: []string{
 					//			LabelAppValue,
 					//		},
@@ -1084,45 +1130,40 @@ func (n *Normalizer) addWeightedPodAffinityTermWithMatchLabels(
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
-func (n *Normalizer) normalizeVolumeClaimTemplate(template *chiv1.ChiVolumeClaimTemplate) {
+func (n *Normalizer) normalizeVolumeClaimTemplate(template *chiV1.ChiVolumeClaimTemplate) {
 	// Check name
 	// Check PVCReclaimPolicy
 	if !template.PVCReclaimPolicy.IsValid() {
-		template.PVCReclaimPolicy = chiv1.PVCReclaimPolicyDelete
+		template.PVCReclaimPolicy = chiV1.PVCReclaimPolicyDelete
 	}
 	// Check Spec
 
-	// Ensure map is in place
-	if n.chi.Spec.Templates.VolumeClaimTemplatesIndex == nil {
-		n.chi.Spec.Templates.VolumeClaimTemplatesIndex = make(map[string]*chiv1.ChiVolumeClaimTemplate)
-	}
-	n.chi.Spec.Templates.VolumeClaimTemplatesIndex[template.Name] = template
+	// Introduce VolumeClaimTemplate into Index
+	n.chi.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
-func (n *Normalizer) normalizeServiceTemplate(template *chiv1.ChiServiceTemplate) {
+func (n *Normalizer) normalizeServiceTemplate(template *chiV1.ChiServiceTemplate) {
 	// Check name
 	// Check GenerateName
 	// Check ObjectMeta
 	// Check Spec
 
-	// Ensure map is in place
-	if n.chi.Spec.Templates.ServiceTemplatesIndex == nil {
-		n.chi.Spec.Templates.ServiceTemplatesIndex = make(map[string]*chiv1.ChiServiceTemplate)
-	}
-	n.chi.Spec.Templates.ServiceTemplatesIndex[template.Name] = template
+	// Introduce ServiceClaimTemplate into Index
+	n.chi.Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeUseTemplates normalizes .spec.useTemplates
-func (n *Normalizer) normalizeUseTemplates(useTemplates []chiv1.ChiUseTemplate) {
+func (n *Normalizer) normalizeUseTemplates(useTemplates []chiV1.ChiUseTemplate) []chiV1.ChiUseTemplate {
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		n.normalizeUseTemplate(useTemplate)
 	}
+	return useTemplates
 }
 
 // normalizeUseTemplate normalizes ChiUseTemplate
-func (n *Normalizer) normalizeUseTemplate(useTemplate *chiv1.ChiUseTemplate) {
+func (n *Normalizer) normalizeUseTemplate(useTemplate *chiV1.ChiUseTemplate) {
 	// Check Name
 	if useTemplate.Name == "" {
 		// This is strange
@@ -1144,39 +1185,49 @@ func (n *Normalizer) normalizeUseTemplate(useTemplate *chiv1.ChiUseTemplate) {
 }
 
 // normalizeClusters normalizes clusters
-func (n *Normalizer) normalizeClusters() {
+func (n *Normalizer) normalizeClusters(clusters []*chiV1.ChiCluster) []*chiV1.ChiCluster {
 	// We need to have at least one cluster available
-	n.ensureCluster()
+	clusters = n.ensureCluster(clusters)
 
-	// Normalize all clusters in this CHI
-	n.chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
-		return n.normalizeCluster(cluster)
-	})
+	// Normalize all clusters
+	for i := range clusters {
+		clusters[i] = n.normalizeCluster(clusters[i])
+	}
+
+	return clusters
 }
 
-// ensureCluster
-func (n *Normalizer) ensureCluster() {
-	// Introduce default cluster in case it is required
-	if len(n.chi.Spec.Configuration.Clusters) == 0 {
-		if n.withDefaultCluster {
-			n.chi.Spec.Configuration.Clusters = []chiv1.ChiCluster{
-				{
-					Name: "cluster",
-				},
-			}
-		} else {
-			n.chi.Spec.Configuration.Clusters = []chiv1.ChiCluster{}
-		}
+// newDefaultCluster
+func (n *Normalizer) newDefaultCluster() *chiV1.ChiCluster {
+	return &chiV1.ChiCluster{
+		Name: "cluster",
 	}
 }
 
+// ensureCluster
+func (n *Normalizer) ensureCluster(clusters []*chiV1.ChiCluster) []*chiV1.ChiCluster {
+	if len(clusters) > 0 {
+		return clusters
+	}
+
+	if n.withDefaultCluster {
+		return []*chiV1.ChiCluster{n.newDefaultCluster()}
+	}
+
+	return []*chiV1.ChiCluster{}
+}
+
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
-func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
-	host.Config.ZookeeperFingerprint = util.Fingerprint(*host.GetZookeeper())
+func (n *Normalizer) calcFingerprints(host *chiV1.ChiHost) error {
+	zk := host.GetZookeeper()
+	host.Config.ZookeeperFingerprint = util.Fingerprint(zk)
+
+	global := n.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()
+	local := host.Settings.AsSortedSliceOfStrings()
 	host.Config.SettingsFingerprint = util.Fingerprint(
 		fmt.Sprintf("%s%s",
-			util.Fingerprint(n.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()),
-			util.Fingerprint(host.Settings.AsSortedSliceOfStrings()),
+			util.Fingerprint(global),
+			util.Fingerprint(local),
 		),
 	)
 	host.Config.FilesFingerprint = util.Fingerprint(
@@ -1184,14 +1235,14 @@ func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
 			util.Fingerprint(
 				n.chi.Spec.Configuration.Files.Filter(
 					nil,
-					[]chiv1.SettingsSection{chiv1.SectionUsers},
+					[]chiV1.SettingsSection{chiV1.SectionUsers},
 					true,
 				).AsSortedSliceOfStrings(),
 			),
 			util.Fingerprint(
 				host.Files.Filter(
 					nil,
-					[]chiv1.SettingsSection{chiv1.SectionUsers},
+					[]chiV1.SettingsSection{chiV1.SectionUsers},
 					true,
 				).AsSortedSliceOfStrings(),
 			),
@@ -1202,7 +1253,11 @@ func (n *Normalizer) calcFingerprints(host *chiv1.ChiHost) error {
 }
 
 // normalizeConfigurationZookeeper normalizes .spec.configuration.zookeeper
-func (n *Normalizer) normalizeConfigurationZookeeper(zk *chiv1.ChiZookeeperConfig) {
+func (n *Normalizer) normalizeConfigurationZookeeper(zk *chiV1.ChiZookeeperConfig) *chiV1.ChiZookeeperConfig {
+	if zk == nil {
+		return nil
+	}
+
 	// In case no ZK port specified - assign default
 	for i := range zk.Nodes {
 		// Convenience wrapper
@@ -1216,154 +1271,127 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *chiv1.ChiZookeeperConfi
 	//if zk.Root == "" {
 	//	zk.Root = fmt.Sprintf(zkDefaultRootTemplate, n.chi.Namespace, n.chi.Name)
 	//}
+
+	return zk
 }
 
 // normalizeConfigurationUsers normalizes .spec.configuration.users
-func (n *Normalizer) normalizeConfigurationUsers(users *chiv1.Settings) {
-
+func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.Settings {
 	if users == nil {
-		// Do not know what to do in this case
-		return
+		users = chiV1.NewSettings()
 	}
-
-	if *users == nil {
-		*users = chiv1.NewSettings()
-	}
-
-	(*users).Normalize()
+	users.Normalize()
 
 	// Extract username from path
 	usernameMap := make(map[string]bool)
-	for path := range *users {
+	users.Walk(func(path string, _ *chiV1.Setting) {
 		// Split 'admin/password'
 		tags := strings.Split(path, "/")
 
 		// Basic sanity check - need to have at least "username/something" pair
 		if len(tags) < 2 {
 			// Skip incorrect entry
-			continue
+			return
 		}
 
 		username := tags[0]
 		usernameMap[username] = true
-	}
+	})
 
-	// Ensure "must have" sections are in place, which are
+	// Ensure "must have" sections are in place, which are:
 	// 1. user/profile
 	// 2. user/quota
 	// 3. user/networks/ip and user/networks/host_regexp defaults to the installation pods
 	// 4. user/password_sha256_hex
 
-	usernameMap["default"] = true // we need default user here in order to secure host_regexp
+	// "default" user is required in order to secure host_regexp
+	usernameMap["default"] = true
 	for username := range usernameMap {
-		if _, ok := (*users)[username+"/profile"]; !ok {
-			// No 'user/profile' section
-			(*users)[username+"/profile"] = chiv1.NewScalarSetting(n.chop.Config().CHConfigUserDefaultProfile)
-		}
-		if _, ok := (*users)[username+"/quota"]; !ok {
-			// No 'user/quota' section
-			(*users)[username+"/quota"] = chiv1.NewScalarSetting(n.chop.Config().CHConfigUserDefaultQuota)
-		}
-		if _, ok := (*users)[username+"/networks/ip"]; !ok {
-			// No 'user/networks/ip' section
-			(*users)[username+"/networks/ip"] = chiv1.NewVectorSetting(n.chop.Config().CHConfigUserDefaultNetworksIP)
-		}
-		if _, ok := (*users)[username+"/networks/host_regexp"]; !ok {
-			// No 'user/networks/host_regexp' section
-			(*users)[username+"/networks/host_regexp"] = chiv1.NewScalarSetting(CreatePodRegexp(n.chi, n.chop.Config().CHConfigNetworksHostRegexpTemplate))
-		}
+		// Ensure 'user/profile' section
+		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(n.chop.Config().CHConfigUserDefaultProfile))
+		// Ensure 'user/quota' section
+		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(n.chop.Config().CHConfigUserDefaultQuota))
+		// Ensure 'user/networks/ip' section
+		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(n.chop.Config().CHConfigUserDefaultNetworksIP))
+		// Ensure 'user/networks/host_regexp' section
+		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, n.chop.Config().CHConfigNetworksHostRegexpTemplate)))
 
 		var pass = ""
-		_pass, okPassword := (*users)[username+"/password"]
-		if okPassword {
-			pass = fmt.Sprintf("%v", _pass)
+		if users.Has(username + "/password") {
+			pass = users.Get(username + "/password").String()
 		} else if username != "default" {
 			pass = n.chop.Config().CHConfigUserDefaultPassword
 		}
 
-		_, okPasswordSHA256 := (*users)[username+"/password_sha256_hex"]
-		_, okPasswordDoubleSHA1 := (*users)[username+"/password_double_sha1_hex"]
-		// if SHA256 or DoubleSHA1 are not set, initialize SHA256 from the password
-		if pass != "" && !okPasswordSHA256 && !okPasswordDoubleSHA1 {
-			pass_sha256 := sha256.Sum256([]byte(pass))
-			(*users)[username+"/password_sha256_hex"] = chiv1.NewScalarSetting(hex.EncodeToString(pass_sha256[:]))
-			okPasswordSHA256 = true
+		hasPasswordSHA256 := users.Has(username + "/password_sha256_hex")
+		hasPasswordDoubleSHA1 := users.Has(username + "/password_double_sha1_hex")
+
+		// if SHA256 or double SHA1 are not set, initialize SHA256 from the password
+		if !hasPasswordSHA256 && !hasPasswordDoubleSHA1 && (pass != "") {
+			passSHA256 := sha256.Sum256([]byte(pass))
+			users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passSHA256[:])))
+			hasPasswordSHA256 = true
 		}
 
-		if okPasswordSHA256 {
+		if hasPasswordSHA256 {
 			// ClickHouse does not start if both password and sha256 are defined
 			if username == "default" {
 				// Set remove password flag for default user that is empty in stock ClickHouse users.xml
-				(*users)[username+"/password"] = chiv1.NewScalarSetting("_removed_")
+				// TODO fix it
+				users.Set(username+"/password", chiV1.NewSettingScalar("_removed_"))
 			} else {
-				delete(*users, username+"/password")
+				users.Delete(username + "/password")
 			}
 		}
 	}
+	return users
 }
 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
-func (n *Normalizer) normalizeConfigurationProfiles(profiles *chiv1.Settings) {
-
+func (n *Normalizer) normalizeConfigurationProfiles(profiles *chiV1.Settings) *chiV1.Settings {
 	if profiles == nil {
-		// Do not know what to do in this case
-		return
+		//profiles = chiV1.NewSettings()
+		return nil
 	}
-
-	if *profiles == nil {
-		*profiles = chiv1.NewSettings()
-	}
-	(*profiles).Normalize()
+	profiles.Normalize()
+	return profiles
 }
 
 // normalizeConfigurationQuotas normalizes .spec.configuration.quotas
-func (n *Normalizer) normalizeConfigurationQuotas(quotas *chiv1.Settings) {
-
+func (n *Normalizer) normalizeConfigurationQuotas(quotas *chiV1.Settings) *chiV1.Settings {
 	if quotas == nil {
-		// Do not know what to do in this case
-		return
+		//quotas = chiV1.NewSettings()
+		return nil
 	}
-
-	if *quotas == nil {
-		*quotas = chiv1.NewSettings()
-	}
-
-	(*quotas).Normalize()
+	quotas.Normalize()
+	return quotas
 }
 
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
-func (n *Normalizer) normalizeConfigurationSettings(settings *chiv1.Settings) {
-
+func (n *Normalizer) normalizeConfigurationSettings(settings *chiV1.Settings) *chiV1.Settings {
 	if settings == nil {
-		// Do not know what to do in this case
-		return
+		//settings = chiV1.NewSettings()
+		return nil
 	}
-
-	if *settings == nil {
-		*settings = chiv1.NewSettings()
-	}
-
-	(*settings).Normalize()
+	settings.Normalize()
+	return settings
 }
 
 // normalizeConfigurationFiles normalizes .spec.configuration.files
-func (n *Normalizer) normalizeConfigurationFiles(files *chiv1.Settings) {
-
+func (n *Normalizer) normalizeConfigurationFiles(files *chiV1.Settings) *chiV1.Settings {
 	if files == nil {
-		// Do not know what to do in this case
-		return
+		//files = chiV1.NewSettings()
+		return nil
 	}
-
-	if *files == nil {
-		*files = chiv1.NewSettings()
-	}
-
-	(*files).Normalize()
+	files.Normalize()
+	return files
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
-func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
-	cluster.FillShardReplicaSpecified()
+func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiCluster {
+	if cluster == nil {
+		cluster = n.newDefaultCluster()
+	}
 
 	// Inherit from .spec.configuration.zookeeper
 	cluster.InheritZookeeperFrom(n.chi)
@@ -1372,42 +1400,45 @@ func (n *Normalizer) normalizeCluster(cluster *chiv1.ChiCluster) error {
 	// Inherit from .spec.defaults
 	cluster.InheritTemplatesFrom(n.chi)
 
-	n.normalizeConfigurationZookeeper(&cluster.Zookeeper)
-	n.normalizeConfigurationSettings(&cluster.Settings)
-	n.normalizeConfigurationFiles(&cluster.Files)
+	cluster.Zookeeper = n.normalizeConfigurationZookeeper(cluster.Zookeeper)
+	cluster.Settings = n.normalizeConfigurationSettings(cluster.Settings)
+	cluster.Files = n.normalizeConfigurationFiles(cluster.Files)
 
-	n.normalizeClusterLayoutShardsCountAndReplicasCount(&cluster.Layout)
-
-	n.ensureClusterLayoutShards(&cluster.Layout)
-	n.ensureClusterLayoutReplicas(&cluster.Layout)
+	if cluster.Layout == nil {
+		cluster.Layout = chiV1.NewChiClusterLayout()
+	}
+	cluster.FillShardReplicaSpecified()
+	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
+	n.ensureClusterLayoutShards(cluster.Layout)
+	n.ensureClusterLayoutReplicas(cluster.Layout)
 
 	n.createHostsField(cluster)
 
 	// Loop over all shards and replicas inside shards and fill structure
-	cluster.WalkShards(func(index int, shard *chiv1.ChiShard) error {
+	cluster.WalkShards(func(index int, shard *chiV1.ChiShard) error {
 		n.normalizeShard(shard, cluster, index)
 		return nil
 	})
 
-	cluster.WalkReplicas(func(index int, replica *chiv1.ChiReplica) error {
+	cluster.WalkReplicas(func(index int, replica *chiV1.ChiReplica) error {
 		n.normalizeReplica(replica, cluster, index)
 		return nil
 	})
 
-	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *chiv1.ChiHost) error {
+	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *chiV1.ChiHost) error {
 		n.normalizeHost(host, cluster.GetShard(shard), cluster.GetReplica(replica), cluster, shard, replica)
 		return nil
 	})
 
-	return nil
+	return cluster
 }
 
 // createHostsField
-func (n *Normalizer) createHostsField(cluster *chiv1.ChiCluster) {
-	cluster.Layout.HostsField = chiv1.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
+func (n *Normalizer) createHostsField(cluster *chiV1.ChiCluster) {
+	cluster.Layout.HostsField = chiV1.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
 
 	// Need to migrate hosts from Shards and Replicas into HostsField
-	hostMergeFunc := func(shard, replica int, host *chiv1.ChiHost) error {
+	hostMergeFunc := func(shard, replica int, host *chiV1.ChiHost) error {
 		if curHost := cluster.Layout.HostsField.Get(shard, replica); curHost == nil {
 			cluster.Layout.HostsField.Set(shard, replica, host)
 		} else {
@@ -1421,7 +1452,11 @@ func (n *Normalizer) createHostsField(cluster *chiv1.ChiCluster) {
 }
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
-func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *chiv1.ChiClusterLayout) {
+func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *chiV1.ChiClusterLayout) *chiV1.ChiClusterLayout {
+	if layout == nil {
+		layout = chiV1.NewChiClusterLayout()
+	}
+
 	// Layout.ShardsCount and
 	// Layout.ReplicasCount must represent max number of shards and replicas requested respectively
 
@@ -1482,41 +1517,43 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *c
 			layout.ReplicasCount = len(layout.Replicas)
 		}
 	}
+
+	return layout
 }
 
 // ensureClusterLayoutShards ensures slice layout.Shards is in place
-func (n *Normalizer) ensureClusterLayoutShards(layout *chiv1.ChiClusterLayout) {
+func (n *Normalizer) ensureClusterLayoutShards(layout *chiV1.ChiClusterLayout) {
 	// Disposition of shards in slice would be
 	// [explicitly specified shards 0..N, N+1..layout.ShardsCount-1 empty slots for to-be-filled shards]
 
 	// Some (may be all) shards specified, need to append space for unspecified shards
 	// TODO may be there is better way to append N slots to a slice
 	for len(layout.Shards) < layout.ShardsCount {
-		layout.Shards = append(layout.Shards, chiv1.ChiShard{})
+		layout.Shards = append(layout.Shards, chiV1.ChiShard{})
 	}
 }
 
 // ensureClusterLayoutReplicas ensures slice layout.Replicas is in place
-func (n *Normalizer) ensureClusterLayoutReplicas(layout *chiv1.ChiClusterLayout) {
+func (n *Normalizer) ensureClusterLayoutReplicas(layout *chiV1.ChiClusterLayout) {
 	// Disposition of replicas in slice would be
 	// [explicitly specified replicas 0..N, N+1..layout.ReplicasCount-1 empty slots for to-be-filled replicas]
 
 	// Some (may be all) replicas specified, need to append space for unspecified replicas
 	// TODO may be there is better way to append N slots to a slice
 	for len(layout.Replicas) < layout.ReplicasCount {
-		layout.Replicas = append(layout.Replicas, chiv1.ChiReplica{})
+		layout.Replicas = append(layout.Replicas, chiV1.ChiReplica{})
 	}
 }
 
 // normalizeShard normalizes a shard - walks over all fields
-func (n *Normalizer) normalizeShard(shard *chiv1.ChiShard, cluster *chiv1.ChiCluster, shardIndex int) {
+func (n *Normalizer) normalizeShard(shard *chiV1.ChiShard, cluster *chiV1.ChiCluster, shardIndex int) {
 	n.normalizeShardName(shard, shardIndex)
 	n.normalizeShardWeight(shard)
 	// For each shard of this normalized cluster inherit from cluster
 	shard.InheritSettingsFrom(cluster)
-	n.normalizeConfigurationSettings(&shard.Settings)
+	shard.Settings = n.normalizeConfigurationSettings(shard.Settings)
 	shard.InheritFilesFrom(cluster)
-	n.normalizeConfigurationSettings(&shard.Files)
+	shard.Files = n.normalizeConfigurationSettings(shard.Files)
 	shard.InheritTemplatesFrom(cluster)
 	// Normalize Replicas
 	n.normalizeShardReplicasCount(shard, cluster.Layout.ReplicasCount)
@@ -1526,13 +1563,13 @@ func (n *Normalizer) normalizeShard(shard *chiv1.ChiShard, cluster *chiv1.ChiClu
 }
 
 // normalizeReplica normalizes a replica - walks over all fields
-func (n *Normalizer) normalizeReplica(replica *chiv1.ChiReplica, cluster *chiv1.ChiCluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplica(replica *chiV1.ChiReplica, cluster *chiV1.ChiCluster, replicaIndex int) {
 	n.normalizeReplicaName(replica, replicaIndex)
 	// For each replica of this normalized cluster inherit from cluster
 	replica.InheritSettingsFrom(cluster)
-	n.normalizeConfigurationSettings(&replica.Settings)
+	replica.Settings = n.normalizeConfigurationSettings(replica.Settings)
 	replica.InheritFilesFrom(cluster)
-	n.normalizeConfigurationSettings(&replica.Files)
+	replica.Files = n.normalizeConfigurationSettings(replica.Files)
 	replica.InheritTemplatesFrom(cluster)
 	// Normalize Shards
 	n.normalizeReplicaShardsCount(replica, cluster.Layout.ShardsCount)
@@ -1540,7 +1577,7 @@ func (n *Normalizer) normalizeReplica(replica *chiv1.ChiReplica, cluster *chiv1.
 }
 
 // normalizeShardReplicasCount ensures shard.ReplicasCount filled properly
-func (n *Normalizer) normalizeShardReplicasCount(shard *chiv1.ChiShard, layoutReplicasCount int) {
+func (n *Normalizer) normalizeShardReplicasCount(shard *chiV1.ChiShard, layoutReplicasCount int) {
 	if shard.ReplicasCount > 0 {
 		// Shard has explicitly specified number of replicas
 		return
@@ -1563,7 +1600,7 @@ func (n *Normalizer) normalizeShardReplicasCount(shard *chiv1.ChiShard, layoutRe
 }
 
 // normalizeReplicaShardsCount ensures replica.ShardsCount filled properly
-func (n *Normalizer) normalizeReplicaShardsCount(replica *chiv1.ChiReplica, layoutShardsCount int) {
+func (n *Normalizer) normalizeReplicaShardsCount(replica *chiV1.ChiReplica, layoutShardsCount int) {
 	if replica.ShardsCount > 0 {
 		// Replica has explicitly specified number of shards
 		return
@@ -1586,7 +1623,7 @@ func (n *Normalizer) normalizeReplicaShardsCount(replica *chiv1.ChiReplica, layo
 }
 
 // normalizeShardName normalizes shard name
-func (n *Normalizer) normalizeShardName(shard *chiv1.ChiShard, index int) {
+func (n *Normalizer) normalizeShardName(shard *chiV1.ChiShard, index int) {
 	if (len(shard.Name) > 0) && !IsAutoGeneratedShardName(shard.Name, shard, index) {
 		// Has explicitly specified name already
 		return
@@ -1596,7 +1633,7 @@ func (n *Normalizer) normalizeShardName(shard *chiv1.ChiShard, index int) {
 }
 
 // normalizeReplicaName normalizes replica name
-func (n *Normalizer) normalizeReplicaName(replica *chiv1.ChiReplica, index int) {
+func (n *Normalizer) normalizeReplicaName(replica *chiV1.ChiReplica, index int) {
 	if (len(replica.Name) > 0) && !IsAutoGeneratedReplicaName(replica.Name, replica, index) {
 		// Has explicitly specified name already
 		return
@@ -1606,24 +1643,24 @@ func (n *Normalizer) normalizeReplicaName(replica *chiv1.ChiReplica, index int) 
 }
 
 // normalizeShardName normalizes shard weight
-func (n *Normalizer) normalizeShardWeight(shard *chiv1.ChiShard) {
+func (n *Normalizer) normalizeShardWeight(shard *chiV1.ChiShard) {
 }
 
 // normalizeShardHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeShardHosts(shard *chiv1.ChiShard, cluster *chiv1.ChiCluster, shardIndex int) {
+func (n *Normalizer) normalizeShardHosts(shard *chiV1.ChiShard, cluster *chiV1.ChiCluster, shardIndex int) {
 	// Use hosts from HostsField
 	shard.Hosts = nil
 	for len(shard.Hosts) < shard.ReplicasCount {
 		// We still have some assumed hosts in this shard - let's add it as replicaIndex
 		replicaIndex := len(shard.Hosts)
 		// Check whether we have this host in HostsField
-		host := cluster.Layout.HostsField.GetOrCreate(shardIndex, replicaIndex)
+		host := cluster.GetOrCreateHost(shardIndex, replicaIndex)
 		shard.Hosts = append(shard.Hosts, host)
 	}
 }
 
 // normalizeReplicaHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeReplicaHosts(replica *chiv1.ChiReplica, cluster *chiv1.ChiCluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplicaHosts(replica *chiV1.ChiReplica, cluster *chiV1.ChiCluster, replicaIndex int) {
 	// Use hosts from HostsField
 	replica.Hosts = nil
 	for len(replica.Hosts) < replica.ShardsCount {
@@ -1637,41 +1674,41 @@ func (n *Normalizer) normalizeReplicaHosts(replica *chiv1.ChiReplica, cluster *c
 
 // normalizeHost normalizes a host/replica
 func (n *Normalizer) normalizeHost(
-	host *chiv1.ChiHost,
-	shard *chiv1.ChiShard,
-	replica *chiv1.ChiReplica,
-	cluster *chiv1.ChiCluster,
+	host *chiV1.ChiHost,
+	shard *chiV1.ChiShard,
+	replica *chiV1.ChiReplica,
+	cluster *chiV1.ChiCluster,
 	shardIndex int,
 	replicaIndex int,
 ) {
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
 	n.normalizeHostPorts(host)
 	// Inherit from either Shard or Replica
-	var s *chiv1.ChiShard
-	var r *chiv1.ChiReplica
+	var s *chiV1.ChiShard
+	var r *chiV1.ChiReplica
 	if cluster.IsShardSpecified() {
 		s = shard
 	} else {
 		r = replica
 	}
 	host.InheritSettingsFrom(s, r)
-	n.normalizeConfigurationSettings(&host.Settings)
+	host.Settings = n.normalizeConfigurationSettings(host.Settings)
 	host.InheritFilesFrom(s, r)
-	n.normalizeConfigurationSettings(&host.Files)
+	host.Files = n.normalizeConfigurationSettings(host.Files)
 	host.InheritTemplatesFrom(s, r, nil)
 }
 
 // normalizeHostTemplateSpec is the same as normalizeHost but for a template
-func (n *Normalizer) normalizeHostTemplateSpec(host *chiv1.ChiHost) {
+func (n *Normalizer) normalizeHostTemplateSpec(host *chiV1.ChiHost) {
 	n.normalizeHostPorts(host)
 }
 
 // normalizeHostName normalizes host's name
 func (n *Normalizer) normalizeHostName(
-	host *chiv1.ChiHost,
-	shard *chiv1.ChiShard,
+	host *chiV1.ChiHost,
+	shard *chiV1.ChiShard,
 	shardIndex int,
-	replica *chiv1.ChiReplica,
+	replica *chiV1.ChiReplica,
 	replicaIndex int,
 ) {
 	if (len(host.Name) > 0) && !IsAutoGeneratedHostName(host.Name, host, shard, shardIndex, replica, replicaIndex) {
@@ -1682,8 +1719,8 @@ func (n *Normalizer) normalizeHostName(
 	host.Name = CreateHostName(host, shard, shardIndex, replica, replicaIndex)
 }
 
-// normalizeHostPorts ensures chiv1.ChiReplica.Port is reasonable
-func (n *Normalizer) normalizeHostPorts(host *chiv1.ChiHost) {
+// normalizeHostPorts ensures chiV1.ChiReplica.Port is reasonable
+func (n *Normalizer) normalizeHostPorts(host *chiV1.ChiHost) {
 	// Deprecated
 	if (host.Port <= 0) || (host.Port >= 65535) {
 		host.Port = chPortNumberMustBeAssignedLater
@@ -1704,22 +1741,11 @@ func (n *Normalizer) normalizeHostPorts(host *chiv1.ChiHost) {
 
 // normalizeShardInternalReplication ensures reasonable values in
 // .spec.configuration.clusters.layout.shards.internalReplication
-func (n *Normalizer) normalizeShardInternalReplication(shard *chiv1.ChiShard) {
+func (n *Normalizer) normalizeShardInternalReplication(shard *chiV1.ChiShard) {
 	// Shards with replicas are expected to have internal replication on by default
 	defaultInternalReplication := false
 	if shard.ReplicasCount > 1 {
 		defaultInternalReplication = true
 	}
 	shard.InternalReplication = util.CastStringBoolToStringTrueFalse(shard.InternalReplication, defaultInternalReplication)
-}
-
-// normalizeDefaultsReplicasUseFQDN ensures chiv1.ChiDefaults.ReplicasUseFQDN section has proper values
-func (n *Normalizer) normalizeDefaultsReplicasUseFQDN(d *chiv1.ChiDefaults) {
-	// Default value set to false
-	d.ReplicasUseFQDN = util.CastStringBoolToStringTrueFalse(d.ReplicasUseFQDN, false)
-}
-
-// normalizeDefaultsTemplates ensures chiv1.ChiDefaults.Templates section has proper values
-func (n *Normalizer) normalizeDefaultsTemplates(d *chiv1.ChiDefaults) {
-	d.Templates.HandleDeprecatedFields()
 }

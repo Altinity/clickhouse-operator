@@ -9,7 +9,7 @@ spec:
       spec:
         containers:
         - name: clickhouse-pod
-          image: yandex/clickhouse-server:20.8.7.15
+          image: yandex/clickhouse-server:21.1.7.1
   defaults:
     templates:
       podTemplate: clickhouse-new

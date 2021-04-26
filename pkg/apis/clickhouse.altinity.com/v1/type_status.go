@@ -16,43 +16,54 @@ package v1
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	Version           string   `json:"version"`
-	ClustersCount     int      `json:"clusters"`
-	ShardsCount       int      `json:"shards"`
-	ReplicasCount     int      `json:"replicas"`
-	HostsCount        int      `json:"hosts"`
-	Status            string   `json:"status"`
-	Action            string   `json:"action"`
-	Actions           []string `json:"actions"`
-	Error             string   `json:"error"`
-	Errors            []string `json:"errors"`
-	UpdatedHostsCount int      `json:"updated"`
-	AddedHostsCount   int      `json:"added"`
-	DeletedHostsCount int      `json:"deleted"`
-	DeleteHostsCount  int      `json:"delete"`
-	Pods              []string `json:"pods"`
-	FQDNs             []string `json:"fqdns"`
-	Endpoint          string   `json:"endpoint"`
-	NormalizedCHI     ChiSpec  `json:"normalized"`
+	Version           string   `json:"version,omitempty"    yaml:"version,omitempty"`
+	ClustersCount     int      `json:"clusters"             yaml:"clusters"`
+	ShardsCount       int      `json:"shards"               yaml:"shards"`
+	ReplicasCount     int      `json:"replicas"             yaml:"replicas"`
+	HostsCount        int      `json:"hosts"                yaml:"hosts"`
+	Status            string   `json:"status"               yaml:"status"`
+	TaskID            string   `json:"taskID,omitempty"     yaml:"taskID,omitempty"`
+	TaskIDs           []string `json:"taskIDs,omitempty"    yaml:"taskIDs,omitempty"`
+	Action            string   `json:"action,omitempty"     yaml:"action,omitempty"`
+	Actions           []string `json:"actions,omitempty"    yaml:"actions,omitempty"`
+	Error             string   `json:"error,omitempty"      yaml:"error,omitempty"`
+	Errors            []string `json:"errors,omitempty"     yaml:"errors,omitempty"`
+	UpdatedHostsCount int      `json:"updated,omitempty"    yaml:"updated,omitempty"`
+	AddedHostsCount   int      `json:"added,omitempty"      yaml:"added,omitempty"`
+	DeletedHostsCount int      `json:"deleted,omitempty"    yaml:"deleted,omitempty"`
+	DeleteHostsCount  int      `json:"delete,omitempty"     yaml:"delete,omitempty"`
+	Pods              []string `json:"pods,omitempty"       yaml:"pods,omitempty"`
+	FQDNs             []string `json:"fqdns,omitempty"      yaml:"fqdns,omitempty"`
+	Endpoint          string   `json:"endpoint,omitempty"   yaml:"endpoint,omitempty"`
+	Generation        int64    `json:"generation,omitempty" yaml:"generation,omitempty"`
+	NormalizedCHI     *ChiSpec `json:"normalized,omitempty" yaml:"normalized,omitempty"`
 }
 
 const (
 	maxActions = 100
 	maxErrors  = 100
+	maxTaskIDs = 100
 )
 
 func (s *ChiStatus) PushAction(action string) {
-	s.Actions = append(s.Actions, action)
+	s.Actions = append([]string{action}, s.Actions...)
 	if len(s.Actions) > maxActions {
-		s.Actions = s.Actions[1:]
+		s.Actions = s.Actions[:maxActions]
 	}
 }
 
 func (s *ChiStatus) SetAndPushError(error string) {
 	s.Error = error
-	s.Errors = append(s.Errors, error)
+	s.Errors = append([]string{error}, s.Errors...)
 	if len(s.Errors) > maxErrors {
-		s.Errors = s.Errors[1:]
+		s.Errors = s.Errors[:maxErrors]
+	}
+}
+
+func (s *ChiStatus) PushTaskID() {
+	s.TaskIDs = append([]string{s.TaskID}, s.TaskIDs...)
+	if len(s.TaskIDs) > maxTaskIDs {
+		s.TaskIDs = s.TaskIDs[:maxTaskIDs]
 	}
 }
 
@@ -62,6 +73,7 @@ func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
 	s.AddedHostsCount = 0
 	s.DeletedHostsCount = 0
 	s.DeleteHostsCount = DeleteHostsCount
+	s.PushTaskID()
 }
 
 func (s *ChiStatus) ReconcileComplete() {
@@ -75,4 +87,5 @@ func (s *ChiStatus) DeleteStart() {
 	s.AddedHostsCount = 0
 	s.DeletedHostsCount = 0
 	s.DeleteHostsCount = 0
+	s.PushTaskID()
 }

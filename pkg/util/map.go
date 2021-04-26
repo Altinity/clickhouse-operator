@@ -32,6 +32,27 @@ func IncludeNonEmpty(dst map[string]string, key, src string) {
 	return
 }
 
+// CopyMap creates a copy of the given map by copying over key by key.
+// It doesn't perform a deep-copy.
+func CopyMap(src map[string]string) map[string]string {
+	result := make(map[string]string, len(src))
+	for k, v := range src {
+		result[k] = v
+	}
+	return result
+}
+
+// CopyMapExcept creates a copy of the given map but will exclude the given set of keys.
+func CopyMapExcept(src map[string]string, exceptKeys ...string) map[string]string {
+	result := CopyMap(src)
+
+	for _, k := range exceptKeys {
+		delete(result, k)
+	}
+
+	return result
+}
+
 // MergeStringMapsOverwrite inserts (and overwrites) data into dst map object from src
 func MergeStringMapsOverwrite(dst, src map[string]string, keys ...string) map[string]string {
 	if len(src) == 0 {
@@ -120,7 +141,7 @@ func SubtractStringMaps(base, delta map[string]string) map[string]string {
 	}
 
 	// Extract keys from delta and delete them from base
-	for _, key := range delta {
+	for key := range delta {
 		if _, ok := base[key]; ok {
 			delete(base, key)
 		}

@@ -121,6 +121,21 @@ const (
 			toString(total_space) AS total_space			
         FROM system.disks
 	`
+
+	queryDetachedPartsSQL = `
+		SELECT 
+			count() AS detached_parts,
+			database,
+			table,
+			disk,
+			if(coalesce(reason,'unknown')='','detached_by_user',coalesce(reason,'unknown')) AS detach_reason
+		FROM system.detached_parts
+		GROUP BY
+			database,
+			table,
+			disk,
+			reason
+    `
 )
 
 type ClickHouseFetcher struct {
@@ -133,8 +148,9 @@ func NewClickHouseFetcher(hostname, username, password string, port int) *ClickH
 	}
 }
 
-func (f *ClickHouseFetcher) SetTimeout(timeout time.Duration) {
+func (f *ClickHouseFetcher) SetTimeout(timeout time.Duration) *ClickHouseFetcher {
 	f.chConnectionParams.SetTimeout(timeout)
+	return f
 }
 
 func (f *ClickHouseFetcher) getCHConnection() *clickhouse.CHConnection {
@@ -205,6 +221,20 @@ func (f *ClickHouseFetcher) getClickHouseQuerySystemDisks() ([][]string, error) 
 			var disk, freeBytes, totalBytes string
 			if err := rows.Scan(&disk, &freeBytes, &totalBytes); err == nil {
 				*data = append(*data, []string{disk, freeBytes, totalBytes})
+			}
+			return nil
+		},
+	)
+}
+
+// getClickHouseQueryDetachedParts requests detached parts reasons from ClickHouse
+func (f *ClickHouseFetcher) getClickHouseQueryDetachedParts() ([][]string, error) {
+	return f.clickHouseQueryScanRows(
+		queryDetachedPartsSQL,
+		func(rows *sqlmodule.Rows, data *[][]string) error {
+			var detachedParts, database, table, disk, reason string
+			if err := rows.Scan(&detachedParts, &database, &table, &disk, &reason); err == nil {
+				*data = append(*data, []string{detachedParts, database, table, disk, reason})
 			}
 			return nil
 		},

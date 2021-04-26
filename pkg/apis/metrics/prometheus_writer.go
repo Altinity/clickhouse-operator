@@ -17,6 +17,7 @@ package metrics
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
@@ -27,6 +28,11 @@ import (
 const (
 	namespace = "chi"
 	subsystem = "clickhouse"
+)
+
+const (
+	// writeMetricWaitTimeout specifies how long to wait for metric being accepted by prometheus writer
+	writeMetricWaitTimeout = 10 * time.Second
 )
 
 type PrometheusWriter struct {
@@ -131,16 +137,24 @@ func (w *PrometheusWriter) WriteSystemDisks(data [][]string) {
 	}
 }
 
-func (w *PrometheusWriter) WriteErrorFetch(fetch_type string) {
-	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "1", prometheus.GaugeValue,
-		[]string{"chi", "namespace", "hostname", "fetch_type"},
-		w.chi.Name, w.chi.Namespace, w.hostname, fetch_type)
+func (w *PrometheusWriter) WriteDetachedParts(data [][]string) {
+	for _, metric := range data {
+		writeSingleMetricToPrometheus(w.out, "metric_DetachedParts", "Count of currently detached parts from system.detached_parts", metric[0], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "database", "table", "disk", "reason"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[1], metric[2], metric[3], metric[4])
+	}
 }
 
-func (w *PrometheusWriter) WriteOKFetch(fetch_type string) {
+func (w *PrometheusWriter) WriteErrorFetch(fetchType string) {
+	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "1", prometheus.GaugeValue,
+		[]string{"chi", "namespace", "hostname", "fetch_type"},
+		w.chi.Name, w.chi.Namespace, w.hostname, fetchType)
+}
+
+func (w *PrometheusWriter) WriteOKFetch(fetchType string) {
 	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "0", prometheus.GaugeValue,
 		[]string{"chi", "namespace", "hostname", "fetch_type"},
-		w.chi.Name, w.chi.Namespace, w.hostname, fetch_type)
+		w.chi.Name, w.chi.Namespace, w.hostname, fetchType)
 }
 
 func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, desc string, value string, metricType prometheus.ValueType, labels []string, labelValues ...string) {
@@ -157,8 +171,7 @@ func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, de
 	}
 	select {
 	case out <- m:
-
-	default:
+	case <-time.After(writeMetricWaitTimeout):
 		log.Infof("Error sending metric to the channel %s", name)
 	}
 }
@@ -187,5 +200,5 @@ func convertMetricName(in string) string {
 		out = append(out, unicode.ToLower(runes[i]))
 	}*/
 
-	return strings.Replace(string(in), ".", "_", -1)
+	return strings.Replace(in, ".", "_", -1)
 }

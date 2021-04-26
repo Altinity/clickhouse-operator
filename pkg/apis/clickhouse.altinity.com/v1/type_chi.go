@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"context"
 	"math"
 	"strings"
 
@@ -23,18 +24,24 @@ import (
 )
 
 // fillStatus fills .Status
-func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string) {
+func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, normalized bool) {
 	chi.Status.Version = version.Version
 	chi.Status.ClustersCount = chi.ClustersCount()
 	chi.Status.ShardsCount = chi.ShardsCount()
 	chi.Status.HostsCount = chi.HostsCount()
+	chi.Status.TaskID = *chi.Spec.TaskID
 	chi.Status.UpdatedHostsCount = 0
 	chi.Status.DeleteHostsCount = 0
 	chi.Status.DeletedHostsCount = 0
 	chi.Status.Pods = pods
 	chi.Status.FQDNs = fqdns
 	chi.Status.Endpoint = endpoint
-	chi.Status.NormalizedCHI = chi.Spec
+	chi.Status.Generation = chi.Generation
+	if normalized {
+		chi.Status.NormalizedCHI = &chi.Spec
+	} else {
+		chi.Status.NormalizedCHI = nil
+	}
 }
 
 func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
@@ -197,8 +204,7 @@ func (chi *ClickHouseInstallation) WalkClustersFullPath(
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
-		res = append(res, f(chi, clusterIndex, cluster))
+		res = append(res, f(chi, clusterIndex, chi.Spec.Configuration.Clusters[clusterIndex]))
 	}
 
 	return res
@@ -211,8 +217,7 @@ func (chi *ClickHouseInstallation) WalkClusters(
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
-		res = append(res, f(cluster))
+		res = append(res, f(chi.Spec.Configuration.Clusters[clusterIndex]))
 	}
 
 	return res
@@ -232,7 +237,7 @@ func (chi *ClickHouseInstallation) WalkShardsFullPath(
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			res = append(res, f(chi, clusterIndex, cluster, shardIndex, shard))
@@ -252,7 +257,7 @@ func (chi *ClickHouseInstallation) WalkShards(
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			res = append(res, f(shard))
@@ -303,7 +308,7 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 	clusterScopeCycleOffset := 0
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
 
 		clusterScopeIndex = 0
 		clusterScopeCycleIndex = 0
@@ -369,7 +374,7 @@ func (chi *ClickHouseInstallation) WalkHosts(
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Hosts {
@@ -387,7 +392,7 @@ func (chi *ClickHouseInstallation) WalkHostsTillError(
 	f func(host *ChiHost) error,
 ) error {
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
+		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Hosts {
@@ -404,37 +409,38 @@ func (chi *ClickHouseInstallation) WalkHostsTillError(
 
 // WalkTillError
 func (chi *ClickHouseInstallation) WalkTillError(
-	fCHIPreliminary func(chi *ClickHouseInstallation) error,
-	fCluster func(cluster *ChiCluster) error,
-	fShard func(shard *ChiShard) error,
-	fHost func(host *ChiHost) error,
-	fCHI func(chi *ClickHouseInstallation) error,
+	ctx context.Context,
+	fCHIPreliminary func(ctx context.Context, chi *ClickHouseInstallation) error,
+	fCluster func(ctx context.Context, cluster *ChiCluster) error,
+	fShard func(ctx context.Context, shard *ChiShard) error,
+	fHost func(ctx context.Context, host *ChiHost) error,
+	fCHI func(ctx context.Context, chi *ClickHouseInstallation) error,
 ) error {
 
-	if err := fCHIPreliminary(chi); err != nil {
+	if err := fCHIPreliminary(ctx, chi); err != nil {
 		return err
 	}
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := &chi.Spec.Configuration.Clusters[clusterIndex]
-		if err := fCluster(cluster); err != nil {
+		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
+		if err := fCluster(ctx, cluster); err != nil {
 			return err
 		}
 		for shardIndex := range cluster.Layout.Shards {
 			shard := &cluster.Layout.Shards[shardIndex]
-			if err := fShard(shard); err != nil {
+			if err := fShard(ctx, shard); err != nil {
 				return err
 			}
 			for replicaIndex := range shard.Hosts {
 				host := shard.Hosts[replicaIndex]
-				if err := fHost(host); err != nil {
+				if err := fHost(ctx, host); err != nil {
 					return err
 				}
 			}
 		}
 	}
 
-	if err := fCHI(chi); err != nil {
+	if err := fCHI(ctx, chi); err != nil {
 		return err
 	}
 
@@ -482,9 +488,9 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		}
 	}
 
-	(&spec.Defaults).MergeFrom(&from.Defaults, _type)
-	(&spec.Configuration).MergeFrom(&from.Configuration, _type)
-	(&spec.Templates).MergeFrom(&from.Templates, _type)
+	spec.Defaults = spec.Defaults.MergeFrom(from.Defaults, _type)
+	spec.Configuration = spec.Configuration.MergeFrom(from.Configuration, _type)
+	spec.Templates = spec.Templates.MergeFrom(from.Templates, _type)
 	// TODO may be it would be wiser to make more intelligent merge
 	spec.UseTemplates = append(spec.UseTemplates, from.UseTemplates...)
 }
@@ -560,73 +566,53 @@ func (chi *ClickHouseInstallation) HostsCountAttributes(a ChiHostReconcileAttrib
 
 // GetHostTemplate gets ChiHostTemplate by name
 func (chi *ClickHouseInstallation) GetHostTemplate(name string) (*ChiHostTemplate, bool) {
-	if chi.Spec.Templates.HostTemplatesIndex == nil {
+	if !chi.Spec.Templates.GetHostTemplatesIndex().Has(name) {
 		return nil, false
-	} else {
-		template, ok := chi.Spec.Templates.HostTemplatesIndex[name]
-		return template, ok
 	}
+	return chi.Spec.Templates.GetHostTemplatesIndex().Get(name), true
 }
 
 // GetPodTemplate gets ChiPodTemplate by name
 func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate, bool) {
-	if chi.Spec.Templates.PodTemplatesIndex == nil {
+	if !chi.Spec.Templates.GetPodTemplatesIndex().Has(name) {
 		return nil, false
-	} else {
-		template, ok := chi.Spec.Templates.PodTemplatesIndex[name]
-		return template, ok
 	}
+	return chi.Spec.Templates.GetPodTemplatesIndex().Get(name), true
 }
 
 // WalkPodTemplates walks over all PodTemplates
 func (chi *ClickHouseInstallation) WalkPodTemplates(f func(template *ChiPodTemplate)) {
-	if chi.Spec.Templates.PodTemplatesIndex == nil {
-		return
-	}
-
-	for name := range chi.Spec.Templates.PodTemplatesIndex {
-		template, _ := chi.Spec.Templates.PodTemplatesIndex[name]
-		f(template)
-	}
+	chi.Spec.Templates.GetPodTemplatesIndex().Walk(f)
 }
 
 // GetVolumeClaimTemplate gets ChiVolumeClaimTemplate by name
 func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolumeClaimTemplate, bool) {
-	if chi.Spec.Templates.VolumeClaimTemplatesIndex == nil {
-		return nil, false
-	} else {
-		template, ok := chi.Spec.Templates.VolumeClaimTemplatesIndex[name]
-		return template, ok
+	if chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Has(name) {
+		return chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Get(name), true
 	}
+	return nil, false
 }
 
 // WalkVolumeClaimTemplates walks over all VolumeClaimTemplates
 func (chi *ClickHouseInstallation) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
-	if chi.Spec.Templates.VolumeClaimTemplatesIndex == nil {
-		return
-	}
-
-	for name := range chi.Spec.Templates.VolumeClaimTemplatesIndex {
-		template, _ := chi.Spec.Templates.VolumeClaimTemplatesIndex[name]
-		f(template)
-	}
+	chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Walk(f)
 }
 
 // GetServiceTemplate gets ChiServiceTemplate by name
 func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceTemplate, bool) {
-	if chi.Spec.Templates.ServiceTemplatesIndex == nil {
+	if !chi.Spec.Templates.GetServiceTemplatesIndex().Has(name) {
 		return nil, false
-	} else {
-		template, ok := chi.Spec.Templates.ServiceTemplatesIndex[name]
-		return template, ok
 	}
+	return chi.Spec.Templates.GetServiceTemplatesIndex().Get(name), true
 }
 
 // GetServiceTemplate gets ChiServiceTemplate of a CHI
 func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ChiServiceTemplate, bool) {
-	name := chi.Spec.Defaults.Templates.ServiceTemplate
-	template, ok := chi.GetServiceTemplate(name)
-	return template, ok
+	if !chi.Spec.Defaults.Templates.HasServiceTemplate() {
+		return nil, false
+	}
+	name := chi.Spec.Defaults.Templates.GetServiceTemplate()
+	return chi.GetServiceTemplate(name)
 }
 
 // MatchFullName
@@ -647,7 +633,7 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 	if (chi.Namespace == "") && (chi.Name == "") {
 		return false
 	}
-	return strings.ToLower(chi.Spec.Templating.Policy) == TemplatingPolicyAuto
+	return strings.ToLower(chi.Spec.Templating.GetPolicy()) == TemplatingPolicyAuto
 }
 
 const ReconcilingPolicyUnspecified = "unspecified"
@@ -661,7 +647,7 @@ func (chi *ClickHouseInstallation) IsReconcilingPolicyWait() bool {
 	if (chi.Namespace == "") && (chi.Name == "") {
 		return false
 	}
-	return strings.ToLower(chi.Spec.Reconciling.Policy) == ReconcilingPolicyWait
+	return strings.ToLower(chi.Spec.Reconciling.GetPolicy()) == ReconcilingPolicyWait
 }
 
 func (chi *ClickHouseInstallation) IsReconcilingPolicyNoWait() bool {
@@ -671,7 +657,7 @@ func (chi *ClickHouseInstallation) IsReconcilingPolicyNoWait() bool {
 	if (chi.Namespace == "") && (chi.Name == "") {
 		return false
 	}
-	return strings.ToLower(chi.Spec.Reconciling.Policy) == ReconcilingPolicyNoWait
+	return strings.ToLower(chi.Spec.Reconciling.GetPolicy()) == ReconcilingPolicyNoWait
 }
 
 func (chi *ClickHouseInstallation) IsStopped() bool {
