@@ -315,6 +315,7 @@ def test_backup_size(self):
                     f"TRUNCATE TABLE default.test_backup",
                     pod=backup_pod
                 )
+            time.sleep(15)
         fired = alerts.wait_alert_state("ClickHouseBackupSizeChanged", "firing", expected_state=True, sleep_time=5,
                                         labels={"pod_name": backup_pod}, time_range='60s')
         assert fired, error(f"can't get ClickHouseBackupSizeChanged alert in firing state, decrease={decrease}")

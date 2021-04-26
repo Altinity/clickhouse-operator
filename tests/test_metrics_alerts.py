@@ -94,7 +94,7 @@ def test_clickhouse_server_reboot(self):
 
     def reboot_clickhouse_server():
         kubectl.launch(
-            f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse -- kill 1",
+            f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse-pod -- kill 1",
             ok_to_fail=True,
         )
 
@@ -129,7 +129,7 @@ def test_clickhouse_dns_errors(self):
     clickhouse_svc = chi["status"]["fqdns"][random_idx]
 
     old_dns = kubectl.launch(
-        f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse -- cat /etc/resolv.conf",
+        f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse-pod -- cat /etc/resolv.conf",
         ok_to_fail=False,
     )
     new_dns = re.sub(r'^nameserver (.+)', 'nameserver 1.1.1.1', old_dns)
@@ -137,11 +137,11 @@ def test_clickhouse_dns_errors(self):
     def rewrite_dns_on_clickhouse_server(write_new=True):
         dns = new_dns if write_new else old_dns
         kubectl.launch(
-            f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse -- bash -c \"printf \\\"{dns}\\\" > /etc/resolv.conf\"",
+            f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse-pod -- bash -c \"printf \\\"{dns}\\\" > /etc/resolv.conf\"",
             ok_to_fail=False,
         )
         kubectl.launch(
-            f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse -- clickhouse-client --echo -mn -q \"SYSTEM DROP DNS CACHE; SELECT count() FROM cluster('all-sharded',system,metrics)\"",
+            f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse-pod -- clickhouse-client --echo -mn -q \"SYSTEM DROP DNS CACHE; SELECT count() FROM cluster('all-sharded',system,metrics)\"",
             ok_to_fail=True,
         )
 
@@ -174,7 +174,7 @@ def test_distributed_files_to_insert(self):
     # we need more than 50 delayed files for catch
     while files_to_insert_from_disk <= 55 and files_to_insert_from_metrics <= 55 and tries < 500:
         kubectl.launch(
-            f"exec -n {kubectl.namespace} {restarted_pod} -c clickhouse -- kill 1",
+            f"exec -n {kubectl.namespace} {restarted_pod} -c clickhouse-pod -- kill 1",
             ok_to_fail=True,
         )
         clickhouse.query(chi["metadata"]["name"], insert_sql, pod=delayed_pod, host=delayed_pod, ns=kubectl.namespace)
@@ -185,7 +185,7 @@ def test_distributed_files_to_insert(self):
         files_to_insert_from_metrics = int(files_to_insert_from_metrics)
 
         files_to_insert_from_disk = int(kubectl.launch(
-            f"exec -n {kubectl.namespace} {delayed_pod} -c clickhouse -- bash -c 'ls -la /var/lib/clickhouse/data/default/test_distr/*/*.bin 2>/dev/null | wc -l'",
+            f"exec -n {kubectl.namespace} {delayed_pod} -c clickhouse-pod -- bash -c 'ls -la /var/lib/clickhouse/data/default/test_distr/*/*.bin 2>/dev/null | wc -l'",
             ok_to_fail=False,
         ))
 
@@ -220,13 +220,13 @@ def test_distributed_connection_exceptions(self):
         select_sql = 'SELECT count() FROM default.test_distr'
         with Then("reboot clickhouse-server pod"):
             kubectl.launch(
-                f"exec -n {kubectl.namespace} {restarted_pod} -c clickhouse -- kill 1",
+                f"exec -n {kubectl.namespace} {restarted_pod} -c clickhouse-pod -- kill 1",
                 ok_to_fail=True,
             )
-            with And("Insert to distributed table"):
+            with Then("Insert to distributed table"):
                 clickhouse.query(chi["metadata"]["name"], insert_sql, host=delayed_pod, ns=kubectl.namespace)
 
-            with And("Select from distributed table"):
+            with Then("Select from distributed table"):
                 clickhouse.query_with_error(chi["metadata"]["name"], select_sql, host=delayed_pod,
                                             ns=kubectl.namespace)
 
@@ -273,7 +273,7 @@ def test_delayed_and_rejected_insert_and_max_part_count_for_partition_and_low_in
             # @TODO we need only one query after resolve https://github.com/ClickHouse/ClickHouse/issues/11384
             sql = min_block + "INSERT INTO default.test(event_time, test) SELECT now(), number FROM system.numbers LIMIT 1;"
             clickhouse.query_with_error(chi_name, sql, host=selected_svc, ns=kubectl.namespace)
-            with And(f"wait prometheus_scrape_interval={prometheus_scrape_interval}*2 sec"):
+            with Then(f"wait prometheus_scrape_interval={prometheus_scrape_interval}*2 sec"):
                 time.sleep(prometheus_scrape_interval * 2)
 
             sql = min_block + "INSERT INTO default.test(event_time, test) SELECT now(), number FROM system.numbers LIMIT 1;"
@@ -369,7 +369,7 @@ def test_read_only_replica(self):
     read_only_pod, read_only_svc, other_pod, other_svc = alerts.random_pod_choice_for_callbacks(chi)
     chi_name = chi["metadata"]["name"]
     create_table_on_cluster('all-replicated', 'default.test_repl',
-                            '(event_time DateTime, test UInt64) ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/{uuid}/test_repl\', \'{replica}\') ORDER BY tuple()')
+                            '(event_time DateTime, test UInt64) ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/test_repl\', \'{replica}\') ORDER BY tuple()')
 
     def restart_zookeeper():
         kubectl.launch(
@@ -407,19 +407,19 @@ def test_read_only_replica(self):
 def test_replicas_max_abosulute_delay(self):
     stop_replica_pod, stop_replica_svc, insert_pod, insert_svc = alerts.random_pod_choice_for_callbacks(chi)
     create_table_on_cluster('all-replicated', 'default.test_repl',
-                            '(event_time DateTime, test UInt64) ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/{uuid}/test_repl\', \'{replica}\') ORDER BY tuple()')
+                            '(event_time DateTime, test UInt64) ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/test_repl\', \'{replica}\') ORDER BY tuple()')
     prometheus_scrape_interval = 15
 
     def restart_clickhouse_and_insert_to_replicated_table():
         with When(f"stop replica fetches on {stop_replica_svc}"):
             sql = "SYSTEM STOP FETCHES default.test_repl"
             kubectl.launch(
-                f"exec -n {kubectl.namespace} {stop_replica_pod} -c clickhouse -- clickhouse-client -q \"{sql}\"",
+                f"exec -n {kubectl.namespace} {stop_replica_pod} -c clickhouse-pod -- clickhouse-client -q \"{sql}\"",
                 ok_to_fail=True,
             )
             sql = "INSERT INTO default.test_repl SELECT now(), number FROM numbers(100000)"
             kubectl.launch(
-                f"exec -n {kubectl.namespace} {insert_pod} -c clickhouse -- clickhouse-client -q \"{sql}\"",
+                f"exec -n {kubectl.namespace} {insert_pod} -c clickhouse-pod -- clickhouse-client -q \"{sql}\"",
             )
 
     with Then("check ClickHouseReplicasMaxAbsoluteDelay firing"):
@@ -446,7 +446,7 @@ def test_too_many_connections(self):
     too_many_connection_pod, too_many_connection_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
     cmd = "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y netcat mysql-client"
     kubectl.launch(
-        f"exec -n {kubectl.namespace} {too_many_connection_pod} -c clickhouse -- bash -c  \"{cmd}\"",
+        f"exec -n {kubectl.namespace} {too_many_connection_pod} -c clickhouse-pod -- bash -c  \"{cmd}\"",
     )
 
     def make_too_many_connection():
@@ -469,11 +469,11 @@ def test_too_many_connections(self):
             f.write(nc_cmd)
 
         kubectl.launch(
-            f"cp /tmp/nc_cmd.sh {too_many_connection_pod}:/tmp/nc_cmd.sh -c clickhouse"
+            f"cp /tmp/nc_cmd.sh {too_many_connection_pod}:/tmp/nc_cmd.sh -c clickhouse-pod"
         )
 
         kubectl.launch(
-            f"exec -n {kubectl.namespace} {too_many_connection_pod} -c clickhouse -- bash /tmp/nc_cmd.sh",
+            f"exec -n {kubectl.namespace} {too_many_connection_pod} -c clickhouse-pod -- bash /tmp/nc_cmd.sh",
             timeout=600,
         )
 
@@ -493,7 +493,7 @@ def test_too_much_running_queries(self):
     _, _, too_many_queries_pod, too_many_queries_svc = alerts.random_pod_choice_for_callbacks(chi)
     cmd = "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y mysql-client"
     kubectl.launch(
-        f"exec -n {kubectl.namespace} {too_many_queries_pod} -c clickhouse -- bash -c  \"{cmd}\"",
+        f"exec -n {kubectl.namespace} {too_many_queries_pod} -c clickhouse-pod -- bash -c  \"{cmd}\"",
         ok_to_fail=True,
     )
 
@@ -513,10 +513,10 @@ def test_too_much_running_queries(self):
             f.write(long_cmd)
 
         kubectl.launch(
-            f"cp /tmp/long_cmd.sh {too_many_queries_pod}:/tmp/long_cmd.sh -c clickhouse"
+            f"cp /tmp/long_cmd.sh {too_many_queries_pod}:/tmp/long_cmd.sh -c clickhouse-pod"
         )
         kubectl.launch(
-            f"exec -n {kubectl.namespace} {too_many_queries_pod} -c clickhouse -- bash /tmp/long_cmd.sh",
+            f"exec -n {kubectl.namespace} {too_many_queries_pod} -c clickhouse-pod -- bash /tmp/long_cmd.sh",
             timeout=70,
         )
 
@@ -603,7 +603,7 @@ def test_version_changed(self):
             }
         )
         prometheus_scrape_interval = 15
-        with And(f"wait prometheus_scrape_interval={prometheus_scrape_interval}*2 sec"):
+        with Then(f"wait prometheus_scrape_interval={prometheus_scrape_interval}*2 sec"):
             time.sleep(prometheus_scrape_interval * 2)
 
     with Then("check ClickHouseVersionChanged firing"):
@@ -700,7 +700,7 @@ def test_distributed_sync_insertion_timeout(self):
 @Name("test_detached_parts. Check ClickHouseDetachedParts")
 def test_detached_parts(self):
     create_table_on_cluster()
-    detached_pod, detached_svc, _, _ = random_pod_choice_for_callbacks()
+    detached_pod, detached_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
     def create_part_and_detach():
         clickhouse.query(chi["metadata"]["name"], "INSERT INTO default.test SELECT now(), number FROM numbers(100)", pod=detached_pod)
@@ -716,7 +716,8 @@ def test_detached_parts(self):
         all_parts = ""
         for part in detached_parts.splitlines():
             all_parts += f"ALTER TABLE default.test ATTACH PART '{part}';"
-        clickhouse.query(chi["metadata"]["name"], all_parts, pod=detached_pod)
+        if all_parts.strip() != "":
+            clickhouse.query(chi["metadata"]["name"], all_parts, pod=detached_pod)
 
     with When("check ClickHouseDetachedParts firing"):
         fired = alerts.wait_alert_state("ClickHouseDetachedParts", "firing", True,
