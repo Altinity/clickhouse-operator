@@ -95,7 +95,7 @@ def test_005(self):
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
 def test_006(self):
     old_version = "yandex/clickhouse-server:20.8.6.6"
-    new_version = "yandex/clickhouse-server:20.8.7.15"
+    new_version = "yandex/clickhouse-server:21.1.7.1"
     with Then("Create initial position"):
         kubectl.create_and_check(
             config="configs/test-006-ch-upgrade-1.yaml",
@@ -157,12 +157,22 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
             }
         )
         start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
+        
+        with Then("Create a table"):
+            clickhouse.query(chi, "CREATE TABLE test_local Engine = Log as SELECT 1")
 
         with When(f"upgrade operator to {version_to}"):
             set_operator_version(version_to, timeout=120)
             time.sleep(10)
             kubectl.wait_chi_status(chi, "Completed", retries=6)
             kubectl.wait_objects(chi, {"statefulset": 1, "pod": 1, "service": 2})
+
+            with Then("Check that table is here"):
+                tables = clickhouse.query(chi, "SHOW TABLES")
+                assert "test_local" in tables
+                out = clickhouse.query(chi, "SELECT * FROM test_local")
+                assert "1" == out
+
             with Then("ClickHouse pods should not be restarted"):
                 new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
                 assert start_time == new_start_time
@@ -202,8 +212,10 @@ def test_operator_restart(config, version=settings.operator_version):
                     "service": 2,
                 })
             time.sleep(10)
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-            assert start_time == new_start_time
+            
+            with Then("ClickHouse pods should not be restarted"):
+                new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+                assert start_time == new_start_time
 
         kubectl.delete_chi(chi)
 
@@ -662,6 +674,7 @@ def test_014(self):
         'test_local',
         'test_view',
         'test_mv',
+        'test_buffer',
         'a_view'
     ]
     with Given("Create schema objects"):
@@ -684,6 +697,10 @@ def test_014(self):
         clickhouse.query(
             chi,
             "CREATE DICTIONARY test_dict (a Int8, b Int8) PRIMARY KEY a SOURCE(CLICKHOUSE(host 'localhost' port 9000 table 'test_local' user 'default')) LAYOUT(FLAT()) LIFETIME(0)",
+            host=f"chi-{chi}-{cluster}-0-0")
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_buffer(a Int8) Engine = Buffer(default, test_local, 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
             host=f"chi-{chi}-{cluster}-0-0")
 
     with Given("Replicated table is created on a first replica and data is inserted"):
@@ -1280,8 +1297,8 @@ def test_024(self):
         assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", ".metadata.annotations.test") == "test"
     with And("Service annotations should be populated"):
         assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.test") == "test"
-    with And("PV annotations should be populated"):
-        assert kubectl.get_field("pv", "-l clickhouse.altinity.com/chi=test-024", ".metadata.annotations.test") == "test"
+    with And("PVC annotations should be populated"):
+        assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", ".metadata.annotations.test") == "test"
         
     kubectl.delete_chi(chi)
     
@@ -1371,4 +1388,47 @@ def test_025(self):
             assert round(lb_error_time - start_time) == 0
 
     kubectl.delete_chi(chi)
+    
+@TestScenario
+@Name("test_026. Test mixed single and multi-volume configuration in one cluster")
+def test_026(self):
+    require_zookeeper()
+    
+    config="configs/test-026-mixed-replicas.yaml"
+    chi = manifest.get_chi_name(util.get_full_path(config))
+    kubectl.create_and_check(
+        config=config,
+        check={
+            "pod_count": 2,
+            "do_not_delete": 1,
+        },
+    )
+    
+    with When("Cluster is ready"):
+        with Then("Check that first replica has one disk"):
+            out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", sql = "select count() from system.disks")
+            assert out == "1"
+    
+        with And("Check that second replica has two disks"):
+            out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-1", sql = "select count() from system.disks")
+            assert out == "2"
+
+    with When("Create a table and generate several inserts"):
+        clickhouse.query(chi, "create table test_disks ON CLUSTER '{cluster}' (a Int64) Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}') partition by (a%10) order by a")
+        clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", sql = "insert into test_disks select * from numbers(100) settings max_block_size=1")
+        clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", sql = "insert into test_disks select * from numbers(100) settings max_block_size=1")
+        time.sleep(5)
+
+        with Then("Data should be placed on a single disk on a first replica"):
+            out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", 
+                                         sql = "select arraySort(groupUniqArray(disk_name)) from system.parts where table='test_disks'")
+            assert out == "['default']"
+
+        with And("Data should be placed on a second disk on a second replica"):
+            out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-1", 
+                                         sql = "select arraySort(groupUniqArray(disk_name)) from system.parts where table='test_disks'")
+            assert out == "['disk2']"
+            
+    kubectl.delete_chi(chi)
+
    

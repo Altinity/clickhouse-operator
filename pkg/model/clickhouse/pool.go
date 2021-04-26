@@ -15,9 +15,9 @@
 package clickhouse
 
 import (
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-
 	"sync"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 )
 
 var (

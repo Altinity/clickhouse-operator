@@ -94,6 +94,13 @@ chConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi
 # located in `chUsersConfigsPath` folder
 chUsername: clickhouse_operator
 chPassword: clickhouse_operator_password
+
+# Location of k8s Secret with username and password to be used by operator to connect to ClickHouse instances
+# Can be used instead of explicitly specified username and password
+chCredentialsSecretNamespace: "dev"
+chCredentialsSecretName: "chop-clickhouse-credentials"
+
+# Port where to connect to ClickHouse instances to
 chPort: 8123
 
 ################################################
@@ -104,7 +111,7 @@ chPort: 8123
 
 logtostderr: "true"
 alsologtostderr: "false"
-v: "2"
+v: "3"
 stderrthreshold: ""
 vmodule: ""
 log_backtrace_at: ""
@@ -119,3 +126,29 @@ log_backtrace_at: ""
 reconcileThreadsNumber: 1
 reconcileWaitExclude: false
 reconcileWaitInclude: false
+
+################################################
+##
+## Labels management parameters
+##
+################################################
+
+# When propagating labels from the chi's `metadata.labels` section to child objects' `metadata.labels`,
+# exclude labels from the following list:
+#excludeFromPropagationLabels:
+#  - "labelA"
+#  - "labelB"
+
+# Whether to append *Scope* labels to StatefulSet and Pod.
+# Full list of available *scope* labels check in labeler.go
+#  LabelShardScopeIndex
+#  LabelReplicaScopeIndex
+#  LabelCHIScopeIndex
+#  LabelCHIScopeCycleSize
+#  LabelCHIScopeCycleIndex
+#  LabelCHIScopeCycleOffset
+#  LabelClusterScopeIndex
+#  LabelClusterScopeCycleSize
+#  LabelClusterScopeCycleIndex
+#  LabelClusterScopeCycleOffset
+appendScopeLabels: "yes"

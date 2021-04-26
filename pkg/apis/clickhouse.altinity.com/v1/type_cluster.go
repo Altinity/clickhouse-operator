@@ -16,41 +16,45 @@ package v1
 
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
-	Name      string             `json:"name"`
-	Zookeeper ChiZookeeperConfig `json:"zookeeper,omitempty"`
-	Settings  Settings           `json:"settings,omitempty"`
-	Files     Settings           `json:"files,omitempty"`
-	Templates ChiTemplateNames   `json:"templates,omitempty"`
-	Layout    ChiClusterLayout   `json:"layout"`
+	Name      string              `json:"name,omitempty"      yaml:"name,omitempty"`
+	Zookeeper *ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper,omitempty"`
+	Settings  *Settings           `json:"settings,omitempty"  yaml:"settings,omitempty"`
+	Files     *Settings           `json:"files,omitempty"     yaml:"files,omitempty"`
+	Templates *ChiTemplateNames   `json:"templates,omitempty" yaml:"templates,omitempty"`
+	Layout    *ChiClusterLayout   `json:"layout,omitempty"    yaml:"layout,omitempty"`
 
 	// Internal data
-	Address ChiClusterAddress       `json:"address,omitempty"`
-	CHI     *ClickHouseInstallation `json:"-" testdiff:"ignore"`
+	Address ChiClusterAddress       `json:"-" yaml:"-"`
+	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 // ChiClusterAddress defines address of a cluster within ClickHouseInstallation
 type ChiClusterAddress struct {
-	Namespace    string `json:"namespace,omitempty"`
-	CHIName      string `json:"chiName,omitempty"`
-	ClusterName  string `json:"clusterName,omitempty"`
-	ClusterIndex int    `json:"clusterIndex,omitempty"`
+	Namespace    string `json:"namespace,omitempty"    yaml:"namespace,omitempty"`
+	CHIName      string `json:"chiName,omitempty"      yaml:"chiName,omitempty"`
+	ClusterName  string `json:"clusterName,omitempty"  yaml:"clusterName,omitempty"`
+	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
 }
 
 // ChiClusterLayout defines layout section of .spec.configuration.clusters
 type ChiClusterLayout struct {
 	// DEPRECATED - to be removed soon
-	Type          string `json:"type,omitempty"`
-	ShardsCount   int    `json:"shardsCount,omitempty"`
-	ReplicasCount int    `json:"replicasCount,omitempty"`
+	Type          string `json:"type,omitempty"          yaml:"type,omitempty"`
+	ShardsCount   int    `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
+	ReplicasCount int    `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiShard
-	Shards   []ChiShard   `json:"shards,omitempty"`
-	Replicas []ChiReplica `json:"replicas,omitempty"`
+	Shards   []ChiShard   `json:"shards,omitempty"   yaml:"shards,omitempty"`
+	Replicas []ChiReplica `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 
 	// Internal data
 	// Whether shards or replicas are explicitly specified as Shards []ChiShard or Replicas []ChiReplica
-	ShardsSpecified   bool        `json:"-" testdiff:"ignore"`
-	ReplicasSpecified bool        `json:"-" testdiff:"ignore"`
-	HostsField        *HostsField `json:"-" testdiff:"ignore"`
+	ShardsSpecified   bool        `json:"-" yaml:"-" testdiff:"ignore"`
+	ReplicasSpecified bool        `json:"-" yaml:"-" testdiff:"ignore"`
+	HostsField        *HostsField `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+func NewChiClusterLayout() *ChiClusterLayout {
+	return new(ChiClusterLayout)
 }
 
 func (cluster *ChiCluster) FillShardReplicaSpecified() {
@@ -79,17 +83,33 @@ func (cluster *ChiCluster) IsShardSpecified() bool {
 }
 
 func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
-	if cluster.Zookeeper.IsEmpty() {
-		(&cluster.Zookeeper).MergeFrom(&chi.Spec.Configuration.Zookeeper, MergeTypeFillEmptyValues)
+	if !cluster.Zookeeper.IsEmpty() {
+		// Has zk config explicitly specified alread
+		return
 	}
+	if chi.Spec.Configuration == nil {
+		return
+	}
+	if chi.Spec.Configuration.Zookeeper == nil {
+		return
+	}
+
+	cluster.Zookeeper = cluster.Zookeeper.MergeFrom(chi.Spec.Configuration.Zookeeper, MergeTypeFillEmptyValues)
 }
 
 func (cluster *ChiCluster) InheritSettingsFrom(chi *ClickHouseInstallation) {
-	(&cluster.Settings).MergeFrom(chi.Spec.Configuration.Settings)
+	cluster.Settings = cluster.Settings.MergeFrom(chi.Spec.Configuration.Settings)
 }
 
 func (cluster *ChiCluster) InheritFilesFrom(chi *ClickHouseInstallation) {
-	(&cluster.Files).MergeFromCB(chi.Spec.Configuration.Files, func(path string, _ *Setting) bool {
+	if chi.Spec.Configuration == nil {
+		return
+	}
+	if chi.Spec.Configuration.Files == nil {
+		return
+	}
+
+	cluster.Files = cluster.Files.MergeFromCB(chi.Spec.Configuration.Files, func(path string, _ *Setting) bool {
 		if section, err := getSectionFromPath(path); err == nil {
 			if section == SectionHost {
 				return true
@@ -101,14 +121,22 @@ func (cluster *ChiCluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 }
 
 func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
-	(&cluster.Templates).MergeFrom(&chi.Spec.Defaults.Templates, MergeTypeFillEmptyValues)
-	(&cluster.Templates).HandleDeprecatedFields()
+	if chi.Spec.Defaults == nil {
+		return
+	}
+	if chi.Spec.Defaults.Templates == nil {
+		return
+	}
+	cluster.Templates = cluster.Templates.MergeFrom(chi.Spec.Defaults.Templates, MergeTypeFillEmptyValues)
+	cluster.Templates.HandleDeprecatedFields()
 }
 
 func (cluster *ChiCluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {
-	name := cluster.Templates.ClusterServiceTemplate
-	template, ok := cluster.CHI.GetServiceTemplate(name)
-	return template, ok
+	if !cluster.Templates.HasClusterServiceTemplate() {
+		return nil, false
+	}
+	name := cluster.Templates.GetClusterServiceTemplate()
+	return cluster.CHI.GetServiceTemplate(name)
 }
 
 func (cluster *ChiCluster) GetCHI() *ClickHouseInstallation {
@@ -117,6 +145,10 @@ func (cluster *ChiCluster) GetCHI() *ClickHouseInstallation {
 
 func (cluster *ChiCluster) GetShard(shard int) *ChiShard {
 	return &cluster.Layout.Shards[shard]
+}
+
+func (cluster *ChiCluster) GetOrCreateHost(shard, replica int) *ChiHost {
+	return cluster.Layout.HostsField.GetOrCreate(shard, replica)
 }
 
 func (cluster *ChiCluster) GetReplica(replica int) *ChiReplica {

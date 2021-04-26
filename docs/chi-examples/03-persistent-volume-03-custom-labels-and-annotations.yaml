@@ -1,0 +1,53 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "pv-log"
+spec:
+  configuration:
+    clusters:
+      - name: "deployment-pv"
+        # Templates are specified for this cluster explicitly
+        templates:
+          podTemplate: pod-template-with-volumes
+        layout:
+          shardsCount: 2
+          replicasCount: 1
+
+  templates:
+    podTemplates:
+      - name: pod-template-with-volumes
+        spec:
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:20.7
+              volumeMounts:
+                - name: data-storage-vc-template
+                  mountPath: /var/lib/clickhouse
+                - name: log-storage-vc-template
+                  mountPath: /var/log/clickhouse-server
+
+    volumeClaimTemplates:
+      - name: data-storage-vc-template
+        metadata:
+          labels:
+            custom.label: "this-is-data-storage"
+          annotations:
+            custom.annotation: "this-is-data-storage"
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 3Gi
+      - name: log-storage-vc-template
+        metadata:
+          labels:
+            custom.label: "this-is-log-storage"
+          annotations:
+            custom.annotation: "this-is-log-storage"
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi

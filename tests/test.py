@@ -50,7 +50,7 @@ if main():
                 test_operator.test_006,
                 test_operator.test_007,
                 test_operator.test_008,
-                (test_operator.test_009, {"version_from": "0.13.0"}),
+                (test_operator.test_009, {"version_from": "0.13.5"}),
                 test_operator.test_010,
                 test_operator.test_011,
                 test_operator.test_011_1,
@@ -67,6 +67,7 @@ if main():
                 test_operator.test_023,
                 test_operator.test_024,
                 test_operator.test_025,
+                test_operator.test_026,
                 test_operator.test_022, # this should go last while failing
             ]
             run_tests = all_tests

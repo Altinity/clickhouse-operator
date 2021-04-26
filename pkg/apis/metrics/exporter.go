@@ -15,6 +15,7 @@
 package metrics
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -32,7 +33,7 @@ import (
 )
 
 const (
-	defaultTimeout = 10 * time.Second
+	defaultTimeout = 30 * time.Second
 )
 
 // Exporter implements prometheus.Collector interface
@@ -50,6 +51,7 @@ var exporter *Exporter
 
 type chInstallationsIndex map[string]*WatchedCHI
 
+// Slice
 func (i chInstallationsIndex) Slice() []*WatchedCHI {
 	res := make([]*WatchedCHI, 0)
 	for _, chi := range i {
@@ -60,18 +62,14 @@ func (i chInstallationsIndex) Slice() []*WatchedCHI {
 
 // NewExporter returns a new instance of Exporter type
 func NewExporter(chAccess *CHAccessInfo) *Exporter {
-	timeout := chAccess.Timeout
-	if timeout == 0 {
-		timeout = defaultTimeout
-	}
-
 	return &Exporter{
 		chInstallations: make(map[string]*WatchedCHI),
 		chAccessInfo:    chAccess,
-		timeout:         chAccess.Timeout,
+		timeout:         defaultTimeout,
 	}
 }
 
+// getWatchedCHIs
 func (e *Exporter) getWatchedCHIs() []*WatchedCHI {
 	return e.chInstallations.Slice()
 }
@@ -110,10 +108,12 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	log.V(2).Info("Finished Collect")
 }
 
+// enqueueToRemoveFromWatched
 func (e *Exporter) enqueueToRemoveFromWatched(chi *WatchedCHI) {
 	e.toRemoveFromWatched.Store(chi, struct{}{})
 }
 
+// WalkWatchedChi
 func (e *Exporter) WalkWatchedChi(f func(chi *WatchedCHI, hostname string)) {
 	// Loop over ClickHouseInstallations
 	for _, chi := range e.chInstallations {
@@ -162,14 +162,15 @@ func (e *Exporter) updateWatched(chi *WatchedCHI) {
 
 // newFetcher returns new Metrics Fetcher for specified host
 func (e *Exporter) newFetcher(hostname string) *ClickHouseFetcher {
-	f := NewClickHouseFetcher(hostname, e.chAccessInfo.Username, e.chAccessInfo.Password, e.chAccessInfo.Port)
-
-	f.SetTimeout(e.timeout)
-
-	return f
+	return NewClickHouseFetcher(
+		hostname,
+		e.chAccessInfo.Username,
+		e.chAccessInfo.Password,
+		e.chAccessInfo.Port,
+	).SetTimeout(e.timeout)
 }
 
-// Ensure hostnames of the Pods from CHI object included into chopmetrics.Exporter state
+// UpdateWatch ensures hostnames of the Pods from CHI object included into metrics.Exporter state
 func (e *Exporter) UpdateWatch(namespace, chiName string, hostnames []string) {
 	chi := &WatchedCHI{
 		Namespace: namespace,
@@ -249,6 +250,18 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		return
 	}
 
+	log.V(2).Infof("Querying detached parts for %s\n", hostname)
+	if detachedParts, err := fetcher.getClickHouseQueryDetachedParts(); err == nil {
+		log.V(2).Infof("Extracted %d detached parts info for %s\n", len(detachedParts), hostname)
+		writer.WriteDetachedParts(detachedParts)
+		writer.WriteOKFetch("system.detached_parts")
+	} else {
+		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
+		log.V(2).Infof("Error querying detached parts for %s: %s\n", hostname, err)
+		writer.WriteErrorFetch("system.detached_parts")
+		//e.enqueueToRemoveFromWatched(chi)
+		return
+	}
 }
 
 // getWatchedCHI serves HTTP request to get list of watched CHIs
@@ -293,7 +306,7 @@ func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
 func (e *Exporter) DiscoveryWatchedCHIs(chop *chop.CHOp, chopClient *chopclientset.Clientset) {
 	// Get all CHI objects from watched namespace(s)
 	watchedNamespace := chop.Config().GetInformerNamespace()
-	list, err := chopClient.ClickhouseV1().ClickHouseInstallations(watchedNamespace).List(v1.ListOptions{})
+	list, err := chopClient.ClickhouseV1().ClickHouseInstallations(watchedNamespace).List(context.TODO(), v1.ListOptions{})
 	if err != nil {
 		log.V(1).Infof("Error read ClickHouseInstallations %v", err)
 		return
@@ -305,12 +318,16 @@ func (e *Exporter) DiscoveryWatchedCHIs(chop *chop.CHOp, chopClient *chopclients
 	// Walk over the list of ClickHouseInstallation objects and add them as watched
 	for i := range list.Items {
 		chi := &list.Items[i]
-		log.V(1).Infof("Adding explicitly found CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.FQDNs))
-		watchedCHI := &WatchedCHI{
-			Namespace: chi.Namespace,
-			Name:      chi.Name,
-			Hostnames: chi.Status.FQDNs,
+		if chi.IsStopped() {
+			log.V(1).Infof("Skip stopped CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.FQDNs))
+		} else {
+			log.V(1).Infof("Add explicitly found CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.FQDNs))
+			watchedCHI := &WatchedCHI{
+				Namespace: chi.Namespace,
+				Name:      chi.Name,
+				Hostnames: chi.Status.FQDNs,
+			}
+			e.updateWatched(watchedCHI)
 		}
-		e.updateWatched(watchedCHI)
 	}
 }

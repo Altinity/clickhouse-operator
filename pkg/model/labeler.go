@@ -38,17 +38,7 @@ const (
 	LabelCHIName                      = clickhousealtinitycom.GroupName + "/chi"
 	LabelClusterName                  = clickhousealtinitycom.GroupName + "/cluster"
 	LabelShardName                    = clickhousealtinitycom.GroupName + "/shard"
-	LabelShardScopeIndex              = clickhousealtinitycom.GroupName + "/shardScopeIndex"
 	LabelReplicaName                  = clickhousealtinitycom.GroupName + "/replica"
-	LabelReplicaScopeIndex            = clickhousealtinitycom.GroupName + "/replicaScopeIndex"
-	LabelCHIScopeIndex                = clickhousealtinitycom.GroupName + "/chiScopeIndex"
-	LabelCHIScopeCycleSize            = clickhousealtinitycom.GroupName + "/chiScopeCycleSize"
-	LabelCHIScopeCycleIndex           = clickhousealtinitycom.GroupName + "/chiScopeCycleIndex"
-	LabelCHIScopeCycleOffset          = clickhousealtinitycom.GroupName + "/chiScopeCycleOffset"
-	LabelClusterScopeIndex            = clickhousealtinitycom.GroupName + "/clusterScopeIndex"
-	LabelClusterScopeCycleSize        = clickhousealtinitycom.GroupName + "/clusterScopeCycleSize"
-	LabelClusterScopeCycleIndex       = clickhousealtinitycom.GroupName + "/clusterScopeCycleIndex"
-	LabelClusterScopeCycleOffset      = clickhousealtinitycom.GroupName + "/clusterScopeCycleOffset"
 	LabelConfigMap                    = clickhousealtinitycom.GroupName + "/ConfigMap"
 	labelConfigMapValueCHICommon      = "ChiCommon"
 	labelConfigMapValueCHICommonUsers = "ChiCommonUsers"
@@ -58,11 +48,24 @@ const (
 	labelServiceValueCluster          = "cluster"
 	labelServiceValueShard            = "shard"
 	labelServiceValueHost             = "host"
+	LabelPVCReclaimPolicyName         = clickhousealtinitycom.GroupName + "/reclaimPolicy"
 
 	// Supplementary service labels - used to cooperate with k8s
 	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/zookeeper-version"
 	LabelSettingsConfigVersion  = clickhousealtinitycom.GroupName + "/settings-version"
 	LabelObjectVersion          = clickhousealtinitycom.GroupName + "/object-version"
+
+	// Optional labels
+	LabelShardScopeIndex         = clickhousealtinitycom.GroupName + "/shardScopeIndex"
+	LabelReplicaScopeIndex       = clickhousealtinitycom.GroupName + "/replicaScopeIndex"
+	LabelCHIScopeIndex           = clickhousealtinitycom.GroupName + "/chiScopeIndex"
+	LabelCHIScopeCycleSize       = clickhousealtinitycom.GroupName + "/chiScopeCycleSize"
+	LabelCHIScopeCycleIndex      = clickhousealtinitycom.GroupName + "/chiScopeCycleIndex"
+	LabelCHIScopeCycleOffset     = clickhousealtinitycom.GroupName + "/chiScopeCycleOffset"
+	LabelClusterScopeIndex       = clickhousealtinitycom.GroupName + "/clusterScopeIndex"
+	LabelClusterScopeCycleSize   = clickhousealtinitycom.GroupName + "/clusterScopeCycleSize"
+	LabelClusterScopeCycleIndex  = clickhousealtinitycom.GroupName + "/clusterScopeCycleIndex"
+	LabelClusterScopeCycleOffset = clickhousealtinitycom.GroupName + "/clusterScopeCycleOffset"
 )
 
 // Labeler is an entity which can label CHI artifacts
@@ -154,8 +157,8 @@ func (l *Labeler) getLabelsCHIScope() map[string]string {
 	})
 }
 
-// getSelectorCHIScope gets labels to select a CHI-scoped object
-func (l *Labeler) getSelectorCHIScope() map[string]string {
+// GetSelectorCHIScope gets labels to select a CHI-scoped object
+func (l *Labeler) GetSelectorCHIScope() map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace: l.namer.getNamePartNamespace(l.chi),
@@ -166,7 +169,7 @@ func (l *Labeler) getSelectorCHIScope() map[string]string {
 
 // getSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
 func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
-	return l.appendReadyLabels(l.getSelectorCHIScope())
+	return l.appendReadyLabels(l.GetSelectorCHIScope())
 }
 
 // getLabelsClusterScope gets labels for Cluster-scoped object
@@ -229,24 +232,29 @@ func (l *Labeler) getSelectorShardScopeReady(shard *chi.ChiShard) map[string]str
 func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	labels := map[string]string{
-		LabelNamespace:               l.namer.getNamePartNamespace(host),
-		LabelAppName:                 LabelAppValue,
-		LabelCHIName:                 l.namer.getNamePartCHIName(host),
-		LabelClusterName:             l.namer.getNamePartClusterName(host),
-		LabelShardName:               l.namer.getNamePartShardName(host),
-		LabelShardScopeIndex:         l.namer.getNamePartShardScopeIndex(host),
-		LabelReplicaName:             l.namer.getNamePartReplicaName(host),
-		LabelReplicaScopeIndex:       l.namer.getNamePartReplicaScopeIndex(host),
-		LabelCHIScopeIndex:           l.namer.getNamePartCHIScopeIndex(host),
-		LabelCHIScopeCycleSize:       l.namer.getNamePartCHIScopeCycleSize(host),
-		LabelCHIScopeCycleIndex:      l.namer.getNamePartCHIScopeCycleIndex(host),
-		LabelCHIScopeCycleOffset:     l.namer.getNamePartCHIScopeCycleOffset(host),
-		LabelClusterScopeIndex:       l.namer.getNamePartClusterScopeIndex(host),
-		LabelClusterScopeCycleSize:   l.namer.getNamePartClusterScopeCycleSize(host),
-		LabelClusterScopeCycleIndex:  l.namer.getNamePartClusterScopeCycleIndex(host),
-		LabelClusterScopeCycleOffset: l.namer.getNamePartClusterScopeCycleOffset(host),
+		// Mandatory labels
+		LabelNamespace:   l.namer.getNamePartNamespace(host),
+		LabelAppName:     LabelAppValue,
+		LabelCHIName:     l.namer.getNamePartCHIName(host),
+		LabelClusterName: l.namer.getNamePartClusterName(host),
+		LabelShardName:   l.namer.getNamePartShardName(host),
+		LabelReplicaName: l.namer.getNamePartReplicaName(host),
+	}
+	if l.chop.Config().AppendScopeLabels {
+		// Optional labels
+		labels[LabelShardScopeIndex] = l.namer.getNamePartShardScopeIndex(host)
+		labels[LabelReplicaScopeIndex] = l.namer.getNamePartReplicaScopeIndex(host)
+		labels[LabelCHIScopeIndex] = l.namer.getNamePartCHIScopeIndex(host)
+		labels[LabelCHIScopeCycleSize] = l.namer.getNamePartCHIScopeCycleSize(host)
+		labels[LabelCHIScopeCycleIndex] = l.namer.getNamePartCHIScopeCycleIndex(host)
+		labels[LabelCHIScopeCycleOffset] = l.namer.getNamePartCHIScopeCycleOffset(host)
+		labels[LabelClusterScopeIndex] = l.namer.getNamePartClusterScopeIndex(host)
+		labels[LabelClusterScopeCycleSize] = l.namer.getNamePartClusterScopeCycleSize(host)
+		labels[LabelClusterScopeCycleIndex] = l.namer.getNamePartClusterScopeCycleIndex(host)
+		labels[LabelClusterScopeCycleOffset] = l.namer.getNamePartClusterScopeCycleOffset(host)
 	}
 	if applySupplementaryServiceLabels {
+		// Optional labels
 		// TODO
 		// When we'll have Cluster Discovery functionality we can refactor this properly
 		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
@@ -258,6 +266,25 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 // getLabelsHostScopeReady gets labels for Host-scoped object including Ready label
 func (l *Labeler) getLabelsHostScopeReady(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	return l.appendReadyLabels(l.getLabelsHostScope(host, applySupplementaryServiceLabels))
+}
+
+func (l *Labeler) getLabelsHostScopeReclaimPolicy(host *chi.ChiHost, template *chi.ChiVolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
+	return util.MergeStringMapsOverwrite(l.getLabelsHostScope(host, applySupplementaryServiceLabels), map[string]string{
+		LabelPVCReclaimPolicyName: template.PVCReclaimPolicy.String(),
+	})
+}
+
+func (l *Labeler) getReclaimPolicy(meta meta.ObjectMeta) chi.PVCReclaimPolicy {
+	defaultReclaimPolicy := chi.PVCReclaimPolicyDelete
+
+	if value, ok := meta.Labels[LabelPVCReclaimPolicyName]; ok {
+		reclaimPolicy := chi.NewPVCReclaimPolicyFromString(value)
+		if reclaimPolicy.IsValid() {
+			return reclaimPolicy
+		}
+	}
+
+	return defaultReclaimPolicy
 }
 
 // getSelectorShardScope gets labels to select a Host-scoped object
@@ -277,7 +304,8 @@ func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 
 // appendCHILabels appends CHI-provided labels to labels set
 func (l *Labeler) appendCHILabels(dst map[string]string) map[string]string {
-	return util.MergeStringMapsOverwrite(dst, l.chi.Labels)
+	sourceLabels := util.CopyMapExcept(l.chi.Labels, l.chop.Config().ExcludeFromPropagationLabels...)
+	return util.MergeStringMapsOverwrite(dst, sourceLabels)
 }
 
 // appendReadyLabels appends "Ready" label to labels set
@@ -469,6 +497,48 @@ func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 		return "", fmt.Errorf("can not find %s label in meta", LabelClusterName)
 	}
 	return meta.Labels[LabelClusterName], nil
+}
+
+// MakeObjectVersionLabel
+func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
+	meta.Labels = util.MergeStringMapsOverwrite(
+		meta.Labels,
+		map[string]string{
+			LabelObjectVersion: util.Fingerprint(obj),
+		},
+	)
+}
+
+func isObjectVersionLabelTheSame(meta *meta.ObjectMeta, value string) bool {
+	if meta == nil {
+		return false
+	}
+
+	l, ok := meta.Labels[LabelObjectVersion]
+	if !ok {
+		return false
+	}
+
+	return l == value
+}
+
+func IsObjectTheSame(meta1, meta2 *meta.ObjectMeta) bool {
+	if (meta1 == nil) && (meta2 == nil) {
+		return true
+	}
+	if (meta1 != nil) && (meta2 == nil) {
+		return false
+	}
+	if (meta1 == nil) && (meta2 != nil) {
+		return false
+	}
+
+	l, ok := meta2.Labels[LabelObjectVersion]
+	if !ok {
+		return false
+	}
+
+	return isObjectVersionLabelTheSame(meta1, l)
 }
 
 // AppendLabelReady adds "ready" label with value = UTC now

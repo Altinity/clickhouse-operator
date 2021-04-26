@@ -81,7 +81,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1602226784521,
+  "iteration": 1619238572345,
   "links": [],
   "panels": [
     {
@@ -2338,13 +2338,8 @@
       "links": [
         {
           "targetBlank": true,
-          "title": "system.parts",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-parts"
-        },
-        {
-          "targetBlank": true,
-          "title": "parts_to_delay_insert",
-          "url": "https://github.com/ClickHouse/ClickHouse/search?q=parts_to_delay_insert"
+          "title": "system.detached_parts",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/detached_parts/"
         }
       ],
       "nullPointMode": "null",
@@ -2355,22 +2350,51 @@
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
+      "seriesOverrides": [
+        {
+          "$$hashKey": "object:254",
+          "alias": "/.*detached_by_user.*/",
+          "color": "#CA95E5"
+        },
+        {
+          "$$hashKey": "object:285",
+          "alias": "/.*broken.*/",
+          "color": "#E02F44"
+        },
+        {
+          "$$hashKey": "object:355",
+          "alias": "/.*(clone|ignored).*/",
+          "color": "#FFEE52"
+        },
+        {
+          "$$hashKey": "object:447",
+          "alias": "/^Inactive/",
+          "yaxis": 2
+        }
+      ],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",active=\"0\"})",
-          "legendFormat": "Parts {{hostname}}",
+          "expr": "sum by(hostname,reason) (chi_clickhouse_metric_DetachedParts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "interval": "",
+          "legendFormat": "{{reason}} {{hostname}} ",
           "refId": "C"
+        },
+        {
+          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",active=\"0\"})",
+          "hide": true,
+          "interval": "",
+          "legendFormat": "Inactive {{hostname}} ",
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Inactive Parts",
+      "title": "Detached parts",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -2403,8 +2427,8 @@
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": true,
+        "alignLevel": 0
       }
     },
     {

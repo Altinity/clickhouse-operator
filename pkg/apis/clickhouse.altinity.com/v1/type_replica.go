@@ -15,22 +15,24 @@
 package v1
 
 func (replica *ChiReplica) InheritSettingsFrom(cluster *ChiCluster) {
-	(&replica.Settings).MergeFrom(cluster.Settings)
+	replica.Settings = replica.Settings.MergeFrom(cluster.Settings)
 }
 
 func (replica *ChiReplica) InheritFilesFrom(cluster *ChiCluster) {
-	(&replica.Files).MergeFrom(cluster.Files)
+	replica.Files = replica.Files.MergeFrom(cluster.Files)
 }
 
 func (replica *ChiReplica) InheritTemplatesFrom(cluster *ChiCluster) {
-	(&replica.Templates).MergeFrom(&cluster.Templates, MergeTypeFillEmptyValues)
-	(&replica.Templates).HandleDeprecatedFields()
+	replica.Templates = replica.Templates.MergeFrom(cluster.Templates, MergeTypeFillEmptyValues)
+	replica.Templates.HandleDeprecatedFields()
 }
 
 func (replica *ChiReplica) GetServiceTemplate() (*ChiServiceTemplate, bool) {
-	name := replica.Templates.ReplicaServiceTemplate
-	template, ok := replica.CHI.GetServiceTemplate(name)
-	return template, ok
+	if !replica.Templates.HasReplicaServiceTemplate() {
+		return nil, false
+	}
+	name := replica.Templates.GetReplicaServiceTemplate()
+	return replica.CHI.GetServiceTemplate(name)
 }
 
 func (replica *ChiReplica) WalkHosts(

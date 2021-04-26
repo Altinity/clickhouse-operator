@@ -66,7 +66,7 @@ func MessageDiffItemString(banner string, items map[*messagediff.Path]interface{
 		}
 		str += fmt.Sprintf("\n")
 		str += fmt.Sprintf("ap item value:")
-		str += fmt.Sprintf("%v\n", items[pathPtr])
+		str += fmt.Sprintf("'%+v'\n", items[pathPtr])
 	}
 	str += fmt.Sprintf("-------------------------\n")
 
