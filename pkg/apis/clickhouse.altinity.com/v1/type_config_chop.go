@@ -474,14 +474,8 @@ func (config *OperatorConfig) applyDefaultWatchNamespace() {
 	}
 
 	// No namespaces specified
-
-	namespace := os.Getenv(OPERATOR_POD_NAMESPACE)
-	if namespace == "kube-system" {
-		// Do nothing, we already have len(config.WatchNamespaces) == 0
-	} else {
-		// We have WATCH_NAMESPACE specified
-		config.WatchNamespaces = []string{namespace}
-	}
+	// Default watch all namespace
+	// Do nothing, we already have len(config.WatchNamespaces) == 0
 }
 
 // readClickHouseCustomConfigFiles reads all extra user-specified ClickHouse config files
