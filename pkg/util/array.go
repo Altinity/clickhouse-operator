@@ -17,6 +17,7 @@ package util
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"sort"
 )
 
@@ -24,6 +25,17 @@ import (
 func InArray(needle string, haystack []string) bool {
 	for _, item := range haystack {
 		if item == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// InArrayWithRegexp checks whether the needle can be matched by haystack
+func InArrayWithRegexp(needle string, haystack []string) bool {
+	for _, item := range haystack {
+		matched, _ := regexp.MatchString(item, needle)
+		if item == needle || matched {
 			return true
 		}
 	}
