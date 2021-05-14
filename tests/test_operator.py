@@ -1182,11 +1182,14 @@ def test_021(self):
         },
     )
 
-    with Then("Storage size should be 100Mi"):
+    with Then("Storage size should be 1Gi"):
         size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
-        assert size == "100Mi"
+        assert size == "1Gi"
+    
+    with Then("Create a table with a single row"):
+        clickhouse.query(chi, "CREATE TABLE test_local Engine = Log as SELECT 1")
 
-    with When("Re-scale volume configuration to 200Mb"):
+    with When("Re-scale volume configuration to 2Gi"):
         kubectl.create_and_check(
             config="configs/test-021-rescale-volume-02-enlarge-disk.yaml",
             check={
@@ -1195,12 +1198,16 @@ def test_021(self):
             },
         )
 
-        with Then("Storage size should be 200Mi"):
-            kubectl.wait_field("pvc", "disk1-chi-test-021-rescale-volume-simple-0-0-0", ".spec.resources.requests.storage", "200Mi")
+        with Then("Storage size should be 2Gi"):
+            kubectl.wait_field("pvc", "disk1-chi-test-021-rescale-volume-simple-0-0-0", ".spec.resources.requests.storage", "2Gi")
             size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
-            assert size == "200Mi"
+            assert size == "2Gi"
+        
+        with And("Table should exist"):
+            out = clickhouse.query(chi, "select * from test_local")
+            assert out == "1"
 
-    with When("Add second disk 50Mi"):
+    with When("Add a second disk"):
         kubectl.create_and_check(
             config="configs/test-021-rescale-volume-03-add-disk.yaml",
             check={
@@ -1216,11 +1223,11 @@ def test_021(self):
 
         with Then("There should be two PVC"):
             size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
-            assert size == "200Mi"
+            assert size == "2Gi"
             kubectl.wait_object("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0")
             kubectl.wait_field("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0", ".status.phase", "Bound")
             size = kubectl.get_pvc_size("disk2-chi-test-021-rescale-volume-simple-0-0-0")
-            assert size == "50Mi"
+            assert size == "1Gi"
 
         with And("There should be two disks recognized by ClickHouse"):
             kubectl.wait_pod_status("chi-test-021-rescale-volume-simple-0-0-0", "Running")
@@ -1236,6 +1243,23 @@ def test_021(self):
             print(out)
             assert out == "2"
 
+    with When("Try reducing the disk size and also change a version to recreate the stateful set"):
+        kubectl.create_and_check(
+            config="configs/test-021-rescale-volume-04-decrease-disk.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+        
+        with Then("Storage size should be unchanged 2Gi"):
+            size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            assert size == "2Gi"
+        
+        with And("Table should exist"):
+            out = clickhouse.query(chi, "select * from test_local")
+            assert out == "1"
+            
     kubectl.delete_chi(chi)
 
 
@@ -1356,7 +1380,7 @@ def test_025(self):
     with Then("Query second pod using service as soon as pod is in ready state"):
         kubectl.wait_field(
             "pod", "chi-test-025-rescaling-default-0-1-0",
-            ".status.containerStatuses[0].ready", "true",
+            ".metadata.labels.\"clickhouse\\.altinity\\.com/ready\"", "yes",
             backoff = 1
         )
         start_time = time.time()
