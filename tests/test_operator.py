@@ -1239,8 +1239,6 @@ def test_021(self):
                     break
                 with Then(f"Not ready yet. Wait for {1<<i} seconds"):
                     time.sleep(1<<i)
-            print("SELECT count() FROM system.disks RETURNED:")
-            print(out)
             assert out == "2"
 
     with When("Try reducing the disk size and also change a version to recreate the stateful set"):
@@ -1259,7 +1257,29 @@ def test_021(self):
         with And("Table should exist"):
             out = clickhouse.query(chi, "select * from test_local")
             assert out == "1"
-            
+        
+        with And("PVC status should not be Terminating"):
+            status = kubectl.get_field("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0", ".status.phase")
+            assert status != "Terminating"
+    
+    with When("Revert disk size back to 2Gi"):
+        kubectl.create_and_check(
+            config="configs/test-021-rescale-volume-03-add-disk.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+        
+        with Then("Storage size should be 2Gi"):
+            kubectl.wait_field("pvc", "disk1-chi-test-021-rescale-volume-simple-0-0-0", ".spec.resources.requests.storage", "2Gi")
+            size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            assert size == "2Gi"
+        
+        with And("Table should exist"):
+            out = clickhouse.query(chi, "select * from test_local")
+            assert out == "1"
+    
     kubectl.delete_chi(chi)
 
 
