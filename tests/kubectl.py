@@ -351,9 +351,9 @@ def check_configmaps(chi_name, ns=namespace):
     check_configmap(
         f"chi-{chi_name}-common-configd",
         [
-            "01-clickhouse-listen.xml",
-            "02-clickhouse-logger.xml",
-            "03-clickhouse-querylog.xml",
+            "01-clickhouse-01-listen.xml",
+            "01-clickhouse-02-logger.xml",
+            "01-clickhouse-03-query_log.xml",
         ],
         ns=ns,
     )
