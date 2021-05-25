@@ -17,6 +17,7 @@ package clickhouse
 import (
 	"context"
 	databasesql "database/sql"
+	"fmt"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 )
@@ -57,4 +58,33 @@ func (q *Query) Close() {
 		q.cancelFunc()
 		q.cancelFunc = nil
 	}
+}
+
+// UnzipColumnsAsStrings splits result table into columns
+func (q *Query) UnzipColumnsAsStrings(columns ...[]string) error {
+	if q == nil {
+		return fmt.Errorf("empty query")
+	}
+	if q.Rows == nil {
+		return fmt.Errorf("no rows")
+	}
+
+	// Results
+	row := make([]string, len(columns), len(columns))
+	pointers := make([]interface{}, len(columns), len(columns))
+	for i := range row {
+		pointers[i] = &row[i]
+	}
+
+	// Scan rows
+	for q.Rows.Next() {
+		if err := q.Rows.Scan(pointers...); err != nil {
+			log.V(1).A().Error("UNABLE to scan row err: %v", err)
+			return err
+		}
+		for i := range columns {
+			columns[i] = append(columns[i], row[i])
+		}
+	}
+	return nil
 }

@@ -16,6 +16,7 @@ package model
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -55,71 +56,69 @@ func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
 	return clickhouse.GetPooledDBConnection(clickhouse.NewCHConnectionParams(hostname, s.Username, s.Password, s.Port))
 }
 
-// getObjectListFromClickHouse
-func (s *Schemer) getObjectListFromClickHouseContext(ctx context.Context, endpoints []string, sql string) ([]string, []string, error) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
-		return nil, nil, nil
-	}
-
-	if len(endpoints) == 0 {
-		// Nowhere to fetch data from
-		return nil, nil, nil
-	}
-
-	// Results
-	var names []string
-	var statements []string
-	var err error
-
-	// Fetch data from any of specified services
-	var query *clickhouse.Query = nil
+// walkQuery walks over provided endpoints and runs query sequentially on each endpoint.
+// In case endpoint returned result, walk is completed and result is returned
+// In case endpoint failed, continue with next endpoint
+func (s *Schemer) walkQuery(ctx context.Context, endpoints []string, sql string) (*clickhouse.Query, error) {
+	// Fetch data from any of specified endpoints
 	for _, endpoint := range endpoints {
 		if util.IsContextDone(ctx) {
 			log.V(2).Info("ctx is done")
-			return nil, nil, nil
+			return nil, nil
 		}
-		log.V(1).Info("Run query on: %s of %v", endpoint, endpoints)
 
-		query, err = s.getCHConnection(endpoint).QueryContext(ctx, sql)
-		if err == nil {
-			// One of specified services returned result, no need to iterate more
-			break
+		log.V(1).Info("Run query on: %s of %v", endpoint, endpoints)
+		if query, err := s.getCHConnection(endpoint).QueryContext(ctx, sql); err == nil {
+			// One of specified endpoints returned result, no need to iterate more
+			return query, nil
 		} else {
 			log.V(1).A().Warning("FAILED to run query on: %s of %v skip to next. err: %v", endpoint, endpoints, err)
 		}
 	}
+
+	str := fmt.Sprintf("FAILED to run query on all endpoints %v", endpoints)
+	log.V(1).A().Error(str)
+	return nil, fmt.Errorf(str)
+}
+
+// walkQueryUnzipColumns
+func (s *Schemer) walkQueryUnzipColumns(ctx context.Context, endpoints []string, sql string, columns ...[]string) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	if len(endpoints) == 0 {
+		// Nowhere to fetch data from
+		return nil
+	}
+
+	// Fetch data from any of specified endpoints
+	query, err := s.walkQuery(ctx, endpoints, sql)
 	if err != nil {
-		log.V(1).A().Error("FAILED to run query on all endpoints %v", endpoints)
-		return nil, nil, err
+		return nil
+	}
+	if query == nil {
+		return nil
 	}
 
 	// Some data available, let's fetch it
 	defer query.Close()
+	return query.UnzipColumnsAsStrings(columns...)
+}
 
-	// Sanity check
-	if query == nil {
-		return nil, nil, nil
+// walkQueryUnzip2Columns
+func (s *Schemer) walkQueryUnzip2Columns(ctx context.Context, endpoints []string, sql string) ([]string, []string, error) {
+	var column1 []string
+	var column2 []string
+	if err := s.walkQueryUnzipColumns(ctx, endpoints, sql, column1, column2); err != nil {
+		return nil, nil, err
 	}
-	if query.Rows == nil {
-		return nil, nil, nil
-	}
-
-	for query.Rows.Next() {
-		var name, statement string
-		if err := query.Rows.Scan(&name, &statement); err == nil {
-			names = append(names, name)
-			statements = append(statements, statement)
-		} else {
-			log.V(1).A().Error("UNABLE to scan row err: %v", err)
-		}
-	}
-
-	return names, statements, nil
+	return column1, column2, nil
 }
 
 // getCreateDistributedObjectsContext returns a list of objects that needs to be created on a shard in a cluster
-// That includes all Distributed tables, corresponding local tables, and databases, if necessary
+// That includes all distributed tables, corresponding local tables and databases, if necessary
 func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
@@ -177,7 +176,7 @@ func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *
 
 	log.V(1).M(host).F().Info("fetch dbs list")
 	log.V(1).M(host).F().Info("dbs sql\n%v", sqlDBs)
-	names1, sqlStatements1, _ := s.getObjectListFromClickHouseContext(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
+	names1, sqlStatements1, _ := s.walkQueryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
 	log.V(1).M(host).F().Info("names1:")
 	for _, v := range names1 {
 		log.V(1).M(host).F().Info("names1: %s", v)
@@ -189,7 +188,7 @@ func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *
 
 	log.V(1).M(host).F().Info("fetch table list")
 	log.V(1).M(host).F().Info("tbl sql\n%v", sqlTables)
-	names2, sqlStatements2, _ := s.getObjectListFromClickHouseContext(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
+	names2, sqlStatements2, _ := s.walkQueryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
 	log.V(1).M(host).F().Info("names2:")
 	for _, v := range names2 {
 		log.V(1).M(host).F().Info("names2: %s", v)
@@ -248,8 +247,8 @@ func (s *Schemer) getCreateReplicaObjectsContext(ctx context.Context, host *chop
 		SETTINGS skip_unavailable_shards = 1`,
 	)
 
-	names1, sqlStatements1, _ := s.getObjectListFromClickHouseContext(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
-	names2, sqlStatements2, _ := s.getObjectListFromClickHouseContext(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
+	names1, sqlStatements1, _ := s.walkQueryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
+	names2, sqlStatements2, _ := s.walkQueryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
 	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
 }
 
@@ -265,7 +264,7 @@ func (s *Schemer) hostGetDropTablesContext(ctx context.Context, host *chop.ChiHo
 		WHERE engine like 'Replicated%'`,
 	)
 
-	names, sqlStatements, _ := s.getObjectListFromClickHouseContext(ctx, []string{CreatePodFQDN(host)}, sql)
+	names, sqlStatements, _ := s.walkQueryUnzip2Columns(ctx, []string{CreatePodFQDN(host)}, sql)
 	return names, sqlStatements, nil
 }
 
