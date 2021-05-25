@@ -1924,7 +1924,7 @@ metadata:
   labels:
     app: clickhouse-operator
 data:
-  01-clickhouse-listen.xml: |
+  01-clickhouse-01-listen.xml: |
     <yandex>
         <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
         <listen_host>::</listen_host>
@@ -1932,7 +1932,7 @@ data:
         <listen_try>1</listen_try>
     </yandex>
 
-  02-clickhouse-logger.xml: |
+  01-clickhouse-02-logger.xml: |
     <yandex>
         <logger>
             <!-- Possible levels: https://github.com/pocoproject/poco/blob/develop/Foundation/include/Poco/Logger.h#L105 -->
@@ -1946,25 +1946,27 @@ data:
         </logger>
     </yandex>
 
-  03-clickhouse-querylog.xml: |
+  01-clickhouse-03-query_log.xml: |
     <yandex>
-    <query_log replace="1">
-        <database>system</database>
-        <table>query_log</table>
-        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
-        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
-    </query_log>
-    <query_thread_log remove="1"/>
+        <query_log replace="1">
+            <database>system</database>
+            <table>query_log</table>
+            <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
+            <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        </query_log>
+        <query_thread_log remove="1"/>
     </yandex>
-  04-clickhouse-partlog.xml: |
+
+  01-clickhouse-04-part_log.xml: |
     <yandex>
-    <part_log replace="1">
-        <database>system</database>
-        <table>part_log</table>
-        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
-        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
-    </part_log>
+        <part_log replace="1">
+            <database>system</database>
+            <table>part_log</table>
+            <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
+            <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        </part_log>
     </yandex>
+
 ---
 # Possible Template Parameters:
 #
