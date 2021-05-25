@@ -61,7 +61,7 @@ func (q *Query) Close() {
 }
 
 // UnzipColumnsAsStrings splits result table into columns
-func (q *Query) UnzipColumnsAsStrings(columns ...[]string) error {
+func (q *Query) UnzipColumnsAsStrings(columns ...*[]string) error {
 	if q == nil {
 		return fmt.Errorf("empty query")
 	}
@@ -83,7 +83,7 @@ func (q *Query) UnzipColumnsAsStrings(columns ...[]string) error {
 			return err
 		}
 		for i := range columns {
-			columns[i] = append(columns[i], row[i])
+			*columns[i] = append(*columns[i], row[i])
 		}
 	}
 	return nil

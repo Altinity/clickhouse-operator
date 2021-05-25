@@ -82,7 +82,7 @@ func (s *Schemer) walkQuery(ctx context.Context, endpoints []string, sql string)
 }
 
 // walkQueryUnzipColumns
-func (s *Schemer) walkQueryUnzipColumns(ctx context.Context, endpoints []string, sql string, columns ...[]string) error {
+func (s *Schemer) walkQueryUnzipColumns(ctx context.Context, endpoints []string, sql string, columns ...*[]string) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -111,7 +111,7 @@ func (s *Schemer) walkQueryUnzipColumns(ctx context.Context, endpoints []string,
 func (s *Schemer) walkQueryUnzip2Columns(ctx context.Context, endpoints []string, sql string) ([]string, []string, error) {
 	var column1 []string
 	var column2 []string
-	if err := s.walkQueryUnzipColumns(ctx, endpoints, sql, column1, column2); err != nil {
+	if err := s.walkQueryUnzipColumns(ctx, endpoints, sql, &column1, &column2); err != nil {
 		return nil, nil, err
 	}
 	return column1, column2, nil
