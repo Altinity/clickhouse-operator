@@ -50,7 +50,7 @@ if main():
                 test_operator.test_006,
                 test_operator.test_007,
                 test_operator.test_008,
-                (test_operator.test_009, {"version_from": "0.13.5"}),
+                (test_operator.test_009, {"version_from": "0.14.0"}),
                 test_operator.test_010,
                 test_operator.test_011,
                 test_operator.test_011_1,

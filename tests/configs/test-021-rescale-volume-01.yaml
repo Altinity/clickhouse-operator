@@ -19,7 +19,7 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 100Mi
+              storage: 1Gi
     podTemplates:
       - name: multi-volume
         spec:

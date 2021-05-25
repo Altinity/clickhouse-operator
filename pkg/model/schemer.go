@@ -16,7 +16,6 @@ package model
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -128,28 +127,14 @@ func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *
 	}
 
 	hosts := CreatePodFQDNsOfCluster(host.GetCluster())
-	nHosts := len(hosts)
-	if nHosts <= 1 {
+	if len(hosts) <= 1 {
 		log.V(1).M(host).F().Info("Single host in a cluster. Nothing to create a schema from.")
 		return nil, nil, nil
 	}
 
-	var hostIndex int
-	for i, h := range hosts {
-		if h == CreatePodFQDN(host) {
-			hostIndex = i
-			break
-		}
-	}
+	log.V(1).M(host).F().Info("Extracting distributed table definitions from hosts %v", hosts)
 
-	// remove new host from the list. See https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
-	hosts[hostIndex] = hosts[nHosts-1]
-	hosts = hosts[:nHosts-1]
-	log.V(1).M(host).F().Info("Extracting distributed table definitions from hosts: %v", hosts)
-
-	cluster_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(hosts, ","))
-
-	sqlDBs := heredoc.Doc(strings.ReplaceAll(`
+	sqlDBs := heredoc.Doc(`
 		SELECT DISTINCT 
 			database AS name, 
 			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_query
@@ -160,10 +145,8 @@ func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 		)`,
-		"cluster('all-sharded', system.tables)",
-		cluster_tables,
-	))
-	sqlTables := heredoc.Doc(strings.ReplaceAll(`
+	)
+	sqlTables := heredoc.Doc(`
 		SELECT DISTINCT 
 			concat(database,'.', name) as name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
@@ -190,9 +173,7 @@ func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *
 		) tables
 		ORDER BY order
 		`,
-		"cluster('all-sharded', system.tables)",
-		cluster_tables,
-	))
+	)
 
 	log.V(1).M(host).F().Info("fetch dbs list")
 	log.V(1).M(host).F().Info("dbs sql\n%v", sqlDBs)
@@ -244,37 +225,28 @@ func (s *Schemer) getCreateReplicaObjectsContext(ctx context.Context, host *chop
 		return nil, nil, nil
 	}
 	replicas := CreatePodFQDNsOfShard(shard)
-	nReplicas := len(replicas)
-	if nReplicas <= 1 {
+	if len(replicas) <= 1 {
 		log.V(1).M(host).F().Info("Single replica in a shard. Nothing to create a schema from.")
 		return nil, nil, nil
 	}
-	// remove new replica from the list. See https://stackoverflow.com/questions/37334119/how-to-delete-an-element-from-a-slice-in-golang
-	replicas[replicaIndex] = replicas[nReplicas-1]
-	replicas = replicas[:nReplicas-1]
 	log.V(1).M(host).F().Info("Extracting replicated table definitions from %v", replicas)
 
-	system_tables := fmt.Sprintf("remote('%s', system, tables)", strings.Join(replicas, ","))
-
-	sqlDBs := heredoc.Doc(strings.ReplaceAll(`
+	sqlDBs := heredoc.Doc(`
 		SELECT DISTINCT 
 			database AS name, 
 			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_db_query
-		FROM system.tables
+		FROM cluster('all-sharded', system.tables) tables
 		WHERE database != 'system'
 		SETTINGS skip_unavailable_shards = 1`,
-		"system.tables", system_tables,
-	))
-	sqlTables := heredoc.Doc(strings.ReplaceAll(`
+	)
+	sqlTables := heredoc.Doc(`
 		SELECT DISTINCT 
 			name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
-		FROM system.tables
+		FROM cluster('all-sharded', system.tables) tables
 		WHERE database != 'system' and create_table_query != '' and name not like '.inner.%'
 		SETTINGS skip_unavailable_shards = 1`,
-		"system.tables",
-		system_tables,
-	))
+	)
 
 	names1, sqlStatements1, _ := s.getObjectListFromClickHouseContext(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
 	names2, sqlStatements2, _ := s.getObjectListFromClickHouseContext(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
