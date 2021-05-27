@@ -171,22 +171,7 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 		return nil, nil, nil
 	}
 
-	var shard *chop.ChiShard = nil
-	var replicaIndex int
-	for shardIndex := range host.GetCluster().Layout.Shards {
-		shard = &host.GetCluster().Layout.Shards[shardIndex]
-		for replicaIndex = range shard.Hosts {
-			replica := shard.Hosts[replicaIndex]
-			if replica == host {
-				break
-			}
-		}
-	}
-	if shard == nil {
-		log.V(1).M(host).F().Info("Can not find shard for replica")
-		return nil, nil, nil
-	}
-	replicas := CreatePodFQDNsOfShard(shard)
+	replicas := CreatePodFQDNsOfShard(host.GetShard())
 	if len(replicas) <= 1 {
 		log.V(1).M(host).F().Info("Single replica in a shard. Nothing to create a schema from.")
 		return nil, nil, nil
