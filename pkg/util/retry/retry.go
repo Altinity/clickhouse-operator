@@ -12,25 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package retry
 
 import (
 	"context"
 	"time"
 
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-
 )
 
 // RetryContext
-func RetryContext(ctx context.Context, tries int, desc string, f func() error, logger func(format string, args ...interface{})) error {
+func RetryContext(ctx context.Context, tries int, desc string, a log.Announcer, f func() error) error {
 	var err error
-	if logger == nil {
-		logger = log.NilLogger
-	}
 	for try := 1; try <= tries; try++ {
-		if IsContextDone(ctx) {
-			logger("ctx is done")
+		if util.IsContextDone(ctx) {
+			a.Info("ctx is done")
 			return nil
 		}
 		// Do useful things
@@ -40,7 +37,7 @@ func RetryContext(ctx context.Context, tries int, desc string, f func() error, l
 			// All ok, no need to retry more
 			if try > 1 {
 				// Done, but after some retries, this is not 'clean'
-				logger("DONE attempt %d of %d: %s", try, tries, desc)
+				a.Info("DONE attempt %d of %d: %s", try, tries, desc)
 			}
 			return nil
 		}
@@ -48,14 +45,14 @@ func RetryContext(ctx context.Context, tries int, desc string, f func() error, l
 		if try < tries {
 			// Try failed, need to sleep and retry
 			seconds := try * 5
-			logger("FAILED attempt %d of %d, sleep %d sec and retry: %s", try, tries, seconds, desc)
-			WaitContextDoneOrTimeout(ctx, time.Duration(seconds)*time.Second)
+			a.Info("FAILED attempt %d of %d, sleep %d sec and retry: %s", try, tries, seconds, desc)
+			util.WaitContextDoneOrTimeout(ctx, time.Duration(seconds)*time.Second)
 		} else if tries == 1 {
 			// On single try do not put so much emotion. It just failed and user is not intended to retry
-			logger("FAILED single try. No retries will be made for %s", desc)
+			a.Warning("FAILED single try. No retries will be made for %s", desc)
 		} else {
 			// On last try no need to wait more
-			logger("FAILED AND ABORT. All %d attempts: %s", tries, desc)
+			a.Warning("FAILED AND ABORT. All %d attempts: %s", tries, desc)
 		}
 	}
 
