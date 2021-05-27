@@ -16,7 +16,6 @@ package model
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -37,17 +36,20 @@ const (
 
 // Schemer
 type Schemer struct {
-	Username string
-	Password string
-	Port     int
+	clickhouse.ClusterConnectionParams
+	Cluster *clickhouse.Cluster
 }
 
 // NewSchemer
 func NewSchemer(username, password string, port int) *Schemer {
-	return &Schemer{
+	params := clickhouse.ClusterConnectionParams{
 		Username: username,
 		Password: password,
 		Port:     port,
+	}
+	return &Schemer{
+		ClusterConnectionParams: params,
+		Cluster: clickhouse.NewCluster().SetConnectionParams(params),
 	}
 }
 
@@ -56,33 +58,8 @@ func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
 	return clickhouse.GetPooledDBConnection(clickhouse.NewCHConnectionParams(hostname, s.Username, s.Password, s.Port))
 }
 
-// walkQuery walks over provided endpoints and runs query sequentially on each endpoint.
-// In case endpoint returned result, walk is completed and result is returned
-// In case endpoint failed, continue with next endpoint
-func (s *Schemer) walkQuery(ctx context.Context, endpoints []string, sql string) (*clickhouse.Query, error) {
-	// Fetch data from any of specified endpoints
-	for _, endpoint := range endpoints {
-		if util.IsContextDone(ctx) {
-			log.V(2).Info("ctx is done")
-			return nil, nil
-		}
-
-		log.V(1).Info("Run query on: %s of %v", endpoint, endpoints)
-		if query, err := s.getCHConnection(endpoint).QueryContext(ctx, sql); err == nil {
-			// One of specified endpoints returned result, no need to iterate more
-			return query, nil
-		} else {
-			log.V(1).A().Warning("FAILED to run query on: %s of %v skip to next. err: %v", endpoint, endpoints, err)
-		}
-	}
-
-	str := fmt.Sprintf("FAILED to run query on all endpoints %v", endpoints)
-	log.V(1).A().Error(str)
-	return nil, fmt.Errorf(str)
-}
-
-// walkQueryUnzipColumns
-func (s *Schemer) walkQueryUnzipColumns(ctx context.Context, endpoints []string, sql string, columns ...*[]string) error {
+// queryUnzipColumns
+func (s *Schemer) queryUnzipColumns(ctx context.Context, endpoints []string, sql string, columns ...*[]string) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -94,7 +71,7 @@ func (s *Schemer) walkQueryUnzipColumns(ctx context.Context, endpoints []string,
 	}
 
 	// Fetch data from any of specified endpoints
-	query, err := s.walkQuery(ctx, endpoints, sql)
+	query, err := s.Cluster.SetEndpoints(endpoints).Any(ctx, sql)
 	if err != nil {
 		return nil
 	}
@@ -107,11 +84,11 @@ func (s *Schemer) walkQueryUnzipColumns(ctx context.Context, endpoints []string,
 	return query.UnzipColumnsAsStrings(columns...)
 }
 
-// walkQueryUnzip2Columns
-func (s *Schemer) walkQueryUnzip2Columns(ctx context.Context, endpoints []string, sql string) ([]string, []string, error) {
+// queryUnzip2Columns
+func (s *Schemer) queryUnzip2Columns(ctx context.Context, endpoints []string, sql string) ([]string, []string, error) {
 	var column1 []string
 	var column2 []string
-	if err := s.walkQueryUnzipColumns(ctx, endpoints, sql, &column1, &column2); err != nil {
+	if err := s.queryUnzipColumns(ctx, endpoints, sql, &column1, &column2); err != nil {
 		return nil, nil, err
 	}
 	return column1, column2, nil
@@ -176,7 +153,7 @@ func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *
 
 	log.V(1).M(host).F().Info("fetch dbs list")
 	log.V(1).M(host).F().Info("dbs sql\n%v", sqlDBs)
-	names1, sqlStatements1, _ := s.walkQueryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
+	names1, sqlStatements1, _ := s.queryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
 	log.V(1).M(host).F().Info("names1:")
 	for _, v := range names1 {
 		log.V(1).M(host).F().Info("names1: %s", v)
@@ -188,7 +165,7 @@ func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *
 
 	log.V(1).M(host).F().Info("fetch table list")
 	log.V(1).M(host).F().Info("tbl sql\n%v", sqlTables)
-	names2, sqlStatements2, _ := s.walkQueryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
+	names2, sqlStatements2, _ := s.queryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
 	log.V(1).M(host).F().Info("names2:")
 	for _, v := range names2 {
 		log.V(1).M(host).F().Info("names2: %s", v)
@@ -247,8 +224,8 @@ func (s *Schemer) getCreateReplicaObjectsContext(ctx context.Context, host *chop
 		SETTINGS skip_unavailable_shards = 1`,
 	)
 
-	names1, sqlStatements1, _ := s.walkQueryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
-	names2, sqlStatements2, _ := s.walkQueryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
+	names1, sqlStatements1, _ := s.queryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
+	names2, sqlStatements2, _ := s.queryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
 	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
 }
 
@@ -264,7 +241,7 @@ func (s *Schemer) hostGetDropTablesContext(ctx context.Context, host *chop.ChiHo
 		WHERE engine like 'Replicated%'`,
 	)
 
-	names, sqlStatements, _ := s.walkQueryUnzip2Columns(ctx, []string{CreatePodFQDN(host)}, sql)
+	names, sqlStatements, _ := s.queryUnzip2Columns(ctx, []string{CreatePodFQDN(host)}, sql)
 	return names, sqlStatements, nil
 }
 
