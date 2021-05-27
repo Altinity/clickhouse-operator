@@ -220,7 +220,7 @@ func (s *Schemer) hostGetDropTables(ctx context.Context, host *chop.ChiHost) ([]
 func (s *Schemer) HostDeleteTables(ctx context.Context, host *chop.ChiHost) error {
 	tableNames, dropTableSQLs, _ := s.hostGetDropTables(ctx, host)
 	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	return s.execHost(ctx, host, dropTableSQLs, false)
+	return s.execHost(ctx, host, dropTableSQLs, false, false)
 }
 
 // HostCreateTables
@@ -238,7 +238,7 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 		if len(createSQLs) > 0 {
 			log.V(1).M(host).F().Info("Creating replica objects at %s: %v", host.Address.HostName, names)
 			log.V(1).M(host).F().Info("\n%v", createSQLs)
-			err1 = s.execHost(ctx, host, createSQLs, true)
+			err1 = s.execHost(ctx, host, createSQLs, true, false)
 		}
 	}
 
@@ -246,7 +246,7 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 		if len(createSQLs) > 0 {
 			log.V(1).M(host).F().Info("Creating distributed objects at %s: %v", host.Address.HostName, names)
 			log.V(1).M(host).F().Info("\n%v", createSQLs)
-			err2 = s.execHost(ctx, host, createSQLs, true)
+			err2 = s.execHost(ctx, host, createSQLs, true, false)
 		}
 	}
 
@@ -269,7 +269,7 @@ func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool 
 		),
 	}
 	//TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
-	return s.execHost(ctx, host, sqls, false) == nil
+	return s.execHost(ctx, host, sqls, false, true) == nil
 }
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
@@ -293,9 +293,15 @@ func (s *Schemer) execCluster(ctx context.Context, cluster *chop.ChiCluster, sql
 }
 
 // execHost runs set of SQL queries over the replica
-func (s *Schemer) execHost(ctx context.Context, host *chop.ChiHost, sqls []string, retry bool) error {
+func (s *Schemer) execHost(ctx context.Context, host *chop.ChiHost, sqls []string, retry bool, silent bool) error {
 	hosts := []string{CreatePodFQDN(host)}
-	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, retry)
+	c := s.Cluster.SetHosts(hosts)
+	if silent {
+		c = c.SetLog(log.Silence())
+	} else {
+		c = c.SetLog(log.New())
+	}
+	return c.ExecAll(ctx, sqls, retry)
 }
 
 // execShard runs set of SQL queries over the shard replicas
