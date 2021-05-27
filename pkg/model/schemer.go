@@ -16,6 +16,7 @@ package model
 
 import (
 	"context"
+
 	"github.com/MakeNowJust/heredoc"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -79,9 +80,9 @@ func (s *Schemer) queryUnzip2Columns(ctx context.Context, endpoints []string, sq
 	return column1, column2, nil
 }
 
-// getCreateDistributedObjectsContext returns a list of objects that needs to be created on a shard in a cluster
+// getCreateDistributedObjects returns a list of objects that needs to be created on a shard in a cluster
 // That includes all distributed tables, corresponding local tables and databases, if necessary
-func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
+func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil, nil, nil
@@ -163,8 +164,8 @@ func (s *Schemer) getCreateDistributedObjectsContext(ctx context.Context, host *
 	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
 }
 
-// getCreateReplicaObjectsContext returns a list of objects that needs to be created on a host in a cluster
-func (s *Schemer) getCreateReplicaObjectsContext(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
+// getCreateReplicaObjects returns a list of objects that needs to be created on a host in a cluster
+func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil, nil, nil
@@ -215,7 +216,7 @@ func (s *Schemer) getCreateReplicaObjectsContext(ctx context.Context, host *chop
 }
 
 // hostGetDropTables returns set of 'DROP TABLE ...' SQLs
-func (s *Schemer) hostGetDropTablesContext(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
+func (s *Schemer) hostGetDropTables(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Doc(`
@@ -232,9 +233,9 @@ func (s *Schemer) hostGetDropTablesContext(ctx context.Context, host *chop.ChiHo
 
 // HostDeleteTables
 func (s *Schemer) HostDeleteTables(ctx context.Context, host *chop.ChiHost) error {
-	tableNames, dropTableSQLs, _ := s.hostGetDropTablesContext(ctx, host)
+	tableNames, dropTableSQLs, _ := s.hostGetDropTables(ctx, host)
 	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	return s.hostApplySQLsContext(ctx, host, dropTableSQLs, false)
+	return s.queryHost(ctx, host, dropTableSQLs, false)
 }
 
 // HostCreateTables
@@ -248,19 +249,19 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 
 	var err1, err2 error
 
-	if names, createSQLs, err := s.getCreateReplicaObjectsContext(ctx, host); err == nil {
+	if names, createSQLs, err := s.getCreateReplicaObjects(ctx, host); err == nil {
 		if len(createSQLs) > 0 {
 			log.V(1).M(host).F().Info("Creating replica objects at %s: %v", host.Address.HostName, names)
 			log.V(1).M(host).F().Info("\n%v", createSQLs)
-			err1 = s.hostApplySQLsContext(ctx, host, createSQLs, true)
+			err1 = s.queryHost(ctx, host, createSQLs, true)
 		}
 	}
 
-	if names, createSQLs, err := s.getCreateDistributedObjectsContext(ctx, host); err == nil {
+	if names, createSQLs, err := s.getCreateDistributedObjects(ctx, host); err == nil {
 		if len(createSQLs) > 0 {
 			log.V(1).M(host).F().Info("Creating distributed objects at %s: %v", host.Address.HostName, names)
 			log.V(1).M(host).F().Info("\n%v", createSQLs)
-			err2 = s.hostApplySQLsContext(ctx, host, createSQLs, true)
+			err2 = s.queryHost(ctx, host, createSQLs, true)
 		}
 	}
 
@@ -283,7 +284,7 @@ func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool 
 		),
 	}
 	//TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
-	return s.hostApplySQLsContext(ctx, host, sqls, false) == nil
+	return s.queryHost(ctx, host, sqls, false) == nil
 }
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
@@ -291,29 +292,29 @@ func (s *Schemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInsta
 	sqls := []string{
 		`SYSTEM DROP DNS CACHE`,
 	}
-	return s.chiApplySQLsContext(ctx, chi, sqls, false)
+	return s.queryCHI(ctx, chi, sqls, false)
 }
 
-// chiApplySQLs runs set of SQL queries over the whole CHI
-func (s *Schemer) chiApplySQLsContext(ctx context.Context, chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
+// queryCHI runs set of SQL queries over the whole CHI
+func (s *Schemer) queryCHI(ctx context.Context, chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
 	hosts := CreatePodFQDNsOfCHI(chi)
 	return s.Cluster.SetHosts(hosts).QueryAll(ctx, sqls, retry)
 }
 
-// clusterApplySQLs runs set of SQL queries over the cluster
-func (s *Schemer) clusterApplySQLsContext(ctx context.Context, cluster *chop.ChiCluster, sqls []string, retry bool) error {
+// queryCluster runs set of SQL queries over the cluster
+func (s *Schemer) queryCluster(ctx context.Context, cluster *chop.ChiCluster, sqls []string, retry bool) error {
 	hosts := CreatePodFQDNsOfCluster(cluster)
 	return s.Cluster.SetHosts(hosts).QueryAll(ctx, sqls, retry)
 }
 
-// hostApplySQLs runs set of SQL queries over the replica
-func (s *Schemer) hostApplySQLsContext(ctx context.Context, host *chop.ChiHost, sqls []string, retry bool) error {
+// queryHost runs set of SQL queries over the replica
+func (s *Schemer) queryHost(ctx context.Context, host *chop.ChiHost, sqls []string, retry bool) error {
 	hosts := []string{CreatePodFQDN(host)}
 	return s.Cluster.SetHosts(hosts).QueryAll(ctx, sqls, retry)
 }
 
-// shardApplySQLs runs set of SQL queries over the shard replicas
-func (s *Schemer) shardApplySQLsContext(ctx context.Context, shard *chop.ChiShard, sqls []string, retry bool) error {
+// queryShard runs set of SQL queries over the shard replicas
+func (s *Schemer) queryShard(ctx context.Context, shard *chop.ChiShard, sqls []string, retry bool) error {
 	hosts := CreatePodFQDNsOfShard(shard)
 	return s.Cluster.SetHosts(hosts).QueryAll(ctx, sqls, retry)
 }
