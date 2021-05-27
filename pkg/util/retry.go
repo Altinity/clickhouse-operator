@@ -17,14 +17,20 @@ package util
 import (
 	"context"
 	"time"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+
 )
 
 // RetryContext
-func RetryContext(ctx context.Context, tries int, desc string, f func() error, log func(format string, args ...interface{})) error {
+func RetryContext(ctx context.Context, tries int, desc string, f func() error, logger func(format string, args ...interface{})) error {
 	var err error
+	if logger == nil {
+		logger = log.NilLogger
+	}
 	for try := 1; try <= tries; try++ {
 		if IsContextDone(ctx) {
-			log("ctx is done")
+			logger("ctx is done")
 			return nil
 		}
 		// Do useful things
@@ -34,7 +40,7 @@ func RetryContext(ctx context.Context, tries int, desc string, f func() error, l
 			// All ok, no need to retry more
 			if try > 1 {
 				// Done, but after some retries, this is not 'clean'
-				log("DONE attempt %d of %d: %s", try, tries, desc)
+				logger("DONE attempt %d of %d: %s", try, tries, desc)
 			}
 			return nil
 		}
@@ -42,14 +48,14 @@ func RetryContext(ctx context.Context, tries int, desc string, f func() error, l
 		if try < tries {
 			// Try failed, need to sleep and retry
 			seconds := try * 5
-			log("FAILED attempt %d of %d, sleep %d sec and retry: %s", try, tries, seconds, desc)
+			logger("FAILED attempt %d of %d, sleep %d sec and retry: %s", try, tries, seconds, desc)
 			WaitContextDoneOrTimeout(ctx, time.Duration(seconds)*time.Second)
 		} else if tries == 1 {
 			// On single try do not put so much emotion. It just failed and user is not intended to retry
-			log("FAILED single try. No retries will be made for %s", desc)
+			logger("FAILED single try. No retries will be made for %s", desc)
 		} else {
 			// On last try no need to wait more
-			log("FAILED AND ABORT. All %d attempts: %s", tries, desc)
+			logger("FAILED AND ABORT. All %d attempts: %s", tries, desc)
 		}
 	}
 
