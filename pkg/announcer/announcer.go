@@ -398,3 +398,8 @@ func (a Announcer) findInAddress(m interface{}) (string, bool) {
 	}
 	return namespace.String() + "/" + name.String(), true
 }
+
+
+// NilLogger
+func NilLogger (format string, args ...interface{}) {
+}
