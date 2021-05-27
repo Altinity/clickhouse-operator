@@ -94,9 +94,9 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*Query, error) {
 	return nil, fmt.Errorf(str)
 }
 
-// QueryAll runs set of SQL queries on all endpoints of the cluster
+// ExecAll runs set of SQL queries on all endpoints of the cluster
 // Retry logic traverses the list of SQLs multiple times until all SQLs succeed
-func (c *Cluster) QueryAll(ctx context.Context, queries []string, retry bool) error {
+func (c *Cluster) ExecAll(ctx context.Context, queries []string, retry bool) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -130,11 +130,11 @@ func (c *Cluster) QueryAll(ctx context.Context, queries []string, retry bool) er
 					// Skip malformed or already executed SQL query, move to the next one
 					continue
 				}
-				err := conn.ExecContext(ctx, sql)
+				err := conn.ExecContext(ctx, sql, true)
 				if err != nil && strings.Contains(err.Error(), "Code: 253,") && strings.Contains(sql, "CREATE TABLE") {
 					log.V(1).M(host).F().Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
 					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
-					err = conn.ExecContext(ctx, sqlAttach)
+					err = conn.ExecContext(ctx, sqlAttach, true)
 				}
 				if err == nil {
 					queries[i] = "" // Query is executed, removing from the list
