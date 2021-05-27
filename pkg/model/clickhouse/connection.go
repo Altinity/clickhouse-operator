@@ -117,7 +117,7 @@ func (c *CHConnection) Query(sql string) (*Query, error) {
 }
 
 // ExecContext runs given sql query
-func (c *CHConnection) ExecContext(ctx context.Context, sql string) error {
+func (c *CHConnection) ExecContext(ctx context.Context, sql string, mumble bool) error {
 	if len(sql) == 0 {
 		return nil
 	}
@@ -134,7 +134,9 @@ func (c *CHConnection) ExecContext(ctx context.Context, sql string) error {
 	if !c.ensureConnectedContext(contxt) {
 		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
-		log.V(1).A().Error(s)
+		if mumble {
+			log.V(1).A().Error(s)
+		}
 		return fmt.Errorf(s)
 	}
 
@@ -142,11 +144,15 @@ func (c *CHConnection) ExecContext(ctx context.Context, sql string) error {
 
 	if err != nil {
 		cancel()
-		log.V(1).A().Error("FAILED Exec(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
+		if mumble {
+			log.V(1).A().Error("FAILED Exec(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
+		}
 		return err
 	}
 
-	log.V(2).F().Info("\n%s", sql)
+	if mumble {
+		log.V(2).F().Info("\n%s", sql)
+	}
 
 	return nil
 }
