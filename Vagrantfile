@@ -53,7 +53,7 @@ Vagrant.configure(2) do |config|
     # hv.default_nic_type = "virtio"
     hv.cpus = total_cpus
     hv.maxmemory = "6144"
-    hv.memory = "2048"
+    hv.memory = "6144"
     hv.enable_virtualization_extensions = true
     hv.linked_clone = true
     hv.vm_integration_services = {
@@ -92,7 +92,7 @@ Vagrant.configure(2) do |config|
 
     apt-get update
     apt-get install --no-install-recommends -y apt-transport-https ca-certificates software-properties-common curl
-    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git
+    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git make gcc g++
 
     # yq
     apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys CC86BB64
@@ -127,9 +127,9 @@ Vagrant.configure(2) do |config|
 
     # k9s CLI
     K9S_VERSION=$(curl -sL https://github.com/derailed/k9s/releases/latest -H "Accept: application/json" | jq -r .tag_name)
-    wget -c --progress=bar:force:noscroll -O /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_x86_64.tar.gz
+    wget -c --progress=bar:force:noscroll -O /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz
     curl -sL https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/checksums.txt | grep Linux_x86_64.tar.gz > /usr/local/bin/k9s.sha256
-    sed -i -e "s/k9s_Linux_x86_64\.tar\.gz/\\/usr\\/local\\/bin\\/k9s_${K9S_VERSION}_Linux_x86_64\\.tar\\.gz/g" /usr/local/bin/k9s.sha256
+    sed -i -e "s/k9s_${K9S_VERSION}_Linux_x86_64\.tar\.gz/\\/usr\\/local\\/bin\\/k9s_${K9S_VERSION}_Linux_x86_64\\.tar\\.gz/g" /usr/local/bin/k9s.sha256
     sha256sum -c /usr/local/bin/k9s.sha256
     tar --verbose -zxvf /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz -C /usr/local/bin k9s
 
@@ -138,8 +138,9 @@ Vagrant.configure(2) do |config|
     curl -sL https://github.com/liggitt/audit2rbac/releases/download/v${AUDIT2RBAC_VERSION}/audit2rbac-linux-amd64.tar.gz | tar -zxvf - -C /usr/local/bin
 
     # minikube
-    MINIKUBE_VERSION=1.18.1
+    # MINIKUBE_VERSION=1.18.1
     # MINIKUBE_VERSION=1.19.0
+    MINIKUBE_VERSION=1.20.0
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -150,9 +151,10 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
 #    K8S_VERSION=${K8S_VERSION:-1.17.17}
-#    K8S_VERSION=${K8S_VERSION:-1.18.18}
-#    K8S_VERSION=${K8S_VERSION:-1.19.10}
-    K8S_VERSION=${K8S_VERSION:-1.20.6}
+#    K8S_VERSION=${K8S_VERSION:-1.18.19}
+#    K8S_VERSION=${K8S_VERSION:-1.19.11}
+#    K8S_VERSION=${K8S_VERSION:-1.20.7}
+    K8S_VERSION=${K8S_VERSION:-1.21.1}
     export VALIDATE_YAML=true
 
     killall kubectl || true

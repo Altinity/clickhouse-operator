@@ -12,6 +12,8 @@ echo "External value for \$GRAFANA_ZOOKEEPER_DASHBOARD_NAME=$GRAFANA_ZOOKEEPER_D
 echo "External value for \$GRAFANA_PROMETHEUS_DATASOURCE_NAME=$GRAFANA_PROMETHEUS_DATASOURCE_NAME"
 echo "External value for \$PROMETHEUS_URL=$PROMETHEUS_URL"
 echo "External value for \$GRAFANA_ROOT_URL=$GRAFANA_ROOT_URL"
+echo "External value for \$VALIDATE_YAML=$VALIDATE_YAML"
+
 
 GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-grafana}"
 
@@ -29,7 +31,7 @@ GRAFANA_ZOOKEEPER_DASHBOARD_NAME=${GRAFANA_ZOOKEEPER_DASHBOARD_NAME:-zookeeper-d
 GRAFANA_PROMETHEUS_DATASOURCE_NAME="${GRAFANA_PROMETHEUS_DATASOURCE_NAME:-clickhouse-operator-prometheus}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://prometheus.prometheus:9090}"
 GRAFANA_ROOT_URL="${GRAFANA_ROOT_URL:-http://localhost:3000}"
-
+VALIDATE_YAML=${VALIDATE_YAML:-yes}
 
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
@@ -138,7 +140,7 @@ wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 #
 
 echo "Install Prometheus DataSource"
-kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
+kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-data-source-prometheus-cr-template.yaml | \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
     PROMETHEUS_URL="$PROMETHEUS_URL" \
@@ -148,7 +150,7 @@ wait_grafana_datasource_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_PROMETHEUS_DA
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 
 echo "Install Operator dashboard"
-kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
+kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-operator-cr-template.yaml | \
     GRAFANA_DASHBOARD_NAME="$GRAFANA_OPERATOR_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
@@ -186,7 +188,7 @@ for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.meta
     GRAFANA_CLICKHOUSE_DATASOURCE_NAME="k8s-${NAMESPACE}-${CHI}"
     CLICKHOUSE_URL="http://${ENDPOINT}:${PORT}"
     echo "Create ClickHouse DataSource for ClickHouseInstallation ${CHI} '${GRAFANA_NAMESPACE}/${GRAFANA_CLICKHOUSE_DATASOURCE_NAME}'"
-    kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
+    kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
         cat ${CUR_DIR}/grafana-data-source-clickhouse-cr-template.yaml | \
         GRAFANA_CLICKHOUSE_DATASOURCE_NAME="$GRAFANA_CLICKHOUSE_DATASOURCE_NAME" \
         CLICKHOUSE_URL="$CLICKHOUSE_URL" \
@@ -200,7 +202,7 @@ done
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 
 echo "Install Queries dashboard"
-kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
+kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-queries-cr-template.yaml | \
     GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
@@ -208,7 +210,7 @@ kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
 )
 
 echo "Install Zookeeper dashboard"
-kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
+kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-zookeeper-cr-template.yaml | \
     GRAFANA_ZOOKEEPER_DASHBOARD_NAME="$GRAFANA_ZOOKEEPER_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
