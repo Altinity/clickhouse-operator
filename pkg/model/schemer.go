@@ -16,22 +16,12 @@ package model
 
 import (
 	"context"
-	"strings"
-
 	"github.com/MakeNowJust/heredoc"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-)
-
-const (
-	// Comma-separated ''-enclosed list of database names to be ignored
-	// ignoredDBs = "'system'"
-
-	// Max number of tries for SQL queries
-	defaultMaxTries = 10
 )
 
 // Schemer
@@ -53,25 +43,20 @@ func NewSchemer(username, password string, port int) *Schemer {
 	}
 }
 
-// getCHConnection
-func (s *Schemer) getCHConnection(hostname string) *clickhouse.CHConnection {
-	return clickhouse.GetPooledDBConnection(clickhouse.NewCHConnectionParams(hostname, s.Username, s.Password, s.Port))
-}
-
 // queryUnzipColumns
-func (s *Schemer) queryUnzipColumns(ctx context.Context, endpoints []string, sql string, columns ...*[]string) error {
+func (s *Schemer) queryUnzipColumns(ctx context.Context, hosts []string, sql string, columns ...*[]string) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
 	}
 
-	if len(endpoints) == 0 {
+	if len(hosts) == 0 {
 		// Nowhere to fetch data from
 		return nil
 	}
 
-	// Fetch data from any of specified endpoints
-	query, err := s.Cluster.SetEndpoints(endpoints).Any(ctx, sql)
+	// Fetch data from any of specified hosts
+	query, err := s.Cluster.SetHosts(hosts).QueryAny(ctx, sql)
 	if err != nil {
 		return nil
 	}
@@ -311,89 +296,24 @@ func (s *Schemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInsta
 
 // chiApplySQLs runs set of SQL queries over the whole CHI
 func (s *Schemer) chiApplySQLsContext(ctx context.Context, chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
-	return s.applySQLsContext(ctx, CreatePodFQDNsOfCHI(chi), sqls, retry)
+	hosts := CreatePodFQDNsOfCHI(chi)
+	return s.Cluster.SetHosts(hosts).QueryAll(ctx, sqls, retry)
 }
 
 // clusterApplySQLs runs set of SQL queries over the cluster
 func (s *Schemer) clusterApplySQLsContext(ctx context.Context, cluster *chop.ChiCluster, sqls []string, retry bool) error {
-	return s.applySQLsContext(ctx, CreatePodFQDNsOfCluster(cluster), sqls, retry)
+	hosts := CreatePodFQDNsOfCluster(cluster)
+	return s.Cluster.SetHosts(hosts).QueryAll(ctx, sqls, retry)
 }
 
 // hostApplySQLs runs set of SQL queries over the replica
 func (s *Schemer) hostApplySQLsContext(ctx context.Context, host *chop.ChiHost, sqls []string, retry bool) error {
 	hosts := []string{CreatePodFQDN(host)}
-	return s.applySQLsContext(ctx, hosts, sqls, retry)
+	return s.Cluster.SetHosts(hosts).QueryAll(ctx, sqls, retry)
 }
 
 // shardApplySQLs runs set of SQL queries over the shard replicas
 func (s *Schemer) shardApplySQLsContext(ctx context.Context, shard *chop.ChiShard, sqls []string, retry bool) error {
-	return s.applySQLsContext(ctx, CreatePodFQDNsOfShard(shard), sqls, retry)
-}
-
-// applySQLs runs set of SQL queries on set on hosts
-// Retry logic traverses the list of SQLs multiple times until all SQLs succeed
-func (s *Schemer) applySQLsContext(ctx context.Context, hosts []string, queries []string, retry bool) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
-		return nil
-	}
-
-	maxTries := 1
-	if retry {
-		maxTries = defaultMaxTries
-	}
-	var errors []error
-
-	// For each host in the list run all SQL queries
-	for _, host := range hosts {
-		if util.IsContextDone(ctx) {
-			log.V(2).Info("ctx is done")
-			return nil
-		}
-		conn := s.getCHConnection(host)
-		if conn == nil {
-			log.V(1).M(host).F().Warning("Unable to get conn to host %s", host)
-			continue
-		}
-		err := util.RetryContext(ctx, maxTries, "Applying sqls", func() error {
-			var errors []error
-			for i, sql := range queries {
-				if util.IsContextDone(ctx) {
-					log.V(2).Info("ctx is done")
-					return nil
-				}
-				if len(sql) == 0 {
-					// Skip malformed or already executed SQL query, move to the next one
-					continue
-				}
-				err := conn.ExecContext(ctx, sql)
-				if err != nil && strings.Contains(err.Error(), "Code: 253,") && strings.Contains(sql, "CREATE TABLE") {
-					log.V(1).M(host).F().Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
-					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
-					err = conn.ExecContext(ctx, sqlAttach)
-				}
-				if err == nil {
-					queries[i] = "" // Query is executed, removing from the list
-				} else {
-					errors = append(errors, err)
-				}
-			}
-
-			if len(errors) > 0 {
-				return errors[0]
-			}
-			return nil
-		},
-			log.V(1).M(host).F().Info,
-		)
-
-		if util.ErrIsNotCanceled(err) {
-			errors = append(errors, err)
-		}
-	}
-
-	if len(errors) > 0 {
-		return errors[0]
-	}
-	return nil
+	hosts := CreatePodFQDNsOfShard(shard)
+	return s.Cluster.SetHosts(hosts).QueryAll(ctx, sqls, retry)
 }

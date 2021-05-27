@@ -17,9 +17,15 @@ package clickhouse
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+)
+
+const (
+	// Max number of tries for SQL queries
+	defaultMaxTries = 10
 )
 
 // ClusterConnectionParams
@@ -32,7 +38,7 @@ type ClusterConnectionParams struct {
 // Cluster
 type Cluster struct {
 	ClusterConnectionParams
-	Endpoints []string
+	Hosts []string
 }
 
 // NewCluster
@@ -49,41 +55,109 @@ func (c *Cluster)SetConnectionParams(params ClusterConnectionParams) *Cluster {
 	return c
 }
 
-// SetEndpoints
-func (c *Cluster)SetEndpoints(endpoints []string) *Cluster {
+// SetHosts
+func (c *Cluster)SetHosts(hosts []string) *Cluster {
 	if c == nil {
 		return nil
 	}
-	c.Endpoints = endpoints
+	c.Hosts = hosts
 	return c
 }
 
 // getCHConnection
-func (c *Cluster) getCHConnection(hostname string) *CHConnection {
-	return GetPooledDBConnection(NewCHConnectionParams(hostname, c.Username, c.Password, c.Port))
+func (c *Cluster) getCHConnection(host string) *CHConnection {
+	return GetPooledDBConnection(NewCHConnectionParams(host, c.Username, c.Password, c.Port))
 }
 
-// Any walks over provided endpoints and runs query sequentially on each endpoint.
+// QueryAny walks over provided endpoints and runs query sequentially on each endpoint.
 // In case endpoint returned result, walk is completed and result is returned
 // In case endpoint failed, continue with next endpoint
-func (c *Cluster) Any(ctx context.Context, sql string) (*Query, error) {
+func (c *Cluster) QueryAny(ctx context.Context, sql string) (*Query, error) {
 	// Fetch data from any of specified endpoints
-	for _, endpoint := range c.Endpoints {
+	for _, host := range c.Hosts {
 		if util.IsContextDone(ctx) {
 			log.V(2).Info("ctx is done")
 			return nil, nil
 		}
 
-		log.V(1).Info("Run query on: %s of %v", endpoint, c.Endpoints)
-		if query, err := c.getCHConnection(endpoint).QueryContext(ctx, sql); err == nil {
+		log.V(1).Info("Run query on: %s of %v", host, c.Hosts)
+		if query, err := c.getCHConnection(host).QueryContext(ctx, sql); err == nil {
 			// One of specified endpoints returned result, no need to iterate more
 			return query, nil
 		} else {
-			log.V(1).A().Warning("FAILED to run query on: %s of %v skip to next. err: %v", endpoint, c.Endpoints, err)
+			log.V(1).A().Warning("FAILED to run query on: %s of %v skip to next. err: %v", host, c.Hosts, err)
 		}
 	}
 
-	str := fmt.Sprintf("FAILED to run query on all endpoints %v", c.Endpoints)
+	str := fmt.Sprintf("FAILED to run query on all hosts %v", c.Hosts)
 	log.V(1).A().Error(str)
 	return nil, fmt.Errorf(str)
+}
+
+// QueryAll runs set of SQL queries on all endpoints of the cluster
+// Retry logic traverses the list of SQLs multiple times until all SQLs succeed
+func (c *Cluster) QueryAll(ctx context.Context, queries []string, retry bool) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	maxTries := 1
+	if retry {
+		maxTries = defaultMaxTries
+	}
+	var errors []error
+
+	// For each host in the list run all SQL queries
+	for _, host := range c.Hosts {
+		if util.IsContextDone(ctx) {
+			log.V(2).Info("ctx is done")
+			return nil
+		}
+		conn := c.getCHConnection(host)
+		if conn == nil {
+			log.V(1).M(host).F().Warning("Unable to get conn to host %s", host)
+			continue
+		}
+		err := util.RetryContext(ctx, maxTries, "Applying sqls", func() error {
+			var errors []error
+			for i, sql := range queries {
+				if util.IsContextDone(ctx) {
+					log.V(2).Info("ctx is done")
+					return nil
+				}
+				if len(sql) == 0 {
+					// Skip malformed or already executed SQL query, move to the next one
+					continue
+				}
+				err := conn.ExecContext(ctx, sql)
+				if err != nil && strings.Contains(err.Error(), "Code: 253,") && strings.Contains(sql, "CREATE TABLE") {
+					log.V(1).M(host).F().Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
+					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
+					err = conn.ExecContext(ctx, sqlAttach)
+				}
+				if err == nil {
+					queries[i] = "" // Query is executed, removing from the list
+				} else {
+					errors = append(errors, err)
+				}
+			}
+
+			if len(errors) > 0 {
+				return errors[0]
+			}
+			return nil
+		},
+			log.V(1).M(host).F().Info,
+		)
+
+		if util.ErrIsNotCanceled(err) {
+			errors = append(errors, err)
+		}
+	}
+
+	if len(errors) > 0 {
+		return errors[0]
+	}
+	return nil
 }
