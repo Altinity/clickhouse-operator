@@ -25,24 +25,37 @@ import (
 	_ "github.com/mailru/go-clickhouse"
 )
 
+// CHConnection
 type CHConnection struct {
 	params *CHConnectionParams
 	conn   *databasesql.DB
+	a log.Announcer
 }
 
+// NewConnection
 func NewConnection(params *CHConnectionParams) *CHConnection {
 	// Do not establish connection immediately, do it in a lazy manner
 	return &CHConnection{
 		params: params,
+		a: log.New(),
 	}
+}
+
+// SetLog
+func (c *CHConnection) SetLog(a log.Announcer) *CHConnection {
+	if c == nil {
+		return nil
+	}
+	c.a = a
+	return c
 }
 
 // connectContext
 func (c *CHConnection) connectContext(ctx context.Context) {
-	log.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
+	c.a.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
 	dbConnection, err := databasesql.Open("clickhouse", c.params.GetDSN())
 	if err != nil {
-		log.V(1).A().Error("FAILED Open(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
+		c.a.V(1).A().Error("FAILED Open(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
 		return
 	}
 
@@ -57,7 +70,7 @@ func (c *CHConnection) connectContext(ctx context.Context) {
 	defer cancel()
 
 	if err := dbConnection.PingContext(contxt); err != nil {
-		log.V(1).A().Error("FAILED Ping(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
+		c.a.V(1).A().Error("FAILED Ping(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
 		_ = dbConnection.Close()
 		return
 	}
@@ -68,7 +81,7 @@ func (c *CHConnection) connectContext(ctx context.Context) {
 // ensureConnectedContext
 func (c *CHConnection) ensureConnectedContext(ctx context.Context) bool {
 	if c.conn != nil {
-		log.V(2).F().Info("Already connected: %s", c.params.GetDSNWithHiddenCredentials())
+		c.a.V(2).F().Info("Already connected: %s", c.params.GetDSNWithHiddenCredentials())
 		return true
 	}
 
@@ -94,7 +107,7 @@ func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*Query, er
 	if !c.ensureConnectedContext(contxt) {
 		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
-		log.V(1).A().Error(s)
+		c.a.V(1).A().Error(s)
 		return nil, fmt.Errorf(s)
 	}
 
@@ -102,11 +115,11 @@ func (c *CHConnection) QueryContext(ctx context.Context, sql string) (*Query, er
 	if err != nil {
 		cancel()
 		s := fmt.Sprintf("FAILED Query(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
-		log.V(1).A().Error(s)
+		c.a.V(1).A().Error(s)
 		return nil, err
 	}
 
-	log.V(2).Info("clickhouse.QueryContext():'%s'", sql)
+	c.a.V(2).Info("clickhouse.QueryContext():'%s'", sql)
 
 	return NewQuery(contxt, cancel, rows), nil
 }
@@ -117,7 +130,7 @@ func (c *CHConnection) Query(sql string) (*Query, error) {
 }
 
 // ExecContext runs given sql query
-func (c *CHConnection) ExecContext(ctx context.Context, sql string, mumble bool) error {
+func (c *CHConnection) ExecContext(ctx context.Context, sql string) error {
 	if len(sql) == 0 {
 		return nil
 	}
@@ -134,9 +147,7 @@ func (c *CHConnection) ExecContext(ctx context.Context, sql string, mumble bool)
 	if !c.ensureConnectedContext(contxt) {
 		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
-		if mumble {
-			log.V(1).A().Error(s)
-		}
+		c.a.V(1).A().Error(s)
 		return fmt.Errorf(s)
 	}
 
@@ -144,15 +155,11 @@ func (c *CHConnection) ExecContext(ctx context.Context, sql string, mumble bool)
 
 	if err != nil {
 		cancel()
-		if mumble {
-			log.V(1).A().Error("FAILED Exec(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
-		}
+		c.a.V(1).A().Error("FAILED Exec(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
 		return err
 	}
 
-	if mumble {
-		log.V(2).F().Info("\n%s", sql)
-	}
+	c.a.V(2).F().Info("\n%s", sql)
 
 	return nil
 }
