@@ -220,7 +220,7 @@ func (s *Schemer) hostGetDropTables(ctx context.Context, host *chop.ChiHost) ([]
 func (s *Schemer) HostDeleteTables(ctx context.Context, host *chop.ChiHost) error {
 	tableNames, dropTableSQLs, _ := s.hostGetDropTables(ctx, host)
 	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	return s.queryHost(ctx, host, dropTableSQLs, false)
+	return s.execHost(ctx, host, dropTableSQLs, false)
 }
 
 // HostCreateTables
@@ -238,7 +238,7 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 		if len(createSQLs) > 0 {
 			log.V(1).M(host).F().Info("Creating replica objects at %s: %v", host.Address.HostName, names)
 			log.V(1).M(host).F().Info("\n%v", createSQLs)
-			err1 = s.queryHost(ctx, host, createSQLs, true)
+			err1 = s.execHost(ctx, host, createSQLs, true)
 		}
 	}
 
@@ -246,7 +246,7 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 		if len(createSQLs) > 0 {
 			log.V(1).M(host).F().Info("Creating distributed objects at %s: %v", host.Address.HostName, names)
 			log.V(1).M(host).F().Info("\n%v", createSQLs)
-			err2 = s.queryHost(ctx, host, createSQLs, true)
+			err2 = s.execHost(ctx, host, createSQLs, true)
 		}
 	}
 
@@ -269,7 +269,7 @@ func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool 
 		),
 	}
 	//TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
-	return s.queryHost(ctx, host, sqls, false) == nil
+	return s.execHost(ctx, host, sqls, false) == nil
 }
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
@@ -277,29 +277,29 @@ func (s *Schemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInsta
 	sqls := []string{
 		`SYSTEM DROP DNS CACHE`,
 	}
-	return s.queryCHI(ctx, chi, sqls, false)
+	return s.execCHI(ctx, chi, sqls, false)
 }
 
-// queryCHI runs set of SQL queries over the whole CHI
-func (s *Schemer) queryCHI(ctx context.Context, chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
+// execCHI runs set of SQL queries over the whole CHI
+func (s *Schemer) execCHI(ctx context.Context, chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
 	hosts := CreatePodFQDNsOfCHI(chi)
-	return s.Cluster.SetHosts(hosts).QueryAll(ctx, sqls, retry)
+	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, retry)
 }
 
-// queryCluster runs set of SQL queries over the cluster
-func (s *Schemer) queryCluster(ctx context.Context, cluster *chop.ChiCluster, sqls []string, retry bool) error {
+// execCluster runs set of SQL queries over the cluster
+func (s *Schemer) execCluster(ctx context.Context, cluster *chop.ChiCluster, sqls []string, retry bool) error {
 	hosts := CreatePodFQDNsOfCluster(cluster)
-	return s.Cluster.SetHosts(hosts).QueryAll(ctx, sqls, retry)
+	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, retry)
 }
 
-// queryHost runs set of SQL queries over the replica
-func (s *Schemer) queryHost(ctx context.Context, host *chop.ChiHost, sqls []string, retry bool) error {
+// execHost runs set of SQL queries over the replica
+func (s *Schemer) execHost(ctx context.Context, host *chop.ChiHost, sqls []string, retry bool) error {
 	hosts := []string{CreatePodFQDN(host)}
-	return s.Cluster.SetHosts(hosts).QueryAll(ctx, sqls, retry)
+	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, retry)
 }
 
-// queryShard runs set of SQL queries over the shard replicas
-func (s *Schemer) queryShard(ctx context.Context, shard *chop.ChiShard, sqls []string, retry bool) error {
+// execShard runs set of SQL queries over the shard replicas
+func (s *Schemer) execShard(ctx context.Context, shard *chop.ChiShard, sqls []string, retry bool) error {
 	hosts := CreatePodFQDNsOfShard(shard)
-	return s.Cluster.SetHosts(hosts).QueryAll(ctx, sqls, retry)
+	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, retry)
 }
