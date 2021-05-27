@@ -82,6 +82,7 @@ else
         envsubst \
     )
 
-    kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f ${CUR_DIR}/prometheus-alert-rules.yaml
+    kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f ${CUR_DIR}/prometheus-alert-rules-clickhouse.yaml
+    kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f ${CUR_DIR}/prometheus-alert-rules-zookeeper.yaml
 fi
 echo "Add is done"
