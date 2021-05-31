@@ -167,7 +167,7 @@ func (e *Exporter) newFetcher(hostname string) *ClickHouseFetcher {
 		e.chAccessInfo.Username,
 		e.chAccessInfo.Password,
 		e.chAccessInfo.Port,
-	).SetTimeout(e.timeout)
+	).SetQueryTimeout(e.timeout)
 }
 
 // UpdateWatch ensures hostnames of the Pods from CHI object included into metrics.Exporter state
