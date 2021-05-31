@@ -4,7 +4,7 @@ echo "External value for \$GRAFANA_NAMESPACE=$GRAFANA_NAMESPACE"
 echo "External value for \$GRAFANA_OPERATOR_VERSION=$GRAFANA_OPERATOR_VERSION"
 
 GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-grafana}"
-GRAFANA_OPERATOR_VERSION="${GRAFANA_OPERATOR_VERSION:-v3.10.1}"
+GRAFANA_OPERATOR_VERSION="${GRAFANA_OPERATOR_VERSION:-v3.9.0}"
 
 echo "Setup Grafana"
 echo "OPTIONS"
@@ -53,7 +53,8 @@ trap "clean_dir ${TMP_DIR}" SIGHUP SIGINT SIGQUIT SIGFPE SIGALRM SIGTERM
 
 # Continue with sources
 echo "Download Grafana operator sources into ${GRAFANA_OPERATOR_DIR}"
-git clone "https://github.com/integr8ly/grafana-operator" "${GRAFANA_OPERATOR_DIR}"
+git clone -b ${GRAFANA_OPERATOR_VERSION} --single-branch "https://github.com/integr8ly/grafana-operator" "${GRAFANA_OPERATOR_DIR}"
+
 
 echo "Setup Grafana operator into ${GRAFANA_NAMESPACE} namespace"
 
@@ -64,7 +65,7 @@ kubectl create namespace "${GRAFANA_NAMESPACE}" || true
 # Setup grafana-operator into dedicated namespace
 
 # 1. Create the custom resource definitions that the operator uses:
-kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/config/crd/bases"
+kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/deploy/crds"
 # 2. Create the operator roles:
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/deploy/roles"
 # 3. If you want to scan for dashboards in other namespaces you also need the cluster roles:
