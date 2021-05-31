@@ -18,12 +18,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// RetryContext
-func RetryContext(ctx context.Context, tries int, desc string, a log.Announcer, f func() error) error {
+// Retry
+func Retry(ctx context.Context, tries int, desc string, a log.Announcer, f func() error) error {
 	var err error
 	for try := 1; try <= tries; try++ {
 		if util.IsContextDone(ctx) {
