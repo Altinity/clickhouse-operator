@@ -115,7 +115,8 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 		FROM 
 		(
 			SELECT 
-			    database, name,
+				database,
+				name,
 				create_table_query,
 				2 AS order
 			FROM cluster('all-sharded', system.tables) tables
@@ -128,8 +129,16 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 				t.create_table_query,
 				1 AS order
 			FROM cluster('all-sharded', system.tables) tables
-			LEFT JOIN (SELECT distinct database, name, create_table_query 
-			             FROM cluster('all-sharded', system.tables) SETTINGS skip_unavailable_shards = 1)  t USING (database, name)
+			LEFT JOIN 
+			(
+				SELECT 
+					DISTINCT database, 
+					name, 
+					create_table_query 
+				FROM cluster('all-sharded', system.tables)
+				SETTINGS skip_unavailable_shards = 1
+			) t 
+			USING (database, name)
 			WHERE engine = 'Distributed' AND t.create_table_query != ''
 			SETTINGS skip_unavailable_shards = 1
 		) tables
@@ -179,19 +188,19 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 	log.V(1).M(host).F().Info("Extracting replicated table definitions from %v", replicas)
 
 	sqlDBs := heredoc.Doc(`
-		SELECT DISTINCT 
-			database AS name, 
+		SELECT 
+			DISTINCT database AS name, 
 			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_db_query
 		FROM cluster('all-sharded', system.tables) tables
 		WHERE database != 'system'
 		SETTINGS skip_unavailable_shards = 1`,
 	)
 	sqlTables := heredoc.Doc(`
-		SELECT DISTINCT 
-			name, 
+		SELECT 
+			DISTINCT name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
 		FROM cluster('all-sharded', system.tables) tables
-		WHERE database != 'system' and create_table_query != '' and name not like '.inner.%'
+		WHERE database != 'system' AND create_table_query != '' AND name NOT LIKE '.inner.%'
 		SETTINGS skip_unavailable_shards = 1`,
 	)
 
@@ -206,10 +215,10 @@ func (s *Schemer) hostGetDropTables(ctx context.Context, host *chop.ChiHost) ([]
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Doc(`
 		SELECT
-			distinct name, 
+			DISTINCT name, 
 			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_db_query
 		FROM system.tables
-		WHERE engine like 'Replicated%'`,
+		WHERE engine LIKE 'Replicated%'`,
 	)
 
 	names, sqlStatements, _ := s.queryUnzip2Columns(ctx, []string{CreatePodFQDN(host)}, sql)
