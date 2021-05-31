@@ -27,20 +27,20 @@ import (
 
 // Schemer
 type Schemer struct {
-	clickhouse.ClusterConnectionParams
+	*clickhouse.ClusterEndpointCredentials
 	Cluster *clickhouse.Cluster
 }
 
 // NewSchemer
 func NewSchemer(username, password string, port int) *Schemer {
-	params := clickhouse.ClusterConnectionParams{
+	endpointCredentials := &clickhouse.ClusterEndpointCredentials{
 		Username: username,
 		Password: password,
 		Port:     port,
 	}
 	return &Schemer{
-		ClusterConnectionParams: params,
-		Cluster: clickhouse.NewCluster().SetConnectionParams(params),
+		ClusterEndpointCredentials: endpointCredentials,
+		Cluster:                    clickhouse.NewCluster().SetEndpointCredentials(endpointCredentials),
 	}
 }
 
