@@ -2,7 +2,7 @@
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// You may obtain l copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
@@ -29,24 +29,17 @@ const (
 	defaultMaxTries = 10
 )
 
-// ClusterConnectionParams
-type ClusterConnectionParams struct {
-	Username string
-	Password string
-	Port int
-}
-
 // Cluster
 type Cluster struct {
-	ClusterConnectionParams
+	*ClusterEndpointCredentials
 	Hosts []string
-	A log.Announcer
+	l     log.Announcer
 }
 
 // NewCluster
 func NewCluster() *Cluster {
 	return &Cluster{
-		A: log.New(),
+		l: log.New(),
 	}
 }
 
@@ -55,21 +48,21 @@ func (c *Cluster) SetLog(a log.Announcer) *Cluster {
 	if c == nil {
 		return nil
 	}
-	c.A = a
+	c.l = a
 	return c
 }
 
-// SetConnectionParams
-func (c *Cluster)SetConnectionParams(params ClusterConnectionParams) *Cluster {
+// SetEndpointCredentials
+func (c *Cluster) SetEndpointCredentials(endpointCredentials *ClusterEndpointCredentials) *Cluster {
 	if c == nil {
 		return nil
 	}
-	c.ClusterConnectionParams = params
+	c.ClusterEndpointCredentials = endpointCredentials
 	return c
 }
 
 // SetHosts
-func (c *Cluster)SetHosts(hosts []string) *Cluster {
+func (c *Cluster) SetHosts(hosts []string) *Cluster {
 	if c == nil {
 		return nil
 	}
@@ -78,8 +71,8 @@ func (c *Cluster)SetHosts(hosts []string) *Cluster {
 }
 
 // getCHConnection
-func (c *Cluster) getCHConnection(host string) *CHConnection {
-	return GetPooledDBConnection(NewCHConnectionParams(host, c.Username, c.Password, c.Port)).SetLog(c.A)
+func (c *Cluster) getConnection(host string) *Connection {
+	return GetPooledDBConnection(NewConnectionParams(host, c.Username, c.Password, c.Port)).SetLog(c.l)
 }
 
 // QueryAny walks over provided endpoints and runs query sequentially on each endpoint.
@@ -89,21 +82,21 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*Query, error) {
 	// Fetch data from any of specified endpoints
 	for _, host := range c.Hosts {
 		if util.IsContextDone(ctx) {
-			c.A.V(2).Info("ctx is done")
+			c.l.V(2).Info("ctx is done")
 			return nil, nil
 		}
 
-		c.A.V(1).Info("Run query on: %s of %v", host, c.Hosts)
-		if query, err := c.getCHConnection(host).QueryContext(ctx, sql); err == nil {
+		c.l.V(1).Info("Run query on: %s of %v", host, c.Hosts)
+		if query, err := c.getConnection(host).QueryContext(ctx, sql); err == nil {
 			// One of specified endpoints returned result, no need to iterate more
 			return query, nil
 		} else {
-			c.A.V(1).A().Warning("FAILED to run query on: %s of %v skip to next. err: %v", host, c.Hosts, err)
+			c.l.V(1).A().Warning("FAILED to run query on: %s of %v skip to next. err: %v", host, c.Hosts, err)
 		}
 	}
 
 	str := fmt.Sprintf("FAILED to run query on all hosts %v", c.Hosts)
-	c.A.V(1).A().Error(str)
+	c.l.V(1).A().Error(str)
 	return nil, fmt.Errorf(str)
 }
 
@@ -111,7 +104,7 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*Query, error) {
 // Retry logic traverses the list of SQLs multiple times until all SQLs succeed
 func (c *Cluster) ExecAll(ctx context.Context, queries []string, retry bool) error {
 	if util.IsContextDone(ctx) {
-		c.A.V(2).Info("ctx is done")
+		c.l.V(2).Info("ctx is done")
 		return nil
 	}
 
@@ -124,44 +117,44 @@ func (c *Cluster) ExecAll(ctx context.Context, queries []string, retry bool) err
 	// For each host in the list run all SQL queries
 	for _, host := range c.Hosts {
 		if util.IsContextDone(ctx) {
-			c.A.V(2).Info("ctx is done")
+			c.l.V(2).Info("ctx is done")
 			return nil
 		}
-		conn := c.getCHConnection(host)
+		conn := c.getConnection(host)
 		if conn == nil {
-			c.A.V(1).M(host).F().Warning("Unable to get conn to host %s", host)
+			c.l.V(1).M(host).F().Warning("Unable to get conn to host %s", host)
 			continue
 		}
-		err := r.RetryContext(ctx, maxTries, "Applying sqls", c.A.V(1).M(host).F(),
+		err := r.Retry(ctx, maxTries, "Applying sqls", c.l.V(1).M(host).F(),
 			func() error {
-			var errors []error
-			for i, sql := range queries {
-				if util.IsContextDone(ctx) {
-					c.A.V(2).Info("ctx is done")
-					return nil
+				var errors []error
+				for i, sql := range queries {
+					if util.IsContextDone(ctx) {
+						c.l.V(2).Info("ctx is done")
+						return nil
+					}
+					if len(sql) == 0 {
+						// Skip malformed or already executed SQL query, move to the next one
+						continue
+					}
+					err := conn.ExecContext(ctx, sql)
+					if err != nil && strings.Contains(err.Error(), "Code: 253,") && strings.Contains(sql, "CREATE TABLE") {
+						c.l.V(1).M(host).F().Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
+						sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
+						err = conn.ExecContext(ctx, sqlAttach)
+					}
+					if err == nil {
+						queries[i] = "" // Query is executed, removing from the list
+					} else {
+						errors = append(errors, err)
+					}
 				}
-				if len(sql) == 0 {
-					// Skip malformed or already executed SQL query, move to the next one
-					continue
-				}
-				err := conn.ExecContext(ctx, sql)
-				if err != nil && strings.Contains(err.Error(), "Code: 253,") && strings.Contains(sql, "CREATE TABLE") {
-					c.A.V(1).M(host).F().Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
-					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
-					err = conn.ExecContext(ctx, sqlAttach)
-				}
-				if err == nil {
-					queries[i] = "" // Query is executed, removing from the list
-				} else {
-					errors = append(errors, err)
-				}
-			}
 
-			if len(errors) > 0 {
-				return errors[0]
-			}
-			return nil
-		},
+				if len(errors) > 0 {
+					return errors[0]
+				}
+				return nil
+			},
 		)
 
 		if util.ErrIsNotCanceled(err) {
