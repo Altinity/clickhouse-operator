@@ -14,6 +14,7 @@ stringData:
       kubernetes_sd_configs:
       - role: pod
       scrape_interval: 30s
+      scrape_timeout: 30s
       tls_config:
         ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         insecure_skip_verify: false
