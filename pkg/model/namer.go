@@ -158,12 +158,14 @@ type namer struct {
 	ctx namerContext
 }
 
+// newNamer
 func newNamer(ctx namerContext) *namer {
 	return &namer{
 		ctx: ctx,
 	}
 }
 
+// namePartNamespace
 func (n *namer) namePartNamespace(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -174,6 +176,7 @@ func (n *namer) namePartNamespace(name string) string {
 	return sanitize(util.StringHead(name, _len))
 }
 
+// namePartChiName
 func (n *namer) namePartChiName(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -184,6 +187,7 @@ func (n *namer) namePartChiName(name string) string {
 	return sanitize(util.StringHead(name, _len))
 }
 
+// namePartChiNameID
 func (n *namer) namePartChiNameID(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -194,6 +198,7 @@ func (n *namer) namePartChiNameID(name string) string {
 	return util.CreateStringID(name, _len)
 }
 
+// namePartClusterName
 func (n *namer) namePartClusterName(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -204,6 +209,7 @@ func (n *namer) namePartClusterName(name string) string {
 	return sanitize(util.StringHead(name, _len))
 }
 
+// namePartClusterNameID
 func (n *namer) namePartClusterNameID(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -214,6 +220,7 @@ func (n *namer) namePartClusterNameID(name string) string {
 	return util.CreateStringID(name, _len)
 }
 
+// namePartShardName
 func (n *namer) namePartShardName(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -224,6 +231,7 @@ func (n *namer) namePartShardName(name string) string {
 	return sanitize(util.StringHead(name, _len))
 }
 
+// namePartShardNameID
 func (n *namer) namePartShardNameID(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -234,6 +242,7 @@ func (n *namer) namePartShardNameID(name string) string {
 	return util.CreateStringID(name, _len)
 }
 
+// namePartReplicaName
 func (n *namer) namePartReplicaName(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -244,6 +253,7 @@ func (n *namer) namePartReplicaName(name string) string {
 	return sanitize(util.StringHead(name, _len))
 }
 
+// namePartReplicaNameID
 func (n *namer) namePartReplicaNameID(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -254,6 +264,7 @@ func (n *namer) namePartReplicaNameID(name string) string {
 	return util.CreateStringID(name, _len)
 }
 
+// namePartHostName
 func (n *namer) namePartHostName(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -264,6 +275,7 @@ func (n *namer) namePartHostName(name string) string {
 	return sanitize(util.StringHead(name, _len))
 }
 
+// namePartHostNameID
 func (n *namer) namePartHostNameID(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -274,6 +286,7 @@ func (n *namer) namePartHostNameID(name string) string {
 	return util.CreateStringID(name, _len)
 }
 
+// getNamePartNamespace
 func (n *namer) getNamePartNamespace(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ClickHouseInstallation:
@@ -293,6 +306,7 @@ func (n *namer) getNamePartNamespace(obj interface{}) string {
 	return "ERROR"
 }
 
+// getNamePartCHIName
 func (n *namer) getNamePartCHIName(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ClickHouseInstallation:
@@ -312,6 +326,7 @@ func (n *namer) getNamePartCHIName(obj interface{}) string {
 	return "ERROR"
 }
 
+// getNamePartClusterName
 func (n *namer) getNamePartClusterName(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ChiCluster:
@@ -328,6 +343,7 @@ func (n *namer) getNamePartClusterName(obj interface{}) string {
 	return "ERROR"
 }
 
+// getNamePartShardName
 func (n *namer) getNamePartShardName(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ChiShard:
@@ -341,54 +357,67 @@ func (n *namer) getNamePartShardName(obj interface{}) string {
 	return "ERROR"
 }
 
+// getNamePartReplicaName
 func (n *namer) getNamePartReplicaName(host *chop.ChiHost) string {
 	return n.namePartReplicaName(host.Address.ReplicaName)
 }
 
+// getNamePartHostName
 func (n *namer) getNamePartHostName(host *chop.ChiHost) string {
 	return n.namePartHostName(host.Address.HostName)
 }
 
+// getNamePartCHIScopeCycleSize
 func (n *namer) getNamePartCHIScopeCycleSize(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeCycleSize)
 }
 
+// getNamePartCHIScopeCycleIndex
 func (n *namer) getNamePartCHIScopeCycleIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeCycleIndex)
 }
 
+// getNamePartCHIScopeCycleOffset
 func (n *namer) getNamePartCHIScopeCycleOffset(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeCycleOffset)
 }
 
+// getNamePartClusterScopeCycleSize
 func (n *namer) getNamePartClusterScopeCycleSize(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeCycleSize)
 }
 
+// getNamePartClusterScopeCycleIndex
 func (n *namer) getNamePartClusterScopeCycleIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeCycleIndex)
 }
 
+// getNamePartClusterScopeCycleOffset
 func (n *namer) getNamePartClusterScopeCycleOffset(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeCycleOffset)
 }
 
+// getNamePartCHIScopeIndex
 func (n *namer) getNamePartCHIScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeIndex)
 }
 
+// getNamePartClusterScopeIndex
 func (n *namer) getNamePartClusterScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeIndex)
 }
 
+// getNamePartShardScopeIndex
 func (n *namer) getNamePartShardScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ShardScopeIndex)
 }
 
+// getNamePartReplicaScopeIndex
 func (n *namer) getNamePartReplicaScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ReplicaScopeIndex)
 }
 
+// newNameMacroReplacerChi
 func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
 	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
@@ -398,6 +427,7 @@ func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer
 	)
 }
 
+// newNameMacroReplacerCluster
 func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
@@ -410,6 +440,7 @@ func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 	)
 }
 
+// newNameMacroReplacerShard
 func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
@@ -427,7 +458,6 @@ func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 
 // clusterScopeIndexOfPreviousCycleTail gets cluster-scope index of previous cycle tail
 func clusterScopeIndexOfPreviousCycleTail(host *chop.ChiHost) int {
-
 	if host.Address.ClusterScopeCycleOffset == 0 {
 		// This is the cycle head - the first host of the cycle
 		// We need to point to previous host in this cluster - which would be previous cycle tail
@@ -448,6 +478,7 @@ func clusterScopeIndexOfPreviousCycleTail(host *chop.ChiHost) int {
 	return host.Address.ClusterScopeIndex
 }
 
+// newNameMacroReplacerHost
 func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
 	n := newNamer(namerContextNames)
 	return strings.NewReplacer(
@@ -581,6 +612,7 @@ func CreateShardName(shard *chop.ChiShard, index int) string {
 	return strconv.Itoa(index)
 }
 
+// IsAutoGeneratedShardName
 func IsAutoGeneratedShardName(name string, shard *chop.ChiShard, index int) bool {
 	return name == CreateShardName(shard, index)
 }
@@ -590,6 +622,7 @@ func CreateReplicaName(replica *chop.ChiReplica, index int) string {
 	return strconv.Itoa(index)
 }
 
+// IsAutoGeneratedReplicaName
 func IsAutoGeneratedReplicaName(name string, replica *chop.ChiReplica, index int) bool {
 	return name == CreateReplicaName(replica, index)
 }
@@ -599,6 +632,23 @@ func CreateHostName(host *chop.ChiHost, shard *chop.ChiShard, shardIndex int, re
 	return fmt.Sprintf("%s-%s", shard.Name, replica.Name)
 }
 
+// CreateHostReplicaName returns hostname (podhostname + service or FQDN) whgich can be used as replica name
+// where ClickHouse requires replica names. These are such places as:
+// 1. "remote_servers.xml"
+// 2. SYSTEM DROP REPLICA <replica_name>
+// based on .Spec.Defaults.ReplicasUseFQDN
+func CreateHostReplicaName(host *chop.ChiHost) string {
+	if util.IsStringBoolTrue(host.GetCHI().Spec.Defaults.ReplicasUseFQDN) {
+		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
+		// otherwise hostname+service name (unique within namespace) would be used
+		// .my-dev-namespace.svc.cluster.local
+		return CreatePodFQDN(host)
+	} else {
+		return CreatePodHostname(host)
+	}
+}
+
+// IsAutoGeneratedHostName
 func IsAutoGeneratedHostName(
 	name string,
 	host *chop.ChiHost,
@@ -710,7 +760,7 @@ func CreatePodFQDNsOfCluster(cluster *chop.ChiCluster) []string {
 	return fqdns
 }
 
-// CreatePodFQDNsOfShards creates fully qualified domain names of all pods in a shard
+// CreatePodFQDNsOfShard creates fully qualified domain names of all pods in a shard
 func CreatePodFQDNsOfShard(shard *chop.ChiShard) []string {
 	fqdns := make([]string, 0)
 	shard.WalkHosts(func(host *chop.ChiHost) error {
@@ -730,6 +780,7 @@ func CreatePodFQDNsOfCHI(chi *chop.ClickHouseInstallation) []string {
 	return fqdns
 }
 
+// CreatePodRegexp
 // template is defined in operator config:
 // CHConfigNetworksHostRegexpTemplate: chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
 func CreatePodRegexp(chi *chop.ClickHouseInstallation, template string) string {
