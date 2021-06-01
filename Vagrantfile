@@ -150,11 +150,13 @@ Vagrant.configure(2) do |config|
 #    export VALIDATE_YAML=false # only for 1.14
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
-#    K8S_VERSION=${K8S_VERSION:-1.17.17}
+    K8S_VERSION=${K8S_VERSION:-1.17.17}
 #    K8S_VERSION=${K8S_VERSION:-1.18.19}
 #    K8S_VERSION=${K8S_VERSION:-1.19.11}
+#    performance issue 1.20.x, 1.21.x, only 1.22 will good to start
+# https://github.com/kubernetes/kubeadm/issues/2395
 #    K8S_VERSION=${K8S_VERSION:-1.20.7}
-    K8S_VERSION=${K8S_VERSION:-1.21.1}
+#    K8S_VERSION=${K8S_VERSION:-1.21.1}
     export VALIDATE_YAML=true
 
     killall kubectl || true
@@ -189,15 +191,6 @@ EOF
     sudo -H -u vagrant minikube addons enable ingress-dns
     sudo -H -u vagrant minikube addons enable metrics-server
 
-#     minikube delete
-#     rm -rf /tmp/juju*
-#     minikube config set vm-driver none
-#     minikube config set kubernetes-version ${K8S_VERSION}
-#     minikube start
-#     minikube addons enable ingress
-#     minikube addons enable ingress-dns
-#     minikube addons enable metrics-server
-
     #krew
     (
         curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/krew.tar.gz" &&
@@ -215,6 +208,7 @@ EOF
     kubectl krew install minio
     # look to https://kubernetes.io/docs/tasks/debug-application-cluster/debug-running-pod/#ephemeral-container
     # kubectl krew install debug
+    chown -R vagrant:vagrant /home/vagrant/.krew
 
     cd /vagrant/
     git_branch=$(git rev-parse --abbrev-ref HEAD /vagrant/)
