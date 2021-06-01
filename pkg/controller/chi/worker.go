@@ -1023,7 +1023,7 @@ func (w *worker) deleteTables(ctx context.Context, host *chop.ChiHost) error {
 	if !host.CanDeleteAllPVCs() {
 		return nil
 	}
-	err := w.schemer.HostDeleteTables(ctx, host)
+	err := w.schemer.HostDropTables(ctx, host)
 
 	if err == nil {
 		w.a.V(1).

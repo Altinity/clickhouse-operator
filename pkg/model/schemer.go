@@ -225,7 +225,7 @@ func (s *Schemer) hostGetDropTables(ctx context.Context, host *chop.ChiHost) ([]
 	sql := heredoc.Doc(`
 		SELECT
 			DISTINCT name, 
-			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_db_query
+			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
 		FROM system.tables
 		WHERE engine LIKE 'Replicated%'`,
 	)
@@ -234,11 +234,38 @@ func (s *Schemer) hostGetDropTables(ctx context.Context, host *chop.ChiHost) ([]
 	return names, sqlStatements, nil
 }
 
-// HostDeleteTables
-func (s *Schemer) HostDeleteTables(ctx context.Context, host *chop.ChiHost) error {
+// hostGetSyncTables returns set of 'SYSTEM SYNC REPLICA database.table ...' SQLs
+func (s *Schemer) hostGetSyncTables(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
+	sql := heredoc.Doc(`
+		SELECT
+			DISTINCT name, 
+			concat('SYSTEM SYNC REPLICA "', database, '"."', name, '"') AS sync_table_query
+		FROM system.tables
+		WHERE engine LIKE 'Replicated%'`,
+	)
+
+	names, sqlStatements, _ := s.queryUnzip2Columns(ctx, []string{CreatePodFQDN(host)}, sql)
+	return names, sqlStatements, nil
+}
+
+// HostSyncTables
+func (s *Schemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error {
+	tableNames, syncTableSQLs, _ := s.hostGetSyncTables(ctx, host)
+	log.V(1).M(host).F().Info("Sync tables: %v as %v", tableNames, syncTableSQLs)
+	return s.execHost(ctx, host, syncTableSQLs, false, false)
+}
+
+// HostDropTables
+func (s *Schemer) HostDropTables(ctx context.Context, host *chop.ChiHost) error {
 	tableNames, dropTableSQLs, _ := s.hostGetDropTables(ctx, host)
 	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
 	return s.execHost(ctx, host, dropTableSQLs, false, false)
+}
+
+// HostDropReplica
+func (s *Schemer) HostDropReplica(ctx context.Context, host *chop.ChiHost) error {
+	log.V(1).M(host).F().Info("Drop replica: %v", CreateHostReplicaName(host))
+	return s.execHost(ctx, host, []string{"SYSTEM DROP REPLICA " + CreateHostReplicaName(host)}, false, false)
 }
 
 // HostCreateTables
