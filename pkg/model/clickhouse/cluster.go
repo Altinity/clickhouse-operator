@@ -116,54 +116,63 @@ func (c *Cluster) ExecAll(ctx context.Context, queries []string, retry bool) err
 
 	// For each host in the list run all SQL queries
 	for _, host := range c.Hosts {
-		if util.IsContextDone(ctx) {
-			c.l.V(2).Info("ctx is done")
-			return nil
-		}
-		conn := c.getConnection(host)
-		if conn == nil {
-			c.l.V(1).M(host).F().Warning("Unable to get conn to host %s", host)
-			continue
-		}
-		err := r.Retry(ctx, maxTries, "Applying sqls", c.l.V(1).M(host).F(),
-			func() error {
-				var errors []error
-				for i, sql := range queries {
-					if util.IsContextDone(ctx) {
-						c.l.V(2).Info("ctx is done")
-						return nil
-					}
-					if len(sql) == 0 {
-						// Skip malformed or already executed SQL query, move to the next one
-						continue
-					}
-					err := conn.ExecContext(ctx, sql)
-					if err != nil && strings.Contains(err.Error(), "Code: 253,") && strings.Contains(sql, "CREATE TABLE") {
-						c.l.V(1).M(host).F().Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
-						sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
-						err = conn.ExecContext(ctx, sqlAttach)
-					}
-					if err == nil {
-						queries[i] = "" // Query is executed, removing from the list
-					} else {
-						errors = append(errors, err)
-					}
-				}
-
-				if len(errors) > 0 {
-					return errors[0]
-				}
-				return nil
-			},
-		)
-
-		if util.ErrIsNotCanceled(err) {
+		if err := c.execQueriesWithRetry(ctx, host, queries, maxTries); err != nil {
 			errors = append(errors, err)
 		}
 	}
 
 	if len(errors) > 0 {
 		return errors[0]
+	}
+	return nil
+}
+
+// execQueriesWithRetry
+func (c *Cluster) execQueriesWithRetry(ctx context.Context, host string, queries []string, maxTries int) error {
+	if util.IsContextDone(ctx) {
+		c.l.V(2).Info("ctx is done")
+		return nil
+	}
+	conn := c.getConnection(host)
+	if conn == nil {
+		c.l.V(1).M(host).F().Warning("Unable to get conn to host %s", host)
+		return nil
+	}
+
+	err := r.Retry(ctx, maxTries, "Applying sqls", c.l.V(1).M(host).F(),
+		func() error {
+			var errors []error
+			for i, sql := range queries {
+				if util.IsContextDone(ctx) {
+					c.l.V(2).Info("ctx is done")
+					return nil
+				}
+				if len(sql) == 0 {
+					// Skip malformed or already executed SQL query, move to the next one
+					continue
+				}
+				err := conn.ExecContext(ctx, sql)
+				if err != nil && strings.Contains(err.Error(), "Code: 253,") && strings.Contains(sql, "CREATE TABLE") {
+					c.l.V(1).M(host).F().Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
+					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
+					err = conn.ExecContext(ctx, sqlAttach)
+				}
+				if err == nil {
+					queries[i] = "" // Query is executed, removing from the list
+				} else {
+					errors = append(errors, err)
+				}
+			}
+
+			if len(errors) > 0 {
+				return errors[0]
+			}
+			return nil
+		},
+	)
+
+	if util.ErrIsNotCanceled(err) {
+		return err
 	}
 	return nil
 }
