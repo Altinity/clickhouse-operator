@@ -96,20 +96,21 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 
 	log.V(1).M(host).F().Info("Extracting distributed table definitions from hosts %v", hosts)
 
-	sqlDBs := heredoc.Doc(`
+	sqlDBs := heredoc.Docf(`
 		SELECT 
 			DISTINCT database AS name, 
 			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_db_query
 		FROM 
 		(
 			SELECT DISTINCT arrayJoin([database, extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+')]) database
-			FROM cluster('all-sharded', system.tables) tables
+			FROM cluster('%s', system.tables) tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 		)
 		`,
+		host.Address.ClusterName,
 	)
-	sqlTables := heredoc.Doc(`
+	sqlTables := heredoc.Docf(`
 		SELECT DISTINCT 
 			concat(database, '.', name) as name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
@@ -120,7 +121,7 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 				name,
 				create_table_query,
 				2 AS order
-			FROM cluster('all-sharded', system.tables) tables
+			FROM cluster('%s', system.tables) tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
@@ -129,14 +130,14 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
 				t.create_table_query,
 				1 AS order
-			FROM cluster('all-sharded', system.tables) tables
+			FROM cluster('%s', system.tables) tables
 			LEFT JOIN 
 			(
 				SELECT 
 					DISTINCT database, 
 					name, 
 					create_table_query 
-				FROM cluster('all-sharded', system.tables)
+				FROM cluster('%s', system.tables)
 				SETTINGS skip_unavailable_shards = 1
 			) t 
 			USING (database, name)
@@ -145,6 +146,9 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 		) tables
 		ORDER BY order
 		`,
+		host.Address.ClusterName,
+		host.Address.ClusterName,
+		host.Address.ClusterName,
 	)
 
 	log.V(1).M(host).F().Info("fetch dbs list")
@@ -188,23 +192,25 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 	}
 	log.V(1).M(host).F().Info("Extracting replicated table definitions from %v", replicas)
 
-	sqlDBs := heredoc.Doc(`
+	sqlDBs := heredoc.Docf(`
 		SELECT 
 			DISTINCT database AS name, 
 			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_db_query
-		FROM cluster('all-sharded', system.tables) tables
+		FROM cluster('%s', system.tables) tables
 		WHERE database != 'system'
 		SETTINGS skip_unavailable_shards = 1
 		`,
+		host.Address.ClusterName,
 	)
-	sqlTables := heredoc.Doc(`
+	sqlTables := heredoc.Docf(`
 		SELECT 
 			DISTINCT name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
-		FROM cluster('all-sharded', system.tables) tables
+		FROM cluster('%s', system.tables) tables
 		WHERE database != 'system' AND create_table_query != '' AND name NOT LIKE '.inner.%'
 		SETTINGS skip_unavailable_shards = 1
 		`,
+		host.Address.ClusterName,
 	)
 
 	names1, sqlStatements1, _ := s.queryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
