@@ -508,22 +508,22 @@ func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
 	)
 }
 
-// CreateConfigMapPodName returns a name for a ConfigMap for ClickHouse pod
-func CreateConfigMapPodName(host *chop.ChiHost) string {
+// CreateConfigMapPersonalName returns a name for a ConfigMap for replica's personal config
+func CreateConfigMapPersonalName(host *chop.ChiHost) string {
 	return newNameMacroReplacerHost(host).Replace(configMapDeploymentNamePattern)
 }
 
-// CreateConfigMapCommonName returns a name for a ConfigMap for replica's common chopConfig
+// CreateConfigMapCommonName returns a name for a ConfigMap for replica's common config
 func CreateConfigMapCommonName(chi *chop.ClickHouseInstallation) string {
 	return newNameMacroReplacerChi(chi).Replace(configMapCommonNamePattern)
 }
 
-// CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common chopConfig
+// CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common users config
 func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
 	return newNameMacroReplacerChi(chi).Replace(configMapCommonUsersNamePattern)
 }
 
-// CreateCHIServiceName creates a name of a Installation Service resource
+// CreateCHIServiceName creates a name of a root ClickHouseInstallation Service resource
 func CreateCHIServiceName(chi *chop.ClickHouseInstallation) string {
 	// Name can be generated either from default name pattern,
 	// or from personal name pattern provided in ServiceTemplate
@@ -544,7 +544,7 @@ func CreateCHIServiceName(chi *chop.ClickHouseInstallation) string {
 	return newNameMacroReplacerChi(chi).Replace(pattern)
 }
 
-// CreateCHIServiceFQDN creates a name of a Installation Service resource
+// CreateCHIServiceFQDN creates a FQD name of a root ClickHouseInstallation Service resource
 func CreateCHIServiceFQDN(chi *chop.ClickHouseInstallation) string {
 	// FQDN can be generated either from default pattern,
 	// or from personal pattern provided
@@ -632,17 +632,17 @@ func CreateHostName(host *chop.ChiHost, shard *chop.ChiShard, shardIndex int, re
 	return fmt.Sprintf("%s-%s", shard.Name, replica.Name)
 }
 
-// CreateHostReplicaName returns hostname (podhostname + service or FQDN) whgich can be used as replica name
-// where ClickHouse requires replica names. These are such places as:
-// 1. "remote_servers.xml"
-// 2. SYSTEM DROP REPLICA <replica_name>
-// based on .Spec.Defaults.ReplicasUseFQDN
+// CreateHostReplicaName returns hostname (pod-hostname + service or FQDN) which can be used as a replica name
+// in all places where ClickHouse requires replica names. These are such places as:
+// 1. "remote_servers.xml" config file
+// 2. statements like SYSTEM DROP REPLICA <replica_name>
+// Function operations are based on .Spec.Defaults.ReplicasUseFQDN
 func CreateHostReplicaName(host *chop.ChiHost) string {
 	if util.IsStringBoolTrue(host.GetCHI().Spec.Defaults.ReplicasUseFQDN) {
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local
-		return CreatePodFQDN(host)
+		return createPodFQDN(host)
 	} else {
 		return CreatePodHostname(host)
 	}
@@ -728,9 +728,9 @@ func CreatePodHostname(host *chop.ChiHost) string {
 	return CreateStatefulSetServiceName(host)
 }
 
-// CreatePodFQDN creates a fully qualified domain name of a pod
+// createPodFQDN creates a fully qualified domain name of a pod
 // ss-1eb454-2-0.my-dev-domain.svc.cluster.local
-func CreatePodFQDN(host *chop.ChiHost) string {
+func createPodFQDN(host *chop.ChiHost) string {
 	// FQDN can be generated either from default pattern,
 	// or from personal pattern provided
 
@@ -750,34 +750,70 @@ func CreatePodFQDN(host *chop.ChiHost) string {
 	)
 }
 
-// CreatePodFQDNsOfCluster creates fully qualified domain names of all pods in a cluster
-func CreatePodFQDNsOfCluster(cluster *chop.ChiCluster) []string {
+// createPodFQDNsOfCluster creates fully qualified domain names of all pods in a cluster
+func createPodFQDNsOfCluster(cluster *chop.ChiCluster) []string {
 	fqdns := make([]string, 0)
 	cluster.WalkHosts(func(host *chop.ChiHost) error {
-		fqdns = append(fqdns, CreatePodFQDN(host))
+		fqdns = append(fqdns, createPodFQDN(host))
 		return nil
 	})
 	return fqdns
 }
 
-// CreatePodFQDNsOfShard creates fully qualified domain names of all pods in a shard
-func CreatePodFQDNsOfShard(shard *chop.ChiShard) []string {
+// createPodFQDNsOfShard creates fully qualified domain names of all pods in a shard
+func createPodFQDNsOfShard(shard *chop.ChiShard) []string {
 	fqdns := make([]string, 0)
 	shard.WalkHosts(func(host *chop.ChiHost) error {
-		fqdns = append(fqdns, CreatePodFQDN(host))
+		fqdns = append(fqdns, createPodFQDN(host))
 		return nil
 	})
 	return fqdns
 }
 
-// CreatePodFQDNsOfCHI creates fully qualified domain names of all pods in a CHI
-func CreatePodFQDNsOfCHI(chi *chop.ClickHouseInstallation) []string {
+// createPodFQDNsOfCHI creates fully qualified domain names of all pods in a CHI
+func createPodFQDNsOfCHI(chi *chop.ClickHouseInstallation) []string {
 	fqdns := make([]string, 0)
 	chi.WalkHosts(func(host *chop.ChiHost) error {
-		fqdns = append(fqdns, CreatePodFQDN(host))
+		fqdns = append(fqdns, createPodFQDN(host))
 		return nil
 	})
 	return fqdns
+}
+
+// CreateFQDN is a wrapper over pod FQDN function
+func CreateFQDN(host *chop.ChiHost) string {
+	return createPodFQDN(host)
+}
+
+// CreateFQDNs is a wrapper over set of create FQDN functions
+// obj specifies source object to create FQDNs from
+// scope specifies target scope - what entity to create FQDNs for - be it CHI, cluster, shard or host itself
+// excludeSelf specifies whether to exclude the host itself. Applicable only in case obj is a host
+func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string {
+	switch typed := obj.(type) {
+	case *chop.ClickHouseInstallation:
+		return createPodFQDNsOfCHI(typed)
+	case *chop.ChiShard:
+		return createPodFQDNsOfShard(typed)
+	case *chop.ChiCluster:
+		return createPodFQDNsOfCluster(typed)
+	case *chop.ChiHost:
+		self := ""
+		if excludeSelf {
+			self = createPodFQDN(typed)
+		}
+		switch scope.(type) {
+		case chop.ChiHost:
+			return util.RemoveFromArray(self, []string{createPodFQDN(typed)})
+		case chop.ChiShard:
+			return util.RemoveFromArray(self, createPodFQDNsOfShard(typed.GetShard()))
+		case chop.ChiCluster:
+			return util.RemoveFromArray(self, createPodFQDNsOfCluster(typed.GetCluster()))
+		case chop.ClickHouseInstallation:
+			return util.RemoveFromArray(self, createPodFQDNsOfCHI(typed.GetCHI()))
+		}
+	}
+	return nil
 }
 
 // CreatePodRegexp

@@ -409,7 +409,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 			WithStatusAction(new).
 			M(new).F().
 			Info("add CHI to monitoring")
-		w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfCHI(new))
+		w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreateFQDNs(new, nil, false))
 	}
 
 	// Update CHI object

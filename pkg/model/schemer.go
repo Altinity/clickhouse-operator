@@ -88,7 +88,7 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 		return nil, nil, nil
 	}
 
-	hosts := CreatePodFQDNsOfCluster(host.GetCluster())
+	hosts := CreateFQDNs(host, chop.ChiCluster{}, false)
 	if len(hosts) <= 1 {
 		log.V(1).M(host).F().Info("Single host in a cluster. Nothing to create a schema from.")
 		return nil, nil, nil
@@ -153,7 +153,7 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 
 	log.V(1).M(host).F().Info("fetch dbs list")
 	log.V(1).M(host).F().Info("dbs sql\n%v", sqlDBs)
-	names1, sqlStatements1, _ := s.queryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
+	names1, sqlStatements1, _ := s.queryUnzip2Columns(ctx, CreateFQDNs(host, chop.ClickHouseInstallation{}, false), sqlDBs)
 	log.V(1).M(host).F().Info("names1:")
 	for _, v := range names1 {
 		log.V(1).M(host).F().Info("names1: %s", v)
@@ -165,7 +165,7 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 
 	log.V(1).M(host).F().Info("fetch table list")
 	log.V(1).M(host).F().Info("tbl sql\n%v", sqlTables)
-	names2, sqlStatements2, _ := s.queryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
+	names2, sqlStatements2, _ := s.queryUnzip2Columns(ctx, CreateFQDNs(host, chop.ClickHouseInstallation{}, false), sqlTables)
 	log.V(1).M(host).F().Info("names2:")
 	for _, v := range names2 {
 		log.V(1).M(host).F().Info("names2: %s", v)
@@ -185,7 +185,7 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 		return nil, nil, nil
 	}
 
-	replicas := CreatePodFQDNsOfShard(host.GetShard())
+	replicas := CreateFQDNs(host, chop.ChiShard{}, false)
 	if len(replicas) <= 1 {
 		log.V(1).M(host).F().Info("Single replica in a shard. Nothing to create a schema from.")
 		return nil, nil, nil
@@ -213,8 +213,8 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 		host.Address.ClusterName,
 	)
 
-	names1, sqlStatements1, _ := s.queryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlDBs)
-	names2, sqlStatements2, _ := s.queryUnzip2Columns(ctx, CreatePodFQDNsOfCHI(host.GetCHI()), sqlTables)
+	names1, sqlStatements1, _ := s.queryUnzip2Columns(ctx, CreateFQDNs(host, chop.ClickHouseInstallation{}, false), sqlDBs)
+	names2, sqlStatements2, _ := s.queryUnzip2Columns(ctx, CreateFQDNs(host, chop.ClickHouseInstallation{}, false), sqlTables)
 	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
 }
 
@@ -230,7 +230,7 @@ func (s *Schemer) hostGetDropTables(ctx context.Context, host *chop.ChiHost) ([]
 		WHERE engine LIKE 'Replicated%'`,
 	)
 
-	names, sqlStatements, _ := s.queryUnzip2Columns(ctx, []string{CreatePodFQDN(host)}, sql)
+	names, sqlStatements, _ := s.queryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
 	return names, sqlStatements, nil
 }
 
@@ -244,7 +244,7 @@ func (s *Schemer) hostGetSyncTables(ctx context.Context, host *chop.ChiHost) ([]
 		WHERE engine LIKE 'Replicated%'`,
 	)
 
-	names, sqlStatements, _ := s.queryUnzip2Columns(ctx, []string{CreatePodFQDN(host)}, sql)
+	names, sqlStatements, _ := s.queryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
 	return names, sqlStatements, nil
 }
 
@@ -327,28 +327,28 @@ func (s *Schemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInsta
 
 // execCHI runs set of SQL queries over the whole CHI
 func (s *Schemer) execCHI(ctx context.Context, chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
-	hosts := CreatePodFQDNsOfCHI(chi)
+	hosts := CreateFQDNs(chi, nil, false)
 	opts := clickhouse.NewQueryOptions().SetRetry(true)
 	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
 }
 
 // execCluster runs set of SQL queries over the cluster
 func (s *Schemer) execCluster(ctx context.Context, cluster *chop.ChiCluster, sqls []string, retry bool) error {
-	hosts := CreatePodFQDNsOfCluster(cluster)
+	hosts := CreateFQDNs(cluster, nil, false)
 	opts := clickhouse.NewQueryOptions().SetRetry(true)
 	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
 }
 
 // execShard runs set of SQL queries over the shard replicas
 func (s *Schemer) execShard(ctx context.Context, shard *chop.ChiShard, sqls []string, retry bool) error {
-	hosts := CreatePodFQDNsOfShard(shard)
+	hosts := CreateFQDNs(shard, nil, false)
 	opts := clickhouse.NewQueryOptions().SetRetry(true)
 	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
 }
 
 // execHost runs set of SQL queries over the replica
 func (s *Schemer) execHost(ctx context.Context, host *chop.ChiHost, sqls []string, retry bool, silent bool) error {
-	hosts := []string{CreatePodFQDN(host)}
+	hosts := CreateFQDNs(host, chop.ChiHost{}, false)
 	opts := clickhouse.NewQueryOptions().SetRetry(true)
 	c := s.Cluster.SetHosts(hosts)
 	if silent {

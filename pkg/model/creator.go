@@ -275,7 +275,7 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      CreateConfigMapPodName(host),
+			Name:      CreateConfigMapPersonalName(host),
 			Namespace: host.Address.Namespace,
 			Labels:    c.labeler.getLabelsConfigMapHost(host),
 		},
@@ -468,7 +468,7 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
 func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
-	configMapPodName := CreateConfigMapPodName(host)
+	configMapPersonalName := CreateConfigMapPersonalName(host)
 	configMapCommonName := CreateConfigMapCommonName(c.chi)
 	configMapCommonUsersName := CreateConfigMapCommonUsersName(c.chi)
 
@@ -477,7 +477,7 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 		statefulSetObject.Spec.Template.Spec.Volumes,
 		newVolumeForConfigMap(configMapCommonName),
 		newVolumeForConfigMap(configMapCommonUsersName),
-		newVolumeForConfigMap(configMapPodName),
+		newVolumeForConfigMap(configMapPersonalName),
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
@@ -490,7 +490,7 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 			container.VolumeMounts,
 			newVolumeMount(configMapCommonName, dirPathCommonConfig),
 			newVolumeMount(configMapCommonUsersName, dirPathUsersConfig),
-			newVolumeMount(configMapPodName, dirPathHostConfig),
+			newVolumeMount(configMapPersonalName, dirPathHostConfig),
 		)
 	}
 }

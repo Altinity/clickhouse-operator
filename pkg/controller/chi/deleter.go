@@ -232,7 +232,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) er
 		return nil
 	}
 
-	name := chopmodel.CreateConfigMapPodName(host)
+	name := chopmodel.CreateConfigMapPersonalName(host)
 	namespace := host.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
