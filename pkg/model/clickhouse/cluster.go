@@ -24,11 +24,6 @@ import (
 	r "github.com/altinity/clickhouse-operator/pkg/util/retry"
 )
 
-const (
-	// Max number of tries for SQL queries
-	defaultMaxTries = 10
-)
-
 // Cluster
 type Cluster struct {
 	*ClusterEndpointCredentials
@@ -102,22 +97,24 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*Query, error) {
 
 // ExecAll runs set of SQL queries on all endpoints of the cluster
 // Retry logic traverses the list of SQLs multiple times until all SQLs succeed
-func (c *Cluster) ExecAll(ctx context.Context, queries []string, retry bool) error {
+func (c *Cluster) ExecAll(ctx context.Context, queries []string, _opts ...*QueryOptions) error {
 	if util.IsContextDone(ctx) {
 		c.l.V(2).Info("ctx is done")
 		return nil
 	}
 
-	maxTries := 1
-	if retry {
-		maxTries = defaultMaxTries
-	}
 	var errors []error
-
 	// For each host in the list run all SQL queries
+	opts := QueryOptionsNormalize(_opts...)
 	for _, host := range c.Hosts {
-		if err := c.execQueriesWithRetry(ctx, host, queries, maxTries); err != nil {
-			errors = append(errors, err)
+		if opts.Parallel {
+			if err := c.exec(ctx, host, queries, opts); err != nil {
+				errors = append(errors, err)
+			}
+		} else {
+			if err := c.exec(ctx, host, queries, opts); err != nil {
+				errors = append(errors, err)
+			}
 		}
 	}
 
@@ -128,7 +125,7 @@ func (c *Cluster) ExecAll(ctx context.Context, queries []string, retry bool) err
 }
 
 // execQueriesWithRetry
-func (c *Cluster) execQueriesWithRetry(ctx context.Context, host string, queries []string, maxTries int) error {
+func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts ...*QueryOptions) error {
 	if util.IsContextDone(ctx) {
 		c.l.V(2).Info("ctx is done")
 		return nil
@@ -139,7 +136,8 @@ func (c *Cluster) execQueriesWithRetry(ctx context.Context, host string, queries
 		return nil
 	}
 
-	err := r.Retry(ctx, maxTries, "Applying sqls", c.l.V(1).M(host).F(),
+	opts := QueryOptionsNormalize(_opts...)
+	err := r.Retry(ctx, opts.Tries, "Applying sqls", c.l.V(1).M(host).F(),
 		func() error {
 			var errors []error
 			for i, sql := range queries {

@@ -207,7 +207,7 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 			DISTINCT name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
 		FROM cluster('%s', system.tables) tables
-		WHERE database != 'system' AND create_table_query != '' AND name NOT LIKE '.inner.%'
+		WHERE database != 'system' AND create_table_query != '' AND name NOT LIKE '.inner.%%'
 		SETTINGS skip_unavailable_shards = 1
 		`,
 		host.Address.ClusterName,
@@ -301,29 +301,33 @@ func (s *Schemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInsta
 // execCHI runs set of SQL queries over the whole CHI
 func (s *Schemer) execCHI(ctx context.Context, chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
 	hosts := CreatePodFQDNsOfCHI(chi)
-	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, retry)
+	opts := clickhouse.NewQueryOptions().SetRetry(true)
+	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
 }
 
 // execCluster runs set of SQL queries over the cluster
 func (s *Schemer) execCluster(ctx context.Context, cluster *chop.ChiCluster, sqls []string, retry bool) error {
 	hosts := CreatePodFQDNsOfCluster(cluster)
-	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, retry)
+	opts := clickhouse.NewQueryOptions().SetRetry(true)
+	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
+}
+
+// execShard runs set of SQL queries over the shard replicas
+func (s *Schemer) execShard(ctx context.Context, shard *chop.ChiShard, sqls []string, retry bool) error {
+	hosts := CreatePodFQDNsOfShard(shard)
+	opts := clickhouse.NewQueryOptions().SetRetry(true)
+	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
 }
 
 // execHost runs set of SQL queries over the replica
 func (s *Schemer) execHost(ctx context.Context, host *chop.ChiHost, sqls []string, retry bool, silent bool) error {
 	hosts := []string{CreatePodFQDN(host)}
+	opts := clickhouse.NewQueryOptions().SetRetry(true)
 	c := s.Cluster.SetHosts(hosts)
 	if silent {
 		c = c.SetLog(log.Silence())
 	} else {
 		c = c.SetLog(log.New())
 	}
-	return c.ExecAll(ctx, sqls, retry)
-}
-
-// execShard runs set of SQL queries over the shard replicas
-func (s *Schemer) execShard(ctx context.Context, shard *chop.ChiShard, sqls []string, retry bool) error {
-	hosts := CreatePodFQDNsOfShard(shard)
-	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, retry)
+	return c.ExecAll(ctx, sqls, opts)
 }
