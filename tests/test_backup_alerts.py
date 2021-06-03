@@ -188,7 +188,7 @@ def test_backup_is_down(self):
         assert fired, error("can't get ClickHouseBackupDown alert in firing state")
 
     with Then("check ClickHouseBackupDown gone away"):
-        resolved = alerts.wait_alert_state("ClickHouseBackupDown", "firing", expected_state=False, sleep_time=5,
+        resolved = alerts.wait_alert_state("ClickHouseBackupDown", "firing", expected_state=False, sleep_time=settings.prometheus_scrape_interval,
                                            labels={"pod_name": reboot_pod}, )
         assert resolved, error("can't get ClickHouseBackupDown alert is gone away")
 
@@ -252,7 +252,7 @@ def test_backup_duration(self):
             kubectl.wait_field("pod", pod, ".spec.containers[1].image", "nginx:latest")
             kubectl.wait_field("pod", pod, ".status.containerStatuses[1].ready", "true")
 
-            fired = alerts.wait_alert_state("ClickHouseBackupTooLong", "firing", expected_state=True, sleep_time=5,
+            fired = alerts.wait_alert_state("ClickHouseBackupTooLong", "firing", expected_state=True, sleep_time=settings.prometheus_scrape_interval,
                                             labels={"pod_name": pod}, time_range='60s')
             assert fired, error(f"can't get ClickHouseBackupTooLong alert in firing state for {pod}")
 
@@ -271,7 +271,7 @@ def test_backup_duration(self):
             '\''
         )
 
-        fired = alerts.wait_alert_state("ClickHouseBackupTooShort", "firing", expected_state=True, sleep_time=5,
+        fired = alerts.wait_alert_state("ClickHouseBackupTooShort", "firing", expected_state=True, sleep_time=settings.prometheus_scrape_interval,
                                         labels={"pod_name": short_pod}, time_range='60s')
         assert fired, error("can't get ClickHouseBackupTooShort alert in firing state")
 
@@ -279,12 +279,12 @@ def test_backup_duration(self):
 
     with Then("check ClickHouseBackupTooShort gone away"):
         resolved = alerts.wait_alert_state("ClickHouseBackupTooShort", "firing", expected_state=False,
-                                           labels={"pod_name": short_pod}, sleep_time=5)
+                                           labels={"pod_name": short_pod})
         assert resolved, error("can't get ClickHouseBackupTooShort alert is gone away")
 
     with Then("check ClickHouseBackupTooLong gone away"):
         resolved = alerts.wait_alert_state("ClickHouseBackupTooLong", "firing", expected_state=False,
-                                           labels={"pod_name": long_pod}, sleep_time=5)
+                                           labels={"pod_name": long_pod})
         assert resolved, error("can't get ClickHouseBackupTooLong alert is gone away")
 
 
@@ -316,13 +316,13 @@ def test_backup_size(self):
                     pod=backup_pod
                 )
             time.sleep(15)
-        fired = alerts.wait_alert_state("ClickHouseBackupSizeChanged", "firing", expected_state=True, sleep_time=5,
+        fired = alerts.wait_alert_state("ClickHouseBackupSizeChanged", "firing", expected_state=True, sleep_time=settings.prometheus_scrape_interval,
                                         labels={"pod_name": backup_pod}, time_range='60s')
         assert fired, error(f"can't get ClickHouseBackupSizeChanged alert in firing state, decrease={decrease}")
 
         with Then("check ClickHouseBackupSizeChanged gone away"):
             resolved = alerts.wait_alert_state("ClickHouseBackupSizeChanged", "firing", expected_state=False,
-                                               labels={"pod_name": backup_pod}, sleep_time=5)
+                                               labels={"pod_name": backup_pod})
             assert resolved, error(f"can't get ClickHouseBackupSizeChanged alert is gone away, decrease={decrease}")
 
 
@@ -345,7 +345,7 @@ def test_backup_not_run(self):
             '\''
         )
 
-        fired = alerts.wait_alert_state("ClickhouseBackupDoesntRunTooLong", "firing", expected_state=True, sleep_time=5,
+        fired = alerts.wait_alert_state("ClickhouseBackupDoesntRunTooLong", "firing", expected_state=True, sleep_time=settings.prometheus_scrape_interval,
                                         labels={"pod_name": not_run_pod}, time_range='60s')
         assert fired, error("can't get ClickhouseBackupDoesntRunTooLong alert in firing state")
 
@@ -363,7 +363,7 @@ def test_backup_not_run(self):
 
     with Then("check ClickhouseBackupDoesntRunTooLong gone away"):
         resolved = alerts.wait_alert_state("ClickhouseBackupDoesntRunTooLong", "firing", expected_state=False,
-                                           labels={"pod_name": not_run_pod}, sleep_time=5)
+                                           labels={"pod_name": not_run_pod})
         assert resolved, error("can't get ClickhouseBackupDoesntRunTooLong alert is gone away")
 
 

@@ -1,11 +1,10 @@
 import kubectl
 import settings
-import test_operator
 import test_clickhouse
+import test_operator
 import util
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE, args, Fail, Error
-from testflows.asserts import error
+from testflows.core import Given, main, Scenario, Module, Fail, Error
 
 if main():
     with Module("main"):
@@ -41,7 +40,7 @@ if main():
              "/main/operator/test_022. Test that chi with broken image can be deleted": [(Error, "Not supported yet. Timeout")],
              "/main/operator/test_024. Test annotations for various template types/PV annotations should be populated": [(Fail, "Not supported yet")],
         }
-        with Module("operator", xfails = xfails):
+        with Module("operator", xfails=xfails):
             all_tests = [
                 test_operator.test_001,
                 test_operator.test_002,
@@ -50,7 +49,7 @@ if main():
                 test_operator.test_006,
                 test_operator.test_007,
                 test_operator.test_008,
-                (test_operator.test_009, {"version_from": "0.13.5"}),
+                (test_operator.test_009, {"version_from": "0.14.1"}),
                 test_operator.test_010,
                 test_operator.test_011,
                 test_operator.test_011_1,
@@ -63,12 +62,12 @@ if main():
                 # test_operator.test_018, # Obsolete, covered by test_016
                 test_operator.test_019,
                 test_operator.test_020,
-                test_operator.test_021,
+                test_operator.test_022,
                 test_operator.test_023,
                 test_operator.test_024,
                 test_operator.test_025,
                 test_operator.test_026,
-                test_operator.test_022, # this should go last while failing
+                test_operator.test_021,  # this should go last while failing
             ]
             run_tests = all_tests
 

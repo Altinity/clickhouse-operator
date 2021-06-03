@@ -505,14 +505,7 @@ func (c *ClickHouseConfigGenerator) getDistributedDDLPath() string {
 // getRemoteServersReplicaHostname returns hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
 func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(host *chiv1.ChiHost) string {
-	if util.IsStringBoolTrue(c.chi.Spec.Defaults.ReplicasUseFQDN) {
-		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
-		// otherwise hostname+service name (unique within namespace) would be used
-		// .my-dev-namespace.svc.cluster.local
-		return CreatePodFQDN(host)
-	} else {
-		return CreatePodHostname(host)
-	}
+	return CreateHostReplicaName(host)
 }
 
 // getMacrosInstallation returns macros value for <installation-name> macros

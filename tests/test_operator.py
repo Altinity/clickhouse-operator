@@ -1159,11 +1159,14 @@ def test_021(self):
         },
     )
 
-    with Then("Storage size should be 100Mi"):
+    with Then("Storage size should be 1Gi"):
         size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
-        assert size == "100Mi"
+        assert size == "1Gi"
 
-    with When("Re-scale volume configuration to 200Mb"):
+    with Then("Create a table with a single row"):
+        clickhouse.query(chi, "CREATE TABLE test_local Engine = Log as SELECT 1 AS wtf")
+
+    with When("Re-scale volume configuration to 2Gi"):
         kubectl.create_and_check(
             config="configs/test-021-rescale-volume-02-enlarge-disk.yaml",
             check={
@@ -1172,20 +1175,20 @@ def test_021(self):
             },
         )
 
-        with Then("Storage size should be 200Mi"):
-            kubectl.wait_field("pvc", "disk1-chi-test-021-rescale-volume-simple-0-0-0", ".spec.resources.requests.storage", "200Mi")
+        with Then("Storage size should be 2Gi"):
+            kubectl.wait_field("pvc", "disk1-chi-test-021-rescale-volume-simple-0-0-0", ".spec.resources.requests.storage", "2Gi")
             size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
-            assert size == "200Mi"
+            assert size == "2Gi"
 
-    with When("Add second disk 50Mi"):
+        with And("Table should exist"):
+            out = clickhouse.query(chi, "select * from test_local")
+            assert out == "1"
+
+    with When("Add a second disk"):
         kubectl.create_and_check(
             config="configs/test-021-rescale-volume-03-add-disk.yaml",
             check={
                 "pod_count": 1,
-                # "pod_volumes": {
-                #   "/var/lib/clickhouse",
-                #    "/var/lib/clickhouse2",
-                # },
                 "do_not_delete": 1,
             },
         )
@@ -1193,11 +1196,11 @@ def test_021(self):
 
         with Then("There should be two PVC"):
             size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
-            assert size == "200Mi"
+            assert size == "2Gi"
             kubectl.wait_object("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0")
             kubectl.wait_field("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0", ".status.phase", "Bound")
             size = kubectl.get_pvc_size("disk2-chi-test-021-rescale-volume-simple-0-0-0")
-            assert size == "50Mi"
+            assert size == "1Gi"
 
         with And("There should be two disks recognized by ClickHouse"):
             kubectl.wait_pod_status("chi-test-021-rescale-volume-simple-0-0-0", "Running")
@@ -1209,10 +1212,51 @@ def test_021(self):
                 if out == "2":
                     break
                 with Then(f"Not ready yet. Wait for {1<<i} seconds"):
-                    time.sleep(1<<i)
-            print("SELECT count() FROM system.disks RETURNED:")
-            print(out)
+                    time.sleep(1 << i)
             assert out == "2"
+
+        with And("Table should exist"):
+            out = clickhouse.query(chi, "select * from test_local")
+            assert out == "1"
+
+    with When("Try reducing the disk size and also change a version to recreate the stateful set"):
+        kubectl.create_and_check(
+            config="configs/test-021-rescale-volume-04-decrease-disk.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+        with Then("Storage size should be unchanged 2Gi"):
+            size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            assert size == "2Gi"
+
+        with And("Table should exist"):
+            out = clickhouse.query(chi, "select * from test_local")
+            assert out == "1"
+
+        with And("PVC status should not be Terminating"):
+            status = kubectl.get_field("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0", ".status.phase")
+            assert status != "Terminating"
+
+    with When("Revert disk size back to 2Gi"):
+        kubectl.create_and_check(
+            config="configs/test-021-rescale-volume-03-add-disk.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+        with Then("Storage size should be 2Gi"):
+            kubectl.wait_field("pvc", "disk1-chi-test-021-rescale-volume-simple-0-0-0", ".spec.resources.requests.storage", "2Gi")
+            size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            assert size == "2Gi"
+
+        with And("Table should exist"):
+            out = clickhouse.query(chi, "select * from test_local")
+            assert out == "1"
 
     kubectl.delete_chi(chi)
 
@@ -1318,6 +1362,9 @@ def test_025(self):
         timeout=600,
     )
 
+    kubectl.wait_jsonpath("pod", "chi-test-025-rescaling-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
+                          ns=kubectl.namespace)
+
     numbers = "100000000"
 
     with Given("Create replicated table and populate it"):
@@ -1339,7 +1386,7 @@ def test_025(self):
     with Then("Query second pod using service as soon as pod is in ready state"):
         kubectl.wait_field(
             "pod", "chi-test-025-rescaling-default-0-1-0",
-            ".status.containerStatuses[0].ready", "true",
+            ".metadata.labels.\"clickhouse\\.altinity\\.com/ready\"", "yes",
             backoff=1
         )
         start_time = time.time()
@@ -1375,7 +1422,7 @@ def test_025(self):
 @TestScenario
 @Name("test_026. Test mixed single and multi-volume configuration in one cluster")
 def test_026(self):
-    require_zookeeper()
+    util.require_zookeeper()
     
     config="configs/test-026-mixed-replicas.yaml"
     chi = manifest.get_chi_name(util.get_full_path(config))
@@ -1389,29 +1436,39 @@ def test_026(self):
     
     with When("Cluster is ready"):
         with Then("Check that first replica has one disk"):
-            out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", sql = "select count() from system.disks")
+            out = clickhouse.query(chi, host="chi-test-026-mixed-replicas-default-0-0", sql="select count() from system.disks")
             assert out == "1"
     
         with And("Check that second replica has two disks"):
-            out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-1", sql = "select count() from system.disks")
+            out = clickhouse.query(chi, host="chi-test-026-mixed-replicas-default-0-1", sql="select count() from system.disks")
             assert out == "2"
 
     with When("Create a table and generate several inserts"):
-        clickhouse.query(chi, "create table test_disks ON CLUSTER '{cluster}' (a Int64) Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}') partition by (a%10) order by a")
-        clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", sql = "insert into test_disks select * from numbers(100) settings max_block_size=1")
-        clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", sql = "insert into test_disks select * from numbers(100) settings max_block_size=1")
+        clickhouse.query(
+            chi, sql="create table test_disks ON CLUSTER '{cluster}' (a Int64) Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}') partition by (a%10) order by a"
+        )
+        clickhouse.query(
+            chi, host="chi-test-026-mixed-replicas-default-0-0",
+            sql="insert into test_disks select * from numbers(100) settings max_block_size=1"
+        )
+        clickhouse.query(
+            chi, host="chi-test-026-mixed-replicas-default-0-0",
+            sql="insert into test_disks select * from numbers(100) settings max_block_size=1"
+        )
         time.sleep(5)
 
         with Then("Data should be placed on a single disk on a first replica"):
-            out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-0", 
-                                         sql = "select arraySort(groupUniqArray(disk_name)) from system.parts where table='test_disks'")
+            out = clickhouse.query(
+                chi, host="chi-test-026-mixed-replicas-default-0-0",
+                sql="select arraySort(groupUniqArray(disk_name)) from system.parts where table='test_disks'"
+            )
             assert out == "['default']"
 
         with And("Data should be placed on a second disk on a second replica"):
-            out = clickhouse.query(chi, host = "chi-test-026-mixed-replicas-default-0-1", 
-                                         sql = "select arraySort(groupUniqArray(disk_name)) from system.parts where table='test_disks'")
+            out = clickhouse.query(
+                chi, host="chi-test-026-mixed-replicas-default-0-1",
+                sql="select arraySort(groupUniqArray(disk_name)) from system.parts where table='test_disks'"
+            )
             assert out == "['disk2']"
             
     kubectl.delete_chi(chi)
-
-   

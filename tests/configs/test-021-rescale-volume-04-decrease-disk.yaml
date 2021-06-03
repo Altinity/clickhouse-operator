@@ -8,6 +8,10 @@ spec:
     - name: simple
       layout:
         shardsCount: 1
+    settings:
+      storage_configuration/disks/disk2/path: /var/lib/clickhouse2/
+      storage_configuration/policies/default/volumes/default/disk: default
+      storage_configuration/policies/default/volumes/disk2/disk: disk2
   defaults:
     templates:
       podTemplate: multi-volume
@@ -20,12 +24,25 @@ spec:
           resources:
             requests:
               storage: 1Gi
+      - name: disk2
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
     podTemplates:
       - name: multi-volume
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:21.1.7.1
+              image: yandex/clickhouse-server:21.1.9.41
               volumeMounts:
                 - name: disk1
                   mountPath: /var/lib/clickhouse
+                - name: disk2
+                  mountPath: /var/lib/clickhouse2
+              command:
+                - /bin/bash
+                - '-c'
+                - chown clickhouse /var/lib/clickhouse2 && /entrypoint.sh

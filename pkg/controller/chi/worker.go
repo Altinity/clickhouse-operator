@@ -409,7 +409,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chop.ClickHouseInstall
 			WithStatusAction(new).
 			M(new).F().
 			Info("add CHI to monitoring")
-		w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreatePodFQDNsOfCHI(new))
+		w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreateFQDNs(new, nil, false))
 	}
 
 	// Update CHI object
@@ -1023,7 +1023,7 @@ func (w *worker) deleteTables(ctx context.Context, host *chop.ChiHost) error {
 	if !host.CanDeleteAllPVCs() {
 		return nil
 	}
-	err := w.schemer.HostDeleteTables(ctx, host)
+	err := w.schemer.HostDropTables(ctx, host)
 
 	if err == nil {
 		w.a.V(1).

@@ -18,8 +18,9 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	log "github.com/golang/glog"
+
+	"github.com/altinity/clickhouse-operator/pkg/util/runtime"
 )
 
 // Announcer handler all log/event/status messages going outside of controller/worker
@@ -60,11 +61,22 @@ func New() Announcer {
 	}
 }
 
+// Silence produces silent announcer
+func (a Announcer) Silence() Announcer {
+	b := a
+	b.writeLog = false
+	return b
+}
+
+// Silence produces silent announcer
+func Silence() Announcer {
+	return announcer.Silence()
+}
+
 // V is inspired by log.V()
 func (a Announcer) V(level log.Level) Announcer {
 	b := a
 	b.v = level
-	b.writeLog = true
 	return b
 }
 
@@ -76,8 +88,7 @@ func V(level log.Level) Announcer {
 // F adds function name
 func (a Announcer) F() Announcer {
 	b := a
-	b.writeLog = true
-	_, _, b.function = util.Caller(skip)
+	_, _, b.function = runtime.Caller(skip)
 	return b
 }
 
@@ -89,8 +100,7 @@ func F() Announcer {
 // L adds line number
 func (a Announcer) L() Announcer {
 	b := a
-	b.writeLog = true
-	_, b.line, _ = util.Caller(skip)
+	_, b.line, _ = runtime.Caller(skip)
 	return b
 }
 
@@ -102,8 +112,7 @@ func L() Announcer {
 // FL adds filename
 func (a Announcer) FL() Announcer {
 	b := a
-	b.writeLog = true
-	b.file, _, _ = util.Caller(skip)
+	b.file, _, _ = runtime.Caller(skip)
 	return b
 }
 
@@ -115,8 +124,7 @@ func FL() Announcer {
 // A adds full code address as 'file:line:function'
 func (a Announcer) A() Announcer {
 	b := a
-	b.writeLog = true
-	b.file, b.line, b.function = util.Caller(skip)
+	b.file, b.line, b.function = runtime.Caller(skip)
 	return b
 }
 
@@ -129,9 +137,8 @@ func A() Announcer {
 // file, line, function and start prefix
 func (a Announcer) S() Announcer {
 	b := a
-	b.writeLog = true
 	b.prefix = "start"
-	b.file, b.line, b.function = util.Caller(skip)
+	b.file, b.line, b.function = runtime.Caller(skip)
 	return b
 }
 
@@ -145,9 +152,8 @@ func S() Announcer {
 // file, line, function and start prefix
 func (a Announcer) E() Announcer {
 	b := a
-	b.writeLog = true
 	b.prefix = "end"
-	b.file, b.line, b.function = util.Caller(skip)
+	b.file, b.line, b.function = runtime.Caller(skip)
 	return b
 }
 
@@ -164,7 +170,6 @@ func (a Announcer) M(m ...interface{}) Announcer {
 	}
 
 	b := a
-	b.writeLog = true
 	switch len(m) {
 	case 1:
 		switch typed := m[0].(type) {

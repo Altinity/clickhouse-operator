@@ -59,7 +59,7 @@
         "name": "prometheus alerts",
         "showIn": 0,
         "step": "30s",
-        "tagKeys": "chi,pod,hostname,exported_namespace,namespace",
+        "tagKeys": "chi,pod,hostname,namespace",
         "tags": [],
         "textFormat": "{{alertstate}}",
         "titleFormat": "{{alertname}}",
@@ -135,7 +135,7 @@
       ],
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_Uptime{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_Uptime{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
           "metric": "chi_clickhouse_metric_Uptime",
@@ -220,7 +220,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "sum(chi_clickhouse_metric_fetch_errors{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",fetch_type=\"system.metrics\"})",
+          "expr": "sum(chi_clickhouse_metric_fetch_errors{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\",fetch_type=\"system.metrics\"})",
           "intervalFactor": 2,
           "legendFormat": "",
           "refId": "A",
@@ -287,7 +287,7 @@
       ],
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_VersionInteger{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_VersionInteger{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
           "metric": "chi_clickhouse_metric_VersionInteger",
@@ -379,7 +379,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "sum(chi_clickhouse_metric_ReadonlyReplica{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "expr": "sum(chi_clickhouse_metric_ReadonlyReplica{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
           "intervalFactor": 2,
           "legendFormat": "",
           "refId": "A",
@@ -455,7 +455,7 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "increase(chi_clickhouse_event_NetworkErrors{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_NetworkErrors{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "NetworkErrors {{hostname}}",
           "metric": "chi_clickhouse_event_NetworkErrors",
@@ -463,7 +463,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_DistributedConnectionFailAtAll{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_DistributedConnectionFailAtAll{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "DistributedConnectionFailAtAll {{hostname}}",
           "metric": "chi_clickhouse_event_DistributedConnectionFailAtAll",
@@ -471,7 +471,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_DistributedConnectionFailTry{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_DistributedConnectionFailTry{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "DistributedConnectionFailTry {{hostname}}",
           "metric": "chi_clickhouse_event_DistributedConnectionFailTry",
@@ -479,7 +479,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_DNSError{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_DNSError{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "DNSErrors {{hostname}}",
           "metric": "chi_clickhouse_event_NetworkErrors",
@@ -589,7 +589,7 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_ReadonlyReplica{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_ReadonlyReplica{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "hide": false,
           "intervalFactor": 2,
           "legendFormat": "ReadonlyReplica {{hostname}}",
@@ -598,7 +598,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_ReplicaPartialShutdown{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_ReplicaPartialShutdown{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "ReplicaPartialShutdown {{hostname}}",
           "metric": "chi_clickhouse_event_ReplicaPartialShutdown",
@@ -606,7 +606,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_ZooKeeperUserExceptions{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_ZooKeeperUserExceptions{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "ZooKeeperUserExceptions  {{hostname}}",
           "metric": "chi_clickhouse_event_ZooKeeperUserExceptions",
@@ -614,7 +614,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_ZooKeeperInit{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_ZooKeeperInit{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "ZooKeeperInit {{hostname}}",
           "metric": "chi_clickhouse_event_ZooKeeperInit",
@@ -622,7 +622,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_metric_ZooKeeperSession{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_metric_ZooKeeperSession{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "ZooKeeperSession  {{hostname}}",
           "metric": "chi_clickhouse_metric_ZooKeeperSession",
@@ -630,7 +630,7 @@
           "step": 120
         },
         {
-          "expr": "increase(chi_clickhouse_event_ZooKeeperHardwareExceptions{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_ZooKeeperHardwareExceptions{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "ZooKeeperHardwareExceptions  {{hostname}}",
           "metric": "chi_clickhouse_event_ZooKeeperUserExceptions",
@@ -739,28 +739,28 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_DelayedInserts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_DelayedInserts{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "delayed  queries {{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
-          "expr": "increase(chi_clickhouse_event_DelayedInserts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_DelayedInserts{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "delayed blocks {{hostname}}",
           "refId": "B",
           "step": 10
         },
         {
-          "expr": "increase(chi_clickhouse_event_RejectedInserts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_RejectedInserts{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "rejected blocks {{hostname}}",
           "refId": "C",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_DistributedFilesToInsert{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_DistributedFilesToInsert{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "delayed distributed files {{ hostname }}",
           "refId": "D"
         }
@@ -867,14 +867,14 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_SelectQuery{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_SelectQuery{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "select {{hostname}}",
           "refId": "B",
           "step": 10
         },
         {
-          "expr": "irate(chi_clickhouse_event_Query{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_Query{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "hide": true,
           "intervalFactor": 2,
           "legendFormat": "total {{hostname}}",
@@ -992,7 +992,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_CompressedReadBufferBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_CompressedReadBufferBytes{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "hide": false,
           "intervalFactor": 2,
           "legendFormat": "uncompressed {{hostname}}",
@@ -1000,7 +1000,7 @@
           "step": 10
         },
         {
-          "expr": "irate(chi_clickhouse_event_ReadCompressedBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_ReadCompressedBytes{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "hide": false,
           "interval": "",
           "intervalFactor": 2,
@@ -1009,7 +1009,7 @@
           "step": 10
         },
         {
-          "expr": "irate(chi_clickhouse_event_ReadBufferFromFileDescriptorReadBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_ReadBufferFromFileDescriptorReadBytes{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "hide": false,
           "interval": "",
           "intervalFactor": 2,
@@ -1018,7 +1018,7 @@
           "step": 10
         },
         {
-          "expr": "irate(chi_clickhouse_event_OSReadBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_OSReadBytes{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "hide": false,
           "interval": "",
           "intervalFactor": 2,
@@ -1125,7 +1125,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_MemoryTracking{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_MemoryTracking{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
           "refId": "A",
@@ -1232,7 +1232,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_InsertQuery{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_InsertQuery{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Insert queries {{hostname}}",
           "refId": "C"
         }
@@ -1337,7 +1337,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_InsertedBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_InsertedBytes{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Insert bytes {{hostname}}",
           "refId": "A"
         }
@@ -1442,7 +1442,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_InsertedRows{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_InsertedRows{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Insert rows {{hostname}}",
           "refId": "A"
         }
@@ -1562,19 +1562,19 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_ReplicasMaxQueueSize{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_ReplicasMaxQueueSize{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "max queue size {{hostname}}",
           "refId": "D"
         },
         {
-          "expr": "chi_clickhouse_metric_ReplicatedChecks{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_ReplicatedChecks{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "check {{hostname}}",
           "refId": "A",
           "step": 20
         },
         {
-          "expr": "chi_clickhouse_metric_ReplicatedFetch{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_ReplicatedFetch{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "interval": "",
           "intervalFactor": 2,
           "legendFormat": "fetch {{hostname}}",
@@ -1582,7 +1582,7 @@
           "step": 20
         },
         {
-          "expr": "chi_clickhouse_metric_ReplicatedSend{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_ReplicatedSend{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "send {{hostname}}",
           "refId": "C",
@@ -1705,14 +1705,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_ReplicasMaxAbsoluteDelay{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_ReplicasMaxAbsoluteDelay{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "absolute {{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_ReplicasMaxRelativeDelay{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_ReplicasMaxRelativeDelay{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "relative {{hostname}}",
           "refId": "B",
@@ -1816,12 +1816,12 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_ZooKeeperTransactions{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_ZooKeeperTransactions{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "transactions {{ hostname }}",
           "refId": "B"
         },
         {
-          "expr": "chi_clickhouse_metric_ZooKeeperRequest{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_ZooKeeperRequest{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "hide": true,
           "legendFormat": "{{ hostname }}",
           "refId": "A"
@@ -1929,7 +1929,7 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_Merge{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_Merge{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "merges {{hostname}}",
           "refId": "A",
@@ -2039,7 +2039,7 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_MergedRows{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_MergedRows{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "rows {{hostname}}",
           "refId": "B",
@@ -2149,7 +2149,7 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_MergedUncompressedBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_MergedUncompressedBytes{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "intervalFactor": 2,
           "legendFormat": "bytes {{hostname}}",
           "refId": "B",
@@ -2257,7 +2257,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",active=\"1\"})",
+          "expr": "sum by(hostname) (chi_clickhouse_table_parts{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\",active=\"1\"})",
           "legendFormat": "Parts {{hostname}}",
           "refId": "C"
         }
@@ -2377,13 +2377,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by(hostname,reason) (chi_clickhouse_metric_DetachedParts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "expr": "sum by(hostname,reason) (chi_clickhouse_metric_DetachedParts{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
           "interval": "",
           "legendFormat": "{{reason}} {{hostname}} ",
           "refId": "C"
         },
         {
-          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",active=\"0\"})",
+          "expr": "sum by(hostname) (chi_clickhouse_table_parts{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\",active=\"0\"})",
           "hide": true,
           "interval": "",
           "legendFormat": "Inactive {{hostname}} ",
@@ -2496,7 +2496,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_MaxPartCountForPartition{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_MaxPartCountForPartition{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
           "refId": "A",
@@ -2615,27 +2615,27 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_MemoryCode{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_MemoryCode{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "CODE {{ hostname }}",
           "refId": "A"
         },
         {
-          "expr": "chi_clickhouse_metric_MemoryResident{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_MemoryResident{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "RES {{ hostname }}",
           "refId": "B"
         },
         {
-          "expr": "chi_clickhouse_metric_MemoryShared{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_MemoryShared{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "SHR {{ hostname }}",
           "refId": "C"
         },
         {
-          "expr": "chi_clickhouse_metric_MemoryDataAndStack{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_MemoryDataAndStack{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "DATA {{ hostname }}",
           "refId": "D"
         },
         {
-          "expr": "chi_clickhouse_metric_MemoryVirtual{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_MemoryVirtual{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "VIRT {{ hostname }}",
           "refId": "E"
         }
@@ -2730,7 +2730,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_MemoryPrimaryKeyBytesAllocated{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_MemoryPrimaryKeyBytesAllocated{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "{{ hostname }}",
           "refId": "A"
         }
@@ -2830,7 +2830,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_MemoryDictionaryBytesAllocated{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_MemoryDictionaryBytesAllocated{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "{{ hostname }}",
           "refId": "A"
         }
@@ -2930,7 +2930,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_DiskFreeBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"} / chi_clickhouse_metric_DiskTotalBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_DiskFreeBytes{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"} / chi_clickhouse_metric_DiskTotalBytes{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "{{ disk }} {{hostname}}",
           "refId": "A"
         }
@@ -3026,7 +3026,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_DiskDataBytes{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_DiskDataBytes{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "legendFormat": "{{ hostname }}",
           "refId": "A"
         }
@@ -3147,28 +3147,28 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_TCPConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_TCPConnection{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "tcp {{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_HTTPConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_HTTPConnection{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "http {{hostname}}",
           "refId": "B",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_InterserverConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_InterserverConnection{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "interserver {{hostname}}",
           "refId": "C",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_MySQLConnection{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_MySQLConnection{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "mysql {{hostname}}",
           "refId": "D",
@@ -3287,21 +3287,21 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_BackgroundPoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_BackgroundPoolTask{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "merge, mutate, fetch {{hostname}}",
           "refId": "A",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_BackgroundSchedulePoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_BackgroundSchedulePoolTask{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "clean, alter, replica re-init {{hostname}}",
           "refId": "B",
           "step": 10
         },
         {
-          "expr": "chi_clickhouse_metric_BackgroundMovePoolTask{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "expr": "chi_clickhouse_metric_BackgroundMovePoolTask{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "moves {{hostname}}",
           "refId": "C",
@@ -3409,12 +3409,12 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "sum by (hostname) (chi_clickhouse_table_mutations{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "expr": "sum by (hostname) (chi_clickhouse_table_mutations{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
           "legendFormat": "mutations {{hostname}}",
           "refId": "A"
         },
         {
-          "expr": "sum by (hostname) (chi_clickhouse_table_mutations_parts_to_do{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "expr": "sum by (hostname) (chi_clickhouse_table_mutations_parts_to_do{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
           "legendFormat": "parts_to_do {{hostname}}",
           "refId": "B"
         }
@@ -3520,7 +3520,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_MarkCacheHits{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) / (irate(chi_clickhouse_event_MarkCacheHits{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) + irate(chi_clickhouse_event_MarkCacheMisses{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]))",
+          "expr": "irate(chi_clickhouse_event_MarkCacheHits{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) / (irate(chi_clickhouse_event_MarkCacheHits{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) + irate(chi_clickhouse_event_MarkCacheMisses{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]))",
           "hide": false,
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
@@ -3655,56 +3655,56 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_DiskReadElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_DiskReadElapsedMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "hide": true,
           "legendFormat": "Disk Read syscall {{hostname}}",
           "refId": "A"
         },
         {
-          "expr": "irate(chi_clickhouse_event_DiskWriteElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_DiskWriteElapsedMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "hide": true,
           "legendFormat": "Disk Write syscall {{hostname}}",
           "refId": "B"
         },
         {
-          "expr": "irate(chi_clickhouse_event_NetworkReceiveElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_NetworkReceiveElapsedMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "hide": true,
           "legendFormat": "Network Receive {{hostname}}",
           "refId": "C"
         },
         {
-          "expr": "irate(chi_clickhouse_event_NetworkSendElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_NetworkSendElapsedMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "hide": true,
           "legendFormat": "Network Send {{hostname}}",
           "refId": "D"
         },
         {
-          "expr": "irate(chi_clickhouse_event_RealTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_RealTimeMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Real Time {{hostname}}",
           "refId": "E"
         },
         {
-          "expr": "irate(chi_clickhouse_event_UserTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_UserTimeMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "User Time {{hostname}}",
           "refId": "F"
         },
         {
-          "expr": "irate(chi_clickhouse_event_SystemTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_SystemTimeMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "System Time {{hostname}}",
           "refId": "G"
         },
         {
-          "expr": "irate(chi_clickhouse_event_OSIOWaitMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_OSIOWaitMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "OS IO Wait {{hostname}}",
           "refId": "H"
         },
         {
-          "expr": "irate(chi_clickhouse_event_OSCPUWaitMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_OSCPUWaitMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "OS CPU Wait {{hostname}}",
           "refId": "I"
         },
         {
-          "expr": "irate(chi_clickhouse_event_OSCPUVirtualTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "irate(chi_clickhouse_event_OSCPUVirtualTimeMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "OS CPU Virtual {{hostname}}",
           "refId": "J"
         }
@@ -3787,107 +3787,107 @@
       "strokeWidth": "",
       "targets": [
         {
-          "expr": "increase(chi_clickhouse_event_DiskReadElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_DiskReadElapsedMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Disk Read syscall {{hostname}}",
           "refId": "A"
         },
         {
-          "expr": "increase(chi_clickhouse_event_DiskWriteElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_DiskWriteElapsedMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Disk Write syscall {{hostname}}",
           "refId": "B"
         },
         {
-          "expr": "increase(chi_clickhouse_event_NetworkReceiveElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_NetworkReceiveElapsedMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Network Receive {{hostname}}",
           "refId": "C"
         },
         {
-          "expr": "increase(chi_clickhouse_event_NetworkSendElapsedMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_NetworkSendElapsedMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Network Send {{hostname}}",
           "refId": "D"
         },
         {
-          "expr": "increase(chi_clickhouse_event_RealTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_RealTimeMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Real Time {{hostname}}",
           "refId": "E"
         },
         {
-          "expr": "increase(chi_clickhouse_event_UserTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_UserTimeMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "User Time {{hostname}}",
           "refId": "F"
         },
         {
-          "expr": "increase(chi_clickhouse_event_SystemTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_SystemTimeMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "System Time {{hostname}}",
           "refId": "G"
         },
         {
-          "expr": "increase(chi_clickhouse_event_OSIOWaitMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_OSIOWaitMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "OS IO Wait {{hostname}}",
           "refId": "H"
         },
         {
-          "expr": "increase(chi_clickhouse_event_OSCPUWaitMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_OSCPUWaitMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "OS CPU Wait {{hostname}}",
           "refId": "I"
         },
         {
-          "expr": "increase(chi_clickhouse_event_OSCPUVirtualTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_OSCPUVirtualTimeMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "OS CPU Virtual {{hostname}}",
           "refId": "J"
         },
         {
-          "expr": "increase(chi_clickhouse_event_ThrottlerSleepMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_ThrottlerSleepMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Throttler Sleep {{hostname}}",
           "refId": "K"
         },
         {
-          "expr": "increase(chi_clickhouse_event_DelayedInsertsMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) * 1000",
+          "expr": "increase(chi_clickhouse_event_DelayedInsertsMilliseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) * 1000",
           "legendFormat": "Delayed Insert {{hostname}}",
           "refId": "L"
         },
         {
-          "expr": "increase(chi_clickhouse_event_ZooKeeperWaitMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_ZooKeeperWaitMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Zookeeper Wait {{hostname}}",
           "refId": "M"
         },
         {
-          "expr": "increase(chi_clickhouse_event_CompileExpressionsMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_CompileExpressionsMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Compile Expressions {{hostname}}",
           "refId": "N"
         },
         {
-          "expr": "increase(chi_clickhouse_event_MergesTimeMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) * 1000",
+          "expr": "increase(chi_clickhouse_event_MergesTimeMilliseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) * 1000",
           "legendFormat": "Merges {{hostname}}",
           "refId": "O"
         },
         {
-          "expr": "increase(chi_clickhouse_event_RWLockReadersWaitMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) * 1000",
+          "expr": "increase(chi_clickhouse_event_RWLockReadersWaitMilliseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) * 1000",
           "legendFormat": "RWLock Reader Wait {{hostname}}",
           "refId": "P"
         },
         {
-          "expr": "increase(chi_clickhouse_event_RWLockWritersWaitMilliseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) * 1000",
+          "expr": "increase(chi_clickhouse_event_RWLockWritersWaitMilliseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) * 1000",
           "legendFormat": "RWLock Writer Wait {{hostname}}",
           "refId": "Q"
         },
         {
-          "expr": "increase(chi_clickhouse_event_SelectQueryTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_SelectQueryTimeMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Select Query {{hostname}}",
           "refId": "R"
         },
         {
-          "expr": "increase(chi_clickhouse_event_InsertQueryTimeMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_InsertQueryTimeMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "Insert Query {{hostname}}",
           "refId": "S"
         },
         {
-          "expr": "increase(chi_clickhouse_event_S3ReadMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_S3ReadMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "S3 Read {{hostname}}",
           "refId": "T"
         },
         {
-          "expr": "increase(chi_clickhouse_event_S3WriteMicroseconds{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "increase(chi_clickhouse_event_S3WriteMicroseconds{namespace=~\"$namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
           "legendFormat": "S3 Write {{hostname}}",
           "refId": "U"
         }
@@ -3953,13 +3953,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(go_memstats_alloc_bytes_total{app=\"clickhouse-operator\",namespace=~\"$exported_namespace|kube-system\"}[1m])",
+          "expr": "irate(go_memstats_alloc_bytes_total{app=\"clickhouse-operator\",namespace=~\"$namespace|kube-system\"}[1m])",
           "hide": false,
           "legendFormat": "{{ namespace }} GO malloc bytes / sec",
           "refId": "A"
         },
         {
-          "expr": "process_resident_memory_bytes{app=\"clickhouse-operator\",namespace=~\"$exported_namespace|kube-system\"}",
+          "expr": "process_resident_memory_bytes{app=\"clickhouse-operator\",namespace=~\"$namespace|kube-system\"}",
           "legendFormat": "{{ namespace }} RSS Memory",
           "refId": "B"
         }
@@ -4021,14 +4021,14 @@
         "allValue": null,
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\"}, exported_namespace)",
+        "definition": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\"}, namespace)",
         "hide": 0,
         "includeAll": true,
         "label": "K8S Namespace",
         "multi": true,
-        "name": "exported_namespace",
+        "name": "namespace",
         "options": [],
-        "query": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\"}, exported_namespace)",
+        "query": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\"}, namespace)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -4043,14 +4043,14 @@
         "allValue": null,
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\", exported_namespace=~\"$exported_namespace\"}, chi)",
+        "definition": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\", namespace=~\"$namespace\"}, chi)",
         "hide": 0,
         "includeAll": true,
         "label": "K8S Clickhouse Installation",
         "multi": true,
         "name": "chi",
         "options": [],
-        "query": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\", exported_namespace=~\"$exported_namespace\"}, chi)",
+        "query": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\", namespace=~\"$namespace\"}, chi)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -4065,14 +4065,14 @@
         "allValue": null,
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\",exported_namespace=~\"$exported_namespace\",chi=~\"$chi\"}, hostname)",
+        "definition": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\",namespace=~\"$namespace\",chi=~\"$chi\"}, hostname)",
         "hide": 0,
         "includeAll": true,
         "label": "Server",
         "multi": true,
         "name": "hostname",
         "options": [],
-        "query": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\",exported_namespace=~\"$exported_namespace\",chi=~\"$chi\"}, hostname)",
+        "query": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\",namespace=~\"$namespace\",chi=~\"$chi\"}, hostname)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,

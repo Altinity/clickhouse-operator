@@ -297,7 +297,7 @@ func (n *Normalizer) fillStatus() {
 	fqdns := make([]string, 0)
 	n.chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		pods = append(pods, CreatePodName(host))
-		fqdns = append(fqdns, CreatePodFQDN(host))
+		fqdns = append(fqdns, CreateFQDN(host))
 		return nil
 	})
 	// Spam normalized config in high-verbose modes only

@@ -35,7 +35,7 @@ def check_alert_state(alert_name, prometheus_pod, alert_state="firing", labels=N
 
 
 def wait_alert_state(alert_name, alert_state, expected_state, prometheus_pod='prometheus-prometheus-0', labels=None, callback=None,
-                     max_try=20, sleep_time=10, time_range="10s"):
+                     max_try=20, sleep_time=settings.prometheus_scrape_interval, time_range=f"{settings.prometheus_scrape_interval*2}s"):
     catched = False
     for _ in range(max_try):
         if callback is not None:

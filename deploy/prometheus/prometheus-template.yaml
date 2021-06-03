@@ -14,7 +14,8 @@ stringData:
       kubernetes_sd_configs:
       - role: pod
       # only for optimization of e2e speed, normal value 30s
-      scrape_interval: 5s
+      scrape_interval: 10s
+      scrape_timeout: 10s
       tls_config:
         ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         insecure_skip_verify: false
