@@ -22,7 +22,7 @@ Vagrant.configure(2) do |config|
   config.vm.box_check_update = false
 
   if get_provider == "hyperv"
-    config.vm.synced_folder ".", "/vagrant", type: "smb", smb_username: ENV['USERNAME'], smb_password: ENV['PASSWORD'], mount_options: ["domain="+ENV['USERDOMAIN'], "user="+ENV['USERNAME'], "vers=3.0"," mfsymlinks"]
+    config.vm.synced_folder ".", "/vagrant", type: "smb", smb_username: ENV['USERNAME'], smb_password: ENV['PASSWORD'], mount_options: ["vers=3.0"]
   else
     config.vm.synced_folder ".", "/vagrant"
   end
@@ -34,7 +34,6 @@ Vagrant.configure(2) do |config|
   if Vagrant.has_plugin?("vagrant-timezone")
     config.timezone.value = "UTC"
   end
-
 
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
@@ -211,7 +210,8 @@ EOF
     chown -R vagrant:vagrant /home/vagrant/.krew
 
     cd /vagrant/
-    git_branch=$(git rev-parse --abbrev-ref HEAD /vagrant/)
+
+    git_branch=$(git rev-parse --abbrev-ref HEAD)
     export OPERATOR_RELEASE=$(cat release)
     export BRANCH=${BRANCH:-$git_branch}
     export OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-kube-system}
@@ -228,6 +228,17 @@ EOF
     cd /vagrant/deploy/prometheus/
     kubectl delete ns ${PROMETHEUS_NAMESPACE} || true
     bash -xe ./create-prometheus.sh
+    cd /vagrant/
+
+    export MINIO_NAMESPACE=${MINIO_NAMESPACE:-minio}
+    cd /vagrant/deploy/minio/
+    kubectl delete ns ${MINIO_NAMESPACE} || true
+    bash -xe ./install-minio-operator.sh
+    bash -xe ./install-minio.sh
+    # kubectl create ns ${MINIO_NAMESPACE}
+    # kubectl minio init --namespace ${MINIO_NAMESPACE}
+    # kubectl minio tenant create --name minio --namespace ${MINIO_NAMESPACE} --servers 1 --volumes 4 --capacity 10Gi --storage-class standard
+
     cd /vagrant/
 
     export GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE:-grafana}
@@ -262,10 +273,11 @@ EOF
 
     pip3 install -r /vagrant/tests/requirements.txt
 
+    python3 /vagrant/tests/test_backup_alerts.py
     python3 /vagrant/tests/test_metrics_alerts.py
-    python3 /vagrant/tests/test.py --only=operator/*
     python3 /vagrant/tests/test_examples.py
     python3 /vagrant/tests/test_metrics_exporter.py
+    python3 /vagrant/tests/test.py
 
     # audit2rbac
     kubectl logs kube-apiserver-minikube -n kube-system | grep audit.k8s.io/v1 > /tmp/audit2rbac.log

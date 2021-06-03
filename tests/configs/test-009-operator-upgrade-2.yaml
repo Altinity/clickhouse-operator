@@ -61,7 +61,7 @@ spec:
             app: clickhouse
         spec:
           containers:
-            - name: clickhouse
+            - name: clickhouse-pod
               image: yandex/clickhouse-server:21.1.7.1
               ports:
                 - name: http

@@ -12,5 +12,5 @@ spec:
       - name: default
         spec:
           containers:
-            - name: clickhouse
+            - name: clickhouse-pod
               image: yandex/clickhouse-server:20.6

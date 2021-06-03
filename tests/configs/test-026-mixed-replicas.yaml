@@ -22,6 +22,7 @@ spec:
               storage_configuration/disks/default/keep_free_space_bytes: 100000000000
               storage_configuration/policies/default/volumes/default/disk: default
               storage_configuration/policies/default/volumes/disk2/disk: disk2
+              storage_configuration/policies/default/move_factor: 1.0
   defaults:
     templates:
       podTemplate: multi-volume

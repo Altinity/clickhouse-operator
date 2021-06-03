@@ -10,18 +10,13 @@ import settings
 import util
 
 
-def set_metrics_exporter_version(version, ns=settings.operator_namespace):
-    kubectl.launch(f"set image deployment.v1.apps/clickhouse-operator metrics-exporter=altinity/metrics-exporter:{version}", ns=ns)
-    kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns)
-
-
 @TestScenario
 @Name("Check metrics server setup and version")
 def test_metrics_exporter_setup(self):
     with Given("clickhouse-operator is installed"):
-        assert kubectl.get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") > 0, error()
+        assert kubectl.get_count("pod", ns='--all-namespaces', label=util.operator_label) > 0, error()
         with Then(f"Set metrics-exporter version {settings.operator_version}"):
-            set_metrics_exporter_version(settings.operator_version)
+            util.set_metrics_exporter_version(settings.operator_version)
 
 
 @TestScenario
@@ -48,9 +43,9 @@ def test_metrics_exporter_reboot(self):
             assert out == expect_result, error()
 
     with Given("clickhouse-operator is installed"):
-        kubectl.wait_field("pods", "-l app=clickhouse-operator", ".status.containerStatuses[*].ready", "true,true",
+        kubectl.wait_field("pods", util.operator_label, ".status.containerStatuses[*].ready", "true,true",
                            ns=settings.operator_namespace)
-        assert kubectl.get_count("pod", ns='--all-namespaces', label="-l app=clickhouse-operator") > 0, error()
+        assert kubectl.get_count("pod", ns='--all-namespaces', label=util.operator_label) > 0, error()
 
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
@@ -78,12 +73,11 @@ def test_metrics_exporter_reboot(self):
             with When("reboot metrics exporter"):
                 kubectl.launch(f"exec -n {operator_namespace} {operator_pod} -c metrics-exporter -- reboot")
                 time.sleep(15)
-                kubectl.wait_field("pods", "-l app=clickhouse-operator",
-                                        ".status.containerStatuses[*].ready", "true,true",
+                kubectl.wait_field("pods", util.operator_label, ".status.containerStatuses[*].ready", "true,true",
                                    ns=settings.operator_namespace)
                 with Then("check metrics exporter still contains chi objects"):
                     check_monitoring_chi(operator_namespace, operator_pod, expected_chi)
-                    kubectl.delete(config)
+                    kubectl.delete(config, timeout=600)
                     check_monitoring_chi(operator_namespace, operator_pod, [])
 
 

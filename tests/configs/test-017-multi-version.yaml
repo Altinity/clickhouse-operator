@@ -8,12 +8,12 @@ spec:
     - name: v20.3
       spec:
         containers:
-        - name: clickhouse
+        - name: clickhouse-pod
           image: yandex/clickhouse-server:20.3.19.4
     - name: v20.8
       spec:
         containers:
-        - name: clickhouse
+        - name: clickhouse-pod
           image: yandex/clickhouse-server:21.1.7.1
   configuration:
     clusters:

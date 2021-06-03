@@ -11,7 +11,7 @@ spec:
     - name: v20.3
       spec:
         containers:
-        - name: clickhouse
+        - name: clickhouse-pod
           image: yandex/clickhouse-server:20.3.13.127-broken
   configuration:
     clusters:
