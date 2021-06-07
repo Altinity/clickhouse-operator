@@ -428,8 +428,6 @@ func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
 
 // personalizeStatefulSetTemplate
 func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	statefulSetName := CreateStatefulSetName(host)
-
 	// Ensure pod created by this StatefulSet has alias 127.0.0.1
 	statefulSet.Spec.Template.Spec.HostAliases = []corev1.HostAlias{
 		{
@@ -440,18 +438,14 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 
 	// Setup volumes based on ConfigMaps into Pod Template
 	c.setupConfigMapVolumes(statefulSet, host)
-
-	c.processClickHouseContainerTroubleshoot(statefulSet)
-
-	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
-	if host.Templates.HasLogVolumeClaimTemplate() {
-		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
-		c.a.V(1).F().Info("add log container for statefulSet %s", statefulSetName)
-	}
+	// Setup statefulSet according to troubleshoot mode (if any)
+	c.setupTroubleshoot(statefulSet)
+	// Setup dedicated log container
+	c.setupLogContainer(statefulSet, host)
 }
 
-// processClickHouseContainerTroubleshoot
-func (c *Creator) processClickHouseContainerTroubleshoot(statefulSet *apps.StatefulSet) {
+// setupTroubleshoot
+func (c *Creator) setupTroubleshoot(statefulSet *apps.StatefulSet) {
 	container, ok := getClickHouseContainer(statefulSet)
 	if !ok {
 		return
@@ -462,6 +456,16 @@ func (c *Creator) processClickHouseContainerTroubleshoot(statefulSet *apps.State
 			container.Command = append(container.Command, "&& sleep 1800")
 		}
 		container.LivenessProbe = nil
+	}
+}
+
+// setupLogContainer
+func (c *Creator) setupLogContainer(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	statefulSetName := CreateStatefulSetName(host)
+	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
+	if host.Templates.HasLogVolumeClaimTemplate() {
+		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
+		c.a.V(1).F().Info("add log container for statefulSet %s", statefulSetName)
 	}
 }
 
