@@ -264,8 +264,8 @@ func (s *Schemer) HostDropTables(ctx context.Context, host *chop.ChiHost) error 
 
 // HostDropReplica
 func (s *Schemer) HostDropReplica(ctx context.Context, host *chop.ChiHost) error {
-	log.V(1).M(host).F().Info("Drop replica: %v", CreateHostReplicaName(host))
-	return s.execHost(ctx, host, []string{"SYSTEM DROP REPLICA " + CreateHostReplicaName(host)}, false, false)
+	log.V(1).M(host).F().Info("Drop replica: %v", CreateReplicaHostname(host))
+	return s.execHost(ctx, host, []string{"SYSTEM DROP REPLICA " + CreateReplicaHostname(host)}, false, false)
 }
 
 // HostCreateTables
