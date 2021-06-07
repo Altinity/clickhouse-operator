@@ -121,6 +121,7 @@ func (n *Normalizer) normalize() (*chiV1.ClickHouseInstallation, error) {
 	n.chi.Spec.TaskID = n.normalizeTaskID(n.chi.Spec.TaskID)
 	n.chi.Spec.UseTemplates = n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
 	n.chi.Spec.Stop = n.normalizeStop(n.chi.Spec.Stop)
+	n.chi.Spec.Troubleshoot = n.normalizeTroubleshoot(n.chi.Spec.Troubleshoot)
 	n.chi.Spec.NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.chi.Spec.NamespaceDomainPattern)
 	n.chi.Spec.Templating = n.normalizeTemplating(n.chi.Spec.Templating)
 	n.chi.Spec.Reconciling = n.normalizeReconciling(n.chi.Spec.Reconciling)
@@ -326,6 +327,17 @@ func (n *Normalizer) normalizeStop(stop string) string {
 	if util.IsStringBool(stop) {
 		// It is bool, use as it is
 		return stop
+	}
+
+	// In case it is unknown value - just use set it to false
+	return util.StringBoolFalseLowercase
+}
+
+// normalizeTroubleshoot normalizes .spec.stop
+func (n *Normalizer) normalizeTroubleshoot(troubleshoot string) string {
+	if util.IsStringBool(troubleshoot) {
+		// It is bool, use as it is
+		return troubleshoot
 	}
 
 	// In case it is unknown value - just use set it to false

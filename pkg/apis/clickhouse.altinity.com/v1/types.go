@@ -59,6 +59,7 @@ type ClickHouseOperatorConfiguration struct {
 type ChiSpec struct {
 	TaskID                 *string          `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
 	Stop                   string           `json:"stop,omitempty"                   yaml:"stop,omitempty"`
+	Troubleshoot           string           `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
 	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating   `json:"templating,omitempty"             yaml:"templating,omitempty"`
 	Reconciling            *ChiReconciling  `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`

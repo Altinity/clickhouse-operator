@@ -393,13 +393,13 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 
 // ensureStatefulSetTemplateIntegrity
 func (c *Creator) ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	c.ensureClickHouseContainerSpecified(statefulSet, host)
+	c.ensureClickHouseContainerSpecified(statefulSet)
 	c.ensureProbesSpecified(statefulSet)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
 // ensureClickHouseContainerSpecified
-func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
+func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet) {
 	_, ok := getClickHouseContainer(statefulSet)
 	if ok {
 		return
@@ -441,10 +441,27 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 	// Setup volumes based on ConfigMaps into Pod Template
 	c.setupConfigMapVolumes(statefulSet, host)
 
+	c.processClickHouseContainerTroubleshoot(statefulSet)
+
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.HasLogVolumeClaimTemplate() {
 		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
 		c.a.V(1).F().Info("add log container for statefulSet %s", statefulSetName)
+	}
+}
+
+// processClickHouseContainerTroubleshoot
+func (c *Creator) processClickHouseContainerTroubleshoot(statefulSet *apps.StatefulSet) {
+	container, ok := getClickHouseContainer(statefulSet)
+	if !ok {
+		return
+	}
+
+	if c.chi.IsTroubleshoot() {
+		if len(container.Command) > 0 {
+			container.Command = append(container.Command, "&& sleep 1800")
+		}
+		container.LivenessProbe = nil
 	}
 }
 
