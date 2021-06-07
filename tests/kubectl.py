@@ -20,12 +20,18 @@ kubectl_cmd = settings.kubectl_cmd
 
 def launch(command, ok_to_fail=False, ns=namespace, timeout=60):
     # Build command
-    cmd = f"{kubectl_cmd}"
+    cmd = f"{kubectl_cmd} "
+    cmd_args = command.split(" ")
     if ns is not None and ns != "" and ns != "--all-namespaces":
-        cmd += f" --namespace={ns}"
+        cmd += f"{cmd_args[0]} --namespace={ns} "
     elif ns == "--all-namespaces":
-        cmd += f" {ns}"
-    cmd += f" {command}"
+        cmd += f"{cmd_args[0]} {ns} "
+    else:
+        cmd += f"{cmd_args[0]} "
+
+    if len(cmd_args) > 1:
+        cmd += " ".join(cmd_args[1:])
+
     # Run command
     cmd = shell(cmd, timeout=timeout)
     # Check command failure
@@ -118,8 +124,8 @@ def create_ns(ns):
     launch(f"get ns {ns}", ns=None)
 
 
-def delete_ns(ns, ok_to_fail=False):
-    launch(f"delete ns {ns}", ns=None, ok_to_fail=ok_to_fail)
+def delete_ns(ns, ok_to_fail=False, timeout=600):
+    launch(f"delete ns {ns}", ns=None, ok_to_fail=ok_to_fail, timeout=timeout)
 
 
 def get_count(kind, name="", label="", ns=namespace):

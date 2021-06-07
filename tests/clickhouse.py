@@ -14,6 +14,7 @@ def query(
         timeout=60,
         advanced_params="",
         pod="",
+        container="clickhouse-pod"
 ):
     pod_names = kubectl.get_pod_names(chi_name, ns)
     pod_name = pod_names[0]
@@ -27,7 +28,7 @@ def query(
 
     if with_error:
         return kubectl.launch(
-            f"exec {pod_name}"
+            f"exec {pod_name} -n {ns} -c {container}"
             f" --"
             f" clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
             f" --query=\"{sql}\""
@@ -38,7 +39,7 @@ def query(
         )
     else:
         return kubectl.launch(
-            f"exec {pod_name} -n {ns}"
+            f"exec {pod_name} -n {ns} -c {container}"
             f" -- "
             f"clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
             f"--query=\"{sql}\"",
@@ -58,7 +59,7 @@ def query_with_error(
         timeout=60,
         advanced_params="",
         pod="",
-
+        container="clickhouse-pod",
 ):
     return query(
         chi_name=chi_name,
@@ -71,5 +72,6 @@ def query_with_error(
         ns=ns,
         timeout=timeout,
         advanced_params=advanced_params,
-        pod=pod
+        pod=pod,
+        container=container
     )
