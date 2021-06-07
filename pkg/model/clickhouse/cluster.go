@@ -17,10 +17,10 @@ package clickhouse
 import (
 	"context"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	"strings"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	r "github.com/altinity/clickhouse-operator/pkg/util/retry"
 )
 
@@ -65,7 +65,7 @@ func (c *Cluster) SetHosts(hosts []string) *Cluster {
 	return c
 }
 
-// getCHConnection
+// getConnection
 func (c *Cluster) getConnection(host string) *Connection {
 	return GetPooledDBConnection(NewConnectionParams(host, c.Username, c.Password, c.Port)).SetLog(c.l)
 }
@@ -108,6 +108,7 @@ func (c *Cluster) ExecAll(ctx context.Context, queries []string, _opts ...*Query
 	opts := QueryOptionsNormalize(_opts...)
 	for _, host := range c.Hosts {
 		if opts.Parallel {
+			// TODO introduce parallel execution
 			if err := c.exec(ctx, host, queries, opts); err != nil {
 				errors = append(errors, err)
 			}
@@ -124,7 +125,7 @@ func (c *Cluster) ExecAll(ctx context.Context, queries []string, _opts ...*Query
 	return nil
 }
 
-// execQueriesWithRetry
+// exec
 func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts ...*QueryOptions) error {
 	if util.IsContextDone(ctx) {
 		c.l.V(2).Info("ctx is done")

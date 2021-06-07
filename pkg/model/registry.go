@@ -16,8 +16,10 @@ package model
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/util"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type EntityType string
@@ -28,16 +30,19 @@ const Service EntityType = "Service"
 const PVC EntityType = "PVC"
 const PV EntityType = "PV"
 
+// Registry
 type Registry struct {
 	r map[EntityType][]v1.ObjectMeta
 }
 
+// NewRegistry
 func NewRegistry() *Registry {
 	return &Registry{
 		r: make(map[EntityType][]v1.ObjectMeta),
 	}
 }
 
+// Len
 func (r *Registry) Len() int {
 	if r == nil {
 		return 0
@@ -45,6 +50,7 @@ func (r *Registry) Len() int {
 	return len(r.r)
 }
 
+// Walk
 func (r *Registry) Walk(f func(entityType EntityType, meta v1.ObjectMeta)) {
 	if r == nil {
 		return
@@ -56,6 +62,7 @@ func (r *Registry) Walk(f func(entityType EntityType, meta v1.ObjectMeta)) {
 	}
 }
 
+// String
 func (r *Registry) String() string {
 	if r == nil {
 		return ""
@@ -67,6 +74,7 @@ func (r *Registry) String() string {
 	return s
 }
 
+// registerEntity
 func (r *Registry) registerEntity(entityType EntityType, meta v1.ObjectMeta) {
 	if r == nil {
 		return
@@ -85,26 +93,32 @@ func (r *Registry) registerEntity(entityType EntityType, meta v1.ObjectMeta) {
 	r.r[entityType] = append(r.r[entityType], m)
 }
 
+// RegisterStatefulSet
 func (r *Registry) RegisterStatefulSet(meta v1.ObjectMeta) {
 	r.registerEntity(StatefulSet, meta)
 }
 
+// RegisterConfigMap
 func (r *Registry) RegisterConfigMap(meta v1.ObjectMeta) {
 	r.registerEntity(ConfigMap, meta)
 }
 
+// RegisterService
 func (r *Registry) RegisterService(meta v1.ObjectMeta) {
 	r.registerEntity(Service, meta)
 }
 
+// RegisterPVC
 func (r *Registry) RegisterPVC(meta v1.ObjectMeta) {
 	r.registerEntity(PVC, meta)
 }
 
+// RegisterPV
 func (r *Registry) RegisterPV(meta v1.ObjectMeta) {
 	r.registerEntity(PV, meta)
 }
 
+// hasEntity
 func (r *Registry) hasEntity(entityType EntityType, meta v1.ObjectMeta) bool {
 	if r.Len() == 0 {
 		return false
@@ -126,10 +140,12 @@ func (r *Registry) hasEntity(entityType EntityType, meta v1.ObjectMeta) bool {
 	return false
 }
 
+// isEqual
 func (r *Registry) isEqual(a, b v1.ObjectMeta) bool {
 	return (a.Namespace == b.Namespace) && (a.Name == b.Name)
 }
 
+// deleteEntity
 func (r *Registry) deleteEntity(entityType EntityType, meta v1.ObjectMeta) bool {
 	if r.Len() == 0 {
 		return false
@@ -159,6 +175,7 @@ func (r *Registry) deleteEntity(entityType EntityType, meta v1.ObjectMeta) bool 
 	return false
 }
 
+// Subtract
 func (r *Registry) Subtract(sub *Registry) *Registry {
 	if sub.Len() == 0 {
 		// Nothing to subtract, return base

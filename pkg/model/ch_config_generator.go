@@ -155,6 +155,7 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string
 	return b.String()
 }
 
+// RemoteServersGeneratorOptions
 type RemoteServersGeneratorOptions struct {
 	exclude struct {
 		reconcileAttributes *chiv1.ChiHostReconcileAttributes
@@ -162,10 +163,12 @@ type RemoteServersGeneratorOptions struct {
 	}
 }
 
+// NewRemoteServersGeneratorOptions
 func NewRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return &RemoteServersGeneratorOptions{}
 }
 
+// ExcludeHost
 func (o *RemoteServersGeneratorOptions) ExcludeHost(host *chiv1.ChiHost) *RemoteServersGeneratorOptions {
 	if (o == nil) || (host == nil) {
 		return o
@@ -175,6 +178,7 @@ func (o *RemoteServersGeneratorOptions) ExcludeHost(host *chiv1.ChiHost) *Remote
 	return o
 }
 
+// ExcludeReconcileAttributes
 func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *chiv1.ChiHostReconcileAttributes) *RemoteServersGeneratorOptions {
 	if (o == nil) || (attrs == nil) {
 		return o
@@ -184,6 +188,7 @@ func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *chiv1.
 	return o
 }
 
+// Skip
 func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
 	if o == nil {
 		return false
@@ -202,6 +207,7 @@ func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
 	return false
 }
 
+// Include
 func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 	if o == nil {
 		return false
@@ -220,10 +226,12 @@ func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 	return true
 }
 
+// defaultRemoteServersGeneratorOptions
 func defaultRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return NewRemoteServersGeneratorOptions()
 }
 
+// CHIHostsNum
 func (c *ClickHouseConfigGenerator) CHIHostsNum(options *RemoteServersGeneratorOptions) int {
 	num := 0
 	c.chi.WalkHosts(func(host *chiv1.ChiHost) error {
@@ -235,6 +243,7 @@ func (c *ClickHouseConfigGenerator) CHIHostsNum(options *RemoteServersGeneratorO
 	return num
 }
 
+// ClusterHostsNum
 func (c *ClickHouseConfigGenerator) ClusterHostsNum(cluster *chiv1.ChiCluster, options *RemoteServersGeneratorOptions) int {
 	num := 0
 	// Build each shard XML
@@ -245,6 +254,7 @@ func (c *ClickHouseConfigGenerator) ClusterHostsNum(cluster *chiv1.ChiCluster, o
 	return num
 }
 
+// ShardHostsNum
 func (c *ClickHouseConfigGenerator) ShardHostsNum(shard *chiv1.ChiShard, options *RemoteServersGeneratorOptions) int {
 	num := 0
 	shard.WalkHosts(func(host *chiv1.ChiHost) error {
@@ -432,6 +442,7 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *chiv1.ChiHost) string {
 	return b.String()
 }
 
+// noCustomPorts
 func noCustomPorts(host *chiv1.ChiHost) bool {
 	if host.TCPPort != chDefaultTCPPortNumber {
 		return false

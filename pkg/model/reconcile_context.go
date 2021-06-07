@@ -22,10 +22,12 @@ type reconcileContextKey string
 
 var k = reconcileContextKey("registry")
 
+// NewReconcileContext
 func NewReconcileContext(ctx context.Context) context.Context {
 	return context.WithValue(ctx, k, NewRegistry())
 }
 
+// ReconcileContextGetRegistry
 func ReconcileContextGetRegistry(ctx context.Context) *Registry {
 	return ctx.Value(k).(*Registry)
 }

@@ -268,12 +268,14 @@ func (l *Labeler) getLabelsHostScopeReady(host *chi.ChiHost, applySupplementaryS
 	return l.appendReadyLabels(l.getLabelsHostScope(host, applySupplementaryServiceLabels))
 }
 
+// getLabelsHostScopeReclaimPolicy
 func (l *Labeler) getLabelsHostScopeReclaimPolicy(host *chi.ChiHost, template *chi.ChiVolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
 	return util.MergeStringMapsOverwrite(l.getLabelsHostScope(host, applySupplementaryServiceLabels), map[string]string{
 		LabelPVCReclaimPolicyName: template.PVCReclaimPolicy.String(),
 	})
 }
 
+// getReclaimPolicy
 func (l *Labeler) getReclaimPolicy(meta meta.ObjectMeta) chi.PVCReclaimPolicy {
 	defaultReclaimPolicy := chi.PVCReclaimPolicyDelete
 
@@ -287,7 +289,7 @@ func (l *Labeler) getReclaimPolicy(meta meta.ObjectMeta) chi.PVCReclaimPolicy {
 	return defaultReclaimPolicy
 }
 
-// getSelectorShardScope gets labels to select a Host-scoped object
+// GetSelectorHostScope gets labels to select a Host-scoped object
 func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
@@ -465,6 +467,7 @@ func makeSetFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Set, error) {
 	return set, nil
 }
 
+// MakeSelectorFromObjectMeta
 // TODO review usage
 func MakeSelectorFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Selector, error) {
 	set, err := makeSetFromObjectMeta(objMeta)
@@ -509,6 +512,7 @@ func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
 	)
 }
 
+// isObjectVersionLabelTheSame
 func isObjectVersionLabelTheSame(meta *meta.ObjectMeta, value string) bool {
 	if meta == nil {
 		return false
@@ -522,6 +526,7 @@ func isObjectVersionLabelTheSame(meta *meta.ObjectMeta, value string) bool {
 	return l == value
 }
 
+// IsObjectTheSame
 func IsObjectTheSame(meta1, meta2 *meta.ObjectMeta) bool {
 	if (meta1 == nil) && (meta2 == nil) {
 		return true

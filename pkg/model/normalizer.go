@@ -113,7 +113,7 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 	return n.normalize()
 }
 
-// NormalizeCHI normalizes CHI.
+// normalize normalizes whole CHI.
 // Returns normalized CHI
 func (n *Normalizer) normalize() (*chiV1.ClickHouseInstallation, error) {
 
@@ -150,6 +150,7 @@ func (n *Normalizer) finalizeCHI() {
 	})
 }
 
+// fillCHIAddressInfo
 func (n *Normalizer) fillCHIAddressInfo() {
 	n.chi.WalkHostsFullPath(0, 0, func(
 		chi *chiV1.ClickHouseInstallation,

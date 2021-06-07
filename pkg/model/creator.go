@@ -29,6 +29,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// Creator
 type Creator struct {
 	chop                   *chop.CHOp
 	chi                    *chiv1.ClickHouseInstallation
@@ -37,6 +38,7 @@ type Creator struct {
 	a                      log.Announcer
 }
 
+// NewCreator
 func NewCreator(chop *chop.CHOp, chi *chiv1.ClickHouseInstallation) *Creator {
 	return &Creator{
 		chop:                   chop,
@@ -364,6 +366,7 @@ func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chi
 	return pv
 }
 
+// PreparePersistentVolumeClaim
 func (c *Creator) PreparePersistentVolumeClaim(
 	pvc *corev1.PersistentVolumeClaim,
 	host *chiv1.ChiHost,
@@ -388,12 +391,14 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 	c.personalizeStatefulSetTemplate(statefulSet, host)
 }
 
+// ensureStatefulSetTemplateIntegrity
 func (c *Creator) ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	c.ensureClickHouseContainerSpecified(statefulSet, host)
 	c.ensureProbesSpecified(statefulSet)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
+// ensureClickHouseContainerSpecified
 func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
 	_, ok := getClickHouseContainer(statefulSet)
 	if ok {
@@ -407,6 +412,7 @@ func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulS
 	)
 }
 
+// ensureProbesSpecified
 func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
 	container, ok := getClickHouseContainer(statefulSet)
 	if !ok {
@@ -420,6 +426,7 @@ func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
 	}
 }
 
+// personalizeStatefulSetTemplate
 func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	statefulSetName := CreateStatefulSetName(host)
 
@@ -556,6 +563,7 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	}
 }
 
+// getClickHouseContainer
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
 	// Find by name
 	for i := range statefulSet.Spec.Template.Spec.Containers {
@@ -573,6 +581,7 @@ func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, b
 	return nil, false
 }
 
+// getClickHouseContainerStatus
 func getClickHouseContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, bool) {
 	// Find by name
 	for i := range pod.Status.ContainerStatuses {
@@ -644,6 +653,7 @@ func StrStatefulSetStatus(status *apps.StatefulSetStatus) string {
 	)
 }
 
+// ensureNamedPortsSpecified
 func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	// Ensure ClickHouse container has all named ports specified
 	container, ok := getClickHouseContainer(statefulSet)
@@ -655,6 +665,7 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHos
 	ensurePortByName(container, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
 }
 
+// ensurePortByName
 func ensurePortByName(container *corev1.Container, name string, port int32) {
 	// Find port with specified name
 	for i := range container.Ports {
@@ -819,6 +830,7 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	statefulSet.Spec.VolumeClaimTemplates = append(statefulSet.Spec.VolumeClaimTemplates, persistentVolumeClaim)
 }
 
+// GetReclaimPolicy
 func (c *Creator) GetReclaimPolicy(meta metav1.ObjectMeta) chiv1.PVCReclaimPolicy {
 	return c.labeler.getReclaimPolicy(meta)
 }

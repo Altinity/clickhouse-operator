@@ -328,28 +328,28 @@ func (s *Schemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInsta
 // execCHI runs set of SQL queries over the whole CHI
 func (s *Schemer) execCHI(ctx context.Context, chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
 	hosts := CreateFQDNs(chi, nil, false)
-	opts := clickhouse.NewQueryOptions().SetRetry(true)
+	opts := clickhouse.NewQueryOptions().SetRetry(retry)
 	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
 }
 
 // execCluster runs set of SQL queries over the cluster
 func (s *Schemer) execCluster(ctx context.Context, cluster *chop.ChiCluster, sqls []string, retry bool) error {
 	hosts := CreateFQDNs(cluster, nil, false)
-	opts := clickhouse.NewQueryOptions().SetRetry(true)
+	opts := clickhouse.NewQueryOptions().SetRetry(retry)
 	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
 }
 
 // execShard runs set of SQL queries over the shard replicas
 func (s *Schemer) execShard(ctx context.Context, shard *chop.ChiShard, sqls []string, retry bool) error {
 	hosts := CreateFQDNs(shard, nil, false)
-	opts := clickhouse.NewQueryOptions().SetRetry(true)
+	opts := clickhouse.NewQueryOptions().SetRetry(retry)
 	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
 }
 
 // execHost runs set of SQL queries over the replica
 func (s *Schemer) execHost(ctx context.Context, host *chop.ChiHost, sqls []string, retry bool, silent bool) error {
 	hosts := CreateFQDNs(host, chop.ChiHost{}, false)
-	opts := clickhouse.NewQueryOptions().SetRetry(true)
+	opts := clickhouse.NewQueryOptions().SetRetry(retry)
 	c := s.Cluster.SetHosts(hosts)
 	if silent {
 		c = c.SetLog(log.Silence())
