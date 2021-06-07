@@ -106,6 +106,30 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
+            # Need to be StringBool
+            troubleshoot:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - ""
+                - "0"
+                - "1"
+                - "False"
+                - "false"
+                - "True"
+                - "true"
+                - "No"
+                - "no"
+                - "Yes"
+                - "yes"
+                - "Off"
+                - "off"
+                - "On"
+                - "on"
+                - "Disabled"
+                - "disabled"
+                - "Enabled"
+                - "enabled"
             namespaceDomainPattern:
               type: string
             templating:
@@ -815,6 +839,30 @@ spec:
               type: string
             # Need to be StringBool
             stop:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - ""
+                - "0"
+                - "1"
+                - "False"
+                - "false"
+                - "True"
+                - "true"
+                - "No"
+                - "no"
+                - "Yes"
+                - "yes"
+                - "Off"
+                - "off"
+                - "On"
+                - "on"
+                - "Disabled"
+                - "disabled"
+                - "Enabled"
+                - "enabled"
+            # Need to be StringBool
+            troubleshoot:
               type: string
               enum:
                 # List StringBoolXXX constants from model
