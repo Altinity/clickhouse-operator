@@ -4,7 +4,7 @@ echo "External value for \$GRAFANA_NAMESPACE=$GRAFANA_NAMESPACE"
 echo "External value for \$GRAFANA_OPERATOR_VERSION=$GRAFANA_OPERATOR_VERSION"
 
 GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-grafana}"
-GRAFANA_OPERATOR_VERSION="${GRAFANA_OPERATOR_VERSION:-v3.9.0}"
+GRAFANA_OPERATOR_VERSION="${GRAFANA_OPERATOR_VERSION:-3.9.0}"
 
 echo "Setup Grafana"
 echo "OPTIONS"
@@ -65,14 +65,14 @@ kubectl create namespace "${GRAFANA_NAMESPACE}" || true
 # Setup grafana-operator into dedicated namespace
 
 # 1. Create the custom resource definitions that the operator uses:
-kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/deploy/crds"
+kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/deploy/olm-catalog/grafana-operator/${GRAFANA_OPERATOR_VERSION%%.*}.x.x/${GRAFANA_OPERATOR_VERSION}"
 # 2. Create the operator roles:
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/deploy/roles"
 # 3. If you want to scan for dashboards in other namespaces you also need the cluster roles:
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/deploy/cluster_roles"
 # 4. Deploy the operator of explicitly specified version
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
-    cat "${GRAFANA_OPERATOR_DIR}/deploy/operatorMasterImage.yaml" | sed -e "s/:master/:${GRAFANA_OPERATOR_VERSION}/g" \
+    cat "${GRAFANA_OPERATOR_DIR}/deploy/operatorMasterImage.yaml" | sed -e "s/:master/:v${GRAFANA_OPERATOR_VERSION}/g" \
 )
 
 # Remove downloaded sources
