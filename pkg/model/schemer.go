@@ -16,6 +16,7 @@ package model
 
 import (
 	"context"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 
@@ -252,20 +253,15 @@ func (s *Schemer) hostGetSyncTables(ctx context.Context, host *chop.ChiHost) ([]
 func (s *Schemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error {
 	tableNames, syncTableSQLs, _ := s.hostGetSyncTables(ctx, host)
 	log.V(1).M(host).F().Info("Sync tables: %v as %v", tableNames, syncTableSQLs)
-	return s.execHost(ctx, host, syncTableSQLs, false, false)
-}
-
-// HostDropTables
-func (s *Schemer) HostDropTables(ctx context.Context, host *chop.ChiHost) error {
-	tableNames, dropTableSQLs, _ := s.hostGetDropTables(ctx, host)
-	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	return s.execHost(ctx, host, dropTableSQLs, false, false)
+	opts := clickhouse.NewQueryOptions()
+	opts.SetQueryTimeout(120 * time.Second)
+	return s.execHost(ctx, host, syncTableSQLs, opts)
 }
 
 // HostDropReplica
 func (s *Schemer) HostDropReplica(ctx context.Context, host *chop.ChiHost) error {
 	log.V(1).M(host).F().Info("Drop replica: %v", CreateReplicaHostname(host))
-	return s.execHost(ctx, host, []string{"SYSTEM DROP REPLICA " + CreateReplicaHostname(host)}, false, false)
+	return s.execHost(ctx, host, []string{"SYSTEM DROP REPLICA " + CreateReplicaHostname(host)})
 }
 
 // HostCreateTables
@@ -283,7 +279,7 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 		if len(createSQLs) > 0 {
 			log.V(1).M(host).F().Info("Creating replica objects at %s: %v", host.Address.HostName, names)
 			log.V(1).M(host).F().Info("\n%v", createSQLs)
-			err1 = s.execHost(ctx, host, createSQLs, true, false)
+			err1 = s.execHost(ctx, host, createSQLs, clickhouse.NewQueryOptions().SetRetry(true))
 		}
 	}
 
@@ -291,7 +287,7 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 		if len(createSQLs) > 0 {
 			log.V(1).M(host).F().Info("Creating distributed objects at %s: %v", host.Address.HostName, names)
 			log.V(1).M(host).F().Info("\n%v", createSQLs)
-			err2 = s.execHost(ctx, host, createSQLs, true, false)
+			err2 = s.execHost(ctx, host, createSQLs, clickhouse.NewQueryOptions().SetRetry(true))
 		}
 	}
 
@@ -305,6 +301,13 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 	return nil
 }
 
+// HostDropTables
+func (s *Schemer) HostDropTables(ctx context.Context, host *chop.ChiHost) error {
+	tableNames, dropTableSQLs, _ := s.hostGetDropTables(ctx, host)
+	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
+	return s.execHost(ctx, host, dropTableSQLs)
+}
+
 // IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
 func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool {
 	sqls := []string{
@@ -314,7 +317,7 @@ func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool 
 		),
 	}
 	//TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
-	return s.execHost(ctx, host, sqls, false, true) == nil
+	return s.execHost(ctx, host, sqls, clickhouse.NewQueryOptions().SetSilent(true)) == nil
 }
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
@@ -322,36 +325,36 @@ func (s *Schemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInsta
 	sqls := []string{
 		`SYSTEM DROP DNS CACHE`,
 	}
-	return s.execCHI(ctx, chi, sqls, false)
+	return s.execCHI(ctx, chi, sqls)
 }
 
 // execCHI runs set of SQL queries over the whole CHI
-func (s *Schemer) execCHI(ctx context.Context, chi *chop.ClickHouseInstallation, sqls []string, retry bool) error {
+func (s *Schemer) execCHI(ctx context.Context, chi *chop.ClickHouseInstallation, sqls []string, _opts ...*clickhouse.QueryOptions) error {
 	hosts := CreateFQDNs(chi, nil, false)
-	opts := clickhouse.NewQueryOptions().SetRetry(retry)
+	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
 }
 
 // execCluster runs set of SQL queries over the cluster
-func (s *Schemer) execCluster(ctx context.Context, cluster *chop.ChiCluster, sqls []string, retry bool) error {
+func (s *Schemer) execCluster(ctx context.Context, cluster *chop.ChiCluster, sqls []string, _opts ...*clickhouse.QueryOptions) error {
 	hosts := CreateFQDNs(cluster, nil, false)
-	opts := clickhouse.NewQueryOptions().SetRetry(retry)
+	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
 }
 
 // execShard runs set of SQL queries over the shard replicas
-func (s *Schemer) execShard(ctx context.Context, shard *chop.ChiShard, sqls []string, retry bool) error {
+func (s *Schemer) execShard(ctx context.Context, shard *chop.ChiShard, sqls []string, _opts ...*clickhouse.QueryOptions) error {
 	hosts := CreateFQDNs(shard, nil, false)
-	opts := clickhouse.NewQueryOptions().SetRetry(retry)
+	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
 }
 
 // execHost runs set of SQL queries over the replica
-func (s *Schemer) execHost(ctx context.Context, host *chop.ChiHost, sqls []string, retry bool, silent bool) error {
+func (s *Schemer) execHost(ctx context.Context, host *chop.ChiHost, sqls []string, _opts ...*clickhouse.QueryOptions) error {
 	hosts := CreateFQDNs(host, chop.ChiHost{}, false)
-	opts := clickhouse.NewQueryOptions().SetRetry(retry)
+	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	c := s.Cluster.SetHosts(hosts)
-	if silent {
+	if opts.GetSilent() {
 		c = c.SetLog(log.Silence())
 	} else {
 		c = c.SetLog(log.New())
