@@ -24,6 +24,7 @@ type QueryOptions struct {
 	Retry    bool
 	Tries    int
 	Parallel bool
+	Silent   bool
 	*Timeouts
 }
 
@@ -56,11 +57,36 @@ func (o *QueryOptions) Normalize() *QueryOptions {
 	return o
 }
 
+// GetRetry
+func (o *QueryOptions) GetRetry() bool {
+	if o == nil {
+		return false
+	}
+	return o.Retry
+}
+
 // SetRetry
 func (o *QueryOptions) SetRetry(retry bool) *QueryOptions {
 	if o == nil {
 		return nil
 	}
 	o.Retry = retry
+	return o
+}
+
+// GetSilent
+func (o *QueryOptions) GetSilent() bool {
+	if o == nil {
+		return false
+	}
+	return o.Silent
+}
+
+// SetSilent
+func (o *QueryOptions) SetSilent(silent bool) *QueryOptions {
+	if o == nil {
+		return nil
+	}
+	o.Silent = silent
 	return o
 }
