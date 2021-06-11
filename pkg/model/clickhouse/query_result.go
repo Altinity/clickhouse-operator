@@ -22,8 +22,8 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 )
 
-// Query
-type Query struct {
+// QueryResult
+type QueryResult struct {
 	// Query execution context
 	ctx        context.Context
 	cancelFunc context.CancelFunc
@@ -32,8 +32,8 @@ type Query struct {
 }
 
 // NewQuery
-func NewQuery(ctx context.Context, cancelFunc context.CancelFunc, rows *databasesql.Rows) *Query {
-	return &Query{
+func NewQuery(ctx context.Context, cancelFunc context.CancelFunc, rows *databasesql.Rows) *QueryResult {
+	return &QueryResult{
 		ctx:        ctx,
 		cancelFunc: cancelFunc,
 		Rows:       rows,
@@ -41,7 +41,7 @@ func NewQuery(ctx context.Context, cancelFunc context.CancelFunc, rows *database
 }
 
 // Close
-func (q *Query) Close() {
+func (q *QueryResult) Close() {
 	if q == nil {
 		return
 	}
@@ -61,7 +61,7 @@ func (q *Query) Close() {
 }
 
 // UnzipColumnsAsStrings splits result table into columns
-func (q *Query) UnzipColumnsAsStrings(columns ...*[]string) error {
+func (q *QueryResult) UnzipColumnsAsStrings(columns ...*[]string) error {
 	if q == nil {
 		return fmt.Errorf("empty query")
 	}
