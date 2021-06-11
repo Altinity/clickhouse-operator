@@ -21,6 +21,7 @@ import (
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 
 	_ "github.com/mailru/go-clickhouse"
 )
@@ -99,7 +100,7 @@ func (c *Connection) ensureConnected(ctx context.Context) bool {
 }
 
 // QueryContext runs given sql query on behalf of specified context
-func (c *Connection) QueryContext(ctx context.Context, sql string) (*Query, error) {
+func (c *Connection) QueryContext(ctx context.Context, sql string) (*QueryResult, error) {
 	if len(sql) == 0 {
 		return nil, nil
 	}
@@ -129,37 +130,47 @@ func (c *Connection) QueryContext(ctx context.Context, sql string) (*Query, erro
 
 	c.l.V(2).Info("clickhouse.QueryContext():'%s'", sql)
 
-	return NewQuery(queryCtx, cancel, rows), nil
+	return NewQueryResult(queryCtx, cancel, rows), nil
 }
 
 // Query runs given sql query
-func (c *Connection) Query(sql string) (*Query, error) {
+func (c *Connection) Query(sql string) (*QueryResult, error) {
 	return c.QueryContext(nil, sql)
 }
 
-// ExecContext runs given sql query
-func (c *Connection) ExecContext(ctx context.Context, sql string) error {
-	if len(sql) == 0 {
-		return nil
-	}
-
+// ctx
+func (c *Connection) ctx(ctx context.Context, opts *QueryOptions) (context.Context, context.CancelFunc) {
 	var parentCtx context.Context
 	if ctx == nil {
 		parentCtx = context.Background()
 	} else {
 		parentCtx = ctx
 	}
-	execCtx, cancel := context.WithDeadline(parentCtx, time.Now().Add(c.params.GetQueryTimeout()))
+	return context.WithDeadline(
+		parentCtx,
+		time.Now().Add(
+			util.ReasonableDuration(opts.GetQueryTimeout(), c.params.GetQueryTimeout()),
+		),
+	)
+}
+
+// Exec runs given sql query
+func (c *Connection) Exec(_ctx context.Context, sql string, opts *QueryOptions) error {
+	if len(sql) == 0 {
+		return nil
+	}
+
+	ctx, cancel := c.ctx(_ctx, opts)
 	defer cancel()
 
-	if !c.ensureConnected(execCtx) {
+	if !c.ensureConnected(ctx) {
 		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
 		c.l.V(1).A().Error(s)
 		return fmt.Errorf(s)
 	}
 
-	_, err := c.conn.ExecContext(execCtx, sql)
+	_, err := c.conn.ExecContext(ctx, sql)
 
 	if err != nil {
 		cancel()
