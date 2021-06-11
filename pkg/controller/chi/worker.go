@@ -926,7 +926,7 @@ func (w *worker) deleteCHI(ctx context.Context, chi *chop.ClickHouseInstallation
 		return nil
 	}
 
-	_ = w.removeCHI(ctx, chi)
+	_ = w.deleteCHIProtocol(ctx, chi)
 
 	// Uninstall finalizer
 	w.a.V(2).M(chi).F().Info("uninstall finalizer")
@@ -945,12 +945,18 @@ func (w *worker) discoveryAndDeleteCHI(ctx context.Context, chi *chop.ClickHouse
 	}
 
 	objs := w.c.discovery(ctx, chi)
+	if objs.NumStatefulSet() > 0 {
+		chi.WalkHosts(func(host *chop.ChiHost) error {
+			w.schemer.HostSyncTables(ctx, host)
+			return nil
+		})
+	}
 	w.purge(ctx, objs)
 	return nil
 }
 
-// removeCHI deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
-func (w *worker) removeCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
+// deleteCHIProtocol deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
+func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chop.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -982,10 +988,18 @@ func (w *worker) removeCHI(ctx context.Context, chi *chop.ClickHouseInstallation
 		return nil
 	}
 
-	// Start delete procedure
+	// Start delete protocol
 
 	// Exclude this CHI from monitoring
 	w.c.deleteWatch(chi.Namespace, chi.Name)
+
+	// Delete Service
+	err = w.c.deleteServiceCHI(ctx, chi)
+
+	chi.WalkHosts(func(host *chop.ChiHost) error {
+		w.schemer.HostSyncTables(ctx, host)
+		return nil
+	})
 
 	// Delete all clusters
 	chi.WalkClusters(func(cluster *chop.ChiCluster) error {
@@ -1000,9 +1014,6 @@ func (w *worker) removeCHI(ctx context.Context, chi *chop.ClickHouseInstallation
 	// Delete ConfigMap(s)
 	err = w.c.deleteConfigMapsCHI(ctx, chi)
 
-	// Delete Service
-	err = w.c.deleteServiceCHI(ctx, chi)
-
 	w.a.V(1).
 		WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
 		WithStatusAction(chi).
@@ -1010,6 +1021,32 @@ func (w *worker) removeCHI(ctx context.Context, chi *chop.ClickHouseInstallation
 		Info("Delete CHI completed")
 
 	return nil
+}
+
+// dropReplica
+func (w *worker) dropReplica(ctx context.Context, host *chop.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	err := w.schemer.HostDropReplica(ctx, host)
+
+	if err == nil {
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(host.CHI).
+			M(host).F().
+			Info("Drop replica on host %s replica %d to shard %d in cluster %s",
+				host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+	} else {
+		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(host.CHI).
+			M(host).A().
+			Error("FAILED to drop replica on host %s with error %v", host.Name, err)
+	}
+
+	return err
 }
 
 // deleteTables
@@ -1076,7 +1113,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *chop.ClickHouseInstallatio
 	// Need to delete all these items
 
 	var err error
-	err = w.deleteTables(ctx, host)
+	err = w.dropReplica(ctx, host)
 	err = w.c.deleteHost(ctx, host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
@@ -1116,13 +1153,13 @@ func (w *worker) deleteShard(ctx context.Context, chi *chop.ClickHouseInstallati
 		M(shard).F().
 		Info("Delete shard %s/%s - started", shard.Address.Namespace, shard.Name)
 
+	// Delete Shard Service
+	_ = w.c.deleteServiceShard(ctx, shard)
+
 	// Delete all replicas
 	shard.WalkHosts(func(host *chop.ChiHost) error {
 		return w.deleteHost(ctx, chi, host)
 	})
-
-	// Delete Shard Service
-	_ = w.c.deleteServiceShard(ctx, shard)
 
 	w.a.V(1).
 		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteCompleted).
@@ -1150,13 +1187,13 @@ func (w *worker) deleteCluster(ctx context.Context, chi *chop.ClickHouseInstalla
 		M(cluster).F().
 		Info("Delete cluster %s/%s - started", cluster.Address.Namespace, cluster.Name)
 
+	// Delete Cluster Service
+	_ = w.c.deleteServiceCluster(ctx, cluster)
+
 	// Delete all shards
 	cluster.WalkShards(func(index int, shard *chop.ChiShard) error {
 		return w.deleteShard(ctx, chi, shard)
 	})
-
-	// Delete Cluster Service
-	_ = w.c.deleteServiceCluster(ctx, cluster)
 
 	w.a.V(1).
 		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteCompleted).
