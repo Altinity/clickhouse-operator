@@ -73,7 +73,7 @@ func (c *Cluster) getConnection(host string) *Connection {
 // QueryAny walks over provided endpoints and runs query sequentially on each endpoint.
 // In case endpoint returned result, walk is completed and result is returned
 // In case endpoint failed, continue with next endpoint
-func (c *Cluster) QueryAny(ctx context.Context, sql string) (*Query, error) {
+func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error) {
 	// Fetch data from any of specified endpoints
 	for _, host := range c.Hosts {
 		if util.IsContextDone(ctx) {
@@ -150,11 +150,11 @@ func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts
 					// Skip malformed or already executed SQL query, move to the next one
 					continue
 				}
-				err := conn.ExecContext(ctx, sql)
+				err := conn.Exec(ctx, sql, opts)
 				if err != nil && strings.Contains(err.Error(), "Code: 253,") && strings.Contains(sql, "CREATE TABLE") {
 					c.l.V(1).M(host).F().Info("Replica is already in ZooKeeper. Trying ATTACH TABLE instead")
 					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
-					err = conn.ExecContext(ctx, sqlAttach)
+					err = conn.Exec(ctx, sqlAttach, opts)
 				}
 				if err == nil {
 					queries[i] = "" // Query is executed, removing from the list
