@@ -43,11 +43,15 @@ func NewRegistry() *Registry {
 }
 
 // Len
-func (r *Registry) Len() int {
+func (r *Registry) Len(_what ...EntityType) int {
 	if r == nil {
 		return 0
 	}
-	return len(r.r)
+	if len(_what) == 0 {
+		return len(r.r)
+	}
+	what := _what[0]
+	return len(r.r[what])
 }
 
 // Walk
@@ -98,9 +102,19 @@ func (r *Registry) RegisterStatefulSet(meta v1.ObjectMeta) {
 	r.registerEntity(StatefulSet, meta)
 }
 
+// NumStatefulSet
+func (r *Registry) NumStatefulSet() int {
+	return r.Len(StatefulSet)
+}
+
 // RegisterConfigMap
 func (r *Registry) RegisterConfigMap(meta v1.ObjectMeta) {
 	r.registerEntity(ConfigMap, meta)
+}
+
+// NumConfigMap
+func (r *Registry) NumConfigMap() int {
+	return r.Len(ConfigMap)
 }
 
 // RegisterService
@@ -108,14 +122,29 @@ func (r *Registry) RegisterService(meta v1.ObjectMeta) {
 	r.registerEntity(Service, meta)
 }
 
+// NumService
+func (r *Registry) NumService() int {
+	return r.Len(Service)
+}
+
 // RegisterPVC
 func (r *Registry) RegisterPVC(meta v1.ObjectMeta) {
 	r.registerEntity(PVC, meta)
 }
 
+// NumPVC
+func (r *Registry) NumPVC() int {
+	return r.Len(PVC)
+}
+
 // RegisterPV
 func (r *Registry) RegisterPV(meta v1.ObjectMeta) {
 	r.registerEntity(PV, meta)
+}
+
+// NumPV
+func (r *Registry) NumPV() int {
+	return r.Len(PV)
 }
 
 // hasEntity
