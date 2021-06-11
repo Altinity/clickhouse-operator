@@ -31,8 +31,8 @@ type QueryResult struct {
 	Rows *databasesql.Rows
 }
 
-// NewQuery
-func NewQuery(ctx context.Context, cancelFunc context.CancelFunc, rows *databasesql.Rows) *QueryResult {
+// NewQueryResult
+func NewQueryResult(ctx context.Context, cancelFunc context.CancelFunc, rows *databasesql.Rows) *QueryResult {
 	return &QueryResult{
 		ctx:        ctx,
 		cancelFunc: cancelFunc,
