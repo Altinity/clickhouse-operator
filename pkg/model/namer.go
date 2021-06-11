@@ -827,7 +827,7 @@ func CreatePodRegexp(chi *chop.ClickHouseInstallation, template string) string {
 	return newNameMacroReplacerChi(chi).Replace(template)
 }
 
-// CreatePodName create Pod name based on specified StatefulSet or Replica
+// CreatePodName create Pod name based on specified StatefulSet or Host
 func CreatePodName(obj interface{}) string {
 	switch obj.(type) {
 	case *apps.StatefulSet:
