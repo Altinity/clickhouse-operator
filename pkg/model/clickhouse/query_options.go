@@ -24,11 +24,14 @@ type QueryOptions struct {
 	Retry    bool
 	Tries    int
 	Parallel bool
+	*Timeouts
 }
 
 // NewQueryOptions
 func NewQueryOptions() *QueryOptions {
-	return new(QueryOptions)
+	opts := new(QueryOptions)
+	opts.Timeouts = NewTimeouts()
+	return opts
 }
 
 // QueryOptionsNormalize
