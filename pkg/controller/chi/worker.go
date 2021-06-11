@@ -1673,7 +1673,7 @@ func (w *worker) reconcilePersistentVolumes(ctx context.Context, host *chop.ChiH
 	})
 }
 
-// reconcilePersistentVolumeClaims
+// reconcilePVCs
 func (w *worker) reconcilePVCs(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		return nil
