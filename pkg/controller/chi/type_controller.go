@@ -26,16 +26,12 @@ import (
 
 	"github.com/altinity/queue"
 
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	choplisters "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 )
 
 // Controller defines CRO controller
 type Controller struct {
-	// Instance of Operator
-	chop *chop.CHOp
-
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 	kubeClient kube.Interface
 	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
