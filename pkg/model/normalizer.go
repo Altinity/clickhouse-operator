@@ -116,7 +116,6 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 // normalize normalizes whole CHI.
 // Returns normalized CHI
 func (n *Normalizer) normalize() (*chiV1.ClickHouseInstallation, error) {
-
 	// Walk over ChiSpec datatype fields
 	n.chi.Spec.TaskID = n.normalizeTaskID(n.chi.Spec.TaskID)
 	n.chi.Spec.UseTemplates = n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
