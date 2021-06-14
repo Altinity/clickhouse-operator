@@ -31,7 +31,6 @@ import (
 
 // Creator
 type Creator struct {
-	chop                   *chop.CHOp
 	chi                    *chiv1.ClickHouseInstallation
 	chConfigFilesGenerator *ClickHouseConfigFilesGenerator
 	labeler                *Labeler
@@ -39,12 +38,11 @@ type Creator struct {
 }
 
 // NewCreator
-func NewCreator(chop *chop.CHOp, chi *chiv1.ClickHouseInstallation) *Creator {
+func NewCreator(chi *chiv1.ClickHouseInstallation) *Creator {
 	return &Creator{
-		chop:                   chop,
 		chi:                    chi,
 		chConfigFilesGenerator: NewClickHouseConfigFilesGenerator(NewClickHouseConfigGenerator(chi), chop.Config()),
-		labeler:                NewLabeler(chop, chi),
+		labeler:                NewLabeler(chi),
 		a:                      log.M(chi),
 	}
 }
@@ -110,7 +108,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 			cluster.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceCluster(cluster),
-			c.labeler.getSelectorClusterScopeReady(cluster),
+			getSelectorClusterScopeReady(cluster),
 		)
 	}
 	// No template specified, no need to create service
@@ -129,7 +127,7 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 			shard.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceShard(shard),
-			c.labeler.getSelectorShardScopeReady(shard),
+			getSelectorShardScopeReady(shard),
 		)
 	}
 	// No template specified, no need to create service
@@ -149,7 +147,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			host.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceHost(host),
-			c.labeler.GetSelectorHostScope(host),
+			GetSelectorHostScope(host),
 		)
 	}
 
@@ -182,7 +180,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 					TargetPort: intstr.FromInt(int(host.InterserverHTTPPort)),
 				},
 			},
-			Selector:                 c.labeler.GetSelectorHostScope(host),
+			Selector:                 GetSelectorHostScope(host),
 			ClusterIP:                templateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
 			PublishNotReadyAddresses: true,
@@ -307,7 +305,7 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 			Replicas:    &replicasNum,
 			ServiceName: serviceName,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: c.labeler.GetSelectorHostScope(host),
+				MatchLabels: GetSelectorHostScope(host),
 			},
 
 			// IMPORTANT
