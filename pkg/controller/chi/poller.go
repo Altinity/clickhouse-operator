@@ -37,7 +37,7 @@ const (
 
 // waitHostNotReady polls host's StatefulSet for not exists or not ready
 func (c *Controller) waitHostNotReady(ctx context.Context, host *chop.ChiHost) error {
-	err := c.pollStatefulSet(ctx, host, NewStatefulSetPollOptionsConfigNoCreate(c.chop.Config()), model.IsStatefulSetNotReady, nil)
+	err := c.pollStatefulSet(ctx, host, NewStatefulSetPollOptions().FromConfig(c.chop.Config()).SetCreateTimeout(0), model.IsStatefulSetNotReady, nil)
 	if apierrors.IsNotFound(err) {
 		err = nil
 	}
@@ -145,24 +145,31 @@ func NewStatefulSetPollOptions() *StatefulSetPollOptions {
 	return &StatefulSetPollOptions{}
 }
 
-func NewStatefulSetPollOptionsConfig(config *chop.OperatorConfig) *StatefulSetPollOptions {
-	return &StatefulSetPollOptions{
-		StartBotheringAfterTimeout: time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second,
-		CreateTimeout:              time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second,
-		Timeout:                    time.Duration(config.StatefulSetUpdateTimeout) * time.Second,
-		MainInterval:               time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second,
-		BackgroundInterval:         1 * time.Second,
+func (o *StatefulSetPollOptions) Ensure() *StatefulSetPollOptions {
+	if o == nil {
+		return NewStatefulSetPollOptions()
 	}
+	return o
 }
 
-func NewStatefulSetPollOptionsConfigNoCreate(config *chop.OperatorConfig) *StatefulSetPollOptions {
-	return &StatefulSetPollOptions{
-		StartBotheringAfterTimeout: time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second,
-		//CreateTimeout:              time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second,
-		Timeout:            time.Duration(config.StatefulSetUpdateTimeout) * time.Second,
-		MainInterval:       time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second,
-		BackgroundInterval: 1 * time.Second,
+func (o *StatefulSetPollOptions) FromConfig(config *chop.OperatorConfig) *StatefulSetPollOptions {
+	if o == nil {
+		return nil
 	}
+	o.StartBotheringAfterTimeout = time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second
+	o.CreateTimeout = time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second
+	o.Timeout = time.Duration(config.StatefulSetUpdateTimeout) * time.Second
+	o.MainInterval = time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second
+	o.BackgroundInterval = 1 * time.Second
+	return o
+}
+
+func (o *StatefulSetPollOptions) SetCreateTimeout(timeout time.Duration) *StatefulSetPollOptions {
+	if o == nil {
+		return nil
+	}
+	o.CreateTimeout = timeout
+	return o
 }
 
 // pollStatefulSet polls StatefulSet with poll callback function.
@@ -177,9 +184,7 @@ func (c *Controller) pollStatefulSet(
 		log.V(2).Info("ctx is done")
 		return nil
 	}
-	if opts == nil {
-		opts = NewStatefulSetPollOptionsConfig(c.chop.Config())
-	}
+	opts = opts.Ensure().FromConfig(c.chop.Config())
 	namespace := ""
 	name := ""
 
@@ -287,9 +292,7 @@ func (c *Controller) pollHostContext(
 		return nil
 	}
 
-	if opts == nil {
-		opts = NewStatefulSetPollOptionsConfig(c.chop.Config())
-	}
+	opts = opts.Ensure().FromConfig(c.chop.Config())
 	namespace := host.Address.Namespace
 	name := host.Address.HostName
 
