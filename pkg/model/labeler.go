@@ -275,8 +275,8 @@ func (l *Labeler) getLabelsHostScopeReclaimPolicy(host *chi.ChiHost, template *c
 	})
 }
 
-// getReclaimPolicy
-func (l *Labeler) getReclaimPolicy(meta meta.ObjectMeta) chi.PVCReclaimPolicy {
+// GetReclaimPolicy
+func GetReclaimPolicy(meta meta.ObjectMeta) chi.PVCReclaimPolicy {
 	defaultReclaimPolicy := chi.PVCReclaimPolicyDelete
 
 	if value, ok := meta.Labels[LabelPVCReclaimPolicyName]; ok {
