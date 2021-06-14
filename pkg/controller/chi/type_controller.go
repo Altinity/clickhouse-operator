@@ -22,7 +22,6 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
 	//"k8s.io/client-go/util/workqueue"
 
 	"github.com/altinity/queue"
@@ -72,10 +71,7 @@ type Controller struct {
 	podListerSynced cache.InformerSynced
 
 	// queues used to organize events queue processed by operator
-	//queues  []workqueue.RateLimitingInterface
-	queues  []queue.PriorityQueue
-	queues2 []workqueue.RateLimitingInterface
-	queues3 []queue.PriorityQueue
+	queues []queue.PriorityQueue
 	// not used explicitly
 	recorder record.EventRecorder
 }
