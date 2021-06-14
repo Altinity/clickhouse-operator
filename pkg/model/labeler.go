@@ -169,7 +169,7 @@ func (l *Labeler) GetSelectorCHIScope() map[string]string {
 
 // getSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
 func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
-	return l.appendReadyLabels(l.GetSelectorCHIScope())
+	return appendReadyLabels(l.GetSelectorCHIScope())
 }
 
 // getLabelsClusterScope gets labels for Cluster-scoped object
@@ -196,7 +196,7 @@ func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]st
 
 // getSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
 func (l *Labeler) getSelectorClusterScopeReady(cluster *chi.ChiCluster) map[string]string {
-	return l.appendReadyLabels(l.getSelectorClusterScope(cluster))
+	return appendReadyLabels(l.getSelectorClusterScope(cluster))
 }
 
 // getLabelsShardScope gets labels for Shard-scoped object
@@ -225,7 +225,7 @@ func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 
 // getSelectorShardScope gets labels to select a ready-labelled Shard-scoped object
 func (l *Labeler) getSelectorShardScopeReady(shard *chi.ChiShard) map[string]string {
-	return l.appendReadyLabels(l.getSelectorShardScope(shard))
+	return appendReadyLabels(l.getSelectorShardScope(shard))
 }
 
 // getLabelsHostScope gets labels for Host-scoped object
@@ -265,7 +265,7 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 
 // getLabelsHostScopeReady gets labels for Host-scoped object including Ready label
 func (l *Labeler) getLabelsHostScopeReady(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
-	return l.appendReadyLabels(l.getLabelsHostScope(host, applySupplementaryServiceLabels))
+	return appendReadyLabels(l.getLabelsHostScope(host, applySupplementaryServiceLabels))
 }
 
 // getLabelsHostScopeReclaimPolicy
@@ -311,20 +311,20 @@ func (l *Labeler) appendCHILabels(dst map[string]string) map[string]string {
 }
 
 // appendReadyLabels appends "Ready" label to labels set
-func (l *Labeler) appendReadyLabels(dst map[string]string) map[string]string {
+func appendReadyLabels(dst map[string]string) map[string]string {
 	return util.MergeStringMapsOverwrite(dst, map[string]string{
 		LabelReadyName: LabelReadyValue,
 	})
 }
 
 // getAnnotationsHostScope gets annotations for Host-scoped object
-func (l *Labeler) getAnnotationsHostScope(host *chi.ChiHost) map[string]string {
+func getAnnotationsHostScope(host *chi.ChiHost) map[string]string {
 	// We may want to append some annotations in here
 	return host.GetAnnotations()
 }
 
 // prepareAffinity
-func (l *Labeler) prepareAffinity(podTemplate *chi.ChiPodTemplate, host *chi.ChiHost) {
+func prepareAffinity(podTemplate *chi.ChiPodTemplate, host *chi.ChiHost) {
 	if podTemplate.Spec.Affinity == nil {
 		return
 	}
@@ -332,55 +332,55 @@ func (l *Labeler) prepareAffinity(podTemplate *chi.ChiPodTemplate, host *chi.Chi
 	// Walk over all affinity fields
 
 	if podTemplate.Spec.Affinity.NodeAffinity != nil {
-		l.processNodeSelector(podTemplate.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
-		l.processPreferredSchedulingTerms(podTemplate.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, host)
+		processNodeSelector(podTemplate.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
+		processPreferredSchedulingTerms(podTemplate.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, host)
 	}
 
 	if podTemplate.Spec.Affinity.PodAffinity != nil {
-		l.processPodAffinityTerms(podTemplate.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
-		l.processWeightedPodAffinityTerms(podTemplate.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution, host)
+		processPodAffinityTerms(podTemplate.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
+		processWeightedPodAffinityTerms(podTemplate.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution, host)
 	}
 
 	if podTemplate.Spec.Affinity.PodAntiAffinity != nil {
-		l.processPodAffinityTerms(podTemplate.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
-		l.processWeightedPodAffinityTerms(podTemplate.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, host)
+		processPodAffinityTerms(podTemplate.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
+		processWeightedPodAffinityTerms(podTemplate.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, host)
 	}
 }
 
 // processNodeSelector
-func (l *Labeler) processNodeSelector(nodeSelector *v1.NodeSelector, host *chi.ChiHost) {
+func processNodeSelector(nodeSelector *v1.NodeSelector, host *chi.ChiHost) {
 	if nodeSelector == nil {
 		return
 	}
 	for i := range nodeSelector.NodeSelectorTerms {
 		nodeSelectorTerm := &nodeSelector.NodeSelectorTerms[i]
-		l.processNodeSelectorTerm(nodeSelectorTerm, host)
+		processNodeSelectorTerm(nodeSelectorTerm, host)
 	}
 }
 
 // processPreferredSchedulingTerms
-func (l *Labeler) processPreferredSchedulingTerms(preferredSchedulingTerms []v1.PreferredSchedulingTerm, host *chi.ChiHost) {
+func processPreferredSchedulingTerms(preferredSchedulingTerms []v1.PreferredSchedulingTerm, host *chi.ChiHost) {
 	for i := range preferredSchedulingTerms {
 		nodeSelectorTerm := &preferredSchedulingTerms[i].Preference
-		l.processNodeSelectorTerm(nodeSelectorTerm, host)
+		processNodeSelectorTerm(nodeSelectorTerm, host)
 	}
 }
 
 // processNodeSelectorTerm
-func (l *Labeler) processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm, host *chi.ChiHost) {
+func processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm, host *chi.ChiHost) {
 	for i := range nodeSelectorTerm.MatchExpressions {
 		nodeSelectorRequirement := &nodeSelectorTerm.MatchExpressions[i]
-		l.processNodeSelectorRequirement(nodeSelectorRequirement, host)
+		processNodeSelectorRequirement(nodeSelectorRequirement, host)
 	}
 
 	for i := range nodeSelectorTerm.MatchFields {
 		nodeSelectorRequirement := &nodeSelectorTerm.MatchFields[i]
-		l.processNodeSelectorRequirement(nodeSelectorRequirement, host)
+		processNodeSelectorRequirement(nodeSelectorRequirement, host)
 	}
 }
 
 // processNodeSelectorRequirement
-func (l *Labeler) processNodeSelectorRequirement(nodeSelectorRequirement *v1.NodeSelectorRequirement, host *chi.ChiHost) {
+func processNodeSelectorRequirement(nodeSelectorRequirement *v1.NodeSelectorRequirement, host *chi.ChiHost) {
 	nodeSelectorRequirement.Key = newNameMacroReplacerHost(host).Replace(nodeSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
 	for i := range nodeSelectorRequirement.Values {
@@ -389,29 +389,29 @@ func (l *Labeler) processNodeSelectorRequirement(nodeSelectorRequirement *v1.Nod
 }
 
 // processPodAffinityTerms
-func (l *Labeler) processPodAffinityTerms(podAffinityTerms []v1.PodAffinityTerm, host *chi.ChiHost) {
+func processPodAffinityTerms(podAffinityTerms []v1.PodAffinityTerm, host *chi.ChiHost) {
 	for i := range podAffinityTerms {
 		podAffinityTerm := &podAffinityTerms[i]
-		l.processPodAffinityTerm(podAffinityTerm, host)
+		processPodAffinityTerm(podAffinityTerm, host)
 	}
 }
 
 // processWeightedPodAffinityTerms
-func (l *Labeler) processWeightedPodAffinityTerms(weightedPodAffinityTerms []v1.WeightedPodAffinityTerm, host *chi.ChiHost) {
+func processWeightedPodAffinityTerms(weightedPodAffinityTerms []v1.WeightedPodAffinityTerm, host *chi.ChiHost) {
 	for i := range weightedPodAffinityTerms {
 		podAffinityTerm := &weightedPodAffinityTerms[i].PodAffinityTerm
-		l.processPodAffinityTerm(podAffinityTerm, host)
+		processPodAffinityTerm(podAffinityTerm, host)
 	}
 }
 
 // processPodAffinityTerm
-func (l *Labeler) processPodAffinityTerm(podAffinityTerm *v1.PodAffinityTerm, host *chi.ChiHost) {
-	l.processLabelSelector(podAffinityTerm.LabelSelector, host)
+func processPodAffinityTerm(podAffinityTerm *v1.PodAffinityTerm, host *chi.ChiHost) {
+	processLabelSelector(podAffinityTerm.LabelSelector, host)
 	podAffinityTerm.TopologyKey = newNameMacroReplacerHost(host).Replace(podAffinityTerm.TopologyKey)
 }
 
 // processLabelSelector
-func (l *Labeler) processLabelSelector(labelSelector *meta.LabelSelector, host *chi.ChiHost) {
+func processLabelSelector(labelSelector *meta.LabelSelector, host *chi.ChiHost) {
 	if labelSelector == nil {
 		return
 	}
@@ -421,12 +421,12 @@ func (l *Labeler) processLabelSelector(labelSelector *meta.LabelSelector, host *
 	}
 	for j := range labelSelector.MatchExpressions {
 		labelSelectorRequirement := &labelSelector.MatchExpressions[j]
-		l.processLabelSelectorRequirement(labelSelectorRequirement, host)
+		processLabelSelectorRequirement(labelSelectorRequirement, host)
 	}
 }
 
 // processLabelSelectorRequirement
-func (l *Labeler) processLabelSelectorRequirement(labelSelectorRequirement *meta.LabelSelectorRequirement, host *chi.ChiHost) {
+func processLabelSelectorRequirement(labelSelectorRequirement *meta.LabelSelectorRequirement, host *chi.ChiHost) {
 	labelSelectorRequirement.Key = newNameMacroReplacerHost(host).Replace(labelSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
 	for i := range labelSelectorRequirement.Values {

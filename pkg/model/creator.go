@@ -489,7 +489,7 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 	// Here we have local copy of Pod Template, to be used to create StatefulSet
 	// Now we can customize this Pod Template for particular host
 
-	c.labeler.prepareAffinity(podTemplate, host)
+	prepareAffinity(podTemplate, host)
 
 	return podTemplate
 }
@@ -576,7 +576,7 @@ func (c *Creator) statefulSetApplyPodTemplate(
 				template.ObjectMeta.Labels,
 			),
 			Annotations: util.MergeStringMapsOverwrite(
-				c.labeler.getAnnotationsHostScope(host),
+				getAnnotationsHostScope(host),
 				template.ObjectMeta.Annotations,
 			),
 		},
