@@ -656,7 +656,7 @@ func (n *Normalizer) normalizeUseTemplate(useTemplate *chiV1.ChiUseTemplate) {
 // normalizeClusters normalizes clusters
 func (n *Normalizer) normalizeClusters(clusters []*chiV1.ChiCluster) []*chiV1.ChiCluster {
 	// We need to have at least one cluster available
-	clusters = n.ensureCluster(clusters)
+	clusters = n.ensureClusters(clusters)
 
 	// Normalize all clusters
 	for i := range clusters {
@@ -673,8 +673,8 @@ func (n *Normalizer) newDefaultCluster() *chiV1.ChiCluster {
 	}
 }
 
-// ensureCluster
-func (n *Normalizer) ensureCluster(clusters []*chiV1.ChiCluster) []*chiV1.ChiCluster {
+// ensureClusters
+func (n *Normalizer) ensureClusters(clusters []*chiV1.ChiCluster) []*chiV1.ChiCluster {
 	if len(clusters) > 0 {
 		return clusters
 	}
