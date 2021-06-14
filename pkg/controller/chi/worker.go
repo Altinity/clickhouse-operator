@@ -438,7 +438,7 @@ func (w *worker) purge(ctx context.Context, reg *chopmodel.Registry) (cnt int) {
 			w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 			cnt++
 		case chopmodel.PVC:
-			if w.creator.GetReclaimPolicy(m) == chop.PVCReclaimPolicyDelete {
+			if chopmodel.GetReclaimPolicy(m) == chop.PVCReclaimPolicyDelete {
 				w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 			}
 		case chopmodel.ConfigMap:
