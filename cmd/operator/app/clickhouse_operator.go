@@ -98,8 +98,7 @@ func Run() {
 	kubeClient, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
 
 	// Create operator instance
-	chop := chop.GetCHOp(kubeClient, chopClient, chopConfigFile)
-	chop.SetupLog()
+	chop.New(kubeClient, chopClient, chopConfigFile)
 	log.V(1).A().Info("Log options parsed")
 	log.Info(chop.Config().String(true))
 
@@ -117,7 +116,6 @@ func Run() {
 
 	// Create Controller
 	chiController := chi.NewController(
-		chop,
 		chopClient,
 		kubeClient,
 		chopInformerFactory,
