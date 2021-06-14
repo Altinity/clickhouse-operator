@@ -708,6 +708,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chop.ChiHost) error {
 	return nil
 }
 
+// migrateTables
 func (w *worker) migrateTables(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
@@ -735,6 +736,7 @@ func (w *worker) migrateTables(ctx context.Context, host *chop.ChiHost) error {
 	return err
 }
 
+// shouldMigrateTables
 func (w *worker) shouldMigrateTables(host *chop.ChiHost) bool {
 	if host.GetCHI().IsStopped() {
 		return false
@@ -780,6 +782,7 @@ func (w *worker) includeHost(ctx context.Context, host *chop.ChiHost) error {
 	return nil
 }
 
+// excludeHostFromService
 func (w *worker) excludeHostFromService(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
@@ -789,6 +792,7 @@ func (w *worker) excludeHostFromService(ctx context.Context, host *chop.ChiHost)
 	return w.c.deleteLabelReady(ctx, host)
 }
 
+// includeHostIntoService
 func (w *worker) includeHostIntoService(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
@@ -896,10 +900,12 @@ func (w *worker) shouldWaitIncludeHost(host *chop.ChiHost) bool {
 	return w.c.chop.Config().ReconcileWaitInclude
 }
 
+// waitHostInCluster
 func (w *worker) waitHostInCluster(ctx context.Context, host *chop.ChiHost) error {
 	return w.c.pollHostContext(ctx, host, nil, w.schemer.IsHostInCluster)
 }
 
+// waitHostNotInCluster
 func (w *worker) waitHostNotInCluster(ctx context.Context, host *chop.ChiHost) error {
 	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chop.ChiHost) bool {
 		return !w.schemer.IsHostInCluster(ctx, host)
