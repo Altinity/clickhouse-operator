@@ -791,16 +791,16 @@ func CreateFQDN(host *chop.ChiHost) string {
 
 // CreateFQDNs is a wrapper over set of create FQDN functions
 // obj specifies source object to create FQDNs from
-// scope specifies target scope - what entity to create FQDNs for - be it CHI, cluster, shard or host itself
-// excludeSelf specifies whether to exclude the host itself. Applicable only in case obj is a host
+// scope specifies target scope - what entity to create FQDNs for - be it CHI, cluster, shard or a host
+// excludeSelf specifies whether to exclude the host itself from the result. Applicable only in case obj is a host
 func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string {
 	switch typed := obj.(type) {
 	case *chop.ClickHouseInstallation:
 		return createPodFQDNsOfCHI(typed)
-	case *chop.ChiShard:
-		return createPodFQDNsOfShard(typed)
 	case *chop.ChiCluster:
 		return createPodFQDNsOfCluster(typed)
+	case *chop.ChiShard:
+		return createPodFQDNsOfShard(typed)
 	case *chop.ChiHost:
 		self := ""
 		if excludeSelf {
