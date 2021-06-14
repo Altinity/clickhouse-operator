@@ -387,19 +387,19 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 	c.statefulSetApplyPodTemplate(statefulSet, podTemplate, host)
 
 	// Post-process StatefulSet
-	c.ensureStatefulSetTemplateIntegrity(statefulSet, host)
+	ensureStatefulSetTemplateIntegrity(statefulSet, host)
 	c.personalizeStatefulSetTemplate(statefulSet, host)
 }
 
 // ensureStatefulSetTemplateIntegrity
-func (c *Creator) ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	c.ensureClickHouseContainerSpecified(statefulSet)
-	c.ensureProbesSpecified(statefulSet)
+func ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	ensureClickHouseContainerSpecified(statefulSet)
+	ensureProbesSpecified(statefulSet)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
 // ensureClickHouseContainerSpecified
-func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet) {
+func ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet) {
 	_, ok := getClickHouseContainer(statefulSet)
 	if ok {
 		return
@@ -408,12 +408,12 @@ func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulS
 	// No ClickHouse container available, let's add one
 	addContainer(
 		&statefulSet.Spec.Template.Spec,
-		c.newDefaultClickHouseContainer(),
+		newDefaultClickHouseContainer(),
 	)
 }
 
 // ensureProbesSpecified
-func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
+func ensureProbesSpecified(statefulSet *apps.StatefulSet) {
 	container, ok := getClickHouseContainer(statefulSet)
 	if !ok {
 		return
@@ -422,7 +422,7 @@ func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
 		container.LivenessProbe = newDefaultLivenessProbe()
 	}
 	if container.ReadinessProbe == nil {
-		container.ReadinessProbe = c.newDefaultReadinessProbe()
+		container.ReadinessProbe = newDefaultReadinessProbe()
 	}
 }
 
@@ -482,7 +482,7 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 		c.a.V(1).F().Info("statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
 	} else {
 		// Host references UNKNOWN PodTemplate, will use default one
-		podTemplate = c.newDefaultPodTemplate(statefulSetName)
+		podTemplate = newDefaultPodTemplate(statefulSetName)
 		c.a.V(1).F().Info("statefulSet %s use default generated template", statefulSetName)
 	}
 
@@ -851,11 +851,6 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	statefulSet.Spec.VolumeClaimTemplates = append(statefulSet.Spec.VolumeClaimTemplates, persistentVolumeClaim)
 }
 
-// GetReclaimPolicy
-func (c *Creator) GetReclaimPolicy(meta metav1.ObjectMeta) chiv1.PVCReclaimPolicy {
-	return c.labeler.getReclaimPolicy(meta)
-}
-
 // newDefaultHostTemplate returns default Host Template to be used with StatefulSet
 func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 	return &chiv1.ChiHostTemplate{
@@ -895,7 +890,7 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 }
 
 // newDefaultPodTemplate returns default Pod Template to be used with StatefulSet
-func (c *Creator) newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
+func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 	podTemplate := &chiv1.ChiPodTemplate{
 		Name: name,
 		Spec: corev1.PodSpec{
@@ -906,7 +901,7 @@ func (c *Creator) newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 
 	addContainer(
 		&podTemplate.Spec,
-		c.newDefaultClickHouseContainer(),
+		newDefaultClickHouseContainer(),
 	)
 
 	return podTemplate
@@ -928,7 +923,7 @@ func newDefaultLivenessProbe() *corev1.Probe {
 }
 
 // newDefaultReadinessProbe
-func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
+func newDefaultReadinessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
@@ -942,7 +937,7 @@ func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
 }
 
 // newDefaultClickHouseContainer returns default ClickHouse Container
-func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
+func newDefaultClickHouseContainer() corev1.Container {
 	return corev1.Container{
 		Name:  ClickHouseContainerName,
 		Image: defaultClickHouseDockerImage,
@@ -961,7 +956,7 @@ func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 			},
 		},
 		LivenessProbe:  newDefaultLivenessProbe(),
-		ReadinessProbe: c.newDefaultReadinessProbe(),
+		ReadinessProbe: newDefaultReadinessProbe(),
 	}
 }
 
