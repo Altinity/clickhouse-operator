@@ -31,17 +31,14 @@ import (
 
 // Normalizer
 type Normalizer struct {
-	chop *chop.CHOp
-	chi  *chiV1.ClickHouseInstallation
+	chi *chiV1.ClickHouseInstallation
 	// Whether should insert default cluster if no cluster specified
 	withDefaultCluster bool
 }
 
 // NewNormalizer
-func NewNormalizer(chop *chop.CHOp) *Normalizer {
-	return &Normalizer{
-		chop: chop,
-	}
+func NewNormalizer() *Normalizer {
+	return &Normalizer{}
 }
 
 // CreateTemplatedCHI produces ready-to-use CHI object
@@ -56,12 +53,12 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 	}
 
 	// What base should be used to create CHI
-	if n.chop.Config().CHITemplate == nil {
+	if chop.Config().CHITemplate == nil {
 		// No template specified - start with clear page
 		n.chi = new(chiV1.ClickHouseInstallation)
 	} else {
 		// Template specified - start with template
-		n.chi = n.chop.Config().CHITemplate.DeepCopy()
+		n.chi = chop.Config().CHITemplate.DeepCopy()
 	}
 
 	// At this moment n.chi is either empty CHI or a system-wide template
@@ -74,7 +71,7 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 
 	var useTemplates []chiV1.ChiUseTemplate
 
-	if autoTemplates := n.chop.Config().FindAutoTemplates(); len(autoTemplates) > 0 {
+	if autoTemplates := chop.Config().FindAutoTemplates(); len(autoTemplates) > 0 {
 		log.V(2).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
 		for _, template := range autoTemplates {
 			log.V(3).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Name, template.Namespace)
@@ -97,7 +94,7 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
-		if template := n.chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
+		if template := chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
 			log.V(1).M(chi).A().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			(&n.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
@@ -301,7 +298,7 @@ func (n *Normalizer) fillStatus() {
 	})
 	// Spam normalized config in high-verbose modes only
 	normalized := false
-	if v, err := n.chop.Config().GetLogLevel(); (err == nil) && (v >= 1) {
+	if v, err := chop.Config().GetLogLevel(); (err == nil) && (v >= 1) {
 		normalized = true
 	}
 	n.chi.FillStatus(endpoint, pods, fqdns, normalized)
@@ -777,19 +774,19 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 	usernameMap["default"] = true
 	for username := range usernameMap {
 		// Ensure 'user/profile' section
-		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(n.chop.Config().CHConfigUserDefaultProfile))
+		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultProfile))
 		// Ensure 'user/quota' section
-		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(n.chop.Config().CHConfigUserDefaultQuota))
+		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultQuota))
 		// Ensure 'user/networks/ip' section
-		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(n.chop.Config().CHConfigUserDefaultNetworksIP))
+		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().CHConfigUserDefaultNetworksIP))
 		// Ensure 'user/networks/host_regexp' section
-		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, n.chop.Config().CHConfigNetworksHostRegexpTemplate)))
+		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().CHConfigNetworksHostRegexpTemplate)))
 
 		var pass = ""
 		if users.Has(username + "/password") {
 			pass = users.Get(username + "/password").String()
 		} else if username != "default" {
-			pass = n.chop.Config().CHConfigUserDefaultPassword
+			pass = chop.Config().CHConfigUserDefaultPassword
 		}
 
 		hasPasswordSHA256 := users.Has(username + "/password_sha256_hex")
