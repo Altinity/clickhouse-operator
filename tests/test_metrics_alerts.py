@@ -537,7 +537,7 @@ def test_too_much_running_queries(self):
         )
         kubectl.launch(
             f"exec -n {kubectl.namespace} {too_many_queries_pod} -c clickhouse-pod -- bash /tmp/long_cmd.sh",
-            timeout=70,
+            timeout=90,
         )
 
     with Then("check ClickHouseTooManyRunningQueries firing"):
