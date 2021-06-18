@@ -16,6 +16,8 @@ package chop
 
 import (
 	"flag"
+	"fmt"
+
 	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -46,11 +48,17 @@ func NewCHOp(
 
 // Init
 func (c *CHOp) Init() error {
+	if c == nil {
+		return fmt.Errorf("chop not created")
+	}
 	return c.ConfigManager.Init()
 }
 
 // Config
 func (c *CHOp) Config() *v1.OperatorConfig {
+	if c == nil {
+		return nil
+	}
 	return c.ConfigManager.Config()
 }
 

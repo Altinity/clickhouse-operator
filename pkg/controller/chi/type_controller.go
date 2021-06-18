@@ -22,21 +22,16 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
 	//"k8s.io/client-go/util/workqueue"
 
 	"github.com/altinity/queue"
 
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	choplisters "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 )
 
 // Controller defines CRO controller
 type Controller struct {
-	// Instance of Operator
-	chop *chop.CHOp
-
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 	kubeClient kube.Interface
 	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
@@ -72,10 +67,7 @@ type Controller struct {
 	podListerSynced cache.InformerSynced
 
 	// queues used to organize events queue processed by operator
-	//queues  []workqueue.RateLimitingInterface
-	queues  []queue.PriorityQueue
-	queues2 []workqueue.RateLimitingInterface
-	queues3 []queue.PriorityQueue
+	queues []queue.PriorityQueue
 	// not used explicitly
 	recorder record.EventRecorder
 }

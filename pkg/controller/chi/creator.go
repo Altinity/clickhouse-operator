@@ -1,5 +1,4 @@
 // Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
-// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,12 +24,13 @@ import (
 	"k8s.io/api/core/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
-func (c *Controller) createStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+func (c *Controller) createStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, host *chiv1.ChiHost) error {
 	log.V(1).M(host).F().P()
 
 	if util.IsContextDone(ctx) {
@@ -59,7 +59,7 @@ func (c *Controller) updateStatefulSet(
 	ctx context.Context,
 	oldStatefulSet *apps.StatefulSet,
 	newStatefulSet *apps.StatefulSet,
-	host *chop.ChiHost,
+	host *chiv1.ChiHost,
 ) error {
 	log.V(2).M(host).F().P()
 
@@ -142,32 +142,32 @@ var errUnexpectedFlow = errors.New("unexpected flow")
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed
 // It can just delete failed StatefulSet or do nothing
-func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatefulSet *apps.StatefulSet, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return errIgnore
 	}
 
 	// What to do with StatefulSet - look into chop configuration settings
-	switch c.chop.Config().OnStatefulSetCreateFailureAction {
-	case chop.OnStatefulSetCreateFailureActionAbort:
+	switch chop.Config().OnStatefulSetCreateFailureAction {
+	case chiv1.OnStatefulSetCreateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
 		log.V(1).M(host).F().Info("abort")
 		return errAbort
 
-	case chop.OnStatefulSetCreateFailureActionDelete:
+	case chiv1.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully failed StatefulSet
 		log.V(1).M(host).F().Info("going to DELETE FAILED StatefulSet %s", util.NamespaceNameString(failedStatefulSet.ObjectMeta))
 		_ = c.deleteHost(ctx, host)
 		return c.shouldContinueOnCreateFailed()
 
-	case chop.OnStatefulSetCreateFailureActionIgnore:
+	case chiv1.OnStatefulSetCreateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
 		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(failedStatefulSet.ObjectMeta))
 		return errIgnore
 
 	default:
-		log.V(1).M(host).A().Error("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", c.chop.Config().OnStatefulSetCreateFailureAction)
+		log.V(1).M(host).A().Error("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", chop.Config().OnStatefulSetCreateFailureAction)
 		return errIgnore
 	}
 
@@ -176,7 +176,7 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatef
 
 // onStatefulSetUpdateFailed handles situation when StatefulSet update failed
 // It can try to revert StatefulSet to its previous version, specified in rollbackStatefulSet
-func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *apps.StatefulSet, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return errIgnore
@@ -187,13 +187,13 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	name := rollbackStatefulSet.Name
 
 	// What to do with StatefulSet - look into chop configuration settings
-	switch c.chop.Config().OnStatefulSetUpdateFailureAction {
-	case chop.OnStatefulSetUpdateFailureActionAbort:
+	switch chop.Config().OnStatefulSetUpdateFailureAction {
+	case chiv1.OnStatefulSetUpdateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
 		log.V(1).M(host).F().Info("abort StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
 		return errAbort
 
-	case chop.OnStatefulSetUpdateFailureActionRollback:
+	case chiv1.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
 		log.V(1).M(host).F().Info("going to ROLLBACK FAILED StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
 		if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, newGetOptions()); err != nil {
@@ -209,13 +209,13 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 			return c.shouldContinueOnUpdateFailed()
 		}
 
-	case chop.OnStatefulSetUpdateFailureActionIgnore:
+	case chiv1.OnStatefulSetUpdateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
 		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
 		return errIgnore
 
 	default:
-		log.V(1).M(host).A().Error("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", c.chop.Config().OnStatefulSetUpdateFailureAction)
+		log.V(1).M(host).A().Error("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", chop.Config().OnStatefulSetUpdateFailureAction)
 		return errIgnore
 	}
 

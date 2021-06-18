@@ -25,7 +25,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -36,8 +37,8 @@ const (
 )
 
 // waitHostNotReady polls host's StatefulSet for not exists or not ready
-func (c *Controller) waitHostNotReady(ctx context.Context, host *chop.ChiHost) error {
-	err := c.pollStatefulSet(ctx, host, NewStatefulSetPollOptionsConfigNoCreate(c.chop.Config()), model.IsStatefulSetNotReady, nil)
+func (c *Controller) waitHostNotReady(ctx context.Context, host *chiv1.ChiHost) error {
+	err := c.pollStatefulSet(ctx, host, NewStatefulSetPollOptions().FromConfig(chop.Config()).SetCreateTimeout(0), model.IsStatefulSetNotReady, nil)
 	if apierrors.IsNotFound(err) {
 		err = nil
 	}
@@ -46,7 +47,7 @@ func (c *Controller) waitHostNotReady(ctx context.Context, host *chop.ChiHost) e
 }
 
 // waitHostReady polls host's StatefulSet until it is ready
-func (c *Controller) waitHostReady(ctx context.Context, host *chop.ChiHost) error {
+func (c *Controller) waitHostReady(ctx context.Context, host *chiv1.ChiHost) error {
 	// Wait for StatefulSet to reach generation
 	err := c.pollStatefulSet(
 		ctx,
@@ -83,7 +84,7 @@ func (c *Controller) waitHostReady(ctx context.Context, host *chop.ChiHost) erro
 }
 
 // waitHostDeleted polls host's StatefulSet until it is not available
-func (c *Controller) waitHostDeleted(host *chop.ChiHost) {
+func (c *Controller) waitHostDeleted(host *chiv1.ChiHost) {
 	for {
 		// TODO
 		// Probably there would be better way to wait until k8s reported StatefulSet deleted
@@ -98,7 +99,7 @@ func (c *Controller) waitHostDeleted(host *chop.ChiHost) {
 }
 
 // waitHostRunning polls host for `Running` state
-func (c *Controller) waitHostRunning(host *chop.ChiHost) error {
+func (c *Controller) waitHostRunning(host *chiv1.ChiHost) error {
 	namespace := host.Address.Namespace
 	name := host.Address.HostName
 	// Wait for some limited time for StatefulSet to reach target generation
@@ -117,7 +118,7 @@ func (c *Controller) waitHostRunning(host *chop.ChiHost) error {
 			log.V(1).M(host).F().Info("%s/%s-WAIT", namespace, name)
 		}
 
-		if time.Since(start) >= (time.Duration(c.chop.Config().StatefulSetUpdateTimeout) * time.Second) {
+		if time.Since(start) >= (time.Duration(chop.Config().StatefulSetUpdateTimeout) * time.Second) {
 			// Timeout reached, no good result available, time to quit
 			log.V(1).M(host).F().Error("%s/%s-TIMEOUT reached", namespace, name)
 			return errors.New(fmt.Sprintf("waitHostRunning(%s/%s) - wait timeout", namespace, name))
@@ -126,7 +127,7 @@ func (c *Controller) waitHostRunning(host *chop.ChiHost) error {
 		// Wait some more time
 		log.V(2).M(host).F().Info("%s/%s", namespace, name)
 		select {
-		case <-time.After(time.Duration(c.chop.Config().StatefulSetUpdatePollPeriod) * time.Second):
+		case <-time.After(time.Duration(chop.Config().StatefulSetUpdatePollPeriod) * time.Second):
 		}
 	}
 
@@ -145,24 +146,31 @@ func NewStatefulSetPollOptions() *StatefulSetPollOptions {
 	return &StatefulSetPollOptions{}
 }
 
-func NewStatefulSetPollOptionsConfig(config *chop.OperatorConfig) *StatefulSetPollOptions {
-	return &StatefulSetPollOptions{
-		StartBotheringAfterTimeout: time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second,
-		CreateTimeout:              time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second,
-		Timeout:                    time.Duration(config.StatefulSetUpdateTimeout) * time.Second,
-		MainInterval:               time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second,
-		BackgroundInterval:         1 * time.Second,
+func (o *StatefulSetPollOptions) Ensure() *StatefulSetPollOptions {
+	if o == nil {
+		return NewStatefulSetPollOptions()
 	}
+	return o
 }
 
-func NewStatefulSetPollOptionsConfigNoCreate(config *chop.OperatorConfig) *StatefulSetPollOptions {
-	return &StatefulSetPollOptions{
-		StartBotheringAfterTimeout: time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second,
-		//CreateTimeout:              time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second,
-		Timeout:            time.Duration(config.StatefulSetUpdateTimeout) * time.Second,
-		MainInterval:       time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second,
-		BackgroundInterval: 1 * time.Second,
+func (o *StatefulSetPollOptions) FromConfig(config *chiv1.OperatorConfig) *StatefulSetPollOptions {
+	if o == nil {
+		return nil
 	}
+	o.StartBotheringAfterTimeout = time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second
+	o.CreateTimeout = time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second
+	o.Timeout = time.Duration(config.StatefulSetUpdateTimeout) * time.Second
+	o.MainInterval = time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second
+	o.BackgroundInterval = 1 * time.Second
+	return o
+}
+
+func (o *StatefulSetPollOptions) SetCreateTimeout(timeout time.Duration) *StatefulSetPollOptions {
+	if o == nil {
+		return nil
+	}
+	o.CreateTimeout = timeout
+	return o
 }
 
 // pollStatefulSet polls StatefulSet with poll callback function.
@@ -177,9 +185,7 @@ func (c *Controller) pollStatefulSet(
 		log.V(2).Info("ctx is done")
 		return nil
 	}
-	if opts == nil {
-		opts = NewStatefulSetPollOptionsConfig(c.chop.Config())
-	}
+	opts = opts.Ensure().FromConfig(chop.Config())
 	namespace := ""
 	name := ""
 
@@ -188,8 +194,8 @@ func (c *Controller) pollStatefulSet(
 		sts := entity.(*apps.StatefulSet)
 		namespace = sts.Namespace
 		name = sts.Name
-	case *chop.ChiHost:
-		h := entity.(*chop.ChiHost)
+	case *chiv1.ChiHost:
+		h := entity.(*chiv1.ChiHost)
 		namespace = h.Address.Namespace
 		name = h.Address.StatefulSet
 	}
@@ -278,18 +284,16 @@ func pollback(ctx context.Context, opts *StatefulSetPollOptions, fn func()) {
 // pollHost polls host with poll callback function.
 func (c *Controller) pollHostContext(
 	ctx context.Context,
-	host *chop.ChiHost,
+	host *chiv1.ChiHost,
 	opts *StatefulSetPollOptions,
-	f func(ctx context.Context, host *chop.ChiHost) bool,
+	f func(ctx context.Context, host *chiv1.ChiHost) bool,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
 	}
 
-	if opts == nil {
-		opts = NewStatefulSetPollOptionsConfig(c.chop.Config())
-	}
+	opts = opts.Ensure().FromConfig(chop.Config())
 	namespace := host.Address.Namespace
 	name := host.Address.HostName
 

@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -58,8 +59,8 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) {
 	}
 
 	// Label operator's Pod with version label
-	podName, ok1 := c.chop.ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAME)
-	namespace, ok2 := c.chop.ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
+	podName, ok1 := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAME)
+	namespace, ok2 := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
 
 	if !ok1 || !ok2 {
 		log.V(1).M(namespace, podName).A().Error("ERROR fetch Pod name out of %s/%s", namespace, podName)
@@ -147,7 +148,7 @@ func (c *Controller) addLabels(meta *v1.ObjectMeta) {
 		// Add the following labels
 		map[string]string{
 			model.LabelAppName: model.LabelAppValue,
-			model.LabelCHOP:    c.chop.Version,
+			model.LabelCHOP:    chop.Get().Version,
 		},
 	)
 }

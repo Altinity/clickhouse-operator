@@ -158,6 +158,11 @@ type namer struct {
 	ctx namerContext
 }
 
+var (
+	labelsNamer = newNamer(namerContextLabels)
+	namesNamer  = newNamer(namerContextNames)
+)
+
 // newNamer
 func newNamer(ctx namerContext) *namer {
 	return &namer{
@@ -368,58 +373,58 @@ func (n *namer) getNamePartHostName(host *chop.ChiHost) string {
 }
 
 // getNamePartCHIScopeCycleSize
-func (n *namer) getNamePartCHIScopeCycleSize(host *chop.ChiHost) string {
+func getNamePartCHIScopeCycleSize(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeCycleSize)
 }
 
 // getNamePartCHIScopeCycleIndex
-func (n *namer) getNamePartCHIScopeCycleIndex(host *chop.ChiHost) string {
+func getNamePartCHIScopeCycleIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeCycleIndex)
 }
 
 // getNamePartCHIScopeCycleOffset
-func (n *namer) getNamePartCHIScopeCycleOffset(host *chop.ChiHost) string {
+func getNamePartCHIScopeCycleOffset(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeCycleOffset)
 }
 
 // getNamePartClusterScopeCycleSize
-func (n *namer) getNamePartClusterScopeCycleSize(host *chop.ChiHost) string {
+func getNamePartClusterScopeCycleSize(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeCycleSize)
 }
 
 // getNamePartClusterScopeCycleIndex
-func (n *namer) getNamePartClusterScopeCycleIndex(host *chop.ChiHost) string {
+func getNamePartClusterScopeCycleIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeCycleIndex)
 }
 
 // getNamePartClusterScopeCycleOffset
-func (n *namer) getNamePartClusterScopeCycleOffset(host *chop.ChiHost) string {
+func getNamePartClusterScopeCycleOffset(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeCycleOffset)
 }
 
 // getNamePartCHIScopeIndex
-func (n *namer) getNamePartCHIScopeIndex(host *chop.ChiHost) string {
+func getNamePartCHIScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeIndex)
 }
 
 // getNamePartClusterScopeIndex
-func (n *namer) getNamePartClusterScopeIndex(host *chop.ChiHost) string {
+func getNamePartClusterScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeIndex)
 }
 
 // getNamePartShardScopeIndex
-func (n *namer) getNamePartShardScopeIndex(host *chop.ChiHost) string {
+func getNamePartShardScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ShardScopeIndex)
 }
 
 // getNamePartReplicaScopeIndex
-func (n *namer) getNamePartReplicaScopeIndex(host *chop.ChiHost) string {
+func getNamePartReplicaScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ReplicaScopeIndex)
 }
 
 // newNameMacroReplacerChi
 func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
-	n := newNamer(namerContextNames)
+	n := namesNamer
 	return strings.NewReplacer(
 		macrosNamespace, n.namePartNamespace(chi.Namespace),
 		macrosChiName, n.namePartChiName(chi.Name),
@@ -429,7 +434,7 @@ func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer
 
 // newNameMacroReplacerCluster
 func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
-	n := newNamer(namerContextNames)
+	n := namesNamer
 	return strings.NewReplacer(
 		macrosNamespace, n.namePartNamespace(cluster.Address.Namespace),
 		macrosChiName, n.namePartChiName(cluster.Address.CHIName),
@@ -442,7 +447,7 @@ func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 
 // newNameMacroReplacerShard
 func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
-	n := newNamer(namerContextNames)
+	n := namesNamer
 	return strings.NewReplacer(
 		macrosNamespace, n.namePartNamespace(shard.Address.Namespace),
 		macrosChiName, n.namePartChiName(shard.Address.CHIName),
@@ -480,7 +485,7 @@ func clusterScopeIndexOfPreviousCycleTail(host *chop.ChiHost) int {
 
 // newNameMacroReplacerHost
 func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
-	n := newNamer(namerContextNames)
+	n := namesNamer
 	return strings.NewReplacer(
 		macrosNamespace, n.namePartNamespace(host.Address.Namespace),
 		macrosChiName, n.namePartChiName(host.Address.CHIName),
@@ -791,16 +796,16 @@ func CreateFQDN(host *chop.ChiHost) string {
 
 // CreateFQDNs is a wrapper over set of create FQDN functions
 // obj specifies source object to create FQDNs from
-// scope specifies target scope - what entity to create FQDNs for - be it CHI, cluster, shard or host itself
-// excludeSelf specifies whether to exclude the host itself. Applicable only in case obj is a host
+// scope specifies target scope - what entity to create FQDNs for - be it CHI, cluster, shard or a host
+// excludeSelf specifies whether to exclude the host itself from the result. Applicable only in case obj is a host
 func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string {
 	switch typed := obj.(type) {
 	case *chop.ClickHouseInstallation:
 		return createPodFQDNsOfCHI(typed)
-	case *chop.ChiShard:
-		return createPodFQDNsOfShard(typed)
 	case *chop.ChiCluster:
 		return createPodFQDNsOfCluster(typed)
+	case *chop.ChiShard:
+		return createPodFQDNsOfShard(typed)
 	case *chop.ChiHost:
 		self := ""
 		if excludeSelf {

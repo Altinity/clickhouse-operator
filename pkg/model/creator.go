@@ -31,7 +31,6 @@ import (
 
 // Creator
 type Creator struct {
-	chop                   *chop.CHOp
 	chi                    *chiv1.ClickHouseInstallation
 	chConfigFilesGenerator *ClickHouseConfigFilesGenerator
 	labeler                *Labeler
@@ -39,12 +38,11 @@ type Creator struct {
 }
 
 // NewCreator
-func NewCreator(chop *chop.CHOp, chi *chiv1.ClickHouseInstallation) *Creator {
+func NewCreator(chi *chiv1.ClickHouseInstallation) *Creator {
 	return &Creator{
-		chop:                   chop,
 		chi:                    chi,
 		chConfigFilesGenerator: NewClickHouseConfigFilesGenerator(NewClickHouseConfigGenerator(chi), chop.Config()),
-		labeler:                NewLabeler(chop, chi),
+		labeler:                NewLabeler(chi),
 		a:                      log.M(chi),
 	}
 }
@@ -110,7 +108,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 			cluster.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceCluster(cluster),
-			c.labeler.getSelectorClusterScopeReady(cluster),
+			getSelectorClusterScopeReady(cluster),
 		)
 	}
 	// No template specified, no need to create service
@@ -129,7 +127,7 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 			shard.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceShard(shard),
-			c.labeler.getSelectorShardScopeReady(shard),
+			getSelectorShardScopeReady(shard),
 		)
 	}
 	// No template specified, no need to create service
@@ -149,7 +147,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			host.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceHost(host),
-			c.labeler.GetSelectorHostScope(host),
+			GetSelectorHostScope(host),
 		)
 	}
 
@@ -182,7 +180,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 					TargetPort: intstr.FromInt(int(host.InterserverHTTPPort)),
 				},
 			},
-			Selector:                 c.labeler.GetSelectorHostScope(host),
+			Selector:                 GetSelectorHostScope(host),
 			ClusterIP:                templateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
 			PublishNotReadyAddresses: true,
@@ -307,7 +305,7 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 			Replicas:    &replicasNum,
 			ServiceName: serviceName,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: c.labeler.GetSelectorHostScope(host),
+				MatchLabels: GetSelectorHostScope(host),
 			},
 
 			// IMPORTANT
@@ -387,19 +385,19 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 	c.statefulSetApplyPodTemplate(statefulSet, podTemplate, host)
 
 	// Post-process StatefulSet
-	c.ensureStatefulSetTemplateIntegrity(statefulSet, host)
+	ensureStatefulSetTemplateIntegrity(statefulSet, host)
 	c.personalizeStatefulSetTemplate(statefulSet, host)
 }
 
 // ensureStatefulSetTemplateIntegrity
-func (c *Creator) ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	c.ensureClickHouseContainerSpecified(statefulSet)
-	c.ensureProbesSpecified(statefulSet)
+func ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	ensureClickHouseContainerSpecified(statefulSet)
+	ensureProbesSpecified(statefulSet)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
 // ensureClickHouseContainerSpecified
-func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet) {
+func ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet) {
 	_, ok := getClickHouseContainer(statefulSet)
 	if ok {
 		return
@@ -408,12 +406,12 @@ func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulS
 	// No ClickHouse container available, let's add one
 	addContainer(
 		&statefulSet.Spec.Template.Spec,
-		c.newDefaultClickHouseContainer(),
+		newDefaultClickHouseContainer(),
 	)
 }
 
 // ensureProbesSpecified
-func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
+func ensureProbesSpecified(statefulSet *apps.StatefulSet) {
 	container, ok := getClickHouseContainer(statefulSet)
 	if !ok {
 		return
@@ -422,7 +420,7 @@ func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
 		container.LivenessProbe = newDefaultLivenessProbe()
 	}
 	if container.ReadinessProbe == nil {
-		container.ReadinessProbe = c.newDefaultReadinessProbe()
+		container.ReadinessProbe = newDefaultReadinessProbe()
 	}
 }
 
@@ -482,14 +480,14 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 		c.a.V(1).F().Info("statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
 	} else {
 		// Host references UNKNOWN PodTemplate, will use default one
-		podTemplate = c.newDefaultPodTemplate(statefulSetName)
+		podTemplate = newDefaultPodTemplate(statefulSetName)
 		c.a.V(1).F().Info("statefulSet %s use default generated template", statefulSetName)
 	}
 
 	// Here we have local copy of Pod Template, to be used to create StatefulSet
 	// Now we can customize this Pod Template for particular host
 
-	c.labeler.prepareAffinity(podTemplate, host)
+	prepareAffinity(podTemplate, host)
 
 	return podTemplate
 }
@@ -576,7 +574,7 @@ func (c *Creator) statefulSetApplyPodTemplate(
 				template.ObjectMeta.Labels,
 			),
 			Annotations: util.MergeStringMapsOverwrite(
-				c.labeler.getAnnotationsHostScope(host),
+				getAnnotationsHostScope(host),
 				template.ObjectMeta.Annotations,
 			),
 		},
@@ -851,11 +849,6 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	statefulSet.Spec.VolumeClaimTemplates = append(statefulSet.Spec.VolumeClaimTemplates, persistentVolumeClaim)
 }
 
-// GetReclaimPolicy
-func (c *Creator) GetReclaimPolicy(meta metav1.ObjectMeta) chiv1.PVCReclaimPolicy {
-	return c.labeler.getReclaimPolicy(meta)
-}
-
 // newDefaultHostTemplate returns default Host Template to be used with StatefulSet
 func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 	return &chiv1.ChiHostTemplate{
@@ -895,7 +888,7 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 }
 
 // newDefaultPodTemplate returns default Pod Template to be used with StatefulSet
-func (c *Creator) newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
+func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 	podTemplate := &chiv1.ChiPodTemplate{
 		Name: name,
 		Spec: corev1.PodSpec{
@@ -906,7 +899,7 @@ func (c *Creator) newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 
 	addContainer(
 		&podTemplate.Spec,
-		c.newDefaultClickHouseContainer(),
+		newDefaultClickHouseContainer(),
 	)
 
 	return podTemplate
@@ -928,7 +921,7 @@ func newDefaultLivenessProbe() *corev1.Probe {
 }
 
 // newDefaultReadinessProbe
-func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
+func newDefaultReadinessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
@@ -942,7 +935,7 @@ func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
 }
 
 // newDefaultClickHouseContainer returns default ClickHouse Container
-func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
+func newDefaultClickHouseContainer() corev1.Container {
 	return corev1.Container{
 		Name:  ClickHouseContainerName,
 		Image: defaultClickHouseDockerImage,
@@ -961,7 +954,7 @@ func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 			},
 		},
 		LivenessProbe:  newDefaultLivenessProbe(),
-		ReadinessProbe: c.newDefaultReadinessProbe(),
+		ReadinessProbe: newDefaultReadinessProbe(),
 	}
 }
 
