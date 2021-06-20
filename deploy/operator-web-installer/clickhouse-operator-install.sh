@@ -81,7 +81,7 @@ function get_file() {
 #
 
 # Namespace to install operator
-OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
+OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-clickhouse-operator}"
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 
 # Operator's docker image
