@@ -38,13 +38,14 @@ OPERATOR_NAMESPACE=test-clickhouse-operator
 ```
 This namespace would be created and used to install `clickhouse-operator` into.
 Install script would download some `.yaml` and `.xml` files and install `clickhouse-operator` into specified namespace.
+After installation **clickhouse-operator** will watch custom resources like a `kind: ClickhouseInstallation` only in `test-clickhouse-operator` namespace.
 
 If no `OPERATOR_NAMESPACE` specified, as:
 ```bash
 cd ~
 curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-web-installer/clickhouse-operator-install.sh | bash
 ```
-installer will create namespace `clickhouse-operator` and install **clickhouse-operator** into it.
+installer will install **clickhouse-operator** into `kube-system` namespace and will watch custom resources like a `kind: ClickhouseInstallation` in all available namespaces.
 
 ## **In case you can not run scripts from internet in your protected environment**, 
 
