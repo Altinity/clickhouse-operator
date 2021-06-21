@@ -158,11 +158,6 @@ type namer struct {
 	ctx namerContext
 }
 
-var (
-	labelsNamer = newNamer(namerContextLabels)
-	namesNamer  = newNamer(namerContextNames)
-)
-
 // newNamer
 func newNamer(ctx namerContext) *namer {
 	return &namer{
@@ -421,6 +416,8 @@ func getNamePartShardScopeIndex(host *chop.ChiHost) string {
 func getNamePartReplicaScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ReplicaScopeIndex)
 }
+
+var namesNamer  = newNamer(namerContextNames)
 
 // newNameMacroReplacerChi
 func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {

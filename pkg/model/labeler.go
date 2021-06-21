@@ -148,6 +148,8 @@ func (l *Labeler) getLabelsCHIScope() map[string]string {
 	return l.appendCHILabels(l.GetSelectorCHIScope())
 }
 
+var labelsNamer = newNamer(namerContextLabels)
+
 // GetSelectorCHIScope gets labels to select a CHI-scoped object
 func (l *Labeler) GetSelectorCHIScope() map[string]string {
 	// Do not include CHI-provided labels
