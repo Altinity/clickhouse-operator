@@ -102,6 +102,38 @@ spec:
                 - "off"
                 - "On"
                 - "on"
+                - "Disable"
+                - "disable"
+                - "Enable"
+                - "enable"
+                - "Disabled"
+                - "disabled"
+                - "Enabled"
+                - "enabled"
+            # Need to be StringBool
+            troubleshoot:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - ""
+                - "0"
+                - "1"
+                - "False"
+                - "false"
+                - "True"
+                - "true"
+                - "No"
+                - "no"
+                - "Yes"
+                - "yes"
+                - "Off"
+                - "off"
+                - "On"
+                - "on"
+                - "Disable"
+                - "disable"
+                - "Enable"
+                - "enable"
                 - "Disabled"
                 - "disabled"
                 - "Enabled"
@@ -144,6 +176,10 @@ spec:
                     - "off"
                     - "On"
                     - "on"
+                    - "Disable"
+                    - "disable"
+                    - "Enable"
+                    - "enable"
                     - "Disabled"
                     - "disabled"
                     - "Enabled"
@@ -333,6 +369,10 @@ spec:
                                     - "off"
                                     - "On"
                                     - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
                                     - "Disabled"
                                     - "disabled"
                                     - "Enabled"
@@ -833,6 +873,38 @@ spec:
                 - "off"
                 - "On"
                 - "on"
+                - "Disable"
+                - "disable"
+                - "Enable"
+                - "enable"
+                - "Disabled"
+                - "disabled"
+                - "Enabled"
+                - "enabled"
+            # Need to be StringBool
+            troubleshoot:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - ""
+                - "0"
+                - "1"
+                - "False"
+                - "false"
+                - "True"
+                - "true"
+                - "No"
+                - "no"
+                - "Yes"
+                - "yes"
+                - "Off"
+                - "off"
+                - "On"
+                - "on"
+                - "Disable"
+                - "disable"
+                - "Enable"
+                - "enable"
                 - "Disabled"
                 - "disabled"
                 - "Enabled"
@@ -875,6 +947,10 @@ spec:
                     - "off"
                     - "On"
                     - "on"
+                    - "Disable"
+                    - "disable"
+                    - "Enable"
+                    - "enable"
                     - "Disabled"
                     - "disabled"
                     - "Enabled"
@@ -1064,6 +1140,10 @@ spec:
                                     - "off"
                                     - "On"
                                     - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
                                     - "Disabled"
                                     - "disabled"
                                     - "Enabled"
@@ -1579,6 +1659,10 @@ spec:
                 - "off"
                 - "On"
                 - "on"
+                - "Disable"
+                - "disable"
+                - "Enable"
+                - "enable"
                 - "Disabled"
                 - "disabled"
                 - "Enabled"
@@ -1726,7 +1810,7 @@ subjects:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:0.14.0
+# altinity/clickhouse-operator:0.15.0
 # etc-clickhouse-operator-files
 #
 apiVersion: v1
@@ -1898,7 +1982,7 @@ data:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:0.14.0
+# altinity/clickhouse-operator:0.15.0
 # etc-clickhouse-operator-confd-files
 #
 apiVersion: v1
@@ -1913,7 +1997,7 @@ data:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:0.14.0
+# altinity/clickhouse-operator:0.15.0
 # etc-clickhouse-operator-configd-files
 #
 apiVersion: v1
@@ -1924,7 +2008,7 @@ metadata:
   labels:
     app: clickhouse-operator
 data:
-  01-clickhouse-listen.xml: |
+  01-clickhouse-01-listen.xml: |
     <yandex>
         <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
         <listen_host>::</listen_host>
@@ -1932,7 +2016,7 @@ data:
         <listen_try>1</listen_try>
     </yandex>
 
-  02-clickhouse-logger.xml: |
+  01-clickhouse-02-logger.xml: |
     <yandex>
         <logger>
             <!-- Possible levels: https://github.com/pocoproject/poco/blob/develop/Foundation/include/Poco/Logger.h#L105 -->
@@ -1946,30 +2030,32 @@ data:
         </logger>
     </yandex>
 
-  03-clickhouse-querylog.xml: |
+  01-clickhouse-03-query_log.xml: |
     <yandex>
-    <query_log replace="1">
-        <database>system</database>
-        <table>query_log</table>
-        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
-        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
-    </query_log>
-    <query_thread_log remove="1"/>
+        <query_log replace="1">
+            <database>system</database>
+            <table>query_log</table>
+            <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
+            <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        </query_log>
+        <query_thread_log remove="1"/>
     </yandex>
-  04-clickhouse-partlog.xml: |
+
+  01-clickhouse-04-part_log.xml: |
     <yandex>
-    <part_log replace="1">
-        <database>system</database>
-        <table>part_log</table>
-        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
-        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
-    </part_log>
+        <part_log replace="1">
+            <database>system</database>
+            <table>part_log</table>
+            <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
+            <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        </part_log>
     </yandex>
+
 ---
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:0.14.0
+# altinity/clickhouse-operator:0.15.0
 # etc-clickhouse-operator-templatesd-files
 #
 apiVersion: v1
@@ -2068,7 +2154,7 @@ data:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:0.14.0
+# altinity/clickhouse-operator:0.15.0
 # etc-clickhouse-operator-usersd-files
 #
 apiVersion: v1
@@ -2126,8 +2212,8 @@ data:
 # Possible Template Parameters:
 #
 # kube-system
-# altinity/clickhouse-operator:0.14.0
-# altinity/metrics-exporter:0.14.0
+# altinity/clickhouse-operator:0.15.0
+# altinity/metrics-exporter:0.15.0
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -2170,7 +2256,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.14.0
+          image: altinity/clickhouse-operator:0.15.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -2235,7 +2321,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.14.0
+          image: altinity/metrics-exporter:0.15.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder

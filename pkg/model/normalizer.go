@@ -21,9 +21,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"gopkg.in/d4l3k/messagediff.v1"
 	"k8s.io/api/core/v1"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -33,17 +31,14 @@ import (
 
 // Normalizer
 type Normalizer struct {
-	chop *chop.CHOp
-	chi  *chiV1.ClickHouseInstallation
+	chi *chiV1.ClickHouseInstallation
 	// Whether should insert default cluster if no cluster specified
 	withDefaultCluster bool
 }
 
 // NewNormalizer
-func NewNormalizer(chop *chop.CHOp) *Normalizer {
-	return &Normalizer{
-		chop: chop,
-	}
+func NewNormalizer() *Normalizer {
+	return &Normalizer{}
 }
 
 // CreateTemplatedCHI produces ready-to-use CHI object
@@ -58,12 +53,12 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 	}
 
 	// What base should be used to create CHI
-	if n.chop.Config().CHITemplate == nil {
+	if chop.Config().CHITemplate == nil {
 		// No template specified - start with clear page
 		n.chi = new(chiV1.ClickHouseInstallation)
 	} else {
 		// Template specified - start with template
-		n.chi = n.chop.Config().CHITemplate.DeepCopy()
+		n.chi = chop.Config().CHITemplate.DeepCopy()
 	}
 
 	// At this moment n.chi is either empty CHI or a system-wide template
@@ -76,7 +71,7 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 
 	var useTemplates []chiV1.ChiUseTemplate
 
-	if autoTemplates := n.chop.Config().FindAutoTemplates(); len(autoTemplates) > 0 {
+	if autoTemplates := chop.Config().FindAutoTemplates(); len(autoTemplates) > 0 {
 		log.V(2).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
 		for _, template := range autoTemplates {
 			log.V(3).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Name, template.Namespace)
@@ -99,7 +94,7 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
-		if template := n.chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
+		if template := chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
 			log.V(1).M(chi).A().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			(&n.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
@@ -113,14 +108,14 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 	return n.normalize()
 }
 
-// NormalizeCHI normalizes CHI.
+// normalize normalizes whole CHI.
 // Returns normalized CHI
 func (n *Normalizer) normalize() (*chiV1.ClickHouseInstallation, error) {
-
 	// Walk over ChiSpec datatype fields
 	n.chi.Spec.TaskID = n.normalizeTaskID(n.chi.Spec.TaskID)
 	n.chi.Spec.UseTemplates = n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
 	n.chi.Spec.Stop = n.normalizeStop(n.chi.Spec.Stop)
+	n.chi.Spec.Troubleshoot = n.normalizeTroubleshoot(n.chi.Spec.Troubleshoot)
 	n.chi.Spec.NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.chi.Spec.NamespaceDomainPattern)
 	n.chi.Spec.Templating = n.normalizeTemplating(n.chi.Spec.Templating)
 	n.chi.Spec.Reconciling = n.normalizeReconciling(n.chi.Spec.Reconciling)
@@ -150,6 +145,7 @@ func (n *Normalizer) finalizeCHI() {
 	})
 }
 
+// fillCHIAddressInfo
 func (n *Normalizer) fillCHIAddressInfo() {
 	n.chi.WalkHostsFullPath(0, 0, func(
 		chi *chiV1.ClickHouseInstallation,
@@ -297,12 +293,12 @@ func (n *Normalizer) fillStatus() {
 	fqdns := make([]string, 0)
 	n.chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		pods = append(pods, CreatePodName(host))
-		fqdns = append(fqdns, CreatePodFQDN(host))
+		fqdns = append(fqdns, CreateFQDN(host))
 		return nil
 	})
 	// Spam normalized config in high-verbose modes only
 	normalized := false
-	if v, err := n.chop.Config().GetLogLevel(); (err == nil) && (v >= 1) {
+	if v, err := chop.Config().GetLogLevel(); (err == nil) && (v >= 1) {
 		normalized = true
 	}
 	n.chi.FillStatus(endpoint, pods, fqdns, normalized)
@@ -325,6 +321,17 @@ func (n *Normalizer) normalizeStop(stop string) string {
 	if util.IsStringBool(stop) {
 		// It is bool, use as it is
 		return stop
+	}
+
+	// In case it is unknown value - just use set it to false
+	return util.StringBoolFalseLowercase
+}
+
+// normalizeTroubleshoot normalizes .spec.stop
+func (n *Normalizer) normalizeTroubleshoot(troubleshoot string) string {
+	if util.IsStringBool(troubleshoot) {
+		// It is bool, use as it is
+		return troubleshoot
 	}
 
 	// In case it is unknown value - just use set it to false
@@ -575,7 +582,7 @@ func (n *Normalizer) normalizePodTemplate(template *chiV1.ChiPodTemplate) {
 	}
 
 	// Spec
-	template.Spec.Affinity = n.mergeAffinity(template.Spec.Affinity, n.newAffinity(template))
+	template.Spec.Affinity = mergeAffinity(template.Spec.Affinity, newAffinity(template))
 
 	// In case we have hostNetwork specified, we need to have ClusterFirstWithHostNet DNS policy, because of
 	// https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
@@ -586,547 +593,6 @@ func (n *Normalizer) normalizePodTemplate(template *chiV1.ChiPodTemplate) {
 
 	// Introduce PodTemplate into Index
 	n.chi.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
-}
-
-// newAffinity
-func (n *Normalizer) newAffinity(template *chiV1.ChiPodTemplate) *v1.Affinity {
-	nodeAffinity := n.newNodeAffinity(template)
-	podAffinity := n.newPodAffinity(template)
-	podAntiAffinity := n.newPodAntiAffinity(template)
-
-	if (nodeAffinity == nil) && (podAffinity == nil) && (podAntiAffinity == nil) {
-		// Neither Affinity nor AntiAffinity specified
-		return nil
-	}
-
-	return &v1.Affinity{
-		NodeAffinity:    nodeAffinity,
-		PodAffinity:     podAffinity,
-		PodAntiAffinity: podAntiAffinity,
-	}
-}
-
-// mergeAffinity
-func (n *Normalizer) mergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affinity {
-	if src == nil {
-		// Nothing to merge from
-		return dst
-	}
-
-	if dst == nil {
-		// No receiver, allocate new one
-		dst = &v1.Affinity{}
-	}
-
-	dst.NodeAffinity = n.mergeNodeAffinity(dst.NodeAffinity, src.NodeAffinity)
-	dst.PodAffinity = n.mergePodAffinity(dst.PodAffinity, src.PodAffinity)
-	dst.PodAntiAffinity = n.mergePodAntiAffinity(dst.PodAntiAffinity, src.PodAntiAffinity)
-
-	return dst
-}
-
-// newNodeAffinity
-func (n *Normalizer) newNodeAffinity(template *chiV1.ChiPodTemplate) *v1.NodeAffinity {
-	if template.Zone.Key == "" {
-		return nil
-	}
-
-	return &v1.NodeAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-			NodeSelectorTerms: []v1.NodeSelectorTerm{
-				{
-					// A list of node selector requirements by node's labels.
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      template.Zone.Key,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   template.Zone.Values,
-						},
-					},
-					// A list of node selector requirements by node's fields.
-					//MatchFields: []v1.NodeSelectorRequirement{
-					//	v1.NodeSelectorRequirement{},
-					//},
-				},
-			},
-		},
-
-		PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{},
-	}
-}
-
-// mergeNodeAffinity
-func (n *Normalizer) mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinity) *v1.NodeAffinity {
-	if src == nil {
-		// Nothing to merge from
-		return dst
-	}
-
-	if dst == nil {
-		// No receiver, allocate new one
-		dst = &v1.NodeAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-				NodeSelectorTerms: []v1.NodeSelectorTerm{},
-			},
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{},
-		}
-	}
-
-	// Merge NodeSelectors
-	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-		s := &src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i]
-		equal := false
-		for j := range dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-			d := &dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[j]
-			if _, equal = messagediff.DeepDiff(*s, *d); equal {
-				break
-			}
-		}
-		if !equal {
-			dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
-				dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-				src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i],
-			)
-		}
-	}
-
-	// Merge PreferredSchedulingTerm
-	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
-		s := &src.PreferredDuringSchedulingIgnoredDuringExecution[i]
-		equal := false
-		for j := range dst.PreferredDuringSchedulingIgnoredDuringExecution {
-			d := &dst.PreferredDuringSchedulingIgnoredDuringExecution[j]
-			if _, equal = messagediff.DeepDiff(*s, *d); equal {
-				break
-			}
-		}
-		if !equal {
-			dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
-				dst.PreferredDuringSchedulingIgnoredDuringExecution,
-				src.PreferredDuringSchedulingIgnoredDuringExecution[i],
-			)
-		}
-	}
-
-	return dst
-}
-
-// newPodAffinity
-func (n *Normalizer) newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
-	podAffinity := &v1.PodAffinity{}
-
-	for i := range template.PodDistribution {
-		podDistribution := &template.PodDistribution[i]
-		switch podDistribution.Type {
-		case chiV1.PodDistributionNamespaceAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
-				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-				1,
-				map[string]string{
-					LabelNamespace: macrosNamespace,
-				},
-			)
-		case chiV1.PodDistributionClickHouseInstallationAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
-				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-				1,
-				map[string]string{
-					LabelCHIName: macrosChiName,
-				},
-			)
-		case chiV1.PodDistributionClusterAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
-				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-				1,
-				map[string]string{
-					LabelClusterName: macrosClusterName,
-				},
-			)
-		case chiV1.PodDistributionShardAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
-				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-				1,
-				map[string]string{
-					LabelShardName: macrosShardName,
-				},
-			)
-		case chiV1.PodDistributionReplicaAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
-				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-				1,
-				map[string]string{
-					LabelReplicaName: macrosReplicaName,
-				},
-			)
-		case chiV1.PodDistributionPreviousTailAffinity:
-			// Newer k8s insists on Required for this Affinity
-			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
-				podAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				map[string]string{
-					LabelClusterScopeIndex: macrosClusterScopeCycleHeadPointsToPreviousCycleTail,
-				},
-			)
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = n.addWeightedPodAffinityTermWithMatchLabels(
-				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-				1,
-				map[string]string{
-					LabelClusterScopeIndex: macrosClusterScopeCycleHeadPointsToPreviousCycleTail,
-				},
-			)
-		}
-	}
-
-	if len(podAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
-		// Has something to return
-		return podAffinity
-	}
-
-	return nil
-}
-
-// mergePodAffinity
-func (n *Normalizer) mergePodAffinity(dst *v1.PodAffinity, src *v1.PodAffinity) *v1.PodAffinity {
-	if src == nil {
-		// Nothing to merge from
-		return dst
-	}
-
-	if dst == nil {
-		// No receiver, allocate new one
-		dst = &v1.PodAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution:  []v1.PodAffinityTerm{},
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{},
-		}
-	}
-
-	// Merge PodAffinityTerm
-	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution {
-		s := &src.RequiredDuringSchedulingIgnoredDuringExecution[i]
-		equal := false
-		for j := range dst.RequiredDuringSchedulingIgnoredDuringExecution {
-			d := &dst.RequiredDuringSchedulingIgnoredDuringExecution[j]
-			if _, equal = messagediff.DeepDiff(*s, *d); equal {
-				break
-			}
-		}
-		if !equal {
-			dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
-				dst.RequiredDuringSchedulingIgnoredDuringExecution,
-				src.RequiredDuringSchedulingIgnoredDuringExecution[i],
-			)
-		}
-	}
-
-	// Merge WeightedPodAffinityTerm
-	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
-		s := &src.PreferredDuringSchedulingIgnoredDuringExecution[i]
-		equal := false
-		for j := range dst.PreferredDuringSchedulingIgnoredDuringExecution {
-			d := &dst.PreferredDuringSchedulingIgnoredDuringExecution[j]
-			if _, equal = messagediff.DeepDiff(*s, *d); equal {
-				break
-			}
-		}
-		if !equal {
-			dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
-				dst.PreferredDuringSchedulingIgnoredDuringExecution,
-				src.PreferredDuringSchedulingIgnoredDuringExecution[i],
-			)
-		}
-	}
-
-	return dst
-}
-
-// newMatchLabels
-func (n *Normalizer) newMatchLabels(
-	podDistribution *chiV1.ChiPodDistribution,
-	matchLabels map[string]string,
-) map[string]string {
-	var scopeLabels map[string]string
-
-	switch podDistribution.Scope {
-	case chiV1.PodDistributionScopeShard:
-		scopeLabels = map[string]string{
-			LabelNamespace:   macrosNamespace,
-			LabelCHIName:     macrosChiName,
-			LabelClusterName: macrosClusterName,
-			LabelShardName:   macrosShardName,
-		}
-	case chiV1.PodDistributionScopeReplica:
-		scopeLabels = map[string]string{
-			LabelNamespace:   macrosNamespace,
-			LabelCHIName:     macrosChiName,
-			LabelClusterName: macrosClusterName,
-			LabelReplicaName: macrosReplicaName,
-		}
-	case chiV1.PodDistributionScopeCluster:
-		scopeLabels = map[string]string{
-			LabelNamespace:   macrosNamespace,
-			LabelCHIName:     macrosChiName,
-			LabelClusterName: macrosClusterName,
-		}
-	case chiV1.PodDistributionScopeClickHouseInstallation:
-		scopeLabels = map[string]string{
-			LabelNamespace: macrosNamespace,
-			LabelCHIName:   macrosChiName,
-		}
-	case chiV1.PodDistributionScopeNamespace:
-		scopeLabels = map[string]string{
-			LabelNamespace: macrosNamespace,
-		}
-	case chiV1.PodDistributionScopeGlobal:
-		scopeLabels = map[string]string{}
-	}
-
-	return util.MergeStringMapsOverwrite(matchLabels, scopeLabels)
-}
-
-// newPodAntiAffinity
-func (n *Normalizer) newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
-	podAntiAffinity := &v1.PodAntiAffinity{}
-
-	// Distribution
-	// DEPRECATED
-	if template.Distribution == chiV1.PodDistributionOnePerHost {
-		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-			map[string]string{
-				LabelAppName: LabelAppValue,
-			},
-		)
-	}
-
-	// PodDistribution
-	for i := range template.PodDistribution {
-		podDistribution := &template.PodDistribution[i]
-		switch podDistribution.Type {
-		case chiV1.PodDistributionClickHouseAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
-				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				n.newMatchLabels(
-					podDistribution,
-					map[string]string{
-						LabelAppName: LabelAppValue,
-					},
-				),
-			)
-		case chiV1.PodDistributionMaxNumberPerNode:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
-				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				n.newMatchLabels(
-					podDistribution,
-					map[string]string{
-						LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
-					},
-				),
-			)
-		case chiV1.PodDistributionShardAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
-				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				n.newMatchLabels(
-					podDistribution,
-					map[string]string{
-						LabelShardName: macrosShardName,
-					},
-				),
-			)
-		case chiV1.PodDistributionReplicaAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchLabels(
-				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				n.newMatchLabels(
-					podDistribution,
-					map[string]string{
-						LabelReplicaName: macrosReplicaName,
-					},
-				),
-			)
-		case chiV1.PodDistributionAnotherNamespaceAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchExpressions(
-				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				[]metaV1.LabelSelectorRequirement{
-					{
-						Key:      LabelNamespace,
-						Operator: metaV1.LabelSelectorOpNotIn,
-						Values: []string{
-							macrosNamespace,
-						},
-					},
-				},
-			)
-		case chiV1.PodDistributionAnotherClickHouseInstallationAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchExpressions(
-				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				[]metaV1.LabelSelectorRequirement{
-					{
-						Key:      LabelCHIName,
-						Operator: metaV1.LabelSelectorOpNotIn,
-						Values: []string{
-							macrosChiName,
-						},
-					},
-				},
-			)
-		case chiV1.PodDistributionAnotherClusterAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = n.addPodAffinityTermWithMatchExpressions(
-				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				[]metaV1.LabelSelectorRequirement{
-					{
-						Key:      LabelClusterName,
-						Operator: metaV1.LabelSelectorOpNotIn,
-						Values: []string{
-							macrosClusterName,
-						},
-					},
-				},
-			)
-		}
-	}
-
-	if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) > 0 {
-		// Has something to return
-		return podAntiAffinity
-	}
-
-	return nil
-}
-
-// mergePodAntiAffinity
-func (n *Normalizer) mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.PodAntiAffinity {
-	if src == nil {
-		// Nothing to merge from
-		return dst
-	}
-
-	if dst == nil {
-		// No receiver, allocate new one
-		dst = &v1.PodAntiAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution:  []v1.PodAffinityTerm{},
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{},
-		}
-	}
-
-	// Merge PodAffinityTerm
-	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution {
-		s := &src.RequiredDuringSchedulingIgnoredDuringExecution[i]
-		equal := false
-		for j := range dst.RequiredDuringSchedulingIgnoredDuringExecution {
-			d := &dst.RequiredDuringSchedulingIgnoredDuringExecution[j]
-			if _, equal = messagediff.DeepDiff(*s, *d); equal {
-				break
-			}
-		}
-		if !equal {
-			dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
-				dst.RequiredDuringSchedulingIgnoredDuringExecution,
-				src.RequiredDuringSchedulingIgnoredDuringExecution[i],
-			)
-		}
-	}
-
-	// Merge WeightedPodAffinityTerm
-	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
-		s := &src.PreferredDuringSchedulingIgnoredDuringExecution[i]
-		equal := false
-		for j := range dst.PreferredDuringSchedulingIgnoredDuringExecution {
-			d := &dst.PreferredDuringSchedulingIgnoredDuringExecution[j]
-			if _, equal = messagediff.DeepDiff(*s, *d); equal {
-				break
-			}
-		}
-		if !equal {
-			dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
-				dst.PreferredDuringSchedulingIgnoredDuringExecution,
-				src.PreferredDuringSchedulingIgnoredDuringExecution[i],
-			)
-		}
-	}
-
-	return dst
-}
-
-// addPodAffinityTermWithMatchLabels
-func (n *Normalizer) addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTerm, matchLabels map[string]string) []v1.PodAffinityTerm {
-	return append(terms,
-		v1.PodAffinityTerm{
-			LabelSelector: &metaV1.LabelSelector{
-				// A list of node selector requirements by node's labels.
-				//MatchLabels: map[string]string{
-				//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
-				//},
-				MatchLabels: matchLabels,
-				// Switch to MatchLabels
-				//MatchExpressions: []metaV1.LabelSelectorRequirement{
-				//	{
-				//		Key:      LabelAppName,
-				//		Operator: metaV1.LabelSelectorOpIn,
-				//		Values: []string{
-				//			LabelAppValue,
-				//		},
-				//	},
-				//},
-			},
-			TopologyKey: "kubernetes.io/hostname",
-		},
-	)
-}
-
-// addPodAffinityTermWithMatchExpressions
-func (n *Normalizer) addPodAffinityTermWithMatchExpressions(terms []v1.PodAffinityTerm, matchExpressions []metaV1.LabelSelectorRequirement) []v1.PodAffinityTerm {
-	return append(terms,
-		v1.PodAffinityTerm{
-			LabelSelector: &metaV1.LabelSelector{
-				// A list of node selector requirements by node's labels.
-				//MatchLabels: map[string]string{
-				//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
-				//},
-				//MatchExpressions: []metaV1.LabelSelectorRequirement{
-				//	{
-				//		Key:      LabelAppName,
-				//		Operator: metaV1.LabelSelectorOpIn,
-				//		Values: []string{
-				//			LabelAppValue,
-				//		},
-				//	},
-				//},
-				MatchExpressions: matchExpressions,
-			},
-			TopologyKey: "kubernetes.io/hostname",
-		},
-	)
-}
-
-// addWeightedPodAffinityTermWithMatchLabels
-func (n *Normalizer) addWeightedPodAffinityTermWithMatchLabels(
-	terms []v1.WeightedPodAffinityTerm,
-	weight int32,
-	matchLabels map[string]string,
-) []v1.WeightedPodAffinityTerm {
-	return append(terms,
-		v1.WeightedPodAffinityTerm{
-			Weight: weight,
-			PodAffinityTerm: v1.PodAffinityTerm{
-				LabelSelector: &metaV1.LabelSelector{
-					// A list of node selector requirements by node's labels.
-					//MatchLabels: map[string]string{
-					//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
-					//},
-					MatchLabels: matchLabels,
-					// Switch to MatchLabels
-					//MatchExpressions: []metaV1.LabelSelectorRequirement{
-					//	{
-					//		Key:      LabelAppName,
-					//		Operator: metaV1.LabelSelectorOpIn,
-					//		Values: []string{
-					//			LabelAppValue,
-					//		},
-					//	},
-					//},
-				},
-				TopologyKey: "kubernetes.io/hostname",
-			},
-		},
-	)
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
@@ -1187,7 +653,7 @@ func (n *Normalizer) normalizeUseTemplate(useTemplate *chiV1.ChiUseTemplate) {
 // normalizeClusters normalizes clusters
 func (n *Normalizer) normalizeClusters(clusters []*chiV1.ChiCluster) []*chiV1.ChiCluster {
 	// We need to have at least one cluster available
-	clusters = n.ensureCluster(clusters)
+	clusters = n.ensureClusters(clusters)
 
 	// Normalize all clusters
 	for i := range clusters {
@@ -1204,8 +670,8 @@ func (n *Normalizer) newDefaultCluster() *chiV1.ChiCluster {
 	}
 }
 
-// ensureCluster
-func (n *Normalizer) ensureCluster(clusters []*chiV1.ChiCluster) []*chiV1.ChiCluster {
+// ensureClusters
+func (n *Normalizer) ensureClusters(clusters []*chiV1.ChiCluster) []*chiV1.ChiCluster {
 	if len(clusters) > 0 {
 		return clusters
 	}
@@ -1308,19 +774,19 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 	usernameMap["default"] = true
 	for username := range usernameMap {
 		// Ensure 'user/profile' section
-		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(n.chop.Config().CHConfigUserDefaultProfile))
+		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultProfile))
 		// Ensure 'user/quota' section
-		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(n.chop.Config().CHConfigUserDefaultQuota))
+		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultQuota))
 		// Ensure 'user/networks/ip' section
-		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(n.chop.Config().CHConfigUserDefaultNetworksIP))
+		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().CHConfigUserDefaultNetworksIP))
 		// Ensure 'user/networks/host_regexp' section
-		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, n.chop.Config().CHConfigNetworksHostRegexpTemplate)))
+		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().CHConfigNetworksHostRegexpTemplate)))
 
 		var pass = ""
 		if users.Has(username + "/password") {
 			pass = users.Get(username + "/password").String()
 		} else if username != "default" {
-			pass = n.chop.Config().CHConfigUserDefaultPassword
+			pass = chop.Config().CHConfigUserDefaultPassword
 		}
 
 		hasPasswordSHA256 := users.Has(username + "/password_sha256_hex")

@@ -137,7 +137,7 @@ spec:
                 echo 'snapCount=3000000'
                 echo 'leaderServes=yes'
                 echo 'standaloneEnabled=true'
-                echo '4lw.commands.whitelist=stat, ruok, conf, isro'
+                echo '4lw.commands.whitelist=stat, ruok, conf, isro, mntr'
                 echo 'metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider'
                 echo "metricsProvider.httpPort=${PROMETHEUS_PORT}"
               } > /conf/zoo.cfg &&

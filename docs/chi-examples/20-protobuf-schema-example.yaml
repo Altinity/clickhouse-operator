@@ -1,0 +1,65 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "protobuf-example"
+spec:
+  configuration:
+    files:
+      your_schema.proto: |
+        syntax = "proto3";
+
+        message MessageType {
+          string name = 1;
+          string surname = 2;
+          uint32 birthDate = 3;
+          repeated string phoneNumbers = 4;
+        };
+
+    clusters:
+      - name: cluster
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+
+  defaults:
+    templates:
+      podTemplate: pod-template-with-init-container
+      dataVolumeClaimTemplate: data-volume-template
+      logVolumeClaimTemplate: data-volume-template
+
+  templates:
+    podTemplates:
+      - name: pod-template-with-init-container
+        spec:
+          securityContext:
+            runAsUser: 101
+            runAsGroup: 101
+            fsGroup: 101
+          containers:
+            - name: clickhouse
+              image: yandex/clickhouse-server:latest
+          initContainers:
+            - name: copy
+              image: alpine:latest
+              command: ["sh", "-xc", "while [[ \"0\" == $(ls -la /etc/clickhouse-server/config.d/*.proto 2> /dev/null | wc -l) ]]; do echo '*.proto not found, sleep 30 sec' ; sleep 30; done; ls -la /var/lib/clickhouse/; mkdir -p /var/lib/clickhouse/format_schemas/; cp -L -rfv /etc/clickhouse-server/config.d/*.proto /var/lib/clickhouse/format_schemas/"]
+              volumeMounts:
+                - mountPath: /etc/clickhouse-server/config.d/
+                  name: chi-protobuf-example-common-configd
+                - mountPath: /var/lib/clickhouse
+                  name: data-volume-template
+
+    volumeClaimTemplates:
+      - name: data-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+      - name: log-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Mi

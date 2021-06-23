@@ -44,6 +44,10 @@ const (
 	StringBoolOffLowercase         = "off"
 	StringBoolOnFirstCapital       = "On"
 	StringBoolOnLowercase          = "on"
+	StringBoolDisableFirstCapital  = "Disable"
+	StringBoolDisableLowercase     = "disable"
+	StringBoolEnableFirstCapital   = "Enable"
+	StringBoolEnableLowercase      = "enable"
 	StringBoolDisabledFirstCapital = "Disabled"
 	StringBoolDisabledLowercase    = "disabled"
 	StringBoolEnabledFirstCapital  = "Enabled"
@@ -66,6 +70,9 @@ func IsStringBool(str string) bool {
 		StringBoolOffLowercase,
 		StringBoolOnLowercase,
 
+		StringBoolDisableLowercase,
+		StringBoolEnableLowercase,
+
 		StringBoolDisabledLowercase,
 		StringBoolEnabledLowercase:
 		return true
@@ -83,6 +90,7 @@ func IsStringBoolFalse(str string) bool {
 		StringBoolFalseLowercase,
 		StringBoolNoLowercase,
 		StringBoolOffLowercase,
+		StringBoolDisableLowercase,
 		StringBoolDisabledLowercase:
 		return true
 
@@ -99,6 +107,7 @@ func IsStringBoolTrue(str string) bool {
 		StringBoolTrueLowercase,
 		StringBoolYesLowercase,
 		StringBoolOnLowercase,
+		StringBoolEnableLowercase,
 		StringBoolEnabledLowercase:
 		return true
 

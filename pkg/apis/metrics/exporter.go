@@ -167,7 +167,7 @@ func (e *Exporter) newFetcher(hostname string) *ClickHouseFetcher {
 		e.chAccessInfo.Username,
 		e.chAccessInfo.Password,
 		e.chAccessInfo.Port,
-	).SetTimeout(e.timeout)
+	).SetQueryTimeout(e.timeout)
 }
 
 // UpdateWatch ensures hostnames of the Pods from CHI object included into metrics.Exporter state
@@ -303,7 +303,7 @@ func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
 }
 
 // DiscoveryWatchedCHIs discovers all ClickHouseInstallation objects available for monitoring and adds them to watched list
-func (e *Exporter) DiscoveryWatchedCHIs(chop *chop.CHOp, chopClient *chopclientset.Clientset) {
+func (e *Exporter) DiscoveryWatchedCHIs(chopClient *chopclientset.Clientset) {
 	// Get all CHI objects from watched namespace(s)
 	watchedNamespace := chop.Config().GetInformerNamespace()
 	list, err := chopClient.ClickhouseV1().ClickHouseInstallations(watchedNamespace).List(context.TODO(), v1.ListOptions{})

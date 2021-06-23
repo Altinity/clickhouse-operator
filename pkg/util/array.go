@@ -17,13 +17,25 @@ package util
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"sort"
 )
 
-// InArray checks whether needle is in haystack
+// InArray checks whether the needle is in the haystack
 func InArray(needle string, haystack []string) bool {
 	for _, item := range haystack {
 		if item == needle {
+			return true
+		}
+	}
+	return false
+}
+
+// InArrayWithRegexp checks whether the needle can be matched by haystack
+func InArrayWithRegexp(needle string, haystack []string) bool {
+	for _, item := range haystack {
+		matched, _ := regexp.MatchString(item, needle)
+		if item == needle || matched {
 			return true
 		}
 	}
@@ -39,7 +51,7 @@ func MergeStringArrays(dst []string, src []string) []string {
 	return dst
 }
 
-// RemoveFromArray removes needle from array
+// RemoveFromArray removes removed the needle from the haystack
 func RemoveFromArray(needle string, haystack []string) []string {
 	result := []string{}
 

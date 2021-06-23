@@ -5,8 +5,9 @@ metadata:
   labels:
     app: grafana
 spec:
-  name: ${GRAFANA_ZOOKEEPER_DASHBOARD_NAME}.json
   url: https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/grafana-dashboard/Zookeeper_dashboard.json
+  # look to https://github.com/integr8ly/grafana-operator/issues/416#issuecomment-849498860, json used as fallback
+  json: ""
   datasources:
     - inputName: "DS_PROMETHEUS"
       datasourceName: "$GRAFANA_PROMETHEUS_DATASOURCE_NAME"

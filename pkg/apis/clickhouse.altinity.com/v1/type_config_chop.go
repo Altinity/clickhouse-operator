@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -596,7 +597,7 @@ func (config *OperatorConfig) IsWatchedNamespace(namespace string) bool {
 		return true
 	}
 
-	return util.InArray(namespace, config.WatchNamespaces)
+	return util.InArrayWithRegexp(namespace, config.WatchNamespaces)
 }
 
 // TODO unify with IsWatchedNamespace
@@ -617,7 +618,10 @@ func (config *OperatorConfig) GetInformerNamespace() string {
 
 		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
 		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
-		namespace = config.WatchNamespaces[0]
+		var labelRegexp = regexp.MustCompile("^[a-z]([-a-z0-9]*[a-z0-9])?$")
+		if labelRegexp.MatchString(config.WatchNamespaces[0]) {
+			namespace = config.WatchNamespaces[0]
+		}
 	}
 
 	return namespace

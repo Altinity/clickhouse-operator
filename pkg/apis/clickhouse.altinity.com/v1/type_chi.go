@@ -475,6 +475,9 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		if spec.Stop == "" {
 			spec.Stop = from.Stop
 		}
+		if spec.Troubleshoot == "" {
+			spec.Troubleshoot = from.Troubleshoot
+		}
 		if spec.NamespaceDomainPattern == "" {
 			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
 		}
@@ -482,6 +485,10 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		if from.Stop != "" {
 			// Override by non-empty values only
 			spec.Stop = from.Stop
+		}
+		if from.Troubleshoot != "" {
+			// Override by non-empty values only
+			spec.Troubleshoot = from.Troubleshoot
 		}
 		if from.NamespaceDomainPattern != "" {
 			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
@@ -662,4 +669,8 @@ func (chi *ClickHouseInstallation) IsReconcilingPolicyNoWait() bool {
 
 func (chi *ClickHouseInstallation) IsStopped() bool {
 	return util.IsStringBoolTrue(chi.Spec.Stop)
+}
+
+func (chi *ClickHouseInstallation) IsTroubleshoot() bool {
+	return util.IsStringBoolTrue(chi.Spec.Troubleshoot)
 }

@@ -16,8 +16,10 @@ package model
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/util"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type EntityType string
@@ -28,23 +30,31 @@ const Service EntityType = "Service"
 const PVC EntityType = "PVC"
 const PV EntityType = "PV"
 
+// Registry
 type Registry struct {
 	r map[EntityType][]v1.ObjectMeta
 }
 
+// NewRegistry
 func NewRegistry() *Registry {
 	return &Registry{
 		r: make(map[EntityType][]v1.ObjectMeta),
 	}
 }
 
-func (r *Registry) Len() int {
+// Len
+func (r *Registry) Len(_what ...EntityType) int {
 	if r == nil {
 		return 0
 	}
-	return len(r.r)
+	if len(_what) == 0 {
+		return len(r.r)
+	}
+	what := _what[0]
+	return len(r.r[what])
 }
 
+// Walk
 func (r *Registry) Walk(f func(entityType EntityType, meta v1.ObjectMeta)) {
 	if r == nil {
 		return
@@ -56,6 +66,7 @@ func (r *Registry) Walk(f func(entityType EntityType, meta v1.ObjectMeta)) {
 	}
 }
 
+// String
 func (r *Registry) String() string {
 	if r == nil {
 		return ""
@@ -67,6 +78,7 @@ func (r *Registry) String() string {
 	return s
 }
 
+// registerEntity
 func (r *Registry) registerEntity(entityType EntityType, meta v1.ObjectMeta) {
 	if r == nil {
 		return
@@ -85,26 +97,57 @@ func (r *Registry) registerEntity(entityType EntityType, meta v1.ObjectMeta) {
 	r.r[entityType] = append(r.r[entityType], m)
 }
 
+// RegisterStatefulSet
 func (r *Registry) RegisterStatefulSet(meta v1.ObjectMeta) {
 	r.registerEntity(StatefulSet, meta)
 }
 
+// NumStatefulSet
+func (r *Registry) NumStatefulSet() int {
+	return r.Len(StatefulSet)
+}
+
+// RegisterConfigMap
 func (r *Registry) RegisterConfigMap(meta v1.ObjectMeta) {
 	r.registerEntity(ConfigMap, meta)
 }
 
+// NumConfigMap
+func (r *Registry) NumConfigMap() int {
+	return r.Len(ConfigMap)
+}
+
+// RegisterService
 func (r *Registry) RegisterService(meta v1.ObjectMeta) {
 	r.registerEntity(Service, meta)
 }
 
+// NumService
+func (r *Registry) NumService() int {
+	return r.Len(Service)
+}
+
+// RegisterPVC
 func (r *Registry) RegisterPVC(meta v1.ObjectMeta) {
 	r.registerEntity(PVC, meta)
 }
 
+// NumPVC
+func (r *Registry) NumPVC() int {
+	return r.Len(PVC)
+}
+
+// RegisterPV
 func (r *Registry) RegisterPV(meta v1.ObjectMeta) {
 	r.registerEntity(PV, meta)
 }
 
+// NumPV
+func (r *Registry) NumPV() int {
+	return r.Len(PV)
+}
+
+// hasEntity
 func (r *Registry) hasEntity(entityType EntityType, meta v1.ObjectMeta) bool {
 	if r.Len() == 0 {
 		return false
@@ -126,10 +169,12 @@ func (r *Registry) hasEntity(entityType EntityType, meta v1.ObjectMeta) bool {
 	return false
 }
 
+// isEqual
 func (r *Registry) isEqual(a, b v1.ObjectMeta) bool {
 	return (a.Namespace == b.Namespace) && (a.Name == b.Name)
 }
 
+// deleteEntity
 func (r *Registry) deleteEntity(entityType EntityType, meta v1.ObjectMeta) bool {
 	if r.Len() == 0 {
 		return false
@@ -159,6 +204,7 @@ func (r *Registry) deleteEntity(entityType EntityType, meta v1.ObjectMeta) bool 
 	return false
 }
 
+// Subtract
 func (r *Registry) Subtract(sub *Registry) *Registry {
 	if sub.Len() == 0 {
 		// Nothing to subtract, return base

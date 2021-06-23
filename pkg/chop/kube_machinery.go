@@ -16,6 +16,7 @@ package chop
 
 import (
 	"fmt"
+	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -82,15 +83,24 @@ func GetClientset(kubeConfigFile, masterURL string) (*kube.Clientset, *chopclien
 	return kubeClientset, chopClientset
 }
 
+var chop *CHOp
+
 // GetCHOp gets chop instance
 // chopClient can be nil, in this case CHOp will not be able to use any ConfigMap(s) with configuration
-func GetCHOp(kubeClient *kube.Clientset, chopClient *chopclientset.Clientset, initCHOpConfigFilePath string) *CHOp {
+func New(kubeClient *kube.Clientset, chopClient *chopclientset.Clientset, initCHOpConfigFilePath string) {
 	// Create operator instance
-	chop := NewCHOp(version.Version, kubeClient, chopClient, initCHOpConfigFilePath)
+	chop = NewCHOp(version.Version, kubeClient, chopClient, initCHOpConfigFilePath)
 	if err := chop.Init(); err != nil {
 		log.A().Fatal("Unable to init CHOP instance %v", err)
 		os.Exit(1)
 	}
+	chop.SetupLog()
+}
 
+func Get() *CHOp {
 	return chop
+}
+
+func Config() *v1.OperatorConfig {
+	return Get().Config()
 }

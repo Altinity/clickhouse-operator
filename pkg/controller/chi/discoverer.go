@@ -31,8 +31,7 @@ func (c *Controller) discovery(ctx context.Context, chi *chop.ClickHouseInstalla
 
 	r := chopmodel.NewRegistry()
 
-	labeler := chopmodel.NewLabeler(c.chop, chi)
-	opts := newListOptions(labeler.GetSelectorCHIScope())
+	opts := newListOptions(chopmodel.NewLabeler(chi).GetSelectorCHIScope())
 
 	if list, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).List(ctx, opts); err != nil {
 		log.M(chi).A().Error("FAIL list StatefulSet err:%v", err)
