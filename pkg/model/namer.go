@@ -417,7 +417,7 @@ func getNamePartReplicaScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ReplicaScopeIndex)
 }
 
-var namesNamer  = newNamer(namerContextNames)
+var namesNamer = newNamer(namerContextNames)
 
 // newNameMacroReplacerChi
 func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
