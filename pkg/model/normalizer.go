@@ -445,15 +445,35 @@ func (n *Normalizer) normalizeReconciling(reconciling *chiV1.ChiReconciling) *ch
 
 func (n *Normalizer) normalizeReconcilingCleanup(cleanup *chiV1.ChiCleanup) *chiV1.ChiCleanup {
 	if cleanup == nil {
-		return chiV1.NewChiCleanup().SetDefaults()
+		cleanup = chiV1.NewChiCleanup()
 	}
+
 	if cleanup.UnknownObjects == nil {
 		cleanup.UnknownObjects = cleanup.DefaultUnknownObjects()
 	}
+	n.normalizeCleanup(&cleanup.UnknownObjects.StatefulSet, chiV1.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.PVC, chiV1.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.ConfigMap, chiV1.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.Service, chiV1.ObjectsCleanupDelete)
+
 	if cleanup.ReconcileFailedObjects == nil {
 		cleanup.ReconcileFailedObjects = cleanup.DefaultReconcileFailedObjects()
 	}
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.StatefulSet, chiV1.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.PVC, chiV1.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.ConfigMap, chiV1.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.Service, chiV1.ObjectsCleanupRetain)
 	return cleanup
+}
+
+func (n *Normalizer) normalizeCleanup(str *string, value string) {
+	switch *str {
+	case
+		chiV1.ObjectsCleanupRetain,
+		chiV1.ObjectsCleanupDelete:
+	default:
+		*str = value
+	}
 }
 
 // normalizeHostTemplate normalizes .spec.templates.hostTemplates
