@@ -439,7 +439,21 @@ func (n *Normalizer) normalizeReconciling(reconciling *chiV1.ChiReconciling) *ch
 	default:
 		reconciling.SetPolicy(strings.ToLower(chiV1.ReconcilingPolicyUnspecified))
 	}
+	reconciling.Cleanup = n.normalizeReconcilingCleanup(reconciling.Cleanup)
 	return reconciling
+}
+
+func (n *Normalizer) normalizeReconcilingCleanup(cleanup *chiV1.ChiCleanup) *chiV1.ChiCleanup {
+	if cleanup == nil {
+		return chiV1.NewChiCleanup().SetDefaults()
+	}
+	if cleanup.UnknownObjects == nil {
+		cleanup.UnknownObjects = cleanup.DefaultUnknownObjects()
+	}
+	if cleanup.ReconcileFailedObjects == nil {
+		cleanup.ReconcileFailedObjects = cleanup.DefaultReconcileFailedObjects()
+	}
+	return cleanup
 }
 
 // normalizeHostTemplate normalizes .spec.templates.hostTemplates
