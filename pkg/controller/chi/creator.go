@@ -18,8 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
-
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 
@@ -122,17 +120,17 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *v1.Pe
 		return nil, fmt.Errorf("ctx is done")
 	}
 
-	updated, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, newUpdateOptions())
+	_, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, newUpdateOptions())
 	if err != nil {
 		// Update failed
-		if strings.Contains(err.Error(), "field can not be less than previous value") {
-			return pvc, nil
-		} else {
-			log.V(1).M(pvc).A().Error("%v", err)
-			return nil, err
-		}
+		//if strings.Contains(err.Error(), "field can not be less than previous value") {
+		//	return pvc, nil
+		//} else {
+		log.V(1).M(pvc).A().Error("unable to update PVC %v", err)
+		//	return nil, err
+		//}
 	}
-	return updated, err
+	return pvc, err
 }
 
 var errAbort = errors.New("onStatefulSetCreateFailed - abort")
