@@ -17,6 +17,8 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
+	"time"
 )
 
 type MergeType string
@@ -104,11 +106,25 @@ func (t *ChiTemplating) SetPolicy(p string) {
 
 // ChiReconciling
 type ChiReconciling struct {
+	// About to be DEPRECATED
 	Policy string `json:"policy,omitempty" yaml:"policy,omitempty"`
+	// ConfigMapPropagationTimeout specifies timeout for ConfigMap to propagate
+	ConfigMapPropagationTimeout int `json:"configMapPropagationTimeout,omitempty" yaml:"configMapPropagationTimeout,omitempty"`
 }
 
+// NewChiReconciling
 func NewChiReconciling() *ChiReconciling {
 	return new(ChiReconciling)
+}
+
+// SetDefaults
+func (t *ChiReconciling) SetDefaults() *ChiReconciling {
+	if t == nil {
+		return nil
+	}
+	t.Policy = ReconcilingPolicyUnspecified
+	t.ConfigMapPropagationTimeout = 60
+	return t
 }
 
 // GetPolicy
@@ -125,6 +141,44 @@ func (t *ChiReconciling) SetPolicy(p string) {
 		return
 	}
 	t.Policy = p
+}
+
+// GetConfigMapPropagationTimeout
+func (t *ChiReconciling) GetConfigMapPropagationTimeout() int {
+	if t == nil {
+		return 0
+	}
+	return t.ConfigMapPropagationTimeout
+}
+
+// SetConfigMapPropagationTimeout
+func (t *ChiReconciling) SetConfigMapPropagationTimeout(timeout int) {
+	if t == nil {
+		return
+	}
+	t.ConfigMapPropagationTimeout = timeout
+}
+
+// GetConfigMapPropagationTimeoutDuration
+func (t *ChiReconciling) GetConfigMapPropagationTimeoutDuration() time.Duration {
+	if t == nil {
+		return 0
+	}
+	return time.Duration(t.GetConfigMapPropagationTimeout()) * time.Second
+}
+
+const ReconcilingPolicyUnspecified = "unspecified"
+const ReconcilingPolicyWait = "wait"
+const ReconcilingPolicyNoWait = "nowait"
+
+// IsReconcilingPolicyWait
+func (t *ChiReconciling) IsReconcilingPolicyWait() bool {
+	return strings.ToLower(t.GetPolicy()) == ReconcilingPolicyWait
+}
+
+// IsReconcilingPolicyNoWait
+func (t *ChiReconciling) IsReconcilingPolicyNoWait() bool {
+	return strings.ToLower(t.GetPolicy()) == ReconcilingPolicyNoWait
 }
 
 // ChiDefaults defines defaults section of .spec
