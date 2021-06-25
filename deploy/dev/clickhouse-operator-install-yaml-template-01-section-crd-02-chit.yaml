@@ -156,6 +156,66 @@ spec:
                   type: integer
                   minimum: 0
                   maximum: 3600
+                cleanup:
+                  type: object
+                  nullable: true
+                  properties:
+                    unknownObjects:
+                      type: object
+                      nullable: true
+                      properties:
+                        statefulSet:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        pvc:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        configMap:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        service:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                    reconcileFailedObjects:
+                      type: object
+                      nullable: true
+                      properties:
+                        statefulSet:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        pvc:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        configMap:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        service:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
             defaults:
               type: object
               nullable: true
