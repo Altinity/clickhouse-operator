@@ -429,7 +429,7 @@ func (n *Normalizer) normalizeTemplating(templating *chiV1.ChiTemplating) *chiV1
 // normalizeReconciling normalizes .spec.reconciling
 func (n *Normalizer) normalizeReconciling(reconciling *chiV1.ChiReconciling) *chiV1.ChiReconciling {
 	if reconciling == nil {
-		reconciling = chiV1.NewChiReconciling()
+		reconciling = chiV1.NewChiReconciling().SetDefaults()
 	}
 	switch strings.ToLower(reconciling.GetPolicy()) {
 	case
