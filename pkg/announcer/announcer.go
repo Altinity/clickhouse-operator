@@ -351,11 +351,17 @@ func (a Announcer) findInObjectMeta(m interface{}) (string, bool) {
 	if !meta.IsValid() || meta.IsZero() || ((meta.Kind() == reflect.Ptr) && meta.IsNil()) {
 		return "", false
 	}
-	namespace := meta.Elem().FieldByName("Namespace")
+	var namespace, name reflect.Value
+	if meta.Kind() == reflect.Ptr {
+		namespace = meta.Elem().FieldByName("Namespace")
+		name = meta.Elem().FieldByName("Name")
+	} else {
+		namespace = meta.FieldByName("Namespace")
+		name = meta.FieldByName("Name")
+	}
 	if !namespace.IsValid() {
 		return "", false
 	}
-	name := meta.Elem().FieldByName("Name")
 	if !name.IsValid() {
 		return "", false
 	}
@@ -374,11 +380,17 @@ func (a Announcer) findInCHI(m interface{}) (string, bool) {
 	if !chi.IsValid() || chi.IsZero() || ((chi.Kind() == reflect.Ptr) && chi.IsNil()) {
 		return "", false
 	}
-	namespace := chi.Elem().FieldByName("Namespace")
+	var namespace, name reflect.Value
+	if chi.Kind() == reflect.Ptr {
+		namespace = chi.Elem().FieldByName("Namespace")
+		name = chi.Elem().FieldByName("Name")
+	} else {
+		namespace = chi.FieldByName("Namespace")
+		name = chi.FieldByName("Name")
+	}
 	if !namespace.IsValid() {
 		return "", false
 	}
-	name := chi.Elem().FieldByName("Name")
 	if !name.IsValid() {
 		return "", false
 	}
@@ -393,11 +405,17 @@ func (a Announcer) findInAddress(m interface{}) (string, bool) {
 	if !address.IsValid() || address.IsZero() || ((address.Kind() == reflect.Ptr) && address.IsNil()) {
 		return "", false
 	}
-	namespace := address.Elem().FieldByName("Namespace")
+	var namespace, name reflect.Value
+	if address.Kind() == reflect.Ptr {
+		namespace = address.Elem().FieldByName("Namespace")
+		name = address.Elem().FieldByName("Name")
+	} else {
+		namespace = address.FieldByName("Namespace")
+		name = address.FieldByName("Name")
+	}
 	if !namespace.IsValid() {
 		return "", false
 	}
-	name := address.Elem().FieldByName("CHIName")
 	if !name.IsValid() {
 		return "", false
 	}
