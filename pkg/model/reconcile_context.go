@@ -20,14 +20,20 @@ import (
 
 type reconcileContextKey string
 
-var k = reconcileContextKey("registry")
+var ReconciledRegistry = reconcileContextKey("reconciled_registry")
+var FailedRegistry = reconcileContextKey("failed_registry")
 
 // NewReconcileContext
 func NewReconcileContext(ctx context.Context) context.Context {
-	return context.WithValue(ctx, k, NewRegistry())
+	return context.WithValue(context.WithValue(ctx, ReconciledRegistry, NewRegistry()), FailedRegistry, NewRegistry())
 }
 
-// ReconcileContextGetRegistry
-func ReconcileContextGetRegistry(ctx context.Context) *Registry {
-	return ctx.Value(k).(*Registry)
+// GetReconciledRegistry
+func GetReconciledRegistry(ctx context.Context) *Registry {
+	return ctx.Value(ReconciledRegistry).(*Registry)
+}
+
+// GetFailedRegistry
+func GetFailedRegistry(ctx context.Context) *Registry {
+	return ctx.Value(FailedRegistry).(*Registry)
 }
