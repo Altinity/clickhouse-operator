@@ -102,6 +102,11 @@ func (r *Registry) RegisterStatefulSet(meta v1.ObjectMeta) {
 	r.registerEntity(StatefulSet, meta)
 }
 
+// HasStatefulSet
+func (r *Registry) HasStatefulSet(meta v1.ObjectMeta) bool {
+	return r.hasEntity(StatefulSet, meta)
+}
+
 // NumStatefulSet
 func (r *Registry) NumStatefulSet() int {
 	return r.Len(StatefulSet)
@@ -110,6 +115,11 @@ func (r *Registry) NumStatefulSet() int {
 // RegisterConfigMap
 func (r *Registry) RegisterConfigMap(meta v1.ObjectMeta) {
 	r.registerEntity(ConfigMap, meta)
+}
+
+// HasConfigMap
+func (r *Registry) HasConfigMap(meta v1.ObjectMeta) bool {
+	return r.hasEntity(ConfigMap, meta)
 }
 
 // NumConfigMap
@@ -122,6 +132,11 @@ func (r *Registry) RegisterService(meta v1.ObjectMeta) {
 	r.registerEntity(Service, meta)
 }
 
+// HasService
+func (r *Registry) HasService(meta v1.ObjectMeta) bool {
+	return r.hasEntity(Service, meta)
+}
+
 // NumService
 func (r *Registry) NumService() int {
 	return r.Len(Service)
@@ -132,6 +147,11 @@ func (r *Registry) RegisterPVC(meta v1.ObjectMeta) {
 	r.registerEntity(PVC, meta)
 }
 
+// HasPVC
+func (r *Registry) HasPVC(meta v1.ObjectMeta) bool {
+	return r.hasEntity(PVC, meta)
+}
+
 // NumPVC
 func (r *Registry) NumPVC() int {
 	return r.Len(PVC)
@@ -140,6 +160,11 @@ func (r *Registry) NumPVC() int {
 // RegisterPV
 func (r *Registry) RegisterPV(meta v1.ObjectMeta) {
 	r.registerEntity(PV, meta)
+}
+
+// HasPV
+func (r *Registry) HasPV(meta v1.ObjectMeta) bool {
+	return r.hasEntity(PV, meta)
 }
 
 // NumPV
