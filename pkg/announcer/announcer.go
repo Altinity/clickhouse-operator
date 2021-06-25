@@ -348,7 +348,7 @@ func (a Announcer) findInObjectMeta(m interface{}) (string, bool) {
 		return "", false
 	}
 	meta := reflect.ValueOf(m)
-	if !meta.IsValid() || meta.IsNil() || meta.IsZero() {
+	if !meta.IsValid() || meta.IsZero() || ((meta.Kind() == reflect.Ptr) && meta.IsNil()) {
 		return "", false
 	}
 	namespace := meta.Elem().FieldByName("Namespace")
@@ -367,11 +367,11 @@ func (a Announcer) findInCHI(m interface{}) (string, bool) {
 		return "", false
 	}
 	object := reflect.ValueOf(m)
-	if !object.IsValid() || object.IsNil() || object.IsZero() {
+	if !object.IsValid() || object.IsZero() || ((object.Kind() == reflect.Ptr) && object.IsNil()) {
 		return "", false
 	}
 	chi := object.Elem().FieldByName("CHI")
-	if !chi.IsValid() || chi.IsNil() || chi.IsZero() {
+	if !chi.IsValid() || chi.IsZero() || ((chi.Kind() == reflect.Ptr) && chi.IsNil()) {
 		return "", false
 	}
 	namespace := chi.Elem().FieldByName("Namespace")
@@ -390,7 +390,7 @@ func (a Announcer) findInAddress(m interface{}) (string, bool) {
 		return "", false
 	}
 	address := reflect.ValueOf(m)
-	if !address.IsValid() || address.IsNil() || address.IsZero() {
+	if !address.IsValid() || address.IsZero() || ((address.Kind() == reflect.Ptr) && address.IsNil()) {
 		return "", false
 	}
 	namespace := address.Elem().FieldByName("Namespace")
