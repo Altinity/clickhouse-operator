@@ -867,9 +867,9 @@ func (w *worker) shouldExcludeHost(host *chiv1.ChiHost) bool {
 func (w *worker) shouldWaitExcludeHost(host *chiv1.ChiHost) bool {
 	// Check CHI settings
 	switch {
-	case host.GetCHI().IsReconcilingPolicyWait():
+	case host.GetCHI().GetReconciling().IsReconcilingPolicyWait():
 		return true
-	case host.GetCHI().IsReconcilingPolicyNoWait():
+	case host.GetCHI().GetReconciling().IsReconcilingPolicyNoWait():
 		return false
 	}
 
@@ -891,9 +891,9 @@ func (w *worker) shouldWaitIncludeHost(host *chiv1.ChiHost) bool {
 
 	// Check CHI settings
 	switch {
-	case host.GetCHI().IsReconcilingPolicyWait():
+	case host.GetCHI().GetReconciling().IsReconcilingPolicyWait():
 		return true
-	case host.GetCHI().IsReconcilingPolicyNoWait():
+	case host.GetCHI().GetReconciling().IsReconcilingPolicyNoWait():
 		return false
 	}
 
@@ -1259,13 +1259,19 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *chiv1.ClickHouseInsta
 		return nil
 	}
 
-	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(ctx, configMap, newUpdateOptions())
+	updatedConfigMap, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(ctx, configMap, newUpdateOptions())
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+		if updatedConfigMap.ResourceVersion != configMap.ResourceVersion {
+			if chi.GetReconciling().GetConfigMapPropagationTimeout() > 0 {
+				w.a.V(1).M(chi).F().Info("Wait for ConfigMap %s/%s propagation", configMap.Namespace, configMap.Name)
+				util.WaitContextDoneOrTimeout(ctx, chi.GetReconciling().GetConfigMapPropagationTimeoutDuration())
+			}
+		}
 	} else {
 		w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
 			WithStatusAction(chi).
