@@ -47,7 +47,7 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=60):
 
 def delete_chi(chi, ns=namespace):
     with When(f"Delete chi {chi}"):
-        launch(f"delete chi {chi}", ns=ns, timeout=180)
+        launch(f"delete chi {chi}", ns=ns, timeout=600)
         wait_objects(
             chi,
             {

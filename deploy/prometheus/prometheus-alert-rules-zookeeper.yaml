@@ -212,7 +212,7 @@ spec:
               ```
 
 
-        - alert: ZookeeperLowGetChildrenCacheHitRate
+        - alert: ZookeeperLowGetDataCacheHitRate
           expr: increase(response_packet_cache_hits{app=~'zookeeper.*'}[1m]) / (increase(response_packet_cache_misses{app=~'zookeeper.*'}[1m]) + increase(response_packet_cache_hits{app=~'zookeeper.*'}[1m]) ) < 0.3
           for: 10m
           labels:
@@ -223,9 +223,26 @@ spec:
             description: |-
               `increase(response_packet_cache_hits{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(response_packet_cache_hits{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} hits{{ end }}
               `increase(response_packet_cache_misses{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(response_packet_cache_misses{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} misses{{ end }}
-              `Get Children Cache Hit Rate` = {{ with printf "increase(response_packet_cache_hits{pod_name='%s',namespace='%s'}[1m]) / (increase(response_packet_cache_misses{pod_name='%s',namespace='%s'}[1m]) + increase(response_packet_cache_hits{pod_name='%s',namespace='%s'}[1m]))" .Labels.pod_name .Labels.namespace .Labels.pod_name .Labels.namespace .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `Get Data Cache Hit Rate` = {{ with printf "increase(response_packet_cache_hits{pod_name='%s',namespace='%s'}[1m]) / (increase(response_packet_cache_misses{pod_name='%s',namespace='%s'}[1m]) + increase(response_packet_cache_hits{pod_name='%s',namespace='%s'}[1m]))" .Labels.pod_name .Labels.namespace .Labels.pod_name .Labels.namespace .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
               For heavy read workloads Zookeeper try to cache response for `get data` API method for save the serialization cost on popular znodes.
               Try to tune `maxResponseCacheSize`
+              Look to documentation:
+              https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_advancedConfiguration
+
+        - alert: ZookeeperLowGetChildrenCacheHitRate
+          expr: increase(response_packet_get_children_cache_hits{app=~'zookeeper.*'}[1m]) / (increase(response_packet_get_children_cache_misses{app=~'zookeeper.*'}[1m]) + increase(response_packet_get_children_cache_hits{app=~'zookeeper.*'}[1m]) ) < 0.3
+          for: 10m
+          labels:
+            severity: info
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper have inefficient get data znodes response cache."
+            description: |-
+              `increase(response_packet_get_children_cache_hits{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(response_packet_get_children_cache_hits{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} hits{{ end }}
+              `increase(response_packet_get_children_cache_misses{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(response_packet_get_children_cache_misses{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} misses{{ end }}
+              `Get Children Cache Hit Rate` = {{ with printf "increase(response_packet_get_children_cache_hits{pod_name='%s',namespace='%s'}[1m]) / (increase(response_packet_get_children_cache_misses{pod_name='%s',namespace='%s'}[1m]) + increase(response_packet_get_children_cache_hits{pod_name='%s',namespace='%s'}[1m]))" .Labels.pod_name .Labels.namespace .Labels.pod_name .Labels.namespace .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              For heavy read workloads Zookeeper try to cache response for `get children` API method for save the serialization cost on popular znodes.
+              Try to tune `maxGetChildrenResponseCacheSize`
               Look to documentation:
               https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_advancedConfiguration
 
