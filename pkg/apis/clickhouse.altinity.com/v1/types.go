@@ -196,7 +196,11 @@ func (t *ChiCleanup) GetUnknownObjects() *ChiObjectsCleanup {
 }
 
 func (t *ChiCleanup) DefaultUnknownObjects() *ChiObjectsCleanup {
-	return nil
+	return NewChiObjectsCleanup().
+		SetStatefulSet(ObjectsCleanupDelete).
+		SetPVC(ObjectsCleanupDelete).
+		SetConfigMap(ObjectsCleanupDelete).
+		SetService(ObjectsCleanupDelete)
 }
 
 func (t *ChiCleanup) GetReconcileFailedObjects() *ChiObjectsCleanup {
@@ -204,7 +208,11 @@ func (t *ChiCleanup) GetReconcileFailedObjects() *ChiObjectsCleanup {
 }
 
 func (t *ChiCleanup) DefaultReconcileFailedObjects() *ChiObjectsCleanup {
-	return NewChiObjectsCleanup().SetPVC(ObjectsCleanupRetain)
+	return NewChiObjectsCleanup().
+		SetStatefulSet(ObjectsCleanupRetain).
+		SetPVC(ObjectsCleanupRetain).
+		SetConfigMap(ObjectsCleanupRetain).
+		SetService(ObjectsCleanupRetain)
 }
 
 // SetDefaults
