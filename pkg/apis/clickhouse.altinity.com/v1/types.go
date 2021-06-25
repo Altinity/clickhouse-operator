@@ -104,12 +104,127 @@ func (t *ChiTemplating) SetPolicy(p string) {
 	t.Policy = p
 }
 
+const ObjectsCleanupUnspecified = "Unspecified"
+const ObjectsCleanupRetain = "Retain"
+const ObjectsCleanupDelete = "Delete"
+
+type ChiObjectsCleanup struct {
+	StatefulSet string `json:"statefulSet,omitempty" yaml:"statefulSet,omitempty"`
+	PVC         string `json:"pvc,omitempty"         yaml:"pvc,omitempty"`
+	ConfigMap   string `json:"configMap,omitempty"   yaml:"configMap,omitempty"`
+	Service     string `json:"service,omitempty"     yaml:"service,omitempty"`
+}
+
+func NewChiObjectsCleanup() *ChiObjectsCleanup {
+	return new(ChiObjectsCleanup)
+}
+
+func (c *ChiObjectsCleanup) GetStatefulSet() string {
+	if c == nil {
+		return ""
+	}
+	return c.StatefulSet
+}
+
+func (c *ChiObjectsCleanup) SetStatefulSet(v string) *ChiObjectsCleanup {
+	if c == nil {
+		return nil
+	}
+	c.StatefulSet = v
+	return c
+}
+
+func (c *ChiObjectsCleanup) GetPVC() string {
+	if c == nil {
+		return ""
+	}
+	return c.PVC
+}
+
+func (c *ChiObjectsCleanup) SetPVC(v string) *ChiObjectsCleanup {
+	if c == nil {
+		return nil
+	}
+	c.PVC = v
+	return c
+}
+
+func (c *ChiObjectsCleanup) GetConfigMap() string {
+	if c == nil {
+		return ""
+	}
+	return c.ConfigMap
+}
+
+func (c *ChiObjectsCleanup) SetConfigMap(v string) *ChiObjectsCleanup {
+	if c == nil {
+		return nil
+	}
+	c.ConfigMap = v
+	return c
+}
+
+func (c *ChiObjectsCleanup) GetService() string {
+	if c == nil {
+		return ""
+	}
+	return c.Service
+}
+
+func (c *ChiObjectsCleanup) SetService(v string) *ChiObjectsCleanup {
+	if c == nil {
+		return nil
+	}
+	c.Service = v
+	return c
+}
+
+type ChiCleanup struct {
+	// UnknownObjects
+	UnknownObjects *ChiObjectsCleanup `json:"unknownObjects,omitempty" yaml:"unknownObjects,omitempty"`
+	// ReconcileFailedObjects
+	ReconcileFailedObjects *ChiObjectsCleanup `json:"reconcileFailedObjects,omitempty" yaml:"reconcileFailedObjects,omitempty"`
+}
+
+// NewChiCleanup
+func NewChiCleanup() *ChiCleanup {
+	return new(ChiCleanup)
+}
+
+func (t *ChiCleanup) GetUnknownObjects() *ChiObjectsCleanup {
+	return t.UnknownObjects
+}
+
+func (t *ChiCleanup) DefaultUnknownObjects() *ChiObjectsCleanup {
+	return nil
+}
+
+func (t *ChiCleanup) GetReconcileFailedObjects() *ChiObjectsCleanup {
+	return t.ReconcileFailedObjects
+}
+
+func (t *ChiCleanup) DefaultReconcileFailedObjects() *ChiObjectsCleanup {
+	return NewChiObjectsCleanup().SetPVC(ObjectsCleanupRetain)
+}
+
+// SetDefaults
+func (t *ChiCleanup) SetDefaults() *ChiCleanup {
+	if t == nil {
+		return nil
+	}
+	t.UnknownObjects = t.DefaultUnknownObjects()
+	t.ReconcileFailedObjects = t.DefaultReconcileFailedObjects()
+	return t
+}
+
 // ChiReconciling
 type ChiReconciling struct {
 	// About to be DEPRECATED
 	Policy string `json:"policy,omitempty" yaml:"policy,omitempty"`
 	// ConfigMapPropagationTimeout specifies timeout for ConfigMap to propagate
 	ConfigMapPropagationTimeout int `json:"configMapPropagationTimeout,omitempty" yaml:"configMapPropagationTimeout,omitempty"`
+	// Cleanup specifies cleanup behavior
+	Cleanup *ChiCleanup `json:"cleanup,omitempty" yaml:"cleanup,omitempty"`
 }
 
 // NewChiReconciling
@@ -124,6 +239,7 @@ func (t *ChiReconciling) SetDefaults() *ChiReconciling {
 	}
 	t.Policy = ReconcilingPolicyUnspecified
 	t.ConfigMapPropagationTimeout = 60
+	t.Cleanup = NewChiCleanup().SetDefaults()
 	return t
 }
 
@@ -179,6 +295,14 @@ func (t *ChiReconciling) IsReconcilingPolicyWait() bool {
 // IsReconcilingPolicyNoWait
 func (t *ChiReconciling) IsReconcilingPolicyNoWait() bool {
 	return strings.ToLower(t.GetPolicy()) == ReconcilingPolicyNoWait
+}
+
+// GetCleanup
+func (t *ChiReconciling) GetCleanup() *ChiCleanup {
+	if t == nil {
+		return nil
+	}
+	return t.Cleanup
 }
 
 // ChiDefaults defines defaults section of .spec
