@@ -152,6 +152,10 @@ spec:
               properties:
                 policy:
                   type: string
+                configMapPropagationTimeout:
+                  type: integer
+                  minimum: 0
+                  maximum: 3600
             defaults:
               type: object
               nullable: true
