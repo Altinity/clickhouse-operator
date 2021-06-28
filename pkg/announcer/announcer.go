@@ -289,6 +289,7 @@ func Fatal(format string, args ...interface{}) {
 	announcer.Fatal(format, args...)
 }
 
+// prependFormat
 func (a Announcer) prependFormat(format string) string {
 	// Result format is expected to be 'file:line:function:prefix:meta:_start_format_'
 	// Prepend each component in reverse order
@@ -330,6 +331,7 @@ func (a Announcer) prependFormat(format string) string {
 	return format
 }
 
+// findMeta
 func (a Announcer) findMeta(m interface{}) (string, bool) {
 	if meta, ok := a.findInObjectMeta(m); ok {
 		return meta, ok
@@ -343,6 +345,7 @@ func (a Announcer) findMeta(m interface{}) (string, bool) {
 	return "", false
 }
 
+// findInObjectMeta
 func (a Announcer) findInObjectMeta(m interface{}) (string, bool) {
 	if m == nil {
 		return "", false
@@ -368,6 +371,7 @@ func (a Announcer) findInObjectMeta(m interface{}) (string, bool) {
 	return namespace.String() + "/" + name.String(), true
 }
 
+// findInCHI
 func (a Announcer) findInCHI(m interface{}) (string, bool) {
 	if m == nil {
 		return "", false
@@ -397,6 +401,7 @@ func (a Announcer) findInCHI(m interface{}) (string, bool) {
 	return namespace.String() + "/" + name.String(), true
 }
 
+// findInAddress
 func (a Announcer) findInAddress(m interface{}) (string, bool) {
 	if m == nil {
 		return "", false
