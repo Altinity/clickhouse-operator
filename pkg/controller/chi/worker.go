@@ -49,6 +49,10 @@ type worker struct {
 	schemer    *chopmodel.Schemer
 	creator    *chopmodel.Creator
 	start      time.Time
+
+	registryReconciled *chopmodel.Registry
+	registryFailed     *chopmodel.Registry
+	cmUpdate           time.Time
 }
 
 // newWorker
@@ -238,7 +242,9 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		return nil
 	}
 
-	ctx = chopmodel.NewReconcileContext(ctx)
+	w.registryFailed = chopmodel.NewRegistry()
+	w.registryReconciled = chopmodel.NewRegistry()
+	w.cmUpdate = time.Time{}
 
 	// Check DeletionTimestamp in order to understand, whether the object is being deleted
 	if new.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -395,12 +401,12 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		Info("remove items scheduled for deletion")
 
 	objs := w.c.discovery(ctx, new)
-	need := chopmodel.GetReconciledRegistry(ctx)
-	w.a.V(1).M(new).F().Info("Reconciled objects:\n%s", chopmodel.GetReconciledRegistry(ctx))
+	need := w.registryReconciled
+	w.a.V(1).M(new).F().Info("Reconciled objects:\n%s", w.registryReconciled)
 	w.a.V(1).M(new).F().Info("Existing objects:\n%s", objs)
 	objs.Subtract(need)
 	w.a.V(1).M(new).F().Info("Non-reconciled objects:\n%s", objs)
-	if w.purge(ctx, new, objs, chopmodel.GetFailedRegistry(ctx)) > 0 {
+	if w.purge(ctx, new, objs, w.registryFailed) > 0 {
 		w.c.enqueueObject(NewDropDns(&new.ObjectMeta))
 	}
 
@@ -539,10 +545,10 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 		if service := w.creator.CreateServiceCHI(); service != nil {
 			if err := w.reconcileService(ctx, chi, service); err != nil {
 				// Service not reconciled
-				chopmodel.GetFailedRegistry(ctx).RegisterService(service.ObjectMeta)
+				w.registryFailed.RegisterService(service.ObjectMeta)
 				return err
 			}
-			chopmodel.GetReconciledRegistry(ctx).RegisterService(service.ObjectMeta)
+			w.registryReconciled.RegisterService(service.ObjectMeta)
 		}
 	}
 
@@ -612,9 +618,9 @@ func (w *worker) reconcileCHIConfigMapCommon(
 	configMapCommon := w.creator.CreateConfigMapCHICommon(options)
 	err := w.reconcileConfigMap(ctx, chi, configMapCommon, update)
 	if err == nil {
-		chopmodel.GetReconciledRegistry(ctx).RegisterConfigMap(configMapCommon.ObjectMeta)
+		w.registryReconciled.RegisterConfigMap(configMapCommon.ObjectMeta)
 	} else {
-		chopmodel.GetFailedRegistry(ctx).RegisterConfigMap(configMapCommon.ObjectMeta)
+		w.registryFailed.RegisterConfigMap(configMapCommon.ObjectMeta)
 	}
 	return err
 }
@@ -636,9 +642,9 @@ func (w *worker) reconcileCHIConfigMapUsers(
 	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
 	err := w.reconcileConfigMap(ctx, chi, configMapUsers, update)
 	if err == nil {
-		chopmodel.GetReconciledRegistry(ctx).RegisterConfigMap(configMapUsers.ObjectMeta)
+		w.registryReconciled.RegisterConfigMap(configMapUsers.ObjectMeta)
 	} else {
-		chopmodel.GetFailedRegistry(ctx).RegisterConfigMap(configMapUsers.ObjectMeta)
+		w.registryFailed.RegisterConfigMap(configMapUsers.ObjectMeta)
 	}
 	return err
 }
@@ -661,9 +667,9 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiv1.ChiCluster
 	}
 	err := w.reconcileService(ctx, cluster.CHI, service)
 	if err == nil {
-		chopmodel.GetReconciledRegistry(ctx).RegisterService(service.ObjectMeta)
+		w.registryReconciled.RegisterService(service.ObjectMeta)
 	} else {
-		chopmodel.GetFailedRegistry(ctx).RegisterService(service.ObjectMeta)
+		w.registryFailed.RegisterService(service.ObjectMeta)
 	}
 	return err
 }
@@ -686,9 +692,9 @@ func (w *worker) reconcileShard(ctx context.Context, shard *chiv1.ChiShard) erro
 	}
 	err := w.reconcileService(ctx, shard.CHI, service)
 	if err == nil {
-		chopmodel.GetReconciledRegistry(ctx).RegisterService(service.ObjectMeta)
+		w.registryReconciled.RegisterService(service.ObjectMeta)
 	} else {
-		chopmodel.GetFailedRegistry(ctx).RegisterService(service.ObjectMeta)
+		w.registryFailed.RegisterService(service.ObjectMeta)
 	}
 	return err
 }
@@ -721,21 +727,21 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiv1.ChiHost) error {
 
 	// Reconcile host's ConfigMap
 	if err := w.reconcileConfigMap(ctx, host.CHI, configMap, true); err != nil {
-		chopmodel.GetFailedRegistry(ctx).RegisterConfigMap(configMap.ObjectMeta)
+		w.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
 		return err
 	}
-	chopmodel.GetReconciledRegistry(ctx).RegisterConfigMap(configMap.ObjectMeta)
+	w.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
 
 	// Reconcile host's StatefulSet
 	var errStatefulSet error
 	if err := w.reconcileStatefulSet(ctx, host); err != nil {
 		if err != errIgnore {
-			chopmodel.GetFailedRegistry(ctx).RegisterStatefulSet(statefulSet.ObjectMeta)
+			w.registryFailed.RegisterStatefulSet(statefulSet.ObjectMeta)
 			return err
 		}
 		errStatefulSet = err
 	}
-	chopmodel.GetReconciledRegistry(ctx).RegisterStatefulSet(statefulSet.ObjectMeta)
+	w.registryReconciled.RegisterStatefulSet(statefulSet.ObjectMeta)
 
 	// Reconcile host's Persistent Volumes
 	w.reconcilePersistentVolumes(ctx, host)
@@ -744,10 +750,10 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiv1.ChiHost) error {
 	if service != nil {
 		// Reconcile host's Service
 		if err := w.reconcileService(ctx, host.CHI, service); err != nil {
-			chopmodel.GetFailedRegistry(ctx).RegisterService(service.ObjectMeta)
+			w.registryFailed.RegisterService(service.ObjectMeta)
 			return err
 		}
-		chopmodel.GetReconciledRegistry(ctx).RegisterService(service.ObjectMeta)
+		w.registryReconciled.RegisterService(service.ObjectMeta)
 	}
 
 	host.ReconcileAttributes.UnsetAdd()
@@ -1329,10 +1335,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *chiv1.ClickHouseInsta
 			M(chi).F().
 			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		if updatedConfigMap.ResourceVersion != configMap.ResourceVersion {
-			if chi.GetReconciling().GetConfigMapPropagationTimeout() > 0 {
-				w.a.V(1).M(chi).F().Info("Wait for ConfigMap %s/%s propagation", configMap.Namespace, configMap.Name)
-				util.WaitContextDoneOrTimeout(ctx, chi.GetReconciling().GetConfigMapPropagationTimeoutDuration())
-			}
+			w.cmUpdate = time.Now()
 		}
 	} else {
 		w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
@@ -1708,6 +1711,14 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		M(host).F().
 		Info("Update StatefulSet(%s/%s) - started", namespace, name)
 
+	if timeout := time.Duration(host.GetCHI().GetReconciling().GetConfigMapPropagationTimeout()); (timeout > 0) && !w.cmUpdate.IsZero() {
+		w.a.V(1).M(host).F().Info("Wait for ConfigMap propagation")
+		elapsed := time.Now().Sub(w.cmUpdate)
+		if elapsed < timeout {
+			util.WaitContextDoneOrTimeout(ctx, timeout-elapsed)
+		}
+	}
+
 	err := w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
 	if err == nil {
 		host.CHI.Status.UpdatedHostsCount++
@@ -1787,12 +1798,11 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiv1.ChiHost) error {
 		pvc, err = w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
 		if err != nil {
 			w.a.M(host).A().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvcName, err)
-			chopmodel.GetFailedRegistry(ctx).RegisterPVC(pvc.ObjectMeta)
+			w.registryFailed.RegisterPVC(pvc.ObjectMeta)
 			return
 		}
 
-		// Register pvc as reconciled
-		chopmodel.GetReconciledRegistry(ctx).RegisterPVC(pvc.ObjectMeta)
+		w.registryReconciled.RegisterPVC(pvc.ObjectMeta)
 	})
 
 	return nil
