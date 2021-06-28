@@ -110,6 +110,10 @@ func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemp
 		return t
 	}
 
+	if t == nil {
+		t = NewChiTemplating()
+	}
+
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if t.Policy == "" {
@@ -121,6 +125,7 @@ func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemp
 			t.Policy = from.Policy
 		}
 	}
+
 	return t
 }
 
@@ -143,6 +148,10 @@ func NewChiObjectsCleanup() *ChiObjectsCleanup {
 func (c *ChiObjectsCleanup) MergeFrom(from *ChiObjectsCleanup, _type MergeType) *ChiObjectsCleanup {
 	if from == nil {
 		return c
+	}
+
+	if c == nil {
+		c = NewChiObjectsCleanup()
 	}
 
 	switch _type {
@@ -259,6 +268,10 @@ func (t *ChiCleanup) MergeFrom(from *ChiCleanup, _type MergeType) *ChiCleanup {
 		return t
 	}
 
+	if t == nil {
+		t = NewChiCleanup()
+	}
+
 	switch _type {
 	case MergeTypeFillEmptyValues:
 	case MergeTypeOverrideByNonEmptyValues:
@@ -266,6 +279,7 @@ func (t *ChiCleanup) MergeFrom(from *ChiCleanup, _type MergeType) *ChiCleanup {
 
 	t.UnknownObjects = t.UnknownObjects.MergeFrom(from.UnknownObjects, _type)
 	t.ReconcileFailedObjects = t.ReconcileFailedObjects.MergeFrom(from.ReconcileFailedObjects, _type)
+
 	return t
 }
 
@@ -330,6 +344,10 @@ func (t *ChiReconciling) MergeFrom(from *ChiReconciling, _type MergeType) *ChiRe
 		return t
 	}
 
+	if t == nil {
+		t = NewChiReconciling()
+	}
+
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if t.Policy == "" {
@@ -350,6 +368,7 @@ func (t *ChiReconciling) MergeFrom(from *ChiReconciling, _type MergeType) *ChiRe
 	}
 
 	t.Cleanup = t.Cleanup.MergeFrom(from.Cleanup, _type)
+
 	return t
 }
 

@@ -143,9 +143,11 @@ func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type M
 	if from == nil {
 		return templateNames
 	}
+
 	if templateNames == nil {
 		templateNames = NewChiTemplateNames()
 	}
+
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if templateNames.HostTemplate == "" {

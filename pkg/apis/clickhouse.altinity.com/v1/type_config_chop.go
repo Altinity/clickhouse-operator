@@ -174,6 +174,10 @@ type OperatorConfig struct {
 
 // MergeFrom merges
 func (config *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) error {
+	if from == nil {
+		return nil
+	}
+
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if err := mergo.Merge(config, *from); err != nil {
