@@ -268,7 +268,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 	//time.Sleep(5 * time.Second)
 	//w.a.V(3).Info("--- Action Plan ---")
 
-	actionPlan := NewActionPlan(old, new)
+	actionPlan := chopmodel.NewActionPlan(old, new)
 	if !actionPlan.HasActionsToDo() {
 		// Nothing to do - no changes found - no need to react
 		w.a.V(3).M(new).F().Info("ResourceVersion changed, but no actual changes found")

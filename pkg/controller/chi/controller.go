@@ -415,7 +415,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 			json.Unmarshal(newjs, &newchi)
 			command.new = &newchi
 		case reconcileUpdate:
-			actionPlan := NewActionPlan(command.old, command.new)
+			actionPlan := chopmodels.NewActionPlan(command.old, command.new)
 			enqueue = actionPlan.HasActionsToDo()
 			if enqueue {
 				log.V(2).Info("actionPlan:\n%s", actionPlan)
