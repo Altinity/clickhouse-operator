@@ -270,6 +270,9 @@ func (t *ChiCleanup) MergeFrom(from *ChiCleanup, _type MergeType) *ChiCleanup {
 }
 
 func (t *ChiCleanup) GetUnknownObjects() *ChiObjectsCleanup {
+	if t == nil {
+		return nil
+	}
 	return t.UnknownObjects
 }
 
@@ -282,6 +285,9 @@ func (t *ChiCleanup) DefaultUnknownObjects() *ChiObjectsCleanup {
 }
 
 func (t *ChiCleanup) GetReconcileFailedObjects() *ChiObjectsCleanup {
+	if t == nil {
+		return nil
+	}
 	return t.ReconcileFailedObjects
 }
 
