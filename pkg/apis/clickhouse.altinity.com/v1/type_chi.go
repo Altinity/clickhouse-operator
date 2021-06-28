@@ -495,6 +495,8 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		}
 	}
 
+	spec.Templating = spec.Templating.MergeFrom(from.Templating, _type)
+	spec.Reconciling = spec.Reconciling.MergeFrom(from.Reconciling, _type)
 	spec.Defaults = spec.Defaults.MergeFrom(from.Defaults, _type)
 	spec.Configuration = spec.Configuration.MergeFrom(from.Configuration, _type)
 	spec.Templates = spec.Templates.MergeFrom(from.Templates, _type)

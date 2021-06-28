@@ -104,6 +104,26 @@ func (t *ChiTemplating) SetPolicy(p string) {
 	t.Policy = p
 }
 
+// MergeFrom
+func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemplating {
+	if from == nil {
+		return t
+	}
+
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if t.Policy == "" {
+			t.Policy = from.Policy
+		}
+	case MergeTypeOverrideByNonEmptyValues:
+		if from.Policy != "" {
+			// Override by non-empty values only
+			t.Policy = from.Policy
+		}
+	}
+	return t
+}
+
 const ObjectsCleanupUnspecified = "Unspecified"
 const ObjectsCleanupRetain = "Retain"
 const ObjectsCleanupDelete = "Delete"
@@ -117,6 +137,48 @@ type ChiObjectsCleanup struct {
 
 func NewChiObjectsCleanup() *ChiObjectsCleanup {
 	return new(ChiObjectsCleanup)
+}
+
+// MergeFrom
+func (c *ChiObjectsCleanup) MergeFrom(from *ChiObjectsCleanup, _type MergeType) *ChiObjectsCleanup {
+	if from == nil {
+		return c
+	}
+
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if c.StatefulSet == "" {
+			c.StatefulSet = from.StatefulSet
+		}
+		if c.PVC == "" {
+			c.PVC = from.PVC
+		}
+		if c.ConfigMap == "" {
+			c.ConfigMap = from.ConfigMap
+		}
+		if c.Service == "" {
+			c.Service = from.Service
+		}
+	case MergeTypeOverrideByNonEmptyValues:
+		if from.StatefulSet != "" {
+			// Override by non-empty values only
+			c.StatefulSet = from.StatefulSet
+		}
+		if from.PVC != "" {
+			// Override by non-empty values only
+			c.PVC = from.PVC
+		}
+		if from.ConfigMap != "" {
+			// Override by non-empty values only
+			c.ConfigMap = from.ConfigMap
+		}
+		if from.Service != "" {
+			// Override by non-empty values only
+			c.Service = from.Service
+		}
+	}
+
+	return c
 }
 
 func (c *ChiObjectsCleanup) GetStatefulSet() string {
@@ -191,6 +253,22 @@ func NewChiCleanup() *ChiCleanup {
 	return new(ChiCleanup)
 }
 
+// MergeFrom
+func (t *ChiCleanup) MergeFrom(from *ChiCleanup, _type MergeType) *ChiCleanup {
+	if from == nil {
+		return t
+	}
+
+	switch _type {
+	case MergeTypeFillEmptyValues:
+	case MergeTypeOverrideByNonEmptyValues:
+	}
+
+	t.UnknownObjects = t.UnknownObjects.MergeFrom(from.UnknownObjects, _type)
+	t.ReconcileFailedObjects = t.ReconcileFailedObjects.MergeFrom(from.ReconcileFailedObjects, _type)
+	return t
+}
+
 func (t *ChiCleanup) GetUnknownObjects() *ChiObjectsCleanup {
 	return t.UnknownObjects
 }
@@ -238,6 +316,35 @@ type ChiReconciling struct {
 // NewChiReconciling
 func NewChiReconciling() *ChiReconciling {
 	return new(ChiReconciling)
+}
+
+// MergeFrom
+func (t *ChiReconciling) MergeFrom(from *ChiReconciling, _type MergeType) *ChiReconciling {
+	if from == nil {
+		return t
+	}
+
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if t.Policy == "" {
+			t.Policy = from.Policy
+		}
+		if t.ConfigMapPropagationTimeout == 0 {
+			t.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
+		}
+	case MergeTypeOverrideByNonEmptyValues:
+		if from.Policy != "" {
+			// Override by non-empty values only
+			t.Policy = from.Policy
+		}
+		if from.ConfigMapPropagationTimeout != 0 {
+			// Override by non-empty values only
+			t.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
+		}
+	}
+
+	t.Cleanup = t.Cleanup.MergeFrom(from.Cleanup, _type)
+	return t
 }
 
 // SetDefaults
