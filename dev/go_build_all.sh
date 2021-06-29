@@ -8,3 +8,4 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 "${CUR_DIR}"/go_build_metrics_exporter.sh
 "${CUR_DIR}"/go_build_operator.sh
+"${CUR_DIR}"/run_gocard.sh
