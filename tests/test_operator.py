@@ -747,11 +747,12 @@ def test_014(self):
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
 
-        with Then("Replica needs to be removed from the Zookeeper as well"):
+        with Then("Replica needs to be removed from the ZooKeeper as well"):
             out = clickhouse.query(
                 chi,
-                "SELECT count() FROM system.replicas WHERE table='test_local'")
-            assert out == "1"
+                "SELECT total_replicas FROM system.replicas WHERE table='test_local'")
+            print(f"Found {out} total replicas")
+            assert out == "2"
 
     with When("Restart Zookeeper pod"):
         with Then("Delete Zookeeper pod"):
