@@ -1167,7 +1167,7 @@ func (n *Normalizer) normalizeReplicaHosts(replica *chiV1.ChiReplica, cluster *c
 		// We still have some assumed hosts in this replica - let's add it as shardIndex
 		shardIndex := len(replica.Hosts)
 		// Check whether we have this host in HostsField
-		host := cluster.Layout.HostsField.GetOrCreate(shardIndex, replicaIndex)
+		host := cluster.GetOrCreateHost(shardIndex, replicaIndex)
 		replica.Hosts = append(replica.Hosts, host)
 	}
 }
