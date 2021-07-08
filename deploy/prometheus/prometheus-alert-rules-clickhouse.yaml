@@ -23,9 +23,21 @@ spec:
               ```kubectl logs -n {{ $labels.namespace }} {{ $labels.pod_name }} -c metrics-exporter -f```
 
         - alert: ClickHouseServerDown
-          expr: chi_clickhouse_metric_fetch_errors > 0
+          expr: chi_clickhouse_metric_fetch_errors{fetch_type='system.metrics'} > 0
           labels:
             severity: critical
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "clickhouse-server possible down"
+            description: |-
+              `metrics-exporter` failed metrics fetch `{{ $labels.fetch_type }}`.
+              Please check instance status
+              ```kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1)```
+
+        - alert: ClickHouseMetricsExporterFetchErrors
+          expr: chi_clickhouse_metric_fetch_errors{fetch_type!='system.metrics'} > 0
+          labels:
+            severity: high
           annotations:
             identifier: "{{ $labels.hostname }}"
             summary: "clickhouse-server possible down"

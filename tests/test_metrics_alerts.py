@@ -118,7 +118,7 @@ def test_clickhouse_server_reboot(self):
                                         labels={"hostname": clickhouse_svc, "chi": chi["metadata"]["name"]}, time_range="30s")
         assert fired, error("after ClickHouseServerDown gone away, ClickHouseServerRestartRecently shall firing")
 
-        resolved = alerts.wait_alert_state("ClickHouseServerRestartRecently", "firing", False,
+        resolved = alerts.wait_alert_state("ClickHouseServerRestartRecently", "firing", False, sleep_time=10,
                                            labels={"hostname": clickhouse_svc})
         assert resolved, error("can't check ClickHouseServerRestartRecently alert is gone away")
 
@@ -233,14 +233,18 @@ def test_distributed_connection_exceptions(self):
                                             ns=kubectl.namespace)
 
     with When("check ClickHouseDistributedConnectionExceptions firing"):
-        fired = alerts.wait_alert_state("ClickHouseDistributedConnectionExceptions", "firing", True,
-                                 labels={"hostname": delayed_svc, "chi": chi["metadata"]["name"]}, time_range='30s',
-                                 callback=reboot_clickhouse_and_distributed_exection)
+        fired = alerts.wait_alert_state(
+            "ClickHouseDistributedConnectionExceptions", "firing", True,
+            labels={"hostname": delayed_svc, "chi": chi["metadata"]["name"]}, time_range='30s',
+            callback=reboot_clickhouse_and_distributed_exection,
+        )
         assert fired, error("can't get ClickHouseDistributedConnectionExceptions alert in firing state")
 
     with Then("check DistributedConnectionExpections gone away"):
-        resolved = alerts.wait_alert_state("ClickHouseDistributedConnectionExceptions", "firing", False,
-                                    labels={"hostname": delayed_svc})
+        resolved = alerts.wait_alert_state(
+            "ClickHouseDistributedConnectionExceptions", "firing", False,
+            labels={"hostname": delayed_svc}
+        )
         assert resolved, error("can't check ClickHouseDistributedConnectionExceptions alert is gone away")
     kubectl.wait_pod_status(restarted_pod, "Running", ns=kubectl.namespace)
     kubectl.wait_jsonpath("pod", restarted_pod, "{.status.containerStatuses[0].ready}", "true",
