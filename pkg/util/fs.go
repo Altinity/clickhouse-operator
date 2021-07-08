@@ -66,9 +66,8 @@ func ReadFilesIntoMap(path string, isOurFile func(string) bool) map[string]strin
 
 	if len(files) > 0 {
 		return files
-	} else {
-		return nil
 	}
+	return nil
 }
 
 // ExtToLower fetches and lower-cases file extension. With dot, as '.xml'
