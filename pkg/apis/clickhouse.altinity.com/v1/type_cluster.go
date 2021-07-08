@@ -207,7 +207,7 @@ func (cluster *ChiCluster) FindHost(needle interface{}) *ChiHost {
 func (cluster *ChiCluster) FirstHost() *ChiHost {
 	var result *ChiHost
 	cluster.WalkHosts(func(host *ChiHost) error {
-		if result != nil {
+		if result == nil {
 			result = host
 		}
 		return nil
