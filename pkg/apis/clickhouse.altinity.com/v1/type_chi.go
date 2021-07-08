@@ -23,7 +23,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
-// fillStatus fills .Status
+// FillStatus fills .Status
 func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, normalized bool) {
 	chi.Status.Version = version.Version
 	chi.Status.ClustersCount = chi.ClustersCount()
@@ -44,6 +44,7 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	}
 }
 
+// FillSelfCalculatedAddressInfo
 func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 	// What is the max number of Pods allowed per Node
 	// TODO need to support multi-cluster
@@ -635,6 +636,7 @@ func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 const TemplatingPolicyManual = "manual"
 const TemplatingPolicyAuto = "auto"
 
+// IsAuto
 func (chi *ClickHouseInstallation) IsAuto() bool {
 	if chi == nil {
 		return false
@@ -645,14 +647,17 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 	return strings.ToLower(chi.Spec.Templating.GetPolicy()) == TemplatingPolicyAuto
 }
 
+// IsStopped
 func (chi *ClickHouseInstallation) IsStopped() bool {
 	return util.IsStringBoolTrue(chi.Spec.Stop)
 }
 
+// IsTroubleshoot
 func (chi *ClickHouseInstallation) IsTroubleshoot() bool {
 	return util.IsStringBoolTrue(chi.Spec.Troubleshoot)
 }
 
+// GetReconciling
 func (chi *ClickHouseInstallation) GetReconciling() *ChiReconciling {
 	if chi == nil {
 		return nil
