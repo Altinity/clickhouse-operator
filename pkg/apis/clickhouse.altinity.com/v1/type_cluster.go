@@ -203,6 +203,18 @@ func (cluster *ChiCluster) FindHost(needle interface{}) *ChiHost {
 	return result
 }
 
+// FirstHost
+func (cluster *ChiCluster) FirstHost() *ChiHost {
+	var result *ChiHost
+	cluster.WalkHosts(func(host *ChiHost) error {
+		if result != nil {
+			result = host
+		}
+		return nil
+	})
+	return result
+}
+
 // WalkShards
 func (cluster *ChiCluster) WalkShards(
 	f func(index int, shard *ChiShard) error,

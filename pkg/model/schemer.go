@@ -260,9 +260,9 @@ func (s *Schemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error 
 }
 
 // HostDropReplica
-func (s *Schemer) HostDropReplica(ctx context.Context, host *chop.ChiHost) error {
-	log.V(1).M(host).F().Info("Drop replica: %v", CreateReplicaHostname(host))
-	return s.execHost(ctx, host, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateReplicaHostname(host))})
+func (s *Schemer) HostDropReplica(ctx context.Context, hostToRun, hostToDrop *chop.ChiHost) error {
+	log.V(1).M(hostToRun).F().Info("Drop replica: %v", CreateReplicaHostname(hostToDrop))
+	return s.execHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateReplicaHostname(hostToDrop))})
 }
 
 // HostCreateTables

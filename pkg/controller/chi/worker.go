@@ -394,6 +394,17 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 	)
 
 	// Remove deleted items
+	objs := w.c.discovery(ctx, new)
+	need := w.registryReconciled
+	w.a.V(1).M(new).F().Info("Reconciled objects:\n%s", w.registryReconciled)
+	w.a.V(1).M(new).F().Info("Existing objects:\n%s", objs)
+	objs.Subtract(need)
+	w.a.V(1).M(new).F().Info("Non-reconciled objects:\n%s", objs)
+	if w.purge(ctx, new, objs, w.registryFailed) > 0 {
+		w.c.enqueueObject(NewDropDns(&new.ObjectMeta))
+		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
+	}
+
 	w.a.V(1).
 		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
 		WithStatusAction(new).
@@ -406,19 +417,20 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		func(shard *chiv1.ChiShard) {
 		},
 		func(host *chiv1.ChiHost) {
-			w.dropReplica(ctx, host)
+			var name string
+			var run *chiv1.ChiHost
+			if cluster := host.GetCluster(); cluster != nil {
+				name = cluster.Name
+			}
+			if cluster := new.FindCluster(name); cluster != nil {
+				run = cluster.FirstHost()
+			}
+
+			if run != nil {
+				w.dropReplica(ctx, run, host)
+			}
 		},
 	)
-
-	objs := w.c.discovery(ctx, new)
-	need := w.registryReconciled
-	w.a.V(1).M(new).F().Info("Reconciled objects:\n%s", w.registryReconciled)
-	w.a.V(1).M(new).F().Info("Existing objects:\n%s", objs)
-	objs.Subtract(need)
-	w.a.V(1).M(new).F().Info("Non-reconciled objects:\n%s", objs)
-	if w.purge(ctx, new, objs, w.registryFailed) > 0 {
-		w.c.enqueueObject(NewDropDns(&new.ObjectMeta))
-	}
 
 	if !new.IsStopped() {
 		w.a.V(1).
@@ -1109,25 +1121,25 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 }
 
 // dropReplica
-func (w *worker) dropReplica(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) dropReplica(ctx context.Context, hostToRun, hostToDrop *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
 	}
 
-	err := w.schemer.HostDropReplica(ctx, host)
+	err := w.schemer.HostDropReplica(ctx, hostToRun, hostToDrop)
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(host.CHI).
-			M(host).F().
-			Info("Drop replica host %s in cluster %s", host.Name, host.Address.ClusterName)
+			WithEvent(hostToRun.CHI, eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(hostToRun.CHI).
+			M(hostToRun).F().
+			Info("Drop replica host %s in cluster %s", hostToDrop.Name, hostToDrop.Address.ClusterName)
 	} else {
-		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
-			WithStatusError(host.CHI).
-			M(host).A().
-			Error("FAILED to drop replica on host %s with error %v", host.Name, err)
+		w.a.WithEvent(hostToRun.CHI, eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(hostToRun.CHI).
+			M(hostToRun).A().
+			Error("FAILED to drop replica on host %s with error %v", hostToDrop.Name, err)
 	}
 
 	return err
@@ -1197,7 +1209,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiv1.ClickHouseInstallati
 	// Need to delete all these items
 
 	var err error
-	err = w.dropReplica(ctx, host)
+	//err = w.dropReplica(ctx, host)
 	err = w.c.deleteHost(ctx, host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
