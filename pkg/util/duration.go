@@ -16,7 +16,7 @@ package util
 
 import "time"
 
-// ReasonableDuration
+// ReasonableDuration finds first duration > 0 or returns 0 in case no durations provided
 func ReasonableDuration(durations ...time.Duration) time.Duration {
 	if len(durations) == 0 {
 		return 0

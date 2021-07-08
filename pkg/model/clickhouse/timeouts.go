@@ -16,8 +16,6 @@ package clickhouse
 
 import (
 	"time"
-
-	_ "github.com/mailru/go-clickhouse"
 )
 
 const (

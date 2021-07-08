@@ -37,6 +37,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// FinalizerName specifies name of the finalizer to be used with CHI
 const FinalizerName = "finalizer.clickhouseinstallation.altinity.com"
 
 // worker represents worker thread which runs reconcile tasks
@@ -1597,17 +1598,16 @@ func (w *worker) getStatefulSetStatus(host *chiv1.ChiHost) chiv1.StatefulSetStat
 			if curLabel == newLabel {
 				w.a.M(host).F().Info("INFO StatefulSet ARE EQUAL based on labels no reconcile is actually needed %s", util.NamespaceNameString(statefulSet.ObjectMeta))
 				return chiv1.StatefulSetStatusSame
-			} else {
-				//if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
-				//	w.a.Info("INFO StatefulSet ARE EQUAL based on diff no reconcile is actually needed")
-				//	//					return chop.StatefulSetStatusSame
-				//} else {
-				//	w.a.Info("INFO StatefulSet ARE DIFFERENT based on diff reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
-				//	//					return chop.StatefulSetStatusModified
-				//}
-				w.a.M(host).F().Info("INFO StatefulSet ARE DIFFERENT based on labels. Reconcile is required for %s", util.NamespaceNameString(statefulSet.ObjectMeta))
-				return chiv1.StatefulSetStatusModified
 			}
+			//if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
+			//	w.a.Info("INFO StatefulSet ARE EQUAL based on diff no reconcile is actually needed")
+			//	//					return chop.StatefulSetStatusSame
+			//} else {
+			//	w.a.Info("INFO StatefulSet ARE DIFFERENT based on diff reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
+			//	//					return chop.StatefulSetStatusModified
+			//}
+			w.a.M(host).F().Info("INFO StatefulSet ARE DIFFERENT based on labels. Reconcile is required for %s", util.NamespaceNameString(statefulSet.ObjectMeta))
+			return chiv1.StatefulSetStatusModified
 		}
 		// No labels to compare, we can not say for sure what exactly is going on
 		return chiv1.StatefulSetStatusUnknown

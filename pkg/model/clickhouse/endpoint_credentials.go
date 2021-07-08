@@ -17,8 +17,6 @@ package clickhouse
 import (
 	"fmt"
 	"strconv"
-
-	_ "github.com/mailru/go-clickhouse"
 )
 
 const (

@@ -84,9 +84,9 @@ func MergeStringMapsOverwrite(dst, src map[string]string, keys ...string) map[st
 
 	if created && (len(dst) == 0) {
 		return nil
-	} else {
-		return dst
 	}
+
+	return dst
 }
 
 // MergeStringMapsPreserve inserts (and preserved existing) data into dst map object from src
@@ -124,9 +124,9 @@ func MergeStringMapsPreserve(dst, src map[string]string, keys ...string) map[str
 
 	if created && (len(dst) == 0) {
 		return nil
-	} else {
-		return dst
 	}
+
+	return dst
 }
 
 // SubtractStringMaps subtracts "delta" from "base" by keys
