@@ -16,6 +16,7 @@ package model
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -261,7 +262,7 @@ func (s *Schemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error 
 // HostDropReplica
 func (s *Schemer) HostDropReplica(ctx context.Context, host *chop.ChiHost) error {
 	log.V(1).M(host).F().Info("Drop replica: %v", CreateReplicaHostname(host))
-	return s.execHost(ctx, host, []string{"SYSTEM DROP REPLICA " + CreateReplicaHostname(host)})
+	return s.execHost(ctx, host, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateReplicaHostname(host))})
 }
 
 // HostCreateTables
