@@ -17,7 +17,6 @@ package chi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -121,7 +120,7 @@ func (c *Controller) waitHostRunning(host *chiv1.ChiHost) error {
 		if time.Since(start) >= (time.Duration(chop.Config().StatefulSetUpdateTimeout) * time.Second) {
 			// Timeout reached, no good result available, time to quit
 			log.V(1).M(host).F().Error("%s/%s-TIMEOUT reached", namespace, name)
-			return errors.New(fmt.Sprintf("waitHostRunning(%s/%s) - wait timeout", namespace, name))
+			return fmt.Errorf("waitHostRunning(%s/%s) - wait timeout", namespace, name)
 		}
 
 		// Wait some more time
@@ -134,6 +133,7 @@ func (c *Controller) waitHostRunning(host *chiv1.ChiHost) error {
 	return fmt.Errorf("unexpected flow")
 }
 
+// StatefulSetPollOptions specifies polling options
 type StatefulSetPollOptions struct {
 	StartBotheringAfterTimeout time.Duration
 	CreateTimeout              time.Duration
@@ -142,10 +142,12 @@ type StatefulSetPollOptions struct {
 	BackgroundInterval         time.Duration
 }
 
+// NewStatefulSetPollOptions creates new poll options
 func NewStatefulSetPollOptions() *StatefulSetPollOptions {
 	return &StatefulSetPollOptions{}
 }
 
+// Ensure ensures poll options do exist
 func (o *StatefulSetPollOptions) Ensure() *StatefulSetPollOptions {
 	if o == nil {
 		return NewStatefulSetPollOptions()
@@ -153,6 +155,7 @@ func (o *StatefulSetPollOptions) Ensure() *StatefulSetPollOptions {
 	return o
 }
 
+// FromConfig makes poll options from config
 func (o *StatefulSetPollOptions) FromConfig(config *chiv1.OperatorConfig) *StatefulSetPollOptions {
 	if o == nil {
 		return nil
@@ -165,6 +168,7 @@ func (o *StatefulSetPollOptions) FromConfig(config *chiv1.OperatorConfig) *State
 	return o
 }
 
+// SetCreateTimeout sets create timeout
 func (o *StatefulSetPollOptions) SetCreateTimeout(timeout time.Duration) *StatefulSetPollOptions {
 	if o == nil {
 		return nil
@@ -246,7 +250,7 @@ func (c *Controller) pollStatefulSet(
 		if time.Since(start) >= opts.Timeout {
 			// Timeout reached, no good result available, time to quit
 			log.V(1).M(namespace, name).F().Info("%s/%s - TIMEOUT reached")
-			return errors.New(fmt.Sprintf("waitStatefulSet(%s/%s) - wait timeout", namespace, name))
+			return fmt.Errorf("waitStatefulSet(%s/%s) - wait timeout", namespace, name)
 		}
 
 		// Wait some more time
@@ -325,7 +329,7 @@ func (c *Controller) pollHostContext(
 		if time.Since(start) >= opts.Timeout {
 			// Timeout reached, no good result available, time to quit
 			log.V(1).M(host).F().Error("%s/%s-TIMEOUT reached", namespace, name)
-			return errors.New(fmt.Sprintf("pollHost(%s/%s) - wait timeout", namespace, name))
+			return fmt.Errorf("pollHost(%s/%s) - wait timeout", namespace, name)
 		}
 
 		// Wait some more time

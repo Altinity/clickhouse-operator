@@ -42,6 +42,7 @@ func InArrayWithRegexp(needle string, haystack []string) bool {
 	return false
 }
 
+// MergeStringArrays appends into dst items from src that are not present in src. src items are being deduplicated
 func MergeStringArrays(dst []string, src []string) []string {
 	for _, str := range src {
 		if !InArray(str, dst) {
@@ -78,6 +79,7 @@ func Unzip(slice [][]string) ([]string, []string) {
 	return col1, col2
 }
 
+// CastToSliceOfStrings makes slice of strings from map
 func CastToSliceOfStrings(m map[string]interface{}) []string {
 	res := make([]string, 0, 0)
 

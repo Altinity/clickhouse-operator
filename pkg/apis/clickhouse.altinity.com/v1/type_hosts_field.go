@@ -14,12 +14,14 @@
 
 package v1
 
+// HostsField specifies field of hosts
 type HostsField struct {
 	ShardsCount   int
 	ReplicasCount int
 	Field         [][]*ChiHost
 }
 
+// NewHostsField creates new field of hosts
 func NewHostsField(shards, replicas int) *HostsField {
 	hf := new(HostsField)
 
@@ -34,10 +36,12 @@ func NewHostsField(shards, replicas int) *HostsField {
 	return hf
 }
 
+// Set sets host on specified coordinates
 func (hf *HostsField) Set(shard, replica int, host *ChiHost) {
 	hf.Field[shard][replica] = host
 }
 
+// Get gets host from specified coordinates
 func (hf *HostsField) Get(shard, replica int) *ChiHost {
 	return hf.Field[shard][replica]
 }
@@ -50,9 +54,8 @@ func (hf *HostsField) GetOrCreate(shard, replica int) *ChiHost {
 	return hf.Field[shard][replica]
 }
 
-func (hf *HostsField) WalkHosts(
-	f func(shard, replica int, host *ChiHost) error,
-) []error {
+// WalkHosts walks hosts with a function
+func (hf *HostsField) WalkHosts(f func(shard, replica int, host *ChiHost) error) []error {
 	res := make([]error, 0)
 
 	for shardIndex := range hf.Field {
@@ -66,6 +69,7 @@ func (hf *HostsField) WalkHosts(
 	return res
 }
 
+// HostsCount returns hosts number
 func (hf *HostsField) HostsCount() int {
 	count := 0
 	hf.WalkHosts(func(shard, replica int, host *ChiHost) error {
