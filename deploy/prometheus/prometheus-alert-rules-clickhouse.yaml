@@ -22,7 +22,7 @@ spec:
               Please check instance status
               ```kubectl logs -n {{ $labels.namespace }} {{ $labels.pod_name }} -c metrics-exporter -f```
 
-        - alert: ClickHouseServerDown
+        - alert: ClickHouseServerPossibleDown
           expr: chi_clickhouse_metric_fetch_errors > 0
           labels:
             severity: critical

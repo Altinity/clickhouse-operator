@@ -194,8 +194,6 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 		log.V(2).Infof("Error querying metrics for %s: %s\n", hostname, err)
 		writer.WriteErrorFetch("system.metrics")
-		//e.enqueueToRemoveFromWatched(chi)
-		return
 	}
 
 	log.V(2).Infof("Querying table sizes for %s\n", hostname)
@@ -207,8 +205,6 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 		log.V(2).Infof("Error querying table sizes for %s: %s\n", hostname, err)
 		writer.WriteErrorFetch("table sizes")
-		// e.enqueueToRemoveFromWatched(chi)
-		return
 	}
 
 	log.V(2).Infof("Querying system replicas for %s\n", hostname)
@@ -220,8 +216,6 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 		log.V(2).Infof("Error querying system replicas for %s: %s\n", hostname, err)
 		writer.WriteErrorFetch("system.replicas")
-		// e.enqueueToRemoveFromWatched(chi)
-		return
 	}
 
 	log.V(2).Infof("Querying mutations for %s\n", hostname)
@@ -233,8 +227,6 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 		log.V(2).Infof("Error querying mutations for %s: %s\n", hostname, err)
 		writer.WriteErrorFetch("system.mutations")
-		//e.enqueueToRemoveFromWatched(chi)
-		return
 	}
 
 	log.V(2).Infof("Querying disks for %s\n", hostname)
@@ -246,8 +238,6 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 		log.V(2).Infof("Error querying disks for %s: %s\n", hostname, err)
 		writer.WriteErrorFetch("system.disks")
-		//e.enqueueToRemoveFromWatched(chi)
-		return
 	}
 
 	log.V(2).Infof("Querying detached parts for %s\n", hostname)
@@ -259,8 +249,6 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 		log.V(2).Infof("Error querying detached parts for %s: %s\n", hostname, err)
 		writer.WriteErrorFetch("system.detached_parts")
-		//e.enqueueToRemoveFromWatched(chi)
-		return
 	}
 }
 
