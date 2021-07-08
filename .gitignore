@@ -28,3 +28,4 @@ dev/log
 .vagrant
 /.DS_Store
 
+operator_output
