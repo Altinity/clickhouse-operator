@@ -62,7 +62,7 @@ if main():
                 # test_operator.test_018, # Obsolete, covered by test_016
                 test_operator.test_019,
                 test_operator.test_020,
-                test_operator.test_021,  # this should go last while failing
+                test_operator.test_021,
                 test_operator.test_022,
                 test_operator.test_023,
                 test_operator.test_024,
