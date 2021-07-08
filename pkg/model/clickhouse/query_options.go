@@ -49,10 +49,12 @@ func (o *QueryOptions) Normalize() *QueryOptions {
 	if o == nil {
 		o = NewQueryOptions()
 	}
+	if (o.Tries == 0) && o.Retry {
+		o.Tries = defaultMaxTries
+	}
 	if o.Tries == 0 {
-		if o.Retry {
-			o.Tries = defaultMaxTries
-		}
+		// We need to have at least one try
+		o.Tries = 1
 	}
 	return o
 }
