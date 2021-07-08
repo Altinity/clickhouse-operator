@@ -202,21 +202,21 @@ func (cm *ConfigManager) getFileBasedConfig(configFilePath string) (*chiv1.Opera
 	// In case we have config file specified - that's it
 	if len(configFilePath) > 0 {
 		// Config file explicitly specified as CLI flag
-		if conf, err := cm.buildConfigFromFile(configFilePath); err == nil {
-			return conf, nil
-		} else {
+		conf, err := cm.buildConfigFromFile(configFilePath)
+		if err != nil {
 			return nil, err
 		}
+		return conf, nil
 	}
 
 	// No file specified - look for ENV var config file path specification
 	if len(os.Getenv(chiv1.CHOP_CONFIG)) > 0 {
 		// Config file explicitly specified as ENV var
-		if conf, err := cm.buildConfigFromFile(os.Getenv(chiv1.CHOP_CONFIG)); err == nil {
-			return conf, nil
-		} else {
+		conf, err := cm.buildConfigFromFile(os.Getenv(chiv1.CHOP_CONFIG))
+		if err != nil {
 			return nil, err
 		}
+		return conf, nil
 	}
 
 	// No ENV var specified - look into user's homedir
@@ -382,7 +382,7 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 	}
 }
 
-// Postprocess
+// Postprocess performs postprocessing of the configuration
 func (cm *ConfigManager) Postprocess() {
 	cm.config.Postprocess()
 }
