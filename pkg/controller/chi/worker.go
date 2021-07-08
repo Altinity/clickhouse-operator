@@ -400,6 +400,16 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		M(new).F().
 		Info("remove items scheduled for deletion")
 
+	actionPlan.WalkRemoved(
+		func(cluster *chiv1.ChiCluster) {
+		},
+		func(shard *chiv1.ChiShard) {
+		},
+		func(host *chiv1.ChiHost) {
+			w.dropReplica(ctx, host)
+		},
+	)
+
 	objs := w.c.discovery(ctx, new)
 	need := w.registryReconciled
 	w.a.V(1).M(new).F().Info("Reconciled objects:\n%s", w.registryReconciled)
@@ -1112,8 +1122,7 @@ func (w *worker) dropReplica(ctx context.Context, host *chiv1.ChiHost) error {
 			WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
 			WithStatusAction(host.CHI).
 			M(host).F().
-			Info("Drop replica on host %s replica %d to shard %d in cluster %s",
-				host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("Drop replica host %s in cluster %s", host.Name, host.Address.ClusterName)
 	} else {
 		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(host.CHI).
