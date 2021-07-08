@@ -14,17 +14,13 @@
 
 package clickhouse
 
-import (
-	_ "github.com/mailru/go-clickhouse"
-)
-
-// ConnectionParams
+// ConnectionParams represents connection parameters
 type ConnectionParams struct {
 	*EndpointCredentials
 	*Timeouts
 }
 
-// NewConnectionParams
+// NewConnectionParams creates new ConnectionParams
 func NewConnectionParams(hostname, username, password string, port int) *ConnectionParams {
 	return &ConnectionParams{
 		NewEndpointCredentials(hostname, username, password, port),
