@@ -30,6 +30,7 @@ func RandomString() string {
 }
 
 const (
+	// Set of string boolean constants
 	StringBool0                    = "0"
 	StringBool1                    = "1"
 	StringBoolFalseFirstCapital    = "False"
@@ -82,7 +83,7 @@ func IsStringBool(str string) bool {
 	}
 }
 
-// IsStringBool checks whether str is a string as bool "false" value
+// IsStringBoolFalse checks whether str is a string as bool "false" value
 func IsStringBoolFalse(str string) bool {
 	switch strings.ToLower(str) {
 	case
@@ -99,7 +100,7 @@ func IsStringBoolFalse(str string) bool {
 	}
 }
 
-// IsStringBool checks whether str is a string as bool "true" value
+// IsStringBoolTrue checks whether str is a string as bool "true" value
 func IsStringBoolTrue(str string) bool {
 	switch strings.ToLower(str) {
 	case
@@ -133,9 +134,9 @@ func CastStringBoolTo01(str string, defaultValue bool) string {
 
 	if defaultValue {
 		return _true
-	} else {
-		return _false
 	}
+
+	return _false
 }
 
 // CastStringBoolToStringTrueFalse casts string-bool into string "true/false"
@@ -155,9 +156,9 @@ func CastStringBoolToStringTrueFalse(str string, defaultValue bool) string {
 
 	if defaultValue {
 		return _true
-	} else {
-		return _false
 	}
+
+	return _false
 }
 
 // CreateStringID creates HEX hash ID out of string.

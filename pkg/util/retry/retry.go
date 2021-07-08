@@ -22,7 +22,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// Retry
+// Retry retries specified function
 func Retry(ctx context.Context, tries int, desc string, a log.Announcer, f func() error) error {
 	var err error
 	for try := 1; try <= tries; try++ {
