@@ -50,6 +50,7 @@ func NewCreator(chi *chiv1.ClickHouseInstallation) *Creator {
 // CreateServiceCHI creates new corev1.Service for specified CHI
 func (c *Creator) CreateServiceCHI() *corev1.Service {
 	serviceName := CreateCHIServiceName(c.chi)
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 
 	c.a.V(1).F().Info("%s/%s", c.chi.Namespace, serviceName)
 	if template, ok := c.chi.GetCHIServiceTemplate(); ok {
@@ -60,6 +61,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 			serviceName,
 			c.labeler.getLabelsServiceCHI(),
 			c.labeler.getSelectorCHIScopeReady(),
+			ownerReferences,
 		)
 	}
 
@@ -67,9 +69,10 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsServiceCHI(),
+			Name:            serviceName,
+			Namespace:       c.chi.Namespace,
+			Labels:          c.labeler.getLabelsServiceCHI(),
+			OwnerReferences: ownerReferences,
 		},
 		Spec: corev1.ServiceSpec{
 			// ClusterIP: templateDefaultsServiceClusterIP,
@@ -99,6 +102,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 // CreateServiceCluster creates new corev1.Service for specified Cluster
 func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
 	serviceName := CreateClusterServiceName(cluster)
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 
 	c.a.V(1).F().Info("%s/%s", cluster.Address.Namespace, serviceName)
 	if template, ok := cluster.GetServiceTemplate(); ok {
@@ -109,6 +113,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 			serviceName,
 			c.labeler.getLabelsServiceCluster(cluster),
 			getSelectorClusterScopeReady(cluster),
+			ownerReferences,
 		)
 	}
 	// No template specified, no need to create service
@@ -118,6 +123,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 // CreateServiceShard creates new corev1.Service for specified Shard
 func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 	serviceName := CreateShardServiceName(shard)
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 
 	c.a.V(1).F().Info("%s/%s", shard.Address.Namespace, serviceName)
 	if template, ok := shard.GetServiceTemplate(); ok {
@@ -128,6 +134,7 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 			serviceName,
 			c.labeler.getLabelsServiceShard(shard),
 			getSelectorShardScopeReady(shard),
+			ownerReferences,
 		)
 	}
 	// No template specified, no need to create service
@@ -138,6 +145,7 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(host)
 	statefulSetName := CreateStatefulSetName(host)
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 
 	c.a.V(1).F().Info("%s/%s for Set %s", host.Address.Namespace, serviceName, statefulSetName)
 	if template, ok := host.GetServiceTemplate(); ok {
@@ -148,6 +156,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			serviceName,
 			c.labeler.getLabelsServiceHost(host),
 			GetSelectorHostScope(host),
+			ownerReferences,
 		)
 	}
 
@@ -155,9 +164,10 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: host.Address.Namespace,
-			Labels:    c.labeler.getLabelsServiceHost(host),
+			Name:            serviceName,
+			Namespace:       host.Address.Namespace,
+			Labels:          c.labeler.getLabelsServiceHost(host),
+			OwnerReferences: ownerReferences,
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -210,6 +220,7 @@ func (c *Creator) createServiceFromTemplate(
 	name string,
 	labels map[string]string,
 	selector map[string]string,
+	ownerReferences []metav1.OwnerReference,
 ) *corev1.Service {
 
 	// Verify Ports
@@ -226,6 +237,7 @@ func (c *Creator) createServiceFromTemplate(
 	// Overwrite .name and .namespace - they are not allowed to be specified in template
 	service.Name = name
 	service.Namespace = namespace
+	service.OwnerReferences = ownerReferences
 
 	// Append provided Labels to already specified Labels in template
 	service.Labels = util.MergeStringMapsOverwrite(service.Labels, labels)
@@ -243,9 +255,10 @@ func (c *Creator) createServiceFromTemplate(
 func (c *Creator) CreateConfigMapCHICommon(options *ClickHouseConfigFilesGeneratorOptions) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      CreateConfigMapCommonName(c.chi),
-			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsConfigMapCHICommon(),
+			Name:            CreateConfigMapCommonName(c.chi),
+			Namespace:       c.chi.Namespace,
+			Labels:          c.labeler.getLabelsConfigMapCHICommon(),
+			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupCommon(options),
@@ -259,9 +272,10 @@ func (c *Creator) CreateConfigMapCHICommon(options *ClickHouseConfigFilesGenerat
 func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      CreateConfigMapCommonUsersName(c.chi),
-			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsConfigMapCHICommonUsers(),
+			Name:            CreateConfigMapCommonUsersName(c.chi),
+			Namespace:       c.chi.Namespace,
+			Labels:          c.labeler.getLabelsConfigMapCHICommonUsers(),
+			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupUsers(),
@@ -275,9 +289,10 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      CreateConfigMapPersonalName(host),
-			Namespace: host.Address.Namespace,
-			Labels:    c.labeler.getLabelsConfigMapHost(host),
+			Name:            CreateConfigMapPersonalName(host),
+			Namespace:       host.Address.Namespace,
+			Labels:          c.labeler.getLabelsConfigMapHost(host),
+			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
 		},
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host),
 	}
@@ -290,6 +305,7 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(host)
 	serviceName := CreateStatefulSetServiceName(host)
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 
 	// Create apps.StatefulSet object
 	replicasNum := host.GetStatefulSetReplicasNum()
@@ -297,9 +313,10 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	// StatefulSet has additional label - ZK config fingerprint
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      statefulSetName,
-			Namespace: host.Address.Namespace,
-			Labels:    c.labeler.getLabelsHostScope(host, true),
+			Name:            statefulSetName,
+			Namespace:       host.Address.Namespace,
+			Labels:          c.labeler.getLabelsHostScope(host, true),
+			OwnerReferences: ownerReferences,
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    &replicasNum,
@@ -1012,4 +1029,17 @@ func getContainerByName(statefulSet *apps.StatefulSet, name string) *corev1.Cont
 	}
 
 	return nil
+}
+
+func getOwnerReferences(t metav1.TypeMeta, o metav1.ObjectMeta, controller, blockOwnerDeletion bool) []metav1.OwnerReference {
+	return []metav1.OwnerReference{
+		metav1.OwnerReference{
+			APIVersion:         t.APIVersion,
+			Kind:               t.Kind,
+			Name:               o.Name,
+			UID:                o.UID,
+			Controller:         &controller,
+			BlockOwnerDeletion: &blockOwnerDeletion,
+		},
+	}
 }
