@@ -45,7 +45,7 @@ If no `OPERATOR_NAMESPACE` specified, as:
 cd ~
 curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-web-installer/clickhouse-operator-install.sh | bash
 ```
-installer will install **clickhouse-operator** into `test-clickhouse-operator` namespace and will watch custom resources like a `kind: ClickhouseInstallation` in all available namespaces.
+installer will install **clickhouse-operator** into `kube-system` namespace and will watch custom resources like a `kind: ClickhouseInstallation` in all available namespaces.
 
 
 ## **In case you can not run scripts from internet in your protected environment**,
