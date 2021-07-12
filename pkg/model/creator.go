@@ -451,7 +451,7 @@ func (c *Creator) setupTroubleshoot(statefulSet *apps.StatefulSet) {
 
 	if c.chi.IsTroubleshoot() {
 		if len(container.Command) > 0 {
-			container.Command = append(container.Command, "&& sleep 1800")
+			container.Command = append(container.Command, "|| sleep 1800")
 		}
 		container.LivenessProbe = nil
 	}
