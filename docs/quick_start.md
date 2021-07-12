@@ -44,7 +44,7 @@ If no `OPERATOR_NAMESPACE` specified, as:
 cd ~
 curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-web-installer/clickhouse-operator-install.sh | bash
 ```
-installer will create namespace `clickhouse-operator` and install **clickhouse-operator** into it.
+installer will create namespace `test-clickhouse-operator` and install **clickhouse-operator** into it.
 
 ## **In case you can not run scripts from internet in your protected environment**,
 
@@ -52,7 +52,7 @@ you can download manually [this template file][clickhouse-operator-install-templ
 and edit it according to your choice. After that apply it with `kubectl`. Or you can use this snippet instead:
 ```bash
 # Namespace to install operator into
-OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-clickhouse-operator}"
+OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-test-clickhouse-operator}"
 # Namespace to install metrics-exporter into
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 
