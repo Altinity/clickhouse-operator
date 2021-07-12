@@ -53,10 +53,12 @@ type ChiClusterLayout struct {
 	HostsField        *HostsField `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
+// NewChiClusterLayout
 func NewChiClusterLayout() *ChiClusterLayout {
 	return new(ChiClusterLayout)
 }
 
+// FillShardReplicaSpecified
 func (cluster *ChiCluster) FillShardReplicaSpecified() {
 	if len(cluster.Layout.Shards) > 0 {
 		cluster.Layout.ShardsSpecified = true
@@ -66,14 +68,17 @@ func (cluster *ChiCluster) FillShardReplicaSpecified() {
 	}
 }
 
+// isShardSpecified
 func (cluster *ChiCluster) isShardSpecified() bool {
 	return cluster.Layout.ShardsSpecified == true
 }
 
+// isReplicaSpecified
 func (cluster *ChiCluster) isReplicaSpecified() bool {
 	return (cluster.Layout.ShardsSpecified == false) && (cluster.Layout.ReplicasSpecified == true)
 }
 
+// IsShardSpecified
 func (cluster *ChiCluster) IsShardSpecified() bool {
 	if !cluster.isShardSpecified() && !cluster.isReplicaSpecified() {
 		return true
@@ -82,6 +87,7 @@ func (cluster *ChiCluster) IsShardSpecified() bool {
 	return cluster.isShardSpecified()
 }
 
+// InheritZookeeperFrom
 func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 	if !cluster.Zookeeper.IsEmpty() {
 		// Has zk config explicitly specified alread
@@ -97,10 +103,12 @@ func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 	cluster.Zookeeper = cluster.Zookeeper.MergeFrom(chi.Spec.Configuration.Zookeeper, MergeTypeFillEmptyValues)
 }
 
+// InheritSettingsFrom
 func (cluster *ChiCluster) InheritSettingsFrom(chi *ClickHouseInstallation) {
 	cluster.Settings = cluster.Settings.MergeFrom(chi.Spec.Configuration.Settings)
 }
 
+// InheritFilesFrom
 func (cluster *ChiCluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 	if chi.Spec.Configuration == nil {
 		return
@@ -120,6 +128,7 @@ func (cluster *ChiCluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 	})
 }
 
+// InheritTemplatesFrom
 func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
 	if chi.Spec.Defaults == nil {
 		return
@@ -131,6 +140,7 @@ func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
 	cluster.Templates.HandleDeprecatedFields()
 }
 
+// GetServiceTemplate
 func (cluster *ChiCluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	if !cluster.Templates.HasClusterServiceTemplate() {
 		return nil, false
@@ -139,22 +149,27 @@ func (cluster *ChiCluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	return cluster.CHI.GetServiceTemplate(name)
 }
 
+// GetCHI
 func (cluster *ChiCluster) GetCHI() *ClickHouseInstallation {
 	return cluster.CHI
 }
 
+// GetShard
 func (cluster *ChiCluster) GetShard(shard int) *ChiShard {
 	return &cluster.Layout.Shards[shard]
 }
 
+// GetOrCreateHost
 func (cluster *ChiCluster) GetOrCreateHost(shard, replica int) *ChiHost {
 	return cluster.Layout.HostsField.GetOrCreate(shard, replica)
 }
 
+// GetReplica
 func (cluster *ChiCluster) GetReplica(replica int) *ChiReplica {
 	return &cluster.Layout.Replicas[replica]
 }
 
+// FindShard
 func (cluster *ChiCluster) FindShard(needle interface{}) *ChiShard {
 	var resultShard *ChiShard
 	cluster.WalkShards(func(index int, shard *ChiShard) error {
@@ -173,6 +188,34 @@ func (cluster *ChiCluster) FindShard(needle interface{}) *ChiShard {
 	return resultShard
 }
 
+// FindHost
+func (cluster *ChiCluster) FindHost(needle interface{}) *ChiHost {
+	var result *ChiHost
+	cluster.WalkHosts(func(host *ChiHost) error {
+		switch typed := needle.(type) {
+		case *ChiHost:
+			if typed == host {
+				result = host
+			}
+		}
+		return nil
+	})
+	return result
+}
+
+// FirstHost
+func (cluster *ChiCluster) FirstHost() *ChiHost {
+	var result *ChiHost
+	cluster.WalkHosts(func(host *ChiHost) error {
+		if result == nil {
+			result = host
+		}
+		return nil
+	})
+	return result
+}
+
+// WalkShards
 func (cluster *ChiCluster) WalkShards(
 	f func(index int, shard *ChiShard) error,
 ) []error {
@@ -186,9 +229,8 @@ func (cluster *ChiCluster) WalkShards(
 	return res
 }
 
-func (cluster *ChiCluster) WalkReplicas(
-	f func(index int, replica *ChiReplica) error,
-) []error {
+// WalkReplicas
+func (cluster *ChiCluster) WalkReplicas(f func(index int, replica *ChiReplica) error) []error {
 	res := make([]error, 0)
 
 	for replicaIndex := range cluster.Layout.Replicas {
@@ -199,9 +241,8 @@ func (cluster *ChiCluster) WalkReplicas(
 	return res
 }
 
-func (cluster *ChiCluster) WalkHosts(
-	f func(host *ChiHost) error,
-) []error {
+// WalkHosts
+func (cluster *ChiCluster) WalkHosts(f func(host *ChiHost) error) []error {
 
 	res := make([]error, 0)
 
@@ -216,9 +257,8 @@ func (cluster *ChiCluster) WalkHosts(
 	return res
 }
 
-func (cluster *ChiCluster) WalkHostsByShards(
-	f func(shard, replica int, host *ChiHost) error,
-) []error {
+// WalkHostsByShards
+func (cluster *ChiCluster) WalkHostsByShards(f func(shard, replica int, host *ChiHost) error) []error {
 
 	res := make([]error, 0)
 
@@ -233,9 +273,8 @@ func (cluster *ChiCluster) WalkHostsByShards(
 	return res
 }
 
-func (cluster *ChiCluster) WalkHostsByReplicas(
-	f func(shard, replica int, host *ChiHost) error,
-) []error {
+// WalkHostsByReplicas
+func (cluster *ChiCluster) WalkHostsByReplicas(f func(shard, replica int, host *ChiHost) error) []error {
 
 	res := make([]error, 0)
 
@@ -250,6 +289,7 @@ func (cluster *ChiCluster) WalkHostsByReplicas(
 	return res
 }
 
+// HostsCount
 func (cluster *ChiCluster) HostsCount() int {
 	count := 0
 	cluster.WalkHosts(func(host *ChiHost) error {

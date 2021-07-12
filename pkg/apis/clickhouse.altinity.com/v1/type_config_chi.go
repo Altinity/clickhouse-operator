@@ -40,6 +40,7 @@ type Configuration struct {
 	Clusters []*ChiCluster `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
 }
 
+// NewConfiguration creates new Configuration objects
 func NewConfiguration() *Configuration {
 	return new(Configuration)
 }

@@ -23,14 +23,14 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 200Mi
+              storage: 2Gi
       - name: disk2
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 50Mi
+              storage: 1Gi
     podTemplates:
       - name: multi-volume
         spec:

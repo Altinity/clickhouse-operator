@@ -102,6 +102,38 @@ spec:
                 - "off"
                 - "On"
                 - "on"
+                - "Disable"
+                - "disable"
+                - "Enable"
+                - "enable"
+                - "Disabled"
+                - "disabled"
+                - "Enabled"
+                - "enabled"
+            # Need to be StringBool
+            troubleshoot:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - ""
+                - "0"
+                - "1"
+                - "False"
+                - "false"
+                - "True"
+                - "true"
+                - "No"
+                - "no"
+                - "Yes"
+                - "yes"
+                - "Off"
+                - "off"
+                - "On"
+                - "on"
+                - "Disable"
+                - "disable"
+                - "Enable"
+                - "enable"
                 - "Disabled"
                 - "disabled"
                 - "Enabled"
@@ -120,6 +152,70 @@ spec:
               properties:
                 policy:
                   type: string
+                configMapPropagationTimeout:
+                  type: integer
+                  minimum: 0
+                  maximum: 3600
+                cleanup:
+                  type: object
+                  nullable: true
+                  properties:
+                    unknownObjects:
+                      type: object
+                      nullable: true
+                      properties:
+                        statefulSet:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        pvc:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        configMap:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        service:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                    reconcileFailedObjects:
+                      type: object
+                      nullable: true
+                      properties:
+                        statefulSet:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        pvc:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        configMap:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        service:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
             defaults:
               type: object
               nullable: true
@@ -144,6 +240,10 @@ spec:
                     - "off"
                     - "On"
                     - "on"
+                    - "Disable"
+                    - "disable"
+                    - "Enable"
+                    - "enable"
                     - "Disabled"
                     - "disabled"
                     - "Enabled"
@@ -333,6 +433,10 @@ spec:
                                     - "off"
                                     - "On"
                                     - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
                                     - "Disabled"
                                     - "disabled"
                                     - "Enabled"
@@ -833,6 +937,38 @@ spec:
                 - "off"
                 - "On"
                 - "on"
+                - "Disable"
+                - "disable"
+                - "Enable"
+                - "enable"
+                - "Disabled"
+                - "disabled"
+                - "Enabled"
+                - "enabled"
+            # Need to be StringBool
+            troubleshoot:
+              type: string
+              enum:
+                # List StringBoolXXX constants from model
+                - ""
+                - "0"
+                - "1"
+                - "False"
+                - "false"
+                - "True"
+                - "true"
+                - "No"
+                - "no"
+                - "Yes"
+                - "yes"
+                - "Off"
+                - "off"
+                - "On"
+                - "on"
+                - "Disable"
+                - "disable"
+                - "Enable"
+                - "enable"
                 - "Disabled"
                 - "disabled"
                 - "Enabled"
@@ -851,6 +987,70 @@ spec:
               properties:
                 policy:
                   type: string
+                configMapPropagationTimeout:
+                  type: integer
+                  minimum: 0
+                  maximum: 3600
+                cleanup:
+                  type: object
+                  nullable: true
+                  properties:
+                    unknownObjects:
+                      type: object
+                      nullable: true
+                      properties:
+                        statefulSet:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        pvc:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        configMap:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        service:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                    reconcileFailedObjects:
+                      type: object
+                      nullable: true
+                      properties:
+                        statefulSet:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        pvc:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        configMap:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
+                        service:
+                          type: string
+                          enum:
+                            # List ObjectsCleanupXXX constants from model
+                            - "Retain"
+                            - "Delete"
             defaults:
               type: object
               nullable: true
@@ -875,6 +1075,10 @@ spec:
                     - "off"
                     - "On"
                     - "on"
+                    - "Disable"
+                    - "disable"
+                    - "Enable"
+                    - "enable"
                     - "Disabled"
                     - "disabled"
                     - "Enabled"
@@ -1064,6 +1268,10 @@ spec:
                                     - "off"
                                     - "On"
                                     - "on"
+                                    - "Disable"
+                                    - "disable"
+                                    - "Enable"
+                                    - "enable"
                                     - "Disabled"
                                     - "disabled"
                                     - "Enabled"
@@ -1579,6 +1787,10 @@ spec:
                 - "off"
                 - "On"
                 - "on"
+                - "Disable"
+                - "disable"
+                - "Enable"
+                - "enable"
                 - "Disabled"
                 - "disabled"
                 - "Enabled"

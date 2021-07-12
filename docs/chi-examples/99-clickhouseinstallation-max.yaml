@@ -16,6 +16,8 @@ spec:
 
   stop: "no"
 
+  troubleshoot: "no"
+
   namespaceDomainPattern:  "%s.svc.my.test"
 
   templating:
@@ -23,6 +25,18 @@ spec:
 
   reconciling:
     policy: "nowait"
+    configMapPropagationTimeout: 90
+    cleanup:
+      unknownObjects:
+        statefulSet: Delete
+        pvc: Delete
+        configMap: Delete
+        service: Delete
+      reconcileFailedObjects:
+        statefulSet: Retain
+        pvc: Retain
+        configMap: Retain
+        service: Retain
 
   # List of templates used by a CHI
   useTemplates:

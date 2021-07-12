@@ -59,7 +59,7 @@
         "name": "prometheus alerts",
         "showIn": 0,
         "step": "30s",
-        "tagKeys": "chi,pod,hostname,exported_namespace,namespace",
+        "tagKeys": "chi,pod_name,hostname,exported_namespace,namespace",
         "tags": [],
         "textFormat": "{{alertstate}}",
         "titleFormat": "{{alertname}}",
@@ -81,7 +81,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1619238572345,
+  "iteration": 1624001415165,
   "links": [],
   "panels": [
     {
@@ -1541,20 +1541,29 @@
       "renderer": "flot",
       "seriesOverrides": [
         {
+          "$$hashKey": "object:227",
           "alias": "/^max.+/",
-          "color": "#F2495C"
+          "color": "#FFA6B0"
         },
         {
+          "$$hashKey": "object:228",
           "alias": "/^check.+/",
           "color": "#FF9830"
         },
         {
+          "$$hashKey": "object:229",
           "alias": "/^fetch.+/",
           "color": "#B877D9"
         },
         {
-          "alias": "/^send.+/",
-          "color": "#5794F2"
+          "$$hashKey": "object:338",
+          "alias": "/^(data loss|fetch fail|check fail).+/",
+          "color": "#C4162A"
+        },
+        {
+          "$$hashKey": "object:1252",
+          "alias": "/^replicated merge.+/",
+          "color": "#DEB6F2"
         }
       ],
       "spaceLength": 10,
@@ -1562,31 +1571,78 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_ReplicasMaxQueueSize{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "max queue size {{hostname}}",
-          "refId": "D"
-        },
-        {
-          "expr": "chi_clickhouse_metric_ReplicatedChecks{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedDataLoss{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "check {{hostname}}",
+          "legendFormat": "data loss {{hostname}}",
           "refId": "A",
           "step": 20
         },
         {
-          "expr": "chi_clickhouse_metric_ReplicatedFetch{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedPartChecks{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
           "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "fetch {{hostname}}",
+          "legendFormat": "check {{hostname}}",
           "refId": "B",
           "step": 20
         },
         {
-          "expr": "chi_clickhouse_metric_ReplicatedSend{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedPartChecksFailed{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "send {{hostname}}",
+          "legendFormat": "check fail {{hostname}}",
           "refId": "C",
           "step": 20
+        },
+        {
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedPartFetches{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "fetch {{hostname}}",
+          "refId": "D",
+          "step": 20
+        },
+        {
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedPartFailedFetches{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "fetch fail {{hostname}}",
+          "refId": "E",
+          "step": 20
+        },
+        {
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedPartFetchesOfMerged{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "fetch merged {{hostname}}",
+          "refId": "F",
+          "step": 20
+        },
+        {
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedPartMerges{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "replicated merge {{hostname}}",
+          "refId": "G",
+          "step": 20
+        },
+        {
+          "expr": "chi_clickhouse_metric_ReplicasMaxQueueSize{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "max queue size {{hostname}}",
+          "refId": "Z"
         }
       ],
       "thresholds": [],
@@ -3953,13 +4009,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(go_memstats_alloc_bytes_total{app=\"clickhouse-operator\",namespace=~\"$exported_namespace|kube-system\"}[1m])",
+          "expr": "irate(go_memstats_alloc_bytes_total{app=\"clickhouse-operator\",namespace=~\"$namespace|kube-system\"}[1m])",
           "hide": false,
           "legendFormat": "{{ namespace }} GO malloc bytes / sec",
           "refId": "A"
         },
         {
-          "expr": "process_resident_memory_bytes{app=\"clickhouse-operator\",namespace=~\"$exported_namespace|kube-system\"}",
+          "expr": "process_resident_memory_bytes{app=\"clickhouse-operator\",namespace=~\"$namespace|kube-system\"}",
           "legendFormat": "{{ namespace }} RSS Memory",
           "refId": "B"
         }
@@ -4091,7 +4147,6 @@
   },
   "timepicker": {
     "refresh_intervals": [
-      "5s",
       "10s",
       "30s",
       "1m",
@@ -4117,5 +4172,5 @@
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
   "uid": "80bd73d2a243583a9ec0d1b3fdf86e98",
-  "version": 20210217
+  "version": 20210618
 }

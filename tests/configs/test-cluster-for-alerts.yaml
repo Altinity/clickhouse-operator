@@ -7,11 +7,18 @@ metadata:
 
 spec:
   useTemplates:
-    - name: clickhouse-latest-version
+    - name: clickhouse-alerts-latest-version
     - name: persistent-volume
   configuration:
     settings:
       mysql_port: 3306
+      # to allow scrape metrics via embedded prometheus protocol
+      prometheus/endpoint: /metrics
+      prometheus/port: 8888
+      prometheus/metrics: true
+      prometheus/events: true
+      prometheus/asynchronous_metrics: true
+
     zookeeper:
       nodes:
         - host: zookeeper

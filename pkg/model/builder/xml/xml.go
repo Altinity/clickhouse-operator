@@ -90,9 +90,9 @@ func normalizePath(prefix, path string) string {
 	path = strings.Trim(path, "/")
 	if len(prefix) > 0 {
 		return prefix + "/" + path
-	} else {
-		return path
 	}
+
+	return path
 }
 
 // addBranch ensures branch exists and assign value to the last tagged node

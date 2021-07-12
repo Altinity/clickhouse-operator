@@ -62,7 +62,7 @@ kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}
 
 echo "Setup Prometheus instance via prometheus-operator into '${PROMETHEUS_NAMESPACE}' namespace"
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
-    cat ${CUR_DIR}/prometheus-template.yaml | PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} envsubst \
+    cat "${CUR_DIR}/prometheus-template.yaml" | PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} envsubst \
 )
 
 echo "Setup Prometheus -> AlertManager -> Slack integration"
@@ -76,12 +76,14 @@ if [[ ! -f ${CUR_DIR}/prometheus-sensitive-data.sh ]]; then
     sleep 10
     echo "Skip Prometheus -> alertmanager -> Slack integration"
 else
-    source ${CUR_DIR}/prometheus-sensitive-data.sh
+    source "${CUR_DIR}/prometheus-sensitive-data.sh"
     kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
-        cat ${CUR_DIR}/prometheus-alertmanager-template.yaml | \
+        cat "${CUR_DIR}/prometheus-alertmanager-template.yaml" | \
         envsubst \
     )
 
-    kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f ${CUR_DIR}/prometheus-alert-rules.yaml
+    for rules_file in "${CUR_DIR}"/prometheus-alert-rules*.yaml; do
+      kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f "${rules_file}"
+    done
 fi
 echo "Add is done"

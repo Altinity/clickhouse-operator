@@ -14,10 +14,12 @@
 
 package v1
 
+// NewChiDefaults creates new ChiDefaults object
 func NewChiDefaults() *ChiDefaults {
 	return new(ChiDefaults)
 }
 
+// MergeFrom merges from specified object
 func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults, _type MergeType) *ChiDefaults {
 	if from == nil {
 		return defaults

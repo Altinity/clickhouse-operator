@@ -27,10 +27,10 @@ func RelativeToBasePath(basePath, relativePath string) string {
 	if absPath, err := filepath.Abs(basePath + "/" + relativePath); err == nil {
 		// Absolute path is fine
 		return absPath
-	} else {
-		// Absolute path is not fine
-		return ""
 	}
+
+	// Unable to build correct absolute path, this is an error
+	return ""
 }
 
 // PreparePath - prepares path absolute/relative with default relative value

@@ -23,7 +23,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
-// fillStatus fills .Status
+// FillStatus fills .Status
 func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, normalized bool) {
 	chi.Status.Version = version.Version
 	chi.Status.ClustersCount = chi.ClustersCount()
@@ -44,6 +44,7 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	}
 }
 
+// FillSelfCalculatedAddressInfo
 func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 	// What is the max number of Pods allowed per Node
 	// TODO need to support multi-cluster
@@ -475,6 +476,9 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		if spec.Stop == "" {
 			spec.Stop = from.Stop
 		}
+		if spec.Troubleshoot == "" {
+			spec.Troubleshoot = from.Troubleshoot
+		}
 		if spec.NamespaceDomainPattern == "" {
 			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
 		}
@@ -483,11 +487,17 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 			// Override by non-empty values only
 			spec.Stop = from.Stop
 		}
+		if from.Troubleshoot != "" {
+			// Override by non-empty values only
+			spec.Troubleshoot = from.Troubleshoot
+		}
 		if from.NamespaceDomainPattern != "" {
 			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
 		}
 	}
 
+	spec.Templating = spec.Templating.MergeFrom(from.Templating, _type)
+	spec.Reconciling = spec.Reconciling.MergeFrom(from.Reconciling, _type)
 	spec.Defaults = spec.Defaults.MergeFrom(from.Defaults, _type)
 	spec.Configuration = spec.Configuration.MergeFrom(from.Configuration, _type)
 	spec.Templates = spec.Templates.MergeFrom(from.Templates, _type)
@@ -626,6 +636,7 @@ func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 const TemplatingPolicyManual = "manual"
 const TemplatingPolicyAuto = "auto"
 
+// IsAuto
 func (chi *ClickHouseInstallation) IsAuto() bool {
 	if chi == nil {
 		return false
@@ -636,30 +647,20 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 	return strings.ToLower(chi.Spec.Templating.GetPolicy()) == TemplatingPolicyAuto
 }
 
-const ReconcilingPolicyUnspecified = "unspecified"
-const ReconcilingPolicyWait = "wait"
-const ReconcilingPolicyNoWait = "nowait"
-
-func (chi *ClickHouseInstallation) IsReconcilingPolicyWait() bool {
-	if chi == nil {
-		return false
-	}
-	if (chi.Namespace == "") && (chi.Name == "") {
-		return false
-	}
-	return strings.ToLower(chi.Spec.Reconciling.GetPolicy()) == ReconcilingPolicyWait
-}
-
-func (chi *ClickHouseInstallation) IsReconcilingPolicyNoWait() bool {
-	if chi == nil {
-		return false
-	}
-	if (chi.Namespace == "") && (chi.Name == "") {
-		return false
-	}
-	return strings.ToLower(chi.Spec.Reconciling.GetPolicy()) == ReconcilingPolicyNoWait
-}
-
+// IsStopped
 func (chi *ClickHouseInstallation) IsStopped() bool {
 	return util.IsStringBoolTrue(chi.Spec.Stop)
+}
+
+// IsTroubleshoot
+func (chi *ClickHouseInstallation) IsTroubleshoot() bool {
+	return util.IsStringBoolTrue(chi.Spec.Troubleshoot)
+}
+
+// GetReconciling
+func (chi *ClickHouseInstallation) GetReconciling() *ChiReconciling {
+	if chi == nil {
+		return nil
+	}
+	return chi.Spec.Reconciling
 }

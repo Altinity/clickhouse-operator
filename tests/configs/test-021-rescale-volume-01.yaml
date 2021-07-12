@@ -19,7 +19,7 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 100Mi
+              storage: 1Gi
     podTemplates:
       - name: multi-volume
         spec:
@@ -29,4 +29,3 @@ spec:
               volumeMounts:
                 - name: disk1
                   mountPath: /var/lib/clickhouse
-

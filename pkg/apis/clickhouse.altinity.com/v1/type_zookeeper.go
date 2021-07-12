@@ -14,10 +14,12 @@
 
 package v1
 
+// NewChiZookeeperConfig creates new ChiZookeeperConfig object
 func NewChiZookeeperConfig() *ChiZookeeperConfig {
 	return new(ChiZookeeperConfig)
 }
 
+// IsEmpty checks whether config is empty
 func (zkc *ChiZookeeperConfig) IsEmpty() bool {
 	if zkc == nil {
 		return true
@@ -26,6 +28,7 @@ func (zkc *ChiZookeeperConfig) IsEmpty() bool {
 	return len(zkc.Nodes) == 0
 }
 
+// MergeFrom merges from provided object
 func (zkc *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeType) *ChiZookeeperConfig {
 	if from == nil {
 		return zkc

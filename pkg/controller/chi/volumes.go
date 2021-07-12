@@ -50,9 +50,8 @@ func (c *Controller) walkPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolum
 
 func (c *Controller) walkActualPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolumeClaim)) {
 	namespace := host.Address.Namespace
-	labeler := chopmodel.NewLabeler(c.chop, host.CHI)
 
-	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newContext(), newListOptions(labeler.GetSelectorHostScope(host)))
+	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newContext(), newListOptions(chopmodel.GetSelectorHostScope(host)))
 	if err != nil {
 		log.M(host).A().Error("FAIL get list of PVC for host %s/%s err:%v", namespace, host.Name, err)
 		return

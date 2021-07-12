@@ -58,6 +58,13 @@ func NewAnnouncer() Announcer {
 	}
 }
 
+// Silence produces silent announcer
+func (a Announcer) Silence() Announcer {
+	b := a
+	b.Announcer = b.Announcer.Silence()
+	return b
+}
+
 // V is inspired by log.V()
 func (a Announcer) V(level log.Level) Announcer {
 	b := a
