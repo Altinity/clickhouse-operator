@@ -58,6 +58,7 @@ func GetPooledDBConnection(params *ConnectionParams) *Connection {
 	return nil
 }
 
+// DropHost deletes host from the pool
 // TODO we need to be able to remove entries from the pool
 func DropHost(host string) {
 

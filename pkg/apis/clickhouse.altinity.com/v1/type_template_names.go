@@ -14,10 +14,12 @@
 
 package v1
 
+// NewChiTemplateNames creates new ChiTemplateNames object
 func NewChiTemplateNames() *ChiTemplateNames {
 	return new(ChiTemplateNames)
 }
 
+// HasHostTemplate checks whether host template is specified
 func (templateNames *ChiTemplateNames) HasHostTemplate() bool {
 	if templateNames == nil {
 		return false
@@ -25,6 +27,7 @@ func (templateNames *ChiTemplateNames) HasHostTemplate() bool {
 	return len(templateNames.HostTemplate) > 0
 }
 
+// GetHostTemplate gets host template
 func (templateNames *ChiTemplateNames) GetHostTemplate() string {
 	if templateNames == nil {
 		return ""
@@ -32,6 +35,7 @@ func (templateNames *ChiTemplateNames) GetHostTemplate() string {
 	return templateNames.HostTemplate
 }
 
+// HasPodTemplate checks whether pod template is specified
 func (templateNames *ChiTemplateNames) HasPodTemplate() bool {
 	if templateNames == nil {
 		return false
@@ -39,6 +43,7 @@ func (templateNames *ChiTemplateNames) HasPodTemplate() bool {
 	return len(templateNames.PodTemplate) > 0
 }
 
+// GetPodTemplate gets pod template
 func (templateNames *ChiTemplateNames) GetPodTemplate() string {
 	if templateNames == nil {
 		return ""
@@ -46,6 +51,7 @@ func (templateNames *ChiTemplateNames) GetPodTemplate() string {
 	return templateNames.PodTemplate
 }
 
+// HasDataVolumeClaimTemplate checks whether data volume claim template is specified
 func (templateNames *ChiTemplateNames) HasDataVolumeClaimTemplate() bool {
 	if templateNames == nil {
 		return false
@@ -53,6 +59,7 @@ func (templateNames *ChiTemplateNames) HasDataVolumeClaimTemplate() bool {
 	return len(templateNames.DataVolumeClaimTemplate) > 0
 }
 
+// GetDataVolumeClaimTemplate gets data volume claim template
 func (templateNames *ChiTemplateNames) GetDataVolumeClaimTemplate() string {
 	if templateNames == nil {
 		return ""
@@ -60,6 +67,7 @@ func (templateNames *ChiTemplateNames) GetDataVolumeClaimTemplate() string {
 	return templateNames.DataVolumeClaimTemplate
 }
 
+// HasLogVolumeClaimTemplate checks whether log volume claim template is specified
 func (templateNames *ChiTemplateNames) HasLogVolumeClaimTemplate() bool {
 	if templateNames == nil {
 		return false
@@ -67,6 +75,7 @@ func (templateNames *ChiTemplateNames) HasLogVolumeClaimTemplate() bool {
 	return len(templateNames.LogVolumeClaimTemplate) > 0
 }
 
+// GetLogVolumeClaimTemplate gets log volume claim template
 func (templateNames *ChiTemplateNames) GetLogVolumeClaimTemplate() string {
 	if templateNames == nil {
 		return ""
@@ -74,6 +83,7 @@ func (templateNames *ChiTemplateNames) GetLogVolumeClaimTemplate() string {
 	return templateNames.LogVolumeClaimTemplate
 }
 
+// HasServiceTemplate checks whether service template is specified
 func (templateNames *ChiTemplateNames) HasServiceTemplate() bool {
 	if templateNames == nil {
 		return false
@@ -81,6 +91,7 @@ func (templateNames *ChiTemplateNames) HasServiceTemplate() bool {
 	return len(templateNames.ServiceTemplate) > 0
 }
 
+// GetServiceTemplate gets service template
 func (templateNames *ChiTemplateNames) GetServiceTemplate() string {
 	if templateNames == nil {
 		return ""
@@ -88,6 +99,7 @@ func (templateNames *ChiTemplateNames) GetServiceTemplate() string {
 	return templateNames.ServiceTemplate
 }
 
+// HasClusterServiceTemplate checks whether cluster service template is specified
 func (templateNames *ChiTemplateNames) HasClusterServiceTemplate() bool {
 	if templateNames == nil {
 		return false
@@ -95,6 +107,7 @@ func (templateNames *ChiTemplateNames) HasClusterServiceTemplate() bool {
 	return len(templateNames.ClusterServiceTemplate) > 0
 }
 
+// GetClusterServiceTemplate gets cluster service template
 func (templateNames *ChiTemplateNames) GetClusterServiceTemplate() string {
 	if templateNames == nil {
 		return ""
@@ -102,6 +115,7 @@ func (templateNames *ChiTemplateNames) GetClusterServiceTemplate() string {
 	return templateNames.ClusterServiceTemplate
 }
 
+// HasShardServiceTemplate checks whether shard service template is specified
 func (templateNames *ChiTemplateNames) HasShardServiceTemplate() bool {
 	if templateNames == nil {
 		return false
@@ -109,6 +123,7 @@ func (templateNames *ChiTemplateNames) HasShardServiceTemplate() bool {
 	return len(templateNames.ShardServiceTemplate) > 0
 }
 
+// GetShardServiceTemplate gets shard service template
 func (templateNames *ChiTemplateNames) GetShardServiceTemplate() string {
 	if templateNames == nil {
 		return ""
@@ -116,6 +131,7 @@ func (templateNames *ChiTemplateNames) GetShardServiceTemplate() string {
 	return templateNames.ShardServiceTemplate
 }
 
+// HasReplicaServiceTemplate checks whether replica service template is specified
 func (templateNames *ChiTemplateNames) HasReplicaServiceTemplate() bool {
 	if templateNames == nil {
 		return false
@@ -123,6 +139,7 @@ func (templateNames *ChiTemplateNames) HasReplicaServiceTemplate() bool {
 	return len(templateNames.ReplicaServiceTemplate) > 0
 }
 
+// GetReplicaServiceTemplate gets replica service template
 func (templateNames *ChiTemplateNames) GetReplicaServiceTemplate() string {
 	if templateNames == nil {
 		return ""
@@ -130,6 +147,7 @@ func (templateNames *ChiTemplateNames) GetReplicaServiceTemplate() string {
 	return templateNames.ReplicaServiceTemplate
 }
 
+// HandleDeprecatedFields helps to deal with deprecated fields
 func (templateNames *ChiTemplateNames) HandleDeprecatedFields() {
 	if templateNames == nil {
 		return
@@ -139,6 +157,7 @@ func (templateNames *ChiTemplateNames) HandleDeprecatedFields() {
 	}
 }
 
+// MergeFrom merges from specified object
 func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type MergeType) *ChiTemplateNames {
 	if from == nil {
 		return templateNames

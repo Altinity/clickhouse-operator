@@ -14,19 +14,23 @@
 
 package v1
 
+// InheritSettingsFrom inherits settings from specified cluster
 func (shard *ChiShard) InheritSettingsFrom(cluster *ChiCluster) {
 	shard.Settings = shard.Settings.MergeFrom(cluster.Settings)
 }
 
+// InheritFilesFrom inherits files from specified cluster
 func (shard *ChiShard) InheritFilesFrom(cluster *ChiCluster) {
 	shard.Files = shard.Files.MergeFrom(cluster.Files)
 }
 
+// InheritTemplatesFrom inherits templates from specified cluster
 func (shard *ChiShard) InheritTemplatesFrom(cluster *ChiCluster) {
 	shard.Templates = shard.Templates.MergeFrom(cluster.Templates, MergeTypeFillEmptyValues)
 	shard.Templates.HandleDeprecatedFields()
 }
 
+// GetServiceTemplate gets service template
 func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	if !shard.Templates.HasShardServiceTemplate() {
 		return nil, false
@@ -35,9 +39,8 @@ func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	return shard.CHI.GetServiceTemplate(name)
 }
 
-func (shard *ChiShard) WalkHosts(
-	f func(host *ChiHost) error,
-) []error {
+// WalkHosts runs specified function on each host
+func (shard *ChiShard) WalkHosts(f func(host *ChiHost) error) []error {
 	res := make([]error, 0)
 
 	for replicaIndex := range shard.Hosts {
@@ -48,6 +51,7 @@ func (shard *ChiShard) WalkHosts(
 	return res
 }
 
+// HostsCount returns count of hosts in the shard
 func (shard *ChiShard) HostsCount() int {
 	count := 0
 	shard.WalkHosts(func(host *ChiHost) error {
@@ -57,10 +61,12 @@ func (shard *ChiShard) HostsCount() int {
 	return count
 }
 
+// GetCHI gets CHI of the shard
 func (shard *ChiShard) GetCHI() *ClickHouseInstallation {
 	return shard.CHI
 }
 
+// GetCluster gets cluster of the shard
 func (shard *ChiShard) GetCluster() *ChiCluster {
 	return shard.CHI.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
 }

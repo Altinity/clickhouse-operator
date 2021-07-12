@@ -30,7 +30,7 @@ const (
 	dsnUsernamePasswordPairUsernameOnlyPattern = "%s@"
 )
 
-// EndpointCredentials
+// EndpointCredentials specifies credentials to access specified endpoint
 type EndpointCredentials struct {
 	// External data
 	hostname string
@@ -43,7 +43,7 @@ type EndpointCredentials struct {
 	dsnHiddenCredentials string
 }
 
-// NewEndpointCredentials
+// NewEndpointCredentials creates new EndpointCredentials object
 func NewEndpointCredentials(hostname, username, password string, port int) *EndpointCredentials {
 	params := &EndpointCredentials{
 		hostname: hostname,
@@ -90,12 +90,12 @@ func (c *EndpointCredentials) makeDSN(hideCredentials bool) string {
 	)
 }
 
-// GetDSN
+// GetDSN gets DSN
 func (c *EndpointCredentials) GetDSN() string {
 	return c.dsn
 }
 
-// GetDSNWithHiddenCredentials
+// GetDSNWithHiddenCredentials gets DSN with hidden sensitive info
 func (c *EndpointCredentials) GetDSNWithHiddenCredentials() string {
 	return c.dsnHiddenCredentials
 }

@@ -20,6 +20,7 @@ import (
 	"strings"
 )
 
+// Caller returns triplet: file name, line number, function name of a caller
 func Caller(skip string) (string, int, string) {
 	pc := make([]uintptr, 7)
 	n := runtime.Callers(2, pc)

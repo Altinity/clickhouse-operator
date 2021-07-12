@@ -28,6 +28,7 @@ import (
 
 const (
 	// Kubernetes labels
+
 	LabelReadyName                    = clickhousealtinitycom.GroupName + "/ready"
 	LabelReadyValue                   = "yes"
 	LabelAppName                      = clickhousealtinitycom.GroupName + "/app"

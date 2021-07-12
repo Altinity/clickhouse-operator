@@ -29,7 +29,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// Creator
+// Creator specifies creator object
 type Creator struct {
 	chi                    *chiv1.ClickHouseInstallation
 	chConfigFilesGenerator *ClickHouseConfigFilesGenerator
@@ -37,7 +37,7 @@ type Creator struct {
 	a                      log.Announcer
 }
 
-// NewCreator
+// NewCreator creates new Creator object
 func NewCreator(chi *chiv1.ClickHouseInstallation) *Creator {
 	return &Creator{
 		chi:                    chi,
@@ -346,7 +346,7 @@ func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
 	c.a.V(2).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
 }
 
-// GetStatefulSetVersion
+// GetStatefulSetVersion gets version of the StatefulSet
 // TODO property of the labeler?
 func (c *Creator) GetStatefulSetVersion(statefulSet *apps.StatefulSet) (string, bool) {
 	if statefulSet == nil {
@@ -356,7 +356,7 @@ func (c *Creator) GetStatefulSetVersion(statefulSet *apps.StatefulSet) (string, 
 	return label, ok
 }
 
-// PreparePersistentVolume
+// PreparePersistentVolume prepares PV labels
 func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chiv1.ChiHost) *corev1.PersistentVolume {
 	pv.Labels = util.MergeStringMapsOverwrite(pv.Labels, c.labeler.getLabelsHostScope(host, false))
 	// And after the object is ready we can put version label
@@ -364,7 +364,7 @@ func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chi
 	return pv
 }
 
-// PreparePersistentVolumeClaim
+// PreparePersistentVolumeClaim prepares labels and annotations of the PVC
 func (c *Creator) PreparePersistentVolumeClaim(
 	pvc *corev1.PersistentVolumeClaim,
 	host *chiv1.ChiHost,

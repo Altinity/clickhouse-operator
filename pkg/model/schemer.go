@@ -27,13 +27,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// Schemer
+// Schemer specifies schema manager
 type Schemer struct {
 	*clickhouse.ClusterEndpointCredentials
 	Cluster *clickhouse.Cluster
 }
 
-// NewSchemer
+// NewSchemer creates new Schemer object
 func NewSchemer(username, password string, port int) *Schemer {
 	endpointCredentials := &clickhouse.ClusterEndpointCredentials{
 		Username: username,
@@ -250,7 +250,7 @@ func (s *Schemer) hostGetSyncTables(ctx context.Context, host *chop.ChiHost) ([]
 	return names, sqlStatements, nil
 }
 
-// HostSyncTables
+// HostSyncTables calls SYSTEM SYNC REPLICA for replicated tables
 func (s *Schemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error {
 	tableNames, syncTableSQLs, _ := s.hostGetSyncTables(ctx, host)
 	log.V(1).M(host).F().Info("Sync tables: %v as %v", tableNames, syncTableSQLs)
@@ -259,13 +259,13 @@ func (s *Schemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error 
 	return s.execHost(ctx, host, syncTableSQLs, opts)
 }
 
-// HostDropReplica
+// HostDropReplica calls SYSTEM DROP REPLICA
 func (s *Schemer) HostDropReplica(ctx context.Context, hostToRun, hostToDrop *chop.ChiHost) error {
 	log.V(1).M(hostToRun).F().Info("Drop replica: %v", CreateReplicaHostname(hostToDrop))
 	return s.execHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateReplicaHostname(hostToDrop))})
 }
 
-// HostCreateTables
+// HostCreateTables creates tables on a new host
 func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
@@ -302,7 +302,7 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 	return nil
 }
 
-// HostDropTables
+// HostDropTables drops tables on a host
 func (s *Schemer) HostDropTables(ctx context.Context, host *chop.ChiHost) error {
 	tableNames, dropTableSQLs, _ := s.hostGetDropTables(ctx, host)
 	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)

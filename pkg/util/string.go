@@ -29,8 +29,8 @@ func RandomString() string {
 	return hex.EncodeToString(b)
 }
 
+// Set of string boolean constants
 const (
-	// Set of string boolean constants
 	StringBool0                    = "0"
 	StringBool1                    = "1"
 	StringBoolFalseFirstCapital    = "False"
