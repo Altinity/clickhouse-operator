@@ -194,18 +194,22 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	case chiv1.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
 		log.V(1).M(host).F().Info("going to ROLLBACK FAILED StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
-		if statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, newGetOptions()); err != nil {
-			// Make copy of "previous" .Spec just to be sure nothing gets corrupted
-			// Update StatefulSet to its 'previous' oldStatefulSet - this is expected to rollback inapplicable changes
-			// Having StatefulSet .spec in rolled back status we need to delete current Pod - because in case of Pod being seriously broken,
-			// it is the only way to go. Just delete Pod and StatefulSet will recreated Pod with current .spec
-			// This will rollback Pod to previous .spec
-			statefulSet.Spec = *rollbackStatefulSet.Spec.DeepCopy()
-			statefulSet, err = c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, statefulSet, newUpdateOptions())
-			_ = c.statefulSetDeletePod(ctx, statefulSet, host)
-
-			return c.shouldContinueOnUpdateFailed()
+		statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, newGetOptions())
+		if err != nil {
+			// Unable to fetch current StatefulSet
+			return err
 		}
+
+		// Make copy of "previous" .Spec just to be sure nothing gets corrupted
+		// Update StatefulSet to its 'previous' oldStatefulSet - this is expected to rollback inapplicable changes
+		// Having StatefulSet .spec in rolled back status we need to delete current Pod - because in case of Pod being seriously broken,
+		// it is the only way to go. Just delete Pod and StatefulSet will recreated Pod with current .spec
+		// This will rollback Pod to previous .spec
+		statefulSet.Spec = *rollbackStatefulSet.Spec.DeepCopy()
+		statefulSet, err = c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, statefulSet, newUpdateOptions())
+		_ = c.statefulSetDeletePod(ctx, statefulSet, host)
+
+		return c.shouldContinueOnUpdateFailed()
 
 	case chiv1.OnStatefulSetUpdateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
