@@ -45,18 +45,19 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=60):
     return cmd.output if (code == 0) or ok_to_fail else ""
 
 
-def delete_chi(chi, ns=namespace):
+def delete_chi(chi, ns=namespace, wait = True):
     with When(f"Delete chi {chi}"):
         launch(f"delete chi {chi}", ns=ns, timeout=600)
-        wait_objects(
-            chi,
-            {
-                "statefulset": 0,
-                "pod": 0,
-                "service": 0,
-            },
-            ns,
-        )
+        if wait:
+            wait_objects(
+                chi,
+                {
+                    "statefulset": 0,
+                    "pod": 0,
+                    "service": 0,
+                    },
+                ns,
+                )
 
 
 def delete_all_chi(ns=namespace):

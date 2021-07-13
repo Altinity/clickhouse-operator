@@ -1473,3 +1473,42 @@ def test_026(self):
             assert out == "['disk2']"
             
     kubectl.delete_chi(chi)
+    
+@TestScenario
+@Name("test_027. Test troubleshooting mode")
+def test_027(self):
+    config="configs/test-027-troubleshooting-1.yaml"
+    chi = manifest.get_chi_name(util.get_full_path(config))
+    kubectl.create_and_check(
+        config= config,
+        check = {
+            "pod_count": 1,
+            "do_not_delete": 1,
+            "chi_status": "InProgress",
+        },
+    )
+    with When("ClickHouse can not start"):
+        kubectl.wait_field(
+            "pod",
+            "chi-test-027-trouble-default-0-0-0",
+            ".status.containerStatuses[0].state.waiting.reason",
+            "CrashLoopBackOff"
+        )
+        with Then("We can start in troublesooting mode"):
+            kubectl.create_and_check(
+                config= "configs/test-027-troubleshooting-2.yaml",
+                check = {
+                    "pod_count": 1,
+                    "do_not_delete": 1,
+                },
+            )
+        with And("We can start in normal mode after correcting the problem"):
+            kubectl.create_and_check(
+                config= "configs/test-027-troubleshooting-3.yaml",
+                check = {
+                    "pod_count": 1,
+                },
+            )
+                                     
+            
+            

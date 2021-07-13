@@ -68,6 +68,7 @@ if main():
                 test_operator.test_024,
                 test_operator.test_025,
                 test_operator.test_026,
+                test_operator.test_027,
             ]
             run_tests = all_tests
 
