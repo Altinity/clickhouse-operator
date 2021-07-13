@@ -582,11 +582,11 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 				chiv1.NewChiHostReconcileAttributes().SetAdd(),
 			),
 		)
-	if err := w.reconcileCHIConfigMapCommon(ctx, chi, options, true); err != nil {
+	if err := w.reconcileCHIConfigMapCommon(ctx, chi, options); err != nil {
 		w.a.A().Error("failed to reconcile config map common. err: %v", err)
 	}
 	// 3. CHI users ConfigMap
-	if err := w.reconcileCHIConfigMapUsers(ctx, chi, nil, true); err != nil {
+	if err := w.reconcileCHIConfigMapUsers(ctx, chi, nil); err != nil {
 		w.a.A().Error("failed to reconcile config map users. err: %v", err)
 	}
 
@@ -604,7 +604,7 @@ func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *chiv1.Cli
 	defer w.a.V(2).M(chi).E().P()
 
 	// CHI ConfigMaps with update
-	return w.reconcileCHIConfigMapCommon(ctx, chi, nil, true)
+	return w.reconcileCHIConfigMapCommon(ctx, chi, nil)
 }
 
 // reconcileCHIConfigMaps reconciles all CHI's ConfigMaps
@@ -636,7 +636,6 @@ func (w *worker) reconcileCHIConfigMapCommon(
 	ctx context.Context,
 	chi *chiv1.ClickHouseInstallation,
 	options *chopmodel.ClickHouseConfigFilesGeneratorOptions,
-	update bool,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
@@ -647,7 +646,7 @@ func (w *worker) reconcileCHIConfigMapCommon(
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
 	configMapCommon := w.creator.CreateConfigMapCHICommon(options)
-	err := w.reconcileConfigMap(ctx, chi, configMapCommon, update)
+	err := w.reconcileConfigMap(ctx, chi, configMapCommon)
 	if err == nil {
 		w.registryReconciled.RegisterConfigMap(configMapCommon.ObjectMeta)
 	} else {
@@ -662,7 +661,6 @@ func (w *worker) reconcileCHIConfigMapUsers(
 	ctx context.Context,
 	chi *chiv1.ClickHouseInstallation,
 	options *chopmodel.ClickHouseConfigFilesGeneratorOptions,
-	update bool,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
@@ -671,7 +669,7 @@ func (w *worker) reconcileCHIConfigMapUsers(
 
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.creator.CreateConfigMapCHICommonUsers()
-	err := w.reconcileConfigMap(ctx, chi, configMapUsers, update)
+	err := w.reconcileConfigMap(ctx, chi, configMapUsers)
 	if err == nil {
 		w.registryReconciled.RegisterConfigMap(configMapUsers.ObjectMeta)
 	} else {
@@ -757,7 +755,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiv1.ChiHost) error {
 	}
 
 	// Reconcile host's ConfigMap
-	if err := w.reconcileConfigMap(ctx, host.CHI, configMap, true); err != nil {
+	if err := w.reconcileConfigMap(ctx, host.CHI, configMap); err != nil {
 		w.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
 		return err
 	}
@@ -921,7 +919,7 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *chi
 
 	// Remove host from cluster config and wait for ClickHouse to pick-up the change
 	if w.shouldWaitExcludeHost(host) {
-		_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options, true)
+		_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
 		_ = w.waitHostNotInCluster(ctx, host)
 	}
 }
@@ -940,7 +938,7 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 			),
 		)
 		// Add host to the cluster config (always) and wait for ClickHouse to pick-up the change
-	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options, true)
+	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
 	if w.shouldWaitIncludeHost(host) {
 		_ = w.waitHostInCluster(ctx, host)
 	}
@@ -962,7 +960,7 @@ func (w *worker) shouldExcludeHost(host *chiv1.ChiHost) bool {
 	return true
 }
 
-// determines whether reconciler should wait for host to be excluded from cluster
+// shouldWaitExcludeHost determines whether reconciler should wait for host to be excluded from cluster
 func (w *worker) shouldWaitExcludeHost(host *chiv1.ChiHost) bool {
 	// Check CHI settings
 	switch {
@@ -976,7 +974,7 @@ func (w *worker) shouldWaitExcludeHost(host *chiv1.ChiHost) bool {
 	return chop.Config().ReconcileWaitExclude
 }
 
-// determines whether reconciler should wait for host to be included into cluster
+// shouldWaitIncludeHost determines whether reconciler should wait for host to be included into cluster
 func (w *worker) shouldWaitIncludeHost(host *chiv1.ChiHost) bool {
 	status := host.ReconcileAttributes.GetStatus()
 	if (status == chiv1.StatefulSetStatusNew) || (status == chiv1.StatefulSetStatusSame) {
@@ -1408,7 +1406,6 @@ func (w *worker) reconcileConfigMap(
 	ctx context.Context,
 	chi *chiv1.ClickHouseInstallation,
 	configMap *core.ConfigMap,
-	update bool,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
@@ -1423,9 +1420,6 @@ func (w *worker) reconcileConfigMap(
 
 	if curConfigMap != nil {
 		// We have ConfigMap - try to update it
-		if !update {
-			return nil
-		}
 		err = w.updateConfigMap(ctx, chi, configMap)
 	}
 
