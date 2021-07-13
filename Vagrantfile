@@ -139,7 +139,8 @@ Vagrant.configure(2) do |config|
     # minikube
     # MINIKUBE_VERSION=1.18.1
     # MINIKUBE_VERSION=1.19.0
-    MINIKUBE_VERSION=1.20.0
+    # MINIKUBE_VERSION=1.20.0
+    MINIKUBE_VERSION=1.22.0
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -149,13 +150,13 @@ Vagrant.configure(2) do |config|
 #    export VALIDATE_YAML=false # only for 1.14
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
-    K8S_VERSION=${K8S_VERSION:-1.17.17}
+#    K8S_VERSION=${K8S_VERSION:-1.17.17}
 #    K8S_VERSION=${K8S_VERSION:-1.18.19}
-#    K8S_VERSION=${K8S_VERSION:-1.19.11}
+#    K8S_VERSION=${K8S_VERSION:-1.19.12}
 #    performance issue 1.20.x, 1.21.x, only 1.22 will good to start
 # https://github.com/kubernetes/kubeadm/issues/2395
-#    K8S_VERSION=${K8S_VERSION:-1.20.7}
-#    K8S_VERSION=${K8S_VERSION:-1.21.1}
+#    K8S_VERSION=${K8S_VERSION:-1.20.8}
+    K8S_VERSION=${K8S_VERSION:-1.21.2}
     export VALIDATE_YAML=true
 
     killall kubectl || true

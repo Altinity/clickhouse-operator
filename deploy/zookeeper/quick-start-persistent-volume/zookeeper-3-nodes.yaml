@@ -90,11 +90,14 @@ spec:
       containers:
         - name: kubernetes-zookeeper
           imagePullPolicy: IfNotPresent
-          image: "docker.io/zookeeper:3.6.1"
+          image: "docker.io/zookeeper:3.7.0"
           resources:
             requests:
-              memory: "4Gi"
+              memory: "512M"
               cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
           ports:
             - containerPort: 2181
               name: client
@@ -136,8 +139,10 @@ spec:
                 echo 'preAllocSize=131072'
                 echo 'snapCount=3000000'
                 echo 'leaderServes=yes'
-                echo 'standaloneEnabled=true'
-                echo '4lw.commands.whitelist=stat, ruok, conf, isro, mntr'
+                echo 'standaloneEnabled=false'
+                echo '4lw.commands.whitelist=*'
+                echo 'maxResponseCacheSize=1200'
+                echo 'maxGetChildrenResponseCacheSize=1200'
                 echo 'metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider'
                 echo "metricsProvider.httpPort=${PROMETHEUS_PORT}"
               } > /conf/zoo.cfg &&
@@ -188,6 +193,7 @@ spec:
           volumeMounts:
             - name: datadir-volume
               mountPath: /var/lib/zookeeper
+
       # Run as a non-privileged user
       securityContext:
         runAsUser: 1000
