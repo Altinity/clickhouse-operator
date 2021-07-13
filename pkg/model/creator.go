@@ -450,10 +450,18 @@ func (c *Creator) setupTroubleshoot(statefulSet *apps.StatefulSet) {
 	}
 
 	if c.chi.IsTroubleshoot() {
-		if len(container.Command) > 0 {
-			container.Command = append(container.Command, "|| sleep 1800")
+		if len(container.Command) == 0 {
+			// Substitute command with troubleshooting-capable command
+			cmd := []string{
+				"/bin/sh",
+				"-c",
+				"/entrypoint.sh || sleep 1800",
+			}
+			container.Command = append(container.Command, cmd...)
+			// Sleep is not able to respond to probes
+			container.LivenessProbe = nil
+			container.ReadinessProbe = nil
 		}
-		container.LivenessProbe = nil
 	}
 }
 
