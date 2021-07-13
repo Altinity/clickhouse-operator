@@ -575,8 +575,14 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 		}
 	}
 
-	// 2. CHI common ConfigMap without update - create only
-	if err := w.reconcileCHIConfigMapCommon(ctx, chi, nil, false); err != nil {
+	// 2. CHI common ConfigMap without added hosts
+	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
+		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
+			ExcludeReconcileAttributes(
+				chiv1.NewChiHostReconcileAttributes().SetAdd(),
+			),
+		)
+	if err := w.reconcileCHIConfigMapCommon(ctx, chi, options, true); err != nil {
 		w.a.A().Error("failed to reconcile config map common. err: %v", err)
 	}
 	// 3. CHI users ConfigMap
@@ -602,6 +608,7 @@ func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *chiv1.Cli
 }
 
 // reconcileCHIConfigMaps reconciles all CHI's ConfigMaps
+/*
 func (w *worker) reconcileCHIConfigMaps(
 	ctx context.Context,
 	chi *chiv1.ClickHouseInstallation,
@@ -622,6 +629,7 @@ func (w *worker) reconcileCHIConfigMaps(
 
 	return nil
 }
+*/
 
 // reconcileCHIConfigMapCommon reconciles all CHI's common ConfigMap
 func (w *worker) reconcileCHIConfigMapCommon(
@@ -918,7 +926,7 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *chi
 	}
 }
 
-// includeHostIntoClickHouseCluster includes host to ClickHouse configuration
+// includeHostIntoClickHouseCluster includes host into ClickHouse configuration
 func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chiv1.ChiHost) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
@@ -1740,30 +1748,37 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		}
 	}
 
-	err := w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
-	if err == nil {
-		host.CHI.Status.UpdatedHostsCount++
-		_ = w.c.updateCHIObjectStatus(ctx, host.CHI, false)
-		w.a.V(1).
-			WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
+	if chopmodel.IsStatefulSetReady(curStatefulSet) {
+		err := w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
+		if err == nil {
+			host.CHI.Status.UpdatedHostsCount++
+			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, false)
+			w.a.V(1).
+				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
+				WithStatusAction(host.CHI).
+				M(host).F().
+				Info("Update StatefulSet(%s/%s) - completed", namespace, name)
+			return nil
+		}
+
+		w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
 			WithStatusAction(host.CHI).
-			M(host).F().
-			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
-		return nil
+			WithStatusError(host.CHI).
+			M(host).A().
+			Error("Update StatefulSet(%s/%s) - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
+
+		diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, newStatefulSet.Spec)
+		w.a.M(host).Info("StatefulSet.Spec diff:")
+		w.a.M(host).Info(util.MessageDiffString(diff, equal))
 	}
 
-	w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
-		WithStatusAction(host.CHI).
-		WithStatusError(host.CHI).
-		M(host).A().
-		Error("Update StatefulSet(%s/%s) - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
+	return w.recreateStatefulSet(ctx, host)
+}
 
-	diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, newStatefulSet.Spec)
-	w.a.M(host).Info("StatefulSet.Spec diff:")
-	w.a.M(host).Info(util.MessageDiffString(diff, equal))
-
-	err = w.c.deleteStatefulSet(ctx, host)
-	err = w.reconcilePVCs(ctx, host)
+// recreateStatefulSet
+func (w *worker) recreateStatefulSet(ctx context.Context, host *chiv1.ChiHost) error {
+	_ = w.c.deleteStatefulSet(ctx, host)
+	_ = w.reconcilePVCs(ctx, host)
 	host.StatefulSet = host.DesiredStatefulSet
 	return w.createStatefulSet(ctx, host)
 }
