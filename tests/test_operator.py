@@ -993,7 +993,7 @@ def test_017(self):
 def test_018(self):
     chi = "test-018-configmap"
     kubectl.create_and_check(
-        config="configs/test-018-configmap.yaml",
+        config="configs/test-018-configmap-1.yaml",
         check={
             "pod_count": 1,
             "do_not_delete": 1,
