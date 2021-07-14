@@ -1734,16 +1734,16 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		M(host).F().
 		Info("Update StatefulSet(%s/%s) - started", namespace, name)
 
-	if timeout := time.Duration(host.GetCHI().GetReconciling().GetConfigMapPropagationTimeout()); (timeout == 0) || w.cmUpdate.IsZero() {
+	if timeout := host.GetCHI().GetReconciling().GetConfigMapPropagationTimeoutDuration(); (timeout == 0) || w.cmUpdate.IsZero() {
 		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable")
 	} else {
 		elapsed := time.Now().Sub(w.cmUpdate)
 		if elapsed < timeout {
 			wait := timeout - elapsed
-			w.a.V(1).M(host).F().Info("Wait for ConfigMap propagation for %s", wait/time.Second)
+			w.a.V(1).M(host).F().Info("Wait for ConfigMap propagation for %s %s/%s", wait, elapsed, timeout)
 			util.WaitContextDoneOrTimeout(ctx, wait)
 		} else {
-			w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed")
+			w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. %s/%s", elapsed, timeout)
 		}
 	}
 

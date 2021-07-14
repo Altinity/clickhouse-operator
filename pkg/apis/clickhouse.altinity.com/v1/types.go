@@ -378,7 +378,7 @@ func (t *ChiReconciling) SetDefaults() *ChiReconciling {
 		return nil
 	}
 	t.Policy = ReconcilingPolicyUnspecified
-	t.ConfigMapPropagationTimeout = 60
+	t.ConfigMapPropagationTimeout = 90
 	t.Cleanup = NewChiCleanup().SetDefaults()
 	return t
 }
