@@ -59,7 +59,7 @@ if main():
                 test_operator.test_015,
                 test_operator.test_016,
                 test_operator.test_017,
-                # test_operator.test_018, # Obsolete, covered by test_016
+                test_operator.test_018,
                 test_operator.test_019,
                 test_operator.test_020,
                 test_operator.test_021,

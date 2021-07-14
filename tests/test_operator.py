@@ -974,9 +974,10 @@ def test_017(self):
 
 
 @TestScenario
-@Name("test_018. Test that configuration is properly updated")
+@Name("test_018. Test that server settings are applied before statefulset is started")
 # Obsolete, covered by test_016
 def test_018(self):
+    chi = "test-018-configmap"
     kubectl.create_and_check(
         config="configs/test-018-configmap.yaml",
         check={
@@ -984,31 +985,27 @@ def test_018(self):
             "do_not_delete": 1,
         },
     )
-    chi_name = "test-018-configmap"
 
-    with Then("user1/networks/ip should be in config"):
-        chi = kubectl.get("chi", chi_name)
-        assert "user1/networks/ip" in chi["spec"]["configuration"]["users"]
+    with When("Update settings"):
+        kubectl.create_and_check(
+            config="configs/test-018-configmap-2.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+                },
+            )
+        
+        with Then("Configmap on the pod should be updated"):
+            display_name = kubectl.launch(
+                f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep display_name /etc/clickhouse-server/config.d/chop-generated-settings.xml\"")
+            print(display_name)
+            assert "new_display_name" in display_name
+            with Then("And ClickHouse should pick them up"):
+                macros = clickhouse.query(chi, "SELECT substitution from system.macros where macro = 'test'")
+                print(macros)
+                assert "new_test" == macros
 
-    start_time = kubectl.get_field("pod", f"chi-{chi_name}-default-0-0-0", ".status.startTime")
-
-    kubectl.create_and_check(
-        config="configs/test-018-configmap-2.yaml",
-        check={
-            "pod_count": 1,
-            "do_not_delete": 1,
-        },
-    )
-    with Then("user2/networks should be in config"):
-        chi = kubectl.get("chi", chi_name)
-        assert "user2/networks/ip" in chi["spec"]["configuration"]["users"]
-        with And("user1/networks/ip should NOT be in config"):
-            assert "user1/networks/ip" not in chi["spec"]["configuration"]["users"]
-        with And("Pod should not be restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi_name}-default-0-0-0", ".status.startTime")
-            assert start_time == new_start_time
-
-    kubectl.delete_chi(chi_name)
+    kubectl.delete_chi(chi)
 
 
 @TestScenario
