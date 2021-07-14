@@ -1216,7 +1216,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiv1.ClickHouseInstallati
 	// Need to delete all these items
 
 	var err error
-	//err = w.dropReplica(ctx, host)
+	w.deleteTables(ctx, host)
 	err = w.c.deleteHost(ctx, host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
