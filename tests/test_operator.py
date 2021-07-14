@@ -1495,7 +1495,6 @@ def test_027(self):
         check={
             "pod_count": 1,
             "do_not_delete": 1,
-            "chi_status": "InProgress",
         },
     )
     with When("ClickHouse can not start"):
@@ -1511,7 +1510,6 @@ def test_027(self):
                 check={
                     "pod_count": 1,
                     "do_not_delete": 1,
-                    "chi_status": "Completed",
                 },
             )
             with And("We can exec to the pod"):
@@ -1523,6 +1521,5 @@ def test_027(self):
                 config="configs/test-027-troubleshooting-3.yaml",
                 check={
                     "pod_count": 1,
-                    "chi_status": "Completed",
                 },
             )
