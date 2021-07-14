@@ -1488,11 +1488,11 @@ def test_026(self):
 @TestScenario
 @Name("test_027. Test troubleshooting mode")
 def test_027(self):
-    config="configs/test-027-troubleshooting-1.yaml"
+    config = "configs/test-027-troubleshooting-1.yaml"
     chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
-        config= config,
-        check = {
+        config=config,
+        check={
             "pod_count": 1,
             "do_not_delete": 1,
             "chi_status": "InProgress",
@@ -1505,12 +1505,13 @@ def test_027(self):
             ".status.containerStatuses[0].state.waiting.reason",
             "CrashLoopBackOff"
         )
-        with Then("We can start in troublesooting mode"):
+        with Then("We can start in troubleshooting mode"):
             kubectl.create_and_check(
-                config= "configs/test-027-troubleshooting-2.yaml",
-                check = {
+                config="configs/test-027-troubleshooting-2.yaml",
+                check={
                     "pod_count": 1,
                     "do_not_delete": 1,
+                    "chi_status": "Completed",
                 },
             )
             with And("We can exec to the pod"):
@@ -1519,11 +1520,9 @@ def test_027(self):
 
         with Then("We can start in normal mode after correcting the problem"):
             kubectl.create_and_check(
-                config= "configs/test-027-troubleshooting-3.yaml",
-                check = {
+                config="configs/test-027-troubleshooting-3.yaml",
+                check={
                     "pod_count": 1,
+                    "chi_status": "Completed",
                 },
             )
-                                     
-            
-            
