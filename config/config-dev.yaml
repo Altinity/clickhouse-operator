@@ -87,6 +87,7 @@ chConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi
 ################################################
 
 # ClickHouse credentials (username, password and port) to be used by operator to connect to ClickHouse instances for:
+# for:
 # 1. Metrics requests
 # 2. Schema maintenance
 # 3. DROP DNS CACHE
