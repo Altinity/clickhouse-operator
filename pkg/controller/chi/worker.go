@@ -1741,7 +1741,10 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		if elapsed < timeout {
 			wait := timeout - elapsed
 			w.a.V(1).M(host).F().Info("Wait for ConfigMap propagation for %s %s/%s", wait, elapsed, timeout)
-			util.WaitContextDoneOrTimeout(ctx, wait)
+			if util.WaitContextDoneOrTimeout(ctx, wait) {
+				log.V(2).Info("ctx is done")
+				return nil
+			}
 		} else {
 			w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. %s/%s", elapsed, timeout)
 		}
@@ -1776,6 +1779,11 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 
 // recreateStatefulSet
 func (w *worker) recreateStatefulSet(ctx context.Context, host *chiv1.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	_ = w.c.deleteStatefulSet(ctx, host)
 	_ = w.reconcilePVCs(ctx, host)
 	host.StatefulSet = host.DesiredStatefulSet
