@@ -620,7 +620,7 @@ def test_014(self):
 
     create_table = """
     CREATE TABLE test_local(a Int8) 
-    Engine = ReplicatedMergeTree('/clickhouse/{installation}/{cluster}/tables/{shard}/{database}/{table}', '{replica}')
+    Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
     PARTITION BY tuple() 
     ORDER BY a
     """.replace('\r', '').replace('\n', '')
@@ -773,8 +773,22 @@ def test_014(self):
         with Then("Table should be back to normal"):
             clickhouse.query(chi, "INSERT INTO test_local values(3)")
 
+    with When("Delete chi"):
+        kubectl.delete_chi("test-014-replication")
+        with Then("Tables should be deleted. We can test it re-creating the chi and checking ZooKeeper contents"):
+            kubectl.create_and_check(
+                config=config,
+                check={
+                    "pod_count": 1,
+                    "do_not_delete": 1,
+                    })
+            out = clickhouse.query(
+                chi,
+                f"select count() from system.zookeeper where path ='/clickhouse/{chi}/tables/0/default'")
+            print(f"Found {out} replicated tables in ZooKeeper")
+            assert out == "0"
+        
     kubectl.delete_chi("test-014-replication")
-
 
 @TestScenario
 @Name("test_015. Test circular replication with hostNetwork")
@@ -1499,7 +1513,11 @@ def test_027(self):
                     "do_not_delete": 1,
                 },
             )
-        with And("We can start in normal mode after correcting the problem"):
+            with And("We can exec to the pod"):
+                out = kubectl.launch(f"exec chi-{chi}-default-0-0-0 -- bash -c \"echo Success\"")
+                assert "Success" == out
+
+        with Then("We can start in normal mode after correcting the problem"):
             kubectl.create_and_check(
                 config= "configs/test-027-troubleshooting-3.yaml",
                 check = {
