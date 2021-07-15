@@ -319,8 +319,8 @@ func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool 
 		),
 	}
 	//TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
-	//opts := clickhouse.NewQueryOptions().SetSilent(true)
-	opts := clickhouse.NewQueryOptions()
+	opts := clickhouse.NewQueryOptions().SetSilent(true)
+	//opts := clickhouse.NewQueryOptions()
 	err := s.execHost(ctx, host, sqls, opts)
 	if err == nil {
 		log.V(1).M(host).F().Info("Host inside the cluster")
