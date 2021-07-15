@@ -311,6 +311,7 @@ func (s *Schemer) HostDropTables(ctx context.Context, host *chop.ChiHost) error 
 
 // IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
 func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool {
+	inside := false
 	sqls := []string{
 		heredoc.Docf(
 			`SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local`,
@@ -318,7 +319,17 @@ func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool 
 		),
 	}
 	//TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
-	return s.execHost(ctx, host, sqls, clickhouse.NewQueryOptions().SetSilent(true)) == nil
+	//opts := clickhouse.NewQueryOptions().SetSilent(true)
+	opts := clickhouse.NewQueryOptions()
+	err := s.execHost(ctx, host, sqls, opts)
+	if err == nil {
+		log.V(1).M(host).F().Info("Host inside the cluster")
+		inside = true
+	} else {
+		log.V(1).M(host).F().Info("Host outside of the cluster")
+		inside = false
+	}
+	return inside
 }
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
