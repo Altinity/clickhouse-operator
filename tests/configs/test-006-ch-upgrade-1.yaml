@@ -3,6 +3,8 @@ kind: ClickHouseInstallation
 metadata:
   name: test-006
 spec:
+  reconciling:
+    policy: "wait"
   templates:
     podTemplates:
     - name: clickhouse-old
@@ -17,4 +19,4 @@ spec:
     clusters:
     - name: shards
       layout:
-        shardsCount: 2
+        replicasCount: 2

@@ -105,7 +105,6 @@ def test_006(self):
                 "do_not_delete": 1,
             }
         )
-    time.sleep(60)
     with Then("Use different podTemplate and confirm that pod image is updated"):
         kubectl.create_and_check(
             config="configs/test-006-ch-upgrade-2.yaml",
@@ -115,7 +114,6 @@ def test_006(self):
                 "do_not_delete": 1,
             }
         )
-    time.sleep(90)
     with Then("Change image in podTemplate itself and confirm that pod image is updated"):
         kubectl.create_and_check(
             config="configs/test-006-ch-upgrade-3.yaml",
@@ -1495,6 +1493,7 @@ def test_027(self):
         check={
             "pod_count": 1,
             "do_not_delete": 1,
+            "chi_status": "InProgress",
         },
     )
     with When("ClickHouse can not start"):
