@@ -411,7 +411,12 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 		switch command.cmd {
 		case reconcileAdd:
 			newjs, _ := json.Marshal(command.new)
-			newchi := chi.ClickHouseInstallation{}
+			newchi := chi.ClickHouseInstallation{
+				TypeMeta: meta.TypeMeta{
+					APIVersion: chi.SchemeGroupVersion.String(),
+					Kind:       chi.ClickHouseInstallationCRDResourceKind,
+				},
+			}
 			json.Unmarshal(newjs, &newchi)
 			command.new = &newchi
 		case reconcileUpdate:
@@ -443,7 +448,12 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 				oldjs, _ := json.Marshal(command.old)
 				newjs, _ := json.Marshal(command.new)
 				oldchi := chi.ClickHouseInstallation{}
-				newchi := chi.ClickHouseInstallation{}
+				newchi := chi.ClickHouseInstallation{
+					TypeMeta: meta.TypeMeta{
+						APIVersion: chi.SchemeGroupVersion.String(),
+						Kind:       chi.ClickHouseInstallationCRDResourceKind,
+					},
+				}
 				json.Unmarshal(oldjs, &oldchi)
 				json.Unmarshal(newjs, &newchi)
 				command.old = &oldchi
