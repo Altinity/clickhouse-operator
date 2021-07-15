@@ -314,13 +314,6 @@ func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool 
 	inside := false
 	sqls := []string{
 		heredoc.Docf(
-			`SYSTEM DROP DNS CACHE`,
-		),
-		heredoc.Docf(
-			`SELECT hostName() FROM clusterAllReplicas('%s', system, one)`,
-			allShardsOneReplicaClusterName,
-		),
-		heredoc.Docf(
 			`SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local`,
 			allShardsOneReplicaClusterName,
 		),
