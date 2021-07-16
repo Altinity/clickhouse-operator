@@ -274,8 +274,9 @@ EOF
 
     pip3 install -r /vagrant/tests/requirements.txt
 
-    python3 /vagrant/tests/test_backup_alerts.py
     python3 /vagrant/tests/test_metrics_alerts.py
+    python3 /vagrant/tests/test_zookeeper.py
+    python3 /vagrant/tests/test_backup_alerts.py
     python3 /vagrant/tests/test_examples.py
     python3 /vagrant/tests/test_metrics_exporter.py
     python3 /vagrant/tests/test.py

@@ -40,12 +40,10 @@ def restart_operator(ns=settings.operator_namespace, timeout=600):
     kubectl.wait_pod_status(pod_name, "Running", ns=ns)
 
 
-def require_zookeeper():
+def require_zookeeper(manifest='zookeeper-1-node-1GB-for-tests-only.yaml', force_install=False):
     with Given("Install Zookeeper if missing"):
-        if kubectl.get_count("service", name="zookeeper") == 0:
-            config = util.get_full_path(
-                "../deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node-1GB-for-tests-only.yaml"
-            )
+        if force_install or kubectl.get_count("service", name="zookeeper") == 0:
+            config = util.get_full_path(f"../deploy/zookeeper/quick-start-persistent-volume/{manifest}")
             kubectl.apply(config)
             kubectl.wait_object("pod", "zookeeper-0")
             kubectl.wait_pod_status("zookeeper-0", "Running")
@@ -68,3 +66,30 @@ def wait_clickhouse_cluster_ready(chi):
                         with Then("Not ready, sleep 5 seconds"):
                             all_pods_ready = False
                             time.sleep(5)
+
+
+def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name):
+    with Given("install zookeeper+clickhouse"):
+        kubectl.delete_ns(settings.test_namespace, ok_to_fail=True, timeout=600)
+        kubectl.create_ns(settings.test_namespace)
+        util.require_zookeeper()
+        kubectl.create_and_check(
+            config=chi_file,
+            check={
+                "apply_templates": [
+                    chi_template_file,
+                    "templates/tpl-persistent-volume-100Mi.yaml"
+                ],
+                "object_counts": {
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
+                },
+                "do_not_delete": 1
+            }
+        )
+        clickhouse_operator_spec = kubectl.get(
+            "pod", name="", ns=settings.operator_namespace, label="-l app=clickhouse-operator"
+        )
+        chi = kubectl.get("chi", ns=settings.test_namespace, name=chi_name)
+        return clickhouse_operator_spec, chi
