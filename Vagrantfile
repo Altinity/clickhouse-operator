@@ -152,11 +152,11 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
 #    K8S_VERSION=${K8S_VERSION:-1.17.17}
 #    K8S_VERSION=${K8S_VERSION:-1.18.19}
-#    K8S_VERSION=${K8S_VERSION:-1.19.12}
+#    K8S_VERSION=${K8S_VERSION:-1.19.13}
 #    performance issue 1.20.x, 1.21.x, only 1.22 will good to start
 # https://github.com/kubernetes/kubeadm/issues/2395
-#    K8S_VERSION=${K8S_VERSION:-1.20.8}
-    K8S_VERSION=${K8S_VERSION:-1.21.2}
+#    K8S_VERSION=${K8S_VERSION:-1.20.9}
+    K8S_VERSION=${K8S_VERSION:-1.21.3}
     export VALIDATE_YAML=true
 
     killall kubectl || true
