@@ -34,7 +34,7 @@ curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/de
 ```
 Take into account explicitly specified namespace
 ```bash
-OPERATOR_NAMESPACE=test-clickhouse-operator
+export OPERATOR_NAMESPACE=test-clickhouse-operator
 ```
 This namespace would be created and used to install `clickhouse-operator` into.
 Install script would download some `.yaml` and `.xml` files and install `clickhouse-operator` into specified namespace.
