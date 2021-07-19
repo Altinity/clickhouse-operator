@@ -12,32 +12,6 @@ import alerts
 import util
 
 
-def drop_table_on_cluster(cluster_name='all-sharded', table='default.test'):
-    drop_local_sql = f'DROP TABLE {table} ON CLUSTER \'{cluster_name}\' SYNC'
-    clickhouse.query(chi["metadata"]["name"], drop_local_sql, timeout=120)
-
-
-def create_table_on_cluster(cluster_name='all-sharded', table='default.test',
-                            create_definition='(event_time DateTime, test UInt64) ENGINE MergeTree() ORDER BY tuple()'):
-    create_local_sql = f'CREATE TABLE {table} ON CLUSTER \'{cluster_name}\' {create_definition}'
-    clickhouse.query(chi["metadata"]["name"], create_local_sql, timeout=120)
-
-
-def drop_distributed_table_on_cluster(cluster_name='all-sharded', distr_table='default.test_distr', local_table='default.test'):
-    drop_distr_sql = f'DROP TABLE {distr_table} ON CLUSTER \'{cluster_name}\''
-    clickhouse.query(chi["metadata"]["name"], drop_distr_sql, timeout=120)
-    drop_table_on_cluster(cluster_name, local_table)
-
-
-def create_distributed_table_on_cluster(cluster_name='all-sharded', distr_table='default.test_distr', local_table='default.test',
-                                        fields_definition='(event_time DateTime, test UInt64)',
-                                        local_engine='ENGINE MergeTree() ORDER BY tuple()',
-                                        distr_engine='ENGINE Distributed(\'all-sharded\',default, test, test)'):
-    create_table_on_cluster(cluster_name, local_table, fields_definition + ' ' + local_engine)
-    create_distr_sql = f'CREATE TABLE {distr_table} ON CLUSTER \'{cluster_name}\' {fields_definition} {distr_engine}'
-    clickhouse.query(chi["metadata"]["name"], create_distr_sql, timeout=120)
-
-
 @TestScenario
 @Name("test_prometheus_setup. Check clickhouse-operator/prometheus/alertmanager setup")
 def test_prometheus_setup(self):
@@ -148,8 +122,10 @@ def test_clickhouse_dns_errors(self):
         )
 
     with When("rewrite /etc/resolv.conf in clickhouse-server pod"):
-        fired = alerts.wait_alert_state("ClickHouseDNSErrors", "firing", True, labels={"hostname": clickhouse_svc},
-                                 time_range='20s', callback=rewrite_dns_on_clickhouse_server)
+        fired = alerts.wait_alert_state(
+            "ClickHouseDNSErrors", "firing", True, labels={"hostname": clickhouse_svc},
+            time_range='20s', callback=rewrite_dns_on_clickhouse_server
+        )
         assert fired, error("can't get ClickHouseDNSErrors alert in firing state")
 
     with Then("check ClickHouseDNSErrors gone away"):
@@ -162,7 +138,7 @@ def test_clickhouse_dns_errors(self):
 @Name("test_distributed_files_to_insert. Check ClickHouseDistributedFilesToInsertHigh")
 def test_distributed_files_to_insert(self):
     delayed_pod, delayed_svc, restarted_pod, restarted_svc = alerts.random_pod_choice_for_callbacks(chi)
-    create_distributed_table_on_cluster()
+    clickhouse.create_distributed_table_on_cluster(chi)
 
     insert_sql = 'INSERT INTO default.test_distr(event_time, test) SELECT now(), number FROM system.numbers LIMIT 1000'
     clickhouse.query(
@@ -192,8 +168,10 @@ def test_distributed_files_to_insert(self):
         ))
 
     with When("reboot clickhouse-server pod"):
-        fired = alerts.wait_alert_state("ClickHouseDistributedFilesToInsertHigh", "firing", True,
-                                 labels={"hostname": delayed_svc, "chi": chi["metadata"]["name"]})
+        fired = alerts.wait_alert_state(
+            "ClickHouseDistributedFilesToInsertHigh", "firing", True,
+            labels={"hostname": delayed_svc, "chi": chi["metadata"]["name"]}
+        )
         assert fired, error("can't get ClickHouseDistributedFilesToInsertHigh alert in firing state")
 
     kubectl.wait_pod_status(restarted_pod, "Running", ns=kubectl.namespace)
@@ -207,14 +185,14 @@ def test_distributed_files_to_insert(self):
         resolved = alerts.wait_alert_state("ClickHouseDistributedFilesToInsertHigh", "firing", False, labels={"hostname": delayed_svc})
         assert resolved, error("can't check ClickHouseDistributedFilesToInsertHigh alert is gone away")
 
-    drop_distributed_table_on_cluster()
+    clickhouse.drop_distributed_table_on_cluster(chi)
 
 
 @TestScenario
 @Name("test_distributed_connection_exceptions. Check ClickHouseDistributedConnectionExceptions")
 def test_distributed_connection_exceptions(self):
     delayed_pod, delayed_svc, restarted_pod, restarted_svc = alerts.random_pod_choice_for_callbacks(chi)
-    create_distributed_table_on_cluster()
+    clickhouse.create_distributed_table_on_cluster(chi)
 
     def reboot_clickhouse_and_distributed_exection():
         # we need 70 delayed files for catch
@@ -249,13 +227,13 @@ def test_distributed_connection_exceptions(self):
     kubectl.wait_pod_status(restarted_pod, "Running", ns=kubectl.namespace)
     kubectl.wait_jsonpath("pod", restarted_pod, "{.status.containerStatuses[0].ready}", "true",
                           ns=kubectl.namespace)
-    drop_distributed_table_on_cluster()
+    clickhouse.drop_distributed_table_on_cluster(chi)
 
 
 @TestScenario
 @Name("test_insert_related_alerts. Check ClickHouseRejectedInsert, ClickHouseDelayedInsertThrottling, ClickHouseMaxPartCountForPartition, ClickHouseLowInsertedRowsPerQuery")
 def test_insert_related_alerts(self):
-    create_table_on_cluster()
+    clickhouse.create_table_on_cluster(chi)
     delayed_pod, delayed_svc, rejected_pod, rejected_svc = alerts.random_pod_choice_for_callbacks(chi)
 
     prometheus_scrape_interval = settings.prometheus_scrape_interval
@@ -272,8 +250,7 @@ def test_insert_related_alerts(self):
         min_block = "SET max_block_size=1; SET max_insert_block_size=1; SET min_insert_block_size_rows=1;"
         with When(f"Insert to MergeTree table {parts_limits} parts"):
             r = parts_limits
-            sql = stop_merges + min_block + \
-                  "INSERT INTO default.test(event_time, test) SELECT now(), number FROM system.numbers LIMIT %d;" % r
+            sql = stop_merges + min_block + f"INSERT INTO default.test(event_time, test) SELECT now(),number FROM system.numbers LIMIT {r};"
             clickhouse.query(chi_name, sql, host=selected_svc, ns=kubectl.namespace)
 
             # @TODO we need only one query after resolve https://github.com/ClickHouse/ClickHouse/issues/11384 and switch to 21.3+
@@ -327,7 +304,7 @@ def test_insert_related_alerts(self):
         assert resolved, error("can't check ClickHouseRejectedInsert alert is gone away")
 
     clickhouse.query(chi_name, "SYSTEM START MERGES default.test", host=selected_svc, ns=kubectl.namespace)
-    drop_table_on_cluster()
+    clickhouse.drop_table_on_cluster(chi)
 
 
 @TestScenario
@@ -377,8 +354,12 @@ def test_query_preempted(self):
 def test_read_only_replica(self):
     read_only_pod, read_only_svc, other_pod, other_svc = alerts.random_pod_choice_for_callbacks(chi)
     chi_name = chi["metadata"]["name"]
-    create_table_on_cluster('all-replicated', 'default.test_repl',
-                            '(event_time DateTime, test UInt64) ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/test_repl\', \'{replica}\') ORDER BY tuple()')
+    clickhouse.create_table_on_cluster(
+        chi,
+        'all-replicated', 'default.test_repl',
+        '(event_time DateTime, test UInt64) ' +
+        'ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/test_repl\', \'{replica}\') ORDER BY tuple()'
+    )
 
     def restart_zookeeper():
         kubectl.launch(
@@ -406,10 +387,9 @@ def test_read_only_replica(self):
         if "imok" in zookeeper_status:
             break
         elif i == 10:
-           fail(f"invalid zookeeper status after {i} retries")
+            fail(f"invalid zookeeper status after {i} retries")
         with Then("zookeper is not ready, wait 2 seconds"):
             time.sleep(2)
-
 
     clickhouse.query_with_error(
         chi_name, "SYSTEM RESTART REPLICAS; SYSTEM SYNC REPLICA default.test_repl",
@@ -420,15 +400,19 @@ def test_read_only_replica(self):
         host=other_svc, timeout=240
     )
 
-    drop_table_on_cluster('all-replicated', 'default.test_repl')
+    clickhouse.drop_table_on_cluster(chi, 'all-replicated', 'default.test_repl')
 
 
 @TestScenario
 @Name("test_replicas_max_abosulute_delay. Check ClickHouseReplicasMaxAbsoluteDelay")
 def test_replicas_max_abosulute_delay(self):
     stop_replica_pod, stop_replica_svc, insert_pod, insert_svc = alerts.random_pod_choice_for_callbacks(chi)
-    create_table_on_cluster('all-replicated', 'default.test_repl',
-                            '(event_time DateTime, test UInt64) ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/test_repl\', \'{replica}\') ORDER BY tuple()')
+    clickhouse.create_table_on_cluster(
+        chi,
+        'all-replicated', 'default.test_repl',
+        '(event_time DateTime, test UInt64) ' +
+        'ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/test_repl\', \'{replica}\') ORDER BY tuple()'
+    )
     prometheus_scrape_interval = 15
 
     def restart_clickhouse_and_insert_to_replicated_table():
@@ -460,7 +444,7 @@ def test_replicas_max_abosulute_delay(self):
         resolved = alerts.wait_alert_state("ClickHouseReplicasMaxAbsoluteDelay", "firing", False, labels={"hostname": stop_replica_svc})
         assert resolved, error("can't check ClickHouseReplicasMaxAbsoluteDelay alert is gone away")
 
-    drop_table_on_cluster('all-replicated', 'default.test_repl')
+    clickhouse.drop_table_on_cluster(chi, 'all-replicated', 'default.test_repl')
 
 
 @TestScenario
@@ -502,8 +486,10 @@ def test_too_many_connections(self):
         )
 
     with Then("check ClickHouseTooManyConnections firing"):
-        fired = alerts.wait_alert_state("ClickHouseTooManyConnections", "firing", True, labels={"hostname": too_many_connection_svc},
-                                 time_range='90s', callback=make_too_many_connection)
+        fired = alerts.wait_alert_state(
+            "ClickHouseTooManyConnections", "firing", True, labels={"hostname": too_many_connection_svc},
+            time_range='90s', callback=make_too_many_connection
+        )
         assert fired, error("can't get ClickHouseTooManyConnections alert in firing state")
 
     with Then("check ClickHouseTooManyConnections gone away"):
@@ -545,8 +531,10 @@ def test_too_much_running_queries(self):
         )
 
     with Then("check ClickHouseTooManyRunningQueries firing"):
-        fired = alerts.wait_alert_state("ClickHouseTooManyRunningQueries", "firing", True, labels={"hostname": too_many_queries_svc},
-                                 callback=make_too_many_queries, time_range="30s")
+        fired = alerts.wait_alert_state(
+            "ClickHouseTooManyRunningQueries", "firing", True, labels={"hostname": too_many_queries_svc},
+            callback=make_too_many_queries, time_range="30s"
+        )
         assert fired, error("can't get ClickHouseTooManyConnections alert in firing state")
 
     with Then("check ClickHouseTooManyConnections gone away"):
@@ -693,7 +681,7 @@ def test_zookeeper_hardware_exceptions(self):
 @Name("test_distributed_sync_insertion_timeout. Check ClickHouseDistributedSyncInsertionTimeoutExceeded")
 def test_distributed_sync_insertion_timeout(self):
     sync_pod, sync_svc, restarted_pod, restarted_svc = alerts.random_pod_choice_for_callbacks(chi)
-    create_distributed_table_on_cluster(local_engine='ENGINE Null()')
+    clickhouse.create_distributed_table_on_cluster(chi, local_engine='ENGINE Null()')
 
     def insert_distributed_sync():
         with When("Insert to distributed table SYNC"):
@@ -718,12 +706,12 @@ def test_distributed_sync_insertion_timeout(self):
                                     labels={"hostname": sync_svc})
         assert resolved, error("can't check ClickHouseDistributedSyncInsertionTimeoutExceeded alert is gone away")
 
-    drop_distributed_table_on_cluster()
+    clickhouse.drop_distributed_table_on_cluster(chi)
 
 @TestScenario
 @Name("test_detached_parts. Check ClickHouseDetachedParts")
 def test_detached_parts(self):
-    create_table_on_cluster()
+    clickhouse.create_table_on_cluster(chi)
     detached_pod, detached_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
     def create_part_and_detach():
@@ -754,7 +742,7 @@ def test_detached_parts(self):
                                     labels={"hostname": detached_svc}, callback=attach_all_parts)
         assert resolved, error("can't check ClickHouseDetachedParts alert is gone away")
 
-    drop_table_on_cluster()
+    clickhouse.drop_table_on_cluster(chi)
 
 @TestScenario
 @Name("test_zookeeper_alerts. Check ZookeeperDown, ZookeeperRestartRecently")

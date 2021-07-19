@@ -64,7 +64,7 @@ spec:
     matchLabels:
       app: zookeeper
   serviceName: zookeepers
-  replicas: 1
+  replicas: 3
   updateStrategy:
     type: RollingUpdate
   podManagementPolicy: Parallel
@@ -106,7 +106,7 @@ spec:
             - -x
             - -c
             - |
-              SERVERS=1 &&
+              SERVERS=3 &&
               HOST=`hostname -s` &&
               DOMAIN=`hostname -d` &&
               CLIENT_PORT=2181 &&

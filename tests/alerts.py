@@ -35,7 +35,7 @@ def check_alert_state(alert_name, prometheus_pod, alert_state="firing", labels=N
 
 
 def wait_alert_state(alert_name, alert_state, expected_state, prometheus_pod='prometheus-prometheus-0', labels=None, callback=None,
-                     max_try=20, sleep_time=settings.prometheus_scrape_interval, time_range=f"{settings.prometheus_scrape_interval*2}s"):
+                     max_try=20, sleep_time=settings.prometheus_scrape_interval, time_range=f"{settings.prometheus_scrape_interval * 2}s"):
     catched = False
     for _ in range(max_try):
         if callback is not None:
@@ -79,37 +79,9 @@ def get_prometheus_and_alertmanager_spec():
         return prometheus_operator_spec, prometheus_spec, alertmanager_spec
 
 
-def install_clickhouse_and_zookeeper_for_alerts(chi_file, chi_template_file, chi_name):
-    with Given("install zookeeper+clickhouse"):
-        kubectl.delete_ns(settings.test_namespace, ok_to_fail=True, timeout=600)
-        kubectl.create_ns(settings.test_namespace)
-        util.require_zookeeper()
-        kubectl.create_and_check(
-            config=chi_file,
-            check={
-                "apply_templates": [
-                    chi_template_file,
-                    "templates/tpl-persistent-volume-100Mi.yaml"
-                ],
-                "object_counts": {
-                    "statefulset": 2,
-                    "pod": 2,
-                    "service": 3,
-                },
-                "do_not_delete": 1
-            }
-        )
-        clickhouse_operator_spec = kubectl.get(
-            "pod", name="", ns=settings.operator_namespace, label="-l app=clickhouse-operator"
-        )
-        chi = kubectl.get("chi", ns=settings.test_namespace, name=chi_name)
-        return clickhouse_operator_spec, chi
-
-
-
 def initialize(chi_file, chi_template_file, chi_name):
     prometheus_operator_spec, prometheus_spec, alertmanager_spec = get_prometheus_and_alertmanager_spec()
-    clickhouse_operator_spec, chi = install_clickhouse_and_zookeeper_for_alerts(chi_file, chi_template_file, chi_name)
+    clickhouse_operator_spec, chi = util.install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name)
     util.wait_clickhouse_cluster_ready(chi)
 
     return prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi

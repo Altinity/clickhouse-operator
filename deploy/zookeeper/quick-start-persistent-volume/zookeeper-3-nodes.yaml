@@ -90,11 +90,14 @@ spec:
       containers:
         - name: kubernetes-zookeeper
           imagePullPolicy: IfNotPresent
-          image: "docker.io/zookeeper:3.6.1"
+          image: "docker.io/zookeeper:3.6.3"
           resources:
             requests:
-              memory: "4Gi"
+              memory: "512M"
               cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
           ports:
             - containerPort: 2181
               name: client
@@ -136,8 +139,8 @@ spec:
                 echo 'preAllocSize=131072'
                 echo 'snapCount=3000000'
                 echo 'leaderServes=yes'
-                echo 'standaloneEnabled=true'
-                echo '4lw.commands.whitelist=stat, ruok, conf, isro, mntr'
+                echo 'standaloneEnabled=false'
+                echo '4lw.commands.whitelist=*'
                 echo 'metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider'
                 echo "metricsProvider.httpPort=${PROMETHEUS_PORT}"
               } > /conf/zoo.cfg &&
@@ -162,11 +165,9 @@ spec:
               mkdir -p ${ZOO_DATA_LOG_DIR} &&
               export MY_ID=$((ORD+1)) &&
               echo $MY_ID > $ZOO_DATA_DIR/myid &&
-              if [[ $SERVERS -gt 1 ]]; then
-                for (( i=1; i<=$SERVERS; i++ )); do
-                    echo "server.$i=$NAME-$((i-1)).$DOMAIN:$SERVER_PORT:$ELECTION_PORT" >> /conf/zoo.cfg;
-                done
-              fi &&
+              for (( i=1; i<=$SERVERS; i++ )); do
+                  echo "server.$i=$NAME-$((i-1)).$DOMAIN:$SERVER_PORT:$ELECTION_PORT" >> /conf/zoo.cfg;
+              done &&
               chown -Rv zookeeper "$ZOO_DATA_DIR" "$ZOO_DATA_LOG_DIR" "$ZOO_LOG_DIR" "$ZOO_CONF_DIR" &&
               zkServer.sh start-foreground
           readinessProbe:
