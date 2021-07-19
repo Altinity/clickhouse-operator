@@ -18,8 +18,9 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	log "github.com/golang/glog"
+
+	"github.com/altinity/clickhouse-operator/pkg/util/runtime"
 )
 
 // Announcer handler all log/event/status messages going outside of controller/worker
@@ -60,11 +61,22 @@ func New() Announcer {
 	}
 }
 
+// Silence produces silent announcer
+func (a Announcer) Silence() Announcer {
+	b := a
+	b.writeLog = false
+	return b
+}
+
+// Silence produces silent announcer
+func Silence() Announcer {
+	return announcer.Silence()
+}
+
 // V is inspired by log.V()
 func (a Announcer) V(level log.Level) Announcer {
 	b := a
 	b.v = level
-	b.writeLog = true
 	return b
 }
 
@@ -76,8 +88,7 @@ func V(level log.Level) Announcer {
 // F adds function name
 func (a Announcer) F() Announcer {
 	b := a
-	b.writeLog = true
-	_, _, b.function = util.Caller(skip)
+	_, _, b.function = runtime.Caller(skip)
 	return b
 }
 
@@ -89,8 +100,7 @@ func F() Announcer {
 // L adds line number
 func (a Announcer) L() Announcer {
 	b := a
-	b.writeLog = true
-	_, b.line, _ = util.Caller(skip)
+	_, b.line, _ = runtime.Caller(skip)
 	return b
 }
 
@@ -102,8 +112,7 @@ func L() Announcer {
 // FL adds filename
 func (a Announcer) FL() Announcer {
 	b := a
-	b.writeLog = true
-	b.file, _, _ = util.Caller(skip)
+	b.file, _, _ = runtime.Caller(skip)
 	return b
 }
 
@@ -115,8 +124,7 @@ func FL() Announcer {
 // A adds full code address as 'file:line:function'
 func (a Announcer) A() Announcer {
 	b := a
-	b.writeLog = true
-	b.file, b.line, b.function = util.Caller(skip)
+	b.file, b.line, b.function = runtime.Caller(skip)
 	return b
 }
 
@@ -129,9 +137,8 @@ func A() Announcer {
 // file, line, function and start prefix
 func (a Announcer) S() Announcer {
 	b := a
-	b.writeLog = true
 	b.prefix = "start"
-	b.file, b.line, b.function = util.Caller(skip)
+	b.file, b.line, b.function = runtime.Caller(skip)
 	return b
 }
 
@@ -145,9 +152,8 @@ func S() Announcer {
 // file, line, function and start prefix
 func (a Announcer) E() Announcer {
 	b := a
-	b.writeLog = true
 	b.prefix = "end"
-	b.file, b.line, b.function = util.Caller(skip)
+	b.file, b.line, b.function = runtime.Caller(skip)
 	return b
 }
 
@@ -164,7 +170,6 @@ func (a Announcer) M(m ...interface{}) Announcer {
 	}
 
 	b := a
-	b.writeLog = true
 	switch len(m) {
 	case 1:
 		switch typed := m[0].(type) {
@@ -284,6 +289,7 @@ func Fatal(format string, args ...interface{}) {
 	announcer.Fatal(format, args...)
 }
 
+// prependFormat
 func (a Announcer) prependFormat(format string) string {
 	// Result format is expected to be 'file:line:function:prefix:meta:_start_format_'
 	// Prepend each component in reverse order
@@ -325,6 +331,7 @@ func (a Announcer) prependFormat(format string) string {
 	return format
 }
 
+// findMeta
 func (a Announcer) findMeta(m interface{}) (string, bool) {
 	if meta, ok := a.findInObjectMeta(m); ok {
 		return meta, ok
@@ -338,61 +345,82 @@ func (a Announcer) findMeta(m interface{}) (string, bool) {
 	return "", false
 }
 
+// findInObjectMeta
 func (a Announcer) findInObjectMeta(m interface{}) (string, bool) {
 	if m == nil {
 		return "", false
 	}
 	meta := reflect.ValueOf(m)
-	if !meta.IsValid() || meta.IsNil() || meta.IsZero() {
+	if !meta.IsValid() || meta.IsZero() || ((meta.Kind() == reflect.Ptr) && meta.IsNil()) {
 		return "", false
 	}
-	namespace := meta.Elem().FieldByName("Namespace")
+	var namespace, name reflect.Value
+	if meta.Kind() == reflect.Ptr {
+		namespace = meta.Elem().FieldByName("Namespace")
+		name = meta.Elem().FieldByName("Name")
+	} else {
+		namespace = meta.FieldByName("Namespace")
+		name = meta.FieldByName("Name")
+	}
 	if !namespace.IsValid() {
 		return "", false
 	}
-	name := meta.Elem().FieldByName("Name")
 	if !name.IsValid() {
 		return "", false
 	}
 	return namespace.String() + "/" + name.String(), true
 }
 
+// findInCHI
 func (a Announcer) findInCHI(m interface{}) (string, bool) {
 	if m == nil {
 		return "", false
 	}
 	object := reflect.ValueOf(m)
-	if !object.IsValid() || object.IsNil() || object.IsZero() {
+	if !object.IsValid() || object.IsZero() || ((object.Kind() == reflect.Ptr) && object.IsNil()) {
 		return "", false
 	}
 	chi := object.Elem().FieldByName("CHI")
-	if !chi.IsValid() || chi.IsNil() || chi.IsZero() {
+	if !chi.IsValid() || chi.IsZero() || ((chi.Kind() == reflect.Ptr) && chi.IsNil()) {
 		return "", false
 	}
-	namespace := chi.Elem().FieldByName("Namespace")
+	var namespace, name reflect.Value
+	if chi.Kind() == reflect.Ptr {
+		namespace = chi.Elem().FieldByName("Namespace")
+		name = chi.Elem().FieldByName("Name")
+	} else {
+		namespace = chi.FieldByName("Namespace")
+		name = chi.FieldByName("Name")
+	}
 	if !namespace.IsValid() {
 		return "", false
 	}
-	name := chi.Elem().FieldByName("Name")
 	if !name.IsValid() {
 		return "", false
 	}
 	return namespace.String() + "/" + name.String(), true
 }
 
+// findInAddress
 func (a Announcer) findInAddress(m interface{}) (string, bool) {
 	if m == nil {
 		return "", false
 	}
 	address := reflect.ValueOf(m)
-	if !address.IsValid() || address.IsNil() || address.IsZero() {
+	if !address.IsValid() || address.IsZero() || ((address.Kind() == reflect.Ptr) && address.IsNil()) {
 		return "", false
 	}
-	namespace := address.Elem().FieldByName("Namespace")
+	var namespace, name reflect.Value
+	if address.Kind() == reflect.Ptr {
+		namespace = address.Elem().FieldByName("Namespace")
+		name = address.Elem().FieldByName("Name")
+	} else {
+		namespace = address.FieldByName("Namespace")
+		name = address.FieldByName("Name")
+	}
 	if !namespace.IsValid() {
 		return "", false
 	}
-	name := address.Elem().FieldByName("CHIName")
 	if !name.IsValid() {
 		return "", false
 	}

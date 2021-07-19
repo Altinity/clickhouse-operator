@@ -22,7 +22,7 @@ Vagrant.configure(2) do |config|
   config.vm.box_check_update = false
 
   if get_provider == "hyperv"
-    config.vm.synced_folder ".", "/vagrant", type: "smb", smb_username: ENV['USERNAME'], smb_password: ENV['PASSWORD'], mount_options: ["domain="+ENV['USERDOMAIN'], "user="+ENV['USERNAME'], "vers=3.0"," mfsymlinks"]
+    config.vm.synced_folder ".", "/vagrant", type: "smb", smb_username: ENV['USERNAME'], smb_password: ENV['PASSWORD'], mount_options: ["vers=3.0"]
   else
     config.vm.synced_folder ".", "/vagrant"
   end
@@ -34,7 +34,6 @@ Vagrant.configure(2) do |config|
   if Vagrant.has_plugin?("vagrant-timezone")
     config.timezone.value = "UTC"
   end
-
 
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
@@ -53,7 +52,7 @@ Vagrant.configure(2) do |config|
     # hv.default_nic_type = "virtio"
     hv.cpus = total_cpus
     hv.maxmemory = "6144"
-    hv.memory = "2048"
+    hv.memory = "6144"
     hv.enable_virtualization_extensions = true
     hv.linked_clone = true
     hv.vm_integration_services = {
@@ -92,7 +91,7 @@ Vagrant.configure(2) do |config|
 
     apt-get update
     apt-get install --no-install-recommends -y apt-transport-https ca-certificates software-properties-common curl
-    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git
+    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git make gcc g++
 
     # yq
     apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys CC86BB64
@@ -138,8 +137,10 @@ Vagrant.configure(2) do |config|
     curl -sL https://github.com/liggitt/audit2rbac/releases/download/v${AUDIT2RBAC_VERSION}/audit2rbac-linux-amd64.tar.gz | tar -zxvf - -C /usr/local/bin
 
     # minikube
-    MINIKUBE_VERSION=1.18.1
+    # MINIKUBE_VERSION=1.18.1
     # MINIKUBE_VERSION=1.19.0
+    # MINIKUBE_VERSION=1.20.0
+    MINIKUBE_VERSION=1.22.0
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -150,9 +151,12 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
 #    K8S_VERSION=${K8S_VERSION:-1.17.17}
-#    K8S_VERSION=${K8S_VERSION:-1.18.18}
-#    K8S_VERSION=${K8S_VERSION:-1.19.10}
-    K8S_VERSION=${K8S_VERSION:-1.20.6}
+#    K8S_VERSION=${K8S_VERSION:-1.18.19}
+#    K8S_VERSION=${K8S_VERSION:-1.19.13}
+#    performance issue 1.20.x, 1.21.x, only 1.22 will good to start
+# https://github.com/kubernetes/kubeadm/issues/2395
+#    K8S_VERSION=${K8S_VERSION:-1.20.9}
+    K8S_VERSION=${K8S_VERSION:-1.21.3}
     export VALIDATE_YAML=true
 
     killall kubectl || true
@@ -187,15 +191,6 @@ EOF
     sudo -H -u vagrant minikube addons enable ingress-dns
     sudo -H -u vagrant minikube addons enable metrics-server
 
-#     minikube delete
-#     rm -rf /tmp/juju*
-#     minikube config set vm-driver none
-#     minikube config set kubernetes-version ${K8S_VERSION}
-#     minikube start
-#     minikube addons enable ingress
-#     minikube addons enable ingress-dns
-#     minikube addons enable metrics-server
-
     #krew
     (
         curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/krew.tar.gz" &&
@@ -213,9 +208,11 @@ EOF
     kubectl krew install minio
     # look to https://kubernetes.io/docs/tasks/debug-application-cluster/debug-running-pod/#ephemeral-container
     # kubectl krew install debug
+    chown -R vagrant:vagrant /home/vagrant/.krew
 
     cd /vagrant/
-    git_branch=$(git rev-parse --abbrev-ref HEAD /vagrant/)
+
+    git_branch=$(git rev-parse --abbrev-ref HEAD)
     export OPERATOR_RELEASE=$(cat release)
     export BRANCH=${BRANCH:-$git_branch}
     export OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-kube-system}
@@ -232,6 +229,17 @@ EOF
     cd /vagrant/deploy/prometheus/
     kubectl delete ns ${PROMETHEUS_NAMESPACE} || true
     bash -xe ./create-prometheus.sh
+    cd /vagrant/
+
+    export MINIO_NAMESPACE=${MINIO_NAMESPACE:-minio}
+    cd /vagrant/deploy/minio/
+    kubectl delete ns ${MINIO_NAMESPACE} || true
+    bash -xe ./install-minio-operator.sh
+    bash -xe ./install-minio.sh
+    # kubectl create ns ${MINIO_NAMESPACE}
+    # kubectl minio init --namespace ${MINIO_NAMESPACE}
+    # kubectl minio tenant create --name minio --namespace ${MINIO_NAMESPACE} --servers 1 --volumes 4 --capacity 10Gi --storage-class standard
+
     cd /vagrant/
 
     export GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE:-grafana}
@@ -267,9 +275,11 @@ EOF
     pip3 install -r /vagrant/tests/requirements.txt
 
     python3 /vagrant/tests/test_metrics_alerts.py
-    python3 /vagrant/tests/test.py --only=operator/*
+    python3 /vagrant/tests/test_zookeeper.py
+    python3 /vagrant/tests/test_backup_alerts.py
     python3 /vagrant/tests/test_examples.py
     python3 /vagrant/tests/test_metrics_exporter.py
+    python3 /vagrant/tests/test.py
 
     # audit2rbac
     kubectl logs kube-apiserver-minikube -n kube-system | grep audit.k8s.io/v1 > /tmp/audit2rbac.log

@@ -16,6 +16,8 @@ package chop
 
 import (
 	"flag"
+	"fmt"
+
 	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -46,31 +48,37 @@ func NewCHOp(
 
 // Init
 func (c *CHOp) Init() error {
+	if c == nil {
+		return fmt.Errorf("chop not created")
+	}
 	return c.ConfigManager.Init()
 }
 
 // Config
 func (c *CHOp) Config() *v1.OperatorConfig {
+	if c == nil {
+		return nil
+	}
 	return c.ConfigManager.Config()
 }
 
 // SetupLog
 func (c *CHOp) SetupLog() {
 	updated := false
-	if c.Config().Logtostderr != "" {
-		c.logUpdate("logtostderr", c.Config().Logtostderr)
+	if c.Config().LogToStderr != "" {
+		c.logUpdate("logtostderr", c.Config().LogToStderr)
 		updated = true
-		_ = flag.Set("logtostderr", c.Config().Logtostderr)
+		_ = flag.Set("logtostderr", c.Config().LogToStderr)
 	}
-	if c.Config().Alsologtostderr != "" {
-		c.logUpdate("alsologtostderr", c.Config().Alsologtostderr)
+	if c.Config().AlsoLogToStderr != "" {
+		c.logUpdate("alsologtostderr", c.Config().AlsoLogToStderr)
 		updated = true
-		_ = flag.Set("alsologtostderr", c.Config().Alsologtostderr)
+		_ = flag.Set("alsologtostderr", c.Config().AlsoLogToStderr)
 	}
-	if c.Config().Stderrthreshold != "" {
-		c.logUpdate("stderrthreshold", c.Config().Stderrthreshold)
+	if c.Config().StderrThreshold != "" {
+		c.logUpdate("stderrthreshold", c.Config().StderrThreshold)
 		updated = true
-		_ = flag.Set("stderrthreshold", c.Config().Stderrthreshold)
+		_ = flag.Set("stderrthreshold", c.Config().StderrThreshold)
 	}
 	if c.Config().V != "" {
 		c.logUpdate("v", c.Config().V)

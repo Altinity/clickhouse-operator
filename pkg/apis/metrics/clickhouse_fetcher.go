@@ -139,22 +139,22 @@ const (
 )
 
 type ClickHouseFetcher struct {
-	chConnectionParams *clickhouse.CHConnectionParams
+	connectionParams *clickhouse.ConnectionParams
 }
 
 func NewClickHouseFetcher(hostname, username, password string, port int) *ClickHouseFetcher {
 	return &ClickHouseFetcher{
-		chConnectionParams: clickhouse.NewCHConnectionParams(hostname, username, password, port),
+		connectionParams: clickhouse.NewConnectionParams(hostname, username, password, port),
 	}
 }
 
-func (f *ClickHouseFetcher) SetTimeout(timeout time.Duration) *ClickHouseFetcher {
-	f.chConnectionParams.SetTimeout(timeout)
+func (f *ClickHouseFetcher) SetQueryTimeout(timeout time.Duration) *ClickHouseFetcher {
+	f.connectionParams.SetQueryTimeout(timeout)
 	return f
 }
 
-func (f *ClickHouseFetcher) getCHConnection() *clickhouse.CHConnection {
-	return clickhouse.GetPooledDBConnection(f.chConnectionParams)
+func (f *ClickHouseFetcher) getConnection() *clickhouse.Connection {
+	return clickhouse.GetPooledDBConnection(f.connectionParams)
 }
 
 // getClickHouseQueryMetrics requests metrics data from ClickHouse
@@ -249,7 +249,7 @@ func (f *ClickHouseFetcher) clickHouseQueryScanRows(
 		data *[][]string,
 	) error,
 ) ([][]string, error) {
-	query, err := f.getCHConnection().Query(heredoc.Doc(sql))
+	query, err := f.getConnection().Query(heredoc.Doc(sql))
 	if err != nil {
 		return nil, err
 	}

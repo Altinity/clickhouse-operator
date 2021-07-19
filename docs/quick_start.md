@@ -24,7 +24,7 @@ Apply `clickhouse-operator` installation manifest. The simplest way - directly f
 just run:
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install.yaml
-``` 
+```
 
 ## **In case you'd like to customize installation parameters**,
 
@@ -38,21 +38,23 @@ OPERATOR_NAMESPACE=test-clickhouse-operator
 ```
 This namespace would be created and used to install `clickhouse-operator` into.
 Install script would download some `.yaml` and `.xml` files and install `clickhouse-operator` into specified namespace.
+After installation **clickhouse-operator** will watch custom resources like a `kind: ClickhouseInstallation` only in `test-clickhouse-operator` namespace.
 
 If no `OPERATOR_NAMESPACE` specified, as:
 ```bash
 cd ~
 curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-web-installer/clickhouse-operator-install.sh | bash
 ```
-installer will create namespace `clickhouse-operator` and install **clickhouse-operator** into it.
+installer will install **clickhouse-operator** into `kube-system` namespace and will watch custom resources like a `kind: ClickhouseInstallation` in all available namespaces.
 
-## **In case you can not run scripts from internet in your protected environment**, 
+
+## **In case you can not run scripts from internet in your protected environment**,
 
 you can download manually [this template file][clickhouse-operator-install-template.yaml]
 and edit it according to your choice. After that apply it with `kubectl`. Or you can use this snippet instead:
 ```bash
 # Namespace to install operator into
-OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-clickhouse-operator}"
+OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-test-clickhouse-operator}"
 # Namespace to install metrics-exporter into
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 
@@ -108,7 +110,7 @@ There are several ready-to-use [ClickHouseInstallation examples][chi-examples]. 
 ## Create Custom Namespace
 It is a good practice to have all components run in dedicated namespaces. Let's run examples in `test` namespace
 ```bash
-kubectl create namespace test
+kubectl create namespace test-clickhouse-operator
 ```
 ```text
 namespace/test created
@@ -162,7 +164,7 @@ ClickHouse is up and running!
 
 There are two ways to connect to ClickHouse database
 
-1. In case previous command `kubectl get service -n test` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
+1. In case previous command `kubectl get service -n test-clickhouse-operator` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
 ```bash
 clickhouse-client -h abc-123.us-east-1.elb.amazonaws.com -u clickhouse_operator --password clickhouse_operator_password 
 ```

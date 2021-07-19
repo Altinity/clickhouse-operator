@@ -30,16 +30,9 @@ import (
 
 // deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
 func (c *Controller) deleteHost(ctx context.Context, host *chop.ChiHost) error {
-	// Each host consists of
-	// 1. Tables on host - we need to delete tables on the host in order to clean Zookeeper data
-	// 2. StatefulSet
-	// 3. PersistentVolumeClaim
-	// 4. ConfigMap
-	// 5. Service
-	// Need to delete all these item
-
 	log.V(1).M(host).S().Info(host.Address.ClusterNameString())
 
+	// Each host consists of:
 	_ = c.deleteStatefulSet(ctx, host)
 	_ = c.deletePVC(ctx, host)
 	_ = c.deleteConfigMap(ctx, host)
@@ -232,7 +225,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) er
 		return nil
 	}
 
-	name := chopmodel.CreateConfigMapPodName(host)
+	name := chopmodel.CreateConfigMapPersonalName(host)
 	namespace := host.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 

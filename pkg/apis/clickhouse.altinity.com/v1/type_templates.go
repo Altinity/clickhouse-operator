@@ -18,12 +18,12 @@ import (
 	"github.com/imdario/mergo"
 )
 
-// NewChiTemplates
+// NewChiTemplates creates new ChiTemplate object
 func NewChiTemplates() *ChiTemplates {
 	return new(ChiTemplates)
 }
 
-// Len
+// Len returns accumulated len of all templates
 func (templates *ChiTemplates) Len() int {
 	if templates == nil {
 		return 0
@@ -36,7 +36,7 @@ func (templates *ChiTemplates) Len() int {
 		len(templates.ServiceTemplates)
 }
 
-// MergeFrom
+// MergeFrom merges from specified object
 func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) *ChiTemplates {
 	if from.Len() == 0 {
 		return templates
@@ -185,7 +185,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) *C
 	return templates
 }
 
-// GetHostTemplatesIndex
+// GetHostTemplatesIndex returns index of host templates
 func (templates *ChiTemplates) GetHostTemplatesIndex() *HostTemplatesIndex {
 	if templates == nil {
 		return nil
@@ -193,7 +193,7 @@ func (templates *ChiTemplates) GetHostTemplatesIndex() *HostTemplatesIndex {
 	return templates.HostTemplatesIndex
 }
 
-// EnsureHostTemplatesIndex
+// EnsureHostTemplatesIndex ensures index exists
 func (templates *ChiTemplates) EnsureHostTemplatesIndex() *HostTemplatesIndex {
 	if templates == nil {
 		return nil
@@ -205,7 +205,7 @@ func (templates *ChiTemplates) EnsureHostTemplatesIndex() *HostTemplatesIndex {
 	return templates.HostTemplatesIndex
 }
 
-// GetPodTemplatesIndex
+// GetPodTemplatesIndex returns index of pod templates
 func (templates *ChiTemplates) GetPodTemplatesIndex() *PodTemplatesIndex {
 	if templates == nil {
 		return nil
@@ -213,7 +213,7 @@ func (templates *ChiTemplates) GetPodTemplatesIndex() *PodTemplatesIndex {
 	return templates.PodTemplatesIndex
 }
 
-// EnsurePodTemplatesIndex
+// EnsurePodTemplatesIndex ensures index exists
 func (templates *ChiTemplates) EnsurePodTemplatesIndex() *PodTemplatesIndex {
 	if templates == nil {
 		return nil
@@ -225,7 +225,7 @@ func (templates *ChiTemplates) EnsurePodTemplatesIndex() *PodTemplatesIndex {
 	return templates.PodTemplatesIndex
 }
 
-// GetVolumeClaimTemplatesIndex
+// GetVolumeClaimTemplatesIndex returns index of VolumeClaim templates
 func (templates *ChiTemplates) GetVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
 	if templates == nil {
 		return nil
@@ -233,7 +233,7 @@ func (templates *ChiTemplates) GetVolumeClaimTemplatesIndex() *VolumeClaimTempla
 	return templates.VolumeClaimTemplatesIndex
 }
 
-// EnsureVolumeClaimTemplatesIndex
+// EnsureVolumeClaimTemplatesIndex ensures index exists
 func (templates *ChiTemplates) EnsureVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
 	if templates == nil {
 		return nil
@@ -245,7 +245,7 @@ func (templates *ChiTemplates) EnsureVolumeClaimTemplatesIndex() *VolumeClaimTem
 	return templates.VolumeClaimTemplatesIndex
 }
 
-// GetServiceTemplatesIndex
+// GetServiceTemplatesIndex returns index of Service templates
 func (templates *ChiTemplates) GetServiceTemplatesIndex() *ServiceTemplatesIndex {
 	if templates == nil {
 		return nil
@@ -253,7 +253,7 @@ func (templates *ChiTemplates) GetServiceTemplatesIndex() *ServiceTemplatesIndex
 	return templates.ServiceTemplatesIndex
 }
 
-// EnsureServiceTemplatesIndex
+// EnsureServiceTemplatesIndex ensures index exists
 func (templates *ChiTemplates) EnsureServiceTemplatesIndex() *ServiceTemplatesIndex {
 	if templates == nil {
 		return nil
@@ -265,19 +265,19 @@ func (templates *ChiTemplates) EnsureServiceTemplatesIndex() *ServiceTemplatesIn
 	return templates.ServiceTemplatesIndex
 }
 
-// HostTemplatesIndex
+// HostTemplatesIndex describes index of host templates
 type HostTemplatesIndex struct {
 	v map[string]*ChiHostTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
-// NewHostTemplatesIndex
+// NewHostTemplatesIndex creates new HostTemplatesIndex object
 func NewHostTemplatesIndex() *HostTemplatesIndex {
 	return &HostTemplatesIndex{
 		v: make(map[string]*ChiHostTemplate),
 	}
 }
 
-// Has
+// Has checks whether index has entity `name`
 func (i *HostTemplatesIndex) Has(name string) bool {
 	if i == nil {
 		return false
@@ -289,7 +289,7 @@ func (i *HostTemplatesIndex) Has(name string) bool {
 	return ok
 }
 
-// Get
+// Get returns entity `name` from the index
 func (i *HostTemplatesIndex) Get(name string) *ChiHostTemplate {
 	if !i.Has(name) {
 		return nil
@@ -297,7 +297,7 @@ func (i *HostTemplatesIndex) Get(name string) *ChiHostTemplate {
 	return i.v[name]
 }
 
-// Set
+// Set sets named template into index
 func (i *HostTemplatesIndex) Set(name string, entry *ChiHostTemplate) {
 	if i == nil {
 		return
@@ -308,7 +308,7 @@ func (i *HostTemplatesIndex) Set(name string, entry *ChiHostTemplate) {
 	i.v[name] = entry
 }
 
-// Walk
+// Walk calls specified function over each items in the index
 func (i *HostTemplatesIndex) Walk(f func(template *ChiHostTemplate)) {
 	if i == nil {
 		return
@@ -318,19 +318,19 @@ func (i *HostTemplatesIndex) Walk(f func(template *ChiHostTemplate)) {
 	}
 }
 
-// PodTemplatesIndex
+// PodTemplatesIndex describes index of pod templates
 type PodTemplatesIndex struct {
 	v map[string]*ChiPodTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
-// NewPodTemplatesIndex
+// NewPodTemplatesIndex creates new PodTemplatesIndex object
 func NewPodTemplatesIndex() *PodTemplatesIndex {
 	return &PodTemplatesIndex{
 		v: make(map[string]*ChiPodTemplate),
 	}
 }
 
-// Has
+// Has checks whether index has entity `name`
 func (i *PodTemplatesIndex) Has(name string) bool {
 	if i == nil {
 		return false
@@ -342,7 +342,7 @@ func (i *PodTemplatesIndex) Has(name string) bool {
 	return ok
 }
 
-// Get
+// Get returns entity `name` from the index
 func (i *PodTemplatesIndex) Get(name string) *ChiPodTemplate {
 	if !i.Has(name) {
 		return nil
@@ -350,7 +350,7 @@ func (i *PodTemplatesIndex) Get(name string) *ChiPodTemplate {
 	return i.v[name]
 }
 
-// Set
+// Set sets named template into index
 func (i *PodTemplatesIndex) Set(name string, entry *ChiPodTemplate) {
 	if i == nil {
 		return
@@ -361,7 +361,7 @@ func (i *PodTemplatesIndex) Set(name string, entry *ChiPodTemplate) {
 	i.v[name] = entry
 }
 
-// Walk
+// Walk calls specified function over each items in the index
 func (i *PodTemplatesIndex) Walk(f func(template *ChiPodTemplate)) {
 	if i == nil {
 		return
@@ -371,19 +371,19 @@ func (i *PodTemplatesIndex) Walk(f func(template *ChiPodTemplate)) {
 	}
 }
 
-// VolumeClaimTemplatesIndex
+// VolumeClaimTemplatesIndex describes index of volume claim templates
 type VolumeClaimTemplatesIndex struct {
 	v map[string]*ChiVolumeClaimTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
-// NewVolumeClaimTemplatesIndex
+// NewVolumeClaimTemplatesIndex creates new VolumeClaimTemplatesIndex object
 func NewVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
 	return &VolumeClaimTemplatesIndex{
 		v: make(map[string]*ChiVolumeClaimTemplate),
 	}
 }
 
-// Has
+// Has checks whether index has entity `name`
 func (i *VolumeClaimTemplatesIndex) Has(name string) bool {
 	if i == nil {
 		return false
@@ -395,7 +395,7 @@ func (i *VolumeClaimTemplatesIndex) Has(name string) bool {
 	return ok
 }
 
-// Get
+// Get returns entity `name` from the index
 func (i *VolumeClaimTemplatesIndex) Get(name string) *ChiVolumeClaimTemplate {
 	if !i.Has(name) {
 		return nil
@@ -403,7 +403,7 @@ func (i *VolumeClaimTemplatesIndex) Get(name string) *ChiVolumeClaimTemplate {
 	return i.v[name]
 }
 
-// Set
+// Set sets named template into index
 func (i *VolumeClaimTemplatesIndex) Set(name string, entry *ChiVolumeClaimTemplate) {
 	if i == nil {
 		return
@@ -414,7 +414,7 @@ func (i *VolumeClaimTemplatesIndex) Set(name string, entry *ChiVolumeClaimTempla
 	i.v[name] = entry
 }
 
-// Walk
+// Walk calls specified function over each items in the index
 func (i *VolumeClaimTemplatesIndex) Walk(f func(template *ChiVolumeClaimTemplate)) {
 	if i == nil {
 		return
@@ -424,19 +424,19 @@ func (i *VolumeClaimTemplatesIndex) Walk(f func(template *ChiVolumeClaimTemplate
 	}
 }
 
-// ServiceTemplatesIndex
+// ServiceTemplatesIndex describes index of service templates
 type ServiceTemplatesIndex struct {
 	v map[string]*ChiServiceTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
-// NewServiceTemplatesIndex
+// NewServiceTemplatesIndex creates new ServiceTemplatesIndex object
 func NewServiceTemplatesIndex() *ServiceTemplatesIndex {
 	return &ServiceTemplatesIndex{
 		v: make(map[string]*ChiServiceTemplate),
 	}
 }
 
-// Has
+// Has checks whether index has entity `name`
 func (i *ServiceTemplatesIndex) Has(name string) bool {
 	if i == nil {
 		return false
@@ -448,7 +448,7 @@ func (i *ServiceTemplatesIndex) Has(name string) bool {
 	return ok
 }
 
-// Get
+// Get returns entity `name` from the index
 func (i *ServiceTemplatesIndex) Get(name string) *ChiServiceTemplate {
 	if !i.Has(name) {
 		return nil
@@ -456,7 +456,7 @@ func (i *ServiceTemplatesIndex) Get(name string) *ChiServiceTemplate {
 	return i.v[name]
 }
 
-// Set
+// Set sets named template into index
 func (i *ServiceTemplatesIndex) Set(name string, entry *ChiServiceTemplate) {
 	if i == nil {
 		return
@@ -467,7 +467,7 @@ func (i *ServiceTemplatesIndex) Set(name string, entry *ChiServiceTemplate) {
 	i.v[name] = entry
 }
 
-// Walk
+// Walk calls specified function over each items in the index
 func (i *ServiceTemplatesIndex) Walk(f func(template *ChiServiceTemplate)) {
 	if i == nil {
 		return

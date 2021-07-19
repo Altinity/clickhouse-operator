@@ -12,20 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package model
+package util
 
-import (
-	"context"
-)
+import "time"
 
-type reconcileContextKey string
-
-var k = reconcileContextKey("registry")
-
-func NewReconcileContext(ctx context.Context) context.Context {
-	return context.WithValue(ctx, k, NewRegistry())
-}
-
-func ReconcileContextGetRegistry(ctx context.Context) *Registry {
-	return ctx.Value(k).(*Registry)
+// ReasonableDuration finds first duration > 0 or returns 0 in case no durations provided
+func ReasonableDuration(durations ...time.Duration) time.Duration {
+	if len(durations) == 0 {
+		return 0
+	}
+	for _, duration := range durations {
+		if duration > 0 {
+			return duration
+		}
+	}
+	return 0
 }

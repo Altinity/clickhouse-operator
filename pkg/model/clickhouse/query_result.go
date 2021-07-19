@@ -17,12 +17,13 @@ package clickhouse
 import (
 	"context"
 	databasesql "database/sql"
+	"fmt"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 )
 
-// Query
-type Query struct {
+// QueryResult
+type QueryResult struct {
 	// Query execution context
 	ctx        context.Context
 	cancelFunc context.CancelFunc
@@ -30,9 +31,9 @@ type Query struct {
 	Rows *databasesql.Rows
 }
 
-// NewQuery
-func NewQuery(ctx context.Context, cancelFunc context.CancelFunc, rows *databasesql.Rows) *Query {
-	return &Query{
+// NewQueryResult
+func NewQueryResult(ctx context.Context, cancelFunc context.CancelFunc, rows *databasesql.Rows) *QueryResult {
+	return &QueryResult{
 		ctx:        ctx,
 		cancelFunc: cancelFunc,
 		Rows:       rows,
@@ -40,7 +41,7 @@ func NewQuery(ctx context.Context, cancelFunc context.CancelFunc, rows *database
 }
 
 // Close
-func (q *Query) Close() {
+func (q *QueryResult) Close() {
 	if q == nil {
 		return
 	}
@@ -57,4 +58,33 @@ func (q *Query) Close() {
 		q.cancelFunc()
 		q.cancelFunc = nil
 	}
+}
+
+// UnzipColumnsAsStrings splits result table into columns
+func (q *QueryResult) UnzipColumnsAsStrings(columns ...*[]string) error {
+	if q == nil {
+		return fmt.Errorf("empty query")
+	}
+	if q.Rows == nil {
+		return fmt.Errorf("no rows")
+	}
+
+	// Results
+	row := make([]string, len(columns), len(columns))
+	pointers := make([]interface{}, len(columns), len(columns))
+	for i := range row {
+		pointers[i] = &row[i]
+	}
+
+	// Scan rows
+	for q.Rows.Next() {
+		if err := q.Rows.Scan(pointers...); err != nil {
+			log.V(1).A().Error("UNABLE to scan row err: %v", err)
+			return err
+		}
+		for i := range columns {
+			*columns[i] = append(*columns[i], row[i])
+		}
+	}
+	return nil
 }

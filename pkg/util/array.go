@@ -17,10 +17,11 @@ package util
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"sort"
 )
 
-// InArray checks whether needle is in haystack
+// InArray checks whether the needle is in the haystack
 func InArray(needle string, haystack []string) bool {
 	for _, item := range haystack {
 		if item == needle {
@@ -30,6 +31,18 @@ func InArray(needle string, haystack []string) bool {
 	return false
 }
 
+// InArrayWithRegexp checks whether the needle can be matched by haystack
+func InArrayWithRegexp(needle string, haystack []string) bool {
+	for _, item := range haystack {
+		matched, _ := regexp.MatchString(item, needle)
+		if item == needle || matched {
+			return true
+		}
+	}
+	return false
+}
+
+// MergeStringArrays appends into dst items from src that are not present in src. src items are being deduplicated
 func MergeStringArrays(dst []string, src []string) []string {
 	for _, str := range src {
 		if !InArray(str, dst) {
@@ -39,7 +52,7 @@ func MergeStringArrays(dst []string, src []string) []string {
 	return dst
 }
 
-// RemoveFromArray removes needle from array
+// RemoveFromArray removes removed the needle from the haystack
 func RemoveFromArray(needle string, haystack []string) []string {
 	result := []string{}
 
@@ -66,6 +79,7 @@ func Unzip(slice [][]string) ([]string, []string) {
 	return col1, col2
 }
 
+// CastToSliceOfStrings makes slice of strings from map
 func CastToSliceOfStrings(m map[string]interface{}) []string {
 	res := make([]string, 0, 0)
 

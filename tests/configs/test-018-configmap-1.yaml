@@ -7,11 +7,8 @@ spec:
     - name: clickhouse-version
   configuration:
     settings:
-      timezone: "Europe/Moscow"
-    users:
-      user1/networks/ip: "::/0"
+      diaplay_name: "old_display_name"
+      macros/test: "old_test"
     clusters:
     - name: default
-      layout:
-        shardsCount: 1
-        replicasCount: 1
+    

@@ -38,14 +38,17 @@ func NewClickHouseConfigFilesGenerator(
 	}
 }
 
+// ClickHouseConfigFilesGeneratorOptions
 type ClickHouseConfigFilesGeneratorOptions struct {
 	RemoteServersGeneratorOptions *RemoteServersGeneratorOptions
 }
 
+// NewClickHouseConfigFilesGeneratorOptions
 func NewClickHouseConfigFilesGeneratorOptions() *ClickHouseConfigFilesGeneratorOptions {
 	return &ClickHouseConfigFilesGeneratorOptions{}
 }
 
+// GetRemoteServersGeneratorOptions
 func (o *ClickHouseConfigFilesGeneratorOptions) GetRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	if o == nil {
 		return nil
@@ -53,6 +56,7 @@ func (o *ClickHouseConfigFilesGeneratorOptions) GetRemoteServersGeneratorOptions
 	return o.RemoteServersGeneratorOptions
 }
 
+// SetRemoteServersGeneratorOptions
 func (o *ClickHouseConfigFilesGeneratorOptions) SetRemoteServersGeneratorOptions(opts *RemoteServersGeneratorOptions) *ClickHouseConfigFilesGeneratorOptions {
 	if o == nil {
 		return nil
@@ -62,6 +66,7 @@ func (o *ClickHouseConfigFilesGeneratorOptions) SetRemoteServersGeneratorOptions
 	return o
 }
 
+// defaultClickHouseConfigFilesGeneratorOptions
 func defaultClickHouseConfigFilesGeneratorOptions() *ClickHouseConfigFilesGeneratorOptions {
 	return NewClickHouseConfigFilesGeneratorOptions()
 }

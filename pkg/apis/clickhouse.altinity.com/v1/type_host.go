@@ -43,6 +43,7 @@ type ChiHost struct {
 	CHI                 *ClickHouseInstallation    `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
+// InheritSettingsFrom inherits settings from specified shard and replica
 func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
 		host.Settings = host.Settings.MergeFrom(shard.Settings)
@@ -53,6 +54,7 @@ func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
 	}
 }
 
+// InheritFilesFrom inherits files from specified shard and replica
 func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
 		host.Files = host.Files.MergeFrom(shard.Files)
@@ -63,6 +65,7 @@ func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
 	}
 }
 
+// InheritTemplatesFrom inherits templates from specified shard and replica
 func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *ChiHostTemplate) {
 	if shard != nil {
 		host.Templates = host.Templates.MergeFrom(shard.Templates, MergeTypeFillEmptyValues)
@@ -79,6 +82,7 @@ func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, 
 	host.Templates.HandleDeprecatedFields()
 }
 
+// MergeFrom merges from specified host
 func (host *ChiHost) MergeFrom(from *ChiHost) {
 	if (host == nil) || (from == nil) {
 		return
@@ -100,6 +104,7 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 	host.Templates.HandleDeprecatedFields()
 }
 
+// GetHostTemplate gets host template
 func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
 	if !host.Templates.HasHostTemplate() {
 		return nil, false
@@ -108,6 +113,7 @@ func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
 	return host.CHI.GetHostTemplate(name)
 }
 
+// GetPodTemplate gets pod template
 func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
 	if !host.Templates.HasPodTemplate() {
 		return nil, false
@@ -116,6 +122,7 @@ func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
 	return host.CHI.GetPodTemplate(name)
 }
 
+// GetServiceTemplate gets service template
 func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	if !host.Templates.HasReplicaServiceTemplate() {
 		return nil, false
@@ -124,6 +131,7 @@ func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	return host.CHI.GetServiceTemplate(name)
 }
 
+// GetStatefulSetReplicasNum gets stateful set replica num
 func (host *ChiHost) GetStatefulSetReplicasNum() int32 {
 	if host.CHI.IsStopped() {
 		return 0
@@ -132,29 +140,35 @@ func (host *ChiHost) GetStatefulSetReplicasNum() int32 {
 	}
 }
 
+// GetSettings gets settings
 func (host *ChiHost) GetSettings() *Settings {
 	return host.Settings
 }
 
+// GetZookeeper gets zookeeper
 func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
 	cluster := host.GetCluster()
 	return cluster.Zookeeper
 }
 
+// GetCHI gets CHI
 func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 	return host.CHI
 }
 
+// GetCluster gets cluster
 func (host *ChiHost) GetCluster() *ChiCluster {
 	// Host has to have filled Address
 	return host.GetCHI().FindCluster(host.Address.ClusterName)
 }
 
+// GetShard gets shard
 func (host *ChiHost) GetShard() *ChiShard {
 	// Host has to have filled Address
 	return host.GetCHI().FindShard(host.Address.ClusterName, host.Address.ShardName)
 }
 
+// CanDeleteAllPVCs checks whether all PVCs can be deleted
 func (host *ChiHost) CanDeleteAllPVCs() bool {
 	canDeleteAllPVCs := true
 	host.CHI.WalkVolumeClaimTemplates(func(template *ChiVolumeClaimTemplate) {
@@ -167,10 +181,12 @@ func (host *ChiHost) CanDeleteAllPVCs() bool {
 	return canDeleteAllPVCs
 }
 
+// WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
 func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
 	host.CHI.WalkVolumeClaimTemplates(f)
 }
 
+// WalkVolumeMounts walks VolumeMount(s)
 func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *corev1.VolumeMount)) {
 	if host.StatefulSet == nil {
 		return

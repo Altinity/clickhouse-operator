@@ -93,8 +93,7 @@ func Run() {
 	kubeClient, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
 
 	// Create operator instance
-	chop := chop.GetCHOp(kubeClient, chopClient, chopConfigFile)
-	chop.SetupLog()
+	chop.New(kubeClient, chopClient, chopConfigFile)
 	log.Info(chop.Config().String(true))
 
 	exporter := metrics.StartMetricsREST(
@@ -111,7 +110,7 @@ func Run() {
 		chiListPath,
 	)
 
-	exporter.DiscoveryWatchedCHIs(chop, chopClient)
+	exporter.DiscoveryWatchedCHIs(chopClient)
 
 	<-ctx.Done()
 }

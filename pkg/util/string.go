@@ -29,6 +29,7 @@ func RandomString() string {
 	return hex.EncodeToString(b)
 }
 
+// Set of string boolean constants
 const (
 	StringBool0                    = "0"
 	StringBool1                    = "1"
@@ -44,6 +45,10 @@ const (
 	StringBoolOffLowercase         = "off"
 	StringBoolOnFirstCapital       = "On"
 	StringBoolOnLowercase          = "on"
+	StringBoolDisableFirstCapital  = "Disable"
+	StringBoolDisableLowercase     = "disable"
+	StringBoolEnableFirstCapital   = "Enable"
+	StringBoolEnableLowercase      = "enable"
 	StringBoolDisabledFirstCapital = "Disabled"
 	StringBoolDisabledLowercase    = "disabled"
 	StringBoolEnabledFirstCapital  = "Enabled"
@@ -66,6 +71,9 @@ func IsStringBool(str string) bool {
 		StringBoolOffLowercase,
 		StringBoolOnLowercase,
 
+		StringBoolDisableLowercase,
+		StringBoolEnableLowercase,
+
 		StringBoolDisabledLowercase,
 		StringBoolEnabledLowercase:
 		return true
@@ -75,7 +83,7 @@ func IsStringBool(str string) bool {
 	}
 }
 
-// IsStringBool checks whether str is a string as bool "false" value
+// IsStringBoolFalse checks whether str is a string as bool "false" value
 func IsStringBoolFalse(str string) bool {
 	switch strings.ToLower(str) {
 	case
@@ -83,6 +91,7 @@ func IsStringBoolFalse(str string) bool {
 		StringBoolFalseLowercase,
 		StringBoolNoLowercase,
 		StringBoolOffLowercase,
+		StringBoolDisableLowercase,
 		StringBoolDisabledLowercase:
 		return true
 
@@ -91,7 +100,7 @@ func IsStringBoolFalse(str string) bool {
 	}
 }
 
-// IsStringBool checks whether str is a string as bool "true" value
+// IsStringBoolTrue checks whether str is a string as bool "true" value
 func IsStringBoolTrue(str string) bool {
 	switch strings.ToLower(str) {
 	case
@@ -99,6 +108,7 @@ func IsStringBoolTrue(str string) bool {
 		StringBoolTrueLowercase,
 		StringBoolYesLowercase,
 		StringBoolOnLowercase,
+		StringBoolEnableLowercase,
 		StringBoolEnabledLowercase:
 		return true
 
@@ -124,9 +134,9 @@ func CastStringBoolTo01(str string, defaultValue bool) string {
 
 	if defaultValue {
 		return _true
-	} else {
-		return _false
 	}
+
+	return _false
 }
 
 // CastStringBoolToStringTrueFalse casts string-bool into string "true/false"
@@ -146,9 +156,9 @@ func CastStringBoolToStringTrueFalse(str string, defaultValue bool) string {
 
 	if defaultValue {
 		return _true
-	} else {
-		return _false
 	}
+
+	return _false
 }
 
 // CreateStringID creates HEX hash ID out of string.

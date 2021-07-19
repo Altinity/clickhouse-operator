@@ -17,7 +17,6 @@ package model
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kublabels "k8s.io/apimachinery/pkg/labels"
 
@@ -29,6 +28,7 @@ import (
 
 const (
 	// Kubernetes labels
+
 	LabelReadyName                    = clickhousealtinitycom.GroupName + "/ready"
 	LabelReadyValue                   = "yes"
 	LabelAppName                      = clickhousealtinitycom.GroupName + "/app"
@@ -70,17 +70,13 @@ const (
 
 // Labeler is an entity which can label CHI artifacts
 type Labeler struct {
-	chop  *chop.CHOp
-	chi   *chi.ClickHouseInstallation
-	namer *namer
+	chi *chi.ClickHouseInstallation
 }
 
 // NewLabeler creates new labeler with context
-func NewLabeler(chop *chop.CHOp, chi *chi.ClickHouseInstallation) *Labeler {
+func NewLabeler(chi *chi.ClickHouseInstallation) *Labeler {
 	return &Labeler{
-		chop:  chop,
-		chi:   chi,
-		namer: newNamer(namerContextLabels),
+		chi: chi,
 	}
 }
 
@@ -150,108 +146,87 @@ func (l *Labeler) getLabelsServiceHost(host *chi.ChiHost) map[string]string {
 // getLabelsCHIScope gets labels for CHI-scoped object
 func (l *Labeler) getLabelsCHIScope() map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.appendCHILabels(map[string]string{
-		LabelNamespace: l.namer.getNamePartNamespace(l.chi),
-		LabelAppName:   LabelAppValue,
-		LabelCHIName:   l.namer.getNamePartCHIName(l.chi),
-	})
+	return l.appendCHILabels(l.GetSelectorCHIScope())
 }
+
+var labelsNamer = newNamer(namerContextLabels)
 
 // GetSelectorCHIScope gets labels to select a CHI-scoped object
 func (l *Labeler) GetSelectorCHIScope() map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelNamespace: l.namer.getNamePartNamespace(l.chi),
+		LabelNamespace: labelsNamer.getNamePartNamespace(l.chi),
 		LabelAppName:   LabelAppValue,
-		LabelCHIName:   l.namer.getNamePartCHIName(l.chi),
+		LabelCHIName:   labelsNamer.getNamePartCHIName(l.chi),
 	}
 }
 
 // getSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
 func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
-	return l.appendReadyLabels(l.GetSelectorCHIScope())
+	return appendReadyLabels(l.GetSelectorCHIScope())
 }
 
 // getLabelsClusterScope gets labels for Cluster-scoped object
 func (l *Labeler) getLabelsClusterScope(cluster *chi.ChiCluster) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.appendCHILabels(map[string]string{
-		LabelNamespace:   l.namer.getNamePartNamespace(cluster),
-		LabelAppName:     LabelAppValue,
-		LabelCHIName:     l.namer.getNamePartCHIName(cluster),
-		LabelClusterName: l.namer.getNamePartClusterName(cluster),
-	})
+	return l.appendCHILabels(getSelectorClusterScope(cluster))
 }
 
 // getSelectorClusterScope gets labels to select a Cluster-scoped object
-func (l *Labeler) getSelectorClusterScope(cluster *chi.ChiCluster) map[string]string {
+func getSelectorClusterScope(cluster *chi.ChiCluster) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelNamespace:   l.namer.getNamePartNamespace(cluster),
+		LabelNamespace:   labelsNamer.getNamePartNamespace(cluster),
 		LabelAppName:     LabelAppValue,
-		LabelCHIName:     l.namer.getNamePartCHIName(cluster),
-		LabelClusterName: l.namer.getNamePartClusterName(cluster),
+		LabelCHIName:     labelsNamer.getNamePartCHIName(cluster),
+		LabelClusterName: labelsNamer.getNamePartClusterName(cluster),
 	}
 }
 
 // getSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
-func (l *Labeler) getSelectorClusterScopeReady(cluster *chi.ChiCluster) map[string]string {
-	return l.appendReadyLabels(l.getSelectorClusterScope(cluster))
+func getSelectorClusterScopeReady(cluster *chi.ChiCluster) map[string]string {
+	return appendReadyLabels(getSelectorClusterScope(cluster))
 }
 
 // getLabelsShardScope gets labels for Shard-scoped object
 func (l *Labeler) getLabelsShardScope(shard *chi.ChiShard) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.appendCHILabels(map[string]string{
-		LabelNamespace:   l.namer.getNamePartNamespace(shard),
-		LabelAppName:     LabelAppValue,
-		LabelCHIName:     l.namer.getNamePartCHIName(shard),
-		LabelClusterName: l.namer.getNamePartClusterName(shard),
-		LabelShardName:   l.namer.getNamePartShardName(shard),
-	})
+	return l.appendCHILabels(getSelectorShardScope(shard))
 }
 
 // getSelectorShardScope gets labels to select a Shard-scoped object
-func (l *Labeler) getSelectorShardScope(shard *chi.ChiShard) map[string]string {
+func getSelectorShardScope(shard *chi.ChiShard) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelNamespace:   l.namer.getNamePartNamespace(shard),
+		LabelNamespace:   labelsNamer.getNamePartNamespace(shard),
 		LabelAppName:     LabelAppValue,
-		LabelCHIName:     l.namer.getNamePartCHIName(shard),
-		LabelClusterName: l.namer.getNamePartClusterName(shard),
-		LabelShardName:   l.namer.getNamePartShardName(shard),
+		LabelCHIName:     labelsNamer.getNamePartCHIName(shard),
+		LabelClusterName: labelsNamer.getNamePartClusterName(shard),
+		LabelShardName:   labelsNamer.getNamePartShardName(shard),
 	}
 }
 
 // getSelectorShardScope gets labels to select a ready-labelled Shard-scoped object
-func (l *Labeler) getSelectorShardScopeReady(shard *chi.ChiShard) map[string]string {
-	return l.appendReadyLabels(l.getSelectorShardScope(shard))
+func getSelectorShardScopeReady(shard *chi.ChiShard) map[string]string {
+	return appendReadyLabels(getSelectorShardScope(shard))
 }
 
 // getLabelsHostScope gets labels for Host-scoped object
 func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	labels := map[string]string{
-		// Mandatory labels
-		LabelNamespace:   l.namer.getNamePartNamespace(host),
-		LabelAppName:     LabelAppValue,
-		LabelCHIName:     l.namer.getNamePartCHIName(host),
-		LabelClusterName: l.namer.getNamePartClusterName(host),
-		LabelShardName:   l.namer.getNamePartShardName(host),
-		LabelReplicaName: l.namer.getNamePartReplicaName(host),
-	}
-	if l.chop.Config().AppendScopeLabels {
+	labels := GetSelectorHostScope(host)
+	if chop.Config().AppendScopeLabels {
 		// Optional labels
-		labels[LabelShardScopeIndex] = l.namer.getNamePartShardScopeIndex(host)
-		labels[LabelReplicaScopeIndex] = l.namer.getNamePartReplicaScopeIndex(host)
-		labels[LabelCHIScopeIndex] = l.namer.getNamePartCHIScopeIndex(host)
-		labels[LabelCHIScopeCycleSize] = l.namer.getNamePartCHIScopeCycleSize(host)
-		labels[LabelCHIScopeCycleIndex] = l.namer.getNamePartCHIScopeCycleIndex(host)
-		labels[LabelCHIScopeCycleOffset] = l.namer.getNamePartCHIScopeCycleOffset(host)
-		labels[LabelClusterScopeIndex] = l.namer.getNamePartClusterScopeIndex(host)
-		labels[LabelClusterScopeCycleSize] = l.namer.getNamePartClusterScopeCycleSize(host)
-		labels[LabelClusterScopeCycleIndex] = l.namer.getNamePartClusterScopeCycleIndex(host)
-		labels[LabelClusterScopeCycleOffset] = l.namer.getNamePartClusterScopeCycleOffset(host)
+		labels[LabelShardScopeIndex] = getNamePartShardScopeIndex(host)
+		labels[LabelReplicaScopeIndex] = getNamePartReplicaScopeIndex(host)
+		labels[LabelCHIScopeIndex] = getNamePartCHIScopeIndex(host)
+		labels[LabelCHIScopeCycleSize] = getNamePartCHIScopeCycleSize(host)
+		labels[LabelCHIScopeCycleIndex] = getNamePartCHIScopeCycleIndex(host)
+		labels[LabelCHIScopeCycleOffset] = getNamePartCHIScopeCycleOffset(host)
+		labels[LabelClusterScopeIndex] = getNamePartClusterScopeIndex(host)
+		labels[LabelClusterScopeCycleSize] = getNamePartClusterScopeCycleSize(host)
+		labels[LabelClusterScopeCycleIndex] = getNamePartClusterScopeCycleIndex(host)
+		labels[LabelClusterScopeCycleOffset] = getNamePartClusterScopeCycleOffset(host)
 	}
 	if applySupplementaryServiceLabels {
 		// Optional labels
@@ -265,16 +240,18 @@ func (l *Labeler) getLabelsHostScope(host *chi.ChiHost, applySupplementaryServic
 
 // getLabelsHostScopeReady gets labels for Host-scoped object including Ready label
 func (l *Labeler) getLabelsHostScopeReady(host *chi.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
-	return l.appendReadyLabels(l.getLabelsHostScope(host, applySupplementaryServiceLabels))
+	return appendReadyLabels(l.getLabelsHostScope(host, applySupplementaryServiceLabels))
 }
 
+// getLabelsHostScopeReclaimPolicy
 func (l *Labeler) getLabelsHostScopeReclaimPolicy(host *chi.ChiHost, template *chi.ChiVolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
 	return util.MergeStringMapsOverwrite(l.getLabelsHostScope(host, applySupplementaryServiceLabels), map[string]string{
 		LabelPVCReclaimPolicyName: template.PVCReclaimPolicy.String(),
 	})
 }
 
-func (l *Labeler) getReclaimPolicy(meta meta.ObjectMeta) chi.PVCReclaimPolicy {
+// GetReclaimPolicy
+func GetReclaimPolicy(meta meta.ObjectMeta) chi.PVCReclaimPolicy {
 	defaultReclaimPolicy := chi.PVCReclaimPolicyDelete
 
 	if value, ok := meta.Labels[LabelPVCReclaimPolicyName]; ok {
@@ -287,149 +264,36 @@ func (l *Labeler) getReclaimPolicy(meta meta.ObjectMeta) chi.PVCReclaimPolicy {
 	return defaultReclaimPolicy
 }
 
-// getSelectorShardScope gets labels to select a Host-scoped object
-func (l *Labeler) GetSelectorHostScope(host *chi.ChiHost) map[string]string {
+// GetSelectorHostScope gets labels to select a Host-scoped object
+func GetSelectorHostScope(host *chi.ChiHost) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelNamespace:   l.namer.getNamePartNamespace(host),
+		LabelNamespace:   labelsNamer.getNamePartNamespace(host),
 		LabelAppName:     LabelAppValue,
-		LabelCHIName:     l.namer.getNamePartCHIName(host),
-		LabelClusterName: l.namer.getNamePartClusterName(host),
-		LabelShardName:   l.namer.getNamePartShardName(host),
-		LabelReplicaName: l.namer.getNamePartReplicaName(host),
-		// skip StatefulSet
-		// skip Zookeeper
+		LabelCHIName:     labelsNamer.getNamePartCHIName(host),
+		LabelClusterName: labelsNamer.getNamePartClusterName(host),
+		LabelShardName:   labelsNamer.getNamePartShardName(host),
+		LabelReplicaName: labelsNamer.getNamePartReplicaName(host),
 	}
 }
 
 // appendCHILabels appends CHI-provided labels to labels set
 func (l *Labeler) appendCHILabels(dst map[string]string) map[string]string {
-	sourceLabels := util.CopyMapExcept(l.chi.Labels, l.chop.Config().ExcludeFromPropagationLabels...)
+	sourceLabels := util.CopyMapExcept(l.chi.Labels, chop.Config().ExcludeFromPropagationLabels...)
 	return util.MergeStringMapsOverwrite(dst, sourceLabels)
 }
 
 // appendReadyLabels appends "Ready" label to labels set
-func (l *Labeler) appendReadyLabels(dst map[string]string) map[string]string {
+func appendReadyLabels(dst map[string]string) map[string]string {
 	return util.MergeStringMapsOverwrite(dst, map[string]string{
 		LabelReadyName: LabelReadyValue,
 	})
 }
 
 // getAnnotationsHostScope gets annotations for Host-scoped object
-func (l *Labeler) getAnnotationsHostScope(host *chi.ChiHost) map[string]string {
+func getAnnotationsHostScope(host *chi.ChiHost) map[string]string {
 	// We may want to append some annotations in here
 	return host.GetAnnotations()
-}
-
-// prepareAffinity
-func (l *Labeler) prepareAffinity(podTemplate *chi.ChiPodTemplate, host *chi.ChiHost) {
-	if podTemplate.Spec.Affinity == nil {
-		return
-	}
-
-	// Walk over all affinity fields
-
-	if podTemplate.Spec.Affinity.NodeAffinity != nil {
-		l.processNodeSelector(podTemplate.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
-		l.processPreferredSchedulingTerms(podTemplate.Spec.Affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, host)
-	}
-
-	if podTemplate.Spec.Affinity.PodAffinity != nil {
-		l.processPodAffinityTerms(podTemplate.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
-		l.processWeightedPodAffinityTerms(podTemplate.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution, host)
-	}
-
-	if podTemplate.Spec.Affinity.PodAntiAffinity != nil {
-		l.processPodAffinityTerms(podTemplate.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, host)
-		l.processWeightedPodAffinityTerms(podTemplate.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, host)
-	}
-}
-
-// processNodeSelector
-func (l *Labeler) processNodeSelector(nodeSelector *v1.NodeSelector, host *chi.ChiHost) {
-	if nodeSelector == nil {
-		return
-	}
-	for i := range nodeSelector.NodeSelectorTerms {
-		nodeSelectorTerm := &nodeSelector.NodeSelectorTerms[i]
-		l.processNodeSelectorTerm(nodeSelectorTerm, host)
-	}
-}
-
-// processPreferredSchedulingTerms
-func (l *Labeler) processPreferredSchedulingTerms(preferredSchedulingTerms []v1.PreferredSchedulingTerm, host *chi.ChiHost) {
-	for i := range preferredSchedulingTerms {
-		nodeSelectorTerm := &preferredSchedulingTerms[i].Preference
-		l.processNodeSelectorTerm(nodeSelectorTerm, host)
-	}
-}
-
-// processNodeSelectorTerm
-func (l *Labeler) processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm, host *chi.ChiHost) {
-	for i := range nodeSelectorTerm.MatchExpressions {
-		nodeSelectorRequirement := &nodeSelectorTerm.MatchExpressions[i]
-		l.processNodeSelectorRequirement(nodeSelectorRequirement, host)
-	}
-
-	for i := range nodeSelectorTerm.MatchFields {
-		nodeSelectorRequirement := &nodeSelectorTerm.MatchFields[i]
-		l.processNodeSelectorRequirement(nodeSelectorRequirement, host)
-	}
-}
-
-// processNodeSelectorRequirement
-func (l *Labeler) processNodeSelectorRequirement(nodeSelectorRequirement *v1.NodeSelectorRequirement, host *chi.ChiHost) {
-	nodeSelectorRequirement.Key = newNameMacroReplacerHost(host).Replace(nodeSelectorRequirement.Key)
-	// Update values only, keys are not macros-ed
-	for i := range nodeSelectorRequirement.Values {
-		nodeSelectorRequirement.Values[i] = newNameMacroReplacerHost(host).Replace(nodeSelectorRequirement.Values[i])
-	}
-}
-
-// processPodAffinityTerms
-func (l *Labeler) processPodAffinityTerms(podAffinityTerms []v1.PodAffinityTerm, host *chi.ChiHost) {
-	for i := range podAffinityTerms {
-		podAffinityTerm := &podAffinityTerms[i]
-		l.processPodAffinityTerm(podAffinityTerm, host)
-	}
-}
-
-// processWeightedPodAffinityTerms
-func (l *Labeler) processWeightedPodAffinityTerms(weightedPodAffinityTerms []v1.WeightedPodAffinityTerm, host *chi.ChiHost) {
-	for i := range weightedPodAffinityTerms {
-		podAffinityTerm := &weightedPodAffinityTerms[i].PodAffinityTerm
-		l.processPodAffinityTerm(podAffinityTerm, host)
-	}
-}
-
-// processPodAffinityTerm
-func (l *Labeler) processPodAffinityTerm(podAffinityTerm *v1.PodAffinityTerm, host *chi.ChiHost) {
-	l.processLabelSelector(podAffinityTerm.LabelSelector, host)
-	podAffinityTerm.TopologyKey = newNameMacroReplacerHost(host).Replace(podAffinityTerm.TopologyKey)
-}
-
-// processLabelSelector
-func (l *Labeler) processLabelSelector(labelSelector *meta.LabelSelector, host *chi.ChiHost) {
-	if labelSelector == nil {
-		return
-	}
-
-	for k := range labelSelector.MatchLabels {
-		labelSelector.MatchLabels[k] = newNameMacroReplacerHost(host).Replace(labelSelector.MatchLabels[k])
-	}
-	for j := range labelSelector.MatchExpressions {
-		labelSelectorRequirement := &labelSelector.MatchExpressions[j]
-		l.processLabelSelectorRequirement(labelSelectorRequirement, host)
-	}
-}
-
-// processLabelSelectorRequirement
-func (l *Labeler) processLabelSelectorRequirement(labelSelectorRequirement *meta.LabelSelectorRequirement, host *chi.ChiHost) {
-	labelSelectorRequirement.Key = newNameMacroReplacerHost(host).Replace(labelSelectorRequirement.Key)
-	// Update values only, keys are not macros-ed
-	for i := range labelSelectorRequirement.Values {
-		labelSelectorRequirement.Values[i] = newNameMacroReplacerHost(host).Replace(labelSelectorRequirement.Values[i])
-	}
 }
 
 // makeSetFromObjectMeta makes kublabels.Set from ObjectMeta
@@ -465,6 +329,7 @@ func makeSetFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Set, error) {
 	return set, nil
 }
 
+// MakeSelectorFromObjectMeta
 // TODO review usage
 func MakeSelectorFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Selector, error) {
 	set, err := makeSetFromObjectMeta(objMeta)
@@ -509,6 +374,7 @@ func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
 	)
 }
 
+// isObjectVersionLabelTheSame
 func isObjectVersionLabelTheSame(meta *meta.ObjectMeta, value string) bool {
 	if meta == nil {
 		return false
@@ -522,6 +388,7 @@ func isObjectVersionLabelTheSame(meta *meta.ObjectMeta, value string) bool {
 	return l == value
 }
 
+// IsObjectTheSame
 func IsObjectTheSame(meta1, meta2 *meta.ObjectMeta) bool {
 	if (meta1 == nil) && (meta2 == nil) {
 		return true

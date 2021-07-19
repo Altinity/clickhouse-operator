@@ -1,0 +1,373 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: prometheus
+    role: alert-rules
+  name: prometheus-zookeeper-rules
+spec:
+  groups:
+    # based on https://blog.serverdensity.com/how-to-monitor-zookeeper/
+    # and https://github.com/apache/zookeeper/blob/master/zookeeper-contrib/zookeeper-contrib-monitoring/nagios/services.cfg
+    - name: ZookeeperRules
+      rules:
+        - alert: ZookeeperDown
+          expr: up{app=~'zookeeper.*'} == 0
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "zookeeper possible down"
+            description: |-
+              `zookeeper` can't be scraped via prometheus.
+              Please check instance status
+              ```kubectl logs -n {{ $labels.namespace }} {{ $labels.pod_name }} -f```
+
+        - alert: ZookeeperRestartRecently
+          expr: uptime{app=~'zookeeper.*'} > 1 < 180000
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Amount of time since the server was started."
+            description: |-
+              `uptime{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "uptime{pod_name='%s',namespace='%s'} / 1000" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanizeDuration }}{{ end }}
+
+              Look to previous Zookeeper pod log to investigate restart reason
+              ```
+              kubectl logs -n {{ $labels.namespace }} pod/{{ $labels.pod_name }} --previous
+              ```
+
+        - alert: ZookeeperHighLatency
+          expr: avg_latency{app=~'zookeeper.*'} > 500
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Average amount of time it takes for the server to respond to each client request (since the server was started)."
+            description: |-
+              `avg_latency{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "avg_latency{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} ticks{{ end }}
+
+              reset server statistics
+              ```
+              kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- bash -xc "echo stats_reset | nc localhost 2181"
+              ```
+
+              Look to CPU/Memory node/pod utilization
+              ```
+              kubectl top -n {{ $labels.namespace }} pod {{ $labels.pod_name }}
+              kubectl top node {{ $labels.node }}
+              ```
+
+              Look to Zookeeper Disk free space
+              ```
+              kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- df -h
+              ```
+
+              Look to zookeeper read\write
+              ```
+              readBegin=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^rchar" | cut -d " " -f 2)
+              writeBegin=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^wchar" | cut -d " " -f 2)
+              sleep 5
+              readEnd=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^rchar" | cut -d " " -f 2)
+              writeEnd=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^wchar" | cut -d " " -f 2)
+              echo "Zookeeper Read $((($readEnd - $readBegin) / 5)) b/s"
+              echo "Zookeeper Write $((($writeEnd - $writeBegin) / 5)) b/s"
+              ```
+
+        - alert: ZookeeperOutstandingRequests
+          expr: outstanding_requests{app=~'zookeeper.*'} > 10
+          for: 10m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper receives more requests than it can process."
+            description: |-
+              `outstanding_requests{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "outstanding_requests{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+
+              Look to CPU/Memory node/pod utilization
+              ```
+              kubectl top -n {{ $labels.namespace }} pod {{ $labels.pod_name }}
+              kubectl top node {{ $labels.node }}
+              ```
+
+              Look to Zookeeper Disk free space
+              ```
+              kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- df -h
+              ```
+
+              Look to zookeeper read\write
+              ```
+              readBegin=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^rchar" | cut -d " " -f 2)
+              writeBegin=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^wchar" | cut -d " " -f 2)
+              sleep 5
+              readEnd=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^rchar" | cut -d " " -f 2)
+              writeEnd=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^wchar" | cut -d " " -f 2)
+              echo "Zookeeper Read $((($readEnd - $readBegin) / 5)) b/s"
+              echo "Zookeeper Write $((($writeEnd - $writeBegin) / 5)) b/s"
+              ```
+
+        - alert: ZookeeperHighFileDescriptors
+          expr: (open_file_descriptor_count{app=~'zookeeper.*'} / max_file_descriptor_count{app=~'zookeeper.*'})  > 0.7
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Number of file descriptors used over the limit."
+            description: |-
+              `open_file_descriptor_count{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "open_file_descriptor_count{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} descriptors{{ end }}
+              `process_open_fds{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "process_open_fds{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} descriptors{{ end }}
+
+        - alert: ZookeeperPendingSyncs
+          expr: pending_syncs{app=~'zookeeper.*'} > 10
+          for: 5m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Possible Zookeeper master pending syncs with followers."
+            description: |-
+              `pending_session_queue_size{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "pending_session_queue_size{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} sessions{{ end }}
+
+        - alert: ZookeeperPendingSessions
+          expr: pending_session_queue_size{app=~'zookeeper.*'} > 10
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Possible Zookeeper pending sessions."
+            description: |-
+              `pending_session_queue_size{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "pending_session_queue_size{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} sessions{{ end }}
+
+        - alert: ZookeeperThrottleRequests
+          expr: increase(request_throttle_wait_count{app=~'zookeeper.*'}[1m]) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper throttle requests"
+            description: |-
+              `increase(request_throttle_wait_count{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(request_throttle_wait_count{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} requests{{ end }}
+              Look `requestThrottleLimit`, `requestThrottleStallTime` in documentation:
+              https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_advancedConfiguration
+
+        - alert: ZookeeperOutstandingTLSHandshakes
+          expr: outstanding_tls_handshake{app=~'zookeeper.*'} > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper receives more TLS handshake than it can process."
+            description: |-
+              `outstanding_tls_handshake{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "outstanding_tls_handshake{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} requests{{ end }}
+
+        - alert: ZookeeperConnectionRejected
+          expr: increase(connection_rejected{app=~'zookeeper.*'}[1m]) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper reject connection."
+            description: |-
+              `increase(connection_rejected{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(connection_rejected{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} requests{{ end }}
+              Check connections count on Zookeeper
+              ```
+              kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/net/sockstat
+              kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/net/sockstat6
+              ```
+
+        - alert: ZookeeperHighEphemeralNodes
+          expr: ephemerals_count{app=~'zookeeper.*'} > 100
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper have too high ephemeral znodes count."
+            description: |-
+              `ephemerals_count{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "ephemerals_count{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} nodes{{ end }}
+              Look to documentation:
+              https://zookeeper.apache.org/doc/current/zookeeperOver.html#Nodes+and+ephemeral+nodes
+
+        - alert: ZookeeperUnrecoverableErrors
+          expr: increase(unrecoverable_error_count{app=~'zookeeper.*'}[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper have unhandled Exception"
+            description: |-
+              `increase(unrecoverable_error_count{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "rate(unrecoverable_error_count{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} exceptions{{ end }}
+              It mean Zookeeper catch some unknown Exception and will close listen socket
+
+              Look to current and previous Zookeeper pod log to investigate restart reason
+              ```
+              kubectl logs -n {{ $labels.namespace }} pod/{{ $labels.pod_name }}
+              kubectl logs -n {{ $labels.namespace }} pod/{{ $labels.pod_name }} --previous
+              ```
+
+
+        - alert: ZookeeperLowGetDataCacheHitRate
+          expr: increase(response_packet_cache_hits{app=~'zookeeper.*'}[1m]) / (increase(response_packet_cache_misses{app=~'zookeeper.*'}[1m]) + increase(response_packet_cache_hits{app=~'zookeeper.*'}[1m]) ) < 0.3
+          for: 10m
+          labels:
+            severity: info
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper have inefficient get data znodes response cache."
+            description: |-
+              `increase(response_packet_cache_hits{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(response_packet_cache_hits{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} hits{{ end }}
+              `increase(response_packet_cache_misses{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(response_packet_cache_misses{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} misses{{ end }}
+              `Get Data Cache Hit Rate` = {{ with printf "increase(response_packet_cache_hits{pod_name='%s',namespace='%s'}[1m]) / (increase(response_packet_cache_misses{pod_name='%s',namespace='%s'}[1m]) + increase(response_packet_cache_hits{pod_name='%s',namespace='%s'}[1m]))" .Labels.pod_name .Labels.namespace .Labels.pod_name .Labels.namespace .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              For heavy read workloads Zookeeper try to cache response for `get data` API method for save the serialization cost on popular znodes.
+              Try to tune `maxResponseCacheSize`
+              Look to documentation:
+              https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_advancedConfiguration
+
+        - alert: ZookeeperLowGetChildrenCacheHitRate
+          expr: increase(response_packet_get_children_cache_hits{app=~'zookeeper.*'}[1m]) / (increase(response_packet_get_children_cache_misses{app=~'zookeeper.*'}[1m]) + increase(response_packet_get_children_cache_hits{app=~'zookeeper.*'}[1m]) ) < 0.3
+          for: 10m
+          labels:
+            severity: info
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper have inefficient get data znodes response cache."
+            description: |-
+              `increase(response_packet_get_children_cache_hits{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(response_packet_get_children_cache_hits{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} hits{{ end }}
+              `increase(response_packet_get_children_cache_misses{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(response_packet_get_children_cache_misses{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} misses{{ end }}
+              `Get Children Cache Hit Rate` = {{ with printf "increase(response_packet_get_children_cache_hits{pod_name='%s',namespace='%s'}[1m]) / (increase(response_packet_get_children_cache_misses{pod_name='%s',namespace='%s'}[1m]) + increase(response_packet_get_children_cache_hits{pod_name='%s',namespace='%s'}[1m]))" .Labels.pod_name .Labels.namespace .Labels.pod_name .Labels.namespace .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              For heavy read workloads Zookeeper try to cache response for `get children` API method for save the serialization cost on popular znodes.
+              Try to tune `maxGetChildrenResponseCacheSize`
+              Look to documentation:
+              https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_advancedConfiguration
+
+        - alert: ZookeeperEnsembleAuthFailures
+          expr: increase(ensemble_auth_fail{app=~'zookeeper.*'}[1m]) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper authentication failures with `ensemble` scheme."
+            description: |-
+              `increase(ensemble_auth_fail{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(response_packet_get_children_cache_hits{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} failures{{ end }}
+              Look to `ensembleAuthName` in documentation:
+              https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_authOptions
+
+        - alert: ZookeeperHighFsyncTime
+          expr: fsynctime{quantile="0.5", app=~'zookeeper.*'} > 10
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper have slow fsync to disk."
+            description: |-
+              `increase(fsynctime_sum{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(fsynctime_sum{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} ms{{ end }}
+              `increase(fsynctime_count{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(fsynctime_count{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} count{{ end }}
+              `fsynctime{quantile="0.5",pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "fsynctime{quantile='0.5',pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} ms{{ end }}
+              It mean writes to Transactional Log (WAL) takes more time than expected. If a Zookkeper crashes it can replay the WAL to recover its previous state after restart.
+
+        - alert: ZookeeperLargeRequestsRejected
+          expr: increase(large_requests_rejected{app=~'zookeeper.*'}[1m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper reject some large requests."
+            description: |-
+              `increase(large_requests_rejected{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(large_requests_rejected{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} requests{{ end }}
+              It mean Zookeeper avoid JVM allocate too much memory and runs out of usable heap and ultimately crashes.
+              Look to `largeRequestMaxBytes` and `largeRequestThreshold` options in documentation:
+              https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_advancedConfiguration
+
+        - alert: ZookeeperStaleRequestsDropped
+          expr: increase(stale_requests_dropped{app=~'zookeeper.*'}[1m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper dropped stale requests."
+            description: |-
+              `increase(stale_requests_dropped{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(stale_requests_dropped{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} requests{{ end }}
+              `Stale request` is a request sent by a connection that is now closed, and/or a request that will have a request latency higher than the `sessionTimeout`.
+              Look to `requestThrottleDropStale`, `requestStaleLatencyCheck`, `requestStaleConnectionCheck` options in documentation:
+              https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_advancedConfiguration
+
+        - alert: ZookeeperDigestMismatch
+          expr: increase(digest_mismatches_count{app=~'zookeeper.*'}[1m]) > 0
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper have inconsistent data in memory."
+            description: |-
+              `increase(digest_mismatches_count{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(digest_mismatches_count{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} mismatches{{ end }}
+              The digest feature is added to detect the data inconsistency inside ZooKeeper when loading database from disk, catching up and following leader, its doing incrementally hash check for the DataTree based on the adHash.
+              Look to `digest.enabled` options in documentation:
+              https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_advancedConfiguration
+
+        - alert: ZookeeperSessionlessConnectionExpires
+          expr: increase(sessionless_connections_expired[1m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper close connection without session."
+            description: |-
+              `increase(sessionless_connections_expired{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[1m])` = {{ with printf "increase(sessionless_connections_expired{pod_name='%s',namespace='%s'}[1m])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} sessionless connections{{ end }}
+              Look to `minSessionTimeout`,`maxSessionTimeout` options in documentation:
+              https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_advancedConfiguration
+
+        - alert: ZookeeperThreadsDeadlocked
+          expr: jvm_threads_deadlocked{app=~'zookeeper.*'} > 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper JVM threads Deadlock occurred."
+            description: |-
+              JVM Thread Deadlock means a situation where two or more JVM threads are blocked forever, waiting for each other.
+              Deadlock occurs when multiple threads need the same locks but obtain them in different order.
+
+              As a quick workaround - pod restart
+              ```
+              kubectl exec -n {{ $labels.namespace }} pod/{{ $labels.pod_name }} -- kill 1
+              ```
+
+              Look to current Zookeeper pod log to investigate Deadlock reason
+              ```
+              kubectl logs -n {{ $labels.namespace }} pod/{{ $labels.pod_name }} -f | grep -i -E "deadlock|exception"
+              ```
+
+              Also look to JVM documentation about threads state:
+              https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/lang/Thread.State.html
+
+              `jvm_threads_deadlocked{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "jvm_threads_deadlocked{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `jvm_threads_current{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "jvm_threads_current{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `jvm_threads_state{state="NEW",pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "jvm_threads_state{state='NEW',pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `jvm_threads_state{state="RUNNABLE",pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "jvm_threads_state{state='RUNNABLE',pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `jvm_threads_state{state="BLOCKED",pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "jvm_threads_state{state='BLOCKED',pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `jvm_threads_state{state="WAITING",pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "jvm_threads_state{state='WAITING',pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `jvm_threads_state{state="TIMED_WAITING",pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "jvm_threads_state{state='TIMED_WAITING',pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `jvm_threads_state{state="TERMINATED",pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "jvm_threads_state{state='TERMINATED',pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+
+        - alert: ZookeeperUnsuccessfulSSLHandshakes
+          expr: increase(unsuccessful_handshake{app=~'zookeeper.*'}[1m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Zookeeper Unsuccessful Handshakes occurred."
+            description: |-
+              Look to `ssl.*` options in documentation:
+              https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_authOptions
+
+              Look to current Zookeeper pod log to investigate unsucessfull handshake reason
+              ```
+              kubectl logs -n {{ $labels.namespace }} pod/{{ $labels.pod_name }} -f | grep -i -E "tls|ssl|auth|cert|handshake"
+              ```

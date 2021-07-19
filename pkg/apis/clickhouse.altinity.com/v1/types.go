@@ -17,6 +17,8 @@ package v1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
+	"time"
 )
 
 type MergeType string
@@ -59,6 +61,7 @@ type ClickHouseOperatorConfiguration struct {
 type ChiSpec struct {
 	TaskID                 *string          `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
 	Stop                   string           `json:"stop,omitempty"                   yaml:"stop,omitempty"`
+	Troubleshoot           string           `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
 	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating   `json:"templating,omitempty"             yaml:"templating,omitempty"`
 	Reconciling            *ChiReconciling  `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
@@ -101,13 +104,283 @@ func (t *ChiTemplating) SetPolicy(p string) {
 	t.Policy = p
 }
 
-// ChiReconciling
-type ChiReconciling struct {
-	Policy string `json:"policy,omitempty" yaml:"policy,omitempty"`
+// MergeFrom
+func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemplating {
+	if from == nil {
+		return t
+	}
+
+	if t == nil {
+		t = NewChiTemplating()
+	}
+
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if t.Policy == "" {
+			t.Policy = from.Policy
+		}
+	case MergeTypeOverrideByNonEmptyValues:
+		if from.Policy != "" {
+			// Override by non-empty values only
+			t.Policy = from.Policy
+		}
+	}
+
+	return t
 }
 
+const ObjectsCleanupUnspecified = "Unspecified"
+const ObjectsCleanupRetain = "Retain"
+const ObjectsCleanupDelete = "Delete"
+
+type ChiObjectsCleanup struct {
+	StatefulSet string `json:"statefulSet,omitempty" yaml:"statefulSet,omitempty"`
+	PVC         string `json:"pvc,omitempty"         yaml:"pvc,omitempty"`
+	ConfigMap   string `json:"configMap,omitempty"   yaml:"configMap,omitempty"`
+	Service     string `json:"service,omitempty"     yaml:"service,omitempty"`
+}
+
+func NewChiObjectsCleanup() *ChiObjectsCleanup {
+	return new(ChiObjectsCleanup)
+}
+
+// MergeFrom
+func (c *ChiObjectsCleanup) MergeFrom(from *ChiObjectsCleanup, _type MergeType) *ChiObjectsCleanup {
+	if from == nil {
+		return c
+	}
+
+	if c == nil {
+		c = NewChiObjectsCleanup()
+	}
+
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if c.StatefulSet == "" {
+			c.StatefulSet = from.StatefulSet
+		}
+		if c.PVC == "" {
+			c.PVC = from.PVC
+		}
+		if c.ConfigMap == "" {
+			c.ConfigMap = from.ConfigMap
+		}
+		if c.Service == "" {
+			c.Service = from.Service
+		}
+	case MergeTypeOverrideByNonEmptyValues:
+		if from.StatefulSet != "" {
+			// Override by non-empty values only
+			c.StatefulSet = from.StatefulSet
+		}
+		if from.PVC != "" {
+			// Override by non-empty values only
+			c.PVC = from.PVC
+		}
+		if from.ConfigMap != "" {
+			// Override by non-empty values only
+			c.ConfigMap = from.ConfigMap
+		}
+		if from.Service != "" {
+			// Override by non-empty values only
+			c.Service = from.Service
+		}
+	}
+
+	return c
+}
+
+func (c *ChiObjectsCleanup) GetStatefulSet() string {
+	if c == nil {
+		return ""
+	}
+	return c.StatefulSet
+}
+
+func (c *ChiObjectsCleanup) SetStatefulSet(v string) *ChiObjectsCleanup {
+	if c == nil {
+		return nil
+	}
+	c.StatefulSet = v
+	return c
+}
+
+func (c *ChiObjectsCleanup) GetPVC() string {
+	if c == nil {
+		return ""
+	}
+	return c.PVC
+}
+
+func (c *ChiObjectsCleanup) SetPVC(v string) *ChiObjectsCleanup {
+	if c == nil {
+		return nil
+	}
+	c.PVC = v
+	return c
+}
+
+func (c *ChiObjectsCleanup) GetConfigMap() string {
+	if c == nil {
+		return ""
+	}
+	return c.ConfigMap
+}
+
+func (c *ChiObjectsCleanup) SetConfigMap(v string) *ChiObjectsCleanup {
+	if c == nil {
+		return nil
+	}
+	c.ConfigMap = v
+	return c
+}
+
+func (c *ChiObjectsCleanup) GetService() string {
+	if c == nil {
+		return ""
+	}
+	return c.Service
+}
+
+func (c *ChiObjectsCleanup) SetService(v string) *ChiObjectsCleanup {
+	if c == nil {
+		return nil
+	}
+	c.Service = v
+	return c
+}
+
+type ChiCleanup struct {
+	// UnknownObjects
+	UnknownObjects *ChiObjectsCleanup `json:"unknownObjects,omitempty" yaml:"unknownObjects,omitempty"`
+	// ReconcileFailedObjects
+	ReconcileFailedObjects *ChiObjectsCleanup `json:"reconcileFailedObjects,omitempty" yaml:"reconcileFailedObjects,omitempty"`
+}
+
+// NewChiCleanup
+func NewChiCleanup() *ChiCleanup {
+	return new(ChiCleanup)
+}
+
+// MergeFrom
+func (t *ChiCleanup) MergeFrom(from *ChiCleanup, _type MergeType) *ChiCleanup {
+	if from == nil {
+		return t
+	}
+
+	if t == nil {
+		t = NewChiCleanup()
+	}
+
+	switch _type {
+	case MergeTypeFillEmptyValues:
+	case MergeTypeOverrideByNonEmptyValues:
+	}
+
+	t.UnknownObjects = t.UnknownObjects.MergeFrom(from.UnknownObjects, _type)
+	t.ReconcileFailedObjects = t.ReconcileFailedObjects.MergeFrom(from.ReconcileFailedObjects, _type)
+
+	return t
+}
+
+func (t *ChiCleanup) GetUnknownObjects() *ChiObjectsCleanup {
+	if t == nil {
+		return nil
+	}
+	return t.UnknownObjects
+}
+
+func (t *ChiCleanup) DefaultUnknownObjects() *ChiObjectsCleanup {
+	return NewChiObjectsCleanup().
+		SetStatefulSet(ObjectsCleanupDelete).
+		SetPVC(ObjectsCleanupDelete).
+		SetConfigMap(ObjectsCleanupDelete).
+		SetService(ObjectsCleanupDelete)
+}
+
+func (t *ChiCleanup) GetReconcileFailedObjects() *ChiObjectsCleanup {
+	if t == nil {
+		return nil
+	}
+	return t.ReconcileFailedObjects
+}
+
+func (t *ChiCleanup) DefaultReconcileFailedObjects() *ChiObjectsCleanup {
+	return NewChiObjectsCleanup().
+		SetStatefulSet(ObjectsCleanupRetain).
+		SetPVC(ObjectsCleanupRetain).
+		SetConfigMap(ObjectsCleanupRetain).
+		SetService(ObjectsCleanupRetain)
+}
+
+// SetDefaults
+func (t *ChiCleanup) SetDefaults() *ChiCleanup {
+	if t == nil {
+		return nil
+	}
+	t.UnknownObjects = t.DefaultUnknownObjects()
+	t.ReconcileFailedObjects = t.DefaultReconcileFailedObjects()
+	return t
+}
+
+// ChiReconciling
+type ChiReconciling struct {
+	// About to be DEPRECATED
+	Policy string `json:"policy,omitempty" yaml:"policy,omitempty"`
+	// ConfigMapPropagationTimeout specifies timeout for ConfigMap to propagate
+	ConfigMapPropagationTimeout int `json:"configMapPropagationTimeout,omitempty" yaml:"configMapPropagationTimeout,omitempty"`
+	// Cleanup specifies cleanup behavior
+	Cleanup *ChiCleanup `json:"cleanup,omitempty" yaml:"cleanup,omitempty"`
+}
+
+// NewChiReconciling
 func NewChiReconciling() *ChiReconciling {
 	return new(ChiReconciling)
+}
+
+// MergeFrom
+func (t *ChiReconciling) MergeFrom(from *ChiReconciling, _type MergeType) *ChiReconciling {
+	if from == nil {
+		return t
+	}
+
+	if t == nil {
+		t = NewChiReconciling()
+	}
+
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		if t.Policy == "" {
+			t.Policy = from.Policy
+		}
+		if t.ConfigMapPropagationTimeout == 0 {
+			t.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
+		}
+	case MergeTypeOverrideByNonEmptyValues:
+		if from.Policy != "" {
+			// Override by non-empty values only
+			t.Policy = from.Policy
+		}
+		if from.ConfigMapPropagationTimeout != 0 {
+			// Override by non-empty values only
+			t.ConfigMapPropagationTimeout = from.ConfigMapPropagationTimeout
+		}
+	}
+
+	t.Cleanup = t.Cleanup.MergeFrom(from.Cleanup, _type)
+
+	return t
+}
+
+// SetDefaults
+func (t *ChiReconciling) SetDefaults() *ChiReconciling {
+	if t == nil {
+		return nil
+	}
+	t.Policy = ReconcilingPolicyUnspecified
+	t.ConfigMapPropagationTimeout = 90
+	t.Cleanup = NewChiCleanup().SetDefaults()
+	return t
 }
 
 // GetPolicy
@@ -124,6 +397,52 @@ func (t *ChiReconciling) SetPolicy(p string) {
 		return
 	}
 	t.Policy = p
+}
+
+// GetConfigMapPropagationTimeout
+func (t *ChiReconciling) GetConfigMapPropagationTimeout() int {
+	if t == nil {
+		return 0
+	}
+	return t.ConfigMapPropagationTimeout
+}
+
+// SetConfigMapPropagationTimeout
+func (t *ChiReconciling) SetConfigMapPropagationTimeout(timeout int) {
+	if t == nil {
+		return
+	}
+	t.ConfigMapPropagationTimeout = timeout
+}
+
+// GetConfigMapPropagationTimeoutDuration
+func (t *ChiReconciling) GetConfigMapPropagationTimeoutDuration() time.Duration {
+	if t == nil {
+		return 0
+	}
+	return time.Duration(t.GetConfigMapPropagationTimeout()) * time.Second
+}
+
+const ReconcilingPolicyUnspecified = "unspecified"
+const ReconcilingPolicyWait = "wait"
+const ReconcilingPolicyNoWait = "nowait"
+
+// IsReconcilingPolicyWait
+func (t *ChiReconciling) IsReconcilingPolicyWait() bool {
+	return strings.ToLower(t.GetPolicy()) == ReconcilingPolicyWait
+}
+
+// IsReconcilingPolicyNoWait
+func (t *ChiReconciling) IsReconcilingPolicyNoWait() bool {
+	return strings.ToLower(t.GetPolicy()) == ReconcilingPolicyNoWait
+}
+
+// GetCleanup
+func (t *ChiReconciling) GetCleanup() *ChiCleanup {
+	if t == nil {
+		return nil
+	}
+	return t.Cleanup
 }
 
 // ChiDefaults defines defaults section of .spec

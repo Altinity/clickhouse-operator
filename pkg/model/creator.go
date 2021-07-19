@@ -29,20 +29,20 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// Creator specifies creator object
 type Creator struct {
-	chop                   *chop.CHOp
 	chi                    *chiv1.ClickHouseInstallation
 	chConfigFilesGenerator *ClickHouseConfigFilesGenerator
 	labeler                *Labeler
 	a                      log.Announcer
 }
 
-func NewCreator(chop *chop.CHOp, chi *chiv1.ClickHouseInstallation) *Creator {
+// NewCreator creates new Creator object
+func NewCreator(chi *chiv1.ClickHouseInstallation) *Creator {
 	return &Creator{
-		chop:                   chop,
 		chi:                    chi,
 		chConfigFilesGenerator: NewClickHouseConfigFilesGenerator(NewClickHouseConfigGenerator(chi), chop.Config()),
-		labeler:                NewLabeler(chop, chi),
+		labeler:                NewLabeler(chi),
 		a:                      log.M(chi),
 	}
 }
@@ -50,6 +50,7 @@ func NewCreator(chop *chop.CHOp, chi *chiv1.ClickHouseInstallation) *Creator {
 // CreateServiceCHI creates new corev1.Service for specified CHI
 func (c *Creator) CreateServiceCHI() *corev1.Service {
 	serviceName := CreateCHIServiceName(c.chi)
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 
 	c.a.V(1).F().Info("%s/%s", c.chi.Namespace, serviceName)
 	if template, ok := c.chi.GetCHIServiceTemplate(); ok {
@@ -60,6 +61,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 			serviceName,
 			c.labeler.getLabelsServiceCHI(),
 			c.labeler.getSelectorCHIScopeReady(),
+			ownerReferences,
 		)
 	}
 
@@ -67,9 +69,10 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsServiceCHI(),
+			Name:            serviceName,
+			Namespace:       c.chi.Namespace,
+			Labels:          c.labeler.getLabelsServiceCHI(),
+			OwnerReferences: ownerReferences,
 		},
 		Spec: corev1.ServiceSpec{
 			// ClusterIP: templateDefaultsServiceClusterIP,
@@ -99,6 +102,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 // CreateServiceCluster creates new corev1.Service for specified Cluster
 func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
 	serviceName := CreateClusterServiceName(cluster)
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 
 	c.a.V(1).F().Info("%s/%s", cluster.Address.Namespace, serviceName)
 	if template, ok := cluster.GetServiceTemplate(); ok {
@@ -108,7 +112,8 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 			cluster.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceCluster(cluster),
-			c.labeler.getSelectorClusterScopeReady(cluster),
+			getSelectorClusterScopeReady(cluster),
+			ownerReferences,
 		)
 	}
 	// No template specified, no need to create service
@@ -118,6 +123,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 // CreateServiceShard creates new corev1.Service for specified Shard
 func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 	serviceName := CreateShardServiceName(shard)
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 
 	c.a.V(1).F().Info("%s/%s", shard.Address.Namespace, serviceName)
 	if template, ok := shard.GetServiceTemplate(); ok {
@@ -127,7 +133,8 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 			shard.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceShard(shard),
-			c.labeler.getSelectorShardScopeReady(shard),
+			getSelectorShardScopeReady(shard),
+			ownerReferences,
 		)
 	}
 	// No template specified, no need to create service
@@ -138,6 +145,7 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(host)
 	statefulSetName := CreateStatefulSetName(host)
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 
 	c.a.V(1).F().Info("%s/%s for Set %s", host.Address.Namespace, serviceName, statefulSetName)
 	if template, ok := host.GetServiceTemplate(); ok {
@@ -147,7 +155,8 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			host.Address.Namespace,
 			serviceName,
 			c.labeler.getLabelsServiceHost(host),
-			c.labeler.GetSelectorHostScope(host),
+			GetSelectorHostScope(host),
+			ownerReferences,
 		)
 	}
 
@@ -155,9 +164,10 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      serviceName,
-			Namespace: host.Address.Namespace,
-			Labels:    c.labeler.getLabelsServiceHost(host),
+			Name:            serviceName,
+			Namespace:       host.Address.Namespace,
+			Labels:          c.labeler.getLabelsServiceHost(host),
+			OwnerReferences: ownerReferences,
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -180,7 +190,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 					TargetPort: intstr.FromInt(int(host.InterserverHTTPPort)),
 				},
 			},
-			Selector:                 c.labeler.GetSelectorHostScope(host),
+			Selector:                 GetSelectorHostScope(host),
 			ClusterIP:                templateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
 			PublishNotReadyAddresses: true,
@@ -210,6 +220,7 @@ func (c *Creator) createServiceFromTemplate(
 	name string,
 	labels map[string]string,
 	selector map[string]string,
+	ownerReferences []metav1.OwnerReference,
 ) *corev1.Service {
 
 	// Verify Ports
@@ -226,6 +237,7 @@ func (c *Creator) createServiceFromTemplate(
 	// Overwrite .name and .namespace - they are not allowed to be specified in template
 	service.Name = name
 	service.Namespace = namespace
+	service.OwnerReferences = ownerReferences
 
 	// Append provided Labels to already specified Labels in template
 	service.Labels = util.MergeStringMapsOverwrite(service.Labels, labels)
@@ -243,9 +255,10 @@ func (c *Creator) createServiceFromTemplate(
 func (c *Creator) CreateConfigMapCHICommon(options *ClickHouseConfigFilesGeneratorOptions) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      CreateConfigMapCommonName(c.chi),
-			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsConfigMapCHICommon(),
+			Name:            CreateConfigMapCommonName(c.chi),
+			Namespace:       c.chi.Namespace,
+			Labels:          c.labeler.getLabelsConfigMapCHICommon(),
+			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupCommon(options),
@@ -259,9 +272,10 @@ func (c *Creator) CreateConfigMapCHICommon(options *ClickHouseConfigFilesGenerat
 func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      CreateConfigMapCommonUsersName(c.chi),
-			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsConfigMapCHICommonUsers(),
+			Name:            CreateConfigMapCommonUsersName(c.chi),
+			Namespace:       c.chi.Namespace,
+			Labels:          c.labeler.getLabelsConfigMapCHICommonUsers(),
+			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupUsers(),
@@ -275,9 +289,10 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      CreateConfigMapPodName(host),
-			Namespace: host.Address.Namespace,
-			Labels:    c.labeler.getLabelsConfigMapHost(host),
+			Name:            CreateConfigMapPersonalName(host),
+			Namespace:       host.Address.Namespace,
+			Labels:          c.labeler.getLabelsConfigMapHost(host),
+			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
 		},
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host),
 	}
@@ -290,6 +305,7 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(host)
 	serviceName := CreateStatefulSetServiceName(host)
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 
 	// Create apps.StatefulSet object
 	replicasNum := host.GetStatefulSetReplicasNum()
@@ -297,15 +313,16 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 	// StatefulSet has additional label - ZK config fingerprint
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      statefulSetName,
-			Namespace: host.Address.Namespace,
-			Labels:    c.labeler.getLabelsHostScope(host, true),
+			Name:            statefulSetName,
+			Namespace:       host.Address.Namespace,
+			Labels:          c.labeler.getLabelsHostScope(host, true),
+			OwnerReferences: ownerReferences,
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    &replicasNum,
 			ServiceName: serviceName,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: c.labeler.GetSelectorHostScope(host),
+				MatchLabels: GetSelectorHostScope(host),
 			},
 
 			// IMPORTANT
@@ -346,7 +363,7 @@ func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
 	c.a.V(2).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
 }
 
-// GetStatefulSetVersion
+// GetStatefulSetVersion gets version of the StatefulSet
 // TODO property of the labeler?
 func (c *Creator) GetStatefulSetVersion(statefulSet *apps.StatefulSet) (string, bool) {
 	if statefulSet == nil {
@@ -356,7 +373,7 @@ func (c *Creator) GetStatefulSetVersion(statefulSet *apps.StatefulSet) (string, 
 	return label, ok
 }
 
-// PreparePersistentVolume
+// PreparePersistentVolume prepares PV labels
 func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chiv1.ChiHost) *corev1.PersistentVolume {
 	pv.Labels = util.MergeStringMapsOverwrite(pv.Labels, c.labeler.getLabelsHostScope(host, false))
 	// And after the object is ready we can put version label
@@ -364,6 +381,7 @@ func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chi
 	return pv
 }
 
+// PreparePersistentVolumeClaim prepares labels and annotations of the PVC
 func (c *Creator) PreparePersistentVolumeClaim(
 	pvc *corev1.PersistentVolumeClaim,
 	host *chiv1.ChiHost,
@@ -384,17 +402,19 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 	c.statefulSetApplyPodTemplate(statefulSet, podTemplate, host)
 
 	// Post-process StatefulSet
-	c.ensureStatefulSetTemplateIntegrity(statefulSet, host)
+	ensureStatefulSetTemplateIntegrity(statefulSet, host)
 	c.personalizeStatefulSetTemplate(statefulSet, host)
 }
 
-func (c *Creator) ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	c.ensureClickHouseContainerSpecified(statefulSet, host)
-	c.ensureProbesSpecified(statefulSet)
+// ensureStatefulSetTemplateIntegrity
+func ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	ensureClickHouseContainerSpecified(statefulSet)
+	ensureProbesSpecified(statefulSet)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
-func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, _ *chiv1.ChiHost) {
+// ensureClickHouseContainerSpecified
+func ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet) {
 	_, ok := getClickHouseContainer(statefulSet)
 	if ok {
 		return
@@ -403,11 +423,12 @@ func (c *Creator) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulS
 	// No ClickHouse container available, let's add one
 	addContainer(
 		&statefulSet.Spec.Template.Spec,
-		c.newDefaultClickHouseContainer(),
+		newDefaultClickHouseContainer(),
 	)
 }
 
-func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
+// ensureProbesSpecified
+func ensureProbesSpecified(statefulSet *apps.StatefulSet) {
 	container, ok := getClickHouseContainer(statefulSet)
 	if !ok {
 		return
@@ -416,13 +437,12 @@ func (c *Creator) ensureProbesSpecified(statefulSet *apps.StatefulSet) {
 		container.LivenessProbe = newDefaultLivenessProbe()
 	}
 	if container.ReadinessProbe == nil {
-		container.ReadinessProbe = c.newDefaultReadinessProbe()
+		container.ReadinessProbe = newDefaultReadinessProbe()
 	}
 }
 
+// personalizeStatefulSetTemplate
 func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	statefulSetName := CreateStatefulSetName(host)
-
 	// Ensure pod created by this StatefulSet has alias 127.0.0.1
 	statefulSet.Spec.Template.Spec.HostAliases = []corev1.HostAlias{
 		{
@@ -433,7 +453,41 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 
 	// Setup volumes based on ConfigMaps into Pod Template
 	c.setupConfigMapVolumes(statefulSet, host)
+	// Setup statefulSet according to troubleshoot mode (if any)
+	c.setupTroubleshoot(statefulSet)
+	// Setup dedicated log container
+	c.setupLogContainer(statefulSet, host)
+}
 
+// setupTroubleshoot
+func (c *Creator) setupTroubleshoot(statefulSet *apps.StatefulSet) {
+	container, ok := getClickHouseContainer(statefulSet)
+	if !ok {
+		return
+	}
+
+	if c.chi.IsTroubleshoot() {
+		sleep := " || sleep 1800"
+		if len(container.Command) > 0 {
+			// Append troubleshooting-capable tail to command and hope for the best
+			container.Command[len(container.Command)-1] += sleep
+		} else {
+			// Substitute entrypoint with troubleshooting-capable command
+			container.Command = []string{
+				"/bin/sh",
+				"-c",
+				"/entrypoint.sh" + sleep,
+			}
+		}
+		// Sleep is not able to respond to probes
+		container.LivenessProbe = nil
+		container.ReadinessProbe = nil
+	}
+}
+
+// setupLogContainer
+func (c *Creator) setupLogContainer(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	statefulSetName := CreateStatefulSetName(host)
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.HasLogVolumeClaimTemplate() {
 		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
@@ -454,21 +508,21 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 		c.a.V(1).F().Info("statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
 	} else {
 		// Host references UNKNOWN PodTemplate, will use default one
-		podTemplate = c.newDefaultPodTemplate(statefulSetName)
+		podTemplate = newDefaultPodTemplate(statefulSetName)
 		c.a.V(1).F().Info("statefulSet %s use default generated template", statefulSetName)
 	}
 
 	// Here we have local copy of Pod Template, to be used to create StatefulSet
 	// Now we can customize this Pod Template for particular host
 
-	c.labeler.prepareAffinity(podTemplate, host)
+	prepareAffinity(podTemplate, host)
 
 	return podTemplate
 }
 
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
 func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
-	configMapPodName := CreateConfigMapPodName(host)
+	configMapPersonalName := CreateConfigMapPersonalName(host)
 	configMapCommonName := CreateConfigMapCommonName(c.chi)
 	configMapCommonUsersName := CreateConfigMapCommonUsersName(c.chi)
 
@@ -477,7 +531,7 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 		statefulSetObject.Spec.Template.Spec.Volumes,
 		newVolumeForConfigMap(configMapCommonName),
 		newVolumeForConfigMap(configMapCommonUsersName),
-		newVolumeForConfigMap(configMapPodName),
+		newVolumeForConfigMap(configMapPersonalName),
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
@@ -490,7 +544,7 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 			container.VolumeMounts,
 			newVolumeMount(configMapCommonName, dirPathCommonConfig),
 			newVolumeMount(configMapCommonUsersName, dirPathUsersConfig),
-			newVolumeMount(configMapPodName, dirPathHostConfig),
+			newVolumeMount(configMapPersonalName, dirPathHostConfig),
 		)
 	}
 }
@@ -548,7 +602,7 @@ func (c *Creator) statefulSetApplyPodTemplate(
 				template.ObjectMeta.Labels,
 			),
 			Annotations: util.MergeStringMapsOverwrite(
-				c.labeler.getAnnotationsHostScope(host),
+				getAnnotationsHostScope(host),
 				template.ObjectMeta.Annotations,
 			),
 		},
@@ -556,6 +610,7 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	}
 }
 
+// getClickHouseContainer
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
 	// Find by name
 	for i := range statefulSet.Spec.Template.Spec.Containers {
@@ -573,6 +628,7 @@ func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, b
 	return nil, false
 }
 
+// getClickHouseContainerStatus
 func getClickHouseContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, bool) {
 	// Find by name
 	for i := range pod.Status.ContainerStatuses {
@@ -644,6 +700,7 @@ func StrStatefulSetStatus(status *apps.StatefulSetStatus) string {
 	)
 }
 
+// ensureNamedPortsSpecified
 func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	// Ensure ClickHouse container has all named ports specified
 	container, ok := getClickHouseContainer(statefulSet)
@@ -655,6 +712,7 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHos
 	ensurePortByName(container, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
 }
 
+// ensurePortByName
 func ensurePortByName(container *corev1.Container, name string, port int32) {
 	// Find port with specified name
 	for i := range container.Ports {
@@ -819,10 +877,6 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	statefulSet.Spec.VolumeClaimTemplates = append(statefulSet.Spec.VolumeClaimTemplates, persistentVolumeClaim)
 }
 
-func (c *Creator) GetReclaimPolicy(meta metav1.ObjectMeta) chiv1.PVCReclaimPolicy {
-	return c.labeler.getReclaimPolicy(meta)
-}
-
 // newDefaultHostTemplate returns default Host Template to be used with StatefulSet
 func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 	return &chiv1.ChiHostTemplate{
@@ -862,7 +916,7 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 }
 
 // newDefaultPodTemplate returns default Pod Template to be used with StatefulSet
-func (c *Creator) newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
+func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 	podTemplate := &chiv1.ChiPodTemplate{
 		Name: name,
 		Spec: corev1.PodSpec{
@@ -873,7 +927,7 @@ func (c *Creator) newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 
 	addContainer(
 		&podTemplate.Spec,
-		c.newDefaultClickHouseContainer(),
+		newDefaultClickHouseContainer(),
 	)
 
 	return podTemplate
@@ -895,7 +949,7 @@ func newDefaultLivenessProbe() *corev1.Probe {
 }
 
 // newDefaultReadinessProbe
-func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
+func newDefaultReadinessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		Handler: corev1.Handler{
 			HTTPGet: &corev1.HTTPGetAction{
@@ -909,7 +963,7 @@ func (c *Creator) newDefaultReadinessProbe() *corev1.Probe {
 }
 
 // newDefaultClickHouseContainer returns default ClickHouse Container
-func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
+func newDefaultClickHouseContainer() corev1.Container {
 	return corev1.Container{
 		Name:  ClickHouseContainerName,
 		Image: defaultClickHouseDockerImage,
@@ -928,7 +982,7 @@ func (c *Creator) newDefaultClickHouseContainer() corev1.Container {
 			},
 		},
 		LivenessProbe:  newDefaultLivenessProbe(),
-		ReadinessProbe: c.newDefaultReadinessProbe(),
+		ReadinessProbe: newDefaultReadinessProbe(),
 	}
 }
 
@@ -986,4 +1040,17 @@ func getContainerByName(statefulSet *apps.StatefulSet, name string) *corev1.Cont
 	}
 
 	return nil
+}
+
+func getOwnerReferences(t metav1.TypeMeta, o metav1.ObjectMeta, controller, blockOwnerDeletion bool) []metav1.OwnerReference {
+	return []metav1.OwnerReference{
+		metav1.OwnerReference{
+			APIVersion:         t.APIVersion,
+			Kind:               t.Kind,
+			Name:               o.Name,
+			UID:                o.UID,
+			Controller:         &controller,
+			BlockOwnerDeletion: &blockOwnerDeletion,
+		},
+	}
 }

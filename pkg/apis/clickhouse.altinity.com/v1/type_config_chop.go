@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -54,13 +55,15 @@ const (
 	defaultChPassword = ""
 	defaultChPort     = 8123
 
-	// Default number of controller threads running concurrently (used in case no other specified in config)
+	// defaultReconcileThreadsNumber specifies default number of controller threads running concurrently.
+	// Used in case no other specified in config
 	defaultReconcileThreadsNumber = 1
 
-	// Default reconcile threads warmup time
+	// DefaultReconcileThreadsWarmup specifies default reconcile threads warmup time
 	DefaultReconcileThreadsWarmup = 10 * time.Second
 
-	// Default number of system controller threads running concurrently (used in case no other specified in config)
+	// DefaultReconcileSystemThreadsNumber specifies default number of system controller threads running concurrently.
+	// Used in case no other specified in config
 	DefaultReconcileSystemThreadsNumber = 1
 )
 
@@ -140,12 +143,12 @@ type OperatorConfig struct {
 	CHPort int `json:"chPort"     yaml:"chPort"`
 
 	// Logger section
-	Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
-	Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`
-	V                string `json:"v"                yaml:"v"`
-	Stderrthreshold  string `json:"stderrthreshold"  yaml:"stderrthreshold"`
-	Vmodule          string `json:"vmodule"          yaml:"vmodule"`
-	Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
+	LogToStderr     string `json:"logtostderr"      yaml:"logtostderr"`
+	AlsoLogToStderr string `json:"alsologtostderr"  yaml:"alsologtostderr"`
+	V               string `json:"v"                yaml:"v"`
+	StderrThreshold string `json:"stderrthreshold"  yaml:"stderrthreshold"`
+	VModule         string `json:"vmodule"          yaml:"vmodule"`
+	LogBacktraceAt  string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
 
 	// Max number of concurrent reconciles in progress
 	ReconcileThreadsNumber int  `json:"reconcileThreadsNumber" yaml:"reconcileThreadsNumber"`
@@ -173,6 +176,10 @@ type OperatorConfig struct {
 
 // MergeFrom merges
 func (config *OperatorConfig) MergeFrom(from *OperatorConfig, _type MergeType) error {
+	if from == nil {
+		return nil
+	}
+
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if err := mergo.Merge(config, *from); err != nil {
@@ -573,12 +580,12 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 
 	util.Fprintf(b, "CHPort: %d\n", config.CHPort)
 
-	util.Fprintf(b, "Logtostderr: %s\n", config.Logtostderr)
-	util.Fprintf(b, "Alsologtostderr: %s\n", config.Alsologtostderr)
+	util.Fprintf(b, "LogToStderr: %s\n", config.LogToStderr)
+	util.Fprintf(b, "AlsoLogToStderr: %s\n", config.AlsoLogToStderr)
 	util.Fprintf(b, "V: %s\n", config.V)
-	util.Fprintf(b, "Stderrthreshold: %s\n", config.Stderrthreshold)
-	util.Fprintf(b, "Vmodule: %s\n", config.Vmodule)
-	util.Fprintf(b, "Log_backtrace_at string: %s\n", config.Log_backtrace_at)
+	util.Fprintf(b, "StderrThreshold: %s\n", config.StderrThreshold)
+	util.Fprintf(b, "VModule: %s\n", config.VModule)
+	util.Fprintf(b, "LogBacktraceAt: %s\n", config.LogBacktraceAt)
 
 	util.Fprintf(b, "ReconcileThreadsNumber: %d\n", config.ReconcileThreadsNumber)
 
@@ -596,7 +603,7 @@ func (config *OperatorConfig) IsWatchedNamespace(namespace string) bool {
 		return true
 	}
 
-	return util.InArray(namespace, config.WatchNamespaces)
+	return util.InArrayWithRegexp(namespace, config.WatchNamespaces)
 }
 
 // TODO unify with IsWatchedNamespace
@@ -617,7 +624,10 @@ func (config *OperatorConfig) GetInformerNamespace() string {
 
 		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
 		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
-		namespace = config.WatchNamespaces[0]
+		var labelRegexp = regexp.MustCompile("^[a-z]([-a-z0-9]*[a-z0-9])?$")
+		if labelRegexp.MatchString(config.WatchNamespaces[0]) {
+			namespace = config.WatchNamespaces[0]
+		}
 	}
 
 	return namespace

@@ -39,7 +39,7 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/clickhouse
               name: default-gp2
-        - image: altinity/clickhouse-backup:0.20
+        - image: altinity/clickhouse-backup:1.0.14
           name: clickhouse-backup
           ports:
             - containerPort: 7171

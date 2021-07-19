@@ -14,6 +14,7 @@ def query(
         timeout=60,
         advanced_params="",
         pod="",
+        container="clickhouse-pod"
 ):
     pod_names = kubectl.get_pod_names(chi_name, ns)
     pod_name = pod_names[0]
@@ -27,7 +28,7 @@ def query(
 
     if with_error:
         return kubectl.launch(
-            f"exec {pod_name}"
+            f"exec {pod_name} -n {ns} -c {container}"
             f" --"
             f" clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
             f" --query=\"{sql}\""
@@ -38,7 +39,7 @@ def query(
         )
     else:
         return kubectl.launch(
-            f"exec {pod_name} -n {ns}"
+            f"exec {pod_name} -n {ns} -c {container}"
             f" -- "
             f"clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
             f"--query=\"{sql}\"",
@@ -58,7 +59,7 @@ def query_with_error(
         timeout=60,
         advanced_params="",
         pod="",
-
+        container="clickhouse-pod",
 ):
     return query(
         chi_name=chi_name,
@@ -71,5 +72,32 @@ def query_with_error(
         ns=ns,
         timeout=timeout,
         advanced_params=advanced_params,
-        pod=pod
+        pod=pod,
+        container=container
     )
+
+
+def drop_table_on_cluster(chi, cluster_name='all-sharded', table='default.test'):
+    drop_local_sql = f'DROP TABLE {table} ON CLUSTER \'{cluster_name}\' SYNC'
+    query(chi["metadata"]["name"], drop_local_sql, timeout=120)
+
+
+def create_table_on_cluster(chi, cluster_name='all-sharded', table='default.test',
+                            create_definition='(event_time DateTime, test UInt64) ENGINE MergeTree() ORDER BY tuple()'):
+    create_local_sql = f'CREATE TABLE {table} ON CLUSTER \'{cluster_name}\' {create_definition}'
+    query(chi["metadata"]["name"], create_local_sql, timeout=120)
+
+
+def drop_distributed_table_on_cluster(chi, cluster_name='all-sharded', distr_table='default.test_distr', local_table='default.test'):
+    drop_distr_sql = f'DROP TABLE {distr_table} ON CLUSTER \'{cluster_name}\''
+    query(chi["metadata"]["name"], drop_distr_sql, timeout=120)
+    drop_table_on_cluster(chi, cluster_name, local_table)
+
+
+def create_distributed_table_on_cluster(chi, cluster_name='all-sharded', distr_table='default.test_distr', local_table='default.test',
+                                        fields_definition='(event_time DateTime, test UInt64)',
+                                        local_engine='ENGINE MergeTree() ORDER BY tuple()',
+                                        distr_engine='ENGINE Distributed(\'all-sharded\',default, test, test)'):
+    create_table_on_cluster(chi, cluster_name, local_table, fields_definition + ' ' + local_engine)
+    create_distr_sql = f'CREATE TABLE {distr_table} ON CLUSTER \'{cluster_name}\' {fields_definition} {distr_engine}'
+    query(chi["metadata"]["name"], create_distr_sql, timeout=120)

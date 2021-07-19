@@ -14,10 +14,12 @@
 
 package v1
 
+// NewChiDistributedDDL creates new ChiDistributedDDL
 func NewChiDistributedDDL() *ChiDistributedDDL {
 	return new(ChiDistributedDDL)
 }
 
+// HasProfile checks whether profile is present
 func (d *ChiDistributedDDL) HasProfile() bool {
 	if d == nil {
 		return false
@@ -25,6 +27,7 @@ func (d *ChiDistributedDDL) HasProfile() bool {
 	return len(d.Profile) > 0
 }
 
+// GetProfile gets profile
 func (d *ChiDistributedDDL) GetProfile() string {
 	if d == nil {
 		return ""
@@ -32,6 +35,7 @@ func (d *ChiDistributedDDL) GetProfile() string {
 	return d.Profile
 }
 
+// MergeFrom merges from specified source
 func (d *ChiDistributedDDL) MergeFrom(from *ChiDistributedDDL, _type MergeType) *ChiDistributedDDL {
 	if from == nil {
 		return d
