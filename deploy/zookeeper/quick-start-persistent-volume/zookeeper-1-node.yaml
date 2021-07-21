@@ -170,6 +170,18 @@ spec:
               for (( i=1; i<=$SERVERS; i++ )); do
                   echo "server.$i=$NAME-$((i-1)).$DOMAIN:$SERVER_PORT:$ELECTION_PORT" >> /conf/zoo.cfg;
               done &&
+              if [[ $SERVERS -eq 1 ]]; then
+                  echo "group.1=1" >> /conf/zoo.cfg;
+              else
+                  echo "group.1=1:2:3" >> /conf/zoo.cfg;
+              fi &&
+              for (( i=1; i<=$SERVERS; i++ )); do
+                  WEIGHT=1
+                  if [[ $i == 1 ]]; then
+                    WEIGHT=10
+                  fi
+                  echo "weight.$i=$WEIGHT" >> /conf/zoo.cfg;
+              done &&
               chown -Rv zookeeper "$ZOO_DATA_DIR" "$ZOO_DATA_LOG_DIR" "$ZOO_LOG_DIR" "$ZOO_CONF_DIR" &&
               zkServer.sh start-foreground
           readinessProbe:
@@ -177,7 +189,28 @@ spec:
               command:
                 - bash
                 - -c
-                - "OK=$(echo ruok | nc 127.0.0.1 2181); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
+                - "OK=$(echo ruok | nc 127.0.0.1 2181);
+                   if [[ \"$OK\" == \"imok\" ]];
+                   then
+                      STATE=$(echo mntr | nc 127.0.0.1 2181 | grep zk_server_state | cut -d \" \" -f 2);
+                      if [[ \"$STATE\" == \"leader\" ]]; then
+                        SYNCED_FOLLOWERS=$(echo mntr | nc 127.0.0.1 2181 | grep zk_synced_followers | cut -d \" \" -f 2 | cut -d \".\" -f 1);
+                        if [[ $SYNCED_FOLLOWERS == $(( $SERVERS - 1 )) ]]; then
+                          exit 0;
+                        else
+                          exit 1;
+                        fi;
+                      elif [[ \"$STATE\" == \"follower\" ]]; then
+                        PEER_STATE=$(echo mntr | nc 127.0.0.1 2181 | grep zk_peer_state);
+                        if [[ \"$PEER_STATE\" == \"following - broadcast\" ]]; then
+                          exit 0;
+                        else
+                          exit 1;
+                        fi;
+                      fi;
+                    else
+                      exit 1;
+                    fi"
             initialDelaySeconds: 10
             timeoutSeconds: 5
           livenessProbe:
