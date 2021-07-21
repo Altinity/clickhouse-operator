@@ -26,19 +26,19 @@ def wait_zookeeper_ready(svc_name='zookeeper', pod_count=3, retries=10):
             Fail(f"Zookeeper failed, ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}")
 
 
-def wait_clickhouse_is_not_readonly(retries=10):
+def wait_clickhouse_readonly_replicas(expected_replicas='[0,0]', retries=10):
     for i in range(retries):
         readonly_replicas=clickhouse.query(
             chi['metadata']['name'],
             "SELECT groupArray(value) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'"
         )
-        if readonly_replicas == '[0,0]':
+        if readonly_replicas == expected_replicas:
             break
         else:
-            with Then(f"Clickhouse have readonly_replicas={readonly_replicas}, expected=[0,0], Wait for {i*3} seconds"):
+            with Then(f"Clickhouse have readonly_replicas={readonly_replicas}, expected={expected_replicas}, Wait for {i*3} seconds"):
                 time.sleep(i*3)
         if i == retries - 1:
-            Fail(f"ClickHouse ZK failed, readonly_replicas={readonly_replicas}, expected=[0,0]")
+            Fail(f"ClickHouse ZK failed, readonly_replicas={readonly_replicas}, expected={expected_replicas}")
 
 
 @TestScenario
@@ -59,7 +59,7 @@ def test_zookeeper_rescale(self):
     with Then('scale up zookeeper to 3 nodes'):
         util.require_zookeeper('zookeeper-3-nodes-1GB-for-tests-only.yaml', force_install=True)
         wait_zookeeper_ready(pod_count=3)
-        wait_clickhouse_is_not_readonly()
+        wait_clickhouse_readonly_replicas()
 
     with When('create replicated table #2'):
         clickhouse.create_table_on_cluster(
@@ -77,7 +77,7 @@ def test_zookeeper_rescale(self):
     with Then('scale down zookeeper to 1 nodes'):
         util.require_zookeeper('zookeeper-1-node-1GB-for-tests-only.yaml', force_install=True)
         wait_zookeeper_ready(pod_count=1)
-        wait_clickhouse_is_not_readonly()
+        wait_clickhouse_readonly_replicas()
 
     with When('create replicated table #3'):
         clickhouse.create_table_on_cluster(
