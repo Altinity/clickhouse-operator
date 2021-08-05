@@ -33,7 +33,7 @@ type CHOp struct {
 	ConfigManager *ConfigManager
 }
 
-// NewCHOp
+// NewCHOp creates new CHOp
 func NewCHOp(
 	version string,
 	kubeClient *kube.Clientset,
@@ -46,7 +46,7 @@ func NewCHOp(
 	}
 }
 
-// Init
+// Init initializes CHOp
 func (c *CHOp) Init() error {
 	if c == nil {
 		return fmt.Errorf("chop not created")
@@ -54,7 +54,7 @@ func (c *CHOp) Init() error {
 	return c.ConfigManager.Init()
 }
 
-// Config
+// Config returns operator config
 func (c *CHOp) Config() *v1.OperatorConfig {
 	if c == nil {
 		return nil
@@ -62,7 +62,7 @@ func (c *CHOp) Config() *v1.OperatorConfig {
 	return c.ConfigManager.Config()
 }
 
-// SetupLog
+// SetupLog sets up loggging options
 func (c *CHOp) SetupLog() {
 	updated := false
 	if c.Config().LogToStderr != "" {
