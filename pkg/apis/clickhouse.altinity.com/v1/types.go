@@ -21,11 +21,13 @@ import (
 	"time"
 )
 
+// MergeType specifies merge types type
 type MergeType string
 
+// Possible merge types
 const (
-	MergeTypeFillEmptyValues          = "fillempty"
-	MergeTypeOverrideByNonEmptyValues = "override"
+	MergeTypeFillEmptyValues          MergeType = "fillempty"
+	MergeTypeOverrideByNonEmptyValues MergeType = "override"
 )
 
 // +genclient
@@ -44,12 +46,14 @@ type ClickHouseInstallation struct {
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ClickHouseInstallationTemplate defines ClickHouseInstallation template
 type ClickHouseInstallationTemplate ClickHouseInstallation
 
 // +genclient
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ClickHouseOperatorConfiguration defines CHOp config
 type ClickHouseOperatorConfiguration struct {
 	metav1.TypeMeta   `json:",inline"               yaml:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"    yaml:"metadata,omitempty"`
@@ -78,17 +82,17 @@ type ChiUseTemplate struct {
 	UseType   string `json:"useType,omitempty"   yaml:"useType,omitempty"`
 }
 
-// ChiTemplating
+// ChiTemplating defines templating policy struct
 type ChiTemplating struct {
 	Policy string `json:"policy,omitempty" yaml:"policy,omitempty"`
 }
 
-// NewChiTemplating
+// NewChiTemplating creates new templating
 func NewChiTemplating() *ChiTemplating {
 	return new(ChiTemplating)
 }
 
-// GetPolicy
+// GetPolicy gets policy
 func (t *ChiTemplating) GetPolicy() string {
 	if t == nil {
 		return ""
@@ -96,7 +100,7 @@ func (t *ChiTemplating) GetPolicy() string {
 	return t.Policy
 }
 
-// SetPolicy
+// SetPolicy sets policy
 func (t *ChiTemplating) SetPolicy(p string) {
 	if t == nil {
 		return
@@ -104,7 +108,7 @@ func (t *ChiTemplating) SetPolicy(p string) {
 	t.Policy = p
 }
 
-// MergeFrom
+// MergeFrom merges from specified templating
 func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemplating {
 	if from == nil {
 		return t
@@ -129,10 +133,14 @@ func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemp
 	return t
 }
 
-const ObjectsCleanupUnspecified = "Unspecified"
-const ObjectsCleanupRetain = "Retain"
-const ObjectsCleanupDelete = "Delete"
+// Possible objects cleanup options
+const (
+	ObjectsCleanupUnspecified = "Unspecified"
+	ObjectsCleanupRetain      = "Retain"
+	ObjectsCleanupDelete      = "Delete"
+)
 
+// ChiObjectsCleanup specifies object cleanup struct
 type ChiObjectsCleanup struct {
 	StatefulSet string `json:"statefulSet,omitempty" yaml:"statefulSet,omitempty"`
 	PVC         string `json:"pvc,omitempty"         yaml:"pvc,omitempty"`
@@ -140,11 +148,12 @@ type ChiObjectsCleanup struct {
 	Service     string `json:"service,omitempty"     yaml:"service,omitempty"`
 }
 
+// NewChiObjectsCleanup creates new object cleanup
 func NewChiObjectsCleanup() *ChiObjectsCleanup {
 	return new(ChiObjectsCleanup)
 }
 
-// MergeFrom
+// MergeFrom merges from specified cleanup
 func (c *ChiObjectsCleanup) MergeFrom(from *ChiObjectsCleanup, _type MergeType) *ChiObjectsCleanup {
 	if from == nil {
 		return c
@@ -190,6 +199,7 @@ func (c *ChiObjectsCleanup) MergeFrom(from *ChiObjectsCleanup, _type MergeType) 
 	return c
 }
 
+// GetStatefulSet gets stateful set
 func (c *ChiObjectsCleanup) GetStatefulSet() string {
 	if c == nil {
 		return ""
@@ -197,6 +207,7 @@ func (c *ChiObjectsCleanup) GetStatefulSet() string {
 	return c.StatefulSet
 }
 
+// SetStatefulSet sets stetaful set
 func (c *ChiObjectsCleanup) SetStatefulSet(v string) *ChiObjectsCleanup {
 	if c == nil {
 		return nil
@@ -205,6 +216,7 @@ func (c *ChiObjectsCleanup) SetStatefulSet(v string) *ChiObjectsCleanup {
 	return c
 }
 
+// GetPVC gets PVC
 func (c *ChiObjectsCleanup) GetPVC() string {
 	if c == nil {
 		return ""
@@ -212,6 +224,7 @@ func (c *ChiObjectsCleanup) GetPVC() string {
 	return c.PVC
 }
 
+// SetPVC sets PVC
 func (c *ChiObjectsCleanup) SetPVC(v string) *ChiObjectsCleanup {
 	if c == nil {
 		return nil
@@ -220,6 +233,7 @@ func (c *ChiObjectsCleanup) SetPVC(v string) *ChiObjectsCleanup {
 	return c
 }
 
+// GetConfigMap gets config map
 func (c *ChiObjectsCleanup) GetConfigMap() string {
 	if c == nil {
 		return ""
@@ -227,6 +241,7 @@ func (c *ChiObjectsCleanup) GetConfigMap() string {
 	return c.ConfigMap
 }
 
+// SetConfigMap sets config map
 func (c *ChiObjectsCleanup) SetConfigMap(v string) *ChiObjectsCleanup {
 	if c == nil {
 		return nil
@@ -235,6 +250,7 @@ func (c *ChiObjectsCleanup) SetConfigMap(v string) *ChiObjectsCleanup {
 	return c
 }
 
+// GetService gets service
 func (c *ChiObjectsCleanup) GetService() string {
 	if c == nil {
 		return ""
@@ -242,6 +258,7 @@ func (c *ChiObjectsCleanup) GetService() string {
 	return c.Service
 }
 
+// SetService sets service
 func (c *ChiObjectsCleanup) SetService(v string) *ChiObjectsCleanup {
 	if c == nil {
 		return nil
@@ -250,19 +267,20 @@ func (c *ChiObjectsCleanup) SetService(v string) *ChiObjectsCleanup {
 	return c
 }
 
+// ChiCleanup defines cleanup
 type ChiCleanup struct {
-	// UnknownObjects
+	// UnknownObjects specifies cleanup of unknown objects
 	UnknownObjects *ChiObjectsCleanup `json:"unknownObjects,omitempty" yaml:"unknownObjects,omitempty"`
-	// ReconcileFailedObjects
+	// ReconcileFailedObjects specifies cleanup of failed objects
 	ReconcileFailedObjects *ChiObjectsCleanup `json:"reconcileFailedObjects,omitempty" yaml:"reconcileFailedObjects,omitempty"`
 }
 
-// NewChiCleanup
+// NewChiCleanup creates new cleanup
 func NewChiCleanup() *ChiCleanup {
 	return new(ChiCleanup)
 }
 
-// MergeFrom
+// MergeFrom merges from specified cleanup
 func (t *ChiCleanup) MergeFrom(from *ChiCleanup, _type MergeType) *ChiCleanup {
 	if from == nil {
 		return t
@@ -283,6 +301,7 @@ func (t *ChiCleanup) MergeFrom(from *ChiCleanup, _type MergeType) *ChiCleanup {
 	return t
 }
 
+// GetUnknownObjects gets unknown objects cleanup
 func (t *ChiCleanup) GetUnknownObjects() *ChiObjectsCleanup {
 	if t == nil {
 		return nil
@@ -290,6 +309,7 @@ func (t *ChiCleanup) GetUnknownObjects() *ChiObjectsCleanup {
 	return t.UnknownObjects
 }
 
+// DefaultUnknownObjects makes default cleanup for known objects
 func (t *ChiCleanup) DefaultUnknownObjects() *ChiObjectsCleanup {
 	return NewChiObjectsCleanup().
 		SetStatefulSet(ObjectsCleanupDelete).
@@ -298,6 +318,7 @@ func (t *ChiCleanup) DefaultUnknownObjects() *ChiObjectsCleanup {
 		SetService(ObjectsCleanupDelete)
 }
 
+// GetReconcileFailedObjects gets failed objects cleanup
 func (t *ChiCleanup) GetReconcileFailedObjects() *ChiObjectsCleanup {
 	if t == nil {
 		return nil
@@ -305,6 +326,7 @@ func (t *ChiCleanup) GetReconcileFailedObjects() *ChiObjectsCleanup {
 	return t.ReconcileFailedObjects
 }
 
+// DefaultReconcileFailedObjects makes default cleanup for failed objects
 func (t *ChiCleanup) DefaultReconcileFailedObjects() *ChiObjectsCleanup {
 	return NewChiObjectsCleanup().
 		SetStatefulSet(ObjectsCleanupRetain).
@@ -313,7 +335,7 @@ func (t *ChiCleanup) DefaultReconcileFailedObjects() *ChiObjectsCleanup {
 		SetService(ObjectsCleanupRetain)
 }
 
-// SetDefaults
+// SetDefaults set defaults for cleanup
 func (t *ChiCleanup) SetDefaults() *ChiCleanup {
 	if t == nil {
 		return nil
@@ -323,7 +345,7 @@ func (t *ChiCleanup) SetDefaults() *ChiCleanup {
 	return t
 }
 
-// ChiReconciling
+// ChiReconciling defines CHI reconciling struct
 type ChiReconciling struct {
 	// About to be DEPRECATED
 	Policy string `json:"policy,omitempty" yaml:"policy,omitempty"`
@@ -333,12 +355,12 @@ type ChiReconciling struct {
 	Cleanup *ChiCleanup `json:"cleanup,omitempty" yaml:"cleanup,omitempty"`
 }
 
-// NewChiReconciling
+// NewChiReconciling creates new reconciling
 func NewChiReconciling() *ChiReconciling {
 	return new(ChiReconciling)
 }
 
-// MergeFrom
+// MergeFrom merges from specified reconciling
 func (t *ChiReconciling) MergeFrom(from *ChiReconciling, _type MergeType) *ChiReconciling {
 	if from == nil {
 		return t
@@ -372,7 +394,7 @@ func (t *ChiReconciling) MergeFrom(from *ChiReconciling, _type MergeType) *ChiRe
 	return t
 }
 
-// SetDefaults
+// SetDefaults set default values for reconciling
 func (t *ChiReconciling) SetDefaults() *ChiReconciling {
 	if t == nil {
 		return nil
@@ -383,7 +405,7 @@ func (t *ChiReconciling) SetDefaults() *ChiReconciling {
 	return t
 }
 
-// GetPolicy
+// GetPolicy gets policy
 func (t *ChiReconciling) GetPolicy() string {
 	if t == nil {
 		return ""
@@ -391,7 +413,7 @@ func (t *ChiReconciling) GetPolicy() string {
 	return t.Policy
 }
 
-// SetPolicy
+// SetPolicy sets policy
 func (t *ChiReconciling) SetPolicy(p string) {
 	if t == nil {
 		return
@@ -399,7 +421,7 @@ func (t *ChiReconciling) SetPolicy(p string) {
 	t.Policy = p
 }
 
-// GetConfigMapPropagationTimeout
+// GetConfigMapPropagationTimeout gets config map propagation timeout
 func (t *ChiReconciling) GetConfigMapPropagationTimeout() int {
 	if t == nil {
 		return 0
@@ -407,7 +429,7 @@ func (t *ChiReconciling) GetConfigMapPropagationTimeout() int {
 	return t.ConfigMapPropagationTimeout
 }
 
-// SetConfigMapPropagationTimeout
+// SetConfigMapPropagationTimeout sets config map propagation timeout
 func (t *ChiReconciling) SetConfigMapPropagationTimeout(timeout int) {
 	if t == nil {
 		return
@@ -415,7 +437,7 @@ func (t *ChiReconciling) SetConfigMapPropagationTimeout(timeout int) {
 	t.ConfigMapPropagationTimeout = timeout
 }
 
-// GetConfigMapPropagationTimeoutDuration
+// GetConfigMapPropagationTimeoutDuration gets config map propagation timeout duration
 func (t *ChiReconciling) GetConfigMapPropagationTimeoutDuration() time.Duration {
 	if t == nil {
 		return 0
@@ -423,21 +445,24 @@ func (t *ChiReconciling) GetConfigMapPropagationTimeoutDuration() time.Duration 
 	return time.Duration(t.GetConfigMapPropagationTimeout()) * time.Second
 }
 
-const ReconcilingPolicyUnspecified = "unspecified"
-const ReconcilingPolicyWait = "wait"
-const ReconcilingPolicyNoWait = "nowait"
+// Possible reconcile policy values
+const (
+	ReconcilingPolicyUnspecified = "unspecified"
+	ReconcilingPolicyWait        = "wait"
+	ReconcilingPolicyNoWait      = "nowait"
+)
 
-// IsReconcilingPolicyWait
+// IsReconcilingPolicyWait checks whether reconcile policy is "wait"
 func (t *ChiReconciling) IsReconcilingPolicyWait() bool {
 	return strings.ToLower(t.GetPolicy()) == ReconcilingPolicyWait
 }
 
-// IsReconcilingPolicyNoWait
+// IsReconcilingPolicyNoWait checks whether reconcile policy is "no wait"
 func (t *ChiReconciling) IsReconcilingPolicyNoWait() bool {
 	return strings.ToLower(t.GetPolicy()) == ReconcilingPolicyNoWait
 }
 
-// GetCleanup
+// GetCleanup gets cleanup
 func (t *ChiReconciling) GetCleanup() *ChiCleanup {
 	if t == nil {
 		return nil
@@ -463,7 +488,8 @@ type ChiTemplateNames struct {
 	ShardServiceTemplate    string `json:"shardServiceTemplate,omitempty"    yaml:"shardServiceTemplate,omitempty"`
 	ReplicaServiceTemplate  string `json:"replicaServiceTemplate,omitempty"  yaml:"replicaServiceTemplate,omitempty"`
 
-	// DEPRECATED!!!  VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate
+	// VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate
+	// !!! DEPRECATED !!!
 	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty"     yaml:"volumeClaimTemplate,omitempty"`
 }
 
@@ -481,10 +507,11 @@ type ChiShard struct {
 	Hosts []*ChiHost `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 
 	// Internal data
+
 	Address ChiShardAddress         `json:"-" yaml:"-"`
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 
-	// DEPRECATED - to be removed soon
+	// DefinitionType is DEPRECATED - to be removed soon
 	DefinitionType string `json:"definitionType,omitempty" yaml:"definitionType,omitempty"`
 }
 
@@ -500,6 +527,7 @@ type ChiReplica struct {
 	Hosts []*ChiHost `json:"shards,omitempty" yaml:"shards,omitempty"`
 
 	// Internal data
+
 	Address ChiReplicaAddress       `json:"-" yaml:"-"`
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
@@ -531,6 +559,7 @@ type ChiHostTemplate struct {
 	Spec             ChiHost               `json:"spec,omitempty"             yaml:"spec,omitempty"`
 }
 
+// ChiPortDistribution defines port distribution
 type ChiPortDistribution struct {
 	Type string `json:"type,omitempty"   yaml:"type,omitempty"`
 }
@@ -542,8 +571,10 @@ type ChiHostConfig struct {
 	FilesFingerprint     string `json:"filesfingerprint"     yaml:"filesfingerprint"`
 }
 
+// StatefulSetStatus specifies StatefulSet status
 type StatefulSetStatus string
 
+// Possible values for StatefulSet status
 const (
 	StatefulSetStatusModified StatefulSetStatus = "modified"
 	StatefulSetStatusNew      StatefulSetStatus = "new"
@@ -560,10 +591,12 @@ type ChiHostReconcileAttributes struct {
 	unclear bool
 }
 
+// NewChiHostReconcileAttributes creates new reconcile attributes
 func NewChiHostReconcileAttributes() *ChiHostReconcileAttributes {
 	return &ChiHostReconcileAttributes{}
 }
 
+// Equal checks whether reconcile attributes are equal
 func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
@@ -571,6 +604,7 @@ func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
 	return (s.add == to.add) && (s.remove == to.remove) && (s.modify == to.modify) && (s.unclear == to.unclear)
 }
 
+// Any checks whether any of the attributes is set
 func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
@@ -578,57 +612,68 @@ func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
 	return (s.add && to.add) || (s.remove && to.remove) || (s.modify && to.modify) || (s.unclear && to.unclear)
 }
 
+// SetStatus sets status
 func (s *ChiHostReconcileAttributes) SetStatus(status StatefulSetStatus) *ChiHostReconcileAttributes {
 	s.status = status
 	return s
 }
 
+// GetStatus gets status
 func (s *ChiHostReconcileAttributes) GetStatus() StatefulSetStatus {
 	return s.status
 }
 
+// SetAdd sets 'add' attribute
 func (s *ChiHostReconcileAttributes) SetAdd() *ChiHostReconcileAttributes {
 	s.add = true
 	return s
 }
 
+// UnsetAdd unsets 'add' attribute
 func (s *ChiHostReconcileAttributes) UnsetAdd() *ChiHostReconcileAttributes {
 	s.add = false
 	return s
 }
 
+// SetRemove sets 'remove' attribute
 func (s *ChiHostReconcileAttributes) SetRemove() *ChiHostReconcileAttributes {
 	s.remove = true
 	return s
 }
 
+// SetModify sets 'modify' attribute
 func (s *ChiHostReconcileAttributes) SetModify() *ChiHostReconcileAttributes {
 	s.modify = true
 	return s
 }
 
+// SetUnclear sets 'unclear' attribute
 func (s *ChiHostReconcileAttributes) SetUnclear() *ChiHostReconcileAttributes {
 	s.unclear = true
 	return s
 }
 
+// IsAdd checks whether 'add' attribute is set
 func (s *ChiHostReconcileAttributes) IsAdd() bool {
 	return s.add
 }
 
+// IsRemove checks whether 'remove' attribute is set
 func (s *ChiHostReconcileAttributes) IsRemove() bool {
 	return s.remove
 }
 
+// IsModify checks whether 'modify' attribute is set
 func (s *ChiHostReconcileAttributes) IsModify() bool {
 	return s.modify
 }
 
+// IsUnclear checks whether 'unclear' attribute is set
 func (s *ChiHostReconcileAttributes) IsUnclear() bool {
 	return s.unclear
 }
 
-// CHITemplates defines templates section of .spec
+// ChiTemplates defines templates section of .spec
 type ChiTemplates struct {
 	// Templates
 	HostTemplates        []ChiHostTemplate        `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
@@ -648,18 +693,20 @@ type ChiPodTemplate struct {
 	Name         string             `json:"name"                    yaml:"name"`
 	GenerateName string             `json:"generateName,omitempty"  yaml:"generateName,omitempty"`
 	Zone         ChiPodTemplateZone `json:"zone,omitempty"          yaml:"zone,omitempty"`
-	// DEPRECATED - to be removed soon
+	// Distribution is DEPRECATED - to be removed soon
 	Distribution    string               `json:"distribution"              yaml:"distribution"`
 	PodDistribution []ChiPodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution,omitempty"`
 	ObjectMeta      metav1.ObjectMeta    `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
 	Spec            corev1.PodSpec       `json:"spec,omitempty"            yaml:"spec,omitempty"`
 }
 
+// ChiPodTemplateZone defines pod template zone
 type ChiPodTemplateZone struct {
 	Key    string   `json:"key,omitempty"    yaml:"key,omitempty"`
 	Values []string `json:"values,omitempty" yaml:"values,omitempty"`
 }
 
+// ChiPodDistribution defines pod distribution
 type ChiPodDistribution struct {
 	Type   string `json:"type,omitempty"   yaml:"type,omitempty"`
 	Scope  string `json:"scope,omitempty"  yaml:"scope,omitempty"`
@@ -674,8 +721,10 @@ type ChiVolumeClaimTemplate struct {
 	Spec             corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"          yaml:"spec,omitempty"`
 }
 
+// PVCReclaimPolicy defines PVC reclaim policy
 type PVCReclaimPolicy string
 
+// Possible values of PVC reclaim policy
 const (
 	PVCReclaimPolicyRetain PVCReclaimPolicy = "Retain"
 	PVCReclaimPolicyDelete PVCReclaimPolicy = "Delete"
@@ -702,6 +751,7 @@ func (v PVCReclaimPolicy) String() string {
 	return string(v)
 }
 
+// ChiServiceTemplate defines CHI service template
 type ChiServiceTemplate struct {
 	Name         string             `json:"name"                   yaml:"name"`
 	GenerateName string             `json:"generateName,omitempty" yaml:"generateName,omitempty"`
@@ -742,6 +792,7 @@ type ClickHouseInstallationList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ClickHouseInstallationTemplateList defines CHI template list
 type ClickHouseInstallationTemplateList struct {
 	metav1.TypeMeta `json:",inline"  yaml:",inline"`
 	metav1.ListMeta `json:"metadata" yaml:"metadata"`
@@ -750,6 +801,7 @@ type ClickHouseInstallationTemplateList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ClickHouseOperatorConfigurationList defines CHI operator config list
 type ClickHouseOperatorConfigurationList struct {
 	metav1.TypeMeta `json:",inline"  yaml:",inline"`
 	metav1.ListMeta `json:"metadata" yaml:"metadata"`

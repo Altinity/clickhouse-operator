@@ -1044,7 +1044,7 @@ func getContainerByName(statefulSet *apps.StatefulSet, name string) *corev1.Cont
 
 func getOwnerReferences(t metav1.TypeMeta, o metav1.ObjectMeta, controller, blockOwnerDeletion bool) []metav1.OwnerReference {
 	return []metav1.OwnerReference{
-		metav1.OwnerReference{
+		{
 			APIVersion:         t.APIVersion,
 			Kind:               t.Kind,
 			Name:               o.Name,
