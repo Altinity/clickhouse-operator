@@ -24,7 +24,7 @@ func InformMetricsExporterAboutWatchedCHI(namespace, chiName string, hostnames [
 	return makeRESTCall(chi, "POST")
 }
 
-// InformMetricsExporterAboutWatchedCHI informs exporter to delete/forget watched CHI
+// InformMetricsExporterToDeleteWatchedCHI informs exporter to delete/forget watched CHI
 func InformMetricsExporterToDeleteWatchedCHI(namespace, chiName string) error {
 	chi := &WatchedCHI{
 		Namespace: namespace,

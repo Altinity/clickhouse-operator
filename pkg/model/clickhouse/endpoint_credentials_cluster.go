@@ -14,7 +14,7 @@
 
 package clickhouse
 
-// ClusterEndpointCredentials
+// ClusterEndpointCredentials specifies cluster endpoint credentials
 type ClusterEndpointCredentials struct {
 	Username string
 	Password string

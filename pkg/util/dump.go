@@ -16,6 +16,7 @@ package util
 
 import dumper "github.com/sanity-io/litter"
 
+// Dump dumps object into string with repeatable order
 func Dump(obj interface{}) string {
 	d := dumper.Options{
 		Separator: " ",
