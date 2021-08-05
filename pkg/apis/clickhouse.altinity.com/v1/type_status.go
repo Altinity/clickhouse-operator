@@ -45,6 +45,7 @@ const (
 	maxTaskIDs = 100
 )
 
+// PushAction pushes action into status
 func (s *ChiStatus) PushAction(action string) {
 	s.Actions = append([]string{action}, s.Actions...)
 	if len(s.Actions) > maxActions {
@@ -52,6 +53,7 @@ func (s *ChiStatus) PushAction(action string) {
 	}
 }
 
+// SetAndPushError sets and pushes error into status
 func (s *ChiStatus) SetAndPushError(error string) {
 	s.Error = error
 	s.Errors = append([]string{error}, s.Errors...)
@@ -60,6 +62,7 @@ func (s *ChiStatus) SetAndPushError(error string) {
 	}
 }
 
+// PushTaskID pushes task id into status
 func (s *ChiStatus) PushTaskID() {
 	s.TaskIDs = append([]string{s.TaskID}, s.TaskIDs...)
 	if len(s.TaskIDs) > maxTaskIDs {
@@ -67,6 +70,7 @@ func (s *ChiStatus) PushTaskID() {
 	}
 }
 
+// ReconcileStart marks reconcile start
 func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
 	s.Status = StatusInProgress
 	s.UpdatedHostsCount = 0
@@ -76,11 +80,13 @@ func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
 	s.PushTaskID()
 }
 
+// ReconcileComplete marks reconcile completion
 func (s *ChiStatus) ReconcileComplete() {
 	s.Status = StatusCompleted
 	s.Action = ""
 }
 
+// DeleteStart marks deletion start
 func (s *ChiStatus) DeleteStart() {
 	s.Status = StatusTerminating
 	s.UpdatedHostsCount = 0
