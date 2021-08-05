@@ -63,14 +63,18 @@ const (
 )
 
 const (
-	// Default ClickHouse docker image to be used
+	// defaultClickHouseDockerImage specifies default ClickHouse docker image to be used
 	defaultClickHouseDockerImage = "yandex/clickhouse-server:latest"
 
-	// Default BusyBox docker image to be used
+	// defaultBusyBoxDockerImage specifies default BusyBox docker image to be used
 	defaultBusyBoxDockerImage = "busybox"
 
-	// Name of container within Pod with ClickHouse instance. Pod may have other containers included, such as monitoring
+	// Name of container within Pod with ClickHouse instance.
+	// Pod may have other containers included, such as monitoring, logging
+
+	// ClickHouseContainerName specifies name of the clickhouse container in the pod
 	ClickHouseContainerName    = "clickhouse"
+	// ClickHouseLogContainerName specifies name of the logger container in the pod
 	ClickHouseLogContainerName = "clickhouse-log"
 )
 
