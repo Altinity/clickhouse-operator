@@ -67,6 +67,7 @@ const (
 	DefaultReconcileSystemThreadsNumber = 1
 )
 
+// OperatorConfig specifies operator configuration
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
@@ -240,7 +241,7 @@ func (config *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation
 	// TODO compact the slice
 }
 
-// FindTemplate
+// FindTemplate finds specified template
 func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *ClickHouseInstallation {
 	// Try to find direct match
 	for _, _template := range config.CHITemplates {
@@ -270,7 +271,7 @@ func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string
 	return nil
 }
 
-// FindAutoTemplates
+// FindAutoTemplates finds auto templates
 func (config *OperatorConfig) FindAutoTemplates() []*ClickHouseInstallation {
 	var res []*ClickHouseInstallation
 	for _, _template := range config.CHITemplates {
@@ -323,25 +324,25 @@ func (config *OperatorConfig) buildUnifiedCHITemplate() {
 	*/
 }
 
-// AddCHITemplate
+// AddCHITemplate adds CHI template
 func (config *OperatorConfig) AddCHITemplate(template *ClickHouseInstallation) {
 	config.enlistCHITemplate(template)
 	config.buildUnifiedCHITemplate()
 }
 
-// UpdateCHITemplate
+// UpdateCHITemplate updates CHI template
 func (config *OperatorConfig) UpdateCHITemplate(template *ClickHouseInstallation) {
 	config.enlistCHITemplate(template)
 	config.buildUnifiedCHITemplate()
 }
 
-// DeleteCHITemplate
+// DeleteCHITemplate deletes CHI template
 func (config *OperatorConfig) DeleteCHITemplate(template *ClickHouseInstallation) {
 	config.unlistCHITemplate(template)
 	config.buildUnifiedCHITemplate()
 }
 
-// Postprocess
+// Postprocess runs all postprocessors
 func (config *OperatorConfig) Postprocess() {
 	config.normalize()
 	config.readClickHouseCustomConfigFiles()
@@ -595,8 +596,8 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 	return b.String()
 }
 
-// TODO unify with GetInformerNamespace
 // IsWatchedNamespace returns whether specified namespace is in a list of watched
+// TODO unify with GetInformerNamespace
 func (config *OperatorConfig) IsWatchedNamespace(namespace string) bool {
 	// In case no namespaces specified - watch all namespaces
 	if len(config.WatchNamespaces) == 0 {
@@ -606,14 +607,14 @@ func (config *OperatorConfig) IsWatchedNamespace(namespace string) bool {
 	return util.InArrayWithRegexp(namespace, config.WatchNamespaces)
 }
 
-// TODO unify with IsWatchedNamespace
-// TODO unify approaches to multiple namespaces support
 // GetInformerNamespace is a TODO stub
 // Namespace where informers would watch notifications from
 // The thing is that InformerFactory can accept only one parameter as watched namespace,
 // be it explicitly specified namespace or empty line for "all namespaces".
 // That's what conflicts with CHOp's approach to 'specify list of namespaces to watch in', having
 // slice of namespaces (CHOp's approach) incompatible with "one namespace name" approach
+// TODO unify with IsWatchedNamespace
+// TODO unify approaches to multiple namespaces support
 func (config *OperatorConfig) GetInformerNamespace() string {
 	// Namespace where informers would watch notifications from
 	namespace := metav1.NamespaceAll
@@ -633,7 +634,7 @@ func (config *OperatorConfig) GetInformerNamespace() string {
 	return namespace
 }
 
-// GetLogLevel
+// GetLogLevel gets logger level
 func (config *OperatorConfig) GetLogLevel() (log.Level, error) {
 	if i, err := strconv.Atoi(config.V); err == nil {
 		return log.Level(i), nil
