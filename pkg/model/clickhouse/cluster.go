@@ -24,21 +24,21 @@ import (
 	r "github.com/altinity/clickhouse-operator/pkg/util/retry"
 )
 
-// Cluster
+// Cluster specifies clickhouse cluster object
 type Cluster struct {
 	*ClusterEndpointCredentials
 	Hosts []string
 	l     log.Announcer
 }
 
-// NewCluster
+// NewCluster creates new clickhouse cluster object
 func NewCluster() *Cluster {
 	return &Cluster{
 		l: log.New(),
 	}
 }
 
-// SetLog
+// SetLog sets new logger/announcer
 func (c *Cluster) SetLog(a log.Announcer) *Cluster {
 	if c == nil {
 		return nil
@@ -47,7 +47,7 @@ func (c *Cluster) SetLog(a log.Announcer) *Cluster {
 	return c
 }
 
-// SetEndpointCredentials
+// SetEndpointCredentials sets endpoint credentials
 func (c *Cluster) SetEndpointCredentials(endpointCredentials *ClusterEndpointCredentials) *Cluster {
 	if c == nil {
 		return nil
@@ -56,7 +56,7 @@ func (c *Cluster) SetEndpointCredentials(endpointCredentials *ClusterEndpointCre
 	return c
 }
 
-// SetHosts
+// SetHosts sets hosts
 func (c *Cluster) SetHosts(hosts []string) *Cluster {
 	if c == nil {
 		return nil
@@ -65,7 +65,7 @@ func (c *Cluster) SetHosts(hosts []string) *Cluster {
 	return c
 }
 
-// getConnection
+// getConnection gets connection
 func (c *Cluster) getConnection(host string) *Connection {
 	return GetPooledDBConnection(NewConnectionParams(host, c.Username, c.Password, c.Port)).SetLog(c.l)
 }
@@ -82,12 +82,13 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error
 		}
 
 		c.l.V(1).Info("Run query on: %s of %v", host, c.Hosts)
-		if query, err := c.getConnection(host).QueryContext(ctx, sql); err == nil {
+		query, err := c.getConnection(host).QueryContext(ctx, sql)
+		if err == nil {
 			// One of specified endpoints returned result, no need to iterate more
 			return query, nil
-		} else {
-			c.l.V(1).A().Warning("FAILED to run query on: %s of %v skip to next. err: %v", host, c.Hosts, err)
 		}
+		// Still need to iterate more
+		c.l.V(1).A().Warning("FAILED to run query on: %s of %v skip to next. err: %v", host, c.Hosts, err)
 	}
 
 	str := fmt.Sprintf("FAILED to run query on all hosts %v", c.Hosts)
