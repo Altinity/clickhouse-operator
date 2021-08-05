@@ -28,10 +28,12 @@ const (
 	reconcileDelete = "delete"
 )
 
+// PriorityQueueItem specifies item of the priority queue
 type PriorityQueueItem struct {
 	priority int
 }
 
+// Priority gets priority of the queue item
 func (i PriorityQueueItem) Priority() int {
 	return i.priority
 }
@@ -43,6 +45,7 @@ const (
 	priorityDropDNS             int = 7
 )
 
+// ReconcileCHI specifies reconcile request queue item
 type ReconcileCHI struct {
 	PriorityQueueItem
 	cmd string
@@ -52,6 +55,7 @@ type ReconcileCHI struct {
 
 var _ queue.PriorityQueueItem = &ReconcileCHI{}
 
+// Handle returns handle of the queue item
 func (r ReconcileCHI) Handle() queue.T {
 	if r.new != nil {
 		return "ReconcileCHI" + ":" + r.new.Namespace + "/" + r.new.Name
@@ -62,6 +66,7 @@ func (r ReconcileCHI) Handle() queue.T {
 	return ""
 }
 
+// NewReconcileCHI creates new reconcile request queue item
 func NewReconcileCHI(cmd string, old, new *chi.ClickHouseInstallation) *ReconcileCHI {
 	return &ReconcileCHI{
 		PriorityQueueItem: PriorityQueueItem{
@@ -91,6 +96,7 @@ func NewReconcileCHI(cmd string, old, new *chi.ClickHouseInstallation) *Reconcil
 	*/
 }
 
+// ReconcileCHIT specifies reconcile CHI template queue item
 type ReconcileCHIT struct {
 	PriorityQueueItem
 	cmd string
@@ -100,6 +106,7 @@ type ReconcileCHIT struct {
 
 var _ queue.PriorityQueueItem = &ReconcileCHIT{}
 
+// Handle returns handle of the queue item
 func (r ReconcileCHIT) Handle() queue.T {
 	if r.new != nil {
 		return "ReconcileCHIT" + ":" + r.new.Namespace + "/" + r.new.Name
@@ -110,6 +117,7 @@ func (r ReconcileCHIT) Handle() queue.T {
 	return ""
 }
 
+// NewReconcileCHIT creates new reconcile CHI template queue item
 func NewReconcileCHIT(cmd string, old, new *chi.ClickHouseInstallationTemplate) *ReconcileCHIT {
 	return &ReconcileCHIT{
 		PriorityQueueItem: PriorityQueueItem{
@@ -121,6 +129,7 @@ func NewReconcileCHIT(cmd string, old, new *chi.ClickHouseInstallationTemplate) 
 	}
 }
 
+// ReconcileChopConfig specifies CHOp config queue item
 type ReconcileChopConfig struct {
 	PriorityQueueItem
 	cmd string
@@ -130,6 +139,7 @@ type ReconcileChopConfig struct {
 
 var _ queue.PriorityQueueItem = &ReconcileChopConfig{}
 
+// Handle returns handle of the queue item
 func (r ReconcileChopConfig) Handle() queue.T {
 	if r.new != nil {
 		return "ReconcileChopConfig" + ":" + r.new.Namespace + "/" + r.new.Name
@@ -140,6 +150,7 @@ func (r ReconcileChopConfig) Handle() queue.T {
 	return ""
 }
 
+// NewReconcileChopConfig creates new CHOp config queue item
 func NewReconcileChopConfig(cmd string, old, new *chi.ClickHouseOperatorConfiguration) *ReconcileChopConfig {
 	return &ReconcileChopConfig{
 		PriorityQueueItem: PriorityQueueItem{
@@ -151,6 +162,7 @@ func NewReconcileChopConfig(cmd string, old, new *chi.ClickHouseOperatorConfigur
 	}
 }
 
+// DropDns specifies drop dns queue item
 type DropDns struct {
 	PriorityQueueItem
 	initiator *v1.ObjectMeta
@@ -158,6 +170,7 @@ type DropDns struct {
 
 var _ queue.PriorityQueueItem = &DropDns{}
 
+// Handle returns handle of the queue item
 func (r DropDns) Handle() queue.T {
 	if r.initiator != nil {
 		return "DropDNS" + ":" + r.initiator.Namespace + "/" + r.initiator.Name
@@ -165,6 +178,7 @@ func (r DropDns) Handle() queue.T {
 	return ""
 }
 
+// NewDropDns creates new drop dns queue item
 func NewDropDns(initiator *v1.ObjectMeta) *DropDns {
 	return &DropDns{
 		PriorityQueueItem: PriorityQueueItem{
