@@ -46,6 +46,7 @@ func serializeRepeatable(obj interface{}) []byte {
 	return []byte(d.Sdump(obj))
 }
 
+// HashIntoString hashes bytes and returns string version of the hash
 func HashIntoString(b []byte) string {
 	if len(b) == 0 {
 		return ""
@@ -55,6 +56,7 @@ func HashIntoString(b []byte) string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
+// HashIntoInt hashes bytes and returns int version of the hash
 func HashIntoInt(b []byte) int {
 	if len(b) == 0 {
 		return 0
@@ -64,6 +66,7 @@ func HashIntoInt(b []byte) int {
 	return int(h.Sum32())
 }
 
+// HashIntoIntTopped hashes bytes and return int version of the ash topped with top
 func HashIntoIntTopped(b []byte, top int) int {
 	return HashIntoInt(b) % top
 }
