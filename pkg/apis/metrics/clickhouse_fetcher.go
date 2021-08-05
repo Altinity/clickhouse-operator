@@ -138,16 +138,19 @@ const (
     `
 )
 
+// ClickHouseFetcher specifies clickhouse fetcher object
 type ClickHouseFetcher struct {
 	connectionParams *clickhouse.ConnectionParams
 }
 
+// NewClickHouseFetcher creates new clickhouse fetcher object
 func NewClickHouseFetcher(hostname, username, password string, port int) *ClickHouseFetcher {
 	return &ClickHouseFetcher{
 		connectionParams: clickhouse.NewConnectionParams(hostname, username, password, port),
 	}
 }
 
+// SetQueryTimeout sets query timeout
 func (f *ClickHouseFetcher) SetQueryTimeout(timeout time.Duration) *ClickHouseFetcher {
 	f.connectionParams.SetQueryTimeout(timeout)
 	return f
@@ -204,9 +207,9 @@ func (f *ClickHouseFetcher) getClickHouseQueryMutations() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		queryMutationsSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
-			var database, table, mutations, parts_to_do string
-			if err := rows.Scan(&database, &table, &mutations, &parts_to_do); err == nil {
-				*data = append(*data, []string{database, table, mutations, parts_to_do})
+			var database, table, mutations, partsToDo string
+			if err := rows.Scan(&database, &table, &mutations, &partsToDo); err == nil {
+				*data = append(*data, []string{database, table, mutations, partsToDo})
 			}
 			return nil
 		},
