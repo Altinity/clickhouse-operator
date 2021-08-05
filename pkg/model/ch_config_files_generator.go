@@ -19,7 +19,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// ClickHouseConfigFilesGenerator
+// ClickHouseConfigFilesGenerator specifies clickhouse configuration generator object
 type ClickHouseConfigFilesGenerator struct {
 	// ClickHouse config generator
 	chConfigGenerator *ClickHouseConfigGenerator
@@ -27,7 +27,7 @@ type ClickHouseConfigFilesGenerator struct {
 	chopConfig *chi.OperatorConfig
 }
 
-// NewClickHouseConfigFilesGenerator
+// NewClickHouseConfigFilesGenerator creates new clickhouse configuration generator object
 func NewClickHouseConfigFilesGenerator(
 	chConfigGenerator *ClickHouseConfigGenerator,
 	chopConfig *chi.OperatorConfig,
@@ -38,17 +38,17 @@ func NewClickHouseConfigFilesGenerator(
 	}
 }
 
-// ClickHouseConfigFilesGeneratorOptions
+// ClickHouseConfigFilesGeneratorOptions specifies options for clickhouse configuration generator
 type ClickHouseConfigFilesGeneratorOptions struct {
 	RemoteServersGeneratorOptions *RemoteServersGeneratorOptions
 }
 
-// NewClickHouseConfigFilesGeneratorOptions
+// NewClickHouseConfigFilesGeneratorOptions creates new options for clickhouse configuration generator
 func NewClickHouseConfigFilesGeneratorOptions() *ClickHouseConfigFilesGeneratorOptions {
 	return &ClickHouseConfigFilesGeneratorOptions{}
 }
 
-// GetRemoteServersGeneratorOptions
+// GetRemoteServersGeneratorOptions gets remote-servers generator options
 func (o *ClickHouseConfigFilesGeneratorOptions) GetRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	if o == nil {
 		return nil
@@ -56,7 +56,7 @@ func (o *ClickHouseConfigFilesGeneratorOptions) GetRemoteServersGeneratorOptions
 	return o.RemoteServersGeneratorOptions
 }
 
-// SetRemoteServersGeneratorOptions
+// SetRemoteServersGeneratorOptions sets remote-servers generator options
 func (o *ClickHouseConfigFilesGeneratorOptions) SetRemoteServersGeneratorOptions(opts *RemoteServersGeneratorOptions) *ClickHouseConfigFilesGeneratorOptions {
 	if o == nil {
 		return nil
@@ -66,12 +66,12 @@ func (o *ClickHouseConfigFilesGeneratorOptions) SetRemoteServersGeneratorOptions
 	return o
 }
 
-// defaultClickHouseConfigFilesGeneratorOptions
+// defaultClickHouseConfigFilesGeneratorOptions creates new default options for clickhouse config generator
 func defaultClickHouseConfigFilesGeneratorOptions() *ClickHouseConfigFilesGeneratorOptions {
 	return NewClickHouseConfigFilesGeneratorOptions()
 }
 
-// CreateConfigFilesGroupCommon
+// CreateConfigFilesGroupCommon creates common config files
 func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupCommon(options *ClickHouseConfigFilesGeneratorOptions) map[string]string {
 	if options == nil {
 		options = defaultClickHouseConfigFilesGeneratorOptions()
@@ -90,7 +90,7 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupCommon(options *C
 	return commonConfigSections
 }
 
-// CreateConfigFilesGroupUsers
+// CreateConfigFilesGroupUsers creates users config files
 func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupUsers() map[string]string {
 	commonUsersConfigSections := make(map[string]string)
 	// commonUsersConfigSections maps section name to section XML chopConfig of the following sections:
@@ -108,7 +108,7 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupUsers() map[strin
 	return commonUsersConfigSections
 }
 
-// CreateConfigFilesGroupHost
+// CreateConfigFilesGroupHost creates host config files
 func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *chi.ChiHost) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	hostConfigSections := make(map[string]string)
@@ -123,7 +123,8 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *chi.Ch
 	return hostConfigSections
 }
 
-// createConfigSectionFilename
+// createConfigSectionFilename creates filename of a configuration file.
+// filename depends on a section which it will contain
 func createConfigSectionFilename(section string) string {
 	return "chop-generated-" + section + ".xml"
 }
