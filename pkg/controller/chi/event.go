@@ -69,7 +69,7 @@ func (c *Controller) EventInfo(
 	c.emitEvent(chi, eventTypeInfo, action, reason, message)
 }
 
-// EventInfo emits event Warning
+// EventWarning emits event Warning
 func (c *Controller) EventWarning(
 	chi *chop.ClickHouseInstallation,
 	action string,
@@ -79,7 +79,7 @@ func (c *Controller) EventWarning(
 	c.emitEvent(chi, eventTypeWarning, action, reason, message)
 }
 
-// EventInfo emits event Error
+// EventError emits event Error
 func (c *Controller) EventError(
 	chi *chop.ClickHouseInstallation,
 	action string,
