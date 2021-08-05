@@ -44,7 +44,7 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	}
 }
 
-// FillSelfCalculatedAddressInfo
+// FillSelfCalculatedAddressInfo calculates and fills address info
 func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 	// What is the max number of Pods allowed per Node
 	// TODO need to support multi-cluster
@@ -164,7 +164,7 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 	})
 }
 
-// FillCHIPointer
+// FillCHIPointer fills CHI pointer
 func (chi *ClickHouseInstallation) FillCHIPointer() {
 	chi.WalkHostsFullPath(0, 0, func(
 		chi *ClickHouseInstallation,
@@ -198,7 +198,7 @@ func (chi *ClickHouseInstallation) FillCHIPointer() {
 	})
 }
 
-// WalkClustersFullPath
+// WalkClustersFullPath walks clusters with full path
 func (chi *ClickHouseInstallation) WalkClustersFullPath(
 	f func(chi *ClickHouseInstallation, clusterIndex int, cluster *ChiCluster) error,
 ) []error {
@@ -211,10 +211,8 @@ func (chi *ClickHouseInstallation) WalkClustersFullPath(
 	return res
 }
 
-// WalkClusters
-func (chi *ClickHouseInstallation) WalkClusters(
-	f func(cluster *ChiCluster) error,
-) []error {
+// WalkClusters walks clusters
+func (chi *ClickHouseInstallation) WalkClusters(f func(cluster *ChiCluster) error) []error {
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
@@ -224,7 +222,7 @@ func (chi *ClickHouseInstallation) WalkClusters(
 	return res
 }
 
-// WalkShardsFullPath
+// WalkShardsFullPath walks shards with full path
 func (chi *ClickHouseInstallation) WalkShardsFullPath(
 	f func(
 		chi *ClickHouseInstallation,
@@ -248,7 +246,7 @@ func (chi *ClickHouseInstallation) WalkShardsFullPath(
 	return res
 }
 
-// WalkShards
+// WalkShards walks shards
 func (chi *ClickHouseInstallation) WalkShards(
 	f func(
 		shard *ChiShard,
@@ -268,7 +266,7 @@ func (chi *ClickHouseInstallation) WalkShards(
 	return res
 }
 
-// WalkHostsFullPath
+// WalkHostsFullPath walks hosts with full path
 func (chi *ClickHouseInstallation) WalkHostsFullPath(
 	chiScopeCycleSize int,
 	clusterScopeCycleSize int,
@@ -367,11 +365,8 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 	return res
 }
 
-// WalkHosts
-func (chi *ClickHouseInstallation) WalkHosts(
-	f func(host *ChiHost) error,
-) []error {
-
+// WalkHosts walks hosts
+func (chi *ClickHouseInstallation) WalkHosts(f func(host *ChiHost) error) []error {
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
@@ -388,10 +383,8 @@ func (chi *ClickHouseInstallation) WalkHosts(
 	return res
 }
 
-// WalkHostsTillError
-func (chi *ClickHouseInstallation) WalkHostsTillError(
-	f func(host *ChiHost) error,
-) error {
+// WalkHostsTillError walks hosts until an error met
+func (chi *ClickHouseInstallation) WalkHostsTillError(f func(host *ChiHost) error) error {
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
 		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
@@ -408,7 +401,7 @@ func (chi *ClickHouseInstallation) WalkHostsTillError(
 	return nil
 }
 
-// WalkTillError
+// WalkTillError walks until an error met
 func (chi *ClickHouseInstallation) WalkTillError(
 	ctx context.Context,
 	fCHIPreliminary func(ctx context.Context, chi *ClickHouseInstallation) error,
@@ -448,7 +441,7 @@ func (chi *ClickHouseInstallation) WalkTillError(
 	return nil
 }
 
-// MergeFrom
+// MergeFrom merges from CHI
 func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type MergeType) {
 	if from == nil {
 		return
@@ -465,7 +458,7 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 	chi.Status = from.Status
 }
 
-// MergeFrom
+// MergeFrom merges from spec
 func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	if from == nil {
 		return
@@ -505,7 +498,7 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	spec.UseTemplates = append(spec.UseTemplates, from.UseTemplates...)
 }
 
-// FindCluster
+// FindCluster finds cluster by name or index
 func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *ChiCluster {
 	var resultCluster *ChiCluster
 	chi.WalkClustersFullPath(func(chi *ClickHouseInstallation, clusterIndex int, cluster *ChiCluster) error {
@@ -524,7 +517,7 @@ func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *ChiCluster {
 	return resultCluster
 }
 
-// FindShard
+// FindShard finds shard by name or index
 func (chi *ClickHouseInstallation) FindShard(needleCluster interface{}, needleShard interface{}) *ChiShard {
 	if cluster := chi.FindCluster(needleCluster); cluster != nil {
 		return cluster.FindShard(needleShard)
@@ -532,7 +525,7 @@ func (chi *ClickHouseInstallation) FindShard(needleCluster interface{}, needleSh
 	return nil
 }
 
-// ClustersCount
+// ClustersCount counts clusters
 func (chi *ClickHouseInstallation) ClustersCount() int {
 	count := 0
 	chi.WalkClusters(func(cluster *ChiCluster) error {
@@ -542,7 +535,7 @@ func (chi *ClickHouseInstallation) ClustersCount() int {
 	return count
 }
 
-// ShardsCount
+// ShardsCount counts shards
 func (chi *ClickHouseInstallation) ShardsCount() int {
 	count := 0
 	chi.WalkShards(func(shard *ChiShard) error {
@@ -552,7 +545,7 @@ func (chi *ClickHouseInstallation) ShardsCount() int {
 	return count
 }
 
-// HostsCount
+// HostsCount counts hosts
 func (chi *ClickHouseInstallation) HostsCount() int {
 	count := 0
 	chi.WalkHosts(func(host *ChiHost) error {
@@ -562,7 +555,7 @@ func (chi *ClickHouseInstallation) HostsCount() int {
 	return count
 }
 
-// HostsCountAttributes
+// HostsCountAttributes counts hosts by attributes
 func (chi *ClickHouseInstallation) HostsCountAttributes(a ChiHostReconcileAttributes) int {
 	count := 0
 	chi.WalkHosts(func(host *ChiHost) error {
@@ -625,7 +618,7 @@ func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ChiServiceTemplate,
 	return chi.GetServiceTemplate(name)
 }
 
-// MatchFullName
+// MatchFullName matches full name
 func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 	if chi == nil {
 		return false
@@ -636,7 +629,7 @@ func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 const TemplatingPolicyManual = "manual"
 const TemplatingPolicyAuto = "auto"
 
-// IsAuto
+// IsAuto checks whether templating policy is auto
 func (chi *ClickHouseInstallation) IsAuto() bool {
 	if chi == nil {
 		return false
@@ -647,17 +640,17 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 	return strings.ToLower(chi.Spec.Templating.GetPolicy()) == TemplatingPolicyAuto
 }
 
-// IsStopped
+// IsStopped checks whether CHI is stopped
 func (chi *ClickHouseInstallation) IsStopped() bool {
 	return util.IsStringBoolTrue(chi.Spec.Stop)
 }
 
-// IsTroubleshoot
+// IsTroubleshoot checks whether CHI is in troubleshoot mode
 func (chi *ClickHouseInstallation) IsTroubleshoot() bool {
 	return util.IsStringBoolTrue(chi.Spec.Troubleshoot)
 }
 
-// GetReconciling
+// GetReconciling gets reconciling spec
 func (chi *ClickHouseInstallation) GetReconciling() *ChiReconciling {
 	if chi == nil {
 		return nil

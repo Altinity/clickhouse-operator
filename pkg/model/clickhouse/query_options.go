@@ -39,9 +39,8 @@ func NewQueryOptions() *QueryOptions {
 func QueryOptionsNormalize(opts ...*QueryOptions) *QueryOptions {
 	if len(opts) == 0 {
 		return NewQueryOptions().Normalize()
-	} else {
-		return opts[0].Normalize()
 	}
+	return opts[0].Normalize()
 }
 
 // Normalize normalizes options
