@@ -22,7 +22,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 )
 
-// QueryResult
+// QueryResult specifies result of a query
 type QueryResult struct {
 	// Query execution context
 	ctx        context.Context
@@ -31,7 +31,7 @@ type QueryResult struct {
 	Rows *databasesql.Rows
 }
 
-// NewQueryResult
+// NewQueryResult creates new query result
 func NewQueryResult(ctx context.Context, cancelFunc context.CancelFunc, rows *databasesql.Rows) *QueryResult {
 	return &QueryResult{
 		ctx:        ctx,
@@ -40,7 +40,8 @@ func NewQueryResult(ctx context.Context, cancelFunc context.CancelFunc, rows *da
 	}
 }
 
-// Close
+// Close closes query result and releases all allocated resources.
+// Should be called on each query result
 func (q *QueryResult) Close() {
 	if q == nil {
 		return
