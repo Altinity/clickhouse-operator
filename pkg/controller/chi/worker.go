@@ -455,72 +455,68 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 	return nil
 }
 
+func purgeStatefulSet(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
+	if reconcileFailedObjs.HasStatefulSet(m) {
+		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetStatefulSet() == chiv1.ObjectsCleanupDelete
+	}
+	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetStatefulSet() == chiv1.ObjectsCleanupDelete
+}
+
+func purgePVC(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
+	if reconcileFailedObjs.HasPVC(m) {
+		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetPVC() == chiv1.ObjectsCleanupDelete
+	}
+	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetPVC() == chiv1.ObjectsCleanupDelete
+}
+
+func purgeConfigMap(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
+	if reconcileFailedObjs.HasConfigMap(m) {
+		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetConfigMap() == chiv1.ObjectsCleanupDelete
+	}
+	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetConfigMap() == chiv1.ObjectsCleanupDelete
+}
+
+func purgeService(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
+	if reconcileFailedObjs.HasService(m) {
+		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetService() == chiv1.ObjectsCleanupDelete
+	}
+	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetService() == chiv1.ObjectsCleanupDelete
+}
+
 // purge
-func (w *worker) purge(ctx context.Context, chi *chiv1.ClickHouseInstallation, reg *chopmodel.Registry, reconcileFailedObjs *chopmodel.Registry) (cnt int) {
+func (w *worker) purge(
+	ctx context.Context,
+	chi *chiv1.ClickHouseInstallation,
+	reg *chopmodel.Registry,
+	reconcileFailedObjs *chopmodel.Registry,
+) (cnt int) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return cnt
 	}
 
 	reg.Walk(func(entityType chopmodel.EntityType, m meta.ObjectMeta) {
-		del := false
 		switch entityType {
 		case chopmodel.StatefulSet:
-			if reconcileFailedObjs.HasStatefulSet(m) {
-				if chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetStatefulSet() == chiv1.ObjectsCleanupDelete {
-					del = true
-				}
-			} else {
-				if chi.GetReconciling().GetCleanup().GetUnknownObjects().GetStatefulSet() == chiv1.ObjectsCleanupDelete {
-					del = true
-				}
-			}
-			if del {
+			if purgeStatefulSet(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete StatefulSet %s/%s", m.Namespace, m.Name)
 				w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 				cnt++
 			}
 		case chopmodel.PVC:
-			if reconcileFailedObjs.HasPVC(m) {
-				if chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetPVC() == chiv1.ObjectsCleanupDelete {
-					del = true
-				}
-			} else {
-				if chi.GetReconciling().GetCleanup().GetUnknownObjects().GetPVC() == chiv1.ObjectsCleanupDelete {
-					del = true
-				}
-			}
-			if del {
+			if purgePVC(chi, reconcileFailedObjs, m) {
 				if chopmodel.GetReclaimPolicy(m) == chiv1.PVCReclaimPolicyDelete {
 					w.a.V(1).M(m).F().Info("Delete PVC %s/%s", m.Namespace, m.Name)
 					w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 				}
 			}
 		case chopmodel.ConfigMap:
-			if reconcileFailedObjs.HasConfigMap(m) {
-				if chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetConfigMap() == chiv1.ObjectsCleanupDelete {
-					del = true
-				}
-			} else {
-				if chi.GetReconciling().GetCleanup().GetUnknownObjects().GetConfigMap() == chiv1.ObjectsCleanupDelete {
-					del = true
-				}
-			}
-			if del {
+			if purgeConfigMap(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete ConfigMap %s/%s", m.Namespace, m.Name)
 				w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 			}
 		case chopmodel.Service:
-			if reconcileFailedObjs.HasService(m) {
-				if chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetService() == chiv1.ObjectsCleanupDelete {
-					del = true
-				}
-			} else {
-				if chi.GetReconciling().GetCleanup().GetUnknownObjects().GetService() == chiv1.ObjectsCleanupDelete {
-					del = true
-				}
-			}
-			if del {
+			if purgeService(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete Service %s/%s", m.Namespace, m.Name)
 				w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 			}
