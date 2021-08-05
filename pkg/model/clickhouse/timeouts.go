@@ -23,7 +23,7 @@ const (
 	defaultQueryTimeout   = 10 * time.Second
 )
 
-// Timeouts
+// Timeouts specifies set of timeouts for a clickhouse connection
 type Timeouts struct {
 	// connect specifies timeout used while connection being established
 	connect time.Duration
@@ -41,7 +41,7 @@ type TimeLimitedConnector interface {
 
 var _ TimeLimitedConnector = &Timeouts{}
 
-// NewTimeouts
+// NewTimeouts creates new set of timeouts
 func NewTimeouts() *Timeouts {
 	return &Timeouts{
 		connect: defaultConnectTimeout,
@@ -49,7 +49,7 @@ func NewTimeouts() *Timeouts {
 	}
 }
 
-// GetConnectTimeout
+// GetConnectTimeout gets connect timeout
 func (t *Timeouts) GetConnectTimeout() time.Duration {
 	if t == nil {
 		return 0
@@ -57,7 +57,7 @@ func (t *Timeouts) GetConnectTimeout() time.Duration {
 	return t.connect
 }
 
-// SetConnectTimeout
+// SetConnectTimeout sets connect timeout
 func (t *Timeouts) SetConnectTimeout(timeout time.Duration) {
 	if t == nil {
 		return
@@ -65,7 +65,7 @@ func (t *Timeouts) SetConnectTimeout(timeout time.Duration) {
 	t.connect = timeout
 }
 
-// GetQueryTimeout
+// GetQueryTimeout gets query timeout
 func (t *Timeouts) GetQueryTimeout() time.Duration {
 	if t == nil {
 		return 0
@@ -73,7 +73,7 @@ func (t *Timeouts) GetQueryTimeout() time.Duration {
 	return t.query
 }
 
-// SetQueryTimeout
+// SetQueryTimeout sets query timeout
 func (t *Timeouts) SetQueryTimeout(timeout time.Duration) {
 	if t == nil {
 		return
