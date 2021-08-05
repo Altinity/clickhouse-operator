@@ -7,13 +7,10 @@ FROM golang:1.13 AS builder
 # Install required packages
 RUN apt-get update && apt-get install -y apt-utils gettext-base
 
-# Check $GOPATH, for convenience
-RUN echo "GOPATH=$GOPATH"
-RUN echo "WORKDIR=$GOPATH/src/github.com/altinity/clickhouse-operator"
-
 # Reconstruct source tree inside docker
-WORKDIR $GOPATH/src/github.com/altinity/clickhouse-operator
+WORKDIR /clickhouse-operator
 ADD . .
+
 # ./vendor is excluded in .dockerignore, reconstruct it with 'mod' tool
 RUN GO111MODULE=on go mod tidy
 RUN GO111MODULE=on go mod vendor
@@ -25,9 +22,20 @@ RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter ./dev/go_build_metrics_exporter.s
 # ===== Metrics exporter =====
 # ============================
 
-FROM alpine:3.10 AS metrics-exporter
+FROM registry.access.redhat.com/ubi7/ubi-minimal AS ubi7
+RUN microdnf update && microdnf clean all
 
-RUN apk add --no-cache ca-certificates
+MAINTAINER "Altinity <support@altinity.com>"
+
+LABEL name="ClickHouse operator. Metrics exporter" \
+      maintainer="support@altinity.com" \
+      vendor="Altinity" \
+      version="0.15.0" \
+      release="1" \
+      summary="Metrics Exporter" \
+      description="Metrics exporter for Altinity ClickHouse operator"
+
+ADD LICENSE /licenses/
 
 WORKDIR /
 
@@ -40,6 +48,8 @@ ADD config/users.d/*     /etc/clickhouse-operator/users.d/
 
 # Copy clickhouse-operator binary into operator image from builder
 COPY --from=builder /tmp/metrics-exporter .
+
+USER nobody
 
 # Run /metrics-exporter -alsologtostderr=true -v=1
 # We can specify additional options, such as:

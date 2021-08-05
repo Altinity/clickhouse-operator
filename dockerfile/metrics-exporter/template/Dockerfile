@@ -1,6 +1,6 @@
 # ===================
 # ===== Builder =====
-# ===================
+# ====================
 
 FROM golang:1.13 AS builder
 
@@ -16,24 +16,24 @@ RUN GO111MODULE=on go mod tidy
 RUN GO111MODULE=on go mod vendor
 
 # Build operator binary with explicitly specified output
-RUN OPERATOR_BIN=/tmp/clickhouse-operator ./dev/go_build_operator.sh
+RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter ./dev/go_build_metrics_exporter.sh
 
-# ====================
-# ===== Operator =====
-# ====================
+# ============================
+# ===== Metrics exporter =====
+# ============================
 
 FROM registry.access.redhat.com/ubi7/ubi-minimal AS ubi7
 RUN microdnf update && microdnf clean all
 
 MAINTAINER "Altinity <support@altinity.com>"
 
-LABEL name="ClickHouse operator" \
+LABEL name="ClickHouse operator. Metrics exporter" \
       maintainer="support@altinity.com" \
       vendor="Altinity" \
-      version="0.15.0" \
-      release="1" \
-      summary="ClickHouse operator" \
-      description="ClickHouse operator operates ClickHouse clusters in kubernetes"
+      version="$VERSION" \
+      release="$RELEASE" \
+      summary="Metrics Exporter" \
+      description="Metrics exporter for Altinity ClickHouse operator"
 
 ADD LICENSE /licenses/
 
@@ -47,14 +47,14 @@ ADD config/templates.d/* /etc/clickhouse-operator/templates.d/
 ADD config/users.d/*     /etc/clickhouse-operator/users.d/
 
 # Copy clickhouse-operator binary into operator image from builder
-COPY --from=builder /tmp/clickhouse-operator .
+COPY --from=builder /tmp/metrics-exporter .
 
 USER nobody
 
-# Run /clickhouse-operator -alsologtostderr=true -v=1
+# Run /metrics-exporter -alsologtostderr=true -v=1
 # We can specify additional options, such as:
-#   --config=/path/to/confi g
+#   --config=/path/to/config
 #   --kube-config=/path/to/kubeconf
-ENTRYPOINT ["/clickhouse-operator"]
+ENTRYPOINT ["/metrics-exporter"]
 CMD ["-logtostderr=true", "-v=1"]
 #CMD ["-alsologtostderr=true", "-v=1"]
