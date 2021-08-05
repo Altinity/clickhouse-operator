@@ -303,9 +303,8 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 
 	if knownType {
 		return res, true
-	} else {
-		return "", false
 	}
+	return "", false
 }
 
 // unmarshalVector
@@ -332,9 +331,8 @@ func unmarshalVector(untyped interface{}) ([]string, bool) {
 
 	if knownType {
 		return res, true
-	} else {
-		return nil, false
 	}
+	return nil, false
 }
 
 // getValueAsScalar
