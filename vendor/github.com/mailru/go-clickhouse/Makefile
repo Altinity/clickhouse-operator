@@ -5,7 +5,7 @@ init:
 	GO111MODULE=off go get golang.org/x/lint/golint
 
 up_docker_server: stop_docker_server
-	docker run --rm=true -p 127.0.0.1:8123:8123 --name dbr-clickhouse-server -d yandex/clickhouse-server:19.16.14.65;
+	docker run --rm=true -p 8123:8123 --name dbr-clickhouse-server -d yandex/clickhouse-server:latest;
 
 stop_docker_server:
 	test -n "$$(docker ps --format {{.Names}} | grep dbr-clickhouse-server)" && docker stop dbr-clickhouse-server || true

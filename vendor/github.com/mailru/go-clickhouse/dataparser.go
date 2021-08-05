@@ -26,40 +26,6 @@ var (
 	reflectTypeFloat64     = reflect.TypeOf(float64(0))
 )
 
-// DataParser implements parsing of a driver value and reporting its type.
-type DataParser interface {
-	Parse(io.RuneScanner) (driver.Value, error)
-	Type() reflect.Type
-}
-
-type stringParser struct {
-	unquote bool
-	length  int
-}
-
-type dateTimeParser struct {
-	unquote  bool
-	format   string
-	location *time.Location
-}
-
-type nullableParser struct {
-	DataParser
-}
-
-func (p *nullableParser) Parse(s io.RuneScanner) (driver.Value, error) {
-	// Clickhouse returns `\N` string for `null` in tsv format.
-	// For checking this value we need to check first two runes in `io.RuneScanner`, but we can't reset `io.RuneScanner` after it.
-	// Copy io.RuneScanner to `bytes.Buffer` and use it twice (1st for casting to string and checking to null, 2nd for passing to original parser)
-	d := readRaw(s)
-
-	if bytes.Equal(d.Bytes(), []byte(`\N`)) {
-		return nil, nil
-	}
-
-	return p.DataParser.Parse(d)
-}
-
 func readNumber(s io.RuneScanner) (string, error) {
 	var builder bytes.Buffer
 
@@ -135,12 +101,141 @@ func readString(s io.RuneScanner, length int, unquote bool) (string, error) {
 	return str, nil
 }
 
+// DataParser implements parsing of a driver value and reporting its type.
+type DataParser interface {
+	Parse(io.RuneScanner) (driver.Value, error)
+	Type() reflect.Type
+}
+
+type nullableParser struct {
+	DataParser
+}
+
+func (p *nullableParser) Parse(s io.RuneScanner) (driver.Value, error) {
+	// Clickhouse returns `\N` string for `null` in tsv format.
+	// For checking this value we need to check first two runes in `io.RuneScanner`, but we can't reset `io.RuneScanner` after it.
+	// Copy io.RuneScanner to `bytes.Buffer` and use it twice (1st for casting to string and checking to null, 2nd for passing to original parser)
+	var dB *bytes.Buffer
+
+	dType := p.DataParser.Type()
+
+	switch dType {
+	case reflectTypeInt8, reflectTypeInt16, reflectTypeInt32, reflectTypeInt64,
+		reflectTypeUInt8, reflectTypeUInt16, reflectTypeUInt32, reflectTypeUInt64,
+		reflectTypeFloat32, reflectTypeFloat64:
+		d, err := readNumber(s)
+		if err != nil {
+			return nil, fmt.Errorf("error: %v", err)
+		}
+
+		dB = bytes.NewBufferString(d)
+	case reflectTypeString:
+		runes := ""
+		iter := 0
+
+		isNotString := false
+		for {
+			r, _, err := s.ReadRune()
+			if err != nil {
+				return nil, fmt.Errorf("error: %v", err)
+			}
+
+			if r != '\'' && iter == 0 {
+				s.UnreadRune()
+				d := readRaw(s)
+				dB = d
+				isNotString = true
+				break
+			}
+
+			isEscaped := false
+			if r == '\\' {
+				escaped, err := readEscaped(s)
+				if err != nil {
+					return "", fmt.Errorf("incorrect escaping in string: %v", err)
+				}
+
+				isEscaped = true
+				r = escaped
+				if r == '\'' {
+					runes += string('\\')
+				}
+			}
+
+			runes += string(r)
+
+			if r == '\'' && iter != 0 && !isEscaped {
+				break
+			}
+			iter++
+		}
+
+		if bytes.Equal([]byte(runes), []byte(`'N'`)) {
+			return nil, nil
+		}
+
+		if !isNotString {
+			dB = bytes.NewBufferString(runes)
+		}
+	case reflectTypeTime:
+		runes := ""
+
+		iter := 0
+		for {
+			r, _, err := s.ReadRune()
+			if err != nil {
+				return nil, nil
+			}
+
+			runes += string(r)
+
+			if r == '\'' && iter != 0 {
+				break
+			}
+			iter++
+		}
+
+		if runes == "0000-00-00" || runes == "0000-00-00 00:00:00" {
+			return time.Time{}, nil
+		}
+
+		if bytes.Equal([]byte(runes), []byte(`'\N'`)) {
+			return nil, nil
+		}
+
+		dB = bytes.NewBufferString(runes)
+	case reflectTypeEmptyStruct:
+		d := readRaw(s)
+		dB = d
+	default:
+		d := readRaw(s)
+		dB = d
+	}
+
+	if bytes.Equal(dB.Bytes(), []byte(`\N`)) {
+		return nil, nil
+	}
+
+	return p.DataParser.Parse(dB)
+}
+
+type stringParser struct {
+	unquote bool
+	length  int
+}
+
 func (p *stringParser) Parse(s io.RuneScanner) (driver.Value, error) {
 	return readString(s, p.length, p.unquote)
 }
 
 func (p *stringParser) Type() reflect.Type {
 	return reflectTypeString
+}
+
+type dateTimeParser struct {
+	unquote  bool
+	format   string
+	location *time.Location
 }
 
 func (p *dateTimeParser) Parse(s io.RuneScanner) (driver.Value, error) {
@@ -173,7 +268,7 @@ type tupleParser struct {
 }
 
 func (p *tupleParser) Type() reflect.Type {
-	fields := make([]reflect.StructField, len(p.args), len(p.args))
+	fields := make([]reflect.StructField, len(p.args))
 	for i, arg := range p.args {
 		fields[i].Name = "Field" + strconv.Itoa(i)
 		fields[i].Type = arg.Type()
@@ -231,7 +326,14 @@ func (p *arrayParser) Parse(s io.RuneScanner) (driver.Value, error) {
 			return nil, fmt.Errorf("failed to parse array element: %v", err)
 		}
 
-		slice = reflect.Append(slice, reflect.ValueOf(v))
+		if v == nil {
+			if reflect.TypeOf(p.arg) != reflect.TypeOf(&nullableParser{}) {
+				//need check if v is nil: panic otherwise
+				return nil, fmt.Errorf("unexpected nil element")
+			}
+		} else {
+			slice = reflect.Append(slice, reflect.ValueOf(v))
+		}
 
 		r = read(s)
 		if r != ',' {
@@ -447,7 +549,7 @@ func newDataParser(t *TypeDesc, unquote bool, opt *DataParserOptions) (DataParse
 		return &floatParser{32}, nil
 	case "Float64":
 		return &floatParser{64}, nil
-	case "Decimal", "String", "Enum8", "Enum16", "UUID":
+	case "Decimal", "String", "Enum8", "Enum16", "UUID", "IPv4", "IPv6":
 		return &stringParser{unquote: unquote}, nil
 	case "FixedString":
 		if len(t.Args) != 1 {
@@ -471,7 +573,7 @@ func newDataParser(t *TypeDesc, unquote bool, opt *DataParserOptions) (DataParse
 		if len(t.Args) < 1 {
 			return nil, fmt.Errorf("element types not specified for Tuple")
 		}
-		subParsers := make([]DataParser, len(t.Args), len(t.Args))
+		subParsers := make([]DataParser, len(t.Args))
 		for i, arg := range t.Args {
 			subParser, err := newDataParser(arg, true, opt)
 			if err != nil {

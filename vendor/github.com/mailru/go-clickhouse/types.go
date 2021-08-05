@@ -3,6 +3,7 @@ package clickhouse
 import (
 	"database/sql/driver"
 	"fmt"
+	"net"
 	"strconv"
 	"time"
 )
@@ -17,7 +18,7 @@ func Date(t time.Time) driver.Valuer {
 	return date(t)
 }
 
-// UInt64 returns date for t
+// UInt64 returns uint64
 func UInt64(u uint64) driver.Valuer {
 	return bigUint64(u)
 }
@@ -38,6 +39,11 @@ func Decimal64(v interface{}, s int32) driver.Valuer {
 // The value can be a number or a string. The S (scale) parameter specifies the number of decimal places.
 func Decimal128(v interface{}, s int32) driver.Valuer {
 	return decimal{128, s, v}
+}
+
+// IP returns compatible database format for net.IP
+func IP(i net.IP) driver.Valuer {
+	return ip(i)
 }
 
 type array struct {
@@ -72,4 +78,11 @@ type decimal struct {
 // Value implements driver.Valuer
 func (d decimal) Value() (driver.Value, error) {
 	return []byte(fmt.Sprintf("toDecimal%d(%v, %d)", d.p, d.v, d.s)), nil
+}
+
+type ip net.IP
+
+// Value implements driver.Valuer
+func (i ip) Value() (driver.Value, error) {
+	return net.IP(i).String(), nil
 }

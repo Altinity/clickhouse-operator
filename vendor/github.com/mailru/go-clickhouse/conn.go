@@ -1,22 +1,23 @@
 package clickhouse
 
 import (
+	"compress/gzip"
 	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
 	"sync/atomic"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/google/uuid"
 )
 
 type key int
@@ -202,7 +203,7 @@ func (c *conn) killQuery(req *http.Request, args []driver.Value) error {
 	}
 	ctx, cancelFunc := context.WithTimeout(context.Background(), timeout)
 	defer cancelFunc()
-	req, err := c.buildRequest(ctx, query, args, false)
+	req, err := c.buildRequest(ctx, query, args)
 	if err != nil {
 		return err
 	}
@@ -211,6 +212,8 @@ func (c *conn) killQuery(req *http.Request, args []driver.Value) error {
 		return err
 	}
 	if body != nil {
+		// Drain body to enable connection reuse
+		io.Copy(ioutil.Discard, body)
 		body.Close()
 	}
 	return nil
@@ -220,7 +223,7 @@ func (c *conn) query(ctx context.Context, query string, args []driver.Value) (dr
 	if atomic.LoadInt32(&c.closed) != 0 {
 		return nil, driver.ErrBadConn
 	}
-	req, err := c.buildRequest(ctx, query, args, true)
+	req, err := c.buildRequest(ctx, query, args)
 	if err != nil {
 		return nil, err
 	}
@@ -242,12 +245,14 @@ func (c *conn) exec(ctx context.Context, query string, args []driver.Value) (dri
 	if atomic.LoadInt32(&c.closed) != 0 {
 		return nil, driver.ErrBadConn
 	}
-	req, err := c.buildRequest(ctx, query, args, false)
+	req, err := c.buildRequest(ctx, query, args)
 	if err != nil {
 		return nil, err
 	}
 	body, err := c.doRequest(ctx, req)
 	if body != nil {
+		// Drain body to enable connection reuse
+		io.Copy(ioutil.Discard, body)
 		body.Close()
 	}
 	return emptyResult, err
@@ -277,53 +282,70 @@ func (c *conn) doRequest(ctx context.Context, req *http.Request) (io.ReadCloser,
 		}
 		return nil, err
 	}
-
 	return resp.Body, nil
 }
 
-func (c *conn) buildRequest(ctx context.Context, query string, params []driver.Value, readonly bool) (*http.Request, error) {
-	var (
-		method string
-		err    error
-	)
-	if params != nil {
+func (c *conn) buildRequest(ctx context.Context, query string, params []driver.Value) (*http.Request, error) {
+	var err error
+	if len(params) > 0 {
 		if query, err = interpolateParams(query, params); err != nil {
 			return nil, err
 		}
 	}
-	if readonly {
-		method = http.MethodGet
-	} else {
-		method = http.MethodPost
-	}
+
+	bodyReader, bodyWriter := io.Pipe()
+	go func() {
+		if c.useGzipCompression {
+			gz := gzip.NewWriter(bodyWriter)
+			gz.Write([]byte(query))
+			gz.Close()
+			bodyWriter.Close()
+		} else {
+			bodyWriter.Write([]byte(query))
+			bodyWriter.Close()
+		}
+	}()
 	c.log("query: ", query)
-	req, err := http.NewRequest(method, c.url.String(), strings.NewReader(query))
+
+	req, err := http.NewRequest(http.MethodPost, c.url.String(), bodyReader)
 	if err != nil {
 		return nil, err
 	}
+
 	// http.Transport ignores url.User argument, handle it here
 	if c.user != nil {
 		p, _ := c.user.Password()
 		req.SetBasicAuth(c.user.Username(), p)
 	}
-	var queryID, quotaKey string
+
+	var reqQuery url.Values
 	if ctx != nil {
-		quotaKey, _ = ctx.Value(QuotaKey).(string)
-		queryID, _ = ctx.Value(QueryID).(string)
+		quotaKey, quotaOk := ctx.Value(QuotaKey).(string)
+		if quotaOk && quotaKey != "" {
+			if reqQuery == nil {
+				reqQuery = req.URL.Query()
+			}
+			reqQuery.Add(quotaKeyParamName, quotaKey)
+		}
+		queryID, queryOk := ctx.Value(QueryID).(string)
+		if c.killQueryOnErr && (!queryOk || queryID == "") {
+			queryID = uuid.New().String()
+		}
+		if queryID != "" {
+			if reqQuery == nil {
+				reqQuery = req.URL.Query()
+			}
+			reqQuery.Add(queryIDParamName, queryID)
+		}
+
+	}
+	if reqQuery != nil {
+		req.URL.RawQuery = reqQuery.Encode()
 	}
 
-	if c.killQueryOnErr && queryID == "" {
-		queryID = uuid.NewV4().String()
+	if c.useGzipCompression {
+		req.Header.Set("Content-Encoding", "gzip")
 	}
-
-	reqQuery := req.URL.Query()
-	if quotaKey != "" {
-		reqQuery.Add(quotaKeyParamName, quotaKey)
-	}
-	if queryID != "" {
-		reqQuery.Add(queryIDParamName, queryID)
-	}
-	req.URL.RawQuery = reqQuery.Encode()
 
 	return req, nil
 }

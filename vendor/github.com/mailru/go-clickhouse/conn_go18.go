@@ -6,8 +6,6 @@ import (
 	"context"
 	"database/sql/driver"
 	"io/ioutil"
-	"net/http"
-	"net/url"
 	"strings"
 )
 
@@ -16,12 +14,12 @@ func (c *conn) Ping(ctx context.Context) error {
 	if c.transport == nil {
 		return ErrTransportNil
 	}
-	// make request with empty body, response must be "Ok.\n"
-	u := &url.URL{Scheme: c.url.Scheme, User: c.url.User, Host: c.url.Host, Path: "/ping"}
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+
+	req, err := c.buildRequest(ctx, "select 1", nil)
 	if err != nil {
 		return err
 	}
+
 	respBody, err := c.doRequest(ctx, req)
 	defer func() {
 		c.cancel = nil
@@ -29,12 +27,12 @@ func (c *conn) Ping(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// Close response body to enable connection reuse
+	defer respBody.Close()
 	resp, err := ioutil.ReadAll(respBody)
-	if err != nil {
-		return err
-	}
-	if len(resp) != 4 || !strings.HasPrefix(string(resp), "Ok.") {
-		return ErrIncorrectResponse
+	if err != nil || !strings.HasPrefix(string(resp), "1") {
+		return driver.ErrBadConn
 	}
 	return nil
 }

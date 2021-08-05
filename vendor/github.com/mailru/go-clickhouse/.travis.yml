@@ -3,16 +3,15 @@ notifications:
   email: false
 language: go
 go:
-  - '1.11'
-  - '1.12'
   - '1.13'
   - '1.14'
-
+  - '1.15'
+  - '1.16'
 services:
   - docker
 
 before_install:
-  - travis_retry docker pull yandex/clickhouse-server:19.16.14.65
+  - travis_retry docker pull yandex/clickhouse-server:20.3.8.53
   - make up_docker_server
 
 install:

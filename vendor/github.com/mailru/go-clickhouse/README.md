@@ -6,6 +6,7 @@ Yet another Golang SQL database driver for [Yandex ClickHouse](https://clickhous
 
 * Uses official http interface
 * Compatibility with [dbr](https://github.com/mailru/dbr)
+* Compatibility with [chproxy](https://github.com/Vertamedia/chproxy)
 
 ## DSN
 ```
@@ -39,13 +40,14 @@ http://user:password@host:8123/clicks?read_timeout=10&write_timeout=20
 * LowCardinality(T)
 * [Array(T) (one-dimensional)](https://clickhouse.yandex/reference_en.html#Array(T))
 * [Nested(Name1 Type1, Name2 Type2, ...)](https://clickhouse.yandex/docs/en/data_types/nested_data_structures/nested/)
+* IPv4, IPv6
 
 Notes:
-database/sql does not allow to use big uint64 values.
-It is recommended use type `UInt64` which is provided by driver for such kind of values.
-type `[]byte` are used as raw string (without quoting)
-for passing value of type `[]uint8` to driver as array - please use the wrapper `clickhouse.Array`
-for passing decimal value please use the wrappers `clickhouse.Decimal*`
+* database/sql does not allow to use big uint64 values. It is recommended use type `UInt64` which is provided by driver for such kind of values.
+* type `[]byte` are used as raw string (without quoting)
+* for passing value of type `[]uint8` to driver as array - please use the wrapper `clickhouse.Array`
+* for passing decimal value please use the wrappers `clickhouse.Decimal*`
+* for passing IPv4/IPv6 types use `clickhouse.IP`
 
 ## Supported request params
 

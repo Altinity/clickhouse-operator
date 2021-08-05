@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	splitInsertRe = regexp.MustCompile(`(?s)(.+\s+VALUES)\s*(\(.+\))`)
+	splitInsertRe = regexp.MustCompile(`(?si)(.+\s*VALUES)\s*(\(.+\))`)
 )
 
 type stmt struct {

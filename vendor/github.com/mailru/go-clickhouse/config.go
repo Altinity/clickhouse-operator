@@ -101,10 +101,8 @@ func (cfg *Config) url(extra map[string]string, dsn bool) *url.URL {
 	for k, v := range cfg.Params {
 		query.Set(k, v)
 	}
-	if extra != nil {
-		for k, v := range extra {
-			query.Set(k, v)
-		}
+	for k, v := range extra {
+		query.Set(k, v)
 	}
 
 	u.RawQuery = query.Encode()

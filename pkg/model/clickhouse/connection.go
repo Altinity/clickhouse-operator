@@ -23,17 +23,18 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 
+	// go-clickhouse is explicitly required in order to setup connection to clickhouse db
 	_ "github.com/mailru/go-clickhouse"
 )
 
-// Connection
+// Connection specifies clickhouse database connection object
 type Connection struct {
 	params *ConnectionParams
 	conn   *databasesql.DB
 	l      log.Announcer
 }
 
-// NewConnection
+// NewConnection creates new clickhouse connection
 func NewConnection(params *ConnectionParams) *Connection {
 	// Do not establish connection immediately, do it in l lazy manner
 	return &Connection{
@@ -42,7 +43,7 @@ func NewConnection(params *ConnectionParams) *Connection {
 	}
 }
 
-// Params
+// Params gets connection params
 func (c *Connection) Params() *ConnectionParams {
 	if c == nil {
 		return nil
@@ -50,7 +51,7 @@ func (c *Connection) Params() *ConnectionParams {
 	return c.params
 }
 
-// SetLog
+// SetLog sets log announcer
 func (c *Connection) SetLog(l log.Announcer) *Connection {
 	if c == nil {
 		return nil
@@ -59,7 +60,7 @@ func (c *Connection) SetLog(l log.Announcer) *Connection {
 	return c
 }
 
-// connect
+// connect performs connect
 func (c *Connection) connect(ctx context.Context) {
 	c.l.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
 	dbConnection, err := databasesql.Open("clickhouse", c.params.GetDSN())
@@ -87,7 +88,7 @@ func (c *Connection) connect(ctx context.Context) {
 	c.conn = dbConnection
 }
 
-// ensureConnected
+// ensureConnected ensures connection is set
 func (c *Connection) ensureConnected(ctx context.Context) bool {
 	if c.conn != nil {
 		c.l.V(2).F().Info("Already connected: %s", c.params.GetDSNWithHiddenCredentials())
@@ -138,7 +139,7 @@ func (c *Connection) Query(sql string) (*QueryResult, error) {
 	return c.QueryContext(nil, sql)
 }
 
-// ctx
+// ctx creates context with deadline
 func (c *Connection) ctx(ctx context.Context, opts *QueryOptions) (context.Context, context.CancelFunc) {
 	var parentCtx context.Context
 	if ctx == nil {
