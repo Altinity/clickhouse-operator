@@ -43,7 +43,7 @@ var (
 )
 
 // Specify returned errors for being re-used
-var(
+var (
 	errorNoSectionSpecified  = fmt.Errorf("no section specified")
 	errorNoFilenameSpecified = fmt.Errorf("no filename specified")
 )
