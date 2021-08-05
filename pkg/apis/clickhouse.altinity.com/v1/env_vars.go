@@ -41,7 +41,7 @@ const (
 	// OPERATOR_CONTAINER_MEM_LIMIT from .containers.resources.limits.memory
 	OPERATOR_CONTAINER_MEM_LIMIT = "OPERATOR_CONTAINER_MEM_LIMIT"
 
-	// What namespaces to watch
+	// WATCH_NAMESPACE/WATCH_NAMESPACES specifies what namespaces to watch
 	WATCH_NAMESPACE  = "WATCH_NAMESPACE"
 	WATCH_NAMESPACES = "WATCH_NAMESPACES"
 
