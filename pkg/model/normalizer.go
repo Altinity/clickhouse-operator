@@ -29,14 +29,14 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// Normalizer
+// Normalizer specifies structures normalizer
 type Normalizer struct {
 	chi *chiV1.ClickHouseInstallation
 	// Whether should insert default cluster if no cluster specified
 	withDefaultCluster bool
 }
 
-// NewNormalizer
+// NewNormalizer creates new normalizer
 func NewNormalizer() *Normalizer {
 	return &Normalizer{}
 }
