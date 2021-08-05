@@ -609,7 +609,7 @@ func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceT
 	return chi.Spec.Templates.GetServiceTemplatesIndex().Get(name), true
 }
 
-// GetServiceTemplate gets ChiServiceTemplate of a CHI
+// GetCHIServiceTemplate gets ChiServiceTemplate of a CHI
 func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ChiServiceTemplate, bool) {
 	if !chi.Spec.Defaults.Templates.HasServiceTemplate() {
 		return nil, false
@@ -626,8 +626,11 @@ func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 	return (chi.Namespace == namespace) && (chi.Name == name)
 }
 
-const TemplatingPolicyManual = "manual"
-const TemplatingPolicyAuto = "auto"
+// Possible templating policies
+const (
+	TemplatingPolicyManual = "manual"
+	TemplatingPolicyAuto   = "auto"
+)
 
 // IsAuto checks whether templating policy is auto
 func (chi *ClickHouseInstallation) IsAuto() bool {
