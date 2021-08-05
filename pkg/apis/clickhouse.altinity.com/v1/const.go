@@ -18,14 +18,15 @@
 // Package v1 defines version 1 of the API used with ClickHouse Installation Custom Resources.
 package v1
 
+// Possible CHI statuses
 const (
 	StatusInProgress  = "InProgress"
 	StatusCompleted   = "Completed"
 	StatusTerminating = "Terminating"
 )
 
+// Possible kinds of CRDs
 const (
-	// ClickHouseInstallationCRDResourceKind defines kind of CRD resource
 	ClickHouseInstallationCRDResourceKind         = "ClickHouseInstallation"
 	ClickHouseInstallationTemplateCRDResourceKind = "ClickHouseInstallationTemplate"
 	ClickHouseOperatorCRDResourceKind             = "ClickHouseOperator"
@@ -56,6 +57,7 @@ const (
 	OnStatefulSetUpdateFailureActionIgnore = "ignore"
 )
 
+// Possible pod distributions
 const (
 	PodDistributionUnspecified = "Unspecified"
 	// AntiAffinity section
@@ -96,11 +98,13 @@ const (
 	PodDistributionOnePerHost = "OnePerHost"
 )
 
+// Possible port distributions
 const (
 	PortDistributionUnspecified       = "Unspecified"
 	PortDistributionClusterScopeIndex = "ClusterScopeIndex"
 )
 
+// Username/password replacers
 const (
 	UsernameReplacer = "***"
 	PasswordReplacer = "***"
