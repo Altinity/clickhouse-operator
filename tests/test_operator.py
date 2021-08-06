@@ -1066,15 +1066,17 @@ def test_019(self):
             },
         )
 
-    with Then("PVC should be re-mounted"):
-        with Then("Non-replicated table should have data"):
-            out = clickhouse.query(chi, sql="select a from t1")
-            assert out == "1"
-        with And("Replicated table should have data"):
-            out = clickhouse.query(chi, sql="select a from t2")
-            assert out == "1"
+        with Then("PVC should be re-mounted"):
+        
+            with Then("Non-replicated table should have data"):
+                out = clickhouse.query(chi, sql="select a from t1")
+                assert out == "1"
+                
+            with And("Replicated table should have data"):
+                out = clickhouse.query(chi, sql="select a from t2")
+                assert out == "1"
             
-    with Then("Stop the Installation"):
+    with When("Stop the Installation"):
         kubectl.create_and_check(
             config="configs/test-019-retain-volume-2.yaml",
             check={
@@ -1087,27 +1089,96 @@ def test_019(self):
                 },
             )
 
-    with Then("Re-start the Installation"):
+        with And("Re-start the Installation"):
+            kubectl.create_and_check(
+                config="configs/test-019-retain-volume.yaml",
+                check={
+                    "pod_count": 1,
+                    "do_not_delete": 1,
+                    },
+                )
+
+        with Then("Data should be in place"):
+            with Then("Non-replicated table should have data"):
+                out = clickhouse.query(chi, sql="select a from t1")
+                assert out == "1"
+                
+            with And("Replicated table should have data"):
+                out = clickhouse.query(chi, sql="select a from t2")
+                assert out == "1"
+    
+    with When("Add a second replica"):
         kubectl.create_and_check(
-            config="configs/test-019-retain-volume.yaml",
+            config="configs/test-019-retain-volume-3.yaml",
             check={
-                "object_counts": {
-                    "statefulset": 1,
-                    "pod": 1,
-                    "service": 2,  # load balancer service should be back
-                },
+                "pod_count": 2,
                 "do_not_delete": 1,
                 },
             )
-
-    with Then("Data should be in place"):
-        with Then("Non-replicated table should have data"):
-            out = clickhouse.query(chi, sql="select a from t1")
+        with Then("Replicated table should have two replicas now"):
+            out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
+            assert out == "2"
+           
+        with When("Remove a replica"):
+            pvc_count = kubectl.get_count("pvc")
+            pv_count = kubectl.get_count("pv")
+            
+            kubectl.create_and_check(
+                config="configs/test-019-retain-volume.yaml",
+                check={
+                    "pod_count": 1,
+                    "do_not_delete": 1,
+                    },
+                )
+            with Then("Replica PVC sbould be retained"):
+                assert kubectl.get_count("pvc") == pvc_count
+                assert kubectl.get_count("pv") == pv_count
+            
+            with And("Replica should NOT be removed from ZooKeeper"):
+                    out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
+                    assert out == "2"
+    
+    with When("Add a second replica one more time"):
+        kubectl.create_and_check(
+            config="configs/test-019-retain-volume-3.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+                },
+            )
+        
+        with Then("Table should have data"):
+            out = clickhouse.query(chi, sql="select a from t2", host=f"chi-{chi}-simple-0-1")
             assert out == "1"
-        with And("Replicated table should have data"):
-            out = clickhouse.query(chi, sql="select a from t2")
-            assert out == "1"
-
+            
+        with When("Set reclaim policy to Delete but do not wait for completion"):
+            kubectl.create_and_check(
+            config="configs/test-019-retain-volume-4.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+                "chi_status": "InProgress",
+                },
+            )
+        
+            with And("Remove a replica"):
+                pvc_count = kubectl.get_count("pvc")
+                pv_count = kubectl.get_count("pv")
+            
+                kubectl.create_and_check(
+                    config="configs/test-019-retain-volume.yaml",
+                    check={
+                        "pod_count": 1,
+                        "do_not_delete": 1,
+                        },
+                    )
+                with Then("Replica PVC sbould be deleted"):
+                    assert kubectl.get_count("pvc") < pvc_count
+                    assert kubectl.get_count("pv") < pv_count
+                
+                with And("Replica should be removed from ZooKeeper"):
+                    out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
+                    assert out == "1"
 
     kubectl.delete_chi(chi)
 
