@@ -29,3 +29,6 @@ dev/log
 /.DS_Store
 
 operator_output
+.gitsecret/keys/random_seed
+!*.secret
+dockerfile/actions
