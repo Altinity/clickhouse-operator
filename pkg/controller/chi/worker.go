@@ -112,6 +112,64 @@ func (w *worker) run() {
 	}
 }
 
+func (w *worker) processReconcileCHI(ctx context.Context, cmd *ReconcileCHI) error {
+	switch cmd.cmd {
+	case reconcileAdd:
+		return w.updateCHI(ctx, nil, cmd.new)
+	case reconcileUpdate:
+		return w.updateCHI(ctx, cmd.old, cmd.new)
+	case reconcileDelete:
+		return w.discoveryAndDeleteCHI(ctx, cmd.old)
+	}
+
+	// Unknown item type, don't know what to do with it
+	// Just skip it and behave like it never existed
+	utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
+	return nil
+}
+
+func (w *worker) processReconcileCHIT(cmd *ReconcileCHIT) error {
+	switch cmd.cmd {
+	case reconcileAdd:
+		return w.c.addChit(cmd.new)
+	case reconcileUpdate:
+		return w.c.updateChit(cmd.old, cmd.new)
+	case reconcileDelete:
+		return w.c.deleteChit(cmd.old)
+	}
+
+	// Unknown item type, don't know what to do with it
+	// Just skip it and behave like it never existed
+	utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
+	return nil
+}
+
+func (w *worker) processReconcileChopConfig(cmd *ReconcileChopConfig) error {
+	switch cmd.cmd {
+	case reconcileAdd:
+		return w.c.addChopConfig(cmd.new)
+	case reconcileUpdate:
+		return w.c.updateChopConfig(cmd.old, cmd.new)
+	case reconcileDelete:
+		return w.c.deleteChopConfig(cmd.old)
+	}
+
+	// Unknown item type, don't know what to do with it
+	// Just skip it and behave like it never existed
+	utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
+	return nil
+}
+
+func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
+	if chi, err := w.createCHIFromObjectMeta(cmd.initiator); err == nil {
+		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
+		_ = w.schemer.CHIDropDnsCache(ctx, chi)
+	} else {
+		w.a.M(cmd.initiator).A().Error("unable to find CHI by %v", cmd.initiator.Labels)
+	}
+	return nil
+}
+
 // processItem processes one work item according to its type
 func (w *worker) processItem(ctx context.Context, item interface{}) error {
 	if util.IsContextDone(ctx) {
@@ -122,61 +180,15 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 	w.a.V(3).S().P()
 	defer w.a.V(3).E().P()
 
-	switch command := item.(type) {
-
+	switch cmd := item.(type) {
 	case *ReconcileCHI:
-		switch command.cmd {
-		case reconcileAdd:
-			return w.updateCHI(ctx, nil, command.new)
-		case reconcileUpdate:
-			return w.updateCHI(ctx, command.old, command.new)
-		case reconcileDelete:
-			return w.discoveryAndDeleteCHI(ctx, command.old)
-		}
-
-		// Unknown item type, don't know what to do with it
-		// Just skip it and behave like it never existed
-		utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", command))
-		return nil
-
+		return w.processReconcileCHI(ctx, cmd)
 	case *ReconcileCHIT:
-		switch command.cmd {
-		case reconcileAdd:
-			return w.c.addChit(command.new)
-		case reconcileUpdate:
-			return w.c.updateChit(command.old, command.new)
-		case reconcileDelete:
-			return w.c.deleteChit(command.old)
-		}
-
-		// Unknown item type, don't know what to do with it
-		// Just skip it and behave like it never existed
-		utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", command))
-		return nil
-
+		return w.processReconcileCHIT(cmd)
 	case *ReconcileChopConfig:
-		switch command.cmd {
-		case reconcileAdd:
-			return w.c.addChopConfig(command.new)
-		case reconcileUpdate:
-			return w.c.updateChopConfig(command.old, command.new)
-		case reconcileDelete:
-			return w.c.deleteChopConfig(command.old)
-		}
-
-		// Unknown item type, don't know what to do with it
-		// Just skip it and behave like it never existed
-		utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", command))
-		return nil
-
+		return w.processReconcileChopConfig(cmd)
 	case *DropDns:
-		if chi, err := w.createCHIFromObjectMeta(command.initiator); err == nil {
-			w.a.V(2).M(command.initiator).Info("flushing DNS for CHI %s", chi.Name)
-			_ = w.schemer.CHIDropDnsCache(ctx, chi)
-		} else {
-			w.a.M(command.initiator).A().Error("unable to find CHI by %v", command.initiator.Labels)
-		}
-		return nil
+		return w.processDropDns(ctx, cmd)
 	}
 
 	// Unknown item type, don't know what to do with it
