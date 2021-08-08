@@ -208,6 +208,11 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *chiv1.ClickHouseInsta
 		return false
 	}
 
+	// In case CHI is being deleted already, no need to meddle with finalizers
+	if !chi.ObjectMeta.DeletionTimestamp.IsZero() {
+		return false
+	}
+
 	// Check whether finalizer is already listed in CHI
 	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
 		w.a.V(2).M(chi).F().Info("finalizer already installed")
@@ -247,27 +252,18 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 	w.registryReconciled = chopmodel.NewRegistry()
 	w.cmUpdate = time.Time{}
 
-	// Check DeletionTimestamp in order to understand, whether the object is being deleted
-	if new.ObjectMeta.DeletionTimestamp.IsZero() {
-		// The object is not being deleted
-		// Need to ensure finalizer is in place
-		if w.ensureFinalizer(ctx, new) {
-			// Finalizer installed, let's restart reconcile cycle
-			return nil
-		}
-	} else {
-		// The object is being deleted
-		return w.deleteCHI(ctx, new)
+	if w.ensureFinalizer(ctx, new) {
+		// Finalizer installed, let's restart reconcile cycle
+		return nil
 	}
 
-	//time.Sleep(5 * time.Second)
-	//w.a.V(3).Info("--- Normalize ---")
+	if w.deleteCHI(ctx, new) {
+		// CHI is being deleted
+		return nil
+	}
 
 	old = w.normalize(old)
 	new = w.normalize(new)
-
-	//time.Sleep(5 * time.Second)
-	//w.a.V(3).Info("--- Action Plan ---")
 
 	actionPlan := chopmodel.NewActionPlan(old, new)
 	if !actionPlan.HasActionsToDo() {
@@ -276,87 +272,9 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		return nil
 	}
 
-	//time.Sleep(5 * time.Second)
-	//w.a.V(3).Info("--- Reconcile Start 1 ---")
-
-	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
-	(&new.Status).ReconcileStart(actionPlan.GetRemovedHostsNum())
-	_ = w.c.updateCHIObjectStatus(ctx, new, false)
-
-	w.a.V(1).
-		WithEvent(new, eventActionReconcile, eventReasonReconcileStarted).
-		WithStatusAction(new).
-		M(new).F().
-		Info("reconcile started")
-	w.a.V(2).M(new).F().Info("action plan\n%s\n", actionPlan.String())
-
-	if new.IsStopped() {
-		w.a.V(1).
-			WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
-			WithStatusAction(new).
-			M(new).F().
-			Info("exclude CHI from monitoring")
-		w.c.deleteWatch(new.Namespace, new.Name)
-	}
-
-	//time.Sleep(5 * time.Second)
-	//w.a.V(3).Info("--- Reconcile Start 3 ---")
-
-	actionPlan.WalkAdded(
-		func(cluster *chiv1.ChiCluster) {
-			cluster.WalkHosts(func(host *chiv1.ChiHost) error {
-				(&host.ReconcileAttributes).SetAdd()
-				return nil
-			})
-		},
-		func(shard *chiv1.ChiShard) {
-			shard.WalkHosts(func(host *chiv1.ChiHost) error {
-				(&host.ReconcileAttributes).SetAdd()
-				return nil
-			})
-		},
-		func(host *chiv1.ChiHost) {
-			(&host.ReconcileAttributes).SetAdd()
-		},
-	)
-
-	actionPlan.WalkModified(
-		func(cluster *chiv1.ChiCluster) {
-		},
-		func(shard *chiv1.ChiShard) {
-		},
-		func(host *chiv1.ChiHost) {
-			(&host.ReconcileAttributes).SetModify()
-		},
-	)
-
-	new.WalkHosts(func(host *chiv1.ChiHost) error {
-		if host.ReconcileAttributes.IsAdd() {
-			// Already added
-		} else if host.ReconcileAttributes.IsModify() {
-			// Already modified
-		} else {
-			// Not clear yet
-			(&host.ReconcileAttributes).SetUnclear()
-		}
-		return nil
-	})
-
-	new.WalkHosts(func(host *chiv1.ChiHost) error {
-		if host.ReconcileAttributes.IsAdd() {
-			w.a.M(host).Info("ADD host: %s", host.Address.CompactString())
-		} else if host.ReconcileAttributes.IsModify() {
-			w.a.M(host).Info("MODIFY host: %s", host.Address.CompactString())
-		} else if host.ReconcileAttributes.IsUnclear() {
-			w.a.M(host).Info("UNCLEAR host: %s", host.Address.CompactString())
-		} else {
-			w.a.M(host).Info("UNTOUCHED host: %s", host.Address.CompactString())
-		}
-		return nil
-	})
-
-	//time.Sleep(5 * time.Second)
-	//w.a.V(3).Info("--- Reconcile Start Real ---")
+	w.markReconcileStart(ctx, new, actionPlan)
+	w.excludeStopped(new)
+	w.walkHosts(new, actionPlan)
 
 	if err := w.reconcile(ctx, new); err != nil {
 		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
@@ -394,25 +312,59 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		},
 	)
 
+	w.clear(ctx, new)
+	w.dropReplicas(ctx, new, actionPlan)
+	w.includeStopped(new)
+	w.markReconcileComplete(ctx, new)
+
+	return nil
+}
+
+func (w *worker) excludeStopped(chi *chiv1.ClickHouseInstallation) {
+	// Exclude stopped CHI from monitoring
+	if chi.IsStopped() {
+		w.a.V(1).
+			WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
+			WithStatusAction(chi).
+			M(chi).F().
+			Info("exclude CHI from monitoring")
+		w.c.deleteWatch(chi.Namespace, chi.Name)
+	}
+}
+
+func (w *worker) includeStopped(chi *chiv1.ClickHouseInstallation) {
+	if !chi.IsStopped() {
+		w.a.V(1).
+			WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
+			WithStatusAction(chi).
+			M(chi).F().
+			Info("add CHI to monitoring")
+		w.c.updateWatch(chi.Namespace, chi.Name, chopmodel.CreateFQDNs(chi, nil, false))
+	}
+}
+
+func (w *worker) clear(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
 	// Remove deleted items
-	objs := w.c.discovery(ctx, new)
+	objs := w.c.discovery(ctx, chi)
 	need := w.registryReconciled
-	w.a.V(1).M(new).F().Info("Reconciled objects:\n%s", w.registryReconciled)
-	w.a.V(1).M(new).F().Info("Existing objects:\n%s", objs)
+	w.a.V(1).M(chi).F().Info("Reconciled objects:\n%s", w.registryReconciled)
+	w.a.V(1).M(chi).F().Info("Existing objects:\n%s", objs)
 	objs.Subtract(need)
-	w.a.V(1).M(new).F().Info("Non-reconciled objects:\n%s", objs)
-	if w.purge(ctx, new, objs, w.registryFailed) > 0 {
-		w.c.enqueueObject(NewDropDns(&new.ObjectMeta))
+	w.a.V(1).M(chi).F().Info("Non-reconciled objects:\n%s", objs)
+	if w.purge(ctx, chi, objs, w.registryFailed) > 0 {
+		w.c.enqueueObject(NewDropDns(&chi.ObjectMeta))
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
 
 	w.a.V(1).
-		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
-		WithStatusAction(new).
-		M(new).F().
+		WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
+		WithStatusAction(chi).
+		M(chi).F().
 		Info("remove items scheduled for deletion")
+}
 
-	actionPlan.WalkRemoved(
+func (w *worker) dropReplicas(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
+	ap.WalkRemoved(
 		func(cluster *chiv1.ChiCluster) {
 		},
 		func(shard *chiv1.ChiShard) {
@@ -423,7 +375,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 			if cluster := host.GetCluster(); cluster != nil {
 				name = cluster.Name
 			}
-			if cluster := new.FindCluster(name); cluster != nil {
+			if cluster := chi.FindCluster(name); cluster != nil {
 				run = cluster.FirstHost()
 			}
 
@@ -433,26 +385,93 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		},
 	)
 
-	if !new.IsStopped() {
-		w.a.V(1).
-			WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
-			WithStatusAction(new).
-			M(new).F().
-			Info("add CHI to monitoring")
-		w.c.updateWatch(new.Namespace, new.Name, chopmodel.CreateFQDNs(new, nil, false))
-	}
+}
 
-	// Update CHI object
-	(&new.Status).ReconcileComplete()
-	_ = w.c.updateCHIObjectStatus(ctx, new, false)
+func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
+	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
+	(&chi.Status).ReconcileStart(ap.GetRemovedHostsNum())
+	_ = w.c.updateCHIObjectStatus(ctx, chi, false)
 
 	w.a.V(1).
-		WithEvent(new, eventActionReconcile, eventReasonReconcileCompleted).
-		WithStatusActions(new).
-		M(new).F().
+		WithEvent(chi, eventActionReconcile, eventReasonReconcileStarted).
+		WithStatusAction(chi).
+		M(chi).F().
+		Info("reconcile started")
+	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
+}
+
+func (w *worker) markReconcileComplete(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
+	// Update CHI object
+	(&chi.Status).ReconcileComplete()
+	_ = w.c.updateCHIObjectStatus(ctx, chi, false)
+
+	w.a.V(1).
+		WithEvent(chi, eventActionReconcile, eventReasonReconcileCompleted).
+		WithStatusActions(chi).
+		M(chi).F().
 		Info("reconcile completed")
 
-	return nil
+}
+
+func (w *worker) walkHosts(chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
+	ap.WalkAdded(
+		func(cluster *chiv1.ChiCluster) {
+			cluster.WalkHosts(func(host *chiv1.ChiHost) error {
+				(&host.ReconcileAttributes).SetAdd()
+				return nil
+			})
+		},
+		func(shard *chiv1.ChiShard) {
+			shard.WalkHosts(func(host *chiv1.ChiHost) error {
+				(&host.ReconcileAttributes).SetAdd()
+				return nil
+			})
+		},
+		func(host *chiv1.ChiHost) {
+			(&host.ReconcileAttributes).SetAdd()
+		},
+	)
+
+	ap.WalkModified(
+		func(cluster *chiv1.ChiCluster) {
+		},
+		func(shard *chiv1.ChiShard) {
+		},
+		func(host *chiv1.ChiHost) {
+			(&host.ReconcileAttributes).SetModify()
+		},
+	)
+
+	chi.WalkHosts(func(host *chiv1.ChiHost) error {
+		if host.ReconcileAttributes.IsAdd() {
+			// Already added
+			return nil
+		}
+		if host.ReconcileAttributes.IsModify() {
+			// Already modified
+			return nil
+		}
+		// Not clear yet
+		(&host.ReconcileAttributes).SetUnclear()
+		return nil
+	})
+
+	chi.WalkHosts(func(host *chiv1.ChiHost) error {
+		if host.ReconcileAttributes.IsAdd() {
+			w.a.M(host).Info("ADD host: %s", host.Address.CompactString())
+			return nil
+		}
+		if host.ReconcileAttributes.IsModify() {
+			w.a.M(host).Info("MODIFY host: %s", host.Address.CompactString())
+			return nil
+		}
+		if host.ReconcileAttributes.IsUnclear() {
+			w.a.M(host).Info("UNCLEAR host: %s", host.Address.CompactString())
+			return nil
+		}
+		w.a.M(host).Info("UNTOUCHED host: %s", host.Address.CompactString())
+		return nil
+	})
 }
 
 func purgeStatefulSet(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
@@ -1007,23 +1026,31 @@ func (w *worker) waitHostNotInCluster(ctx context.Context, host *chiv1.ChiHost) 
 }
 
 // deleteCHI
-func (w *worker) deleteCHI(ctx context.Context, chi *chiv1.ClickHouseInstallation) error {
+func (w *worker) deleteCHI(ctx context.Context, chi *chiv1.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
-		return nil
+		return false
+	}
+
+	if chi.ObjectMeta.DeletionTimestamp.IsZero() {
+		// CHI is not being deleted
+		return false
 	}
 
 	w.a.V(3).M(chi).S().P()
 	defer w.a.V(3).M(chi).E().P()
 
 	cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(ctx, chi.Name, newGetOptions())
-	if (err != nil) || (cur == nil) {
-		return nil
+	if cur == nil {
+		return false
+	}
+	if err != nil {
+		return false
 	}
 
 	if !util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
 		// No finalizer found, unexpected behavior
-		return nil
+		return false
 	}
 
 	_ = w.deleteCHIProtocol(ctx, chi)
@@ -1034,7 +1061,7 @@ func (w *worker) deleteCHI(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 		w.a.V(1).M(chi).A().Error("unable to uninstall finalizer: err:%v", err)
 	}
 
-	return nil
+	return true
 }
 
 // discoveryAndDeleteCHI deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
