@@ -1133,7 +1133,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 	w.c.deleteWatch(chi.Namespace, chi.Name)
 
 	// Delete Service
-	err = w.c.deleteServiceCHI(ctx, chi)
+	_ = w.c.deleteServiceCHI(ctx, chi)
 
 	chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		w.schemer.HostSyncTables(ctx, host)
@@ -1151,7 +1151,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 	}
 
 	// Delete ConfigMap(s)
-	err = w.c.deleteConfigMapsCHI(ctx, chi)
+	_ = w.c.deleteConfigMapsCHI(ctx, chi)
 
 	w.a.V(1).
 		WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).

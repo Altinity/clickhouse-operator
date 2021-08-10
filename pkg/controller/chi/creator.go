@@ -206,7 +206,7 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 		// it is the only way to go. Just delete Pod and StatefulSet will recreated Pod with current .spec
 		// This will rollback Pod to previous .spec
 		statefulSet.Spec = *rollbackStatefulSet.Spec.DeepCopy()
-		statefulSet, err = c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, statefulSet, newUpdateOptions())
+		statefulSet, _ = c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, statefulSet, newUpdateOptions())
 		_ = c.statefulSetDeletePod(ctx, statefulSet, host)
 
 		return c.shouldContinueOnUpdateFailed()

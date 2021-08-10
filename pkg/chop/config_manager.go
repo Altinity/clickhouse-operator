@@ -257,7 +257,7 @@ func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.Oper
 	}
 
 	// Fill OperatorConfig's paths
-	config.ConfigFilePath, err = filepath.Abs(configFilePath)
+	config.ConfigFilePath, _ = filepath.Abs(configFilePath)
 	config.ConfigFolderPath = filepath.Dir(config.ConfigFilePath)
 
 	return config, nil
