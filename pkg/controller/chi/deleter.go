@@ -63,22 +63,23 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chop.ClickHou
 
 	// Delete ConfigMap
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(ctx, configMapCommon, newDeleteOptions())
-	if err == nil {
+	switch {
+	case err == nil:
 		log.V(1).M(chi).Info("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommon)
-	} else if apierrors.IsNotFound(err) {
+	case apierrors.IsNotFound(err):
 		log.V(1).M(chi).Info("NEUTRAL not found ConfigMap %s/%s", chi.Namespace, configMapCommon)
-		err = nil
-	} else {
+	default:
 		log.V(1).M(chi).A().Error("FAIL delete ConfigMap %s/%s err:%v", chi.Namespace, configMapCommon, err)
 	}
 
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(ctx, configMapCommonUsersName, newDeleteOptions())
-	if err == nil {
+	switch {
+	case err == nil:
 		log.V(1).M(chi).Info("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommonUsersName)
-	} else if apierrors.IsNotFound(err) {
+	case apierrors.IsNotFound(err):
 		log.V(1).M(chi).Info("NEUTRAL not found ConfigMap %s/%s", chi.Namespace, configMapCommonUsersName)
 		err = nil
-	} else {
+	default:
 		log.V(1).M(chi).A().Error("FAIL delete ConfigMap %s/%s err:%v", chi.Namespace, configMapCommonUsersName, err)
 	}
 
@@ -154,7 +155,6 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) 
 		c.waitHostDeleted(host)
 	} else if apierrors.IsNotFound(err) {
 		log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
-		err = nil
 	} else {
 		log.V(1).M(host).A().Error("FAIL delete StatefulSet %s/%s err: %v", namespace, name, err)
 	}
@@ -209,7 +209,6 @@ func (c *Controller) deletePVC(ctx context.Context, host *chop.ChiHost) error {
 			log.V(1).M(host).Info("OK delete PVC %s/%s", namespace, pvc.Name)
 		} else if apierrors.IsNotFound(err) {
 			log.V(1).M(host).Info("NEUTRAL not found PVC %s/%s", namespace, pvc.Name)
-			err = nil
 		} else {
 			log.M(host).A().Error("FAIL to delete PVC %s/%s err:%v", namespace, pvc.Name, err)
 		}
@@ -233,7 +232,6 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) er
 		log.V(1).M(host).Info("OK delete ConfigMap %s/%s", namespace, name)
 	} else if apierrors.IsNotFound(err) {
 		log.V(1).M(host).Info("NEUTRAL not found ConfigMap %s/%s", namespace, name)
-		err = nil
 	} else {
 		log.V(1).M(host).A().Error("FAIL delete ConfigMap %s/%s err:%v", namespace, name, err)
 	}
