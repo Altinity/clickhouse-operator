@@ -329,12 +329,12 @@ spec:
               that ZooKeeper consistency model allows.
 
         - alert: ClickHouseDiskUsage
-          expr: (chi_clickhouse_metric_DiskTotalBytes - chi_clickhouse_metric_DiskFreeBytes) / chi_clickhouse_metric_DiskTotalBytes > 0.8
+          expr: (chi_clickhouse_metric_DiskFreeBytes / chi_clickhouse_metric_DiskTotalBytes) < 0.1
           labels:
             severity: high
           annotations:
             identifier: "{{ $labels.hostname }}"
-            summary: "Disk Usage in `&lt;yandex&gt;&lt;path&gt;` > 80%"
+            summary: "Disk Usage in `&lt;yandex&gt;&lt;path&gt;` > 90%"
             description: |-
               data size: {{ with printf "chi_clickhouse_metric_DiskDataBytes{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | humanize1024 }}B {{ end }}
               disk free: {{ with printf "chi_clickhouse_metric_DiskFreeBytes{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | humanize1024 }}B {{ end }}
