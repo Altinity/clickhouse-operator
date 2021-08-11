@@ -190,7 +190,7 @@ spec:
             team: ClickHouse
           annotations:
             identifier: "{{ $labels.pod_name }}"
-            summary: "clickhouse-backup last backup size is zero last 3 days"
+            summary: "clickhouse-backup last backup size is zero last 24 hours"
             description: |-
               `clickhouse_backup_last_backup_size_remote{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_size_remote{pod_name='%s',namespace='%s',container_name='clickhouse-backup'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
               `clickhouse_backup_last_backup_size_local{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s',container_name='clickhouse-backup'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
