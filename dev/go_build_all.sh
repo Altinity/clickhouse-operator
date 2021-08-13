@@ -11,3 +11,4 @@ PROJECT_ROOT="$(realpath "${CUR_DIR}/..")"
 "${CUR_DIR}"/go_build_metrics_exporter.sh
 "${CUR_DIR}"/go_build_operator.sh
 "${CUR_DIR}"/run_gocard.sh
+"${CUR_DIR}"/run_gosec.sh
