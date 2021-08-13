@@ -12,7 +12,7 @@
 *.out
 
 # IDE folders
-.idea
+.idea/
 /.project
 /.pydevproject
 
@@ -32,3 +32,6 @@ operator_output
 .gitsecret/keys/random_seed
 !*.secret
 dockerfile/actions
+
+# python virtualenv
+venv/

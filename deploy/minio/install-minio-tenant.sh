@@ -1,8 +1,8 @@
 export MINIO_BACKUP_BUCKET=${MINIO_BACKUP_BUCKET:-clickhouse-backup}
 
 export MINIO_NAMESPACE="${MINIO_NAMESPACE:-minio}"
-# look to https://github.com/minio/operator/blob/v3.0.29/examples/tenant.yaml
-# export MINIO_VERSION="${MINIO_VERSION:-RELEASE.2020-11-19T23-48-16Z}"
+# look to https://github.com/minio/operator/blob/v4.1.3/examples/tenant.yaml
+# export MINIO_VERSION="${MINIO_VERSION:-RELEASE.2021-06-17T00-10-46Z}"
 export MINIO_VERSION="${MINIO_VERSION:-latest}"
 export MINIO_CLIENT_VERSION="${MINIO_CLIENT_VERSION:-latest}"
 export MINIO_CONSOLE_VERSION="${MINIO_CONSOLE_VERSION:-latest}"
@@ -78,7 +78,7 @@ kubectl apply -n "${MINIO_NAMESPACE}" -f <(
   cat $CUR_DIR/minio-tenant-template.yaml | envsubst
 )
 
-wait_minio_to_start $MINIO_NAMESPACE minio-console minio-zone-0-0
+wait_minio_to_start $MINIO_NAMESPACE minio-console minio-pool-0-0
 
 kubectl apply -n "${MINIO_NAMESPACE}" -f <(
   cat $CUR_DIR/minio-tenant-create-bucket-template.yaml | envsubst
