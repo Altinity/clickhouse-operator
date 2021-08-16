@@ -63,7 +63,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue) *worker {
 		c:          c,
 		a:          NewAnnouncer().WithController(c),
 		queue:      q,
-		normalizer: chopmodel.NewNormalizer(),
+		normalizer: chopmodel.NewNormalizer(c.kubeClient),
 		schemer: chopmodel.NewSchemer(
 			chop.Config().CHUsername,
 			chop.Config().CHPassword,
