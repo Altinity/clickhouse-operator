@@ -80,6 +80,8 @@ type OperatorConfig struct {
 	ConfigFilePath   string
 	ConfigFolderPath string
 
+	// Namespace specifies namespace where operator runs
+	Namespace string
 	// WatchNamespaces where operator watches for events
 	WatchNamespaces []string `json:"watchNamespaces" yaml:"watchNamespaces"`
 
@@ -354,6 +356,7 @@ func (config *OperatorConfig) Postprocess() {
 
 // normalize() makes fully-and-correctly filled OperatorConfig
 func (config *OperatorConfig) normalize() {
+	config.Namespace = os.Getenv(OPERATOR_POD_NAMESPACE)
 
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
@@ -483,12 +486,14 @@ func (config *OperatorConfig) applyDefaultWatchNamespace() {
 
 	// No namespaces specified
 
-	namespace := os.Getenv(OPERATOR_POD_NAMESPACE)
-	if namespace == "kube-system" {
+	if config.Namespace == "kube-system" {
+		// Operator is running in system namespace
 		// Do nothing, we already have len(config.WatchNamespaces) == 0
 	} else {
-		// We have WATCH_NAMESPACE specified
-		config.WatchNamespaces = []string{namespace}
+		// Operator is running is explicit namespace. Watch in it
+		config.WatchNamespaces = []string{
+			config.Namespace,
+		}
 	}
 }
 
@@ -529,6 +534,7 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 	util.Fprintf(b, "ConfigFilePath: %s\n", config.ConfigFilePath)
 	util.Fprintf(b, "ConfigFolderPath: %s\n", config.ConfigFolderPath)
 
+	util.Fprintf(b, "Namespace: %s\n", config.Namespace)
 	util.Fprintf(b, "%s", util.Slice2String("WatchNamespaces", config.WatchNamespaces))
 
 	util.Fprintf(b, "CHCommonConfigsPath: %s\n", config.CHCommonConfigsPath)
