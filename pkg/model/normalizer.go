@@ -798,15 +798,13 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		usernameMap[username] = true
 	})
 
-	// Ensure "must have" sections are in place, which are:
-	// 1. user/profile
-	// 2. user/quota
-	// 3. user/networks/ip and user/networks/host_regexp defaults to the installation pods
-	// 4. user/password_sha256_hex
-
 	// "default" user is required in order to secure host_regexp
 	usernameMap["default"] = true
+
+	// Process users
 	for username := range usernameMap {
+		// Ensure "must have" sections are in place
+
 		// Ensure 'user/profile' section
 		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultProfile))
 		// Ensure 'user/quota' section
@@ -816,19 +814,23 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		// Ensure 'user/networks/host_regexp' section
 		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().CHConfigNetworksHostRegexpTemplate)))
 
-		var pass = ""
+		plaintextPassword := ""
+		// Use explicitly specified plaintext password, if specified
 		if users.Has(username + "/password") {
-			pass = users.Get(username + "/password").String()
-		} else if username != "default" {
-			pass = chop.Config().CHConfigUserDefaultPassword
+			plaintextPassword = users.Get(username + "/password").String()
+		}
+
+		// Apply default password for password-less non-default users
+		if (plaintextPassword == "") && (username != "default") {
+			plaintextPassword = chop.Config().CHConfigUserDefaultPassword
 		}
 
 		hasPasswordSHA256 := users.Has(username + "/password_sha256_hex")
 		hasPasswordDoubleSHA1 := users.Has(username + "/password_double_sha1_hex")
 
-		// if SHA256 or double SHA1 are not set, initialize SHA256 from the password
-		if !hasPasswordSHA256 && !hasPasswordDoubleSHA1 && (pass != "") {
-			passSHA256 := sha256.Sum256([]byte(pass))
+		// Encode plaintext password if no encoded password provided
+		if (plaintextPassword != "") && !hasPasswordSHA256 && !hasPasswordDoubleSHA1 {
+			passSHA256 := sha256.Sum256([]byte(plaintextPassword))
 			users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passSHA256[:])))
 			hasPasswordSHA256 = true
 		}
