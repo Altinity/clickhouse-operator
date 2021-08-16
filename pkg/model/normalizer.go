@@ -15,9 +15,12 @@
 package model
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kube "k8s.io/client-go/kubernetes"
 	"strings"
 
 	"github.com/google/uuid"
@@ -31,14 +34,17 @@ import (
 
 // Normalizer specifies structures normalizer
 type Normalizer struct {
-	chi *chiV1.ClickHouseInstallation
+	kubeClient kube.Interface
+	chi        *chiV1.ClickHouseInstallation
 	// Whether should insert default cluster if no cluster specified
 	withDefaultCluster bool
 }
 
 // NewNormalizer creates new normalizer
-func NewNormalizer() *Normalizer {
-	return &Normalizer{}
+func NewNormalizer(kubeClient kube.Interface) *Normalizer {
+	return &Normalizer{
+		kubeClient: kubeClient,
+	}
 }
 
 // CreateTemplatedCHI produces ready-to-use CHI object
@@ -775,6 +781,51 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *chiV1.ChiZookeeperConfi
 	return zk
 }
 
+func (n *Normalizer) substWithSecretField(users *chiV1.Settings, username string, userSettingsField, userSettingsK8SSecretField string) {
+	if !users.Has(username + "/" + userSettingsK8SSecretField) {
+		return
+	}
+
+	secretFieldAddress := users.Get(username + "/" + userSettingsK8SSecretField).String()
+	// Split 'secret namespace/secret name/field name'
+	tags := strings.Split(secretFieldAddress, "/")
+
+	// Basic sanity check - need to have all fields in place
+	if len(tags) < 3 {
+		// Skip incorrect entry
+		return
+	}
+
+	namespace := tags[0]
+	name := tags[1]
+	field := tags[2]
+
+	// Sanity check
+	if (namespace == "") || (name == "") {
+		return
+	}
+
+	secret, err := n.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		log.V(1).M(namespace, name).F().Info("unable to read secret %v", err)
+		return
+	}
+
+	found := false
+	for key, value := range secret.Data {
+		if key == field {
+			users.Set(username+"/"+userSettingsField, chiV1.NewSettingScalar(string(value)))
+			found = true
+		}
+	}
+
+	if !found {
+		log.V(1).M(namespace, name).F().Info("unable to locate in specified secret field %s", field)
+	}
+	// Anyway remove the field, it should not be included into final ch config
+	users.Delete(username + "/" + userSettingsK8SSecretField)
+}
+
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.Settings {
 	if users == nil {
@@ -814,7 +865,13 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		// Ensure 'user/networks/host_regexp' section
 		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().CHConfigNetworksHostRegexpTemplate)))
 
+		// Values from secret have higher priority
+		n.substWithSecretField(users, username, "password", "k8s_secret_password")
+		n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
+		n.substWithSecretField(users, username, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
+
 		plaintextPassword := ""
+
 		// Use explicitly specified plaintext password, if specified
 		if users.Has(username + "/password") {
 			plaintextPassword = users.Get(username + "/password").String()
