@@ -155,6 +155,9 @@ func CastStringBoolToStringTrueFalse(str string, defaultValue bool) string {
 // CreateStringID creates HEX hash ID out of string.
 // In case maxHashLen == 0 the whole hash is returned
 func CreateStringID(str string, maxHashLen int) string {
+	// #nosec
+	// G401 (CWE-326): Use of weak cryptographic primitive
+	// It is good enough for string ID
 	sha := sha1.New()
 	sha.Write([]byte(str))
 	hash := hex.EncodeToString(sha.Sum(nil))

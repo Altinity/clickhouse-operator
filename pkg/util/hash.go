@@ -51,6 +51,9 @@ func HashIntoString(b []byte) string {
 	if len(b) == 0 {
 		return ""
 	}
+	// #nosec
+	// G401 (CWE-326): Use of weak cryptographic primitive
+	// It is good enough for string ID
 	hasher := sha1.New()
 	hasher.Write(b)
 	return hex.EncodeToString(hasher.Sum(nil))
