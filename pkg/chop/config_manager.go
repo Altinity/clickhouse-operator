@@ -244,7 +244,7 @@ func (cm *ConfigManager) getFileBasedConfig(configFilePath string) (*chiv1.Opera
 // buildConfigFromFile returns OperatorConfig struct built out of specified file path
 func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.OperatorConfig, error) {
 	// Read config file content
-	yamlText, err := ioutil.ReadFile(configFilePath)
+	yamlText, err := ioutil.ReadFile(filepath.Clean(configFilePath))
 	if err != nil {
 		return nil, err
 	}
