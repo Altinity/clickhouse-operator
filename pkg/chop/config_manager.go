@@ -355,10 +355,8 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 	if namespace == "" {
 		// No namespace explicitly specified, let's look into namespace where pod is running
 		if cm.HasRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE) {
-			// Unable to figure out namespace where pod is running, can not continue
-			return
+			namespace, _ = cm.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
 		}
-		namespace, _ = cm.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
 	}
 
 	// Sanity check
