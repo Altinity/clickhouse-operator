@@ -16,6 +16,9 @@ package util
 
 import (
 	"bytes"
+	// #nosec
+	// G505 (CWE-327): Blocklisted import crypto/sha1: weak cryptographic primitive
+	// It is good enough for string ID
 	"crypto/sha1"
 	"encoding/gob"
 	"encoding/hex"
