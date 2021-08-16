@@ -177,7 +177,7 @@ func (cm *ConfigManager) buildUnifiedConfig() {
 
 	// Merge all the rest CR-based configs into base config
 	for _, chOperatorConfiguration := range cm.crConfigs {
-		cm.config.MergeFrom(chOperatorConfiguration, chiv1.MergeTypeOverrideByNonEmptyValues)
+		_ = cm.config.MergeFrom(chOperatorConfiguration, chiv1.MergeTypeOverrideByNonEmptyValues)
 	}
 }
 

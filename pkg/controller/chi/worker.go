@@ -392,7 +392,7 @@ func (w *worker) dropReplicas(ctx context.Context, chi *chiv1.ClickHouseInstalla
 			}
 
 			if run != nil {
-				w.dropReplica(ctx, run, host)
+				_ = w.dropReplica(ctx, run, host)
 			}
 		},
 	)
@@ -531,25 +531,25 @@ func (w *worker) purge(
 		case chopmodel.StatefulSet:
 			if purgeStatefulSet(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete StatefulSet %s/%s", m.Namespace, m.Name)
-				w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
+				_ = w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 				cnt++
 			}
 		case chopmodel.PVC:
 			if purgePVC(chi, reconcileFailedObjs, m) {
 				if chopmodel.GetReclaimPolicy(m) == chiv1.PVCReclaimPolicyDelete {
 					w.a.V(1).M(m).F().Info("Delete PVC %s/%s", m.Namespace, m.Name)
-					w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
+					_ = w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 				}
 			}
 		case chopmodel.ConfigMap:
 			if purgeConfigMap(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete ConfigMap %s/%s", m.Namespace, m.Name)
-				w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
+				_ = w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 			}
 		case chopmodel.Service:
 			if purgeService(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete Service %s/%s", m.Namespace, m.Name)
-				w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
+				_ = w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
 			}
 		}
 	})
@@ -801,7 +801,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiv1.ChiHost) error {
 
 	// Reconcile host's Persistent Volumes
 	w.reconcilePersistentVolumes(ctx, host)
-	w.reconcilePVCs(ctx, host)
+	_ = w.reconcilePVCs(ctx, host)
 
 	if service != nil {
 		// Reconcile host's Service
@@ -884,7 +884,7 @@ func (w *worker) excludeHost(ctx context.Context, host *chiv1.ChiHost) error {
 			M(host).F().
 			Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
-		w.excludeHostFromService(ctx, host)
+		_ = w.excludeHostFromService(ctx, host)
 		w.excludeHostFromClickHouseCluster(ctx, host)
 	}
 	return nil
@@ -902,7 +902,7 @@ func (w *worker) includeHost(ctx context.Context, host *chiv1.ChiHost) error {
 		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
 	w.includeHostIntoClickHouseCluster(ctx, host)
-	w.includeHostIntoService(ctx, host)
+	_ = w.includeHostIntoService(ctx, host)
 
 	return nil
 }
@@ -1086,7 +1086,7 @@ func (w *worker) discoveryAndDeleteCHI(ctx context.Context, chi *chiv1.ClickHous
 	objs := w.c.discovery(ctx, chi)
 	if objs.NumStatefulSet() > 0 {
 		chi.WalkHosts(func(host *chiv1.ChiHost) error {
-			w.schemer.HostSyncTables(ctx, host)
+			_ = w.schemer.HostSyncTables(ctx, host)
 			return nil
 		})
 	}
@@ -1136,7 +1136,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 	_ = w.c.deleteServiceCHI(ctx, chi)
 
 	chi.WalkHosts(func(host *chiv1.ChiHost) error {
-		w.schemer.HostSyncTables(ctx, host)
+		_ = w.schemer.HostSyncTables(ctx, host)
 		return nil
 	})
 
@@ -1251,7 +1251,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiv1.ClickHouseInstallati
 	// Need to delete all these items
 
 	var err error
-	w.deleteTables(ctx, host)
+	_ = w.deleteTables(ctx, host)
 	err = w.c.deleteHost(ctx, host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly

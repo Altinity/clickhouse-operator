@@ -458,7 +458,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 					Kind:       chi.ClickHouseInstallationCRDResourceKind,
 				},
 			}
-			json.Unmarshal(newjs, &newchi)
+			_ = json.Unmarshal(newjs, &newchi)
 			command.new = &newchi
 		case reconcileUpdate:
 			actionPlan := chopmodels.NewActionPlan(command.old, command.new)
@@ -495,8 +495,8 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 						Kind:       chi.ClickHouseInstallationCRDResourceKind,
 					},
 				}
-				json.Unmarshal(oldjs, &oldchi)
-				json.Unmarshal(newjs, &newchi)
+				_ = json.Unmarshal(oldjs, &oldchi)
+				_ = json.Unmarshal(newjs, &newchi)
 				command.old = &oldchi
 				command.new = &newchi
 			}

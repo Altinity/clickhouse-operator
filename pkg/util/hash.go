@@ -68,7 +68,7 @@ func HashIntoInt(b []byte) int {
 		return 0
 	}
 	h := fnv.New32a()
-	h.Write(b)
+	_, _ = h.Write(b)
 	return int(h.Sum32())
 }
 
