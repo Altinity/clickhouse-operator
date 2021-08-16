@@ -1,5 +1,3 @@
-## TODO: modify template after next minio-operator release
-
 ## Secret to be used as MinIO Root Credentials
 apiVersion: v1
 kind: Secret
@@ -29,7 +27,7 @@ data:
   CONSOLE_SECRET_KEY: "$MINIO_CONSOLE_SECRET_KEY_B64"
 ---
 ## MinIO Tenant Definition
-apiVersion: minio.min.io/v1
+apiVersion: minio.min.io/v2
 kind: Tenant
 metadata:
   name: minio
@@ -38,7 +36,7 @@ metadata:
     app: minio
   ## Annotations for MinIO Tenant Pods
   annotations:
-    prometheus.io/path: /minio/prometheus/metrics
+    prometheus.io/path: /minio/v2/metrics/cluster
     prometheus.io/port: "9000"
     prometheus.io/scrape: "true"
 
@@ -64,20 +62,32 @@ spec:
 
 
   ## Specification for MinIO Pool(s) in this Tenant.
-  zones:
-    ## Servers specifies the number of MinIO Tenant Pods / Servers in this pool.
-    ## For standalone mode, supply 1. For distributed mode, supply 4 or more.
-    ## Note that the operator does not support upgrading from standalone to distributed mode.
+  pools:
+      ## Servers specifies the number of MinIO Tenant Pods / Servers in this pool.
+      ## For standalone mode, supply 1. For distributed mode, supply 4 or more.
+      ## Note that the operator does not support upgrading from standalone to distributed mode.
     - servers: 1
-
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: v1.min.io/tenant
+                    operator: In
+                    values:
+                      - minio
+                  - key: v1.min.io/pool
+                    operator: In
+                    values:
+                      - pool-0
+              topologyKey: kubernetes.io/hostname
+      name: pool-0
       ## volumesPerServer specifies the number of volumes attached per MinIO Tenant Pod / Server.
       volumesPerServer: 4
 
       ## This VolumeClaimTemplate is used across all the volumes provisioned for MinIO Tenant in this
       ## Pool.
       volumeClaimTemplate:
-        apiVersion: v1
-        kind: persistentvolumeclaims
         metadata:
           name: data
         spec:
@@ -113,6 +123,15 @@ spec:
       #           values:
       #           - hostname1
       #           - hostname2
+      #   podAntiAffinity:
+      #     requiredDuringSchedulingIgnoredDuringExecution:
+      #     - labelSelector:
+      #         matchExpressions:
+      #         - key: app
+      #           operator: In
+      #           values:
+      #           - store
+      #       topologyKey: "kubernetes.io/hostname"
 
       ## Configure resource requests and limits for MinIO containers
       # resources:
@@ -158,12 +177,33 @@ spec:
   ## for details.
   podManagementPolicy: Parallel
 
+  ## serviceMetadata allows passing additional labels and annotations to MinIO and Console specific
+  ## services created by the operator.
+  serviceMetadata:
+    minioServiceLabels:
+      label: minio-svc
+    minioServiceAnnotations:
+      v2.min.io: minio-svc
+    consoleServiceLabels:
+      label: console-svc
+    consoleServiceAnnotations:
+      v2.min.io: console-svc
+
   ## Add environment variables to be set in MinIO container (https://github.com/minio/minio/tree/master/docs/config)
   # env:
   # - name: MINIO_BROWSER
   #   value: "off" # to turn-off browser
   # - name: MINIO_STORAGE_CLASS_STANDARD
   #   value: "EC:2"
+  #   ## For secure env vars like passwords, create an opaque Kubernetes secret and specify the secret in
+  #   ## the `valueFrom` field. The `valueFrom` object must contain the following fields:
+  #   ## `name` - the secret from which MinIO extracts the password, `key` - the data field
+  #   ## within secret, whose value will be set to the env variable's value
+  # - name: MINIO_IDENTITY_LDAP_LOOKUP_BIND_PASSWORD
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: ldap-minio-secret
+  #       key: MINIO_IDENTITY_LDAP_LOOKUP_BIND_PASSWORD
 
   ## PriorityClassName indicates the Pod priority and hence importance of a Pod relative to other Pods.
   ## This is applied to MinIO pods only.
@@ -177,5 +217,3 @@ spec:
     replicas: 1
     consoleSecret:
       name: minio-console-secret
-
-

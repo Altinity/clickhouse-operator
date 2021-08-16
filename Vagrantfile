@@ -152,11 +152,11 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
 #    K8S_VERSION=${K8S_VERSION:-1.17.17}
 #    K8S_VERSION=${K8S_VERSION:-1.18.19}
-#    K8S_VERSION=${K8S_VERSION:-1.19.13}
+#    K8S_VERSION=${K8S_VERSION:-1.19.14}
 #    performance issue 1.20.x, 1.21.x, only 1.22 will good to start
 # https://github.com/kubernetes/kubeadm/issues/2395
-#    K8S_VERSION=${K8S_VERSION:-1.20.9}
-    K8S_VERSION=${K8S_VERSION:-1.21.3}
+#    K8S_VERSION=${K8S_VERSION:-1.20.10}
+    K8S_VERSION=${K8S_VERSION:-1.21.4}
     export VALIDATE_YAML=true
 
     killall kubectl || true
@@ -235,7 +235,7 @@ EOF
     cd /vagrant/deploy/minio/
     kubectl delete ns ${MINIO_NAMESPACE} || true
     bash -xe ./install-minio-operator.sh
-    bash -xe ./install-minio.sh
+    bash -xe ./install-minio-tenant.sh
     # kubectl create ns ${MINIO_NAMESPACE}
     # kubectl minio init --namespace ${MINIO_NAMESPACE}
     # kubectl minio tenant create --name minio --namespace ${MINIO_NAMESPACE} --servers 1 --volumes 4 --capacity 10Gi --storage-class standard
