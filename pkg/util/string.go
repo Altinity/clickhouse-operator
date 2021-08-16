@@ -17,17 +17,8 @@ package util
 import (
 	"crypto/sha1"
 	"encoding/hex"
-	"math/rand"
 	"strings"
-	"time"
 )
-
-// RandomString generates random string
-func RandomString() string {
-	b := make([]byte, 3)
-	rand.New(rand.NewSource(time.Now().UnixNano())).Read(b)
-	return hex.EncodeToString(b)
-}
 
 // Set of string boolean constants
 const (
