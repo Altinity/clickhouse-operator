@@ -788,22 +788,30 @@ func (n *Normalizer) substWithSecretField(users *chiV1.Settings, username string
 		return
 	}
 
-	secretFieldAddress := users.Get(username + "/" + userSettingsK8SSecretField).String()
-	// Split 'secret namespace/secret name/field name'
-	tags := strings.Split(secretFieldAddress, "/")
+	// Anyway remove the field, it should not be included into final clickhouse config
+	defer users.Delete(username + "/" + userSettingsK8SSecretField)
 
-	// Basic sanity check - need to have all fields in place
-	if len(tags) < 3 {
+	secretFieldAddress := users.Get(username + "/" + userSettingsK8SSecretField).String()
+	// Extract secret namespace, name and field by splitting namespace/name/field triple
+	var namespace, name, field string
+	switch tags := strings.Split(secretFieldAddress, "/"); len(tags) {
+	case 2:
+		namespace = chop.Config().Namespace
+		name = tags[0]
+		field = tags[1]
+	case 3:
+		namespace = tags[0]
+		name = tags[1]
+		field = tags[2]
+	default:
 		// Skip incorrect entry
+		log.V(1).M(namespace, name).F().Warning("unable to parse secret field address: %s", secretFieldAddress)
 		return
 	}
 
-	namespace := tags[0]
-	name := tags[1]
-	field := tags[2]
-
 	// Sanity check
 	if (namespace == "") || (name == "") || (field == "") {
+		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: %s", secretFieldAddress)
 		return
 	}
 
@@ -824,8 +832,6 @@ func (n *Normalizer) substWithSecretField(users *chiV1.Settings, username string
 	if !found {
 		log.V(1).M(namespace, name).F().Info("unable to locate in specified secret field %s", field)
 	}
-	// Anyway remove the field, it should not be included into final clickhouse config
-	users.Delete(username + "/" + userSettingsK8SSecretField)
 }
 
 // normalizeUsersList extracts usernames from provided 'users' settings
