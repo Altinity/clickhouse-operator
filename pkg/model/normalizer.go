@@ -781,7 +781,9 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *chiV1.ChiZookeeperConfi
 	return zk
 }
 
+// substWithSecretField substitute users settings field with value from k8s secret
 func (n *Normalizer) substWithSecretField(users *chiV1.Settings, username string, userSettingsField, userSettingsK8SSecretField string) {
+	// Has to have source field specified
 	if !users.Has(username + "/" + userSettingsK8SSecretField) {
 		return
 	}
@@ -801,7 +803,7 @@ func (n *Normalizer) substWithSecretField(users *chiV1.Settings, username string
 	field := tags[2]
 
 	// Sanity check
-	if (namespace == "") || (name == "") {
+	if (namespace == "") || (name == "") || (field == "") {
 		return
 	}
 
@@ -822,21 +824,16 @@ func (n *Normalizer) substWithSecretField(users *chiV1.Settings, username string
 	if !found {
 		log.V(1).M(namespace, name).F().Info("unable to locate in specified secret field %s", field)
 	}
-	// Anyway remove the field, it should not be included into final ch config
+	// Anyway remove the field, it should not be included into final clickhouse config
 	users.Delete(username + "/" + userSettingsK8SSecretField)
 }
 
-// normalizeConfigurationUsers normalizes .spec.configuration.users
-func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.Settings {
-	if users == nil {
-		users = chiV1.NewSettings()
-	}
-	users.Normalize()
-
+// normalizeUsersList extracts usernames from provided 'users' settings
+func (n *Normalizer) normalizeUsersList(users *chiV1.Settings) (usernames []string) {
 	// Extract username from path
 	usernameMap := make(map[string]bool)
 	users.Walk(func(path string, _ *chiV1.Setting) {
-		// Split 'admin/password'
+		// Split username/action into username and all the rest. Ex. 'admin/password', 'admin/networks/ip'
 		tags := strings.Split(path, "/")
 
 		// Basic sanity check - need to have at least "username/something" pair
@@ -848,12 +845,25 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		username := tags[0]
 		usernameMap[username] = true
 	})
-
-	// "default" user is required in order to secure host_regexp
-	usernameMap["default"] = true
-
-	// Process users
+	// Make list of usernames
 	for username := range usernameMap {
+		usernames = append(usernames, username)
+	}
+	return usernames
+}
+
+const defaultUsername = "default"
+
+// normalizeConfigurationUsers normalizes .spec.configuration.users
+func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.Settings {
+	if users == nil {
+		users = chiV1.NewSettings()
+	}
+	users.Normalize()
+	// "default" user is required in order to secure host_regexp
+	usernames := append(n.normalizeUsersList(users), defaultUsername)
+	// Normalize each user
+	for _, username := range usernames {
 		// Ensure "must have" sections are in place
 
 		// Ensure 'user/profile' section
@@ -870,25 +880,25 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
 		n.substWithSecretField(users, username, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
 
-		plaintextPassword := ""
+		passwordPlaintext := ""
 
-		// Use explicitly specified plaintext password, if specified
+		// Use explicitly specified plaintext password, if provided
 		if users.Has(username + "/password") {
-			plaintextPassword = users.Get(username + "/password").String()
+			passwordPlaintext = users.Get(username + "/password").String()
 		}
 
 		// Apply default password for password-less non-default users
-		if (plaintextPassword == "") && (username != "default") {
-			plaintextPassword = chop.Config().CHConfigUserDefaultPassword
+		if (passwordPlaintext == "") && (username != defaultUsername) {
+			passwordPlaintext = chop.Config().CHConfigUserDefaultPassword
 		}
 
 		hasPasswordSHA256 := users.Has(username + "/password_sha256_hex")
 		hasPasswordDoubleSHA1 := users.Has(username + "/password_double_sha1_hex")
 
-		// Encode plaintext password if no encoded password provided
-		if (plaintextPassword != "") && !hasPasswordSHA256 && !hasPasswordDoubleSHA1 {
-			passSHA256 := sha256.Sum256([]byte(plaintextPassword))
-			users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passSHA256[:])))
+		// In case no encoded password provided - encode plaintext password (if it is available)
+		if !hasPasswordSHA256 && !hasPasswordDoubleSHA1 && (passwordPlaintext != "") {
+			passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
+			users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
 			hasPasswordSHA256 = true
 		}
 
