@@ -3,6 +3,7 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "test-027-trouble"
 spec:
+
   useTemplates:
     - name: clickhouse-version
   configuration:
