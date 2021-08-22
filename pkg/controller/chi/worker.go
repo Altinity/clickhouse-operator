@@ -328,6 +328,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 	w.dropReplicas(ctx, new, actionPlan)
 	w.includeStopped(new)
 	w.markReconcileComplete(ctx, new)
+	w.createPDB(ctx, new)
 
 	return nil
 }
@@ -1034,6 +1035,14 @@ func (w *worker) waitHostNotInCluster(ctx context.Context, host *chiv1.ChiHost) 
 	})
 }
 
+func (w *worker) createPDB(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
+	_, _ = w.c.kubeClient.PolicyV1beta1().PodDisruptionBudgets(chi.Namespace).Create(ctx, w.creator.NewPodDisruptionBudget(), newCreateOptions())
+}
+
+func (w *worker) deletePDB(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
+	_ = w.c.kubeClient.PolicyV1beta1().PodDisruptionBudgets(chi.Namespace).Delete(ctx, chi.Name, newDeleteOptions())
+}
+
 // deleteCHI
 func (w *worker) deleteCHI(ctx context.Context, chi *chiv1.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
@@ -1149,6 +1158,8 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 
 	// Delete ConfigMap(s)
 	_ = w.c.deleteConfigMapsCHI(ctx, chi)
+
+	w.deletePDB(ctx, chi)
 
 	w.a.V(1).
 		WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
