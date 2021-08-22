@@ -192,7 +192,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *chop.ChiHost) error {
 	defer log.V(2).M(host).E().P()
 
 	namespace := host.Address.Namespace
-	c.walkActualPVCs(host, func(pvc *v1.PersistentVolumeClaim) {
+	c.walkDiscoveredPVCs(host, func(pvc *v1.PersistentVolumeClaim) {
 		if util.IsContextDone(ctx) {
 			log.V(2).Info("ctx is done")
 			return
