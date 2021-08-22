@@ -391,12 +391,9 @@ func (w *worker) dropReplicas(ctx context.Context, chi *chiv1.ClickHouseInstalla
 				run = cluster.FirstHost()
 			}
 
-			if run != nil {
-				_ = w.dropReplica(ctx, run, host)
-			}
+			_ = w.dropReplica(ctx, run, host)
 		},
 	)
-
 }
 
 func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
@@ -1162,10 +1159,25 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 	return nil
 }
 
+// canDropReplica
+func (w *worker) canDropReplica(host *chiv1.ChiHost) (can bool) {
+	can = true
+	w.c.walkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
+		can = false
+	})
+	return can
+}
+
 // dropReplica
 func (w *worker) dropReplica(ctx context.Context, hostToRun, hostToDrop *chiv1.ChiHost) error {
+	if (hostToRun == nil) || (hostToDrop == nil) {
+		return nil
+	}
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
+		return nil
+	}
+	if !w.canDropReplica(hostToDrop) {
 		return nil
 	}
 
