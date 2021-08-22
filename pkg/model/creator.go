@@ -16,10 +16,12 @@ package model
 
 import (
 	"fmt"
+
 	// "net/url"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -729,6 +731,28 @@ func ensurePortByName(container *corev1.Container, name string, port int32) {
 		Name:          name,
 		ContainerPort: port,
 	})
+}
+
+// NewPodDisruptionBudget
+func (c *Creator) NewPodDisruptionBudget() *v1beta1.PodDisruptionBudget {
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
+	return &v1beta1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            c.chi.Name,
+			Namespace:       c.chi.Namespace,
+			Labels:          c.labeler.getLabelsCHIScope(),
+			OwnerReferences: ownerReferences,
+		},
+		Spec: v1beta1.PodDisruptionBudgetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: c.labeler.GetSelectorCHIScope(),
+			},
+			MaxUnavailable: &intstr.IntOrString{
+				Type:   intstr.Int,
+				IntVal: 1,
+			},
+		},
+	}
 }
 
 // setupStatefulSetApplyVolumeMount applies .templates.volumeClaimTemplates.* to a StatefulSet
