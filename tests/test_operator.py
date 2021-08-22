@@ -1025,7 +1025,7 @@ def test_018(self):
 def test_019(self):
     util.require_zookeeper()
 
-    config="configs/test-019-retain-volume.yaml"
+    config="configs/test-019-retain-volume-1.yaml"
     chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
         config=config,
@@ -1081,7 +1081,7 @@ def test_019(self):
             config="configs/test-019-retain-volume-2.yaml",
             check={
                 "object_counts": { 
-                    "statefulset": 1,  # When stopping, pod is removed but statefulset and all volumes are in place
+                    "statefulset": 1,  # When stopping, pod is removed but StatefulSet and all volumes are in place
                     "pod": 0,
                     "service": 1,  # load balancer service should be removed
                 },
@@ -1091,7 +1091,7 @@ def test_019(self):
 
         with And("Re-start the Installation"):
             kubectl.create_and_check(
-                config="configs/test-019-retain-volume.yaml",
+                config="configs/test-019-retain-volume-1.yaml",
                 check={
                     "pod_count": 1,
                     "do_not_delete": 1,
@@ -1124,13 +1124,13 @@ def test_019(self):
             pv_count = kubectl.get_count("pv")
             
             kubectl.create_and_check(
-                config="configs/test-019-retain-volume.yaml",
+                config="configs/test-019-retain-volume-1.yaml",
                 check={
                     "pod_count": 1,
                     "do_not_delete": 1,
                     },
                 )
-            with Then("Replica PVC sbould be retained"):
+            with Then("Replica PVC should be retained"):
                 assert kubectl.get_count("pvc") == pvc_count
                 assert kubectl.get_count("pv") == pv_count
             
@@ -1166,7 +1166,7 @@ def test_019(self):
                 pv_count = kubectl.get_count("pv")
             
                 kubectl.create_and_check(
-                    config="configs/test-019-retain-volume.yaml",
+                    config="configs/test-019-retain-volume-1.yaml",
                     check={
                         "pod_count": 1,
                         "do_not_delete": 1,
