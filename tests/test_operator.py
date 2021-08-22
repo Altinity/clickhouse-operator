@@ -1172,7 +1172,7 @@ def test_019(self):
                         "do_not_delete": 1,
                         },
                     )
-                with Then("Replica PVC sbould be deleted"):
+                with Then("Replica PVC should be deleted"):
                     assert kubectl.get_count("pvc") < pvc_count
                     assert kubectl.get_count("pv") < pv_count
                 
@@ -1557,7 +1557,7 @@ def test_026(self):
 @TestScenario
 @Name("test_027. Test troubleshooting mode")
 def test_027(self):
-    config = "configs/test-027-troubleshooting-1.yaml"
+    config = "configs/test-027-troubleshooting-1-bad-config.yaml"
     chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
         config=config,
@@ -1576,7 +1576,7 @@ def test_027(self):
         )
         with Then("We can start in troubleshooting mode"):
             kubectl.create_and_check(
-                config="configs/test-027-troubleshooting-2.yaml",
+                config="configs/test-027-troubleshooting-2-troubleshoot.yaml",
                 check={
                     "pod_count": 1,
                     "do_not_delete": 1,
@@ -1588,7 +1588,7 @@ def test_027(self):
 
         with Then("We can start in normal mode after correcting the problem"):
             kubectl.create_and_check(
-                config="configs/test-027-troubleshooting-3.yaml",
+                config="configs/test-027-troubleshooting-3-fixed-config.yaml",
                 check={
                     "pod_count": 1,
                 },
