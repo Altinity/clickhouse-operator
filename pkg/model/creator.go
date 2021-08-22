@@ -463,28 +463,36 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 
 // setupTroubleshoot
 func (c *Creator) setupTroubleshoot(statefulSet *apps.StatefulSet) {
-	container, ok := getClickHouseContainer(statefulSet)
-	if !ok {
+	if !c.chi.IsTroubleshoot() {
+		// We are not troubleshooting
 		return
 	}
 
-	if c.chi.IsTroubleshoot() {
-		sleep := " || sleep 1800"
-		if len(container.Command) > 0 {
-			// Append troubleshooting-capable tail to command and hope for the best
-			container.Command[len(container.Command)-1] += sleep
-		} else {
-			// Substitute entrypoint with troubleshooting-capable command
-			container.Command = []string{
-				"/bin/sh",
-				"-c",
-				"/entrypoint.sh" + sleep,
-			}
-		}
-		// Sleep is not able to respond to probes
-		container.LivenessProbe = nil
-		container.ReadinessProbe = nil
+	container, ok := getClickHouseContainer(statefulSet)
+	if !ok {
+		// Unable to locate ClickHouse container
+		return
 	}
+
+	// Let's setup troubleshooting in ClickHouse container
+
+	sleep := " || sleep 1800"
+	if len(container.Command) > 0 {
+		// In case we have user-specified command, let's
+		// append troubleshooting-capable tail and hope for the best
+		container.Command[len(container.Command)-1] += sleep
+	} else {
+		// Assume standard ClickHouse container is used
+		// Substitute entrypoint with troubleshooting-capable command
+		container.Command = []string{
+			"/bin/sh",
+			"-c",
+			"/entrypoint.sh" + sleep,
+		}
+	}
+	// Sleep is not able to respond to probes
+	container.LivenessProbe = nil
+	container.ReadinessProbe = nil
 }
 
 // setupLogContainer
