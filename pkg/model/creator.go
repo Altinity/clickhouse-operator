@@ -618,6 +618,11 @@ func (c *Creator) statefulSetApplyPodTemplate(
 		},
 		Spec: *template.Spec.DeepCopy(),
 	}
+
+	if statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds == nil {
+		terminationGracePeriod := int64(60)
+		statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds = &terminationGracePeriod
+	}
 }
 
 // getClickHouseContainer
