@@ -1140,6 +1140,8 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 
 	// Start delete protocol
 
+	w.deletePDB(ctx, chi)
+
 	// Exclude this CHI from monitoring
 	w.c.deleteWatch(chi.Namespace, chi.Name)
 
@@ -1163,8 +1165,6 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 
 	// Delete ConfigMap(s)
 	_ = w.c.deleteConfigMapsCHI(ctx, chi)
-
-	w.deletePDB(ctx, chi)
 
 	w.a.V(1).
 		WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).

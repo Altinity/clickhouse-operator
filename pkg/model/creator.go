@@ -748,11 +748,13 @@ func ensurePortByName(container *corev1.Container, name string, port int32) {
 
 // NewPodDisruptionBudget creates new PodDisruptionBudget
 func (c *Creator) NewPodDisruptionBudget() *v1beta1.PodDisruptionBudget {
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 	return &v1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.chi.Name,
-			Namespace: c.chi.Namespace,
-			Labels:    c.labeler.getLabelsCHIScope(),
+			Name:            c.chi.Name,
+			Namespace:       c.chi.Namespace,
+			Labels:          c.labeler.getLabelsCHIScope(),
+			OwnerReferences: ownerReferences,
 		},
 		Spec: v1beta1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
