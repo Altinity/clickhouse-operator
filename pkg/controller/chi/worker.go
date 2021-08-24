@@ -328,7 +328,6 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 	w.dropReplicas(ctx, new, actionPlan)
 	w.includeStopped(new)
 	w.markReconcileComplete(ctx, new)
-	w.createPDB(ctx, new)
 
 	return nil
 }
@@ -565,6 +564,7 @@ func (w *worker) reconcile(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 	defer w.a.V(2).M(chi).E().P()
 
 	w.creator = chopmodel.NewCreator(chi)
+	w.createPDB(ctx, chi)
 	return chi.WalkTillError(
 		ctx,
 		w.reconcileCHIAuxObjectsPreliminary,
