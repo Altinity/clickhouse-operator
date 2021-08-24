@@ -1157,7 +1157,7 @@ def test_019(self):
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
-                "chi_status": "InProgress",
+                # "chi_status": "InProgress",
                 },
             )
         
@@ -1173,13 +1173,13 @@ def test_019(self):
                         },
                     )
 # Not implemented yet
-#                with Then("Replica PVC should be deleted"):
-#                    assert kubectl.get_count("pvc") < pvc_count
-#                    assert kubectl.get_count("pv") < pv_count
-#
-#                with And("Replica should be removed from ZooKeeper"):
-#                    out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
-#                    assert out == "1"
+                with Then("Replica PVC should be deleted"):
+                    assert kubectl.get_count("pvc") < pvc_count
+                    assert kubectl.get_count("pv") < pv_count
+
+                with And("Replica should be removed from ZooKeeper"):
+                    out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
+                    assert out == "1"
 
     kubectl.delete_chi(chi)
 
