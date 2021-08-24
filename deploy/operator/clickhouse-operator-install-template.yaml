@@ -1814,112 +1814,117 @@ metadata:
   name: clickhouse-operator-$OPERATOR_NAMESPACE
 rules:
 - apiGroups:
-  - ""
+    - ""
   resources:
-  - configmaps
-  - services
-  - poddisruptionbudgets
+    - configmaps
+    - services
   verbs:
-  - create
-  - delete
-  - get
-  - patch
-  - update
+    - create
+    - delete
+    - get
+    - patch
+    - update
+    - list
+    - watch
 - apiGroups:
-  - ""
+    - ""
   resources:
-  - events
+    - endpoints
   verbs:
-  - create
+    - get
+    - list
+    - watch
 - apiGroups:
-  - ""
+    - ""
   resources:
-  - persistentvolumeclaims
+    - events
   verbs:
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
+    - create
 - apiGroups:
-  - ""
+    - ""
   resources:
-  - persistentvolumes
-  - pods
+    - persistentvolumeclaims
   verbs:
-  - get
-  - list
-  - patch
-  - update
-  - watch
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
 - apiGroups:
-  - apps
+    - ""
   resources:
-  - statefulsets
+    - persistentvolumes
+    - pods
   verbs:
-  - create
-  - delete
-  - get
-  - patch
-  - update
+    - get
+    - list
+    - patch
+    - update
+    - watch
 - apiGroups:
-  - clickhouse.altinity.com
+    - apps
   resources:
-  - clickhouseinstallations
+    - statefulsets
   verbs:
-  - delete
-  - get
-  - patch
-  - update
+    - create
+    - delete
+    - get
+    - patch
+    - update
+    - list
+    - watch
 - apiGroups:
-  - apps
+    - apps
+  resources:
+    - replicasets
+  verbs:
+    - delete
+    - get
+    - patch
+    - update
+- apiGroups:
+    - apps
   resourceNames:
-  - clickhouse-operator
+    - clickhouse-operator
   resources:
-  - deployments
+    - deployments
   verbs:
-  - get
-  - patch
-  - update
-  - delete
+    - get
+    - patch
+    - update
+    - delete
 - apiGroups:
-  - apps
+    - policy
   resources:
-  - replicasets
+    - poddisruptionbudgets
   verbs:
-  - delete
-  - get
-  - patch
-  - update
+    - create
+    - delete
+    - get
+    - patch
+    - update
+    - list
+    - watch
 - apiGroups:
-  - ""
+    - clickhouse.altinity.com
   resources:
-  - configmaps
-  - endpoints
-  - services
+    - clickhouseinstallations
   verbs:
-  - get
-  - list
-  - watch
+    - delete
+    - get
+    - patch
+    - update
 - apiGroups:
-  - apps
+    - clickhouse.altinity.com
   resources:
-  - statefulsets
+    - clickhouseinstallations
+    - clickhouseinstallationtemplates
+    - clickhouseoperatorconfigurations
   verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - clickhouse.altinity.com
-  resources:
-  - clickhouseinstallations
-  - clickhouseinstallationtemplates
-  - clickhouseoperatorconfigurations
-  verbs:
-  - get
-  - list
-  - watch
+    - get
+    - list
+    - watch
 ---
 # Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
 # ClusterRoleBinding is namespace-less and must have unique name
