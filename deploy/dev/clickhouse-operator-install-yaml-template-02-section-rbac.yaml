@@ -20,7 +20,6 @@ rules:
   resources:
   - configmaps
   - services
-  - poddisruptionbudgets
   verbs:
   - create
   - delete
@@ -66,6 +65,18 @@ rules:
   - patch
   - update
 - apiGroups:
+    - policy
+  resources:
+    - poddisruptionbudgets
+  verbs:
+    - create
+    - delete
+    - get
+    - patch
+    - update
+    - list
+    - watch
+- apiGroups:
   - clickhouse.altinity.com
   resources:
   - clickhouseinstallations
@@ -98,8 +109,8 @@ rules:
   - ""
   resources:
   - configmaps
-  - endpoints
   - services
+  - endpoints
   verbs:
   - get
   - list
