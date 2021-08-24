@@ -1036,7 +1036,12 @@ func (w *worker) waitHostNotInCluster(ctx context.Context, host *chiv1.ChiHost) 
 }
 
 func (w *worker) createPDB(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
-	_, _ = w.c.kubeClient.PolicyV1beta1().PodDisruptionBudgets(chi.Namespace).Create(ctx, w.creator.NewPodDisruptionBudget(), newCreateOptions())
+	pdb, err := w.c.kubeClient.PolicyV1beta1().PodDisruptionBudgets(chi.Namespace).Create(ctx, w.creator.NewPodDisruptionBudget(), newCreateOptions())
+	if err != nil {
+		log.V(1).Warning("unable to create PDB %v", err)
+		return
+	}
+	log.V(1).Info("PDB created %s/%s", pdb.Namespace, pdb.Name)
 }
 
 func (w *worker) deletePDB(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
