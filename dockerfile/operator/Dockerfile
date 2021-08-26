@@ -25,7 +25,7 @@ RUN OPERATOR_BIN=/tmp/clickhouse-operator ./dev/go_build_operator.sh
 # ===== Operator =====
 # ====================
 
-FROM alpine:3.10 AS operator
+FROM alpine:3.14.1 AS operator
 
 RUN apk add --no-cache ca-certificates
 

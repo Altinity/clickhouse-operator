@@ -25,7 +25,7 @@ RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter ./dev/go_build_metrics_exporter.s
 # ===== Metrics exporter =====
 # ============================
 
-FROM alpine:3.10 AS metrics-exporter
+FROM alpine:3.14.1 AS metrics-exporter
 
 RUN apk add --no-cache ca-certificates
 
