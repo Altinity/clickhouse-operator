@@ -13,8 +13,4 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:21.8.5.7
-          #    command:
-          #      - "/bin/bash"
-          #      - "-c"
-          #      - "/entrypoint.sh; while true; do sleep 600; done"
+              image: yandex/clickhouse-server:21.8
