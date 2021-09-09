@@ -23,12 +23,16 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// newAffinity
+// newAffinity creates new Affinity struct
 func newAffinity(template *chiV1.ChiPodTemplate) *v1.Affinity {
+	// Pod node affinity scheduling rules.
 	nodeAffinity := newNodeAffinity(template)
+	// Pod affinity scheduling rules. Ex.: co-locate this pod in the same node, zone, etc
 	podAffinity := newPodAffinity(template)
+	// Pod anti-affinity scheduling rules. Ex.: avoid putting this pod in the same node, zone, etc
 	podAntiAffinity := newPodAntiAffinity(template)
 
+	// At least one affinity has to be reasonable
 	if (nodeAffinity == nil) && (podAffinity == nil) && (podAntiAffinity == nil) {
 		// Neither Affinity nor AntiAffinity specified
 		return nil
@@ -41,7 +45,7 @@ func newAffinity(template *chiV1.ChiPodTemplate) *v1.Affinity {
 	}
 }
 
-// mergeAffinity
+// mergeAffinity merges from src into dst and returns dst
 func mergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affinity {
 	if src == nil {
 		// Nothing to merge from
@@ -154,7 +158,7 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
 		case chiV1.PodDistributionNamespaceAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = addWeightedPodAffinityTermWithMatchLabels(
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = appendWeightedPodAffinityTermWithMatchLabels(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
 				map[string]string{
@@ -162,7 +166,7 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 				},
 			)
 		case chiV1.PodDistributionClickHouseInstallationAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = addWeightedPodAffinityTermWithMatchLabels(
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = appendWeightedPodAffinityTermWithMatchLabels(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
 				map[string]string{
@@ -170,7 +174,7 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 				},
 			)
 		case chiV1.PodDistributionClusterAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = addWeightedPodAffinityTermWithMatchLabels(
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = appendWeightedPodAffinityTermWithMatchLabels(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
 				map[string]string{
@@ -178,7 +182,7 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 				},
 			)
 		case chiV1.PodDistributionShardAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = addWeightedPodAffinityTermWithMatchLabels(
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = appendWeightedPodAffinityTermWithMatchLabels(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
 				map[string]string{
@@ -186,7 +190,7 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 				},
 			)
 		case chiV1.PodDistributionReplicaAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = addWeightedPodAffinityTermWithMatchLabels(
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = appendWeightedPodAffinityTermWithMatchLabels(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
 				map[string]string{
@@ -195,13 +199,13 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 			)
 		case chiV1.PodDistributionPreviousTailAffinity:
 			// Newer k8s insists on Required for this Affinity
-			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchLabels(
+			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = appendPodAffinityTermWithMatchLabels(
 				podAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				map[string]string{
 					LabelClusterScopeIndex: macrosClusterScopeCycleHeadPointsToPreviousCycleTail,
 				},
 			)
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = addWeightedPodAffinityTermWithMatchLabels(
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = appendWeightedPodAffinityTermWithMatchLabels(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				1,
 				map[string]string{
@@ -324,7 +328,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 	// Distribution
 	// DEPRECATED
 	if template.Distribution == chiV1.PodDistributionOnePerHost {
-		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchLabels(
+		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = appendPodAffinityTermWithMatchLabels(
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 			map[string]string{
 				LabelAppName: LabelAppValue,
@@ -337,7 +341,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
 		case chiV1.PodDistributionClickHouseAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchLabels(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = appendPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				newMatchLabels(
 					podDistribution,
@@ -347,7 +351,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 				),
 			)
 		case chiV1.PodDistributionMaxNumberPerNode:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchLabels(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = appendPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				newMatchLabels(
 					podDistribution,
@@ -357,7 +361,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 				),
 			)
 		case chiV1.PodDistributionShardAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchLabels(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = appendPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				newMatchLabels(
 					podDistribution,
@@ -367,7 +371,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 				),
 			)
 		case chiV1.PodDistributionReplicaAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchLabels(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = appendPodAffinityTermWithMatchLabels(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				newMatchLabels(
 					podDistribution,
@@ -377,7 +381,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 				),
 			)
 		case chiV1.PodDistributionAnotherNamespaceAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchExpressions(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = appendPodAffinityTermWithMatchExpressions(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				[]metaV1.LabelSelectorRequirement{
 					{
@@ -390,7 +394,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 				},
 			)
 		case chiV1.PodDistributionAnotherClickHouseInstallationAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchExpressions(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = appendPodAffinityTermWithMatchExpressions(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				[]metaV1.LabelSelectorRequirement{
 					{
@@ -403,7 +407,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 				},
 			)
 		case chiV1.PodDistributionAnotherClusterAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchExpressions(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = appendPodAffinityTermWithMatchExpressions(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				[]metaV1.LabelSelectorRequirement{
 					{
@@ -480,8 +484,8 @@ func mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.
 	return dst
 }
 
-// addPodAffinityTermWithMatchLabels
-func addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTerm, matchLabels map[string]string) []v1.PodAffinityTerm {
+// appendPodAffinityTermWithMatchLabels is an enhanced append()
+func appendPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTerm, matchLabels map[string]string) []v1.PodAffinityTerm {
 	return append(terms,
 		v1.PodAffinityTerm{
 			LabelSelector: &metaV1.LabelSelector{
@@ -506,8 +510,8 @@ func addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTerm, matchLabels m
 	)
 }
 
-// addPodAffinityTermWithMatchExpressions
-func addPodAffinityTermWithMatchExpressions(terms []v1.PodAffinityTerm, matchExpressions []metaV1.LabelSelectorRequirement) []v1.PodAffinityTerm {
+// appendPodAffinityTermWithMatchExpressions is an enhanced append()
+func appendPodAffinityTermWithMatchExpressions(terms []v1.PodAffinityTerm, matchExpressions []metaV1.LabelSelectorRequirement) []v1.PodAffinityTerm {
 	return append(terms,
 		v1.PodAffinityTerm{
 			LabelSelector: &metaV1.LabelSelector{
@@ -531,8 +535,8 @@ func addPodAffinityTermWithMatchExpressions(terms []v1.PodAffinityTerm, matchExp
 	)
 }
 
-// addWeightedPodAffinityTermWithMatchLabels
-func addWeightedPodAffinityTermWithMatchLabels(
+// appendWeightedPodAffinityTermWithMatchLabels is an enhanced append()
+func appendWeightedPodAffinityTermWithMatchLabels(
 	terms []v1.WeightedPodAffinityTerm,
 	weight int32,
 	matchLabels map[string]string,
