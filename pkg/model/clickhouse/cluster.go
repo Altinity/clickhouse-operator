@@ -84,7 +84,7 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error
 		c.l.V(1).Info("Run query on: %s of %v", host, c.Hosts)
 		query, err := c.getConnection(host).QueryContext(ctx, sql)
 		if err == nil {
-			// One of specified endpoints returned result, no need to iterate more
+			// Endpoint returned result, no need to iterate more
 			return query, nil
 		}
 		// Still need to iterate more
@@ -96,7 +96,8 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error
 	return nil, fmt.Errorf(str)
 }
 
-// ExecAll runs set of SQL queries on all endpoints of the cluster
+// ExecAll runs set of SQL queries on all endpoints of the cluster.
+// No data is expected to be returned back.
 // Retry logic traverses the list of SQLs multiple times until all SQLs succeed
 func (c *Cluster) ExecAll(ctx context.Context, queries []string, _opts ...*QueryOptions) error {
 	if util.IsContextDone(ctx) {
@@ -126,7 +127,9 @@ func (c *Cluster) ExecAll(ctx context.Context, queries []string, _opts ...*Query
 	return nil
 }
 
-// exec
+// exec runs set of SQL queries on specified host.
+// No data is expected to be returned back.
+// Retry logic traverses the list of SQLs multiple times until all SQLs succeed
 func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts ...*QueryOptions) error {
 	if util.IsContextDone(ctx) {
 		c.l.V(2).Info("ctx is done")
