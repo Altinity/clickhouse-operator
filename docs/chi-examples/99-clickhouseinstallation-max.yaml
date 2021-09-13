@@ -15,7 +15,7 @@ metadata:
 spec:
 
   stop: "no"
-
+  restart: "RollingUpdate"
   troubleshoot: "no"
 
   namespaceDomainPattern:  "%s.svc.my.test"
