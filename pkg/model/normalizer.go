@@ -276,20 +276,20 @@ func hostApplyPortsFromSettings(host *chiV1.ChiHost) {
 
 // ensurePortValue
 func ensurePortValue(port *int32, settings, _default int32) {
+	// Port may already be explicitly specified in podTemplate or by portDistribution
 	if *port != chPortNumberMustBeAssignedLater {
 		// Port has a value already
 		return
 	}
 
-	// Port has no value, let's assign value from settings
-
+	// Port has no value, let's use value from settings
 	if settings != chPortNumberMustBeAssignedLater {
-		// Settings gas a value, use it
+		// Settings has a value, use it
 		*port = settings
 		return
 	}
 
-	// Port has no value, settings has no value, fallback to default value
+	// Port has no explicit value, settings has no value, fallback to default value
 	*port = _default
 }
 
