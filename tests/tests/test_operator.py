@@ -544,8 +544,7 @@ def test_013(self):
     with Then("Create local and distributed tables"):
         clickhouse.query(self.context.runner, chi,
             "CREATE TABLE test_local Engine = Log as SELECT * FROM system.one")
-        clickhouse.query(
-            chi,
+        clickhouse.query(self.context.runner, chi,
             "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
         clickhouse.query(self.context.runner, chi,
             "CREATE DATABASE \\\"test-db\\\"")
@@ -993,7 +992,7 @@ def test_017(self):
     print(f"{test_query}")
 
     for shard in range(pod_count):
-        host = f"chi-{chi}-default-{shard}-0"
+        host = f"chi-{chi}-default-{shard}-0-0"
         for q in queries:
             clickhouse.query(self.context.runner, chi, host=host, sql=q)
         out = clickhouse.query(self.context.runner, chi, host=host, sql=test_query)
