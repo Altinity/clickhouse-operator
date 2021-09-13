@@ -611,7 +611,7 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 		w.a.A().Error("failed to reconcile config map common. err: %v", err)
 	}
 	// 3. CHI users ConfigMap
-	if err := w.reconcileCHIConfigMapUsers(ctx, chi, nil); err != nil {
+	if err := w.reconcileCHIConfigMapUsers(ctx, chi); err != nil {
 		w.a.A().Error("failed to reconcile config map users. err: %v", err)
 	}
 
@@ -682,11 +682,7 @@ func (w *worker) reconcileCHIConfigMapCommon(
 
 // reconcileCHIConfigMapUsers reconciles all CHI's users ConfigMap
 // ConfigMap common for all users resources in CHI
-func (w *worker) reconcileCHIConfigMapUsers(
-	ctx context.Context,
-	chi *chiv1.ClickHouseInstallation,
-	options *chopmodel.ClickHouseConfigFilesGeneratorOptions,
-) error {
+func (w *worker) reconcileCHIConfigMapUsers(ctx context.Context, chi *chiv1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -699,6 +695,80 @@ func (w *worker) reconcileCHIConfigMapUsers(
 		w.registryReconciled.RegisterConfigMap(configMapUsers.ObjectMeta)
 	} else {
 		w.registryFailed.RegisterConfigMap(configMapUsers.ObjectMeta)
+	}
+	return err
+}
+
+// reconcileHostConfigMap reconciles host's personal ConfigMap
+func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiv1.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	// ConfigMap for a host
+	configMap := w.creator.CreateConfigMapHost(host)
+	err := w.reconcileConfigMap(ctx, host.CHI, configMap)
+	if err == nil {
+		w.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
+	} else {
+		w.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
+	}
+	return err
+}
+
+// prepareHostStatefulSetWithStatus prepares host's StatefulSet status
+func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *chiv1.ChiHost, shutdown bool) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return
+	}
+
+	// StatefulSet for a host
+	_ = w.creator.CreateStatefulSet(host, shutdown)
+	(&host.ReconcileAttributes).SetStatus(w.getStatefulSetStatus(host))
+}
+
+// reconcileHostStatefulSet reconciles host's StatefulSet
+func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiv1.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	if host.CHI.IsRollingUpdate() {
+		// First stage of rolling update
+		w.prepareHostStatefulSetWithStatus(ctx, host, true)
+		_ = w.reconcileStatefulSet(ctx, host)
+	}
+
+	// Reconcile to desired configuration
+	w.prepareHostStatefulSetWithStatus(ctx, host, false)
+	err := w.reconcileStatefulSet(ctx, host)
+	if err == nil {
+		w.registryReconciled.RegisterStatefulSet(host.StatefulSet.ObjectMeta)
+	} else {
+		w.registryFailed.RegisterStatefulSet(host.StatefulSet.ObjectMeta)
+	}
+	return err
+}
+
+// reconcileHostService reconciles host's Service
+func (w *worker) reconcileHostService(ctx context.Context, host *chiv1.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+	service := w.creator.CreateServiceHost(host)
+	if service == nil {
+		// This is not a problem, service may be omitted
+		return nil
+	}
+	err := w.reconcileService(ctx, host.CHI, service)
+	if err == nil {
+		w.registryReconciled.RegisterService(service.ObjectMeta)
+	} else {
+		w.registryFailed.RegisterService(service.ObjectMeta)
 	}
 	return err
 }
@@ -770,52 +840,28 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiv1.ChiHost) error {
 		Info("Reconcile Host %s started", host.Name)
 
 	// Create artifacts
-	configMap := w.creator.CreateConfigMapHost(host)
-	statefulSet := w.creator.CreateStatefulSet(host)
-	service := w.creator.CreateServiceHost(host)
-	(&host.ReconcileAttributes).SetStatus(w.getStatefulSetStatus(host))
+	w.prepareHostStatefulSetWithStatus(ctx, host, false)
 
 	if err := w.excludeHost(ctx, host); err != nil {
 		return err
 	}
 
-	// Reconcile host's ConfigMap
-	if err := w.reconcileConfigMap(ctx, host.CHI, configMap); err != nil {
-		w.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
+	if err := w.reconcileHostConfigMap(ctx, host); err != nil {
 		return err
 	}
-	w.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
-
-	// Reconcile host's StatefulSet
-	var errStatefulSet error
-	if err := w.reconcileStatefulSet(ctx, host); err != nil {
-		if err != errIgnore {
-			w.registryFailed.RegisterStatefulSet(statefulSet.ObjectMeta)
-			return err
-		}
-		errStatefulSet = err
+	if err := w.reconcileHostStatefulSet(ctx, host); err != nil {
+		return err
 	}
-	w.registryReconciled.RegisterStatefulSet(statefulSet.ObjectMeta)
 
 	// Reconcile host's Persistent Volumes
 	w.reconcilePersistentVolumes(ctx, host)
 	_ = w.reconcilePVCs(ctx, host)
 
-	if service != nil {
-		// Reconcile host's Service
-		if err := w.reconcileService(ctx, host.CHI, service); err != nil {
-			w.registryFailed.RegisterService(service.ObjectMeta)
-			return err
-		}
-		w.registryReconciled.RegisterService(service.ObjectMeta)
-	}
+	_ = w.reconcileHostService(ctx, host)
 
 	host.ReconcileAttributes.UnsetAdd()
 
-	if errStatefulSet == nil {
-		// Migrate table only in case no errors during StatefulSet reconcile
-		_ = w.migrateTables(ctx, host)
-	}
+	_ = w.migrateTables(ctx, host)
 
 	if err := w.includeHost(ctx, host); err != nil {
 		// If host is not ready - fallback
@@ -861,10 +907,12 @@ func (w *worker) migrateTables(ctx context.Context, host *chiv1.ChiHost) error {
 
 // shouldMigrateTables
 func (w *worker) shouldMigrateTables(host *chiv1.ChiHost) bool {
-	if host.GetCHI().IsStopped() {
+	switch {
+	case host.GetCHI().IsStopped():
+		// Stopped host is not able to receive data
 		return false
-	}
-	if host.ReconcileAttributes.GetStatus() == chiv1.StatefulSetStatusSame {
+	case host.ReconcileAttributes.GetStatus() == chiv1.StatefulSetStatusSame:
+		// No need to migrate on the same host
 		return false
 	}
 	return true
@@ -969,19 +1017,23 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 	}
 }
 
-// shouldExcludeHost determines whether host to be excluded from cluster
+// shouldExcludeHost determines whether host to be excluded from cluster before reconciling
 func (w *worker) shouldExcludeHost(host *chiv1.ChiHost) bool {
 	status := host.ReconcileAttributes.GetStatus()
-	if (status == chiv1.StatefulSetStatusNew) || (status == chiv1.StatefulSetStatusSame) {
-		// No need to exclude for new and non-modified StatefulSets
+	switch {
+	case host.CHI.IsRollingUpdate():
+		// While rolling update host would be restarted
+		return true
+	case status == chiv1.StatefulSetStatusNew:
+		// Nothing to exclude, host is not yet in the cluster
 		return false
-	}
-
-	if host.GetShard().HostsCount() == 1 {
+	case status == chiv1.StatefulSetStatusSame:
+		// The same host would not be updated
+		return false
+	case host.GetShard().HostsCount() == 1:
 		// In case shard where current host is located has only one host (means no replication), no need to exclude
 		return false
 	}
-
 	return true
 }
 
@@ -1002,20 +1054,20 @@ func (w *worker) shouldWaitExcludeHost(host *chiv1.ChiHost) bool {
 // shouldWaitIncludeHost determines whether reconciler should wait for host to be included into cluster
 func (w *worker) shouldWaitIncludeHost(host *chiv1.ChiHost) bool {
 	status := host.ReconcileAttributes.GetStatus()
-	if (status == chiv1.StatefulSetStatusNew) || (status == chiv1.StatefulSetStatusSame) {
-		return false
-	}
-
-	if host.GetShard().HostsCount() == 1 {
-		// In case shard where current host is located has only one host (means no replication), no need to wait
-		return false
-	}
-
-	// Check CHI settings
 	switch {
+	case status == chiv1.StatefulSetStatusNew:
+		return false
+	case status == chiv1.StatefulSetStatusSame:
+		// The same host was not modified and no need to wait it to be included - it already is
+		return false
+	case host.GetShard().HostsCount() == 1:
+		// No need to wait one-host-shard
+		return false
 	case host.GetCHI().GetReconciling().IsReconcilingPolicyWait():
+		// Check CHI settings - explicitly requested to wait
 		return true
 	case host.GetCHI().GetReconciling().IsReconcilingPolicyNoWait():
+		// Check CHI settings - explicitly requested to not wait
 		return false
 	}
 
