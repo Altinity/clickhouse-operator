@@ -121,6 +121,7 @@ func (n *Normalizer) normalize() (*chiV1.ClickHouseInstallation, error) {
 	n.chi.Spec.TaskID = n.normalizeTaskID(n.chi.Spec.TaskID)
 	n.chi.Spec.UseTemplates = n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
 	n.chi.Spec.Stop = n.normalizeStop(n.chi.Spec.Stop)
+	n.chi.Spec.Restart = n.normalizeRestart(n.chi.Spec.Restart)
 	n.chi.Spec.Troubleshoot = n.normalizeTroubleshoot(n.chi.Spec.Troubleshoot)
 	n.chi.Spec.NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.chi.Spec.NamespaceDomainPattern)
 	n.chi.Spec.Templating = n.normalizeTemplating(n.chi.Spec.Templating)
@@ -331,6 +332,19 @@ func (n *Normalizer) normalizeStop(stop string) string {
 
 	// In case it is unknown value - just use set it to false
 	return util.StringBoolFalseLowercase
+}
+
+// normalizeRestart normalizes .spec.restart
+func (n *Normalizer) normalizeRestart(restart string) string {
+	switch strings.ToLower(restart) {
+	case strings.ToLower(chiV1.RestartAll):
+		return chiV1.RestartAll
+	case strings.ToLower(chiV1.RestartRollingUpdate):
+		return chiV1.RestartRollingUpdate
+	}
+
+	// In case it is unknown value - just use empty
+	return ""
 }
 
 // normalizeTroubleshoot normalizes .spec.stop
