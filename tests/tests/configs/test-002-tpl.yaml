@@ -1,0 +1,12 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-002-tpl"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+    - name: clickhouse-log-volume-mount
+    - name: one-per-host-distribution
+  configuration:
+    clusters:
+      - name: single

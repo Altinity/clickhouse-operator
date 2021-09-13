@@ -16,7 +16,7 @@ spec:
     clusters:
     - name: simple
       layout:
-        replicasCount: 1
+        shardsCount: 1
   defaults:
     templates:
       volumeClaimTemplate: default

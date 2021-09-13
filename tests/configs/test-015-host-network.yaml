@@ -41,7 +41,7 @@ spec:
           hostNetwork: true
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:latest
+              image: altinity/clickhouse-server:21.8.altinity_prestable
 
 
           # dnsPolicy: ClusterFirstWithHostNet

@@ -11,7 +11,7 @@ spec:
       spec:
         containers:
         - name: clickhouse-pod
-          image: yandex/clickhouse-server:20.8.6.6
+          image: altinity/clickhouse-server:21.8.altinity_prestable
   defaults:
     templates:
       podTemplate: clickhouse-new

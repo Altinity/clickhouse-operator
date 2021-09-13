@@ -27,7 +27,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:21.1.7.1
+              image: altinity/clickhouse-server:21.8.altinity_prestable
               command:
                 - "/bin/bash"
                 - "-c"

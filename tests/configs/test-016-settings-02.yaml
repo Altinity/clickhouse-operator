@@ -20,7 +20,7 @@ spec:
       user2/password: qwerty
       user2/networks/ip: "::/0"
     settings:
-      dictionaries_config: config.d/dict_*.xml
+      dictionaries_config: config.d/*.dict
       macros/layer: "01"
       query_log: _removed_
     files:
@@ -57,14 +57,14 @@ spec:
                 <shard>
                 <internal_replication>false</internal_replication>
                 <replica>
-                    <host>chi-test-016-settings-default-0-0</host>
+                    <host>chi-test-016-settings-default-0-0-0</host>
                     <port>9000</port>
                 </replica>
                 </shard>
               </custom>
            </remote_servers>
         </yandex>
-      config.d/dict_one.xml: |
+      dict_one.dict: |
         <yandex>
           <dictionary>
         <name>one</name>
