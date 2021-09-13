@@ -304,13 +304,12 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 }
 
 // CreateStatefulSet creates new apps.StatefulSet
-func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
+func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost, shutdown bool) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(host)
 	serviceName := CreateStatefulSetServiceName(host)
 	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 
 	// Create apps.StatefulSet object
-	replicasNum := host.GetStatefulSetReplicasNum()
 	revisionHistoryLimit := int32(10)
 	// StatefulSet has additional label - ZK config fingerprint
 	statefulSet := &apps.StatefulSet{
@@ -321,7 +320,7 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 			OwnerReferences: ownerReferences,
 		},
 		Spec: apps.StatefulSetSpec{
-			Replicas:    &replicasNum,
+			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
 			ServiceName: serviceName,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: GetSelectorHostScope(host),
