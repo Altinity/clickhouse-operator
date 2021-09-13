@@ -469,6 +469,9 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		if spec.Stop == "" {
 			spec.Stop = from.Stop
 		}
+		if spec.Restart == "" {
+			spec.Restart = from.Restart
+		}
 		if spec.Troubleshoot == "" {
 			spec.Troubleshoot = from.Troubleshoot
 		}
@@ -479,6 +482,10 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		if from.Stop != "" {
 			// Override by non-empty values only
 			spec.Stop = from.Stop
+		}
+		if from.Restart != "" {
+			// Override by non-empty values only
+			spec.Restart = from.Restart
 		}
 		if from.Troubleshoot != "" {
 			// Override by non-empty values only
@@ -646,6 +653,22 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 // IsStopped checks whether CHI is stopped
 func (chi *ClickHouseInstallation) IsStopped() bool {
 	return util.IsStringBoolTrue(chi.Spec.Stop)
+}
+
+// Restart const presents possible values for .spec.restart
+const (
+	RestartAll           = "Restart"
+	RestartRollingUpdate = "RollingUpdate"
+)
+
+// IsRollingUpdate checks whether CHI should perform rolling update
+func (chi *ClickHouseInstallation) IsRollingUpdate() bool {
+	return chi.Spec.Restart == RestartRollingUpdate
+}
+
+// IsNoRestart checks whether CHI has no restart request
+func (chi *ClickHouseInstallation) IsNoRestart() bool {
+	return chi.Spec.Restart == ""
 }
 
 // IsTroubleshoot checks whether CHI is in troubleshoot mode
