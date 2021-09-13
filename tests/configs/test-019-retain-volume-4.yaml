@@ -16,7 +16,7 @@ spec:
     clusters:
     - name: simple
       layout:
-        shardsCount: 1
+        replicasCount: 2
   defaults:
     templates:
       volumeClaimTemplate: default
@@ -24,7 +24,7 @@ spec:
   templates:
     volumeClaimTemplates:
       - name: default
-        reclaimPolicy: Retain
+        reclaimPolicy: Delete
         spec:
           accessModes:
             - ReadWriteOnce

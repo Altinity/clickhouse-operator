@@ -99,7 +99,7 @@ def test_005(self):
 @TestScenario
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
 def test_006(self):
-    old_version = "yandex/clickhouse-server:20.8.6.6"
+    old_version = "yandex/clickhouse-server:21.3"
     new_version = "altinity/clickhouse-server:21.8.altinity_prestable"
     with Then("Create initial position"):
         kubectl.create_and_check(

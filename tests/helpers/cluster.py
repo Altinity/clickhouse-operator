@@ -13,7 +13,7 @@ from testflows.uexpect import ExpectTimeoutError
 from testflows._core.testtype import TestSubType
 
 class Shell(ShellBase):
-    timeout = 300
+    timeout = 600
     def __exit__(self, type, value, traceback):
         # send exit and Ctrl-D repeatedly
         # to terminate any open shell commands.
@@ -95,7 +95,7 @@ class Node(object):
         """
 
         command = f"{cmd}"
-        with Step("executing command", description=command, format_description=False) if steps else NullStep():
+        with step("executing command", description=command, format_description=False) if steps else NullStep():
             try:
                 r = self.cluster.bash(self.name, command=shell_command, timeout=timeout)(command, *args, **kwargs)
             except ExpectTimeoutError:
@@ -168,7 +168,7 @@ class Cluster(object):
         self.lock = threading.Lock()
 
     @property
-    def control_shell(self, timeout=5000):
+    def control_shell(self, timeout=6000):
         """Must be called with self.lock.acquired.
         """
         if self._control_shell is not None:
@@ -178,7 +178,7 @@ class Cluster(object):
         while True:
             try:
                 shell = Shell()
-                shell.timeout = 500
+                shell.timeout = 6000
                 shell("echo 1")
                 break
             except:
@@ -188,7 +188,7 @@ class Cluster(object):
         self._control_shell = shell
         return self._control_shell
 
-    def node_container_id(self, node, timeout=5000):
+    def node_container_id(self, node, timeout=6000):
         """Must be called with self.lock acquired.
         """
         container_id = None
@@ -202,7 +202,7 @@ class Cluster(object):
                 raise RuntimeError(f"failed to get docker container id for the {node} service")
         return container_id
 
-    def shell(self, node, timeout=5000):
+    def shell(self, node, timeout=6000):
         """Returns unique shell terminal to be used.
         """
         container_id = None
@@ -220,7 +220,7 @@ class Cluster(object):
                     shell = Shell(command=[
                         "/bin/bash", "--noediting", "-c", f"docker exec -it {container_id} bash --noediting"
                     ], name=node)
-                shell.timeout = 500
+                shell.timeout = 6000
                 shell("echo 1")
                 break
             except:
@@ -261,7 +261,7 @@ class Cluster(object):
                             self._bash[id] = Shell(command=[
                                 "/bin/bash", "--noediting", "-c", f"docker exec -it {container_id} {command}"
                             ], name=node).__enter__()
-                        self._bash[id].timeout = 500
+                        self._bash[id].timeout = 6000
                         self._bash[id]("echo 1")
                         break
                     except:
@@ -314,11 +314,9 @@ class Cluster(object):
         """Get object with node bound methods.
         :param name: name of service name
         """
-        if name.startswith("clickhouse"):
-            return ClickHouseNode(self, name)
         return Node(self, name)
 
-    def down(self, timeout=5000):
+    def down(self, timeout=6000):
         """Bring cluster down by executing docker-compose down."""
 
         try:
@@ -332,14 +330,14 @@ class Cluster(object):
                     else:
                         self._bash[id] = shell
         finally:
-            cmd = self.command(None, f"{self.docker_compose} down --timeout 600  -v --remove-orphans", bash=bash, timeout=timeout)
+            cmd = self.command(None, f"{self.docker_compose} down --timeout 6000  -v --remove-orphans", bash=bash, timeout=timeout)
             with self.lock:
                 if self._control_shell:
                     self._control_shell.__exit__(None, None, None)
                     self._control_shell = None
             return cmd
 
-    def up(self, timeout=30*60):
+    def up(self, timeout=6000):
         if self.local:
             with Given("I am running in local mode"):
                 with Then("check --clickhouse-binary-path is specified"):
@@ -385,7 +383,7 @@ class Cluster(object):
                     with And("executing docker-compose up"):
                         for up_attempt in range(max_up_attempts):
                             with By(f"attempt {up_attempt}/{max_up_attempts}"):
-                                cmd = self.command(None, f"{self.docker_compose} up --force-recreate --timeout 5000 -d 2>&1 | tee", timeout=timeout)
+                                cmd = self.command(None, f"{self.docker_compose} up --force-recreate --timeout 6000 -d 2>&1 | tee", timeout=timeout)
                                 if "is unhealthy" not in cmd.output:
                                     break
 

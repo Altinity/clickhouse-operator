@@ -3,8 +3,11 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "test-027-trouble"
 spec:
+
   useTemplates:
     - name: clickhouse-version
   configuration:
     clusters:
       - name: default
+    settings:
+      merge_tree/some_trash: 1

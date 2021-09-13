@@ -14,4 +14,3 @@ spec:
           containers:
             - name: clickhouse-pod
               image: altinity/clickhouse-server:21.8.altinity_prestable
-

@@ -25,14 +25,14 @@ spec:
             fsGroup: 101
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:20.8
+              image: yandex/clickhouse-server:21.8
               command:
                 - clickhouse-server
                 - --config-file=/etc/clickhouse-server/config.xml
 
             - name: clickhouse-backup
               image: altinity/clickhouse-backup:1.0.14
-              imagePullPolicy: Always
+              imagePullPolicy: IfNotPresent
               command:
                 - bash
                 - -xc

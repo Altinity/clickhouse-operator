@@ -25,14 +25,14 @@ spec:
             fsGroup: 101
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:20.8
+              image: yandex/clickhouse-server:21.8
               command:
                 - clickhouse-server
                 - --config-file=/etc/clickhouse-server/config.xml
 
             - name: clickhouse-backup
               image: altinity/clickhouse-backup:1.0.14
-              imagePullPolicy: Always
+              imagePullPolicy: IfNotPresent
               command:
                 - bash
                 - -xc
@@ -59,7 +59,7 @@ spec:
                 # for tests only do not use in production
                 - name: S3_DISABLE_CERT_VERIFICATION
                   value: "true"
-                # look to /deploy/minio/install-minio.sh
+                # look to /deploy/minio/install-minio-tenant.sh
                 - name: S3_ACCESS_KEY
                   value: minio-access-key
                 - name: S3_SECRET_KEY
