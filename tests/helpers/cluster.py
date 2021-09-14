@@ -330,7 +330,7 @@ class Cluster(object):
                     else:
                         self._bash[id] = shell
         finally:
-            cmd = self.command(None, f"{self.docker_compose} down --timeout 6000  -v --remove-orphans", bash=bash, timeout=timeout)
+            cmd = self.command(None, f"{self.docker_compose} down --timeout 300  -v --remove-orphans", bash=bash, timeout=timeout)
             with self.lock:
                 if self._control_shell:
                     self._control_shell.__exit__(None, None, None)
