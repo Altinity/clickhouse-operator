@@ -1151,7 +1151,7 @@ def test_019(self):
 
             kubectl.create_and_check(
                 self.context.runner,
-                config="configs/test-019-retain-volume.yaml",
+                config="configs/test-019-retain-volume-1.yaml",
                 check={
                     "pod_count": 1,
                     "do_not_delete": 1,
@@ -1196,7 +1196,7 @@ def test_019(self):
 
                 kubectl.create_and_check(
                     self.context.runner,
-                    config="configs/test-019-retain-volume.yaml",
+                    config="configs/test-019-retain-volume-1.yaml",
                     check={
                         "pod_count": 1,
                         "do_not_delete": 1,

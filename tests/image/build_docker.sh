@@ -3,6 +3,7 @@
 OPERATOR_VERSION=${OPERATOR_VERSION:=0.16.0}
 OPERATOR_VERSION_OLD=${OPERATOR_VERSION_OLD:=0.15.0}
 CLICKHOUSE_IMAGE=${CLICKHOUSE_IMAGE:="altinity/clickhouse-server:21.8.altinity_prestable"}
+CLICKHOUSE_IMAGE_OLD=${CLICKHOUSE_IMAGE_OLD:="yandex/clickhouse-server:21.3"}
 
 set -e
 
@@ -55,13 +56,13 @@ then
     docker pull docker.io/zookeeper:3.6.3
 fi
 
-if [[ "$(docker images -q yandex/clickhouse-server:20.8.6.6 2> /dev/null)" == "" ]]
+if [[ "$(docker images -q ${CLICKHOUSE_IMAGE_OLD} 2> /dev/null)" == "" ]]
 then
-    docker pull yandex/clickhouse-server:20.8.6.6
+    docker pull ${CLICKHOUSE_IMAGE_OLD}
 fi
 
 echo "Save images"
-docker save yandex/clickhouse-server:20.8.6.6 -o cache/ch_old.dockerimage
+docker save yandex/clickhouse-server:21.3 -o cache/ch_old.dockerimage
 docker save gcr.io/k8s-minikube/kicbase:v0.0.26 -o cache/kicbase.dockerimage
 docker save ${CLICKHOUSE_IMAGE} -o cache/ch_image.dockerimage
 docker save altinity/metrics-exporter:${OPERATOR_VERSION} -o cache/m_expo.dockerimage

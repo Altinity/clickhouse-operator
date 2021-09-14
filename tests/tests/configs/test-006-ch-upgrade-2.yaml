@@ -14,7 +14,7 @@ spec:
           image: altinity/clickhouse-server:21.8.altinity_prestable
   defaults:
     templates:
-      podTemplate: clickhouse-new
+      podTemplate: clickhouse-old
   configuration:
     clusters:
     - name: shards
