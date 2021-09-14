@@ -127,7 +127,7 @@ def test_006(self):
             config="configs/test-006-ch-upgrade-3.yaml",
             check={
                 "pod_count": 2,
-                "pod_image": new_version,
+                "pod_image": old_version,
             }
         )
 
