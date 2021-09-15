@@ -110,6 +110,11 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
+            restart:
+              type: string
+              enum:
+                - ""
+                - "RollingUpdate"
             # Need to be StringBool
             troubleshoot:
               type: string
@@ -944,6 +949,11 @@ spec:
                 - "disabled"
                 - "Enabled"
                 - "enabled"
+            restart:
+              type: string
+              enum:
+                - ""
+                - "RollingUpdate"
             # Need to be StringBool
             troubleshoot:
               type: string
