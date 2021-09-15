@@ -15,7 +15,7 @@ if main():
 
         with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
             if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
-                config = util.get_full_path('../deploy/operator/clickhouse-operator-install-template.yaml')
+                config = util.get_full_path(settings.clickhouse_operator_install)
                 kubectl.apply(
                     ns=settings.operator_namespace,
                     config=f"<(cat {config} | "
