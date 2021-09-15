@@ -95,7 +95,8 @@ class Node(object):
         """
 
         command = f"{cmd}"
-        with step("executing command", description=command, format_description=False) if steps else NullStep():
+        r = None
+        with By("executing command", description=command, format_description=False) if steps else NullStep():
             try:
                 r = self.cluster.bash(self.name, command=shell_command, timeout=timeout)(command, *args, **kwargs)
             except ExpectTimeoutError:

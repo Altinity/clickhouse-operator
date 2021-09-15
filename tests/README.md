@@ -6,7 +6,7 @@ This folder contains TestFlows tests for ClickHouse Operator. This file describe
 
 To execute tests, you will need:
 
-- Python 3.9 or higher
+- Python 3.8 or higher
 - TestFlows Python library
 - Docker and docker-compose
 

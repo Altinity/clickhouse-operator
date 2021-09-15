@@ -33,8 +33,8 @@ metrics_exporter_docker_repo = "altinity/metrics-exporter"
 clickhouse_template = "templates/tpl-clickhouse-21.8.yaml"
 clickhouse_template_old = "templates/tpl-clickhouse-21.3.yaml"
 
-clickhouse_version = get_ch_version(clickhouse_template)
-clickhouse_version_old = get_ch_version(clickhouse_template_old)
+clickhouse_version = get_ch_version(f'../{clickhouse_template}')
+clickhouse_version_old = get_ch_version(f'../{clickhouse_template_old}')
 
 
 prometheus_namespace = "prometheus"

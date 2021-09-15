@@ -6,7 +6,7 @@ import tests.manifest as manifest
 import tests.settings as settings
 import tests.util as util
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
+from testflows.core import *
 from testflows.asserts import error
 
 
@@ -30,6 +30,7 @@ def test_001(self):
 @TestScenario
 @Name("test_002. useTemplates for pod, volume templates, and distribution")
 def test_002(self):
+    debug(f"templ: {settings.clickhouse_template}, version: {settings.clickhouse_version}")
     kubectl.create_and_check(
         node=self.context.runner,
         config="configs/test-002-tpl.yaml",

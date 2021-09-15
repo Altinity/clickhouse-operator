@@ -71,12 +71,12 @@ def delete_all_chi(node, ns=namespace):
 
 
 def create_and_check(node, config, check, ns=namespace, timeout=10000):
-    chi_name = manifest.get_chi_name(util.get_full_path(config))
+    chi_name = manifest.get_chi_name(util.get_full_path(f'{config}'))
 
     if "apply_templates" in check:
-        print("Need to apply additional templates")
+        debug("Need to apply additional templates")
         for t in check["apply_templates"]:
-            debug(f"Applying template:\n{t}")
+            debug(f"Applying template: {util.get_full_path(t, False)} \n{t}")
             apply(node, util.get_full_path(t, False), ns)
         time.sleep(5)
 

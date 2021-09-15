@@ -32,12 +32,11 @@ def main_module(self):
         util.set_operator_version(self.context.runner, settings.operator_version)
 
     with Given(f"Install ClickHouse template {settings.clickhouse_template}"):
-        kubectl.apply(self.context.runner, f'/home/master/clickhouse-operator/tests/{settings.clickhouse_template}', settings.test_namespace)
+        kubectl.apply(self.context.runner, util.get_full_path(f'{settings.clickhouse_template}', False), settings.test_namespace)
 
     with Given(f"ClickHouse version {settings.clickhouse_version}"):
         pass
 
-    # python3 tests/test.py --only operator*
     xfails = {
         "/main/operator/test_006*": [(Error, "May hit timeout")],
         "/main/operator/test_009. Test operator upgrade": [(Fail, "May fail due to label changes")],

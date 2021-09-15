@@ -1,8 +1,8 @@
-import sys
 from testflows.core import *
 
 from helpers.cluster import Cluster
 from helpers.argparser import argparser
+import tests.test as test
 
 xfails = {
         "/clickhouse operator/test/main module/operator/test_003*": [(Error, "Hits tf timeout")],

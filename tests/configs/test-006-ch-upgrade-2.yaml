@@ -7,14 +7,14 @@ spec:
     policy: "wait"
   templates:
     podTemplates:
-    - name: clickhouse-old
+    - name: clickhouse-new
       spec:
         containers:
         - name: clickhouse-pod
           image: altinity/clickhouse-server:21.8.altinity_prestable
   defaults:
     templates:
-      podTemplate: clickhouse-old
+      podTemplate: clickhouse-new
   configuration:
     clusters:
     - name: shards

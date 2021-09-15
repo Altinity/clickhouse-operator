@@ -4,7 +4,6 @@ import time
 import tests.clickhouse as clickhouse
 import tests.kubectl as kubectl
 import tests.settings as settings
-import tests.util as util
 
 from testflows.core import fail, Given, Then
 
@@ -46,7 +45,7 @@ def restart_operator(node, ns=settings.operator_namespace, timeout=6000):
 def require_zookeeper(node, manifest='zookeeper-1-node-1GB-for-tests-only.yaml', force_install=False):
     if force_install or kubectl.get_count(node, "service", name="zookeeper") == 0:
         with Given("Zookeeper is missing, installing"):
-            config = util.get_full_path(f"../deploy/zookeeper/quick-start-persistent-volume/{manifest}", False)
+            config = get_full_path(f"../deploy/zookeeper/quick-start-persistent-volume/{manifest}", False)
             kubectl.apply(node, config)
             kubectl.wait_object(node, "pod", "zookeeper-0")
             kubectl.wait_pod_status(node, "zookeeper-0", "Running")
