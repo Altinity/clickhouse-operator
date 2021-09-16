@@ -79,9 +79,11 @@ const (
 )
 
 const (
+	// chPortNumberMustBeAssignedLater value means that port
+	// is not assigned yet and is expected to be assigned later.
 	chPortNumberMustBeAssignedLater = 0
 
-	// ClickHouse open ports
+	// ClickHouse open ports names and values
 	chDefaultTCPPortName               = "tcp"
 	chDefaultTCPPortNumber             = int32(9000)
 	chDefaultHTTPPortName              = "http"
@@ -91,6 +93,7 @@ const (
 )
 
 const (
+	// zkDefaultPort specifies Zookeeper default port
 	zkDefaultPort = 2181
 	// zkDefaultRootTemplate specifies default ZK root - /clickhouse/{namespace}/{chi name}
 	zkDefaultRootTemplate = "/clickhouse/%s/%s"
