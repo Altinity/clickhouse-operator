@@ -2,6 +2,8 @@ import os
 import yaml
 import pathlib
 
+from testflows.connect import Shell
+from testflows.core import *
 
 def get_ch_version(test_file):
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -9,9 +11,6 @@ def get_ch_version(test_file):
         open(os.path.join(current_dir, test_file), "r")
     )["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
 
-
-# kubectl_cmd="minikube kubectl --"
-kubectl_cmd = "kubectl"
 test_namespace = os.getenv('TEST_NAMESPACE') if 'TEST_NAMESPACE' in os.environ else "test"
 
 # Default value

@@ -19,9 +19,7 @@ xfails = {
 def regression(self, clickhouse_image, operator_version):
     """ClickHouse Operator test regression suite.
     """
-    nodes = {"runners": ("runner", )}
-
-    with Cluster(nodes=nodes) as cluster:
+    with Cluster(nodes={"runners": ("runner", )}) as cluster:
         self.context.cluster = cluster
         self.context.runner = self.context.cluster.node("runner")
 

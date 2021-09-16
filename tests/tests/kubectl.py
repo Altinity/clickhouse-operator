@@ -1,7 +1,7 @@
 import json
 import os
 import time
-
+import inspect
 import tests.manifest as manifest
 import tests.util as util
 
@@ -17,10 +17,25 @@ max_retries = 20
 shell = Shell()
 shell.timeout = 300
 namespace = settings.test_namespace
-kubectl_cmd = settings.kubectl_cmd
+
+def get_runner_node_id():
+    caller_dir = os.path.dirname(os.path.abspath(inspect.currentframe().f_back.f_globals["__file__"]))
+    docker_compose = "docker-compose"
+    docker_compose_project_dir = os.path.join(caller_dir, "../docker-compose")
+    docker_compose_file_path = os.path.join(docker_compose_project_dir, "docker-compose.yml")
+    docker_compose += f" --ansi never --project-directory \"{docker_compose_project_dir}\" --file \"{docker_compose_file_path}\""
+    ret = shell(f"{docker_compose} ps -q runner").output.strip()
+    return ret
+
+# kubectl_cmd = settings.kubectl_cmd
+kubectl_cmd = None
 
 
 def launch(node, command, ok_to_fail=False, ns=namespace, timeout=6000):
+    global kubectl_cmd
+    if not kubectl_cmd:
+        kubectl_cmd = f"docker exec {get_runner_node_id()} kubectl"
+
     # Build command
     cmd = f"{kubectl_cmd} "
     cmd_args = command.split(" ")
@@ -35,8 +50,8 @@ def launch(node, command, ok_to_fail=False, ns=namespace, timeout=6000):
         cmd += " ".join(cmd_args[1:])
 
     # Run command
-    cmd = node.cmd(cmd, timeout=timeout, no_checks=ok_to_fail)
-    # cmd = shell(cmd, timeout=timeout)
+    # cmd = node.cmd(cmd, timeout=timeout, no_checks=ok_to_fail)
+    cmd = shell(cmd, timeout=timeout)
 
     # Check command failure
     if not ok_to_fail:

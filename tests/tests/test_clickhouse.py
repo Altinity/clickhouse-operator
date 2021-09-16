@@ -13,10 +13,11 @@ from testflows.asserts import error
 @TestScenario
 @Name("test_ch_001. Insert quorum")
 def test_ch_001(self):
-    util.require_zookeeper()
+    util.require_zookeeper(node=self.context.runner)
     chit_data = manifest.get_chit_data(util.get_full_path("templates/tpl-clickhouse-21.8.yaml"))
-    kubectl.launch(f"delete chit {chit_data['metadata']['name']}", ns=settings.test_namespace)
+    kubectl.launch(self.context.runner, f"delete chit {chit_data['metadata']['name']}", ns=settings.test_namespace)
     kubectl.create_and_check(
+        self.context.runner,
         "configs/test-ch-001-insert-quorum.yaml",
         {
             "apply_templates": {"templates/tpl-clickhouse-21.8.yaml"},
@@ -24,8 +25,8 @@ def test_ch_001(self):
             "do_not_delete": 1,
         })
     chi = manifest.get_chi_name(util.get_full_path("configs/test-ch-001-insert-quorum.yaml"))
-    chi_data = kubectl.get("chi", ns=settings.test_namespace, name=chi)
-    util.wait_clickhouse_cluster_ready(chi_data)
+    chi_data = kubectl.get(self.context.runner, "chi", ns=settings.test_namespace, name=chi)
+    util.wait_clickhouse_cluster_ready(self.context.runner, chi_data)
 
     host0 = "chi-test-ch-001-insert-quorum-default-0-0"
     host1 = "chi-test-ch-001-insert-quorum-default-0-1"
@@ -51,7 +52,7 @@ def test_ch_001(self):
     create_mv3 = "create materialized view t_mv3 on cluster default to t3 as select a from t1"
 
     with Given("Tables t1, t2, t3 and MVs t1->t2, t1-t3 are created"):
-        clickhouse.query(self.context.runner, chi, create_table)
+        clickhouse.query(self.context.runner, self.context.runner, chi, create_table)
         clickhouse.query(self.context.runner, chi, create_mv_table2)
         clickhouse.query(self.context.runner, chi, create_mv_table3)
 
@@ -126,6 +127,7 @@ def test_ch_001(self):
 @Name("test_ch_002. Row-level security")
 def test_ch_002(self):
     kubectl.create_and_check(
+        self.context.runner,
         "configs/test-ch-002-row-level.yaml",
         {
             "apply_templates": {"templates/tpl-clickhouse-21.8.yaml"},
@@ -154,4 +156,4 @@ def test_ch_002(self):
             out = clickhouse.query(self.context.runner, chi, "select count() from test", user=user)
             assert out == "1"
 
-    kubectl.delete_chi(chi)
+    kubectl.delete_chi(self.context.runner, chi)
