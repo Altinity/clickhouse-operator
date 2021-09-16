@@ -53,8 +53,8 @@ docker load < /var/lib/docker/m_expo_old.dockerimage
 docker load < /var/lib/docker/zk.dockerimage
 docker load < /var/lib/docker/ch_old.dockerimage
 
-chown -R master /home/master/.minikube
-chmod -R u+wrx /home/master/.minikube
+chown -R master /home/master
+chmod -R u+wrx /home/master
 
 su master -c "minikube start --kubernetes-version=1.21.2 --base-image='gcr.io/k8s-minikube/kicbase:v0.0.26'"
 

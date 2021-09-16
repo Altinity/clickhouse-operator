@@ -20,7 +20,6 @@ def regression(self, clickhouse_image, operator_version):
     """ClickHouse Operator test regression suite.
     """
     with Cluster():
-        self.context.runner = 0
         Feature(run=load("tests.test", "test"), flags=TE)
 
 

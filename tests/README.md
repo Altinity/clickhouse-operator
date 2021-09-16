@@ -21,14 +21,14 @@ cd image
 ./build_docker.sh
 ```
 
-Be aware that building an image, as well as pulling it, will require about 3 GB of downloaded data.
+Be aware that building an image, as well as pulling it, will require about 5 GB of downloaded data.
 
 ## Execution
 
-To execute the whole test suite (that currently involves only operator tests, not tests for third-party tools used by operator), execute the following command:
+To execute the test suite (that currently involves only operator tests, not tests for third-party tools used by operator), execute the following command:
 
 ```bash
-python3 regression.py
+python3 regression.py --only "/clickhouse operator/test/main module/operator*"
 ```
 
 If you need only one certain test, you may execute

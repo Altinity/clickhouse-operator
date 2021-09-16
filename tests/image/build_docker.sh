@@ -51,9 +51,9 @@ then
     docker pull altinity/clickhouse-operator:${OPERATOR_VERSION_OLD}
 fi
 
-if [[ "$(docker images -q docker.io/zookeeper:3.6.3 2> /dev/null)" == "" ]]
+if [[ "$(docker images -q zookeeper:3.6.3 2> /dev/null)" == "" ]]
 then
-    docker pull docker.io/zookeeper:3.6.3
+    docker pull zookeeper:3.6.3
 fi
 
 if [[ "$(docker images -q ${CLICKHOUSE_IMAGE_OLD} 2> /dev/null)" == "" ]]
@@ -70,6 +70,6 @@ docker save altinity/clickhouse-operator:${OPERATOR_VERSION} -o cache/cho.docker
 docker save gcr.io/k8s-minikube/storage-provisioner:v5 -o cache/s_prov.dockerimage
 docker save altinity/metrics-exporter:${OPERATOR_VERSION_OLD} -o cache/m_expo_old.dockerimage
 docker save altinity/clickhouse-operator:${OPERATOR_VERSION_OLD} -o cache/cho_old.dockerimage
-docker save docker.io/zookeeper:3.6.3 -o cache/zk.dockerimage
+docker save zookeeper:3.6.3 -o cache/zk.dockerimage
 
-docker build -f Dockerfile -t altinity/clickhouse-operator-test .
+docker build -f Dockerfile -t altinity/clickhouse-operator-test:1.2 .
