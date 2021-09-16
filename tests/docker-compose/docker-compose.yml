@@ -2,7 +2,7 @@ version: '2.3'
 
 services:
   runner:
-    image: registry.gitlab.com/altinity-qa/clickhouse/cicd/clickhouse-operator:latest
+    image: altinity/clickhouse-operator-test:latest
     volumes:
       - "../../:/home/master/clickhouse-operator/"
     privileged: true
