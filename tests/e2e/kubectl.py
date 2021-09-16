@@ -2,14 +2,14 @@ import json
 import os
 import time
 import inspect
-import tests.manifest as manifest
-import tests.util as util
+import e2e.manifest as manifest
+import e2e.util as util
 
 from testflows.core import *
 from testflows.asserts import error
 from testflows.connect import Shell
 
-import tests.settings as settings
+import e2e.settings as settings
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 max_retries = 20

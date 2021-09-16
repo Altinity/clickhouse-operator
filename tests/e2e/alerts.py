@@ -4,10 +4,10 @@ import random
 
 from testflows.core import Given, Then, And, fail, When
 
-import tests.kubectl as kubectl
-import tests.settings as settings
-import tests.clickhouse as clickhouse
-import tests.util as util
+import e2e.kubectl as kubectl
+import e2e.settings as settings
+import e2e.clickhouse as clickhouse
+import e2e.util as util
 
 
 def check_alert_state(alert_name, prometheus_pod, alert_state="firing", labels=None, time_range="10s"):

@@ -1,9 +1,9 @@
 import os
 import time
 
-import tests.clickhouse as clickhouse
-import tests.kubectl as kubectl
-import tests.settings as settings
+import e2e.clickhouse as clickhouse
+import e2e.kubectl as kubectl
+import e2e.settings as settings
 
 from testflows.core import fail, Given, Then
 

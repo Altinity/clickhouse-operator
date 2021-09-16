@@ -1,7 +1,7 @@
-import tests.clickhouse as clickhouse
-import tests.kubectl as kubectl
-import tests.settings as settings
-import tests.util as util
+import e2e.clickhouse as clickhouse
+import e2e.kubectl as kubectl
+import e2e.settings as settings
+import e2e.util as util
 
 from testflows.core import When, Then, main, Scenario, Module, TestScenario, Name
 

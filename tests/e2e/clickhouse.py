@@ -1,5 +1,5 @@
-import tests.kubectl as kubectl
-import tests.settings as settings
+import e2e.kubectl as kubectl
+import e2e.settings as settings
 
 
 def query(

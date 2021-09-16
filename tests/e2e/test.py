@@ -1,9 +1,9 @@
-import tests.test_clickhouse as test_clickhouse
-import tests.test_operator as test_operator
+import e2e.test_clickhouse as test_clickhouse
+import e2e.test_operator as test_operator
 
-import tests.kubectl as kubectl
-import tests.settings as settings
-import tests.util as util
+import e2e.kubectl as kubectl
+import e2e.settings as settings
+import e2e.util as util
 
 from testflows.core import *
 
@@ -86,7 +86,7 @@ def main_module(self):
             else:
                 Scenario(test=t[0], args=t[1], flags=TE)()
 
-    # python3 tests/test.py --only clickhouse*
+    # python3 e2e/test.py --only clickhouse*
     with Module("clickhouse"):
         all_tests = [
             test_clickhouse.test_ch_001,

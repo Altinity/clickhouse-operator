@@ -1,10 +1,10 @@
 import time
 
-import tests.clickhouse as clickhouse
-import tests.kubectl as kubectl
-import tests.manifest as manifest
-import tests.settings as settings
-import tests.util as util
+import e2e.clickhouse as clickhouse
+import e2e.kubectl as kubectl
+import e2e.manifest as manifest
+import e2e.settings as settings
+import e2e.util as util
 
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
 from testflows.asserts import error
