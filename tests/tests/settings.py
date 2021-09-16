@@ -1,15 +1,27 @@
 import os
 import yaml
+import inspect
 import pathlib
 
 from testflows.connect import Shell
 from testflows.core import *
+
 
 def get_ch_version(test_file):
     current_dir = os.path.dirname(os.path.abspath(__file__))
     return yaml.safe_load(
         open(os.path.join(current_dir, test_file), "r")
     )["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
+
+
+def get_docker_compose_path():
+    caller_dir = os.path.dirname(os.path.abspath(inspect.currentframe().f_back.f_globals["__file__"]))
+    docker_compose_project_dir = os.path.join(caller_dir, "../docker-compose")
+    docker_compose_file_path = os.path.join(docker_compose_project_dir, "docker-compose.yml")
+    return docker_compose_file_path, docker_compose_project_dir
+
+
+kubectl_cmd = f"docker-compose -f {get_docker_compose_path()[0]} exec runner kubectl"
 
 test_namespace = os.getenv('TEST_NAMESPACE') if 'TEST_NAMESPACE' in os.environ else "test"
 

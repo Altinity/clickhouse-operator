@@ -13,11 +13,10 @@ from testflows.asserts import error
 @TestScenario
 @Name("test_ch_001. Insert quorum")
 def test_ch_001(self):
-    util.require_zookeeper(node=self.context.runner)
+    util.require_zookeeper()
     chit_data = manifest.get_chit_data(util.get_full_path("templates/tpl-clickhouse-21.8.yaml"))
-    kubectl.launch(self.context.runner, f"delete chit {chit_data['metadata']['name']}", ns=settings.test_namespace)
+    kubectl.launch(f"delete chit {chit_data['metadata']['name']}", ns=settings.test_namespace)
     kubectl.create_and_check(
-        self.context.runner,
         "configs/test-ch-001-insert-quorum.yaml",
         {
             "apply_templates": {"templates/tpl-clickhouse-21.8.yaml"},
@@ -25,8 +24,8 @@ def test_ch_001(self):
             "do_not_delete": 1,
         })
     chi = manifest.get_chi_name(util.get_full_path("configs/test-ch-001-insert-quorum.yaml"))
-    chi_data = kubectl.get(self.context.runner, "chi", ns=settings.test_namespace, name=chi)
-    util.wait_clickhouse_cluster_ready(self.context.runner, chi_data)
+    chi_data = kubectl.get("chi", ns=settings.test_namespace, name=chi)
+    util.wait_clickhouse_cluster_ready(chi_data)
 
     host0 = "chi-test-ch-001-insert-quorum-default-0-0"
     host1 = "chi-test-ch-001-insert-quorum-default-0-1"
@@ -52,38 +51,38 @@ def test_ch_001(self):
     create_mv3 = "create materialized view t_mv3 on cluster default to t3 as select a from t1"
 
     with Given("Tables t1, t2, t3 and MVs t1->t2, t1-t3 are created"):
-        clickhouse.query(self.context.runner, self.context.runner, chi, create_table)
-        clickhouse.query(self.context.runner, chi, create_mv_table2)
-        clickhouse.query(self.context.runner, chi, create_mv_table3)
+        clickhouse.query(chi, create_table)
+        clickhouse.query(chi, create_mv_table2)
+        clickhouse.query(chi, create_mv_table3)
 
-        clickhouse.query(self.context.runner, chi, create_mv2)
-        clickhouse.query(self.context.runner, chi, create_mv3)
+        clickhouse.query(chi, create_mv2)
+        clickhouse.query(chi, create_mv3)
 
         with When("Add a row to an old partition"):
-            clickhouse.query(self.context.runner, chi, "insert into t1(a,d) values(6, today()-1)", host=host0)
+            clickhouse.query(chi, "insert into t1(a,d) values(6, today()-1)", host=host0)
 
         with When("Stop fetches for t1 at replica1"):
-            clickhouse.query(self.context.runner, chi, "system stop fetches default.t1", host=host1)
+            clickhouse.query(chi, "system stop fetches default.t1", host=host1)
 
             with Then("Wait 10 seconds and the data should be dropped by TTL"):
                 time.sleep(10)
-                out = clickhouse.query(self.context.runner, chi, "select count() from t1 where a=6", host=host0)
+                out = clickhouse.query(chi, "select count() from t1 where a=6", host=host0)
                 assert out == "0"
 
         with When("Resume fetches for t1 at replica1"):
-            clickhouse.query(self.context.runner, chi, "system start fetches default.t1", host=host1)
+            clickhouse.query(chi, "system start fetches default.t1", host=host1)
             time.sleep(5)
 
             with Then("Inserts should resume"):
-                clickhouse.query(self.context.runner, chi, "insert into t1(a) values(7)", host=host0)
+                clickhouse.query(chi, "insert into t1(a) values(7)", host=host0)
 
-        clickhouse.query(self.context.runner, chi, "insert into t1(a) values(1)")
+        clickhouse.query(chi, "insert into t1(a) values(1)")
 
         with When("Stop fetches for t2 at replica1"):
-            clickhouse.query(self.context.runner, chi, "system stop fetches default.t2", host=host1)
+            clickhouse.query(chi, "system stop fetches default.t2", host=host1)
 
             with Then("Insert should fail since it can not reach the quorum"):
-                out = clickhouse.query_with_error(self.context.runner, chi, "insert into t1(a) values(2)", host=host0)
+                out = clickhouse.query_with_error(chi, "insert into t1(a) values(2)", host=host0)
                 assert "Timeout while waiting for quorum" in out
 
         # kubectl(f"exec {host0}-0 -n test -- cp /var/lib//clickhouse/data/default/t2/all_1_1_0/a.mrk2 /var/lib//clickhouse/data/default/t2/all_1_1_0/a.bin")
@@ -91,32 +90,32 @@ def test_ch_001(self):
         #    kubectl(f"exec {host0}-0 -n test -- sed -i \"s/b/c/\" /var/lib/clickhouse/data/default/t2/all_1_1_0/a.bin")
 
         with When("Resume fetches for t2 at replica1"):
-            clickhouse.query(self.context.runner, chi, "system start fetches default.t2", host=host1)
+            clickhouse.query(chi, "system start fetches default.t2", host=host1)
             i = 0
-            while "2" != clickhouse.query(self.context.runner, chi, "select active_replicas from system.replicas where database='default' and table='t1'", pod=host0) and i < 10:
+            while "2" != clickhouse.query(chi, "select active_replicas from system.replicas where database='default' and table='t1'", pod=host0) and i < 10:
                 with Then("Not ready, wait 5 seconds"):
                     time.sleep(5)
                     i += 1
 
             with Then("Inserts should fail with an error regarding not satisfied quorum"):
-                out = clickhouse.query_with_error(self.context.runner, chi, "insert into t1(a) values(3)", host=host0)
+                out = clickhouse.query_with_error(chi, "insert into t1(a) values(3)", host=host0)
                 assert "Quorum for previous write has not been satisfied yet" in out
 
             with And("Second insert of the same block should pass"):
-                clickhouse.query(self.context.runner, chi, "insert into t1(a) values(3)", host=host0)
+                clickhouse.query(chi, "insert into t1(a) values(3)", host=host0)
 
             with And("Insert of the new block should fail"):
-                out = clickhouse.query_with_error(self.context.runner, chi, "insert into t1(a) values(4)", host=host0)
+                out = clickhouse.query_with_error(chi, "insert into t1(a) values(4)", host=host0)
                 assert "Quorum for previous write has not been satisfied yet" in out
 
             with And(
                     "Second insert of the same block with 'deduplicate_blocks_in_dependent_materialized_views' setting should fail"):
-                out = clickhouse.query_with_error(self.context.runner, chi,
+                out = clickhouse.query_with_error(chi,
                                        "set deduplicate_blocks_in_dependent_materialized_views=1; insert into t1(a) values(5)",
                                        host=host0)
                 assert "Quorum for previous write has not been satisfied yet" in out
 
-        out = clickhouse.query_with_error(self.context.runner, chi,
+        out = clickhouse.query_with_error(chi,
                                "select t1.a t1_a, t2.a t2_a from t1 left outer join t2 using (a) order by t1_a settings join_use_nulls=1")
         print(out)
 
@@ -127,7 +126,6 @@ def test_ch_001(self):
 @Name("test_ch_002. Row-level security")
 def test_ch_002(self):
     kubectl.create_and_check(
-        self.context.runner,
         "configs/test-ch-002-row-level.yaml",
         {
             "apply_templates": {"templates/tpl-clickhouse-21.8.yaml"},
@@ -138,22 +136,22 @@ def test_ch_002(self):
     create_table = """create table test (d Date default today(), team LowCardinality(String), user String) Engine = MergeTree() PARTITION BY d ORDER BY d;"""
 
     with When("Create test table"):
-        clickhouse.query(self.context.runner, chi, create_table)
+        clickhouse.query(chi, create_table)
 
     with And("Insert some data"):
-        clickhouse.query(self.context.runner, chi,
+        clickhouse.query(chi,
               "INSERT INTO test(team, user) values('team1', 'user1'),('team2', 'user2'),('team3', 'user3'),('team4', 'user4')")
 
     with Then(
             "Make another query for different users. It should be restricted to corresponding team by row-level security"):
         for user in ['user1', 'user2', 'user3', 'user4']:
-            out = clickhouse.query(self.context.runner, chi, "select user from test", user=user)
+            out = clickhouse.query(chi, "select user from test", user=user)
             assert out == user
 
     with Then(
             "Make a count() query for different users. It should be restricted to corresponding team by row-level security"):
         for user in ['user1', 'user2', 'user3', 'user4']:
-            out = clickhouse.query(self.context.runner, chi, "select count() from test", user=user)
+            out = clickhouse.query(chi, "select count() from test", user=user)
             assert out == "1"
 
-    kubectl.delete_chi(self.context.runner, chi)
+    kubectl.delete_chi(chi)

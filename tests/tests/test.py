@@ -11,15 +11,15 @@ from testflows.core import *
 @TestModule
 def main_module(self):
     with Given(f"Clean namespace {settings.test_namespace}"):
-        if self.context.runner.cmd("kubectl get namespace | grep test", timeout=60).exitcode == 0:
-            kubectl.delete_all_chi(self.context.runner, settings.test_namespace)
-            kubectl.delete_ns(self.context.runner, settings.test_namespace, ok_to_fail=True)
-        kubectl.create_ns(self.context.runner, settings.test_namespace)
+        if kubectl.launch("get namespace | grep test", timeout=60, ok_to_fail=True):
+            kubectl.delete_all_chi(settings.test_namespace, ok_to_fail=True)
+            kubectl.delete_ns(settings.test_namespace, ok_to_fail=True)
+        kubectl.create_ns(settings.test_namespace)
 
     with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
-        if kubectl.get_count(self.context.runner, "pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
+        if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
             config = util.get_full_path('../deploy/operator/clickhouse-operator-install-template.yaml', False)
-            kubectl.apply(self.context.runner,
+            kubectl.apply(
                 ns=settings.operator_namespace,
                 config=f"<(cat {config} | "
                 f"OPERATOR_IMAGE=\"{settings.operator_docker_repo}:{settings.operator_version}\" "
@@ -29,10 +29,10 @@ def main_module(self):
                 f"envsubst)",
                 validate=False
             )
-        util.set_operator_version(self.context.runner, settings.operator_version)
+        util.set_operator_version(settings.operator_version)
 
     with Given(f"Install ClickHouse template {settings.clickhouse_template}"):
-        kubectl.apply(self.context.runner, util.get_full_path(f'{settings.clickhouse_template}', False), settings.test_namespace)
+        kubectl.apply(util.get_full_path(f'{settings.clickhouse_template}', False), settings.test_namespace)
 
     with Given(f"ClickHouse version {settings.clickhouse_version}"):
         pass
@@ -99,7 +99,7 @@ def main_module(self):
         # run_test = [test_ch_002]
 
         for t in run_test:
-            Scenario(test=t)()
+            Scenario(test=t, flags=TE)()
 
 
 @TestFeature
