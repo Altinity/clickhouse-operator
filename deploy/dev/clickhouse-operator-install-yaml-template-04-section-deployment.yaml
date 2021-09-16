@@ -30,7 +30,7 @@ spec:
       containers:
         - name: clickhouse-operator
           image: ${OPERATOR_IMAGE}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -84,4 +84,4 @@ spec:
 
         - name: metrics-exporter
           image: ${METRICS_EXPORTER_IMAGE}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent

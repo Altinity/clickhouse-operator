@@ -46,7 +46,7 @@ spec:
       containers:
         - name: clickhouse-operator
           image: ${OPERATOR_IMAGE}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
@@ -111,7 +111,7 @@ spec:
 
         - name: metrics-exporter
           image: ${METRICS_EXPORTER_IMAGE}
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator

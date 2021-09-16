@@ -285,7 +285,7 @@ data:
                 "containers" : [
                   {
                     "name": "clickhouse",
-                    "image": "yandex/clickhouse-server:19.3.7",
+                    "image": "yandex/clickhouse-server:21.3",
                     "ports": [
                       {
                         "name": "http",
@@ -442,7 +442,7 @@ spec:
       containers:
         - name: clickhouse-operator
           image: altinity/clickhouse-operator:0.16.0
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
@@ -507,7 +507,7 @@ spec:
 
         - name: metrics-exporter
           image: altinity/metrics-exporter:0.16.0
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
