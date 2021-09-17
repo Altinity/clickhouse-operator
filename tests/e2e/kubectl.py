@@ -1,24 +1,25 @@
 import json
 import os
 import time
-import manifest
-import util
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, Module
+from testflows.core import *
 from testflows.asserts import error
 from testflows.connect import Shell
 
-import settings
+import e2e.settings as settings
+import e2e.manifest as manifest
+import e2e.util as util
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-max_retries = 15
+max_retries = 20
 
 shell = Shell()
+shell.timeout = 300
 namespace = settings.test_namespace
 kubectl_cmd = settings.kubectl_cmd
 
 
-def launch(command, ok_to_fail=False, ns=namespace, timeout=60):
+def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
     # Build command
     cmd = f"{kubectl_cmd} "
     cmd_args = command.split(" ")
@@ -34,20 +35,20 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=60):
 
     # Run command
     cmd = shell(cmd, timeout=timeout)
+
     # Check command failure
     code = cmd.exitcode
     if not ok_to_fail:
         if code != 0:
-            print("command failed, output:")
-            print(cmd.output)
+            debug(f"command failed, output:\n{cmd.output}")
         assert code == 0, error()
     # Command test result
     return cmd.output if (code == 0) or ok_to_fail else ""
 
 
-def delete_chi(chi, ns=namespace, wait = True):
+def delete_chi(chi, ns=namespace, wait = True, ok_to_fail=False):
     with When(f"Delete chi {chi}"):
-        launch(f"delete chi {chi}", ns=ns, timeout=600)
+        launch(f"delete chi {chi}", ns=ns, timeout=600, ok_to_fail=ok_to_fail)
         if wait:
             wait_objects(
                 chi,
@@ -63,24 +64,23 @@ def delete_chi(chi, ns=namespace, wait = True):
 def delete_all_chi(ns=namespace):
     crds = launch("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
     if "clickhouseinstallations.clickhouse.altinity.com" in crds:
-        chis = get("chi", "", ns=ns)["items"]
+        chis = get("chi", "", ns=ns, ok_to_fail=True)["items"]
         for chi in chis:
             # kubectl(f"patch chi {chi} --type=merge -p '\{\"metadata\":\{\"finalizers\": [null]\}\}'", ns = ns)
             delete_chi(chi["metadata"]["name"], ns)
 
 
-def create_and_check(config, check, ns=namespace, timeout=600):
-    config = util.get_full_path(config)
-    chi_name = manifest.get_chi_name(config)
+def create_and_check(config, check, ns=namespace, timeout=10000):
+    chi_name = manifest.get_chi_name(util.get_full_path(f'{config}'))
 
     if "apply_templates" in check:
-        print("Need to apply additional templates")
+        debug("Need to apply additional templates")
         for t in check["apply_templates"]:
-            print("Applying template:" + t)
-            apply(util.get_full_path(t), ns)
+            debug(f"Applying template: {util.get_full_path(t, False)} \n{t}")
+            apply(util.get_full_path(t, False), ns)
         time.sleep(5)
 
-    apply(config, ns=ns, timeout=timeout)
+    apply(util.get_full_path(config, False), ns=ns, timeout=timeout)
 
     if "object_counts" in check:
         wait_objects(chi_name, check["object_counts"], ns)
@@ -115,8 +115,8 @@ def create_and_check(config, check, ns=namespace, timeout=600):
         delete_chi(chi_name, ns)
 
 
-def get(kind, name, label="", ns=namespace):
-    out = launch(f"get {kind} {name} {label} -o json", ns=ns)
+def get(kind, name, label="", ns=namespace, ok_to_fail=False):
+    out = launch(f"get {kind} {name} {label} -o json", ns=ns, ok_to_fail=ok_to_fail)
     return json.loads(out.strip())
 
 
@@ -125,7 +125,7 @@ def create_ns(ns):
     launch(f"get ns {ns}", ns=None)
 
 
-def delete_ns(ns, ok_to_fail=False, timeout=600):
+def delete_ns(ns, ok_to_fail=False, timeout=6000):
     launch(f"delete ns {ns}", ns=None, ok_to_fail=ok_to_fail, timeout=timeout)
 
 
@@ -144,12 +144,12 @@ def count_objects(label="", ns=namespace):
     }
 
 
-def apply(config, ns=namespace, validate=True, timeout=30):
+def apply(config, ns=namespace, validate=True, timeout=600):
     with When(f"{config} is applied"):
         launch(f"apply --validate={validate} -f {config}", ns=ns, timeout=timeout)
 
 
-def delete(config, ns=namespace, timeout=30):
+def delete(config, ns=namespace, timeout=600):
     with When(f"{config} is deleted"):
         launch(f"delete -f {config}", ns=ns, timeout=timeout)
 

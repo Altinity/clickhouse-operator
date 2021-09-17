@@ -2,11 +2,11 @@ import json
 import random
 import time
 import datetime
-import alerts
-import settings
-import kubectl
-import clickhouse
-import util
+import e2e.alerts as alerts
+import e2e.settings as settings
+import e2e.kubectl as settings
+import e2e.clickhouse as clickhouse
+import e2e.util as util
 
 from testflows.core import TestScenario, Name, When, Then, Given, main, Scenario, Module, fail
 from testflows.asserts import error
@@ -267,7 +267,7 @@ def test_backup_duration(self):
             'echo "clickhouse_backup_last_create_duration 7000000000000" >> /usr/share/nginx/html/metrics && '
             'echo "# HELP clickhouse_backup_last_create_status Last backup create status: 0=failed, 1=success, 2=unknown" >> /usr/share/nginx/html/metrics && '
             'echo "# TYPE clickhouse_backup_last_create_status gauge" >> /usr/share/nginx/html/metrics && '
-            'echo "clickhouse_backup_last_create_status 1" >> /usr/share/nginx/html/metrics'            
+            'echo "clickhouse_backup_last_create_status 1" >> /usr/share/nginx/html/metrics'
             '\''
         )
 

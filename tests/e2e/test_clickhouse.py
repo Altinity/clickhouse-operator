@@ -1,10 +1,10 @@
 import time
 
-import clickhouse
-import kubectl
-import manifest
-import settings
-import util
+import e2e.clickhouse as clickhouse
+import e2e.kubectl as kubectl
+import e2e.manifest as manifest
+import e2e.settings as settings
+import e2e.util as util
 
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
 from testflows.asserts import error
@@ -14,12 +14,12 @@ from testflows.asserts import error
 @Name("test_ch_001. Insert quorum")
 def test_ch_001(self):
     util.require_zookeeper()
-    chit_data = manifest.get_chit_data(util.get_full_path("templates/tpl-clickhouse-19.11.yaml"))
+    chit_data = manifest.get_chit_data(util.get_full_path("templates/tpl-clickhouse-21.8.yaml"))
     kubectl.launch(f"delete chit {chit_data['metadata']['name']}", ns=settings.test_namespace)
     kubectl.create_and_check(
         "configs/test-ch-001-insert-quorum.yaml",
         {
-            "apply_templates": {"templates/tpl-clickhouse-20.8.yaml"},
+            "apply_templates": {"templates/tpl-clickhouse-21.8.yaml"},
             "pod_count": 2,
             "do_not_delete": 1,
         })
@@ -128,7 +128,7 @@ def test_ch_002(self):
     kubectl.create_and_check(
         "configs/test-ch-002-row-level.yaml",
         {
-            "apply_templates": {"templates/tpl-clickhouse-20.3.yaml"},
+            "apply_templates": {"templates/tpl-clickhouse-21.8.yaml"},
             "do_not_delete": 1,
         })
 

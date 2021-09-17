@@ -1,10 +1,9 @@
 import os
 import time
 
-import settings
-import kubectl
-import clickhouse
-import util
+import e2e.clickhouse as clickhouse
+import e2e.kubectl as kubectl
+import e2e.settings as settings
 
 from testflows.core import fail, Given, Then
 
@@ -13,11 +12,14 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 operator_label = "-l app=clickhouse-operator"
 
 
-def get_full_path(test_file):
-    return os.path.join(current_dir, f"{test_file}")
+def get_full_path(test_file, baremetal=True):
+    if baremetal:
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), f"../{test_file}")
+    else:
+        return "/home/master/clickhouse-operator/tests/" + test_file
 
 
-def set_operator_version(version, ns=settings.operator_namespace, timeout=60):
+def set_operator_version(version, ns=settings.operator_namespace, timeout=600):
     operator_image = f"{settings.operator_docker_repo}:{version}"
     metrics_exporter_image = f"{settings.metrics_exporter_docker_repo}:{version}"
     kubectl.launch(f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator={operator_image}", ns=ns)
@@ -41,9 +43,9 @@ def restart_operator(ns=settings.operator_namespace, timeout=600):
 
 
 def require_zookeeper(manifest='zookeeper-1-node-1GB-for-tests-only.yaml', force_install=False):
-    with Given("Install Zookeeper if missing"):
-        if force_install or kubectl.get_count("service", name="zookeeper") == 0:
-            config = util.get_full_path(f"../deploy/zookeeper/quick-start-persistent-volume/{manifest}")
+    if force_install or kubectl.get_count("service", name="zookeeper") == 0:
+        with Given("Zookeeper is missing, installing"):
+            config = get_full_path(f"../deploy/zookeeper/quick-start-persistent-volume/{manifest}", False)
             kubectl.apply(config)
             kubectl.wait_object("pod", "zookeeper-0")
             kubectl.wait_pod_status("zookeeper-0", "Running")
@@ -72,7 +74,7 @@ def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name):
     with Given("install zookeeper+clickhouse"):
         kubectl.delete_ns(settings.test_namespace, ok_to_fail=True, timeout=600)
         kubectl.create_ns(settings.test_namespace)
-        util.require_zookeeper()
+        require_zookeeper()
         kubectl.create_and_check(
             config=chi_file,
             check={

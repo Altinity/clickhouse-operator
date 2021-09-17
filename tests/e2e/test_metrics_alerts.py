@@ -5,11 +5,12 @@ import random
 from testflows.core import TestScenario, Name, When, Then, Given, main, Scenario, Module, fail
 from testflows.asserts import error
 
-import settings
-import kubectl
-import clickhouse
-import alerts
-import util
+import e2e.clickhouse as clickhouse
+import e2e.kubectl as kubectl
+import e2e.manifest as manifest
+import e2e.settings as settings
+import e2e.util as util
+import e2e.alerts as alerts
 
 
 @TestScenario
@@ -790,8 +791,8 @@ def test_zookeeper_alerts(self):
 if main():
     with Module("main"):
         prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi = alerts.initialize(
-            chi_file='configs/test-cluster-for-alerts.yaml',
-            chi_template_file='templates/tpl-clickhouse-alerts.yaml',
+            chi_file='../configs/test-cluster-for-alerts.yaml',
+            chi_template_file='../templates/tpl-clickhouse-alerts.yaml',
             chi_name='test-cluster-for-alerts',
         )
 

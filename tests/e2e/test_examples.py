@@ -1,7 +1,7 @@
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module
 from testflows.asserts import error
 
-import kubectl
+import e2e.kubectl as kubectl
 
 
 @TestScenario

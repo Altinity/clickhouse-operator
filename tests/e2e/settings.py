@@ -1,5 +1,6 @@
 import os
 import yaml
+import inspect
 import pathlib
 
 
@@ -10,13 +11,20 @@ def get_ch_version(test_file):
     )["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
 
 
-# kubectl_cmd="minikube kubectl --"
-kubectl_cmd = "kubectl"
+def get_docker_compose_path():
+    caller_dir = os.path.dirname(os.path.abspath(inspect.currentframe().f_back.f_globals["__file__"]))
+    docker_compose_project_dir = os.path.join(caller_dir, "../docker-compose")
+    docker_compose_file_path = os.path.join(docker_compose_project_dir, "docker-compose.yml")
+    return docker_compose_file_path, docker_compose_project_dir
+
+
+kubectl_cmd = f"docker-compose -f {get_docker_compose_path()[0]} exec runner kubectl"
+
 test_namespace = os.getenv('TEST_NAMESPACE') if 'TEST_NAMESPACE' in os.environ else "test"
 
 # Default value
 operator_version = os.getenv('OPERATOR_VERSION') if 'OPERATOR_VERSION' in os.environ else \
-    open(os.path.join(pathlib.Path(__file__).parent.absolute(), "../release")).read(1024)
+    open(os.path.join(pathlib.Path(__file__).parent.absolute(), "../../release")).read(1024)
 operator_namespace = os.getenv('OPERATOR_NAMESPACE') if 'OPERATOR_NAMESPACE' in os.environ else \
     'kube-system'
 minio_namespace = os.getenv('MINIO_NAMESPACE') if 'MINIO_NAMESPACE' in os.environ else 'minio'
@@ -25,13 +33,17 @@ operator_docker_repo = os.getenv('OPERATOR_DOCKER_REPO') if 'OPERATOR_DOCKER_REP
     "altinity/clickhouse-operator"
 metrics_exporter_docker_repo = "altinity/metrics-exporter"
 
-clickhouse_template = "templates/tpl-clickhouse-stable.yaml"
+# clickhouse_template = "templates/tpl-clickhouse-stable.yaml"
 # clickhouse_template = "templates/tpl-clickhouse-19.17.yaml"
 # clickhouse_template = "templates/tpl-clickhouse-20.3.yaml"
 # clickhouse_template = "templates/tpl-clickhouse-20.8.yaml"
 # clickhouse_template = "templates/tpl-clickhouse-21.3.yaml"
+clickhouse_template = "templates/tpl-clickhouse-21.8.yaml"
+clickhouse_template_old = "templates/tpl-clickhouse-21.3.yaml"
 
-clickhouse_version = get_ch_version(clickhouse_template)
+clickhouse_version = get_ch_version(f'../{clickhouse_template}')
+clickhouse_version_old = get_ch_version(f'../{clickhouse_template_old}')
+
 
 prometheus_namespace = "prometheus"
 prometheus_operator_version = "0.43"

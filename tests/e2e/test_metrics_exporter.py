@@ -5,9 +5,9 @@ import json
 from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
 from testflows.asserts import error
 
-import kubectl
-import settings
-import util
+import e2e.kubectl as kubectl
+import e2e.settings as settings
+import e2e.util as util
 
 
 @TestScenario

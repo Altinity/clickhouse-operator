@@ -36,7 +36,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:21.1.9.41
+              image: altinity/clickhouse-server:21.8.altinity_prestable
               volumeMounts:
                 - name: disk1
                   mountPath: /var/lib/clickhouse
