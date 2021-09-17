@@ -93,7 +93,7 @@ RUN wget -c --progress=bar:force:noscroll -O /usr/local/bin/kubectl https://stor
 
 RUN adduser --disabled-password --gecos "" master && usermod -a -G docker master
 
-RUN ln -svf /home/master/.minikube /root/.minikube && mkdir -p /home/master/.minikube/cache/preloaded-tarball
+RUN ln -svf /home/master/.minikube /root/.minikube && mkdir -p /home/master/.minikube/cache/preloaded-tarball && mkdir -p /home/master/.kube
 
 ENV KUBECONFIG /home/master/.kube/config
 
