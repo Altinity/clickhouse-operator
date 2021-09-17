@@ -26,6 +26,7 @@ def get_full_path(test_file, baremetal=True):
 def set_operator_version(version, ns=settings.operator_namespace, timeout=600):
     operator_image = f"{settings.operator_docker_repo}:{version}"
     metrics_exporter_image = f"{settings.metrics_exporter_docker_repo}:{version}"
+
     kubectl.launch(f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator={operator_image}", ns=ns)
     kubectl.launch(f"set image deployment.v1.apps/clickhouse-operator metrics-exporter={metrics_exporter_image}", ns=ns)
     kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
@@ -60,6 +61,7 @@ def wait_clickhouse_cluster_ready(chi):
         all_pods_ready = False
         while all_pods_ready is False:
             all_pods_ready = True
+
             for pod in chi['status']['pods']:
                 cluster_response = clickhouse.query(
                     chi["metadata"]["name"],
@@ -79,6 +81,7 @@ def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name):
         kubectl.delete_ns(settings.test_namespace, ok_to_fail=True, timeout=600)
         kubectl.create_ns(settings.test_namespace)
         require_zookeeper()
+
         kubectl.create_and_check(
             config=chi_file,
             check={
@@ -98,4 +101,5 @@ def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name):
             "pod", name="", ns=settings.operator_namespace, label="-l app=clickhouse-operator"
         )
         chi = kubectl.get("chi", ns=settings.test_namespace, name=chi_name)
+        
         return clickhouse_operator_spec, chi

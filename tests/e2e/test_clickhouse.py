@@ -6,8 +6,7 @@ import e2e.manifest as manifest
 import e2e.settings as settings
 import e2e.util as util
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
-from testflows.asserts import error
+from testflows.core import *
 
 
 @TestScenario
@@ -15,6 +14,7 @@ from testflows.asserts import error
 def test_ch_001(self):
     util.require_zookeeper()
     chit_data = manifest.get_chit_data(util.get_full_path("templates/tpl-clickhouse-21.8.yaml"))
+
     kubectl.launch(f"delete chit {chit_data['metadata']['name']}", ns=settings.test_namespace)
     kubectl.create_and_check(
         "configs/test-ch-001-insert-quorum.yaml",
@@ -23,6 +23,7 @@ def test_ch_001(self):
             "pod_count": 2,
             "do_not_delete": 1,
         })
+
     chi = manifest.get_chi_name(util.get_full_path("configs/test-ch-001-insert-quorum.yaml"))
     chi_data = kubectl.get("chi", ns=settings.test_namespace, name=chi)
     util.wait_clickhouse_cluster_ready(chi_data)
@@ -117,7 +118,7 @@ def test_ch_001(self):
 
         out = clickhouse.query_with_error(chi,
                                "select t1.a t1_a, t2.a t2_a from t1 left outer join t2 using (a) order by t1_a settings join_use_nulls=1")
-        print(out)
+        note(out)
 
         # cat /var/log/clickhouse-server/clickhouse-server.log | grep t2 | grep -E "all_1_1_0|START|STOP"
 
