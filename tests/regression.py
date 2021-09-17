@@ -20,9 +20,13 @@ xfails = {
 def regression(self, clickhouse_image, operator_version):
     """ClickHouse Operator test regression suite.
     """
-    with Cluster():
-        Feature(run=load("e2e.test", "test"), flags=TE)
+    # this must be substituted if ran in docker
 
+    # with Cluster():
+    #     Feature(run=load("e2e.test", "test"), flags=TE)
+
+    # this must be substituted if ran on bare metal
+    Feature(run=load("e2e.test", "test"), flags=TE)
 
 if main():
     regression()

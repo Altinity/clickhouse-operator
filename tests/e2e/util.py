@@ -13,10 +13,16 @@ operator_label = "-l app=clickhouse-operator"
 
 
 def get_full_path(test_file, baremetal=True):
-    if baremetal:
-        return os.path.join(os.path.dirname(os.path.abspath(__file__)), f"../{test_file}")
-    else:
-        return "/home/master/clickhouse-operator/tests/" + test_file
+    # this must be substituted if ran in docker
+
+    # if baremetal:
+    #     return os.path.join(os.path.dirname(os.path.abspath(__file__)), f"../{test_file}")
+    # else:
+    #     return "/home/master/clickhouse-operator/tests/" + test_file
+
+    # this must be substituted if ran on bare metal
+
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), f"../{test_file}")
 
 
 def set_operator_version(version, ns=settings.operator_namespace, timeout=600):

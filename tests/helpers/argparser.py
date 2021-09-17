@@ -11,4 +11,4 @@ def argparser(parser):
     parser.add_argument("--operator-version",
         type=str, dest="operator_version",
         help="ClickHouse Operator version, default: 0.15.0", metavar="path",
-        default=os.getenv("OPERATOR_VERSION", "0.15.0"))
+        default=os.getenv("OPERATOR_VERSION", "0.16.0"))
