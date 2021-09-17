@@ -6,13 +6,17 @@ This folder contains TestFlows tests for ClickHouse Operator. This file describe
 
 To execute tests, you will need:
 
-- Python 3.8 or higher
-- TestFlows Python library (`pip3 install testflows`)
-- Docker and docker-compose
+* Python 3.8 or higher
+* TestFlows Python library (`pip3 install testflows`)
+* To run tests in docker container (approximately 2 times slower, but does not require any additional configuration):
+    - docker and docker-compose
+* To run tests natively on your machine:
+    - kubectl
+    - docker
 
 ## Build test image
 
-In order to run tests, you will need a base image. By default it will be pulled from GitLab registry. 
+In order to run tests in docker, you will need a base image. By default it will be pulled from GitLab registry.
 
 You may alse build the image locally. To do it, make the following steps:
 
@@ -30,6 +34,8 @@ To execute the test suite (that currently involves only operator tests, not test
 ```bash
 python3 regression.py --only "/clickhouse operator/test/main module/operator*"
 ```
+
+To execute tests natively (not in docker), you need to add `--native` parameter
 
 If you need only one certain test, you may execute
 

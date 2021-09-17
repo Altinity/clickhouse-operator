@@ -2,7 +2,6 @@ from testflows.core import *
 
 from helpers.cluster import Cluster
 from helpers.argparser import argparser
-import e2e.test as test
 
 xfails = {
         "/clickhouse operator/test/main module/operator/test_003*": [(Error, "Hits tf timeout")],
@@ -17,16 +16,16 @@ xfails = {
 @Name("clickhouse operator")
 @XFails(xfails)
 @ArgumentParser(argparser)
-def regression(self, clickhouse_image, operator_version):
+def regression(self, clickhouse_image, operator_version, native):
     """ClickHouse Operator test regression suite.
     """
-    # this must be substituted if ran in docker
+    self.context.native = native
+    if native:
+        Feature(run=load("e2e.test", "test"), flags=TE)
+    else:
+        with Cluster():
+            Feature(run=load("e2e.test", "test"), flags=TE)
 
-    # with Cluster():
-    #     Feature(run=load("e2e.test", "test"), flags=TE)
-
-    # this must be substituted if ran on bare metal
-    Feature(run=load("e2e.test", "test"), flags=TE)
 
 if main():
     regression()

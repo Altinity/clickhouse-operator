@@ -11,7 +11,7 @@ from testflows.core import *
 def main_module(self):
     with Given(f"Clean namespace {settings.test_namespace}"):
         if kubectl.launch("get namespace | grep test", timeout=60, ok_to_fail=True):
-            kubectl.delete_all_chi(settings.test_namespace, ok_to_fail=True)
+            kubectl.delete_all_chi(settings.test_namespace)
             kubectl.delete_ns(settings.test_namespace, ok_to_fail=True)
         kubectl.create_ns(settings.test_namespace)
 

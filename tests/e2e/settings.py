@@ -2,6 +2,7 @@ import os
 import yaml
 import inspect
 import pathlib
+from testflows.core import current
 
 
 def get_ch_version(test_file):
@@ -18,8 +19,7 @@ def get_docker_compose_path():
     return docker_compose_file_path, docker_compose_project_dir
 
 
-kubectl_cmd = "kubectl"
-# kubectl_cmd = f"docker-compose -f {get_docker_compose_path()[0]} exec runner kubectl"
+kubectl_cmd = "kubectl" if current().context.native else f"docker-compose -f {get_docker_compose_path()[0]} exec runner kubectl"
 
 test_namespace = os.getenv('TEST_NAMESPACE') if 'TEST_NAMESPACE' in os.environ else "test"
 
