@@ -628,9 +628,9 @@ def test_014(self):
         util.require_zookeeper()
 
         create_table = """
-        CREATE TABLE test_local(a Int8) 
+        CREATE TABLE test_local(a Int8)
         Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-        PARTITION BY tuple() 
+        PARTITION BY tuple()
         ORDER BY a
         """.replace('\r', '').replace('\n', '')
 
@@ -1055,8 +1055,8 @@ def test_019(self):
 
         create_non_replicated_table = "drop table if exists t1; create table t1 Engine = Log as select 1 as a"
         create_replicated_table = """
-        drop table if exists t2; 
-        create table t2 
+        drop table if exists t2;
+        create table t2
         Engine = ReplicatedMergeTree('/clickhouse/{installation}/{cluster}/tables/{shard}/{database}/{table}', '{replica}')
         partition by tuple() order by a
         as select 1 as a""".replace('\r', '').replace('\n', '')
@@ -1445,9 +1445,9 @@ def test_024(self):
 def test_025(self):
     config = "configs/test-025-rescaling.yaml"
     create_table = """
-    CREATE TABLE test_local(a UInt32) 
+    CREATE TABLE test_local(a UInt32)
     Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-    PARTITION BY tuple() 
+    PARTITION BY tuple()
     ORDER BY a
     """.replace('\r', '').replace('\n', '')
 

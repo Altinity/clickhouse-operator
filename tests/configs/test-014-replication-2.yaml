@@ -19,6 +19,5 @@ spec:
     clusters:
       - name: default
         layout:
-          shardsCount: 1
-          replicasCount: 3
+          replicasCount: 5
 

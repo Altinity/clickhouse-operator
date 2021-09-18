@@ -105,7 +105,7 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 		FROM 
 		(
 			SELECT DISTINCT arrayJoin([database, extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+')]) database
-			FROM cluster('%s', system.tables) tables
+			FROM clusterAllReplicas('%s', system.tables) tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 		)
@@ -123,7 +123,7 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 				name,
 				create_table_query,
 				2 AS order
-			FROM cluster('%s', system.tables) tables
+			FROM clusterAllReplicas('%s', system.tables) tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
@@ -132,14 +132,14 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
 				t.create_table_query,
 				1 AS order
-			FROM cluster('%s', system.tables) tables
+			FROM clusterAllReplicas('%s', system.tables) tables
 			LEFT JOIN 
 			(
 				SELECT 
 					DISTINCT database, 
 					name, 
 					create_table_query 
-				FROM cluster('%s', system.tables)
+				FROM clusterAllReplicas('%s', system.tables)
 				SETTINGS skip_unavailable_shards = 1
 			) t 
 			USING (database, name)
@@ -198,7 +198,7 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 		SELECT 
 			DISTINCT database AS name, 
 			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_db_query
-		FROM cluster('%s', system.tables) tables
+		FROM clusterAllReplicas('%s', system.tables) tables
 		WHERE database != 'system'
 		SETTINGS skip_unavailable_shards = 1
 		`,
@@ -208,7 +208,7 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 		SELECT 
 			DISTINCT name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
-		FROM cluster('%s', system.tables) tables
+		FROM clusterAllReplicas('%s', system.tables) tables
 		WHERE database != 'system' AND create_table_query != '' AND name NOT LIKE '.inner.%%'
 		SETTINGS skip_unavailable_shards = 1
 		`,
