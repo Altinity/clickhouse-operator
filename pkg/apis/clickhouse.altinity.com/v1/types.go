@@ -691,11 +691,9 @@ type ChiTemplates struct {
 
 // ChiPodTemplate defines full Pod Template, directly used by StatefulSet
 type ChiPodTemplate struct {
-	Name         string             `json:"name"                    yaml:"name"`
-	GenerateName string             `json:"generateName,omitempty"  yaml:"generateName,omitempty"`
-	Zone         ChiPodTemplateZone `json:"zone,omitempty"          yaml:"zone,omitempty"`
-	// Distribution is DEPRECATED - to be removed soon
-	Distribution    string               `json:"distribution"              yaml:"distribution"`
+	Name            string               `json:"name"                      yaml:"name"`
+	GenerateName    string               `json:"generateName,omitempty"    yaml:"generateName,omitempty"`
+	Zone            ChiPodTemplateZone   `json:"zone,omitempty"            yaml:"zone,omitempty"`
 	PodDistribution []ChiPodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution,omitempty"`
 	ObjectMeta      metav1.ObjectMeta    `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
 	Spec            corev1.PodSpec       `json:"spec,omitempty"            yaml:"spec,omitempty"`
@@ -709,9 +707,10 @@ type ChiPodTemplateZone struct {
 
 // ChiPodDistribution defines pod distribution
 type ChiPodDistribution struct {
-	Type   string `json:"type,omitempty"   yaml:"type,omitempty"`
-	Scope  string `json:"scope,omitempty"  yaml:"scope,omitempty"`
-	Number int    `json:"number,omitempty" yaml:"number,omitempty"`
+	Type        string `json:"type,omitempty"        yaml:"type,omitempty"`
+	Scope       string `json:"scope,omitempty"       yaml:"scope,omitempty"`
+	Number      int    `json:"number,omitempty"      yaml:"number,omitempty"`
+	TopologyKey string `json:"topologyKey,omitempty" yaml:"topologyKey,omitempty"`
 }
 
 // ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
