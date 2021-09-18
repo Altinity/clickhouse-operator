@@ -1,5 +1,3 @@
-import testflows.settings as settings
-
 from testflows.core import *
 
 from multiprocessing.dummy import Pool

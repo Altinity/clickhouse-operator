@@ -61,13 +61,6 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 COPY requirements.txt /home/master/requirements.txt
 RUN pip3 install -U -r /home/master/requirements.txt
 
-ENV GOLANG_VERSION 1.16
-RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F6BC817356A3D45E \
-    && add-apt-repository ppa:longsleep/golang-backports \
-    && apt install --no-install-recommends -y golang-${GOLANG_VERSION}-go \
-    && ln -nvsf /usr/lib/go-${GOLANG_VERSION}/bin/go /bin/go \
-    && ln -nvsf /usr/lib/go-${GOLANG_VERSION}/bin/gofmt /bin/gofmt
-
 RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys CC86BB64 \
     && add-apt-repository ppa:rmescandon/yq \
     && apt install --no-install-recommends -y yq

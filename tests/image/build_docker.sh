@@ -72,4 +72,4 @@ docker save altinity/metrics-exporter:${OPERATOR_VERSION_OLD} -o cache/m_expo_ol
 docker save altinity/clickhouse-operator:${OPERATOR_VERSION_OLD} -o cache/cho_old.dockerimage
 docker save zookeeper:3.6.3 -o cache/zk.dockerimage
 
-docker build -f Dockerfile -t altinity/clickhouse-operator-test:1.3 .
+docker build -f Dockerfile -t altinity/clickhouse-operator-test:1.4 .
