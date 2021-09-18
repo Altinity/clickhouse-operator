@@ -101,5 +101,5 @@ def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name):
             "pod", name="", ns=settings.operator_namespace, label="-l app=clickhouse-operator"
         )
         chi = kubectl.get("chi", ns=settings.test_namespace, name=chi_name)
-        
+
         return clickhouse_operator_spec, chi
