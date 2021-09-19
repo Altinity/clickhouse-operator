@@ -2,7 +2,7 @@ version: '2.3'
 
 services:
   runner:
-    image: altinity/clickhouse-operator-test:1.4
+    image: altinity/clickhouse-operator-test:1.5
     volumes:
       - "../../:/home/master/clickhouse-operator/"
     privileged: true

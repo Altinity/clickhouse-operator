@@ -5,8 +5,8 @@ def argparser(parser):
     """
     parser.add_argument("--clickhouse-image",
         type=str, dest="clickhouse_image",
-        help="ClickHouse server docker image, default: altinity/clickhouse-server:21.8.altinity_prestable", metavar="path",
-        default=os.getenv("CLICKHOUSE_IMAGE", "altinity/clickhouse-server:21.8.altinity_prestable"))
+        help="ClickHouse server docker image, default: yandex/clickhouse-server:21.8", metavar="path",
+        default=os.getenv("CLICKHOUSE_IMAGE", "yandex/clickhouse-server:21.8"))
 
     parser.add_argument("--operator-version",
         type=str, dest="operator_version",

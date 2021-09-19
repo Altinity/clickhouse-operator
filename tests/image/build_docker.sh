@@ -2,7 +2,7 @@
 
 OPERATOR_VERSION=${OPERATOR_VERSION:=0.16.0}
 OPERATOR_VERSION_OLD=${OPERATOR_VERSION_OLD:=0.15.0}
-CLICKHOUSE_IMAGE=${CLICKHOUSE_IMAGE:="altinity/clickhouse-server:21.8.altinity_prestable"}
+CLICKHOUSE_IMAGE=${CLICKHOUSE_IMAGE:="yandex/clickhouse-server:21.8"}
 CLICKHOUSE_IMAGE_OLD=${CLICKHOUSE_IMAGE_OLD:="yandex/clickhouse-server:21.3"}
 
 set -e
@@ -72,4 +72,4 @@ docker save altinity/metrics-exporter:${OPERATOR_VERSION_OLD} -o cache/m_expo_ol
 docker save altinity/clickhouse-operator:${OPERATOR_VERSION_OLD} -o cache/cho_old.dockerimage
 docker save zookeeper:3.6.3 -o cache/zk.dockerimage
 
-docker build -f Dockerfile -t altinity/clickhouse-operator-test:1.4 .
+docker build -f Dockerfile -t altinity/clickhouse-operator-test:1.5 .
