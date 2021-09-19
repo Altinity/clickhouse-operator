@@ -932,6 +932,7 @@ func (w *worker) excludeHost(ctx context.Context, host *chiv1.ChiHost) error {
 
 		_ = w.excludeHostFromService(ctx, host)
 		w.excludeHostFromClickHouseCluster(ctx, host)
+		_ = w.waitHostNoActiveQueries(ctx, host)
 	}
 	return nil
 }
@@ -1084,6 +1085,14 @@ func (w *worker) waitHostInCluster(ctx context.Context, host *chiv1.ChiHost) err
 func (w *worker) waitHostNotInCluster(ctx context.Context, host *chiv1.ChiHost) error {
 	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chiv1.ChiHost) bool {
 		return !w.schemer.IsHostInCluster(ctx, host)
+	})
+}
+
+// waitHostNoActiveQueries
+func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *chiv1.ChiHost) error {
+	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chiv1.ChiHost) bool {
+		n, _ := w.schemer.HostActiveQueriesNum(ctx, host)
+		return n <= 1
 	})
 }
 
