@@ -70,11 +70,11 @@ func (c *Cluster) getConnection(host string) *Connection {
 	return GetPooledDBConnection(NewConnectionParams(host, c.Username, c.Password, c.Port)).SetLog(c.l)
 }
 
-// QueryAny walks over provided endpoints and runs query sequentially on each endpoint.
-// In case endpoint returned result, walk is completed and result is returned
-// In case endpoint failed, continue with next endpoint
+// QueryAny walks over all endpoints and runs query sequentially on each of them.
+// In case endpoint returned result, walk is completed and result is returned.
+// In case endpoint failed, continue with next endpoint.
 func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error) {
-	// Fetch data from any of specified endpoints
+	// Try to fetch data from any of endpoints.
 	for _, host := range c.Hosts {
 		if util.IsContextDone(ctx) {
 			c.l.V(2).Info("ctx is done")
@@ -98,7 +98,7 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error
 
 // ExecAll runs set of SQL queries on all endpoints of the cluster.
 // No data is expected to be returned back.
-// Retry logic traverses the list of SQLs multiple times until all SQLs succeed
+// Retry logic traverses the list of SQLs multiple times until all SQLs succeed.
 func (c *Cluster) ExecAll(ctx context.Context, queries []string, _opts ...*QueryOptions) error {
 	if util.IsContextDone(ctx) {
 		c.l.V(2).Info("ctx is done")
