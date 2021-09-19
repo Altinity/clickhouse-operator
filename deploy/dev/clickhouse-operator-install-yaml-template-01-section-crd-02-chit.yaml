@@ -770,6 +770,8 @@ spec:
                               type: integer
                               minimum: 0
                               maximum: 65535
+                            topologyKey:
+                              type: string
                       spec:
                         # TODO specify PodSpec
                         type: object
