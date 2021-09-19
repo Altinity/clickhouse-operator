@@ -268,14 +268,29 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 
 // hostApplyPortsFromSettings
 func hostApplyPortsFromSettings(host *chiV1.ChiHost) {
-	settings := host.GetSettings()
-	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), chDefaultTCPPortNumber)
-	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), chDefaultHTTPPortNumber)
-	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), chDefaultInterserverHTTPPortNumber)
+	// Use host personal settings at first
+	ensurePortValuesFromSettings(host, host.GetSettings(), false)
+	// Fallback to common settings
+	ensurePortValuesFromSettings(host, host.GetCHI().Spec.Configuration.Settings, true)
+}
+
+// ensurePortValuesFromSettings fetches port spec from settings, if any provided
+func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings, finalize bool) {
+	fallbackTCPPortNumber := chPortNumberMustBeAssignedLater
+	fallbackHTTPPortNumber := chPortNumberMustBeAssignedLater
+	fallbackInterserverHTTPPortNumber := chPortNumberMustBeAssignedLater
+	if finalize {
+		fallbackTCPPortNumber = chDefaultTCPPortNumber
+		fallbackHTTPPortNumber = chDefaultHTTPPortNumber
+		fallbackInterserverHTTPPortNumber = chDefaultInterserverHTTPPortNumber
+	}
+	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), fallbackTCPPortNumber)
+	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPortNumber)
+	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPortNumber)
 }
 
 // ensurePortValue
-func ensurePortValue(port *int32, settings, _default int32) {
+func ensurePortValue(port *int32, value, _default int32) {
 	// Port may already be explicitly specified in podTemplate or by portDistribution
 	if *port != chPortNumberMustBeAssignedLater {
 		// Port has a value already
@@ -283,9 +298,9 @@ func ensurePortValue(port *int32, settings, _default int32) {
 	}
 
 	// Port has no value, let's use value from settings
-	if settings != chPortNumberMustBeAssignedLater {
+	if value != chPortNumberMustBeAssignedLater {
 		// Settings has a value, use it
-		*port = settings
+		*port = value
 		return
 	}
 
