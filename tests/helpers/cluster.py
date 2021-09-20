@@ -67,11 +67,11 @@ class Cluster(object):
         with Finally("I clean up"):
             self.down()
 
-    def down(self, timeout=300):
+    def down(self, timeout=600):
         """Bring cluster down by executing docker-compose down."""
         return self.shell(f"{self.docker_compose} down --timeout {timeout}  -v --remove-orphans")
 
-    def up(self, timeout=6000):
+    def up(self, timeout=600):
         with Given("docker-compose"):
             max_attempts = 5
             max_up_attempts = 1
