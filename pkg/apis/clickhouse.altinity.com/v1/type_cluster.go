@@ -103,11 +103,6 @@ func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 	cluster.Zookeeper = cluster.Zookeeper.MergeFrom(chi.Spec.Configuration.Zookeeper, MergeTypeFillEmptyValues)
 }
 
-// InheritSettingsFrom inherits settings from CHI
-func (cluster *ChiCluster) InheritSettingsFrom(chi *ClickHouseInstallation) {
-	cluster.Settings = cluster.Settings.MergeFrom(chi.Spec.Configuration.Settings)
-}
-
 // InheritFilesFrom inherits files from CHI
 func (cluster *ChiCluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 	if chi.Spec.Configuration == nil {

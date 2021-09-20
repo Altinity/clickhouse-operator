@@ -268,14 +268,29 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 
 // hostApplyPortsFromSettings
 func hostApplyPortsFromSettings(host *chiV1.ChiHost) {
-	settings := host.GetSettings()
-	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), chDefaultTCPPortNumber)
-	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), chDefaultHTTPPortNumber)
-	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), chDefaultInterserverHTTPPortNumber)
+	// Use host personal settings at first
+	ensurePortValuesFromSettings(host, host.GetSettings(), false)
+	// Fallback to common settings
+	ensurePortValuesFromSettings(host, host.GetCHI().Spec.Configuration.Settings, true)
+}
+
+// ensurePortValuesFromSettings fetches port spec from settings, if any provided
+func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings, finalize bool) {
+	fallbackTCPPortNumber := chPortNumberMustBeAssignedLater
+	fallbackHTTPPortNumber := chPortNumberMustBeAssignedLater
+	fallbackInterserverHTTPPortNumber := chPortNumberMustBeAssignedLater
+	if finalize {
+		fallbackTCPPortNumber = chDefaultTCPPortNumber
+		fallbackHTTPPortNumber = chDefaultHTTPPortNumber
+		fallbackInterserverHTTPPortNumber = chDefaultInterserverHTTPPortNumber
+	}
+	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), fallbackTCPPortNumber)
+	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPortNumber)
+	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPortNumber)
 }
 
 // ensurePortValue
-func ensurePortValue(port *int32, settings, _default int32) {
+func ensurePortValue(port *int32, value, _default int32) {
 	// Port may already be explicitly specified in podTemplate or by portDistribution
 	if *port != chPortNumberMustBeAssignedLater {
 		// Port has a value already
@@ -283,9 +298,9 @@ func ensurePortValue(port *int32, settings, _default int32) {
 	}
 
 	// Port has no value, let's use value from settings
-	if settings != chPortNumberMustBeAssignedLater {
+	if value != chPortNumberMustBeAssignedLater {
 		// Settings has a value, use it
-		*port = settings
+		*port = value
 		return
 	}
 
@@ -545,93 +560,10 @@ func (n *Normalizer) normalizePodTemplate(template *chiV1.ChiPodTemplate) {
 		// We have both key and value(s) specified explicitly
 	}
 
-	// Distribution
-	if template.Distribution == chiV1.PodDistributionOnePerHost {
-		// Known distribution, all is fine
-	} else {
-		// Default Pod Distribution
-		template.Distribution = chiV1.PodDistributionUnspecified
-	}
-
 	// PodDistribution
 	for i := range template.PodDistribution {
-		podDistribution := &template.PodDistribution[i]
-		switch podDistribution.Type {
-		case
-			chiV1.PodDistributionUnspecified,
-
-			// AntiAffinity section
-			chiV1.PodDistributionClickHouseAntiAffinity,
-			chiV1.PodDistributionShardAntiAffinity,
-			chiV1.PodDistributionReplicaAntiAffinity:
-			if podDistribution.Scope == "" {
-				podDistribution.Scope = chiV1.PodDistributionScopeCluster
-			}
-		case
-			chiV1.PodDistributionAnotherNamespaceAntiAffinity,
-			chiV1.PodDistributionAnotherClickHouseInstallationAntiAffinity,
-			chiV1.PodDistributionAnotherClusterAntiAffinity:
-			// PodDistribution is known
-		case
-			chiV1.PodDistributionMaxNumberPerNode:
-			// PodDistribution is known
-			if podDistribution.Number < 0 {
-				podDistribution.Number = 0
-			}
-		case
-			// Affinity section
-			chiV1.PodDistributionNamespaceAffinity,
-			chiV1.PodDistributionClickHouseInstallationAffinity,
-			chiV1.PodDistributionClusterAffinity,
-			chiV1.PodDistributionShardAffinity,
-			chiV1.PodDistributionReplicaAffinity,
-			chiV1.PodDistributionPreviousTailAffinity:
-			// PodDistribution is known
-
-		case chiV1.PodDistributionCircularReplication:
-			// Shortcut section
-			// All shortcuts have to be expanded
-
-			// PodDistribution is known
-
-			if podDistribution.Scope == "" {
-				podDistribution.Scope = chiV1.PodDistributionScopeCluster
-			}
-
-			// TODO need to support multi-cluster
-			cluster := n.chi.Spec.Configuration.Clusters[0]
-
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type:  chiV1.PodDistributionShardAntiAffinity,
-				Scope: podDistribution.Scope,
-			})
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type:  chiV1.PodDistributionReplicaAntiAffinity,
-				Scope: podDistribution.Scope,
-			})
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type:   chiV1.PodDistributionMaxNumberPerNode,
-				Scope:  podDistribution.Scope,
-				Number: cluster.Layout.ReplicasCount,
-			})
-
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type: chiV1.PodDistributionPreviousTailAffinity,
-			})
-
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type: chiV1.PodDistributionNamespaceAffinity,
-			})
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type: chiV1.PodDistributionClickHouseInstallationAffinity,
-			})
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type: chiV1.PodDistributionClusterAffinity,
-			})
-
-		default:
-			// PodDistribution is not known
-			podDistribution.Type = chiV1.PodDistributionUnspecified
+		if additionalPoDistributions := n.normalizePodDistribution(&template.PodDistribution[i]); additionalPoDistributions != nil {
+			template.PodDistribution = append(template.PodDistribution, additionalPoDistributions...)
 		}
 	}
 
@@ -647,6 +579,97 @@ func (n *Normalizer) normalizePodTemplate(template *chiV1.ChiPodTemplate) {
 
 	// Introduce PodTemplate into Index
 	n.chi.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
+}
+
+const defaultTopologyKey = "kubernetes.io/hostname"
+
+func (n *Normalizer) normalizePodDistribution(podDistribution *chiV1.ChiPodDistribution) []chiV1.ChiPodDistribution {
+	if podDistribution.TopologyKey == "" {
+		podDistribution.TopologyKey = defaultTopologyKey
+	}
+	switch podDistribution.Type {
+	case
+		chiV1.PodDistributionUnspecified,
+		// AntiAffinity section
+		chiV1.PodDistributionClickHouseAntiAffinity,
+		chiV1.PodDistributionShardAntiAffinity,
+		chiV1.PodDistributionReplicaAntiAffinity:
+		// PodDistribution is known
+		if podDistribution.Scope == "" {
+			podDistribution.Scope = chiV1.PodDistributionScopeCluster
+		}
+		return nil
+	case
+		chiV1.PodDistributionAnotherNamespaceAntiAffinity,
+		chiV1.PodDistributionAnotherClickHouseInstallationAntiAffinity,
+		chiV1.PodDistributionAnotherClusterAntiAffinity:
+		// PodDistribution is known
+		return nil
+	case
+		chiV1.PodDistributionMaxNumberPerNode:
+		// PodDistribution is known
+		if podDistribution.Number < 0 {
+			podDistribution.Number = 0
+		}
+		return nil
+	case
+		// Affinity section
+		chiV1.PodDistributionNamespaceAffinity,
+		chiV1.PodDistributionClickHouseInstallationAffinity,
+		chiV1.PodDistributionClusterAffinity,
+		chiV1.PodDistributionShardAffinity,
+		chiV1.PodDistributionReplicaAffinity,
+		chiV1.PodDistributionPreviousTailAffinity:
+		// PodDistribution is known
+		return nil
+
+	case chiV1.PodDistributionCircularReplication:
+		// PodDistribution is known
+		// PodDistributionCircularReplication is a shortcut to simplify complex set of other distributions
+		// All shortcuts have to be expanded
+
+		if podDistribution.Scope == "" {
+			podDistribution.Scope = chiV1.PodDistributionScopeCluster
+		}
+
+		// TODO need to support multi-cluster
+		cluster := n.chi.Spec.Configuration.Clusters[0]
+
+		// Expand shortcut
+		return []chiV1.ChiPodDistribution{
+			{
+				Type:  chiV1.PodDistributionShardAntiAffinity,
+				Scope: podDistribution.Scope,
+			},
+			{
+				Type:  chiV1.PodDistributionReplicaAntiAffinity,
+				Scope: podDistribution.Scope,
+			},
+			{
+				Type:   chiV1.PodDistributionMaxNumberPerNode,
+				Scope:  podDistribution.Scope,
+				Number: cluster.Layout.ReplicasCount,
+			},
+
+			{
+				Type: chiV1.PodDistributionPreviousTailAffinity,
+			},
+
+			{
+				Type: chiV1.PodDistributionNamespaceAffinity,
+			},
+			{
+				Type: chiV1.PodDistributionClickHouseInstallationAffinity,
+			},
+			{
+				Type: chiV1.PodDistributionClusterAffinity,
+			},
+		}
+	}
+
+	// PodDistribution is not known
+	podDistribution.Type = chiV1.PodDistributionUnspecified
+	return nil
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates

@@ -301,7 +301,7 @@ def get_pod_ports(chi_name, ns=namespace):
 def check_pod_ports(chi_name, ports, ns=namespace):
     pod_ports = get_pod_ports(chi_name, ns)
     with Then(f"Expect pod ports {pod_ports} to match {ports}"):
-        assert set(pod_ports) == set(ports)
+        assert sorted(pod_ports) == sorted(ports)
 
 
 def check_pod_image(chi_name, image, ns=namespace):

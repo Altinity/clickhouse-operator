@@ -698,11 +698,11 @@ def test_014(self):
                     host=f"chi-{chi}-{cluster}-0-1")
                 assert out == "1"
 
-    with When("Add one more replica"):
+    with When("Add 3 more replica"):
         kubectl.create_and_check(
             config="configs/test-014-replication-2.yaml",
             check={
-                "pod_count": 3,
+                "pod_count": 5,
                 "do_not_delete": 1,
             },
             timeout=600,
@@ -713,19 +713,22 @@ def test_014(self):
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
 
-        with Then("Schema objects should be migrated to the new replica"):
-            for obj in schema_objects:
-                out = clickhouse.query(
-                    chi,
-                    f"SELECT count() FROM system.tables WHERE name = '{obj}'",
-                    host=f"chi-{chi}-{cluster}-0-2")
-                assert out == "1"
-            # Check dictionary
-            out = clickhouse.query(
-                    chi,
-                    f"SELECT count() FROM system.dictionaries WHERE name = 'test_dict'",
-                    host=f"chi-{chi}-{cluster}-0-2")
-            assert out == "1"
+        with Then("Schema objects should be migrated to the new replicas"):
+            for replica in [2,3,4]:
+                host=f"chi-{chi}-{cluster}-0-{replica}"
+                print(f"Checking replica {host}")
+                for obj in schema_objects:
+                    out = clickhouse.query(
+                        chi,
+                        f"SELECT count() FROM system.tables WHERE name = '{obj}'",
+                        host=host)
+                    assert out == "1"
+                    # Check dictionary
+                    out = clickhouse.query(
+                        chi,
+                        f"SELECT count() FROM system.dictionaries WHERE name = 'test_dict'",
+                        host=host)
+                    assert out == "1"
 
         with And("Replicated table should have the data"):
             out = clickhouse.query(
@@ -734,7 +737,7 @@ def test_014(self):
                 host=f"chi-{chi}-{cluster}-0-2")
             assert out == "1"
 
-    with When("Remove replica"):
+    with When("Remove replicas"):
         kubectl.create_and_check(
             config=config,
             check={

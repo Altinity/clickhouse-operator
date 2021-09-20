@@ -69,7 +69,7 @@ func (c *ClickHouseConfigGenerator) GetSettings(host *chiv1.ChiHost) string {
 		// No host specified means request to generate common config
 		return c.generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
 	}
-	// Gnerate config for specified host
+	// Generate config for the specified host
 	return c.generateXMLConfig(host.Settings, "")
 }
 

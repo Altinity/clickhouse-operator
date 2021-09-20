@@ -1094,6 +1094,9 @@ spec:
                               description: "define, how much ClickHouse Pods could be inside selected scope with selected distribution type"
                               minimum: 0
                               maximum: 65535
+                            topologyKey:
+                              type: string
+                              description: "use for inter-pod affinity look to `pod.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution.podAffinityTerm.topologyKey`, More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity"
                       spec:
                         # TODO specify PodSpec
                         type: object
@@ -2304,6 +2307,9 @@ spec:
                               description: "define, how much ClickHouse Pods could be inside selected scope with selected distribution type"
                               minimum: 0
                               maximum: 65535
+                            topologyKey:
+                              type: string
+                              description: "use for inter-pod affinity look to `pod.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution.podAffinityTerm.topologyKey`, More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity"
                       spec:
                         # TODO specify PodSpec
                         type: object
