@@ -182,3 +182,6 @@ OPERATOR_IMAGE="$OPERATOR_IMAGE" \
 METRICS_EXPORTER_IMAGE="$METRICS_EXPORTER_IMAGE" \
 OPERATOR_NAMESPACE="-" \
 "${MANIFEST_ROOT}/dev/cat-clickhouse-operator-install-yaml.sh" > "${CUR_DIR}/clickhouse-operator-install-service.yaml"
+
+# Build clickhouse-operator-install-v1beta1.yaml, need install https://github.com/mikefarah/yq
+source "${CUR_DIR}/build-clickhouse-operator-install-v1beta1-yaml.sh"

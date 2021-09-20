@@ -63,10 +63,11 @@ def delete_chi(chi, ns=namespace, wait = True):
 def delete_all_chi(ns=namespace):
     crds = launch("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
     if "clickhouseinstallations.clickhouse.altinity.com" in crds:
-        chis = get("chi", "", ns=ns)["items"]
-        for chi in chis:
-            # kubectl(f"patch chi {chi} --type=merge -p '\{\"metadata\":\{\"finalizers\": [null]\}\}'", ns = ns)
-            delete_chi(chi["metadata"]["name"], ns)
+        chis = get("chi", "", ns=ns)
+        if "items" in chis:
+            for chi in chis["items"]:
+                # kubectl(f"patch chi {chi} --type=merge -p '\{\"metadata\":\{\"finalizers\": [null]\}\}'", ns = ns)
+                delete_chi(chi["metadata"]["name"], ns)
 
 
 def create_and_check(config, check, ns=namespace, timeout=600):
