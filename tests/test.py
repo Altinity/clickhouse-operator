@@ -44,6 +44,7 @@ if main():
             all_tests = [
                 test_operator.test_001,
                 test_operator.test_002,
+                test_operator.test_003,
                 test_operator.test_004,
                 test_operator.test_005,
                 test_operator.test_006,
