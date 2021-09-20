@@ -31,7 +31,7 @@ spec:
                 - --config-file=/etc/clickhouse-server/config.xml
 
             - name: clickhouse-backup
-              image: altinity/clickhouse-backup:1.0.14
+              image: altinity/clickhouse-backup:1.0.16
               imagePullPolicy: IfNotPresent
               command:
                 - bash
@@ -68,4 +68,3 @@ spec:
               ports:
                 - name: backup-rest
                   containerPort: 7171
-

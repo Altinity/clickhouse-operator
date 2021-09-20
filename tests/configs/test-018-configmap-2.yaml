@@ -7,7 +7,7 @@ spec:
     - name: clickhouse-version
   configuration:
     settings:
-      diaplay_name: "new_display_name"
+      display_name: "new_display_name"
       macros/test:  "new_test"
     clusters:
     - name: default

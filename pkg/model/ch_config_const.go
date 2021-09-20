@@ -81,7 +81,7 @@ const (
 const (
 	// chPortNumberMustBeAssignedLater value means that port
 	// is not assigned yet and is expected to be assigned later.
-	chPortNumberMustBeAssignedLater = 0
+	chPortNumberMustBeAssignedLater = int32(0)
 
 	// ClickHouse open ports names and values
 	chDefaultTCPPortName               = "tcp"

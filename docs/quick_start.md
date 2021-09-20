@@ -25,6 +25,12 @@ just run:
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install.yaml
 ```
+## **If you want to install operator on kubernetes version prior `1.17` in `kube-system` namespace**
+
+just run:
+```bash
+kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-v1beta1.yaml
+```
 
 ## **In case you'd like to customize installation parameters**,
 
