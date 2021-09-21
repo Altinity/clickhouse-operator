@@ -22,7 +22,7 @@ RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter ./dev/go_build_metrics_exporter.s
 # ===== Metrics exporter =====
 # ============================
 
-FROM registry.access.redhat.com/ubi7/ubi-minimal AS ubi7
+FROM registry.access.redhat.com/ubi7/ubi-minimal:latest AS ubi7
 RUN microdnf update && microdnf clean all
 
 MAINTAINER "Altinity <support@altinity.com>"
