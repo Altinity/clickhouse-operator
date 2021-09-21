@@ -90,7 +90,7 @@ func (q *QueryResult) UnzipColumnsAsStrings(columns ...*[]string) error {
 	return nil
 }
 
-// Int
+// Int fetches one int from the query result
 func (q *QueryResult) Int() (int, error) {
 	if q == nil {
 		return 0, fmt.Errorf("empty query")
