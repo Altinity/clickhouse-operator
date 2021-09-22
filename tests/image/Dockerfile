@@ -6,6 +6,7 @@ RUN apt-get update \
     apt-transport-https \
     software-properties-common \
     vim \
+    iputils-ping \
     gettext-base \
     ethtool \
     jq \
@@ -48,12 +49,12 @@ RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /
     && apt-get update \
     && apt-get install --yes docker-ce docker-ce-cli containerd.io
 
+ENV MINIKUBE_VERSION 1.22.0
+
 RUN curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | tee /etc/apt/sources.list.d/kubernetes.list \
-    && curl -LO https://storage.googleapis.com/minikube/releases/v1.23.0/minikube-linux-amd64 \
-    && install minikube-linux-amd64 /usr/local/bin/minikube \
-    && apt-get update \
-    && apt-get install -y kubectl
+    && curl -LO https://storage.googleapis.com/minikube/releases/v${MINIKUBE_VERSION}/minikube-linux-amd64 \
+    && install minikube-linux-amd64 /usr/local/bin/minikube
 
 ENV TZ=Europe/Moscow
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -75,11 +76,9 @@ RUN set -x \
 VOLUME /var/lib/docker
 EXPOSE 2375
 
-
-ENV MINIKUBE_VERSION 1.22.0
 ENV MINIKUBE_HOME /home/master/.minikube
 
-ENV K8S_VERSION=${K8S_VERSION:-1.21.2}
+ENV K8S_VERSION=${K8S_VERSION:-1.22.0}
 
 RUN wget -c --progress=bar:force:noscroll -O /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl \
    && chmod +x /usr/local/bin/kubectl
@@ -93,7 +92,7 @@ ENV KUBECONFIG /home/master/.kube/config
 COPY ./modprobe.sh /usr/local/bin/modprobe
 COPY ./dockerd-start.sh /usr/local/bin/
 COPY cache/*.dockerimage /var/lib/docker/
-COPY cache/preloaded-images-k8s-v12-v1.21.2-docker-overlay2-amd64.tar.lz4 /home/master/.minikube/cache/preloaded-tarball/
+COPY cache/preloaded-images-k8s-v12-v${K8S_VERSION}-docker-overlay2-amd64.tar.lz4 /home/master/.minikube/cache/preloaded-tarball/
 
 RUN chmod +x /usr/local/bin/dockerd-start.sh && chown -R master /home/master/.minikube \
     && chmod -R u+wrx /home/master/.minikube

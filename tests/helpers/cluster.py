@@ -78,15 +78,7 @@ class Cluster(object):
 
             for attempt in range(max_attempts):
                 with When(f"attempt {attempt}/{max_attempts}"):
-                    with By("checking if images already pulled"):
-                        cmd = self.shell("docker images | grep registry.gitlab.com/altinity-qa/clickhouse/cicd/clickhouse-operator")
-                        if cmd.exitcode != 0:
-                            with By("pulling images for all the services"):
-                                cmd = self.shell(f"{self.docker_compose} pull 2>&1 | tee")
-                                if cmd.exitcode != 0:
-                                    continue
-
-                    with And("checking if any containers are already running"):
+                    with By("checking if any containers are already running"):
                         self.shell(f"{self.docker_compose} ps | tee")
 
                     with And("executing docker-compose down just in case it is up"):

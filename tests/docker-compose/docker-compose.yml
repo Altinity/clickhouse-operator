@@ -2,20 +2,19 @@ version: '2.3'
 
 services:
   runner:
-    image: altinity/clickhouse-operator-test:1.5
+    image: zvonand/clickhouse-operator-test:1.9
     volumes:
       - "../../:/home/master/clickhouse-operator/"
     privileged: true
+    network_mode: "host"
     healthcheck:
       test: kubectl get pods --namespace kube-system | grep clickhouse-operator | grep Running || exit 1
       interval: 20s
       timeout: 10s
       retries: 10
       start_period: 300s
-
     cap_add:
       - NET_ADMIN
-      - NET_RAW
 
   # dummy service which does nothing, but allows to postpone
   # 'docker-compose up -d' till all dependecies will go healthy

@@ -442,7 +442,7 @@ spec:
       containers:
         - name: clickhouse-operator
           image: altinity/clickhouse-operator:0.16.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
@@ -507,7 +507,7 @@ spec:
 
         - name: metrics-exporter
           image: altinity/metrics-exporter:0.16.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator

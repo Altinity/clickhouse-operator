@@ -45,11 +45,7 @@ set -e
 
 docker load < /var/lib/docker/kicbase.dockerimage
 docker load < /var/lib/docker/ch_image.dockerimage
-docker load < /var/lib/docker/m_expo.dockerimage
-docker load < /var/lib/docker/cho.dockerimage
 docker load < /var/lib/docker/s_prov.dockerimage
-docker load < /var/lib/docker/cho_old.dockerimage
-docker load < /var/lib/docker/m_expo_old.dockerimage
 docker load < /var/lib/docker/zk.dockerimage
 docker load < /var/lib/docker/ch_old.dockerimage
 
@@ -59,15 +55,11 @@ chmod -R u+wrx /home/master/.kube
 chown -R master /home/master/.minikube
 chmod -R u+wrx /home/master/.minikube
 
-su master -c "minikube start --kubernetes-version=1.21.2 --base-image='gcr.io/k8s-minikube/kicbase:v0.0.26'"
+su master -c "minikube start --kubernetes-version=1.22.0 --base-image='gcr.io/k8s-minikube/kicbase:v0.0.26'"
 
 minikube image load /var/lib/docker/kicbase.dockerimage
 minikube image load /var/lib/docker/ch_image.dockerimage
-minikube image load /var/lib/docker/m_expo.dockerimage
-minikube image load /var/lib/docker/cho.dockerimage
 minikube image load /var/lib/docker/s_prov.dockerimage
-minikube image load /var/lib/docker/cho_old.dockerimage
-minikube image load /var/lib/docker/m_expo_old.dockerimage
 minikube image load /var/lib/docker/zk.dockerimage
 minikube image load /var/lib/docker/ch_old.dockerimage
 
