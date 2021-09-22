@@ -1612,7 +1612,11 @@ def test_028(self):
             "do_not_delete": 1,
         },
     )
-    
+
+    sql = "select groupArray(hostName()) online_hosts from cluster('all-sharded', system.one)"
+    print ("Before restart")
+    out = clickhouse.query_with_error(chi, sql)
+    print(out)
     with When("CHI is patched with a restart attribute"):
         cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"add\",\"path\":\"/spec/restart\",\"value\":\"RollingUpdate\"}}]'"
         kubectl.launch(cmd)
@@ -1621,7 +1625,7 @@ def test_028(self):
             kubectl.wait_chi_status(chi, "InProgress")
             with And("Queries keep running"):
                 while kubectl.get_field("chi", chi, ".status.status") == "InProgress":
-                    out = clickhouse.query_with_error(chi, "select groupArray(hostName()) online_hosts from cluster('all-sharded', system.one)")
+                    out = clickhouse.query_with_error(chi, sql)
                     print(out)
                     # print("Waiting 5 seconds")
                     time.sleep(5)
@@ -1629,4 +1633,7 @@ def test_028(self):
             #     restart = kubectl.get_field("chi", chi, ".spec.restart")
             #     assert restart == ""
     
+    print ("After restart")
+    out = clickhouse.query_with_error(chi, sql)
+    print(out)
     kubectl.delete_chi(chi)
