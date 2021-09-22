@@ -15,7 +15,7 @@ User configuration typically contains ClickHouse configuration sections with use
 
 Operator settings are initialized in-order from 3 sources:
 * `/etc/clickhouse-operator/config.yaml`
-* etc-clickhouse-operator-files configmap (also a part of default [clickhouse-operator-install.yaml][clickhouse-operator-install.yaml]
+* etc-clickhouse-operator-files configmap (also a part of default [clickhouse-operator-install-bundle.yaml][clickhouse-operator-install-bundle.yaml]
 * `ClickHouseOperatorConfiguration` resource. See [example][70-chop-config.yaml] for details.
 
 Next sources merges with the previous one. Changes to `etc-clickhouse-operator-files` are not monitored, but picked up if operator is restarted. Changes to `ClickHouseOperatorConfiguration` are monitored by an operator and applied immediately.
@@ -126,7 +126,7 @@ Default ClickHouse configuration files can be found in the following config maps
 * etc-clickhouse-operator-configd-files
 * etc-clickhouse-operator-usersd-files
 
-Config maps are initialized in default [clickhouse-operator-install.yaml][clickhouse-operator-install.yaml].
+Config maps are initialized in default [clickhouse-operator-install-bundle.yaml][clickhouse-operator-install-bundle.yaml].
 
 ### Defaults for ClickHouseInstallation
 
@@ -163,5 +163,5 @@ spec:
 ...
 ```
 
-[clickhouse-operator-install.yaml]: ../deploy/operator/clickhouse-operator-install.yaml
+[clickhouse-operator-install-bundle.yaml]: ../deploy/operator/clickhouse-operator-install-bundle.yaml
 [70-chop-config.yaml]: ./chi-examples/70-chop-config.yaml

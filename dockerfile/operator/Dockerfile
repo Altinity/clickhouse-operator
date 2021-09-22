@@ -2,7 +2,7 @@
 # ===== Builder =====
 # ===================
 
-FROM golang:1.13 AS builder
+FROM golang:1.15 AS builder
 
 # Install required packages
 RUN apt-get update && apt-get install -y apt-utils gettext-base
@@ -22,7 +22,7 @@ RUN OPERATOR_BIN=/tmp/clickhouse-operator ./dev/go_build_operator.sh
 # ===== Operator =====
 # ====================
 
-FROM registry.access.redhat.com/ubi7/ubi-minimal AS ubi7
+FROM registry.access.redhat.com/ubi7/ubi-minimal:latest AS ubi7
 RUN microdnf update && microdnf clean all
 
 MAINTAINER "Altinity <support@altinity.com>"
