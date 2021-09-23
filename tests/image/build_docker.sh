@@ -49,4 +49,4 @@ docker save ${CLICKHOUSE_IMAGE} -o cache/ch_image.dockerimage
 docker save gcr.io/k8s-minikube/storage-provisioner:v5 -o cache/s_prov.dockerimage
 docker save zookeeper:3.6.3 -o cache/zk.dockerimage
 
-docker build -f Dockerfile -t zvonand/clickhouse-operator-test:1.9 .
+docker build -f Dockerfile -t zvonand/clickhouse-operator-test:2.0 .

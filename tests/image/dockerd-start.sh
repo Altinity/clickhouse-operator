@@ -63,7 +63,7 @@ minikube image load /var/lib/docker/s_prov.dockerimage
 minikube image load /var/lib/docker/zk.dockerimage
 minikube image load /var/lib/docker/ch_old.dockerimage
 
-kubectl apply -f /home/master/clickhouse-operator/deploy/operator/clickhouse-operator-install.yaml
+kubectl apply -f /home/master/clickhouse-operator/deploy/operator/clickhouse-operator-install-bundle.yaml
 
 export CLICKHOUSE_TESTS_SERVER_BIN_PATH=/clickhouse
 export CLICKHOUSE_TESTS_CLIENT_BIN_PATH=/clickhouse
