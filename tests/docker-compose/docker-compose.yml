@@ -2,7 +2,7 @@ version: '2.3'
 
 services:
   runner:
-    image: zvonand/clickhouse-operator-test:1.9
+    image: zvonand/clickhouse-operator-test:2.0
     volumes:
       - "../../:/home/master/clickhouse-operator/"
     privileged: true
