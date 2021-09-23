@@ -1,12 +1,12 @@
 import time
 
-import clickhouse
-import kubectl
-import settings
-import util
-import manifest
+import e2e.clickhouse as clickhouse
+import e2e.kubectl as kubectl
+import e2e.manifest as manifest
+import e2e.settings as settings
+import e2e.util as util
 
-from testflows.core import TestScenario, Name, When, Then, Given, And, main, Scenario, Module, TE
+from testflows.core import *
 from testflows.asserts import error
 
 
@@ -94,8 +94,8 @@ def test_005(self):
 @TestScenario
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
 def test_006(self):
-    old_version = "yandex/clickhouse-server:20.8.6.6"
-    new_version = "yandex/clickhouse-server:21.1.7.1"
+    old_version = "yandex/clickhouse-server:21.3"
+    new_version = "yandex/clickhouse-server:21.8"
     with Then("Create initial position"):
         kubectl.create_and_check(
             config="configs/test-006-ch-upgrade-1.yaml",
@@ -139,8 +139,7 @@ def test_007(self):
 def test_operator_upgrade(config, version_from, version_to=settings.operator_version):
     with Given(f"clickhouse-operator FROM {version_from}"):
         util.set_operator_version(version_from)
-        config = util.get_full_path(config)
-        chi = manifest.get_chi_name(config)
+        chi = manifest.get_chi_name(util.get_full_path(config, True))
 
         kubectl.create_and_check(
             config=config,
@@ -185,8 +184,7 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
 def test_operator_restart(config, version=settings.operator_version):
     with Given(f"clickhouse-operator {version}"):
         util.set_operator_version(version)
-        config = util.get_full_path(config)
-        chi = manifest.get_chi_name(config)
+        chi = manifest.get_chi_name(util.get_full_path(config))
         cluster = chi
 
         kubectl.create_and_check(
@@ -234,7 +232,7 @@ def test_008(self):
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
-def test_009(self, version_from="0.11.0", version_to=settings.operator_version):
+def test_009(self, version_from="0.15.0", version_to=settings.operator_version):
     with Then("Test simple chi for operator upgrade"):
         test_operator_upgrade("configs/test-009-operator-upgrade-1.yaml", version_from, version_to)
     with Then("Test advanced chi for operator upgrade"):
@@ -260,7 +258,8 @@ def test_010(self):
     time.sleep(10)
     with And("ClickHouse should complain regarding zookeeper path"):
         out = clickhouse.query_with_error("test-010-zkroot", "select * from system.zookeeper where path = '/'")
-        assert "Received exception from server" in out, error()
+        assert "DB::Exception" in out, error()
+
 
     kubectl.delete_chi("test-010-zkroot")
 
@@ -505,8 +504,7 @@ def test_013(self):
         out = clickhouse.query_with_error(
             chi,
             "SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
-        print("cluster out=")
-        print(out)
+        note(f"cluster out:\n{out}")
         if out == "1":
             break
     else:
@@ -553,8 +551,7 @@ def test_013(self):
         out = clickhouse.query_with_error(
             chi,
             "SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
-        print("cluster out=")
-        print(out)
+        note(f"cluster out:\n{out}")
         if out == "3":
             break
     else:
@@ -598,8 +595,7 @@ def test_013(self):
             out = clickhouse.query_with_error(
                 chi,
                 "SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
-            print("cluster out=")
-            print(out)
+            note(f"cluster out:\n{out}")
             if out == "1":
                 break
         else:
@@ -753,7 +749,7 @@ def test_014(self):
             out = clickhouse.query(
                 chi,
                 "SELECT total_replicas FROM system.replicas WHERE table='test_local'")
-            print(f"Found {out} total replicas")
+            note(f"Found {out} total replicas")
             assert out == "2"
 
     with When("Restart Zookeeper pod"):
@@ -777,6 +773,7 @@ def test_014(self):
 
     with When("Delete chi"):
         kubectl.delete_chi("test-014-replication")
+
         with Then("Tables should be deleted. We can test it re-creating the chi and checking ZooKeeper contents"):
             kubectl.create_and_check(
                 config=config,
@@ -787,10 +784,11 @@ def test_014(self):
             out = clickhouse.query(
                 chi,
                 f"select count() from system.zookeeper where path ='/clickhouse/{chi}/tables/0/default'")
-            print(f"Found {out} replicated tables in ZooKeeper")
+            note(f"Found {out} replicated tables in ZooKeeper")
             assert out == "0"
-        
+
     kubectl.delete_chi("test-014-replication")
+
 
 @TestScenario
 @Name("test_015. Test circular replication with hostNetwork")
@@ -811,8 +809,7 @@ def test_015(self):
             host="chi-test-015-host-network-default-0-0",
             port="10000",
             sql="SELECT * FROM remote('chi-test-015-host-network-default-0-1:11000', system.one)")
-        print("remote out=")
-        print(out)
+        note(f"remote out:\n{out}")
 
     with Then("Distributed query should work"):
         for _ in range(20):
@@ -822,8 +819,7 @@ def test_015(self):
                 host="chi-test-015-host-network-default-0-0",
                 port="10000",
                 sql="SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
-            print("cluster out=")
-            print(out)
+            note(f"cluster out:\n{out}")
             if out == "2":
                 break
         else:
@@ -973,9 +969,9 @@ def test_017(self):
     ]
 
     for q in queries:
-        print(f"{q}")
+        note(q)
     test_query = "select min(offset), max(offset) from test_max"
-    print(f"{test_query}")
+    note(test_query)
 
     for shard in range(pod_count):
         host = f"chi-{chi}-default-{shard}-0"
@@ -983,8 +979,7 @@ def test_017(self):
             clickhouse.query(chi, host=host, sql=q)
         out = clickhouse.query(chi, host=host, sql=test_query)
         ver = clickhouse.query(chi, host=host, sql="select version()")
-
-        print(f"version: {ver}, result: {out}")
+        note(f"version: {ver}, result: {out}")
 
     kubectl.delete_chi(chi)
 
@@ -1014,11 +1009,11 @@ def test_018(self):
         with Then("Configmap on the pod should be updated"):
             display_name = kubectl.launch(
                 f"exec chi-{chi}-default-0-0-0 -- bash -c \"grep display_name /etc/clickhouse-server/config.d/chop-generated-settings.xml\"")
-            print(display_name)
+            note(display_name)
             assert "new_display_name" in display_name
             with Then("And ClickHouse should pick them up"):
                 macros = clickhouse.query(chi, "SELECT substitution from system.macros where macro = 'test'")
-                print(macros)
+                note(macros)
                 assert "new_test" == macros
 
     kubectl.delete_chi(chi)
@@ -1028,8 +1023,7 @@ def test_018(self):
 @Name("test_019. Test that volume is correctly retained and can be re-attached")
 def test_019(self):
     util.require_zookeeper()
-
-    config="configs/test-019-retain-volume-1.yaml"
+    config = "configs/test-019-retain-volume-1.yaml"
     chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
         config=config,
@@ -1071,20 +1065,19 @@ def test_019(self):
         )
 
         with Then("PVC should be re-mounted"):
-        
             with Then("Non-replicated table should have data"):
                 out = clickhouse.query(chi, sql="select a from t1")
                 assert out == "1"
-                
+
             with And("Replicated table should have data"):
                 out = clickhouse.query(chi, sql="select a from t2")
                 assert out == "1"
-            
+
     with When("Stop the Installation"):
         kubectl.create_and_check(
             config="configs/test-019-retain-volume-2.yaml",
             check={
-                "object_counts": { 
+                "object_counts": {
                     "statefulset": 1,  # When stopping, pod is removed but StatefulSet and all volumes are in place
                     "pod": 0,
                     "service": 1,  # load balancer service should be removed
@@ -1106,11 +1099,11 @@ def test_019(self):
             with Then("Non-replicated table should have data"):
                 out = clickhouse.query(chi, sql="select a from t1")
                 assert out == "1"
-                
+
             with And("Replicated table should have data"):
                 out = clickhouse.query(chi, sql="select a from t2")
                 assert out == "1"
-    
+
     with When("Add a second replica"):
         kubectl.create_and_check(
             config="configs/test-019-retain-volume-3.yaml",
@@ -1227,6 +1220,7 @@ def test_020(self):
 @Name("test_021. Test rescaling storage")
 def test_021(self):
     config = "configs/test-021-rescale-volume-01.yaml"
+    chi = manifest.get_chi_name(util.get_full_path(config))
 
     with Given("Default storage class is expandable"):
         default_storage_class = kubectl.get_default_storage_class()
@@ -1236,7 +1230,6 @@ def test_021(self):
         if allow_volume_expansion != "true":
             kubectl.launch(f"patch storageclass {default_storage_class} -p '{{\"allowVolumeExpansion\":true}}'")
 
-    chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
         config=config,
         check={
@@ -1487,16 +1480,16 @@ def test_025(self):
                 lb_error_time = time.time()
             if "Exception" in cnt_distr_lb or cnt_distr_lb == 0:
                 distr_lb_error_time = time.time()
-            print(f"local via loadbalancer: {cnt_lb}, distributed via loadbalancer: {cnt_distr_lb}")
+            note(f"local via loadbalancer: {cnt_lb}, distributed via loadbalancer: {cnt_distr_lb}")
             if "Exception" not in cnt_local:
-                print(f"local: {cnt_local}, distr: {cnt_distr_lb}")
+                note(f"local: {cnt_local}, distr: {cnt_distr_lb}")
                 if cnt_local == numbers:
                     break
                 latent_replica_time = time.time()
-                print("Replicated table did not catch up")
-            print("Waiting 1 second.")
+                note("Replicated table did not catch up")
+            note("Waiting 1 second.")
             time.sleep(1)
-        print(f"Tables not ready: {round(distr_lb_error_time - start_time)}s, data not ready: {round(latent_replica_time - distr_lb_error_time)}s")
+        note(f"Tables not ready: {round(distr_lb_error_time - start_time)}s, data not ready: {round(latent_replica_time - distr_lb_error_time)}s")
 
         with Then("Query to the distributed table via load balancer should never fail"):
             assert round(distr_lb_error_time - start_time) == 0
@@ -1504,7 +1497,8 @@ def test_025(self):
             assert round(lb_error_time - start_time) == 0
 
     kubectl.delete_chi(chi)
-    
+
+
 @TestScenario
 @Name("test_026. Test mixed single and multi-volume configuration in one cluster")
 def test_026(self):
@@ -1615,9 +1609,9 @@ def test_028(self):
     )
 
     sql = "select groupArray(hostName()) online_hosts from cluster('all-sharded', system.one)"
-    print ("Before restart")
+    note("Before restart")
     out = clickhouse.query_with_error(chi, sql)
-    print(out)
+    note(out)
     with When("CHI is patched with a restart attribute"):
         cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"add\",\"path\":\"/spec/restart\",\"value\":\"RollingUpdate\"}}]'"
         kubectl.launch(cmd)
@@ -1634,7 +1628,7 @@ def test_028(self):
             #     restart = kubectl.get_field("chi", chi, ".spec.restart")
             #     assert restart == ""
     
-    print ("After restart")
+    note("After restart")
     out = clickhouse.query_with_error(chi, sql)
-    print(out)
+    note(out)
     kubectl.delete_chi(chi)
