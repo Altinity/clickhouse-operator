@@ -200,12 +200,12 @@ def test_operator_restart(config, version=settings.operator_version):
                 "do_not_delete": 1,
             })
         time.sleep(10)
+        kubectl.wait_chi_status(chi, "Completed")
         start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
         with When("Restart operator"):
             util.restart_operator()
             time.sleep(10)
-            kubectl.wait_chi_status(chi, "Completed")
             kubectl.wait_objects(
                 chi,
                 {
@@ -214,9 +214,10 @@ def test_operator_restart(config, version=settings.operator_version):
                     "service": 2,
                 })
             time.sleep(10)
-            
+            kubectl.wait_chi_status(chi, "Completed")
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+
             with Then("ClickHouse pods should not be restarted"):
-                new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
                 assert start_time == new_start_time
 
         kubectl.delete_chi(chi)
