@@ -2757,6 +2757,14 @@ rules:
     - list
     - watch
 - apiGroups:
+    - clickhouse.altinity.com
+  resources:
+    - clickhouseinstallations/finalizers
+    - clickhouseinstallationtemplates/finalizers
+    - clickhouseoperatorconfigurations/finalizers
+  verbs:
+    - update
+- apiGroups:
     - ""
   resources:
     - secrets
