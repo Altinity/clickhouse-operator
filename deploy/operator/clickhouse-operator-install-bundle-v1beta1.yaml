@@ -17,57 +17,46 @@ spec:
       type: string
       description: Operator version
       priority: 1 # show in wide view
-      JSONPath: .status.version
     - name: clusters
       type: integer
       description: Clusters count
       priority: 0 # show in standard view
-      JSONPath: .status.clusters
     - name: shards
       type: integer
       description: Shards count
       priority: 1 # show in wide view
-      JSONPath: .status.shards
     - name: hosts
       type: integer
       description: Hosts count
       priority: 0 # show in standard view
-      JSONPath: .status.hosts
     - name: taskID
       type: string
       description: TaskID
       priority: 1 # show in wide view
-      JSONPath: .status.taskID
     - name: status
       type: string
       description: CHI status
       priority: 0 # show in standard view
-      JSONPath: .status.status
     - name: updated
       type: integer
       description: Updated hosts count
       priority: 1 # show in wide view
-      JSONPath: .status.updated
     - name: added
       type: integer
       description: Added hosts count
       priority: 1 # show in wide view
-      JSONPath: .status.added
     - name: deleted
       type: integer
       description: Hosts deleted count
       priority: 1 # show in wide view
-      JSONPath: .status.deleted
     - name: delete
       type: integer
       description: Hosts to be deleted count
       priority: 1 # show in wide view
-      JSONPath: .status.delete
     - name: endpoint
       type: string
       description: Client access endpoint
       priority: 1 # show in wide view
-      JSONPath: .status.endpoint
   validation:
     openAPIV3Schema:
       description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more ClickHouse clusters"
@@ -1230,57 +1219,46 @@ spec:
       type: string
       description: Operator version
       priority: 1 # show in wide view
-      JSONPath: .status.version
     - name: clusters
       type: integer
       description: Clusters count
       priority: 0 # show in standard view
-      JSONPath: .status.clusters
     - name: shards
       type: integer
       description: Shards count
       priority: 1 # show in wide view
-      JSONPath: .status.shards
     - name: hosts
       type: integer
       description: Hosts count
       priority: 0 # show in standard view
-      JSONPath: .status.hosts
     - name: taskID
       type: string
       description: TaskID
       priority: 1 # show in wide view
-      JSONPath: .status.taskID
     - name: status
       type: string
       description: CHI status
       priority: 0 # show in standard view
-      JSONPath: .status.status
     - name: updated
       type: integer
       description: Updated hosts count
       priority: 1 # show in wide view
-      JSONPath: .status.updated
     - name: added
       type: integer
       description: Added hosts count
       priority: 1 # show in wide view
-      JSONPath: .status.added
     - name: deleted
       type: integer
       description: Hosts deleted count
       priority: 1 # show in wide view
-      JSONPath: .status.deleted
     - name: delete
       type: integer
       description: Hosts to be deleted count
       priority: 1 # show in wide view
-      JSONPath: .status.delete
     - name: endpoint
       type: string
       description: Client access endpoint
       priority: 1 # show in wide view
-      JSONPath: .status.endpoint
   validation:
     openAPIV3Schema:
       description: "define a template which describe Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more ClickHouse clusters, would be used in `chi.spec.useTemplates`"
@@ -2443,7 +2421,6 @@ spec:
       type: string
       description: Watch namespaces
       priority: 0 # show in standard view
-      JSONPath: .status
   validation:
     openAPIV3Schema:
       type: object
@@ -2616,7 +2593,10 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
 spec:
-  additionalPrinterColumns: []
+  versions:
+    - name: null
+      additionalPrinterColumns: null
+      schema: null
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -2743,7 +2723,10 @@ rules:
       - get
       - list
 spec:
-  additionalPrinterColumns: []
+  versions:
+    - name: null
+      additionalPrinterColumns: null
+      schema: null
 ---
 # Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
 # ClusterRoleBinding is namespace-less and must have unique name
@@ -2760,7 +2743,10 @@ subjects:
     name: clickhouse-operator
     namespace: kube-system
 spec:
-  additionalPrinterColumns: []
+  versions:
+    - name: null
+      additionalPrinterColumns: null
+      schema: null
 ---
 # Possible Template Parameters:
 #
@@ -2933,7 +2919,10 @@ data:
     #  LabelClusterScopeCycleOffset
     appendScopeLabels: "no"
 spec:
-  additionalPrinterColumns: []
+  versions:
+    - name: null
+      additionalPrinterColumns: null
+      schema: null
 ---
 # Possible Template Parameters:
 #
@@ -2950,7 +2939,10 @@ metadata:
     app: clickhouse-operator
 data:
 spec:
-  additionalPrinterColumns: []
+  versions:
+    - name: null
+      additionalPrinterColumns: null
+      schema: null
 ---
 # Possible Template Parameters:
 #
@@ -3006,7 +2998,10 @@ data:
         </part_log>
     </yandex>
 spec:
-  additionalPrinterColumns: []
+  versions:
+    - name: null
+      additionalPrinterColumns: null
+      schema: null
 ---
 # Possible Template Parameters:
 #
@@ -3105,7 +3100,10 @@ data:
   readme: |
     Templates in this folder are packaged with an operator and available via 'useTemplate'
 spec:
-  additionalPrinterColumns: []
+  versions:
+    - name: null
+      additionalPrinterColumns: null
+      schema: null
 ---
 # Possible Template Parameters:
 #
@@ -3164,7 +3162,10 @@ data:
         </profiles>
     </yandex>
 spec:
-  additionalPrinterColumns: []
+  versions:
+    - name: null
+      additionalPrinterColumns: null
+      schema: null
 ---
 # Possible Template Parameters:
 #
@@ -3289,7 +3290,10 @@ spec:
               mountPath: /etc/clickhouse-operator/templates.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/users.d
-  additionalPrinterColumns: []
+  versions:
+    - name: null
+      additionalPrinterColumns: null
+      schema: null
 ---
 # Possible Template Parameters:
 #
@@ -3313,4 +3317,7 @@ spec:
       name: clickhouse-operator-metrics
   selector:
     app: clickhouse-operator
-  additionalPrinterColumns: []
+  versions:
+    - name: null
+      additionalPrinterColumns: null
+      schema: null

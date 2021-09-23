@@ -69,7 +69,7 @@ func (c *Cluster) queryUnzipColumns(ctx context.Context, hosts []string, sql str
 	return query.UnzipColumnsAsStrings(columns...)
 }
 
-// QueryUnzip2Columns
+// QueryUnzip2Columns unzips query result into two columns
 func (c *Cluster) QueryUnzip2Columns(ctx context.Context, endpoints []string, sql string) ([]string, []string, error) {
 	var column1 []string
 	var column2 []string
@@ -113,7 +113,7 @@ func (c *Cluster) ExecHost(ctx context.Context, host *chop.ChiHost, SQLs []strin
 	return c.ExecAll(ctx, SQLs, opts)
 }
 
-// QueryHost
+// QueryHost runs specified query on specified host
 func (c *Cluster) QueryHost(ctx context.Context, host *chop.ChiHost, sql string, _opts ...*clickhouse.QueryOptions) (*clickhouse.QueryResult, error) {
 	hosts := CreateFQDNs(host, chop.ChiHost{}, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
@@ -127,7 +127,7 @@ func (c *Cluster) QueryHost(ctx context.Context, host *chop.ChiHost, sql string,
 	return c.SetHosts(hosts).QueryAny(ctx, sql)
 }
 
-// QueryHostInt
+// QueryHostInt runs specified query on specified host and returns one int as a result
 func (c *Cluster) QueryHostInt(ctx context.Context, host *chop.ChiHost, sql string, _opts ...*clickhouse.QueryOptions) (int, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")

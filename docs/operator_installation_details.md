@@ -1,13 +1,13 @@
 # Install ClickHouse Operator
 
-Verify [clickhouse-operator-install.yaml][clickhouse-operator-install.yaml] file availability.
+Verify [clickhouse-operator-install-bundle.yaml][clickhouse-operator-install-bundle.yaml] file availability.
 In is located in `deploy/operator` folder inside `clickhouse-operator` sources.
 
 ## Install
 Operator installation process is quite straightforward and consists of one main step - deploy **ClickHouse operator**.
 We'll apply operator manifest directly from github repo
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install.yaml
+kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-bundle.yaml
 ```
 
 The following results are expected:
@@ -139,7 +139,7 @@ clickhouse-operator    1/1     1            1           31m
 
 ```
 
-[clickhouse-operator-install.yaml]: ../deploy/operator/clickhouse-operator-install.yaml
+[clickhouse-operator-install-bundle.yaml]: ../deploy/operator/clickhouse-operator-install-bundle.yaml
 [customresourcedefinitions]: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions
 [configure-service-account]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
 [rolebinding-and-clusterrolebinding]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#rolebinding-and-clusterrolebinding

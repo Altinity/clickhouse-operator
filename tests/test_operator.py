@@ -1597,3 +1597,44 @@ def test_027(self):
                     "pod_count": 1,
                 },
             )
+
+@TestScenario
+@Name("test_028. Test rolling restart")
+def test_028(self):
+    util.require_zookeeper()
+    
+    config="configs/test-014-replication-1.yaml"
+    
+    chi = manifest.get_chi_name(util.get_full_path(config))
+    kubectl.create_and_check(
+        config=config,
+        check={
+            "pod_count": 2,
+            "do_not_delete": 1,
+        },
+    )
+
+    sql = "select groupArray(hostName()) online_hosts from cluster('all-sharded', system.one)"
+    print ("Before restart")
+    out = clickhouse.query_with_error(chi, sql)
+    print(out)
+    with When("CHI is patched with a restart attribute"):
+        cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"add\",\"path\":\"/spec/restart\",\"value\":\"RollingUpdate\"}}]'"
+        kubectl.launch(cmd)
+
+        with Then("Operator should start processing a change"):
+            kubectl.wait_chi_status(chi, "InProgress")
+            with And("Queries keep running"):
+                while kubectl.get_field("chi", chi, ".status.status") == "InProgress":
+                    out = clickhouse.query_with_error(chi, sql)
+                    print(out)
+                    # print("Waiting 5 seconds")
+                    time.sleep(5)
+            # with And("Restart attribute is cleaned up upon completion"):
+            #     restart = kubectl.get_field("chi", chi, ".spec.restart")
+            #     assert restart == ""
+    
+    print ("After restart")
+    out = clickhouse.query_with_error(chi, sql)
+    print(out)
+    kubectl.delete_chi(chi)
