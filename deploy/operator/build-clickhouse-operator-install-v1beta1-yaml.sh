@@ -12,7 +12,7 @@ for YAML in "${ALL_YAML[@]}"; do
   yq eval -e --inplace '(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.version) = .spec.versions[0].name' "${YAML}"
   yq eval -e --inplace '(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.additionalPrinterColumns) = .spec.versions[0].additionalPrinterColumns' "${YAML}"
   # sed -i -e 's/jsonPath/JSONPath/g' "${YAML}"
-  yq eval -e --inplace 'with(.spec.additionalPrinterColumns.[]; .JSONPath = .jsonPath )' "${YAML}"
+  yq eval -e --inplace 'with(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.additionalPrinterColumns.[]; .JSONPath = .jsonPath )' "${YAML}"
   yq eval -e --inplace 'del(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.additionalPrinterColumns[].jsonPath)' "${YAML}"
   yq eval -e --inplace '(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.validation ) = .spec.versions[0].schema' "${YAML}"
   yq eval -e --inplace 'del(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.versions)' "${YAML}"
