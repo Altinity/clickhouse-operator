@@ -14,13 +14,10 @@ operator_label = "-l app=clickhouse-operator"
 
 def get_full_path(test_file, baremetal=True):
     # this must be substituted if ran in docker
-    if current().context.native:
-        return os.path.join(os.path.dirname(os.path.abspath(__file__)), f"../{test_file}")
+    if current().context.native or baremetal:
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), f"{test_file}")
     else:
-        if baremetal:
-            return os.path.join(os.path.dirname(os.path.abspath(__file__)), f"../{test_file}")
-        else:
-            return "/home/master/clickhouse-operator/tests/" + test_file
+        return "/home/master/clickhouse-operator/tests/e2e/" + test_file
 
 
 def set_operator_version(version, ns=settings.operator_namespace, timeout=600):
@@ -50,7 +47,7 @@ def restart_operator(ns=settings.operator_namespace, timeout=600):
 def require_zookeeper(manifest='zookeeper-1-node-1GB-for-tests-only.yaml', force_install=False):
     if force_install or kubectl.get_count("service", name="zookeeper") == 0:
         with Given("Zookeeper is missing, installing"):
-            config = get_full_path(f"../deploy/zookeeper/quick-start-persistent-volume/{manifest}", False)
+            config = get_full_path(f"../../deploy/zookeeper/quick-start-persistent-volume/{manifest}", False)
             kubectl.apply(config)
             kubectl.wait_object("pod", "zookeeper-0")
             kubectl.wait_pod_status("zookeeper-0", "Running")

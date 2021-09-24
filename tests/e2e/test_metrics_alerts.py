@@ -791,8 +791,8 @@ def test_zookeeper_alerts(self):
 if main():
     with Module("main"):
         prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi = alerts.initialize(
-            chi_file='../configs/test-cluster-for-alerts.yaml',
-            chi_template_file='../templates/tpl-clickhouse-alerts.yaml',
+            chi_file='configs/test-cluster-for-alerts.yaml',
+            chi_template_file='templates/tpl-clickhouse-alerts.yaml',
             chi_name='test-cluster-for-alerts',
         )
 

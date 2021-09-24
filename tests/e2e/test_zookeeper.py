@@ -51,8 +51,8 @@ def test_zookeeper_rescale(self):
 if main():
     with Module("main"):
         clickhouse_operator_spec, chi = util.install_clickhouse_and_zookeeper(
-            chi_file='../configs/test-cluster-for-zookeeper.yaml',
-            chi_template_file='../templates/tpl-clickhouse-latest.yaml',
+            chi_file='configs/test-cluster-for-zookeeper.yaml',
+            chi_template_file='templates/tpl-clickhouse-latest.yaml',
             chi_name='test-cluster-for-zk',
         )
         util.wait_clickhouse_cluster_ready(chi)

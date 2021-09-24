@@ -6,17 +6,18 @@ import e2e.util as util
 
 from testflows.core import *
 
-# python3 tests/e2e/test.py --only operator*
+
 @TestModule
 def main_module(self):
     with Given(f"Clean namespace {settings.test_namespace}"):
-        kubectl.delete_all_chi(settings.test_namespace)
-        kubectl.delete_ns(settings.test_namespace, ok_to_fail=True)
+        if kubectl.launch("get namespace | grep test", timeout=60, ok_to_fail=True):
+            kubectl.delete_all_chi(settings.test_namespace)
+            kubectl.delete_ns(settings.test_namespace, ok_to_fail=True)
         kubectl.create_ns(settings.test_namespace)
 
     with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
         if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
-            config = util.get_full_path(settings.clickhouse_operator_install)
+            config = util.get_full_path(settings.clickhouse_operator_install, False)
             kubectl.apply(
                 ns=settings.operator_namespace,
                 config=f"<(cat {config} | "
@@ -30,7 +31,7 @@ def main_module(self):
         util.set_operator_version(settings.operator_version)
 
     with Given(f"Install ClickHouse template {settings.clickhouse_template}"):
-        kubectl.apply(util.get_full_path(settings.clickhouse_template), settings.test_namespace)
+        kubectl.apply(util.get_full_path(settings.clickhouse_template, False), settings.test_namespace)
 
     with Given(f"ClickHouse version {settings.clickhouse_version}"):
         pass
@@ -85,9 +86,7 @@ def main_module(self):
             else:
                 Scenario(test=t[0], args=t[1])()
 
-# python3 tests/e2e/test.py --only=clickhouse/*
-@TestModule
-def clickhouse_module(self):
+    with Module("ClickHouse tests"):
         all_tests = [
             test_clickhouse.test_ch_001,
             test_clickhouse.test_ch_002,
@@ -100,6 +99,7 @@ def clickhouse_module(self):
 
         for t in run_test:
             Scenario(test=t)()
+
 
 @TestFeature
 def test(self):
