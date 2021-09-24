@@ -6,7 +6,7 @@ import e2e.util as util
 
 from testflows.core import *
 
-# python3 tests/e2e/test.py --only operator*
+# python3 regression.py --only "/clickhouse_operator/test/main/operator*"
 @TestModule
 def main_module(self):
     with Given(f"Clean namespace {settings.test_namespace}"):
@@ -85,9 +85,9 @@ def main_module(self):
             else:
                 Scenario(test=t[0], args=t[1])()
 
-# python3 tests/e2e/test.py --only=clickhouse/*
+# python3 regression.py --only "/clickhouse_operator/test/clickhouse/*"
 @TestModule
-def clickhouse_module(self):
+def clickhouse(self):
         all_tests = [
             test_clickhouse.test_ch_001,
             test_clickhouse.test_ch_002,
