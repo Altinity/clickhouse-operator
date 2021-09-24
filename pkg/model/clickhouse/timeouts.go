@@ -20,7 +20,7 @@ import (
 
 const (
 	defaultConnectTimeout = 10 * time.Second
-	defaultQueryTimeout   = 10 * time.Second
+	defaultQueryTimeout   = 60 * time.Second
 )
 
 // Timeouts
