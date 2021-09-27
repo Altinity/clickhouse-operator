@@ -419,7 +419,7 @@ spec:
             number: 2
             # Apply podDistribution on per-host basis
             topologyKey: "kubernetes.io/hostname"
-            # Apply podDsitribution on per-zone basis
+            # Apply podDistribution on per-zone basis
             #topologyKey: "kubernetes.io/zone"
 
         # type PodSpec struct {} from k8s.io/core/v1
