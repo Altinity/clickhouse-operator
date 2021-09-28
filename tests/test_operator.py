@@ -1656,6 +1656,7 @@ def test_029(self):
         check={
             "pod_count": 2,
             "do_not_delete": 1,
+            "chi_status": "InProgress",  # do not wait
         },
     )
     
