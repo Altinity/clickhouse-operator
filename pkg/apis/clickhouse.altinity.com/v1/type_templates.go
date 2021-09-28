@@ -46,143 +46,169 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) *C
 		templates = NewChiTemplates()
 	}
 
-	if len(from.HostTemplates) > 0 {
-		// We have templates to copy from
-		// Append HostTemplates from `from` to receiver
-		if templates.HostTemplates == nil {
-			templates.HostTemplates = make([]ChiHostTemplate, 0)
-		}
-		// Loop over all 'from' templates and copy it in case no such template in receiver
-		for fromIndex := range from.HostTemplates {
-			fromTemplate := &from.HostTemplates[fromIndex]
-
-			// Try to find entry with the same name among local templates in receiver
-			sameNameFound := false
-			for toIndex := range templates.HostTemplates {
-				toTemplate := &templates.HostTemplates[toIndex]
-				if toTemplate.Name == fromTemplate.Name {
-					// Receiver already have such a template
-					sameNameFound = true
-					// Override `to` template with `from` template
-					//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
-					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-						//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
-					}
-					break
-				}
-			}
-
-			if !sameNameFound {
-				// Receiver does not have template with such a name
-				// Append template from `from`
-				templates.HostTemplates = append(templates.HostTemplates, *fromTemplate.DeepCopy())
-			}
-		}
-	}
-
-	if len(from.PodTemplates) > 0 {
-		// We have templates to copy from
-		// Append PodTemplates from `from` to receiver
-		if templates.PodTemplates == nil {
-			templates.PodTemplates = make([]ChiPodTemplate, 0)
-		}
-		// Loop over all 'from' templates and copy it in case no such template in receiver
-		for fromIndex := range from.PodTemplates {
-			fromTemplate := &from.PodTemplates[fromIndex]
-
-			// Try to find entry with the same name among local templates in receiver
-			sameNameFound := false
-			for toIndex := range templates.PodTemplates {
-				toTemplate := &templates.PodTemplates[toIndex]
-				if toTemplate.Name == fromTemplate.Name {
-					// Receiver already have such a template
-					sameNameFound = true
-					// Override `to` template with `from` template
-					//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
-					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-						//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
-					}
-					break
-				}
-			}
-
-			if !sameNameFound {
-				// Receiver does not have template with such a name
-				// Append template from `from`
-				templates.PodTemplates = append(templates.PodTemplates, *fromTemplate.DeepCopy())
-			}
-		}
-	}
-
-	if len(from.VolumeClaimTemplates) > 0 {
-		// We have templates to copy from
-		// Append VolumeClaimTemplates from `from` to receiver
-		if templates.VolumeClaimTemplates == nil {
-			templates.VolumeClaimTemplates = make([]ChiVolumeClaimTemplate, 0)
-		}
-		// Loop over all 'from' templates and copy it in case no such template in receiver
-		for fromIndex := range from.VolumeClaimTemplates {
-			fromTemplate := &from.VolumeClaimTemplates[fromIndex]
-
-			// Try to find entry with the same name among local templates in receiver
-			sameNameFound := false
-			for toIndex := range templates.VolumeClaimTemplates {
-				toTemplate := &templates.VolumeClaimTemplates[toIndex]
-				if toTemplate.Name == fromTemplate.Name {
-					// Receiver already have such a template
-					sameNameFound = true
-					// Override `to` template with `from` template
-					//templates.VolumeClaimTemplates[toIndex] = *fromTemplate.DeepCopy()
-					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-						//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
-					}
-					break
-				}
-			}
-
-			if !sameNameFound {
-				// Receiver does not have template with such a name
-				// Append template from `from`
-				templates.VolumeClaimTemplates = append(templates.VolumeClaimTemplates, *fromTemplate.DeepCopy())
-			}
-		}
-	}
-
-	if len(from.ServiceTemplates) > 0 {
-		// We have templates to copy from
-		// Append ServiceTemplates from `from` to receiver
-		if templates.ServiceTemplates == nil {
-			templates.ServiceTemplates = make([]ChiServiceTemplate, 0)
-		}
-		// Loop over all 'from' templates and copy it in case no such template in receiver
-		for fromIndex := range from.ServiceTemplates {
-			fromTemplate := &from.ServiceTemplates[fromIndex]
-
-			// Try to find entry with the same name among local templates in receiver
-			sameNameFound := false
-			for toIndex := range templates.ServiceTemplates {
-				toTemplate := &templates.ServiceTemplates[toIndex]
-				if toTemplate.Name == fromTemplate.Name {
-					// Receiver already have such a template
-					sameNameFound = true
-					// Override `to` template with `from` template
-					//templates.ServiceTemplates[toIndex] = *fromTemplate.DeepCopy()
-					if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-						//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
-					}
-					break
-				}
-			}
-
-			if !sameNameFound {
-				// Receiver does not have template with such a name
-				// Append template from `from`
-				templates.ServiceTemplates = append(templates.ServiceTemplates, *fromTemplate.DeepCopy())
-			}
-		}
-	}
+	templates.mergeHostTemplates(from)
+	templates.mergePodTemplates(from)
+	templates.mergeVolumeClaimTemplates(from)
+	templates.mergeServiceTemplates(from)
 
 	return templates
+}
+
+func (templates *ChiTemplates) mergeHostTemplates(from *ChiTemplates) {
+	if len(from.HostTemplates) == 0 {
+		return
+	}
+
+	// We have templates to copy from
+	// Append HostTemplates from `from` to receiver
+
+	if templates.HostTemplates == nil {
+		templates.HostTemplates = make([]ChiHostTemplate, 0)
+	}
+
+	// Loop over all 'from' templates and copy it in case no such template in receiver
+	for fromIndex := range from.HostTemplates {
+		fromTemplate := &from.HostTemplates[fromIndex]
+
+		// Try to find entry with the same name among local templates in receiver
+		sameNameFound := false
+		for toIndex := range templates.HostTemplates {
+			toTemplate := &templates.HostTemplates[toIndex]
+			if toTemplate.Name == fromTemplate.Name {
+				// Receiver already have such a template
+				sameNameFound = true
+				// Override `to` template with `from` template
+				//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
+				if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
+					//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
+				}
+				break
+			}
+		}
+
+		if !sameNameFound {
+			// Receiver does not have template with such a name
+			// Append template from `from`
+			templates.HostTemplates = append(templates.HostTemplates, *fromTemplate.DeepCopy())
+		}
+	}
+}
+
+func (templates *ChiTemplates) mergePodTemplates(from *ChiTemplates) {
+	if len(from.PodTemplates) == 0 {
+		return
+	}
+
+	// We have templates to copy from
+	// Append PodTemplates from `from` to receiver
+
+	if templates.PodTemplates == nil {
+		templates.PodTemplates = make([]ChiPodTemplate, 0)
+	}
+	// Loop over all 'from' templates and copy it in case no such template in receiver
+	for fromIndex := range from.PodTemplates {
+		fromTemplate := &from.PodTemplates[fromIndex]
+
+		// Try to find entry with the same name among local templates in receiver
+		sameNameFound := false
+		for toIndex := range templates.PodTemplates {
+			toTemplate := &templates.PodTemplates[toIndex]
+			if toTemplate.Name == fromTemplate.Name {
+				// Receiver already have such a template
+				sameNameFound = true
+				// Override `to` template with `from` template
+				//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
+				if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
+					//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
+				}
+				break
+			}
+		}
+
+		if !sameNameFound {
+			// Receiver does not have template with such a name
+			// Append template from `from`
+			templates.PodTemplates = append(templates.PodTemplates, *fromTemplate.DeepCopy())
+		}
+	}
+}
+
+func (templates *ChiTemplates) mergeVolumeClaimTemplates(from *ChiTemplates) {
+	if len(from.VolumeClaimTemplates) == 0 {
+		return
+	}
+
+	// We have templates to copy from
+	// Append VolumeClaimTemplates from `from` to receiver
+
+	if templates.VolumeClaimTemplates == nil {
+		templates.VolumeClaimTemplates = make([]ChiVolumeClaimTemplate, 0)
+	}
+	// Loop over all 'from' templates and copy it in case no such template in receiver
+	for fromIndex := range from.VolumeClaimTemplates {
+		fromTemplate := &from.VolumeClaimTemplates[fromIndex]
+
+		// Try to find entry with the same name among local templates in receiver
+		sameNameFound := false
+		for toIndex := range templates.VolumeClaimTemplates {
+			toTemplate := &templates.VolumeClaimTemplates[toIndex]
+			if toTemplate.Name == fromTemplate.Name {
+				// Receiver already have such a template
+				sameNameFound = true
+				// Override `to` template with `from` template
+				//templates.VolumeClaimTemplates[toIndex] = *fromTemplate.DeepCopy()
+				if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
+					//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
+				}
+				break
+			}
+		}
+
+		if !sameNameFound {
+			// Receiver does not have template with such a name
+			// Append template from `from`
+			templates.VolumeClaimTemplates = append(templates.VolumeClaimTemplates, *fromTemplate.DeepCopy())
+		}
+	}
+}
+
+func (templates *ChiTemplates) mergeServiceTemplates(from *ChiTemplates) {
+	if len(from.ServiceTemplates) == 0 {
+		return
+	}
+
+	// We have templates to copy from
+	// Append ServiceTemplates from `from` to receiver
+
+	if templates.ServiceTemplates == nil {
+		templates.ServiceTemplates = make([]ChiServiceTemplate, 0)
+	}
+	// Loop over all 'from' templates and copy it in case no such template in receiver
+	for fromIndex := range from.ServiceTemplates {
+		fromTemplate := &from.ServiceTemplates[fromIndex]
+
+		// Try to find entry with the same name among local templates in receiver
+		sameNameFound := false
+		for toIndex := range templates.ServiceTemplates {
+			toTemplate := &templates.ServiceTemplates[toIndex]
+			if toTemplate.Name == fromTemplate.Name {
+				// Receiver already have such a template
+				sameNameFound = true
+				// Override `to` template with `from` template
+				//templates.ServiceTemplates[toIndex] = *fromTemplate.DeepCopy()
+				if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
+					//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
+				}
+				break
+			}
+		}
+
+		if !sameNameFound {
+			// Receiver does not have template with such a name
+			// Append template from `from`
+			templates.ServiceTemplates = append(templates.ServiceTemplates, *fromTemplate.DeepCopy())
+		}
+	}
 }
 
 // GetHostTemplatesIndex returns index of host templates

@@ -177,7 +177,7 @@ func (cm *ConfigManager) buildUnifiedConfig() {
 
 	// Merge all the rest CR-based configs into base config
 	for _, chOperatorConfiguration := range cm.crConfigs {
-		cm.config.MergeFrom(chOperatorConfiguration, chiv1.MergeTypeOverrideByNonEmptyValues)
+		_ = cm.config.MergeFrom(chOperatorConfiguration, chiv1.MergeTypeOverrideByNonEmptyValues)
 	}
 }
 
@@ -244,7 +244,7 @@ func (cm *ConfigManager) getFileBasedConfig(configFilePath string) (*chiv1.Opera
 // buildConfigFromFile returns OperatorConfig struct built out of specified file path
 func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.OperatorConfig, error) {
 	// Read config file content
-	yamlText, err := ioutil.ReadFile(configFilePath)
+	yamlText, err := ioutil.ReadFile(filepath.Clean(configFilePath))
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +257,7 @@ func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.Oper
 	}
 
 	// Fill OperatorConfig's paths
-	config.ConfigFilePath, err = filepath.Abs(configFilePath)
+	config.ConfigFilePath, _ = filepath.Abs(configFilePath)
 	config.ConfigFolderPath = filepath.Dir(config.ConfigFilePath)
 
 	return config, nil
@@ -355,10 +355,8 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 	if namespace == "" {
 		// No namespace explicitly specified, let's look into namespace where pod is running
 		if cm.HasRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE) {
-			// Unable to figure out namespace where pod is running, can not continue
-			return
+			namespace, _ = cm.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
 		}
-		namespace, _ = cm.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
 	}
 
 	// Sanity check

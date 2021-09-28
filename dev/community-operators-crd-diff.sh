@@ -5,7 +5,7 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
 # Where community-operators sources are located
-CO_PATH=~/dev/community-operators/upstream-community-operators/clickhouse/${VERSION}
+CO_PATH=~/dev/community-operators/operators/clickhouse/${VERSION}
 
 # Ask to prepare copy of required files
 echo "Please ensure new version ${VERSION} is already available by the following path:"

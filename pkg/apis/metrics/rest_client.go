@@ -14,6 +14,7 @@
 
 package metrics
 
+// InformMetricsExporterAboutWatchedCHI informs exporter about new watched CHI
 func InformMetricsExporterAboutWatchedCHI(namespace, chiName string, hostnames []string) error {
 	chi := &WatchedCHI{
 		Namespace: namespace,
@@ -23,6 +24,7 @@ func InformMetricsExporterAboutWatchedCHI(namespace, chiName string, hostnames [
 	return makeRESTCall(chi, "POST")
 }
 
+// InformMetricsExporterToDeleteWatchedCHI informs exporter to delete/forget watched CHI
 func InformMetricsExporterToDeleteWatchedCHI(namespace, chiName string) error {
 	chi := &WatchedCHI{
 		Namespace: namespace,

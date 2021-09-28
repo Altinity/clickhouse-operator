@@ -16,10 +16,12 @@ package util
 
 import "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// NamespaceName returns namespace and anme from the meta
 func NamespaceName(meta v1.ObjectMeta) (string, string) {
 	return meta.Namespace, meta.Name
 }
 
+// NamespaceNameString returns namespace and name as one string
 func NamespaceNameString(meta v1.ObjectMeta) string {
 	return meta.Namespace + "/" + meta.Name
 }

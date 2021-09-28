@@ -23,12 +23,16 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// newAffinity
+// newAffinity creates new Affinity struct
 func newAffinity(template *chiV1.ChiPodTemplate) *v1.Affinity {
+	// Pod node affinity scheduling rules.
 	nodeAffinity := newNodeAffinity(template)
+	// Pod affinity scheduling rules. Ex.: co-locate this pod in the same node, zone, etc
 	podAffinity := newPodAffinity(template)
+	// Pod anti-affinity scheduling rules. Ex.: avoid putting this pod in the same node, zone, etc
 	podAntiAffinity := newPodAntiAffinity(template)
 
+	// At least one affinity has to be reasonable
 	if (nodeAffinity == nil) && (podAffinity == nil) && (podAntiAffinity == nil) {
 		// Neither Affinity nor AntiAffinity specified
 		return nil
@@ -41,7 +45,7 @@ func newAffinity(template *chiV1.ChiPodTemplate) *v1.Affinity {
 	}
 }
 
-// mergeAffinity
+// mergeAffinity merges from src into dst and returns dst
 func mergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affinity {
 	if src == nil {
 		// Nothing to merge from
@@ -154,59 +158,80 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
 		case chiV1.PodDistributionNamespaceAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = addWeightedPodAffinityTermWithMatchLabels(
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-				1,
-				map[string]string{
-					LabelNamespace: macrosNamespace,
-				},
+				newWeightedPodAffinityTermWithMatchLabels(
+					1,
+					podDistribution,
+					map[string]string{
+						LabelNamespace: macrosNamespace,
+					},
+				),
 			)
 		case chiV1.PodDistributionClickHouseInstallationAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = addWeightedPodAffinityTermWithMatchLabels(
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-				1,
-				map[string]string{
-					LabelCHIName: macrosChiName,
-				},
+				newWeightedPodAffinityTermWithMatchLabels(
+					1,
+					podDistribution,
+					map[string]string{
+						LabelCHIName: macrosChiName,
+					},
+				),
 			)
 		case chiV1.PodDistributionClusterAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = addWeightedPodAffinityTermWithMatchLabels(
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-				1,
-				map[string]string{
-					LabelClusterName: macrosClusterName,
-				},
+				newWeightedPodAffinityTermWithMatchLabels(
+					1,
+					podDistribution,
+					map[string]string{
+						LabelClusterName: macrosClusterName,
+					},
+				),
 			)
 		case chiV1.PodDistributionShardAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = addWeightedPodAffinityTermWithMatchLabels(
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-				1,
-				map[string]string{
-					LabelShardName: macrosShardName,
-				},
+				newWeightedPodAffinityTermWithMatchLabels(
+					1,
+					podDistribution,
+					map[string]string{
+						LabelShardName: macrosShardName,
+					},
+				),
 			)
 		case chiV1.PodDistributionReplicaAffinity:
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = addWeightedPodAffinityTermWithMatchLabels(
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-				1,
-				map[string]string{
-					LabelReplicaName: macrosReplicaName,
-				},
+				newWeightedPodAffinityTermWithMatchLabels(
+					1,
+					podDistribution,
+					map[string]string{
+						LabelReplicaName: macrosReplicaName,
+					},
+				),
 			)
 		case chiV1.PodDistributionPreviousTailAffinity:
 			// Newer k8s insists on Required for this Affinity
-			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchLabels(
+			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				map[string]string{
-					LabelClusterScopeIndex: macrosClusterScopeCycleHeadPointsToPreviousCycleTail,
-				},
+				newPodAffinityTermWithMatchLabels(
+					podDistribution,
+					map[string]string{
+						LabelClusterScopeIndex: macrosClusterScopeCycleHeadPointsToPreviousCycleTail,
+					},
+				),
 			)
-			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = addWeightedPodAffinityTermWithMatchLabels(
+			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-				1,
-				map[string]string{
-					LabelClusterScopeIndex: macrosClusterScopeCycleHeadPointsToPreviousCycleTail,
-				},
+				newWeightedPodAffinityTermWithMatchLabels(
+					1,
+					podDistribution,
+					map[string]string{
+						LabelClusterScopeIndex: macrosClusterScopeCycleHeadPointsToPreviousCycleTail,
+					},
+				),
 			)
 		}
 	}
@@ -321,99 +346,109 @@ func newMatchLabels(
 func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 	podAntiAffinity := &v1.PodAntiAffinity{}
 
-	// Distribution
-	// DEPRECATED
-	if template.Distribution == chiV1.PodDistributionOnePerHost {
-		podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchLabels(
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-			map[string]string{
-				LabelAppName: LabelAppValue,
-			},
-		)
-	}
-
 	// PodDistribution
 	for i := range template.PodDistribution {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
 		case chiV1.PodDistributionClickHouseAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchLabels(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				newMatchLabels(
+				newPodAffinityTermWithMatchLabels(
 					podDistribution,
-					map[string]string{
-						LabelAppName: LabelAppValue,
-					},
+					newMatchLabels(
+						podDistribution,
+						map[string]string{
+							LabelAppName: LabelAppValue,
+						},
+					),
 				),
 			)
 		case chiV1.PodDistributionMaxNumberPerNode:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchLabels(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				newMatchLabels(
+				newPodAffinityTermWithMatchLabels(
 					podDistribution,
-					map[string]string{
-						LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
-					},
+					newMatchLabels(
+						podDistribution,
+						map[string]string{
+							LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
+						},
+					),
 				),
 			)
 		case chiV1.PodDistributionShardAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchLabels(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				newMatchLabels(
+				newPodAffinityTermWithMatchLabels(
 					podDistribution,
-					map[string]string{
-						LabelShardName: macrosShardName,
-					},
+					newMatchLabels(
+						podDistribution,
+						map[string]string{
+							LabelShardName: macrosShardName,
+						},
+					),
 				),
 			)
 		case chiV1.PodDistributionReplicaAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchLabels(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				newMatchLabels(
+				newPodAffinityTermWithMatchLabels(
 					podDistribution,
-					map[string]string{
-						LabelReplicaName: macrosReplicaName,
-					},
+					newMatchLabels(
+						podDistribution,
+						map[string]string{
+							LabelReplicaName: macrosReplicaName,
+						},
+					),
 				),
 			)
 		case chiV1.PodDistributionAnotherNamespaceAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchExpressions(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				[]metaV1.LabelSelectorRequirement{
-					{
-						Key:      LabelNamespace,
-						Operator: metaV1.LabelSelectorOpNotIn,
-						Values: []string{
-							macrosNamespace,
+				newPodAffinityTermWithMatchExpressions(
+					podDistribution,
+					[]metaV1.LabelSelectorRequirement{
+						{
+							Key:      LabelNamespace,
+							Operator: metaV1.LabelSelectorOpNotIn,
+							Values: []string{
+								macrosNamespace,
+							},
 						},
 					},
-				},
+				),
 			)
 		case chiV1.PodDistributionAnotherClickHouseInstallationAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchExpressions(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				[]metaV1.LabelSelectorRequirement{
-					{
-						Key:      LabelCHIName,
-						Operator: metaV1.LabelSelectorOpNotIn,
-						Values: []string{
-							macrosChiName,
+				newPodAffinityTermWithMatchExpressions(
+					podDistribution,
+					[]metaV1.LabelSelectorRequirement{
+						{
+							Key:      LabelCHIName,
+							Operator: metaV1.LabelSelectorOpNotIn,
+							Values: []string{
+								macrosChiName,
+							},
 						},
 					},
-				},
+				),
 			)
 		case chiV1.PodDistributionAnotherClusterAntiAffinity:
-			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = addPodAffinityTermWithMatchExpressions(
+			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-				[]metaV1.LabelSelectorRequirement{
-					{
-						Key:      LabelClusterName,
-						Operator: metaV1.LabelSelectorOpNotIn,
-						Values: []string{
-							macrosClusterName,
+				newPodAffinityTermWithMatchExpressions(
+					podDistribution,
+					[]metaV1.LabelSelectorRequirement{
+						{
+							Key:      LabelClusterName,
+							Operator: metaV1.LabelSelectorOpNotIn,
+							Values: []string{
+								macrosClusterName,
+							},
 						},
 					},
-				},
+				),
 			)
 		}
 	}
@@ -480,10 +515,68 @@ func mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.
 	return dst
 }
 
-// addPodAffinityTermWithMatchLabels
-func addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTerm, matchLabels map[string]string) []v1.PodAffinityTerm {
-	return append(terms,
-		v1.PodAffinityTerm{
+// newPodAffinityTermWithMatchLabels
+func newPodAffinityTermWithMatchLabels(
+	podDistribution *chiV1.ChiPodDistribution,
+	matchLabels map[string]string,
+) v1.PodAffinityTerm {
+	return v1.PodAffinityTerm{
+		LabelSelector: &metaV1.LabelSelector{
+			// A list of node selector requirements by node's labels.
+			//MatchLabels: map[string]string{
+			//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
+			//},
+			MatchLabels: matchLabels,
+			// Switch to MatchLabels
+			//MatchExpressions: []metaV1.LabelSelectorRequirement{
+			//	{
+			//		Key:      LabelAppName,
+			//		Operator: metaV1.LabelSelectorOpIn,
+			//		Values: []string{
+			//			LabelAppValue,
+			//		},
+			//	},
+			//},
+		},
+		TopologyKey: podDistribution.TopologyKey,
+	}
+}
+
+// newPodAffinityTermWithMatchExpressions
+func newPodAffinityTermWithMatchExpressions(
+	podDistribution *chiV1.ChiPodDistribution,
+	matchExpressions []metaV1.LabelSelectorRequirement,
+) v1.PodAffinityTerm {
+	return v1.PodAffinityTerm{
+		LabelSelector: &metaV1.LabelSelector{
+			// A list of node selector requirements by node's labels.
+			//MatchLabels: map[string]string{
+			//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
+			//},
+			//MatchExpressions: []metaV1.LabelSelectorRequirement{
+			//	{
+			//		Key:      LabelAppName,
+			//		Operator: metaV1.LabelSelectorOpIn,
+			//		Values: []string{
+			//			LabelAppValue,
+			//		},
+			//	},
+			//},
+			MatchExpressions: matchExpressions,
+		},
+		TopologyKey: podDistribution.TopologyKey,
+	}
+}
+
+// newWeightedPodAffinityTermWithMatchLabels is an enhanced append()
+func newWeightedPodAffinityTermWithMatchLabels(
+	weight int32,
+	podDistribution *chiV1.ChiPodDistribution,
+	matchLabels map[string]string,
+) v1.WeightedPodAffinityTerm {
+	return v1.WeightedPodAffinityTerm{
+		Weight: weight,
+		PodAffinityTerm: v1.PodAffinityTerm{
 			LabelSelector: &metaV1.LabelSelector{
 				// A list of node selector requirements by node's labels.
 				//MatchLabels: map[string]string{
@@ -501,67 +594,9 @@ func addPodAffinityTermWithMatchLabels(terms []v1.PodAffinityTerm, matchLabels m
 				//	},
 				//},
 			},
-			TopologyKey: "kubernetes.io/hostname",
+			TopologyKey: podDistribution.TopologyKey,
 		},
-	)
-}
-
-// addPodAffinityTermWithMatchExpressions
-func addPodAffinityTermWithMatchExpressions(terms []v1.PodAffinityTerm, matchExpressions []metaV1.LabelSelectorRequirement) []v1.PodAffinityTerm {
-	return append(terms,
-		v1.PodAffinityTerm{
-			LabelSelector: &metaV1.LabelSelector{
-				// A list of node selector requirements by node's labels.
-				//MatchLabels: map[string]string{
-				//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
-				//},
-				//MatchExpressions: []metaV1.LabelSelectorRequirement{
-				//	{
-				//		Key:      LabelAppName,
-				//		Operator: metaV1.LabelSelectorOpIn,
-				//		Values: []string{
-				//			LabelAppValue,
-				//		},
-				//	},
-				//},
-				MatchExpressions: matchExpressions,
-			},
-			TopologyKey: "kubernetes.io/hostname",
-		},
-	)
-}
-
-// addWeightedPodAffinityTermWithMatchLabels
-func addWeightedPodAffinityTermWithMatchLabels(
-	terms []v1.WeightedPodAffinityTerm,
-	weight int32,
-	matchLabels map[string]string,
-) []v1.WeightedPodAffinityTerm {
-	return append(terms,
-		v1.WeightedPodAffinityTerm{
-			Weight: weight,
-			PodAffinityTerm: v1.PodAffinityTerm{
-				LabelSelector: &metaV1.LabelSelector{
-					// A list of node selector requirements by node's labels.
-					//MatchLabels: map[string]string{
-					//	LabelClusterScopeCycleIndex: macrosClusterScopeCycleIndex,
-					//},
-					MatchLabels: matchLabels,
-					// Switch to MatchLabels
-					//MatchExpressions: []metaV1.LabelSelectorRequirement{
-					//	{
-					//		Key:      LabelAppName,
-					//		Operator: metaV1.LabelSelectorOpIn,
-					//		Values: []string{
-					//			LabelAppValue,
-					//		},
-					//	},
-					//},
-				},
-				TopologyKey: "kubernetes.io/hostname",
-			},
-		},
-	)
+	}
 }
 
 // prepareAffinity

@@ -169,63 +169,74 @@ func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type M
 
 	switch _type {
 	case MergeTypeFillEmptyValues:
-		if templateNames.HostTemplate == "" {
-			templateNames.HostTemplate = from.HostTemplate
-		}
-		if templateNames.PodTemplate == "" {
-			templateNames.PodTemplate = from.PodTemplate
-		}
-		if templateNames.DataVolumeClaimTemplate == "" {
-			templateNames.DataVolumeClaimTemplate = from.DataVolumeClaimTemplate
-		}
-		if templateNames.LogVolumeClaimTemplate == "" {
-			templateNames.LogVolumeClaimTemplate = from.LogVolumeClaimTemplate
-		}
-		if templateNames.VolumeClaimTemplate == "" {
-			templateNames.VolumeClaimTemplate = from.VolumeClaimTemplate
-		}
-		if templateNames.ServiceTemplate == "" {
-			templateNames.ServiceTemplate = from.ServiceTemplate
-		}
-		if templateNames.ClusterServiceTemplate == "" {
-			templateNames.ClusterServiceTemplate = from.ClusterServiceTemplate
-		}
-		if templateNames.ShardServiceTemplate == "" {
-			templateNames.ShardServiceTemplate = from.ShardServiceTemplate
-		}
-		if templateNames.ReplicaServiceTemplate == "" {
-			templateNames.ReplicaServiceTemplate = from.ReplicaServiceTemplate
-		}
+		return templateNames.mergeFromFillEmptyValues(from)
 	case MergeTypeOverrideByNonEmptyValues:
-		// Override by non-empty values only
-		if from.HostTemplate != "" {
-			templateNames.HostTemplate = from.HostTemplate
-		}
-		if from.PodTemplate != "" {
-			templateNames.PodTemplate = from.PodTemplate
-		}
-		if from.DataVolumeClaimTemplate != "" {
-			templateNames.DataVolumeClaimTemplate = from.DataVolumeClaimTemplate
-		}
-		if from.LogVolumeClaimTemplate != "" {
-			templateNames.LogVolumeClaimTemplate = from.LogVolumeClaimTemplate
-		}
-		if from.VolumeClaimTemplate != "" {
-			templateNames.VolumeClaimTemplate = from.VolumeClaimTemplate
-		}
-		if from.ServiceTemplate != "" {
-			templateNames.ServiceTemplate = from.ServiceTemplate
-		}
-		if from.ClusterServiceTemplate != "" {
-			templateNames.ClusterServiceTemplate = from.ClusterServiceTemplate
-		}
-		if from.ShardServiceTemplate != "" {
-			templateNames.ShardServiceTemplate = from.ShardServiceTemplate
-		}
-		if from.ReplicaServiceTemplate != "" {
-			templateNames.ReplicaServiceTemplate = from.ReplicaServiceTemplate
-		}
+		return templateNames.mergeFromOverwriteByNonEmptyValues(from)
 	}
 
+	return templateNames
+}
+
+// mergeFromFillEmptyValues fills empty values
+func (templateNames *ChiTemplateNames) mergeFromFillEmptyValues(from *ChiTemplateNames) *ChiTemplateNames {
+	if templateNames.HostTemplate == "" {
+		templateNames.HostTemplate = from.HostTemplate
+	}
+	if templateNames.PodTemplate == "" {
+		templateNames.PodTemplate = from.PodTemplate
+	}
+	if templateNames.DataVolumeClaimTemplate == "" {
+		templateNames.DataVolumeClaimTemplate = from.DataVolumeClaimTemplate
+	}
+	if templateNames.LogVolumeClaimTemplate == "" {
+		templateNames.LogVolumeClaimTemplate = from.LogVolumeClaimTemplate
+	}
+	if templateNames.VolumeClaimTemplate == "" {
+		templateNames.VolumeClaimTemplate = from.VolumeClaimTemplate
+	}
+	if templateNames.ServiceTemplate == "" {
+		templateNames.ServiceTemplate = from.ServiceTemplate
+	}
+	if templateNames.ClusterServiceTemplate == "" {
+		templateNames.ClusterServiceTemplate = from.ClusterServiceTemplate
+	}
+	if templateNames.ShardServiceTemplate == "" {
+		templateNames.ShardServiceTemplate = from.ShardServiceTemplate
+	}
+	if templateNames.ReplicaServiceTemplate == "" {
+		templateNames.ReplicaServiceTemplate = from.ReplicaServiceTemplate
+	}
+	return templateNames
+}
+
+// mergeFromOverwriteByNonEmptyValues overwrites by non-empty values
+func (templateNames *ChiTemplateNames) mergeFromOverwriteByNonEmptyValues(from *ChiTemplateNames) *ChiTemplateNames {
+	if from.HostTemplate != "" {
+		templateNames.HostTemplate = from.HostTemplate
+	}
+	if from.PodTemplate != "" {
+		templateNames.PodTemplate = from.PodTemplate
+	}
+	if from.DataVolumeClaimTemplate != "" {
+		templateNames.DataVolumeClaimTemplate = from.DataVolumeClaimTemplate
+	}
+	if from.LogVolumeClaimTemplate != "" {
+		templateNames.LogVolumeClaimTemplate = from.LogVolumeClaimTemplate
+	}
+	if from.VolumeClaimTemplate != "" {
+		templateNames.VolumeClaimTemplate = from.VolumeClaimTemplate
+	}
+	if from.ServiceTemplate != "" {
+		templateNames.ServiceTemplate = from.ServiceTemplate
+	}
+	if from.ClusterServiceTemplate != "" {
+		templateNames.ClusterServiceTemplate = from.ClusterServiceTemplate
+	}
+	if from.ShardServiceTemplate != "" {
+		templateNames.ShardServiceTemplate = from.ShardServiceTemplate
+	}
+	if from.ReplicaServiceTemplate != "" {
+		templateNames.ReplicaServiceTemplate = from.ReplicaServiceTemplate
+	}
 	return templateNames
 }

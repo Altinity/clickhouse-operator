@@ -20,6 +20,7 @@ import (
 	"gopkg.in/d4l3k/messagediff.v1"
 )
 
+// MessageDiffString stringifies message diff
 func MessageDiffString(diff *messagediff.Diff, equal bool) string {
 	if equal {
 		return ""

@@ -26,8 +26,9 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// Set of kubernetes labels used by the operator
 const (
-	// Kubernetes labels
+	// Main labels
 
 	LabelReadyName                    = clickhousealtinitycom.GroupName + "/ready"
 	LabelReadyValue                   = "yes"
@@ -51,11 +52,13 @@ const (
 	LabelPVCReclaimPolicyName         = clickhousealtinitycom.GroupName + "/reclaimPolicy"
 
 	// Supplementary service labels - used to cooperate with k8s
+
 	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/zookeeper-version"
 	LabelSettingsConfigVersion  = clickhousealtinitycom.GroupName + "/settings-version"
 	LabelObjectVersion          = clickhousealtinitycom.GroupName + "/object-version"
 
 	// Optional labels
+
 	LabelShardScopeIndex         = clickhousealtinitycom.GroupName + "/shardScopeIndex"
 	LabelReplicaScopeIndex       = clickhousealtinitycom.GroupName + "/replicaScopeIndex"
 	LabelCHIScopeIndex           = clickhousealtinitycom.GroupName + "/chiScopeIndex"
@@ -250,7 +253,7 @@ func (l *Labeler) getLabelsHostScopeReclaimPolicy(host *chi.ChiHost, template *c
 	})
 }
 
-// GetReclaimPolicy
+// GetReclaimPolicy gets reclaim policy from meta
 func GetReclaimPolicy(meta meta.ObjectMeta) chi.PVCReclaimPolicy {
 	defaultReclaimPolicy := chi.PVCReclaimPolicyDelete
 
@@ -329,7 +332,7 @@ func makeSetFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Set, error) {
 	return set, nil
 }
 
-// MakeSelectorFromObjectMeta
+// MakeSelectorFromObjectMeta makes selector from meta
 // TODO review usage
 func MakeSelectorFromObjectMeta(objMeta *meta.ObjectMeta) (kublabels.Selector, error) {
 	set, err := makeSetFromObjectMeta(objMeta)
@@ -364,7 +367,7 @@ func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	return meta.Labels[LabelClusterName], nil
 }
 
-// MakeObjectVersionLabel
+// MakeObjectVersionLabel makes object version label
 func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
 	meta.Labels = util.MergeStringMapsOverwrite(
 		meta.Labels,
@@ -388,7 +391,7 @@ func isObjectVersionLabelTheSame(meta *meta.ObjectMeta, value string) bool {
 	return l == value
 }
 
-// IsObjectTheSame
+// IsObjectTheSame checks whether objects are the same
 func IsObjectTheSame(meta1, meta2 *meta.ObjectMeta) bool {
 	if (meta1 == nil) && (meta2 == nil) {
 		return true

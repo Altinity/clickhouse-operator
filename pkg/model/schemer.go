@@ -29,57 +29,19 @@ import (
 
 // Schemer specifies schema manager
 type Schemer struct {
-	*clickhouse.ClusterEndpointCredentials
-	Cluster *clickhouse.Cluster
+	*Cluster
 }
 
 // NewSchemer creates new Schemer object
 func NewSchemer(username, password string, port int) *Schemer {
-	endpointCredentials := &clickhouse.ClusterEndpointCredentials{
+	credentials := &clickhouse.ClusterEndpointCredentials{
 		Username: username,
 		Password: password,
 		Port:     port,
 	}
 	return &Schemer{
-		ClusterEndpointCredentials: endpointCredentials,
-		Cluster:                    clickhouse.NewCluster().SetEndpointCredentials(endpointCredentials),
+		NewCluster().SetEndpointCredentials(credentials),
 	}
-}
-
-// queryUnzipColumns
-func (s *Schemer) queryUnzipColumns(ctx context.Context, hosts []string, sql string, columns ...*[]string) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
-		return nil
-	}
-
-	if len(hosts) == 0 {
-		// Nowhere to fetch data from
-		return nil
-	}
-
-	// Fetch data from any of specified hosts
-	query, err := s.Cluster.SetHosts(hosts).QueryAny(ctx, sql)
-	if err != nil {
-		return nil
-	}
-	if query == nil {
-		return nil
-	}
-
-	// Some data available, let's fetch it
-	defer query.Close()
-	return query.UnzipColumnsAsStrings(columns...)
-}
-
-// queryUnzip2Columns
-func (s *Schemer) queryUnzip2Columns(ctx context.Context, endpoints []string, sql string) ([]string, []string, error) {
-	var column1 []string
-	var column2 []string
-	if err := s.queryUnzipColumns(ctx, endpoints, sql, &column1, &column2); err != nil {
-		return nil, nil, err
-	}
-	return column1, column2, nil
 }
 
 // getCreateDistributedObjects returns a list of objects that needs to be created on a shard in a cluster
@@ -105,7 +67,7 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 		FROM 
 		(
 			SELECT DISTINCT arrayJoin([database, extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+')]) database
-			FROM cluster('%s', system.tables) tables
+			FROM clusterAllReplicas('%s', system.tables) tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 		)
@@ -123,7 +85,7 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 				name,
 				create_table_query,
 				2 AS order
-			FROM cluster('%s', system.tables) tables
+			FROM clusterAllReplicas('%s', system.tables) tables
 			WHERE engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
@@ -132,14 +94,14 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
 				t.create_table_query,
 				1 AS order
-			FROM cluster('%s', system.tables) tables
+			FROM clusterAllReplicas('%s', system.tables) tables
 			LEFT JOIN 
 			(
 				SELECT 
 					DISTINCT database, 
 					name, 
 					create_table_query 
-				FROM cluster('%s', system.tables)
+				FROM clusterAllReplicas('%s', system.tables)
 				SETTINGS skip_unavailable_shards = 1
 			) t 
 			USING (database, name)
@@ -155,7 +117,7 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 
 	log.V(1).M(host).F().Info("fetch dbs list")
 	log.V(1).M(host).F().Info("dbs sql\n%v", sqlDBs)
-	names1, sqlStatements1, _ := s.queryUnzip2Columns(ctx, CreateFQDNs(host, chop.ClickHouseInstallation{}, false), sqlDBs)
+	names1, sqlStatements1, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ClickHouseInstallation{}, false), sqlDBs)
 	log.V(1).M(host).F().Info("names1:")
 	for _, v := range names1 {
 		log.V(1).M(host).F().Info("names1: %s", v)
@@ -167,7 +129,7 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 
 	log.V(1).M(host).F().Info("fetch table list")
 	log.V(1).M(host).F().Info("tbl sql\n%v", sqlTables)
-	names2, sqlStatements2, _ := s.queryUnzip2Columns(ctx, CreateFQDNs(host, chop.ClickHouseInstallation{}, false), sqlTables)
+	names2, sqlStatements2, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ClickHouseInstallation{}, false), sqlTables)
 	log.V(1).M(host).F().Info("names2:")
 	for _, v := range names2 {
 		log.V(1).M(host).F().Info("names2: %s", v)
@@ -198,7 +160,7 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 		SELECT 
 			DISTINCT database AS name, 
 			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_db_query
-		FROM cluster('%s', system.tables) tables
+		FROM clusterAllReplicas('%s', system.tables) tables
 		WHERE database != 'system'
 		SETTINGS skip_unavailable_shards = 1
 		`,
@@ -208,15 +170,15 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 		SELECT 
 			DISTINCT name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
-		FROM cluster('%s', system.tables) tables
+		FROM clusterAllReplicas('%s', system.tables) tables
 		WHERE database != 'system' AND create_table_query != '' AND name NOT LIKE '.inner.%%'
 		SETTINGS skip_unavailable_shards = 1
 		`,
 		host.Address.ClusterName,
 	)
 
-	names1, sqlStatements1, _ := s.queryUnzip2Columns(ctx, CreateFQDNs(host, chop.ClickHouseInstallation{}, false), sqlDBs)
-	names2, sqlStatements2, _ := s.queryUnzip2Columns(ctx, CreateFQDNs(host, chop.ClickHouseInstallation{}, false), sqlTables)
+	names1, sqlStatements1, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ClickHouseInstallation{}, false), sqlDBs)
+	names2, sqlStatements2, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ClickHouseInstallation{}, false), sqlTables)
 	return append(names1, names2...), append(sqlStatements1, sqlStatements2...), nil
 }
 
@@ -232,7 +194,7 @@ func (s *Schemer) hostGetDropTables(ctx context.Context, host *chop.ChiHost) ([]
 		WHERE engine LIKE 'Replicated%'`,
 	)
 
-	names, sqlStatements, _ := s.queryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
 	return names, sqlStatements, nil
 }
 
@@ -246,7 +208,7 @@ func (s *Schemer) hostGetSyncTables(ctx context.Context, host *chop.ChiHost) ([]
 		WHERE engine LIKE 'Replicated%'`,
 	)
 
-	names, sqlStatements, _ := s.queryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
 	return names, sqlStatements, nil
 }
 
@@ -256,13 +218,13 @@ func (s *Schemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error 
 	log.V(1).M(host).F().Info("Sync tables: %v as %v", tableNames, syncTableSQLs)
 	opts := clickhouse.NewQueryOptions()
 	opts.SetQueryTimeout(120 * time.Second)
-	return s.execHost(ctx, host, syncTableSQLs, opts)
+	return s.ExecHost(ctx, host, syncTableSQLs, opts)
 }
 
 // HostDropReplica calls SYSTEM DROP REPLICA
 func (s *Schemer) HostDropReplica(ctx context.Context, hostToRun, hostToDrop *chop.ChiHost) error {
 	log.V(1).M(hostToRun).F().Info("Drop replica: %v", CreateReplicaHostname(hostToDrop))
-	return s.execHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateReplicaHostname(hostToDrop))})
+	return s.ExecHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateReplicaHostname(hostToDrop))})
 }
 
 // HostCreateTables creates tables on a new host
@@ -280,7 +242,7 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 		if len(createSQLs) > 0 {
 			log.V(1).M(host).F().Info("Creating replica objects at %s: %v", host.Address.HostName, names)
 			log.V(1).M(host).F().Info("\n%v", createSQLs)
-			err1 = s.execHost(ctx, host, createSQLs, clickhouse.NewQueryOptions().SetRetry(true))
+			err1 = s.ExecHost(ctx, host, createSQLs, clickhouse.NewQueryOptions().SetRetry(true))
 		}
 	}
 
@@ -288,7 +250,7 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 		if len(createSQLs) > 0 {
 			log.V(1).M(host).F().Info("Creating distributed objects at %s: %v", host.Address.HostName, names)
 			log.V(1).M(host).F().Info("\n%v", createSQLs)
-			err2 = s.execHost(ctx, host, createSQLs, clickhouse.NewQueryOptions().SetRetry(true))
+			err2 = s.ExecHost(ctx, host, createSQLs, clickhouse.NewQueryOptions().SetRetry(true))
 		}
 	}
 
@@ -306,13 +268,13 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 func (s *Schemer) HostDropTables(ctx context.Context, host *chop.ChiHost) error {
 	tableNames, dropTableSQLs, _ := s.hostGetDropTables(ctx, host)
 	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	return s.execHost(ctx, host, dropTableSQLs)
+	return s.ExecHost(ctx, host, dropTableSQLs)
 }
 
 // IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
 func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool {
 	inside := false
-	sqls := []string{
+	SQLs := []string{
 		heredoc.Docf(
 			`SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local`,
 			allShardsOneReplicaClusterName,
@@ -321,7 +283,7 @@ func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool 
 	//TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
 	opts := clickhouse.NewQueryOptions().SetSilent(true)
 	//opts := clickhouse.NewQueryOptions()
-	err := s.execHost(ctx, host, sqls, opts)
+	err := s.ExecHost(ctx, host, SQLs, opts)
 	if err == nil {
 		log.V(1).M(host).F().Info("Host inside the cluster")
 		inside = true
@@ -334,42 +296,14 @@ func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool 
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
 func (s *Schemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInstallation) error {
-	sqls := []string{
+	SQLs := []string{
 		`SYSTEM DROP DNS CACHE`,
 	}
-	return s.execCHI(ctx, chi, sqls)
+	return s.ExecCHI(ctx, chi, SQLs)
 }
 
-// execCHI runs set of SQL queries over the whole CHI
-func (s *Schemer) execCHI(ctx context.Context, chi *chop.ClickHouseInstallation, sqls []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := CreateFQDNs(chi, nil, false)
-	opts := clickhouse.QueryOptionsNormalize(_opts...)
-	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
-}
-
-// execCluster runs set of SQL queries over the cluster
-func (s *Schemer) execCluster(ctx context.Context, cluster *chop.ChiCluster, sqls []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := CreateFQDNs(cluster, nil, false)
-	opts := clickhouse.QueryOptionsNormalize(_opts...)
-	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
-}
-
-// execShard runs set of SQL queries over the shard replicas
-func (s *Schemer) execShard(ctx context.Context, shard *chop.ChiShard, sqls []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := CreateFQDNs(shard, nil, false)
-	opts := clickhouse.QueryOptionsNormalize(_opts...)
-	return s.Cluster.SetHosts(hosts).ExecAll(ctx, sqls, opts)
-}
-
-// execHost runs set of SQL queries over the replica
-func (s *Schemer) execHost(ctx context.Context, host *chop.ChiHost, sqls []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := CreateFQDNs(host, chop.ChiHost{}, false)
-	opts := clickhouse.QueryOptionsNormalize(_opts...)
-	c := s.Cluster.SetHosts(hosts)
-	if opts.GetSilent() {
-		c = c.SetLog(log.Silence())
-	} else {
-		c = c.SetLog(log.New())
-	}
-	return c.ExecAll(ctx, sqls, opts)
+// HostActiveQueriesNum returns how many active queries are on the host
+func (s *Schemer) HostActiveQueriesNum(ctx context.Context, host *chop.ChiHost) (int, error) {
+	sql := `SELECT count() FROM system.processes`
+	return s.QueryHostInt(ctx, host, sql)
 }

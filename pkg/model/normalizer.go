@@ -15,9 +15,12 @@
 package model
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kube "k8s.io/client-go/kubernetes"
 	"strings"
 
 	"github.com/google/uuid"
@@ -29,16 +32,19 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// Normalizer
+// Normalizer specifies structures normalizer
 type Normalizer struct {
-	chi *chiV1.ClickHouseInstallation
+	kubeClient kube.Interface
+	chi        *chiV1.ClickHouseInstallation
 	// Whether should insert default cluster if no cluster specified
 	withDefaultCluster bool
 }
 
-// NewNormalizer
-func NewNormalizer() *Normalizer {
-	return &Normalizer{}
+// NewNormalizer creates new normalizer
+func NewNormalizer(kubeClient kube.Interface) *Normalizer {
+	return &Normalizer{
+		kubeClient: kubeClient,
+	}
 }
 
 // CreateTemplatedCHI produces ready-to-use CHI object
@@ -115,6 +121,7 @@ func (n *Normalizer) normalize() (*chiV1.ClickHouseInstallation, error) {
 	n.chi.Spec.TaskID = n.normalizeTaskID(n.chi.Spec.TaskID)
 	n.chi.Spec.UseTemplates = n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
 	n.chi.Spec.Stop = n.normalizeStop(n.chi.Spec.Stop)
+	n.chi.Spec.Restart = n.normalizeRestart(n.chi.Spec.Restart)
 	n.chi.Spec.Troubleshoot = n.normalizeTroubleshoot(n.chi.Spec.Troubleshoot)
 	n.chi.Spec.NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.chi.Spec.NamespaceDomainPattern)
 	n.chi.Spec.Templating = n.normalizeTemplating(n.chi.Spec.Templating)
@@ -261,28 +268,43 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 
 // hostApplyPortsFromSettings
 func hostApplyPortsFromSettings(host *chiV1.ChiHost) {
-	settings := host.GetSettings()
-	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), chDefaultTCPPortNumber)
-	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), chDefaultHTTPPortNumber)
-	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), chDefaultInterserverHTTPPortNumber)
+	// Use host personal settings at first
+	ensurePortValuesFromSettings(host, host.GetSettings(), false)
+	// Fallback to common settings
+	ensurePortValuesFromSettings(host, host.GetCHI().Spec.Configuration.Settings, true)
+}
+
+// ensurePortValuesFromSettings fetches port spec from settings, if any provided
+func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings, finalize bool) {
+	fallbackTCPPortNumber := chPortNumberMustBeAssignedLater
+	fallbackHTTPPortNumber := chPortNumberMustBeAssignedLater
+	fallbackInterserverHTTPPortNumber := chPortNumberMustBeAssignedLater
+	if finalize {
+		fallbackTCPPortNumber = chDefaultTCPPortNumber
+		fallbackHTTPPortNumber = chDefaultHTTPPortNumber
+		fallbackInterserverHTTPPortNumber = chDefaultInterserverHTTPPortNumber
+	}
+	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), fallbackTCPPortNumber)
+	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPortNumber)
+	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPortNumber)
 }
 
 // ensurePortValue
-func ensurePortValue(port *int32, settings, _default int32) {
+func ensurePortValue(port *int32, value, _default int32) {
+	// Port may already be explicitly specified in podTemplate or by portDistribution
 	if *port != chPortNumberMustBeAssignedLater {
 		// Port has a value already
 		return
 	}
 
-	// Port has no value, let's assign value from settings
-
-	if settings != chPortNumberMustBeAssignedLater {
-		// Settings gas a value, use it
-		*port = settings
+	// Port has no value, let's use value from settings
+	if value != chPortNumberMustBeAssignedLater {
+		// Settings has a value, use it
+		*port = value
 		return
 	}
 
-	// Port has no value, settings has no value, fallback to default value
+	// Port has no explicit value, settings has no value, fallback to default value
 	*port = _default
 }
 
@@ -325,6 +347,19 @@ func (n *Normalizer) normalizeStop(stop string) string {
 
 	// In case it is unknown value - just use set it to false
 	return util.StringBoolFalseLowercase
+}
+
+// normalizeRestart normalizes .spec.restart
+func (n *Normalizer) normalizeRestart(restart string) string {
+	switch strings.ToLower(restart) {
+	case strings.ToLower(chiV1.RestartAll):
+		return chiV1.RestartAll
+	case strings.ToLower(chiV1.RestartRollingUpdate):
+		return chiV1.RestartRollingUpdate
+	}
+
+	// In case it is unknown value - just use empty
+	return ""
 }
 
 // normalizeTroubleshoot normalizes .spec.stop
@@ -525,93 +560,10 @@ func (n *Normalizer) normalizePodTemplate(template *chiV1.ChiPodTemplate) {
 		// We have both key and value(s) specified explicitly
 	}
 
-	// Distribution
-	if template.Distribution == chiV1.PodDistributionOnePerHost {
-		// Known distribution, all is fine
-	} else {
-		// Default Pod Distribution
-		template.Distribution = chiV1.PodDistributionUnspecified
-	}
-
 	// PodDistribution
 	for i := range template.PodDistribution {
-		podDistribution := &template.PodDistribution[i]
-		switch podDistribution.Type {
-		case
-			chiV1.PodDistributionUnspecified,
-
-			// AntiAffinity section
-			chiV1.PodDistributionClickHouseAntiAffinity,
-			chiV1.PodDistributionShardAntiAffinity,
-			chiV1.PodDistributionReplicaAntiAffinity:
-			if podDistribution.Scope == "" {
-				podDistribution.Scope = chiV1.PodDistributionScopeCluster
-			}
-		case
-			chiV1.PodDistributionAnotherNamespaceAntiAffinity,
-			chiV1.PodDistributionAnotherClickHouseInstallationAntiAffinity,
-			chiV1.PodDistributionAnotherClusterAntiAffinity:
-			// PodDistribution is known
-		case
-			chiV1.PodDistributionMaxNumberPerNode:
-			// PodDistribution is known
-			if podDistribution.Number < 0 {
-				podDistribution.Number = 0
-			}
-		case
-			// Affinity section
-			chiV1.PodDistributionNamespaceAffinity,
-			chiV1.PodDistributionClickHouseInstallationAffinity,
-			chiV1.PodDistributionClusterAffinity,
-			chiV1.PodDistributionShardAffinity,
-			chiV1.PodDistributionReplicaAffinity,
-			chiV1.PodDistributionPreviousTailAffinity:
-			// PodDistribution is known
-
-		case chiV1.PodDistributionCircularReplication:
-			// Shortcut section
-			// All shortcuts have to be expanded
-
-			// PodDistribution is known
-
-			if podDistribution.Scope == "" {
-				podDistribution.Scope = chiV1.PodDistributionScopeCluster
-			}
-
-			// TODO need to support multi-cluster
-			cluster := n.chi.Spec.Configuration.Clusters[0]
-
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type:  chiV1.PodDistributionShardAntiAffinity,
-				Scope: podDistribution.Scope,
-			})
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type:  chiV1.PodDistributionReplicaAntiAffinity,
-				Scope: podDistribution.Scope,
-			})
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type:   chiV1.PodDistributionMaxNumberPerNode,
-				Scope:  podDistribution.Scope,
-				Number: cluster.Layout.ReplicasCount,
-			})
-
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type: chiV1.PodDistributionPreviousTailAffinity,
-			})
-
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type: chiV1.PodDistributionNamespaceAffinity,
-			})
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type: chiV1.PodDistributionClickHouseInstallationAffinity,
-			})
-			template.PodDistribution = append(template.PodDistribution, chiV1.ChiPodDistribution{
-				Type: chiV1.PodDistributionClusterAffinity,
-			})
-
-		default:
-			// PodDistribution is not known
-			podDistribution.Type = chiV1.PodDistributionUnspecified
+		if additionalPoDistributions := n.normalizePodDistribution(&template.PodDistribution[i]); additionalPoDistributions != nil {
+			template.PodDistribution = append(template.PodDistribution, additionalPoDistributions...)
 		}
 	}
 
@@ -627,6 +579,97 @@ func (n *Normalizer) normalizePodTemplate(template *chiV1.ChiPodTemplate) {
 
 	// Introduce PodTemplate into Index
 	n.chi.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
+}
+
+const defaultTopologyKey = "kubernetes.io/hostname"
+
+func (n *Normalizer) normalizePodDistribution(podDistribution *chiV1.ChiPodDistribution) []chiV1.ChiPodDistribution {
+	if podDistribution.TopologyKey == "" {
+		podDistribution.TopologyKey = defaultTopologyKey
+	}
+	switch podDistribution.Type {
+	case
+		chiV1.PodDistributionUnspecified,
+		// AntiAffinity section
+		chiV1.PodDistributionClickHouseAntiAffinity,
+		chiV1.PodDistributionShardAntiAffinity,
+		chiV1.PodDistributionReplicaAntiAffinity:
+		// PodDistribution is known
+		if podDistribution.Scope == "" {
+			podDistribution.Scope = chiV1.PodDistributionScopeCluster
+		}
+		return nil
+	case
+		chiV1.PodDistributionAnotherNamespaceAntiAffinity,
+		chiV1.PodDistributionAnotherClickHouseInstallationAntiAffinity,
+		chiV1.PodDistributionAnotherClusterAntiAffinity:
+		// PodDistribution is known
+		return nil
+	case
+		chiV1.PodDistributionMaxNumberPerNode:
+		// PodDistribution is known
+		if podDistribution.Number < 0 {
+			podDistribution.Number = 0
+		}
+		return nil
+	case
+		// Affinity section
+		chiV1.PodDistributionNamespaceAffinity,
+		chiV1.PodDistributionClickHouseInstallationAffinity,
+		chiV1.PodDistributionClusterAffinity,
+		chiV1.PodDistributionShardAffinity,
+		chiV1.PodDistributionReplicaAffinity,
+		chiV1.PodDistributionPreviousTailAffinity:
+		// PodDistribution is known
+		return nil
+
+	case chiV1.PodDistributionCircularReplication:
+		// PodDistribution is known
+		// PodDistributionCircularReplication is a shortcut to simplify complex set of other distributions
+		// All shortcuts have to be expanded
+
+		if podDistribution.Scope == "" {
+			podDistribution.Scope = chiV1.PodDistributionScopeCluster
+		}
+
+		// TODO need to support multi-cluster
+		cluster := n.chi.Spec.Configuration.Clusters[0]
+
+		// Expand shortcut
+		return []chiV1.ChiPodDistribution{
+			{
+				Type:  chiV1.PodDistributionShardAntiAffinity,
+				Scope: podDistribution.Scope,
+			},
+			{
+				Type:  chiV1.PodDistributionReplicaAntiAffinity,
+				Scope: podDistribution.Scope,
+			},
+			{
+				Type:   chiV1.PodDistributionMaxNumberPerNode,
+				Scope:  podDistribution.Scope,
+				Number: cluster.Layout.ReplicasCount,
+			},
+
+			{
+				Type: chiV1.PodDistributionPreviousTailAffinity,
+			},
+
+			{
+				Type: chiV1.PodDistributionNamespaceAffinity,
+			},
+			{
+				Type: chiV1.PodDistributionClickHouseInstallationAffinity,
+			},
+			{
+				Type: chiV1.PodDistributionClusterAffinity,
+			},
+		}
+	}
+
+	// PodDistribution is not known
+	podDistribution.Type = chiV1.PodDistributionUnspecified
+	return nil
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
@@ -775,17 +818,65 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *chiV1.ChiZookeeperConfi
 	return zk
 }
 
-// normalizeConfigurationUsers normalizes .spec.configuration.users
-func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.Settings {
-	if users == nil {
-		users = chiV1.NewSettings()
+// substWithSecretField substitute users settings field with value from k8s secret
+func (n *Normalizer) substWithSecretField(users *chiV1.Settings, username string, userSettingsField, userSettingsK8SSecretField string) {
+	// Has to have source field specified
+	if !users.Has(username + "/" + userSettingsK8SSecretField) {
+		return
 	}
-	users.Normalize()
 
+	// Anyway remove the field, it should not be included into final clickhouse config
+	defer users.Delete(username + "/" + userSettingsK8SSecretField)
+
+	secretFieldAddress := users.Get(username + "/" + userSettingsK8SSecretField).String()
+	// Extract secret namespace, name and field by splitting namespace/name/field triple
+	var namespace, name, field string
+	switch tags := strings.Split(secretFieldAddress, "/"); len(tags) {
+	case 2:
+		namespace = chop.Config().Namespace
+		name = tags[0]
+		field = tags[1]
+	case 3:
+		namespace = tags[0]
+		name = tags[1]
+		field = tags[2]
+	default:
+		// Skip incorrect entry
+		log.V(1).M(namespace, name).F().Warning("unable to parse secret field address: %s", secretFieldAddress)
+		return
+	}
+
+	// Sanity check
+	if (namespace == "") || (name == "") || (field == "") {
+		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: %s", secretFieldAddress)
+		return
+	}
+
+	secret, err := n.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		log.V(1).M(namespace, name).F().Info("unable to read secret %v", err)
+		return
+	}
+
+	found := false
+	for key, value := range secret.Data {
+		if key == field {
+			users.Set(username+"/"+userSettingsField, chiV1.NewSettingScalar(string(value)))
+			found = true
+		}
+	}
+
+	if !found {
+		log.V(1).M(namespace, name).F().Info("unable to locate in specified secret field %s", field)
+	}
+}
+
+// normalizeUsersList extracts usernames from provided 'users' settings
+func (n *Normalizer) normalizeUsersList(users *chiV1.Settings) (usernames []string) {
 	// Extract username from path
 	usernameMap := make(map[string]bool)
 	users.Walk(func(path string, _ *chiV1.Setting) {
-		// Split 'admin/password'
+		// Split username/action into username and all the rest. Ex. 'admin/password', 'admin/networks/ip'
 		tags := strings.Split(path, "/")
 
 		// Basic sanity check - need to have at least "username/something" pair
@@ -797,39 +888,59 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		username := tags[0]
 		usernameMap[username] = true
 	})
-
-	// Ensure "must have" sections are in place, which are:
-	// 1. user/profile
-	// 2. user/quota
-	// 3. user/networks/ip and user/networks/host_regexp defaults to the installation pods
-	// 4. user/password_sha256_hex
-
-	// "default" user is required in order to secure host_regexp
-	usernameMap["default"] = true
+	// Make list of usernames
 	for username := range usernameMap {
-		// Ensure 'user/profile' section
+		usernames = append(usernames, username)
+	}
+	return usernames
+}
+
+const defaultUsername = "default"
+
+// normalizeConfigurationUsers normalizes .spec.configuration.users
+func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.Settings {
+	if users == nil {
+		users = chiV1.NewSettings()
+	}
+	users.Normalize()
+	// "default" user is required in order to secure host_regexp
+	usernames := append(n.normalizeUsersList(users), defaultUsername)
+	// Normalize each user
+	for _, username := range usernames {
+		// Ensure "must have" sections are in place
+		// 1. user/profile
+		// 2. user/quota
+		// 3. user/networks/ip
+		// 4. user/networks/host_regexp
 		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultProfile))
-		// Ensure 'user/quota' section
 		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultQuota))
-		// Ensure 'user/networks/ip' section
 		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().CHConfigUserDefaultNetworksIP))
-		// Ensure 'user/networks/host_regexp' section
 		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().CHConfigNetworksHostRegexpTemplate)))
 
-		var pass = ""
+		// Values from secret have higher priority
+		n.substWithSecretField(users, username, "password", "k8s_secret_password")
+		n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
+		n.substWithSecretField(users, username, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
+
+		passwordPlaintext := ""
+
+		// Use explicitly specified plaintext password, if provided
 		if users.Has(username + "/password") {
-			pass = users.Get(username + "/password").String()
-		} else if username != "default" {
-			pass = chop.Config().CHConfigUserDefaultPassword
+			passwordPlaintext = users.Get(username + "/password").String()
+		}
+
+		// Apply default password for password-less non-default users
+		if (passwordPlaintext == "") && (username != defaultUsername) {
+			passwordPlaintext = chop.Config().CHConfigUserDefaultPassword
 		}
 
 		hasPasswordSHA256 := users.Has(username + "/password_sha256_hex")
 		hasPasswordDoubleSHA1 := users.Has(username + "/password_double_sha1_hex")
 
-		// if SHA256 or double SHA1 are not set, initialize SHA256 from the password
-		if !hasPasswordSHA256 && !hasPasswordDoubleSHA1 && (pass != "") {
-			passSHA256 := sha256.Sum256([]byte(pass))
-			users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passSHA256[:])))
+		// In case no encoded password provided - encode plaintext password (if it is available)
+		if !hasPasswordSHA256 && !hasPasswordDoubleSHA1 && (passwordPlaintext != "") {
+			passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
+			users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
 			hasPasswordSHA256 = true
 		}
 

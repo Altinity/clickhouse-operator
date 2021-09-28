@@ -16,12 +16,14 @@ package chi
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 
+	v13 "k8s.io/api/apps/v1"
+	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -67,19 +69,36 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) {
 		return
 	}
 
-	// Pod namespaced name found, fetch the Pod
-	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(ctx, podName, newGetOptions())
-	if err != nil {
-		log.V(1).M(namespace, podName).A().Error("ERROR get Pod %s/%s", namespace, podName)
+	// Pod namespaced name found, find and label the Pod
+	pod := c.labelPod(ctx, namespace, podName)
+	if pod == nil {
 		return
+	}
+
+	replicaSet := c.labelReplicaSet(ctx, pod)
+	if replicaSet == nil {
+		return
+	}
+
+	c.labelDeployment(ctx, replicaSet)
+}
+
+func (c *Controller) labelPod(ctx context.Context, namespace, name string) *v12.Pod {
+	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, newGetOptions())
+	if err != nil {
+		log.V(1).M(namespace, name).A().Error("ERROR get Pod %s/%s", namespace, name)
+		return nil
 	}
 
 	// Put label on the Pod
 	c.addLabels(&pod.ObjectMeta)
 	if _, err := c.kubeClient.CoreV1().Pods(namespace).Update(ctx, pod, newUpdateOptions()); err != nil {
-		log.V(1).M(namespace, podName).A().Error("ERROR put label on Pod %s/%s %v", namespace, podName, err)
+		log.V(1).M(namespace, name).A().Error("ERROR put label on Pod %s/%s %v", namespace, name, err)
 	}
+	return pod
+}
 
+func (c *Controller) labelReplicaSet(ctx context.Context, pod *v12.Pod) *v13.ReplicaSet {
 	// Find parent ReplicaSet
 	replicaSetName := ""
 	for i := range pod.OwnerReferences {
@@ -93,27 +112,31 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) {
 
 	if replicaSetName == "" {
 		// ReplicaSet not found
-		log.V(1).M(namespace, podName).A().Error("ERROR ReplicaSet for Pod %s/%s not found", namespace, podName)
-		return
+		log.V(1).M(pod.Namespace, pod.Name).A().Error("ERROR ReplicaSet for Pod %s/%s not found", pod.Namespace, pod.Name)
+		return nil
 	}
 
 	// ReplicaSet namespaced name found, fetch the ReplicaSet
-	replicaSet, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Get(ctx, replicaSetName, newGetOptions())
+	replicaSet, err := c.kubeClient.AppsV1().ReplicaSets(pod.Namespace).Get(ctx, replicaSetName, newGetOptions())
 	if err != nil {
-		log.V(1).M(namespace, replicaSetName).A().Error("ERROR get ReplicaSet %s/%s %v", namespace, replicaSetName, err)
-		return
+		log.V(1).M(pod.Namespace, replicaSetName).A().Error("ERROR get ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
+		return replicaSet
 	}
 
 	// Put label on the ReplicaSet
 	c.addLabels(&replicaSet.ObjectMeta)
-	if _, err := c.kubeClient.AppsV1().ReplicaSets(namespace).Update(ctx, replicaSet, newUpdateOptions()); err != nil {
-		log.V(1).M(namespace, replicaSetName).A().Error("ERROR put label on ReplicaSet %s/%s %v", namespace, replicaSetName, err)
+	if _, err := c.kubeClient.AppsV1().ReplicaSets(pod.Namespace).Update(ctx, replicaSet, newUpdateOptions()); err != nil {
+		log.V(1).M(pod.Namespace, replicaSetName).A().Error("ERROR put label on ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
 	}
 
+	return replicaSet
+}
+
+func (c *Controller) labelDeployment(ctx context.Context, rs *v13.ReplicaSet) {
 	// Find parent Deployment
 	deploymentName := ""
-	for i := range replicaSet.OwnerReferences {
-		owner := &replicaSet.OwnerReferences[i]
+	for i := range rs.OwnerReferences {
+		owner := &rs.OwnerReferences[i]
 		if owner.Kind == "Deployment" {
 			// Deployment found
 			deploymentName = owner.Name
@@ -123,21 +146,21 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) {
 
 	if deploymentName == "" {
 		// Deployment not found
-		log.V(1).M(namespace, replicaSetName).A().Error("ERROR Deployment for %s Pod %s ReplicaSet %s not found", namespace, podName, replicaSetName)
+		log.V(1).M(rs.Namespace, rs.Name).A().Error("ERROR find Deployment for ReplicaSet %s/%s not found", rs.Namespace, rs.Name)
 		return
 	}
 
 	// Deployment namespaced name found, fetch the Deployment
-	deployment, err := c.kubeClient.AppsV1().Deployments(namespace).Get(ctx, deploymentName, newGetOptions())
+	deployment, err := c.kubeClient.AppsV1().Deployments(rs.Namespace).Get(ctx, deploymentName, newGetOptions())
 	if err != nil {
-		log.V(1).M(namespace, deploymentName).A().Error("ERROR get Deployment %s/%s", namespace, deploymentName)
+		log.V(1).M(rs.Namespace, deploymentName).A().Error("ERROR get Deployment %s/%s", rs.Namespace, deploymentName)
 		return
 	}
 
 	// Put label on the Deployment
 	c.addLabels(&deployment.ObjectMeta)
-	if _, err := c.kubeClient.AppsV1().Deployments(namespace).Update(ctx, deployment, newUpdateOptions()); err != nil {
-		log.V(1).M(namespace, deploymentName).A().Error("ERROR put label on Deployment %s/%s %v", namespace, deploymentName, err)
+	if _, err := c.kubeClient.AppsV1().Deployments(rs.Namespace).Update(ctx, deployment, newUpdateOptions()); err != nil {
+		log.V(1).M(rs.Namespace, deploymentName).A().Error("ERROR put label on Deployment %s/%s %v", rs.Namespace, deploymentName, err)
 	}
 }
 

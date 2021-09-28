@@ -1,0 +1,56 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "simple-04"
+spec:
+  configuration:
+    settings:
+      http_server_default_response: "from_top_level"
+    files:
+      # need unique file names
+      conf.d/test_file_confd.xml: "<yandex><http_server_default_response>from_top_level from files</http_server_default_response></yandex>"
+      config.d/test_file_configd.xml: "<yandex><http_server_default_response>from_top_level from files</http_server_default_response></yandex>"
+      users.d/test_file_usersd.xml: "<yandex><users><custom_user><password>from_top_level_from_files</password></custom_user></users></yandex>"
+    clusters:
+      - name: "replicas"
+        # will override on layout.shards level
+        settings:
+          http_server_default_response: "from_cluster"
+        files:
+          conf.d/test_file_cluster_confd.xml: "<yandex><http_server_default_response>from_cluster from files</http_server_default_response></yandex>"
+          config.d/test_file_cluster_configd.xml: "<yandex><http_server_default_response>from_cluster from files</http_server_default_response></yandex>"
+          users.d/test_file_cluster_usersd.xml: "<yandex><users><custom_user><password>from_cluster_from_files</password></custom_user></users></yandex>"
+          users.d/test_file_cluster_usersd2.xml: "<yandex><users><custom_user><password>from_cluster_from_files</password></custom_user></users></yandex>"
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+          shards:
+            # will override on layout.shards.replicas level
+            - settings:
+                http_server_default_response: "from_shard"
+              files:
+                conf.d/test_file_shard_confd.xml: "<yandex><http_server_default_response>from_shard from files</http_server_default_response></yandex>"
+                config.d/test_file_shard_configd.xml: "<yandex><http_server_default_response>from_shard from files</http_server_default_response></yandex>"
+                users.d/test_file_shard_usersd.xml: "<yandex><users><custom_user><password>from_shard_from_files</password></custom_user></users></yandex>"
+                users.d/test_file_shard_usersd2.xml: "<yandex><users><custom_user><password>from_shard_from_files2</password></custom_user></users></yandex>"
+              replicas:
+                # will mount into /etc/clickhouse-server/conf.d
+                - settings:
+                    http_server_default_response: "from_replica_inside_shard"
+                  files:
+                    config.d/test_file_shard_replica_configd.xml: "<yandex><http_server_default_response>from_replica_inside_shard from files</http_server_default_response></yandex>"
+          replicas:
+            # will completely ignore, cause layout.shards exists
+            - settings:
+                users/custom_user/password: "from_replica"
+              files:
+                conf.d/test_file_replica_confd.xml: "<yandex><http_server_default_response>from_replica from files</http_server_default_response></yandex>"
+                config.d/test_file_replica_configd.xml: "<yandex><http_server_default_response>from_replica from files</http_server_default_response></yandex>"
+                users.d/test_file_replica_usersd.xml: "<yandex><users><custom_user><password>from_replica_from_files</password></custom_user></users></yandex>"
+                users.d/test_file_replica_usersd2.xml: "<yandex><users><custom_user><password>from_replica_from_files2</password></custom_user></users></yandex>"
+              shards:
+                - settings:
+                    users/custom_user/password: "from_shard_inside_replica"
+                  files:
+                    config.d/test_file_replica_shard.xml: "<yandex><http_server_default_response>from_shard_inside_replica from files</http_server_default_response></yandex>"
+

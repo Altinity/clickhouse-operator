@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -29,59 +30,87 @@ func (c *Controller) discovery(ctx context.Context, chi *chop.ClickHouseInstalla
 		return nil
 	}
 
-	r := chopmodel.NewRegistry()
-
 	opts := newListOptions(chopmodel.NewLabeler(chi).GetSelectorCHIScope())
-
-	if list, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).List(ctx, opts); err != nil {
-		log.M(chi).A().Error("FAIL list StatefulSet err:%v", err)
-	} else if list != nil {
-		for _, obj := range list.Items {
-			r.RegisterStatefulSet(obj.ObjectMeta)
-		}
-	} else {
-		log.M(chi).A().Error("FAIL list StatefulSet list is nil")
-	}
-
-	if list, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).List(ctx, opts); err != nil {
-		log.M(chi).A().Error("FAIL list ConfigMap err:%v", err)
-	} else if list != nil {
-		for _, obj := range list.Items {
-			r.RegisterConfigMap(obj.ObjectMeta)
-		}
-	} else {
-		log.M(chi).A().Error("FAIL list ConfigMap list is nil")
-	}
-
-	if list, err := c.kubeClient.CoreV1().Services(chi.Namespace).List(ctx, opts); err != nil {
-		log.M(chi).A().Error("FAIL list Service err:%v", err)
-	} else if list != nil {
-		for _, obj := range list.Items {
-			r.RegisterService(obj.ObjectMeta)
-		}
-	} else {
-		log.M(chi).A().Error("FAIL list Service list is nil")
-	}
-
-	if list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(chi.Namespace).List(ctx, opts); err != nil {
-		log.M(chi).A().Error("FAIL list PVC err:%v", err)
-	} else if list != nil {
-		for _, obj := range list.Items {
-			r.RegisterPVC(obj.ObjectMeta)
-		}
-	} else {
-		log.M(chi).A().Error("FAIL list PVC list is nil")
-	}
-
-	if list, err := c.kubeClient.CoreV1().PersistentVolumes().List(ctx, opts); err != nil {
-		log.M(chi).A().Error("FAIL list PV err:%v", err)
-	} else if list != nil {
-		for _, obj := range list.Items {
-			r.RegisterPV(obj.ObjectMeta)
-		}
-	} else {
-		log.M(chi).A().Error("FAIL list PV list is nil")
-	}
-
+	r := chopmodel.NewRegistry()
+	c.discoveryStatefulSet(ctx, r, chi, opts)
+	c.discoveryConfigMap(ctx, r, chi, opts)
+	c.discoveryService(ctx, r, chi, opts)
+	c.discoveryPVC(ctx, r, chi, opts)
+	c.discoveryPV(ctx, r, chi, opts)
 	return r
+}
+
+func (c *Controller) discoveryStatefulSet(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+	list, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).List(ctx, opts)
+	if err != nil {
+		log.M(chi).A().Error("FAIL list StatefulSet err:%v", err)
+		return
+	}
+	if list == nil {
+		log.M(chi).A().Error("FAIL list StatefulSet list is nil")
+		return
+	}
+	for _, obj := range list.Items {
+		r.RegisterStatefulSet(obj.ObjectMeta)
+	}
+}
+
+func (c *Controller) discoveryConfigMap(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+	list, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).List(ctx, opts)
+	if err != nil {
+		log.M(chi).A().Error("FAIL list ConfigMap err:%v", err)
+		return
+	}
+	if list == nil {
+		log.M(chi).A().Error("FAIL list ConfigMap list is nil")
+		return
+	}
+	for _, obj := range list.Items {
+		r.RegisterConfigMap(obj.ObjectMeta)
+	}
+}
+
+func (c *Controller) discoveryService(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+	list, err := c.kubeClient.CoreV1().Services(chi.Namespace).List(ctx, opts)
+	if err != nil {
+		log.M(chi).A().Error("FAIL list Service err:%v", err)
+		return
+	}
+	if list == nil {
+		log.M(chi).A().Error("FAIL list Service list is nil")
+		return
+	}
+	for _, obj := range list.Items {
+		r.RegisterService(obj.ObjectMeta)
+	}
+}
+
+func (c *Controller) discoveryPVC(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+	list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(chi.Namespace).List(ctx, opts)
+	if err != nil {
+		log.M(chi).A().Error("FAIL list PVC err:%v", err)
+		return
+	}
+	if list == nil {
+		log.M(chi).A().Error("FAIL list PVC list is nil")
+		return
+	}
+	for _, obj := range list.Items {
+		r.RegisterPVC(obj.ObjectMeta)
+	}
+}
+
+func (c *Controller) discoveryPV(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+	list, err := c.kubeClient.CoreV1().PersistentVolumes().List(ctx, opts)
+	if err != nil {
+		log.M(chi).A().Error("FAIL list PV err:%v", err)
+		return
+	}
+	if list == nil {
+		log.M(chi).A().Error("FAIL list PV list is nil")
+		return
+	}
+	for _, obj := range list.Items {
+		r.RegisterPV(obj.ObjectMeta)
+	}
 }

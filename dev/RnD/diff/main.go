@@ -19,7 +19,7 @@ import (
 	"github.com/r3labs/diff"
 )
 
-type Order struct {
+type order struct {
 	ID    string `diff:"id"`
 	Items []int  `diff:"items"`
 }

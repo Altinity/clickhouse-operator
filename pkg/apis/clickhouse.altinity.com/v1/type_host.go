@@ -132,12 +132,17 @@ func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 }
 
 // GetStatefulSetReplicasNum gets stateful set replica num
-func (host *ChiHost) GetStatefulSetReplicasNum() int32 {
-	if host.CHI.IsStopped() {
-		return 0
-	} else {
-		return 1
+func (host *ChiHost) GetStatefulSetReplicasNum(shutdown bool) *int32 {
+	var num int32 = 0
+	switch {
+	case shutdown:
+		num = 0
+	case host.CHI.IsStopped():
+		num = 0
+	default:
+		num = 1
 	}
+	return &num
 }
 
 // GetSettings gets settings

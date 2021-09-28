@@ -148,39 +148,19 @@ func (ap *ActionPlan) HasActionsToDo() bool {
 	}
 
 	if (ap.specDiff == nil) && (ap.labelsDiff == nil) {
+		// No diffs available
 		return !ap.deletionTimestampEqual || !ap.finalizersEqual
 	}
 
 	// Looks like have some changes in diffs
 
-	if ap.specDiff != nil {
-		if len(ap.specDiff.Added) > 0 {
-			// Something added
-			return true
-		}
-		if len(ap.specDiff.Removed) > 0 {
-			// Something removed
-			return true
-		}
-		if len(ap.specDiff.Modified) > 0 {
-			// Something modified
-			return true
-		}
+	if (ap.specDiff != nil) && (len(ap.specDiff.Added)+len(ap.specDiff.Removed)+len(ap.specDiff.Modified) > 0) {
+		// Has some modifications
+		return true
 	}
-
-	if ap.labelsDiff != nil {
-		if len(ap.labelsDiff.Added) > 0 {
-			// Something added
-			return true
-		}
-		if len(ap.labelsDiff.Removed) > 0 {
-			// Something removed
-			return true
-		}
-		if len(ap.labelsDiff.Modified) > 0 {
-			// Something modified
-			return true
-		}
+	if (ap.labelsDiff != nil) && (len(ap.labelsDiff.Added)+len(ap.labelsDiff.Removed)+len(ap.labelsDiff.Modified) > 0) {
+		// Has some modifications
+		return true
 	}
 
 	return !ap.deletionTimestampEqual || !ap.finalizersEqual

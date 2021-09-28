@@ -6,6 +6,8 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 SRC_ROOT="$(realpath "${CUR_DIR}/..")"
 
 MANIFESTS_ROOT="${SRC_ROOT}/deploy"
+CMD_ROOT="${SRC_ROOT}/cmd"
+PKG_ROOT="${SRC_ROOT}/pkg"
 
 REPO="github.com/altinity/clickhouse-operator"
 # 0.9.3

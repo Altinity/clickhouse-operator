@@ -7,6 +7,10 @@ metadata:
 spec:
   configuration:
     files:
+      /wrong/prefix/file.txt: |
+        !!! WILL TOTALLY IGNORED and not render in ConfigMap !!!
+      conf.d/subfolder/file_in_subfolder.txt: |
+        !!! SUBFOLDER WILL INGORED, file will placed into conf.d !!!
       simple_1.file: |
         <yandex>
           <!-- simple_1.file goes to COMMON -->

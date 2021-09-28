@@ -29,3 +29,4 @@ There were changes in ClickHouseInstallation CRD, so it is recommended to remove
 
 [a187]: https://github.com/Altinity/clickhouse-operator/pull/187
 [a159]: https://github.com/Altinity/clickhouse-operator/pull/159
+

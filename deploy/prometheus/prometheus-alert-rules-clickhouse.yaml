@@ -329,15 +329,16 @@ spec:
               that ZooKeeper consistency model allows.
 
         - alert: ClickHouseDiskUsage
-          expr: (chi_clickhouse_metric_DiskDataBytes / (chi_clickhouse_metric_DiskFreeBytes + chi_clickhouse_metric_DiskDataBytes)) > 0.8
+          expr: (chi_clickhouse_metric_DiskFreeBytes / chi_clickhouse_metric_DiskTotalBytes) < 0.1
           labels:
             severity: high
           annotations:
             identifier: "{{ $labels.hostname }}"
-            summary: "Disk Usage in `&lt;yandex&gt;&lt;path&gt;` > 80%"
+            summary: "Disk Usage in `&lt;yandex&gt;&lt;path&gt;` > 90%"
             description: |-
               data size: {{ with printf "chi_clickhouse_metric_DiskDataBytes{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | humanize1024 }}B {{ end }}
-              disk free {{ with printf "chi_clickhouse_metric_DiskFreeBytes{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | humanize1024 }}B {{ end }}
+              disk free: {{ with printf "chi_clickhouse_metric_DiskFreeBytes{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | humanize1024 }}B {{ end }}
+              disk size: {{ with printf "chi_clickhouse_metric_DiskTotalBytes{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | humanize1024 }}B {{ end }}
               currently k8s doesn't support resize of Persistent Volumes, but you can try add another volume to existing pod with restart pod
               please read documentation:
               - https://github.com/Altinity/clickhouse-operator/blob/master/docs/storage.md

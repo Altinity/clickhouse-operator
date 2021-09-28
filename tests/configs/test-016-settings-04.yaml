@@ -20,7 +20,7 @@ spec:
       user2/password: qwerty
       user2/networks/ip: "::/0"
     settings:
-      dictionaries_config: config.d/*.dict
+      dictionaries_config: config.d/dict_*.xml
       macros/layer: "01"
       query_log: _removed_
     files:
@@ -65,7 +65,7 @@ spec:
               </custom>
            </remote_servers>
         </yandex>
-      dict_one.dict: |
+      config.d/dict_one.xml: |
         <yandex>
           <dictionary>
         <name>one</name>
