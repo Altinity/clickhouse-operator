@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -xe
 
 # Ensure we have some semi-random machine-id
 if [ ! -f  /etc/machine-id ]; then
@@ -43,11 +43,9 @@ while true; do
 done
 set -e
 
-docker load < /var/lib/docker/kicbase.dockerimage
-docker load < /var/lib/docker/ch_image.dockerimage
-docker load < /var/lib/docker/s_prov.dockerimage
-docker load < /var/lib/docker/zk.dockerimage
-docker load < /var/lib/docker/ch_old.dockerimage
+for img in /var/lib/docker/*.dockerimage; do
+  docker load < "${img}"
+done
 
 chown -R master /home/master/.kube
 chmod -R u+wrx /home/master/.kube
@@ -55,19 +53,17 @@ chmod -R u+wrx /home/master/.kube
 chown -R master /home/master/.minikube
 chmod -R u+wrx /home/master/.minikube
 
-su master -c "minikube start --kubernetes-version=1.22.0 --base-image='gcr.io/k8s-minikube/kicbase:v0.0.26'"
+su master -c "minikube start --kubernetes-version=1.22.2 --base-image='gcr.io/k8s-minikube/kicbase:v0.0.27'"
+for img in /var/lib/docker/*.dockerimage; do
+  echo minikube image load "${img}"
+  minikube image load "${img}"
+done
 
-minikube image load /var/lib/docker/kicbase.dockerimage
-minikube image load /var/lib/docker/ch_image.dockerimage
-minikube image load /var/lib/docker/s_prov.dockerimage
-minikube image load /var/lib/docker/zk.dockerimage
-minikube image load /var/lib/docker/ch_old.dockerimage
-
-kubectl apply -f /home/master/clickhouse-operator/deploy/operator/clickhouse-operator-install-bundle.yaml
-
-export CLICKHOUSE_TESTS_SERVER_BIN_PATH=/clickhouse
-export CLICKHOUSE_TESTS_CLIENT_BIN_PATH=/clickhouse
-export CLICKHOUSE_TESTS_BASE_CONFIG_DIR=/clickhouse-config
-export CLICKHOUSE_ODBC_BRIDGE_BINARY_PATH=/clickhouse-odbc-bridge
+sed -e 's/imagePullPolicy: Always/imagePullPolicy: IfNotPresent/' < /home/master/clickhouse-operator/deploy/operator/clickhouse-operator-install-bundle.yaml | kubectl apply -f -
+# need for metric alerts tests
+export NO_WAIT=1
+bash -xe /home/master/clickhouse-operator/deploy/prometheus/create-prometheus.sh
+bash -xe /home/master/clickhouse-operator/deploy/minio/install-minio-operator.sh
+bash -xe /home/master/clickhouse-operator/deploy/minio/install-minio-tenant.sh
 
 tail -f /dev/null

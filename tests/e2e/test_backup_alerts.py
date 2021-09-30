@@ -4,11 +4,11 @@ import time
 import datetime
 import e2e.alerts as alerts
 import e2e.settings as settings
-import e2e.kubectl as settings
+import e2e.kubectl as kubectl
 import e2e.clickhouse as clickhouse
 import e2e.util as util
 
-from testflows.core import TestScenario, Name, When, Then, Given, main, Scenario, Module, fail
+from testflows.core import *
 from testflows.asserts import error
 
 
@@ -67,7 +67,7 @@ def wait_backup_pod_ready_and_curl_installed(backup_pod):
         kubectl.launch(f'exec {backup_pod} -c clickhouse-backup -- curl --version')
 
 
-def prepare_table_for_backup(backup_pod, rows=1000):
+def prepare_table_for_backup(backup_pod, chi, rows=1000):
     backup_name = f'test_backup_{time.strftime("%Y-%m-%d_%H%M%S")}'
     clickhouse.query(
         chi['metadata']['name'],
@@ -117,7 +117,7 @@ def apply_normal_backup():
 
 @TestScenario
 @Name("Check clickhouse-operator/minio setup")
-def test_minio_setup(self):
+def test_minio_setup(self, chi, minio_spec):
     with Given("clickhouse-operator is installed"):
         assert kubectl.get_count(
             "pod", ns=settings.operator_namespace,
@@ -144,9 +144,9 @@ def test_minio_setup(self):
 
 @TestScenario
 @Name('test_backup_is_success. Basic backup scenario')
-def test_backup_is_success(self):
+def test_backup_is_success(self, chi, minio_spec):
     _, _, backup_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
-    backup_name = prepare_table_for_backup(backup_pod)
+    backup_name = prepare_table_for_backup(backup_pod, chi)
     wait_backup_pod_ready_and_curl_installed(backup_pod)
 
     with When('Backup is success'):
@@ -173,7 +173,7 @@ def test_backup_is_success(self):
 
 @TestScenario
 @Name('test_backup_is_down. ClickHouseBackupDown and ClickHouseBackupRecentlyRestart alerts')
-def test_backup_is_down(self):
+def test_backup_is_down(self, chi, minio_spec):
     reboot_pod, _, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
     def reboot_backup_container():
@@ -205,9 +205,9 @@ def test_backup_is_down(self):
 
 @TestScenario
 @Name('test_backup_failed. Check ClickHouseBackupFailed alerts')
-def test_backup_failed(self):
+def test_backup_failed(self, chi, minio_spec):
     backup_pod, _, _, _ = alerts.random_pod_choice_for_callbacks(chi)
-    backup_prefix = prepare_table_for_backup(backup_pod)
+    backup_prefix = prepare_table_for_backup(backup_pod, chi)
 
     wait_backup_pod_ready_and_curl_installed(backup_pod)
 
@@ -243,7 +243,7 @@ def test_backup_failed(self):
 
 @TestScenario
 @Name('test_backup_duration. Check ClickHouseBackupTooShort and ClickHouseBackupTooLong alerts')
-def test_backup_duration(self):
+def test_backup_duration(self, chi, minio_spec):
     short_pod, _, long_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
     apply_fake_backup("prepare fake backup duration metric")
 
@@ -290,7 +290,7 @@ def test_backup_duration(self):
 
 @TestScenario
 @Name('test_backup_size. Check ClickHouseBackupSizeChanged alerts')
-def test_backup_size(self):
+def test_backup_size(self, chi, minio_spec):
     decrease_pod, _, increase_pod, _ = alerts.random_pod_choice_for_callbacks(chi)
 
     backup_cases = {
@@ -306,7 +306,7 @@ def test_backup_size(self):
     for backup_pod in backup_cases:
         decrease = backup_cases[backup_pod]['decrease']
         for backup_rows in backup_cases[backup_pod]['rows']:
-            backup_name = prepare_table_for_backup(backup_pod, rows=backup_rows)
+            backup_name = prepare_table_for_backup(backup_pod, chi, rows=backup_rows)
             exec_on_backup_container(backup_pod, f'curl -X POST -sL "http://127.0.0.1:7171/backup/create?name={backup_name}"')
             wait_backup_command_status(backup_pod, f'create {backup_name}', expected_status='success')
             if decrease:
@@ -328,7 +328,7 @@ def test_backup_size(self):
 
 @TestScenario
 @Name('test_backup_not_run. Check ClickhouseBackupDoesntRunTooLong alert')
-def test_backup_not_run(self):
+def test_backup_not_run(self, chi, minio_spec):
     not_run_pod, _, _, _ = alerts.random_pod_choice_for_callbacks(chi)
     apply_fake_backup("prepare fake backup for time metric")
 
@@ -351,7 +351,7 @@ def test_backup_not_run(self):
 
     apply_normal_backup()
 
-    backup_name = prepare_table_for_backup(not_run_pod)
+    backup_name = prepare_table_for_backup(not_run_pod, chi)
     wait_backup_pod_ready_and_curl_installed(not_run_pod)
 
     with When('Backup is success'):
@@ -367,23 +367,24 @@ def test_backup_not_run(self):
         assert resolved, error("can't get ClickhouseBackupDoesntRunTooLong alert is gone away")
 
 
-if main():
-    with Module("main"):
-        prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi = alerts.initialize(
-            chi_file='configs/test-cluster-for-backups.yaml',
-            chi_template_file='templates/tpl-clickhouse-backups.yaml',
-            chi_name='test-cluster-for-backups',
-        )
-        minio_spec = get_minio_spec()
+@TestModule
+@Name("e2e.test_backup_alerts")
+def test(self):
+    _, _, _, _, chi = alerts.initialize(
+        chi_file='configs/test-cluster-for-backups.yaml',
+        chi_template_file='templates/tpl-clickhouse-backups.yaml',
+        chi_name='test-cluster-for-backups',
+    )
+    minio_spec = get_minio_spec()
 
-        with Module("backup_alerts"):
-            test_cases = [
-                test_backup_is_success,
-                test_backup_is_down,
-                test_backup_failed,
-                test_backup_duration,
-                test_backup_size,
-                test_backup_not_run,
-            ]
-            for t in test_cases:
-                Scenario(test=t)()
+    with Module("backup_alerts"):
+        test_cases = [
+            test_backup_is_success,
+            test_backup_is_down,
+            test_backup_failed,
+            test_backup_duration,
+            test_backup_size,
+            test_backup_not_run,
+        ]
+        for t in test_cases:
+            Scenario(test=t)(chi=chi, minio_spec=minio_spec)

@@ -18,10 +18,10 @@ spec:
       user2/databases/default/test/filter: team='team2'
       user3/databases/default/test/filter: team='team3'
       user4/databases/default/test/filter: team='team4'
-      user1/password: ""
-      user2/password: ""
-      user3/password: ""
-      user4/password: ""
+      user1/password: "user1"
+      user2/password: "user2"
+      user3/password: "user3"
+      user4/password: "user4"
     clusters:
       - name: default
         layout:

@@ -46,7 +46,7 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
     return cmd.output if (code == 0) or ok_to_fail else ""
 
 
-def delete_chi(chi, ns=namespace, wait = True, ok_to_fail=False):
+def delete_chi(chi, ns=namespace, wait=True, ok_to_fail=False):
     with When(f"Delete chi {chi}"):
         launch(f"delete chi {chi}", ns=ns, timeout=600, ok_to_fail=ok_to_fail)
         if wait:
@@ -56,15 +56,18 @@ def delete_chi(chi, ns=namespace, wait = True, ok_to_fail=False):
                     "statefulset": 0,
                     "pod": 0,
                     "service": 0,
-                    },
+                },
                 ns,
-                )
+            )
 
 
 def delete_all_chi(ns=namespace):
     crds = launch("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
     if "clickhouseinstallations.clickhouse.altinity.com" in crds:
-        chis = get("chi", "", ns=ns, ok_to_fail=True)
+        try:
+            chis = get("chi", "", ns=ns, ok_to_fail=True)
+        except Exception:
+            chis = {}
         if "items" in chis:
             for chi in chis["items"]:
                 # kubectl(f"patch chi {chi} --type=merge -p '\{\"metadata\":\{\"finalizers\": [null]\}\}'", ns = ns)
@@ -147,7 +150,7 @@ def count_objects(label="", ns=namespace):
 
 def apply(config, ns=namespace, validate=True, timeout=600):
     with When(f"{config} is applied"):
-        launch(f"apply --validate={validate} -f {config}", ns=ns, timeout=timeout)
+        launch(f"apply --validate={validate} -f \"{config}\"", ns=ns, timeout=timeout)
 
 
 def delete(config, ns=namespace, timeout=600):
@@ -178,7 +181,7 @@ def wait_objects(chi, object_counts, ns=namespace):
         assert cur_object_counts == object_counts, error()
 
 
-def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries, backoff = 5):
+def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries, backoff=5):
     with Then(f"{count} {kind}(s) {name} should be created"):
         for i in range(1, retries):
             cur_count = get_count(kind, ns=ns, name=name, label=label)
@@ -212,7 +215,7 @@ def wait_pod_status(pod, status, ns=namespace):
     wait_field("pod", pod, ".status.phase", status, ns)
 
 
-def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff = 5):
+def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff=5):
     with Then(f"{kind} {name} {field} should be {value}"):
         for i in range(1, retries):
             cur_value = get_field(kind, name, field, ns)

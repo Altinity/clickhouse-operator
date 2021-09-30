@@ -21,7 +21,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:20.8
+              image: yandex/clickhouse-server:21.8
 
             - name: clickhouse-backup
               image: nginx:latest

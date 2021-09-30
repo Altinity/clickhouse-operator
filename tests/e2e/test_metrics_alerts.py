@@ -2,12 +2,11 @@ import re
 import time
 import random
 
-from testflows.core import TestScenario, Name, When, Then, Given, main, Scenario, Module, fail
+from testflows.core import *
 from testflows.asserts import error
 
 import e2e.clickhouse as clickhouse
 import e2e.kubectl as kubectl
-import e2e.manifest as manifest
 import e2e.settings as settings
 import e2e.util as util
 import e2e.alerts as alerts
@@ -15,7 +14,7 @@ import e2e.alerts as alerts
 
 @TestScenario
 @Name("test_prometheus_setup. Check clickhouse-operator/prometheus/alertmanager setup")
-def test_prometheus_setup(self):
+def test_prometheus_setup(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     with Given("clickhouse-operator is installed"):
         assert kubectl.get_count("pod", ns=settings.operator_namespace,
                                  label="-l app=clickhouse-operator") > 0, error(
@@ -42,11 +41,11 @@ def test_prometheus_setup(self):
 
 @TestScenario
 @Name("test_metrics_exporter_down. Check ClickHouseMetricsExporterDown")
-def test_metrics_exporter_down(self):
+def test_metrics_exporter_down(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     def reboot_metrics_exporter():
         clickhouse_operator_pod = clickhouse_operator_spec["items"][0]["metadata"]["name"]
         kubectl.launch(
-            f"exec -n {settings.operator_namespace} {clickhouse_operator_pod} -c metrics-exporter -- reboot",
+            f"exec -n {settings.operator_namespace} {clickhouse_operator_pod} -c metrics-exporter -- sh -c 'kill 1'",
             ok_to_fail=True,
         )
 
@@ -64,7 +63,7 @@ def test_metrics_exporter_down(self):
 
 @TestScenario
 @Name("test_clickhouse_server_reboot. Check ClickHouseServerDown, ClickHouseServerRestartRecently")
-def test_clickhouse_server_reboot(self):
+def test_clickhouse_server_reboot(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     random_idx = random.randint(0, 1)
     clickhouse_pod = chi["status"]["pods"][random_idx]
     clickhouse_svc = chi["status"]["fqdns"][random_idx]
@@ -100,7 +99,7 @@ def test_clickhouse_server_reboot(self):
 
 @TestScenario
 @Name("test_clickhouse_dns_errors. Check ClickHouseDNSErrors")
-def test_clickhouse_dns_errors(self):
+def test_clickhouse_dns_errors(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     random_idx = random.randint(0, 1)
     clickhouse_pod = chi["status"]["pods"][random_idx]
     clickhouse_svc = chi["status"]["fqdns"][random_idx]
@@ -109,7 +108,7 @@ def test_clickhouse_dns_errors(self):
         f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse-pod -- cat /etc/resolv.conf",
         ok_to_fail=False,
     )
-    new_dns = re.sub(r'^nameserver (.+)', 'nameserver 1.1.1.1', old_dns)
+    new_dns = re.sub(r'^nameserver (.+)', 'nameserver 1.1.1.1', old_dns, flags=re.MULTILINE)
 
     def rewrite_dns_on_clickhouse_server(write_new=True):
         dns = new_dns if write_new else old_dns
@@ -118,7 +117,8 @@ def test_clickhouse_dns_errors(self):
             ok_to_fail=False,
         )
         kubectl.launch(
-            f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse-pod -- clickhouse-client --echo -mn -q \"SYSTEM DROP DNS CACHE; SELECT count() FROM cluster('all-sharded',system,metrics)\"",
+            f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse-pod -- clickhouse-client --echo -mn "
+            f"-q \"SYSTEM DROP DNS CACHE; SELECT count() FROM cluster('all-sharded',system.metrics); SELECT sum(ProfileEvents_DNSError) FROM system.metric_log\"",
             ok_to_fail=True,
         )
 
@@ -137,7 +137,7 @@ def test_clickhouse_dns_errors(self):
 
 @TestScenario
 @Name("test_distributed_files_to_insert. Check ClickHouseDistributedFilesToInsertHigh")
-def test_distributed_files_to_insert(self):
+def test_distributed_files_to_insert(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     delayed_pod, delayed_svc, restarted_pod, restarted_svc = alerts.random_pod_choice_for_callbacks(chi)
     clickhouse.create_distributed_table_on_cluster(chi)
 
@@ -191,7 +191,7 @@ def test_distributed_files_to_insert(self):
 
 @TestScenario
 @Name("test_distributed_connection_exceptions. Check ClickHouseDistributedConnectionExceptions")
-def test_distributed_connection_exceptions(self):
+def test_distributed_connection_exceptions(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     delayed_pod, delayed_svc, restarted_pod, restarted_svc = alerts.random_pod_choice_for_callbacks(chi)
     clickhouse.create_distributed_table_on_cluster(chi)
 
@@ -233,7 +233,7 @@ def test_distributed_connection_exceptions(self):
 
 @TestScenario
 @Name("test_insert_related_alerts. Check ClickHouseRejectedInsert, ClickHouseDelayedInsertThrottling, ClickHouseMaxPartCountForPartition, ClickHouseLowInsertedRowsPerQuery")
-def test_insert_related_alerts(self):
+def test_insert_related_alerts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     clickhouse.create_table_on_cluster(chi)
     delayed_pod, delayed_svc, rejected_pod, rejected_svc = alerts.random_pod_choice_for_callbacks(chi)
 
@@ -254,14 +254,15 @@ def test_insert_related_alerts(self):
             sql = stop_merges + min_block + f"INSERT INTO default.test(event_time, test) SELECT now(),number FROM system.numbers LIMIT {r};"
             clickhouse.query(chi_name, sql, host=selected_svc, ns=kubectl.namespace)
 
-            # @TODO we need only one query after resolve https://github.com/ClickHouse/ClickHouse/issues/11384 and switch to 21.3+
             sql = min_block + "INSERT INTO default.test(event_time, test) SELECT now(), number FROM system.numbers LIMIT 1;"
             clickhouse.query_with_error(chi_name, sql, host=selected_svc, ns=kubectl.namespace)
             with Then(f"wait prometheus_scrape_interval={prometheus_scrape_interval}*2 sec"):
                 time.sleep(prometheus_scrape_interval * 2)
 
-            sql = min_block + "INSERT INTO default.test(event_time, test) SELECT now(), number FROM system.numbers LIMIT 1;"
-            clickhouse.query_with_error(chi_name, sql, host=selected_svc, ns=kubectl.namespace)
+            with Then("after 21.8 InsertedRows include system.* rows"):
+                for i in range(35):
+                    sql = min_block + "INSERT INTO default.test(event_time, test) SELECT now(), number FROM system.numbers LIMIT 1;"
+                    clickhouse.query_with_error(chi_name, sql, host=selected_svc, ns=kubectl.namespace)
 
     insert_many_parts_to_clickhouse()
     with Then("check ClickHouseDelayedInsertThrottling firing"):
@@ -310,7 +311,7 @@ def test_insert_related_alerts(self):
 
 @TestScenario
 @Name("test_longest_running_query. Check ClickHouseLongestRunningQuery")
-def test_longest_running_query(self):
+def test_longest_running_query(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     long_running_pod, long_running_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
     # 600s trigger + 2*30s - double prometheus scraping interval
     clickhouse.query(chi["metadata"]["name"], "SELECT now(),sleepEachRow(1),number FROM system.numbers LIMIT 660",
@@ -326,7 +327,7 @@ def test_longest_running_query(self):
 
 @TestScenario
 @Name("test_query_preempted. Check ClickHouseQueryPreempted")
-def test_query_preempted(self):
+def test_query_preempted(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     priority_pod, priority_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
     def run_queries_with_priority():
@@ -352,7 +353,7 @@ def test_query_preempted(self):
 
 @TestScenario
 @Name("test_read_only_replica. Check ClickHouseReadonlyReplica")
-def test_read_only_replica(self):
+def test_read_only_replica(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     read_only_pod, read_only_svc, other_pod, other_svc = alerts.random_pod_choice_for_callbacks(chi)
     chi_name = chi["metadata"]["name"]
     clickhouse.create_table_on_cluster(
@@ -406,7 +407,7 @@ def test_read_only_replica(self):
 
 @TestScenario
 @Name("test_replicas_max_abosulute_delay. Check ClickHouseReplicasMaxAbsoluteDelay")
-def test_replicas_max_abosulute_delay(self):
+def test_replicas_max_abosulute_delay(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     stop_replica_pod, stop_replica_svc, insert_pod, insert_svc = alerts.random_pod_choice_for_callbacks(chi)
     clickhouse.create_table_on_cluster(
         chi,
@@ -450,7 +451,7 @@ def test_replicas_max_abosulute_delay(self):
 
 @TestScenario
 @Name("test_too_many_connections. Check ClickHouseTooManyConnections")
-def test_too_many_connections(self):
+def test_too_many_connections(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     too_many_connection_pod, too_many_connection_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
     cmd = "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y netcat mysql-client"
     kubectl.launch(
@@ -500,7 +501,7 @@ def test_too_many_connections(self):
 
 @TestScenario
 @Name("test_too_much_running_queries. Check ClickHouseTooManyRunningQueries")
-def test_too_much_running_queries(self):
+def test_too_much_running_queries(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     _, _, too_many_queries_pod, too_many_queries_svc = alerts.random_pod_choice_for_callbacks(chi)
     cmd = "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y mysql-client"
     kubectl.launch(
@@ -546,7 +547,7 @@ def test_too_much_running_queries(self):
 
 @TestScenario
 @Name("test_system_settings_changed. Check ClickHouseSystemSettingsChanged")
-def test_system_settings_changed(self):
+def test_system_settings_changed(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     changed_pod, changed_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
     with When("apply changed settings"):
@@ -596,7 +597,7 @@ def test_system_settings_changed(self):
 
 @TestScenario
 @Name("test_version_changed. Check ClickHouseVersionChanged")
-def test_version_changed(self):
+def test_version_changed(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     changed_pod, changed_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
     with When("apply changed settings"):
@@ -650,7 +651,7 @@ def test_version_changed(self):
 
 @TestScenario
 @Name("test_zookeeper_hardware_exceptions. Check ClickHouseZooKeeperHardwareExceptions")
-def test_zookeeper_hardware_exceptions(self):
+def test_zookeeper_hardware_exceptions(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     pod1, svc1, pod2, svc2 = alerts.random_pod_choice_for_callbacks(chi)
     chi_name = chi["metadata"]["name"]
 
@@ -680,7 +681,7 @@ def test_zookeeper_hardware_exceptions(self):
 
 @TestScenario
 @Name("test_distributed_sync_insertion_timeout. Check ClickHouseDistributedSyncInsertionTimeoutExceeded")
-def test_distributed_sync_insertion_timeout(self):
+def test_distributed_sync_insertion_timeout(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     sync_pod, sync_svc, restarted_pod, restarted_svc = alerts.random_pod_choice_for_callbacks(chi)
     clickhouse.create_distributed_table_on_cluster(chi, local_engine='ENGINE Null()')
 
@@ -711,7 +712,7 @@ def test_distributed_sync_insertion_timeout(self):
 
 @TestScenario
 @Name("test_detached_parts. Check ClickHouseDetachedParts")
-def test_detached_parts(self):
+def test_detached_parts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     clickhouse.create_table_on_cluster(chi)
     detached_pod, detached_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
@@ -747,7 +748,7 @@ def test_detached_parts(self):
 
 @TestScenario
 @Name("test_zookeeper_alerts. Check ZookeeperDown, ZookeeperRestartRecently")
-def test_zookeeper_alerts(self):
+def test_zookeeper_alerts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     zookeeper_spec = kubectl.get("endpoints", "zookeeper")
     zookeeper_pod = random.choice(zookeeper_spec["subsets"][0]["addresses"])["targetRef"]["name"]
 
@@ -788,35 +789,35 @@ def test_zookeeper_alerts(self):
         assert resolved, error("can't check ZookeeperRestartRecently alert is gone away")
 
 
-if main():
-    with Module("main"):
-        prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi = alerts.initialize(
-            chi_file='../configs/test-cluster-for-alerts.yaml',
-            chi_template_file='../templates/tpl-clickhouse-alerts.yaml',
-            chi_name='test-cluster-for-alerts',
-        )
+@TestFeature
+@Name("e2e.test_metrics_alerts")
+def test(self):
+    prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi = alerts.initialize(
+        chi_file='configs/test-cluster-for-alerts.yaml',
+        chi_template_file='templates/tpl-clickhouse-alerts.yaml',
+        chi_name='test-cluster-for-alerts',
+    )
 
-        with Module("metrics_alerts"):
-            test_cases = [
-                test_prometheus_setup,
-                test_read_only_replica,
-                test_replicas_max_abosulute_delay,
-                test_metrics_exporter_down,
-                test_clickhouse_server_reboot,
-                test_clickhouse_dns_errors,
-                test_distributed_connection_exceptions,
-                test_insert_related_alerts,
-                test_too_many_connections,
-                test_too_much_running_queries,
-                test_longest_running_query,
-                test_system_settings_changed,
-                test_version_changed,
-                test_zookeeper_hardware_exceptions,
-                test_distributed_sync_insertion_timeout,
-                test_distributed_files_to_insert,
-                test_clickhouse_server_reboot,
-                test_detached_parts,
-                test_zookeeper_alerts,
-            ]
-            for t in test_cases:
-                Scenario(test=t)()
+    test_cases = [
+#        test_prometheus_setup,
+#        test_read_only_replica,
+#        test_replicas_max_abosulute_delay,
+#        test_metrics_exporter_down,
+#        test_clickhouse_server_reboot,
+#        test_clickhouse_dns_errors,
+#        test_distributed_connection_exceptions,
+#        test_insert_related_alerts,
+#        test_too_many_connections,
+#        test_too_much_running_queries,
+#        test_longest_running_query,
+#        test_system_settings_changed,
+        test_version_changed,
+        test_zookeeper_hardware_exceptions,
+        test_distributed_sync_insertion_timeout,
+        test_distributed_files_to_insert,
+        test_clickhouse_server_reboot,
+        test_detached_parts,
+        test_zookeeper_alerts,
+    ]
+    for t in test_cases:
+        Scenario(test=t)(prometheus_operator_spec=prometheus_operator_spec, clickhouse_operator_spec=clickhouse_operator_spec, chi=chi)

@@ -7,19 +7,21 @@ import e2e.settings as settings
 import e2e.util as util
 
 from testflows.core import *
+from testflows.asserts import error
 
 
 @TestScenario
 @Name("test_ch_001. Insert quorum")
 def test_ch_001(self):
     util.require_zookeeper()
-    chit_data = manifest.get_chit_data(util.get_full_path("templates/tpl-clickhouse-21.8.yaml"))
+    quorum_template = "templates/tpl-clickhouse-21.8.yaml"
+    chit_data = manifest.get_chit_data(util.get_full_path(quorum_template))
 
-    kubectl.launch(f"delete chit {chit_data['metadata']['name']}", ns=settings.test_namespace)
+    kubectl.launch(f"delete chit {chit_data['metadata']['name']}", ns=settings.test_namespace, ok_to_fail=True)
     kubectl.create_and_check(
         "configs/test-ch-001-insert-quorum.yaml",
         {
-            "apply_templates": {"templates/tpl-clickhouse-21.8.yaml"},
+            "apply_templates": {quorum_template},
             "pod_count": 2,
             "do_not_delete": 1,
         })
@@ -68,7 +70,7 @@ def test_ch_001(self):
             with Then("Wait 10 seconds and the data should be dropped by TTL"):
                 time.sleep(10)
                 out = clickhouse.query(chi, "select count() from t1 where a=6", host=host0)
-                assert out == "0"
+                assert out == "0", error()
 
         with When("Resume fetches for t1 at replica1"):
             clickhouse.query(chi, "system start fetches default.t1", host=host1)
@@ -84,7 +86,7 @@ def test_ch_001(self):
 
             with Then("Insert should fail since it can not reach the quorum"):
                 out = clickhouse.query_with_error(chi, "insert into t1(a) values(2)", host=host0)
-                assert "Timeout while waiting for quorum" in out
+                assert "Timeout while waiting for quorum" in out, error()
 
         # kubectl(f"exec {host0}-0 -n test -- cp /var/lib//clickhouse/data/default/t2/all_1_1_0/a.mrk2 /var/lib//clickhouse/data/default/t2/all_1_1_0/a.bin")
         # with Then("Corrupt data part in t2"):
@@ -100,24 +102,26 @@ def test_ch_001(self):
 
             with Then("Inserts should fail with an error regarding not satisfied quorum"):
                 out = clickhouse.query_with_error(chi, "insert into t1(a) values(3)", host=host0)
-                assert "Quorum for previous write has not been satisfied yet" in out
+                assert "Quorum for previous write has not been satisfied yet" in out, error()
 
             with And("Second insert of the same block should pass"):
                 clickhouse.query(chi, "insert into t1(a) values(3)", host=host0)
 
             with And("Insert of the new block should fail"):
                 out = clickhouse.query_with_error(chi, "insert into t1(a) values(4)", host=host0)
-                assert "Quorum for previous write has not been satisfied yet" in out
+                assert "Quorum for previous write has not been satisfied yet" in out, error()
 
-            with And(
-                    "Second insert of the same block with 'deduplicate_blocks_in_dependent_materialized_views' setting should fail"):
-                out = clickhouse.query_with_error(chi,
-                                       "set deduplicate_blocks_in_dependent_materialized_views=1; insert into t1(a) values(5)",
-                                       host=host0)
-                assert "Quorum for previous write has not been satisfied yet" in out
+            with And("Second insert of the same block with 'deduplicate_blocks_in_dependent_materialized_views' setting should fail"):
+                out = clickhouse.query_with_error(
+                    chi,
+                    "set deduplicate_blocks_in_dependent_materialized_views=1; insert into t1(a) values(5)",
+                    host=host0
+                )
+                assert "Quorum for previous write has not been satisfied yet" in out, error()
 
-        out = clickhouse.query_with_error(chi,
-                               "select t1.a t1_a, t2.a t2_a from t1 left outer join t2 using (a) order by t1_a settings join_use_nulls=1")
+        out = clickhouse.query_with_error(
+            chi, "select t1.a t1_a, t2.a t2_a from t1 left outer join t2 using (a) order by t1_a settings join_use_nulls=1"
+        )
         note(out)
 
         # cat /var/log/clickhouse-server/clickhouse-server.log | grep t2 | grep -E "all_1_1_0|START|STOP"
@@ -140,19 +144,36 @@ def test_ch_002(self):
         clickhouse.query(chi, create_table)
 
     with And("Insert some data"):
-        clickhouse.query(chi,
-              "INSERT INTO test(team, user) values('team1', 'user1'),('team2', 'user2'),('team3', 'user3'),('team4', 'user4')")
+        clickhouse.query(
+            chi, "INSERT INTO test(team, user) values('team1', 'user1'),('team2', 'user2'),('team3', 'user3'),('team4', 'user4')"
+        )
 
-    with Then(
-            "Make another query for different users. It should be restricted to corresponding team by row-level security"):
+    with Then("Make another query for different users. It should be restricted to corresponding team by row-level security"):
         for user in ['user1', 'user2', 'user3', 'user4']:
-            out = clickhouse.query(chi, "select user from test", user=user)
-            assert out == user
+            out = clickhouse.query(chi, "select user from test", user=user, pwd=user)
+            assert out == user, error()
 
-    with Then(
-            "Make a count() query for different users. It should be restricted to corresponding team by row-level security"):
+    with Then("Make a count() query for different users. It should be restricted to corresponding team by row-level security"):
         for user in ['user1', 'user2', 'user3', 'user4']:
-            out = clickhouse.query(chi, "select count() from test", user=user)
-            assert out == "1"
+            out = clickhouse.query(chi, "select count() from test", user=user, pwd=user)
+            assert out == "1", error()
 
     kubectl.delete_chi(chi)
+
+
+@TestFeature
+@Name("e2e.test_clickhouse")
+def test(self):
+    util.clean_namespace(delete_chi=False)
+    all_tests = [
+        test_ch_001,
+        test_ch_002,
+    ]
+
+    run_test = all_tests
+
+    # placeholder for selective test running
+    # run_test = [test_ch_002]
+
+    for t in run_test:
+        Scenario(test=t)()

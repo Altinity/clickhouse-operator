@@ -12,15 +12,15 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 operator_label = "-l app=clickhouse-operator"
 
 
-def get_full_path(test_file, baremetal=True):
+def get_full_path(test_file, lookup_in_host=True):
     # this must be substituted if ran in docker
     if current().context.native:
-        return os.path.join(os.path.dirname(os.path.abspath(__file__)), f"../{test_file}")
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), test_file)
     else:
-        if baremetal:
-            return os.path.join(os.path.dirname(os.path.abspath(__file__)), f"../{test_file}")
+        if lookup_in_host:
+            return os.path.join(os.path.dirname(os.path.abspath(__file__)), test_file)
         else:
-            return "/home/master/clickhouse-operator/tests/" + test_file
+            return os.path.abspath(f"/home/master/clickhouse-operator/tests/e2e/{test_file}")
 
 
 def set_operator_version(version, ns=settings.operator_namespace, timeout=600):
@@ -50,7 +50,7 @@ def restart_operator(ns=settings.operator_namespace, timeout=600):
 def require_zookeeper(manifest='zookeeper-1-node-1GB-for-tests-only.yaml', force_install=False):
     if force_install or kubectl.get_count("service", name="zookeeper") == 0:
         with Given("Zookeeper is missing, installing"):
-            config = get_full_path(f"../deploy/zookeeper/quick-start-persistent-volume/{manifest}", False)
+            config = get_full_path(f"../../deploy/zookeeper/quick-start-persistent-volume/{manifest}", lookup_in_host=False)
             kubectl.apply(config)
             kubectl.wait_object("pod", "zookeeper-0")
             kubectl.wait_pod_status("zookeeper-0", "Running")
@@ -103,3 +103,27 @@ def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name):
         chi = kubectl.get("chi", ns=settings.test_namespace, name=chi_name)
 
         return clickhouse_operator_spec, chi
+
+
+def clean_namespace(delete_chi=False):
+    with Given(f"Clean namespace {settings.test_namespace}"):
+        if delete_chi:
+            kubectl.delete_all_chi(settings.test_namespace)
+        kubectl.delete_ns(settings.test_namespace, ok_to_fail=True)
+        kubectl.create_ns(settings.test_namespace)
+
+
+def make_http_get_request(host, port, path):
+    # thanks to https://github.com/falzm/burl
+    # return f"wget -O- -q http://{host}:{port}{path}"
+    cmd = "export LC_ALL=C; unset headers_read; "
+    cmd += f"exec 3<>/dev/tcp/{host}/{port} ; "
+    cmd += f"printf \"GET {path} HTTP/1.1\\r\\nHost: {host}\\r\\nUser-Agent: bash\\r\\n\\r\\n\" >&3 ; "
+    cmd += 'IFS=; while read -r -t 1 line 0<&3; do '
+    cmd += "line=${line//$'\"'\"'\\r'\"'\"'}; "
+    cmd += 'if [[ ! -v headers_read ]]; then if [[ -z $line ]]; then headers_read=yes; fi; continue; fi; '
+    cmd += 'echo "$line"; done; '
+    cmd += 'exec 3<&- ;'
+    return f"bash -c '{cmd}'"
+
+

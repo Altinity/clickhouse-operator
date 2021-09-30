@@ -3,12 +3,11 @@ import e2e.kubectl as kubectl
 import e2e.settings as settings
 import e2e.util as util
 
-from testflows.core import When, Then, main, Scenario, Module, TestScenario, Name
-
+from testflows.core import *
 
 @TestScenario
 @Name("test_zookeeper_rescale. Check ZK scale-up / scale-down cases")
-def test_zookeeper_rescale(self):
+def test_zookeeper_rescale(self, chi):
     with When('create replicated table'):
         clickhouse.create_table_on_cluster(
             chi, 'all-sharded', 'default.zk_repl',
@@ -48,20 +47,25 @@ def test_zookeeper_rescale(self):
     clickhouse.drop_table_on_cluster(chi, 'all-sharded', 'default.zk_repl')
 
 
-if main():
-    with Module("main"):
-        clickhouse_operator_spec, chi = util.install_clickhouse_and_zookeeper(
-            chi_file='../configs/test-cluster-for-zookeeper.yaml',
-            chi_template_file='../templates/tpl-clickhouse-latest.yaml',
-            chi_name='test-cluster-for-zk',
-        )
-        util.wait_clickhouse_cluster_ready(chi)
+@TestModule
+@Name("e2e.test_zookeeper")
+def test(self):
+    """
+    Perform test for zookeeper scale-up / scale-down scenarios
+    """
+    _, chi = util.install_clickhouse_and_zookeeper(
+        chi_file='configs/test-cluster-for-zookeeper.yaml',
+        chi_template_file='templates/tpl-clickhouse-latest.yaml',
+        chi_name='test-cluster-for-zk',
+    )
+    util.wait_clickhouse_cluster_ready(chi)
 
-        all_tests = [
-            test_zookeeper_rescale
-        ]
-        for t in all_tests:
-            if callable(t):
-                Scenario(test=t)()
-            else:
-                Scenario(test=t[0], args=t[1])()
+    all_tests = [
+        test_zookeeper_rescale
+    ]
+
+    for t in all_tests:
+        if callable(t):
+            Scenario(test=t)(chi=chi)
+        else:
+            Scenario(test=t[0])(args=t[1], chi=chi)
