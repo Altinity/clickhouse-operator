@@ -1557,6 +1557,7 @@ def test_026(self):
 @TestScenario
 @Name("test_027. Test troubleshooting mode")
 def test_027(self):
+    # TODO: Add a case for a custom endpoint
     config = "configs/test-027-troubleshooting-1-bad-config.yaml"
     chi = manifest.get_chi_name(util.get_full_path(config))
     kubectl.create_and_check(
@@ -1622,8 +1623,12 @@ def test_028(self):
     with When("CHI is patched with a restart attribute"):
         cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"add\",\"path\":\"/spec/restart\",\"value\":\"RollingUpdate\"}}]'"
         kubectl.launch(cmd)
+        with Then("Operator should let the query to finish"):
+            out = clickhouse.query_with_error(chi, "select count(sleepEachRow(1)) from numbers(30)")
+            assert out == "30"
 
         with Then("Operator should start processing a change"):
+            # TODO: Test needs to be improved
             kubectl.wait_chi_status(chi, "InProgress")
             with And("Queries keep running"):
                 while kubectl.get_field("chi", chi, ".status.status") == "InProgress":
@@ -1638,6 +1643,33 @@ def test_028(self):
     note("After restart")
     out = clickhouse.query_with_error(chi, sql)
     note(out)
+    kubectl.delete_chi(chi)
+
+@TestScenario
+@Name("test_029. Test different distribution settings")
+def test_029(self):
+    # TODO: this test needs to be extended in order to handle more distribution types
+    config="configs/test-029-distribution.yaml"
+
+    chi = manifest.get_chi_name(util.get_full_path(config))
+    kubectl.create_and_check(
+        config=config,
+        check={
+            "pod_count": 2,
+            "do_not_delete": 1,
+            "chi_status": "InProgress",  # do not wait
+        },
+    )
+
+    kubectl.check_pod_antiaffinity(chi, "chi-test-029-distribution-t1-0-0-0", topologyKey = "kubernetes.io/hostname")
+    kubectl.check_pod_antiaffinity(chi, "chi-test-029-distribution-t1-0-1-0",
+                    match_labels = {
+                        "clickhouse.altinity.com/chi": f"{chi}",
+                        "clickhouse.altinity.com/namespace": f"{kubectl.namespace}",
+                        "clickhouse.altinity.com/replica": "1",
+                    },
+                    topologyKey = "kubernetes.io/os")
+
     kubectl.delete_chi(chi)
 
 
@@ -1696,6 +1728,7 @@ def test(self):
         test_026,
         test_027,
         test_028,
+        test_029,
     ]
     run_tests = all_tests
 

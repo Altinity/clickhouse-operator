@@ -1,0 +1,34 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-029-distribution
+spec:
+  templates:
+    podTemplates:
+    - name: template-1
+      spec:
+        containers:
+        - name: clickhouse-pod
+          image: yandex/clickhouse-server:21.8
+      podDistribution:
+      - scope: ClickHouseInstallation
+        type: ClickHouseAntiAffinity
+    - name: template-2
+      spec:
+        containers:
+        - name: clickhouse-pod
+          image: yandex/clickhouse-server:21.8
+      podDistribution:
+      - scope: ClickHouseInstallation
+        type: ReplicaAntiAffinity
+        topologyKey: "kubernetes.io/os"
+  configuration:
+    clusters:
+    - name: t1
+      layout:
+        shardsCount: 1
+        replicas:
+          - templates:
+              podTemplate: template-1
+          - templates:
+              podTemplate: template-2

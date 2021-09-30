@@ -74,49 +74,49 @@ def delete_all_chi(ns=namespace):
                 delete_chi(chi["metadata"]["name"], ns)
 
 
-def create_and_check(config, check, ns=namespace, timeout=10000):
+def create_and_check(config, check, ns=namespace, timeout=900):
     chi_name = manifest.get_chi_name(util.get_full_path(f'{config}'))
 
     if "apply_templates" in check:
         debug("Need to apply additional templates")
         for t in check["apply_templates"]:
             debug(f"Applying template: {util.get_full_path(t, False)} \n{t}")
-            apply(util.get_full_path(t, False), ns)
+            apply(util.get_full_path(t, False), ns=ns)
         time.sleep(5)
 
     apply(util.get_full_path(config, False), ns=ns, timeout=timeout)
 
     if "object_counts" in check:
-        wait_objects(chi_name, check["object_counts"], ns)
+        wait_objects(chi_name, check["object_counts"], ns=ns)
 
     if "pod_count" in check:
         wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi_name}", count=check["pod_count"], ns=ns)
 
     if "chi_status" in check:
-        wait_chi_status(chi_name, check["chi_status"], ns)
+        wait_chi_status(chi_name, check["chi_status"], ns=ns)
     else:
-        wait_chi_status(chi_name, "Completed", ns)
+        wait_chi_status(chi_name, "Completed", ns=ns)
 
     if "pod_image" in check:
-        check_pod_image(chi_name, check["pod_image"], ns)
+        check_pod_image(chi_name, check["pod_image"], ns=ns)
 
     if "pod_volumes" in check:
-        check_pod_volumes(chi_name, check["pod_volumes"], ns)
+        check_pod_volumes(chi_name, check["pod_volumes"], ns=ns)
 
     if "pod_podAntiAffinity" in check:
-        check_pod_antiaffinity(chi_name, ns)
+        check_pod_antiaffinity(chi_name, ns=ns)
 
     if "pod_ports" in check:
-        check_pod_ports(chi_name, check["pod_ports"], ns)
+        check_pod_ports(chi_name, check["pod_ports"], ns=ns)
 
     if "service" in check:
-        check_service(check["service"][0], check["service"][1], ns)
+        check_service(check["service"][0], check["service"][1], ns=ns)
 
     if "configmaps" in check:
-        check_configmaps(chi_name, ns)
+        check_configmaps(chi_name, ns=ns)
 
     if "do_not_delete" not in check:
-        delete_chi(chi_name, ns)
+        delete_chi(chi_name, ns=ns)
 
 
 def get(kind, name, label="", ns=namespace, ok_to_fail=False):
@@ -270,13 +270,17 @@ def get_default_storage_class(ns=namespace):
             return parts[1].strip()
 
 
-def get_pod_spec(chi_name, ns=namespace):
-    pod = get("pod", "", ns=ns, label=f"-l clickhouse.altinity.com/chi={chi_name}")["items"][0]
+def get_pod_spec(chi_name, pod_name="", ns=namespace):
+    label = f"-l clickhouse.altinity.com/chi={chi_name}"
+    if pod_name == "":
+        pod = get("pod", "", ns=ns, label=label)["items"][0]
+    else:
+        pod = get("pod", pod_name, ns=ns)
     return pod["spec"]
 
 
-def get_pod_image(chi_name, ns=namespace):
-    pod_image = get_pod_spec(chi_name, ns)["containers"][0]["image"]
+def get_pod_image(chi_name, pod_name="", ns=namespace):
+    pod_image = get_pod_spec(chi_name, pod_name, ns)["containers"][0]["image"]
     return pod_image
 
 
@@ -288,13 +292,13 @@ def get_pod_names(chi_name, ns=namespace):
     return pod_names[1:]
 
 
-def get_pod_volumes(chi_name, ns=namespace):
-    volume_mounts = get_pod_spec(chi_name, ns)["containers"][0]["volumeMounts"]
+def get_pod_volumes(chi_name, pod_name="",  ns=namespace):
+    volume_mounts = get_pod_spec(chi_name, pod_name, ns)["containers"][0]["volumeMounts"]
     return volume_mounts
 
 
-def get_pod_ports(chi_name, ns=namespace):
-    port_specs = get_pod_spec(chi_name, ns)["containers"][0]["ports"]
+def get_pod_ports(chi_name, pod_name="", ns=namespace):
+    port_specs = get_pod_spec(chi_name, pod_name, ns)["containers"][0]["ports"]
     ports = []
     for p in port_specs:
         ports.append(p["containerPort"])
@@ -302,19 +306,19 @@ def get_pod_ports(chi_name, ns=namespace):
 
 
 def check_pod_ports(chi_name, ports, ns=namespace):
-    pod_ports = get_pod_ports(chi_name, ns)
+    pod_ports = get_pod_ports(chi_name, ns=ns)
     with Then(f"Expect pod ports {pod_ports} to match {ports}"):
         assert sorted(pod_ports) == sorted(ports)
 
 
 def check_pod_image(chi_name, image, ns=namespace):
-    pod_image = get_pod_image(chi_name, ns)
+    pod_image = get_pod_image(chi_name, ns=ns)
     with Then(f"Expect pod image {pod_image} to match {image}"):
         assert pod_image == image
 
 
 def check_pod_volumes(chi_name, volumes, ns=namespace):
-    pod_volumes = get_pod_volumes(chi_name, ns)
+    pod_volumes = get_pod_volumes(chi_name, ns=ns)
     for v in volumes:
         with Then(f"Expect pod has volume mount {v}"):
             found = 0
@@ -329,19 +333,21 @@ def get_pvc_size(pvc_name, ns=namespace):
     return get_field("pvc", pvc_name, ".spec.resources.requests.storage", ns)
 
 
-def check_pod_antiaffinity(chi_name, ns=namespace):
-    pod_spec = get_pod_spec(chi_name, ns)
+def check_pod_antiaffinity(chi_name, pod_name = "", match_labels = {}, topologyKey = "kubernetes.io/hostname", ns=namespace):
+    pod_spec = get_pod_spec(chi_name, pod_name, ns)
+    if match_labels == {}:
+        match_labels = {
+                        "clickhouse.altinity.com/app": "chop",
+                        "clickhouse.altinity.com/chi": f"{chi_name}",
+                        "clickhouse.altinity.com/namespace": f"{ns}",
+                    }
     expected = {
         "requiredDuringSchedulingIgnoredDuringExecution": [
             {
                 "labelSelector": {
-                    "matchLabels": {
-                        "clickhouse.altinity.com/app": "chop",
-                        "clickhouse.altinity.com/chi": f"{chi_name}",
-                        "clickhouse.altinity.com/namespace": f"{ns}",
-                    },
+                    "matchLabels": match_labels,
                 },
-                "topologyKey": "kubernetes.io/hostname",
+                "topologyKey": f"{topologyKey}",
             },
         ],
     }

@@ -908,14 +908,13 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 	// Normalize each user
 	for _, username := range usernames {
 		// Ensure "must have" sections are in place
-
-		// Ensure 'user/profile' section
+		// 1. user/profile
+		// 2. user/quota
+		// 3. user/networks/ip
+		// 4. user/networks/host_regexp
 		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultProfile))
-		// Ensure 'user/quota' section
 		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultQuota))
-		// Ensure 'user/networks/ip' section
 		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().CHConfigUserDefaultNetworksIP))
-		// Ensure 'user/networks/host_regexp' section
 		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().CHConfigNetworksHostRegexpTemplate)))
 
 		// Values from secret have higher priority
