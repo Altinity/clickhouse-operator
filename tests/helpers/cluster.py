@@ -56,7 +56,7 @@ class Cluster(object):
 
         docker_compose_file_path = os.path.join(docker_compose_project_dir or "", "docker-compose.yml")
 
-        self.docker_compose += f" --ansi never --project-directory \"{docker_compose_project_dir}\" --file \"{docker_compose_file_path}\""
+        self.docker_compose += f" --project-directory \"{docker_compose_project_dir}\" --file \"{docker_compose_file_path}\""
 
     def __enter__(self):
         with Given("docker-compose cluster"):

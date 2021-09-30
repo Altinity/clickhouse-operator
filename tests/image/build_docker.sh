@@ -26,7 +26,7 @@ MINIO_OPERATOR_IMAGE=${MINIO_OPERATOR_IMAGE:="minio/operator:v4.1.3"}
 
 PROMETHEUS_RELOADER_IMAGE=${PROMETHEUS_RELOADER_IMAGE:="quay.io/prometheus-operator/prometheus-config-reloader:v0.50.0"}
 PROMETHEUS_OPERATOR_IMAGE=${PROMETHEUS_OPERATOR_IMAGE:="quay.io/prometheus-operator/prometheus-operator:v0.50.0"}
-PROMETHEUS_IMAGE=${PROMETHEUS_OPERATOR_IMAGE:="quay.io/prometheus/prometheus"}
+PROMETHEUS_IMAGE=${PROMETHEUS_IMAGE:="quay.io/prometheus/prometheus"}
 PROMETHEUS_ALERT_MANAGER_IMAGE=${PROMETHEUS_ALERT_MANAGER_IMAGE:="quay.io/prometheus/alertmanager:v0.22.2"}
 
 
@@ -58,7 +58,7 @@ ALL_IMAGES=(
   "${MINIO_OPERATOR_IMAGE} minio_operator"
   "${PROMETHEUS_RELOADER_IMAGE} prometheus_preloader"
   "${PROMETHEUS_OPERATOR_IMAGE} prometheus_operator"
-  "${PROMETHEUS_OPERATOR_IMAGE} prometheus"
+  "${PROMETHEUS_IMAGE} prometheus"
   "${PROMETHEUS_ALERT_MANAGER_IMAGE} alert_manager"
   "${CLICKHOUSE_BACKUP_IMAGE} clickhouse_backup"
   "busybox busybox"

@@ -14,12 +14,9 @@ operator_label = "-l app=clickhouse-operator"
 
 def get_full_path(test_file, lookup_in_host=True):
     # this must be substituted if ran in docker
-    if current().context.native:
-        return os.path.join(os.path.dirname(os.path.abspath(__file__)), test_file)
+    if current().context.native or lookup_in_host:
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), f"../{test_file}")
     else:
-        if lookup_in_host:
-            return os.path.join(os.path.dirname(os.path.abspath(__file__)), test_file)
-        else:
             return os.path.abspath(f"/home/master/clickhouse-operator/tests/e2e/{test_file}")
 
 
