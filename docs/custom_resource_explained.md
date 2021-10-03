@@ -117,6 +117,8 @@ expands into
         </test>
      </users>
 ```
+when you skip user/password, or setup it as empty value then `chConfigUserDefaultPassword` parameter value from `etc-clickhouse-operator-files` ConfigMap will use. 
+
 ## .spec.configuration.settings
 ```yaml
     settings:
