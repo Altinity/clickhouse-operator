@@ -1651,7 +1651,7 @@ def test_029(self):
     # TODO: this test needs to be extended in order to handle more distribution types
     config="configs/test-029-distribution.yaml"
 
-    chi = manifest.get_chi_name(util.get_full_path(config, lookup_on_host=True))
+    chi = manifest.get_chi_name(util.get_full_path(config, lookup_in_host=True))
     kubectl.create_and_check(
         config=config,
         check={

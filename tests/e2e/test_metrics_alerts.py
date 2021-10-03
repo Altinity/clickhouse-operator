@@ -83,7 +83,7 @@ def test_clickhouse_server_reboot(self, prometheus_operator_spec, clickhouse_ope
         assert fired, error("can't get ClickHouseServerDown alert in firing state")
 
     with Then("check ClickHouseServerDown gone away"):
-        resolved = alerts.wait_alert_state("ClickHouseServerDown", "firing", False, labels={"hostname": clickhouse_svc}, time_range='5s',
+        resolved = alerts.wait_alert_state("ClickHouseServerDown", "firing", False, labels={"hostname": clickhouse_svc}, time_range="5s",
                                            sleep_time=settings.prometheus_scrape_interval, max_try=100)
         assert resolved, error("can't check ClickHouseServerDown alert is gone away")
 
@@ -92,7 +92,7 @@ def test_clickhouse_server_reboot(self, prometheus_operator_spec, clickhouse_ope
                                         labels={"hostname": clickhouse_svc, "chi": chi["metadata"]["name"]}, time_range="30s")
         assert fired, error("after ClickHouseServerDown gone away, ClickHouseServerRestartRecently shall firing")
 
-        resolved = alerts.wait_alert_state("ClickHouseServerRestartRecently", "firing", False, sleep_time=10,
+        resolved = alerts.wait_alert_state("ClickHouseServerRestartRecently", "firing", False, sleep_time=10, max_try=100, time_range="5s",
                                            labels={"hostname": clickhouse_svc})
         assert resolved, error("can't check ClickHouseServerRestartRecently alert is gone away")
 
@@ -118,8 +118,13 @@ def test_clickhouse_dns_errors(self, prometheus_operator_spec, clickhouse_operat
         )
         kubectl.launch(
             f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse-pod -- clickhouse-client --echo -mn "
-            f"-q \"SYSTEM DROP DNS CACHE; SELECT count() FROM cluster('all-sharded',system.metrics); SELECT sum(ProfileEvents_DNSError) FROM system.metric_log\"",
+            f"-q \"SYSTEM DROP DNS CACHE; SELECT count() FROM cluster('all-sharded',system.metrics)\"",
             ok_to_fail=True,
+        )
+        kubectl.launch(
+            f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse-pod -- clickhouse-client --echo -mn "
+            f"-q \"SELECT sum(ProfileEvent_DNSError) FROM system.metric_log;SELECT * FROM system.events WHERE event='DNSError' FORMAT Vertical; SELECT * FROM system.errors FORMAT Vertical\"",
+            ok_to_fail=False,
         )
 
     with When("rewrite /etc/resolv.conf in clickhouse-server pod"):
@@ -406,8 +411,8 @@ def test_read_only_replica(self, prometheus_operator_spec, clickhouse_operator_s
 
 
 @TestScenario
-@Name("test_replicas_max_abosulute_delay. Check ClickHouseReplicasMaxAbsoluteDelay")
-def test_replicas_max_abosulute_delay(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
+@Name("test_replicas_max_absolute_delay. Check ClickHouseReplicasMaxAbsoluteDelay")
+def test_replicas_max_absolute_delay(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     stop_replica_pod, stop_replica_svc, insert_pod, insert_svc = alerts.random_pod_choice_for_callbacks(chi)
     clickhouse.create_table_on_cluster(
         chi,
@@ -778,14 +783,13 @@ def test_zookeeper_alerts(self, prometheus_operator_spec, clickhouse_operator_sp
     restart_zookeeper()
 
     with Then("check ZookeeperRestartRecently firing"):
-        fired = alerts.wait_alert_state("ZookeeperRestartRecently", "firing", True, labels={"pod_name": zookeeper_pod},
-                                 time_range='30s')
+        fired = alerts.wait_alert_state("ZookeeperRestartRecently", "firing", True, labels={"pod_name": zookeeper_pod}, time_range='30s')
         assert fired, error("can't get ZookeeperRestartRecently alert in firing state")
 
     wait_when_zookeeper_up()
 
     with Then("check ZookeeperRestartRecently gone away"):
-        resolved = alerts.wait_alert_state("ZookeeperRestartRecently", "firing", False, labels={"pod_name": zookeeper_pod})
+        resolved = alerts.wait_alert_state("ZookeeperRestartRecently", "firing", False, labels={"pod_name": zookeeper_pod}, max_try=30)
         assert resolved, error("can't check ZookeeperRestartRecently alert is gone away")
 
 
@@ -799,18 +803,18 @@ def test(self):
     )
 
     test_cases = [
-       test_prometheus_setup,
-       test_read_only_replica,
-       test_replicas_max_abosulute_delay,
-       test_metrics_exporter_down,
-       test_clickhouse_server_reboot,
-       test_clickhouse_dns_errors,
-       test_distributed_connection_exceptions,
-       test_insert_related_alerts,
-       test_too_many_connections,
-       test_too_much_running_queries,
-       test_longest_running_query,
-       test_system_settings_changed,
+        test_prometheus_setup,
+        test_read_only_replica,
+        test_replicas_max_absolute_delay,
+        test_metrics_exporter_down,
+        test_clickhouse_server_reboot,
+        test_clickhouse_dns_errors,
+        test_distributed_connection_exceptions,
+        test_insert_related_alerts,
+        test_too_many_connections,
+        test_too_much_running_queries,
+        test_longest_running_query,
+        test_system_settings_changed,
         test_version_changed,
         test_zookeeper_hardware_exceptions,
         test_distributed_sync_insertion_timeout,

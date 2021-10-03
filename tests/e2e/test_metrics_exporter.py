@@ -148,6 +148,7 @@ def test_metrics_exporter_with_multiple_clickhouse_version(self):
 @TestFeature
 @Name("e2e.test_metrics_exporter")
 def test(self):
+    util.clean_namespace(delete_chi=True)
     test_cases = [
         test_metrics_exporter_setup,
         test_metrics_exporter_reboot,
