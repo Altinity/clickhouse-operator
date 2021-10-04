@@ -1,0 +1,64 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: clickhouse-backups-fake-backup
+spec:
+  defaults:
+    templates:
+      podTemplate: clickhouse-backups-fake-backup
+  templates:
+    podTemplates:
+      - name: clickhouse-backups-fake-backup
+        metadata:
+          annotations:
+            prometheus.io/port: '8888'
+            prometheus.io/scrape: 'true'
+            # look to https://github.com/prometheus/prometheus/issues/3756
+            clickhouse.backup/scrape: 'true'
+            clickhouse.backup/port: '7171'
+            clickhouse.backup/path: '/metrics'
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:21.8
+
+            - name: clickhouse-backup
+              image: nginx:latest
+              command:
+                - bash
+                - -xc
+                - 'echo "server {" > /etc/nginx/conf.d/backup.conf &&
+                echo "  listen 7171 default_server;" >> /etc/nginx/conf.d/backup.conf &&
+                echo "  location / {" >> /etc/nginx/conf.d/backup.conf &&
+                echo "    root   /usr/share/nginx/html;" >> /etc/nginx/conf.d/backup.conf &&
+                echo "    index  index.html index.htm;" >> /etc/nginx/conf.d/backup.conf &&
+                echo "  }" >> /etc/nginx/conf.d/backup.conf &&
+                echo "}" >> /etc/nginx/conf.d/backup.conf &&
+                echo "# HELP clickhouse_backup_last_backup_duration Backup duration in nanoseconds." > /usr/share/nginx/html/metrics &&
+                echo "# TYPE clickhouse_backup_last_backup_duration gauge" >> /usr/share/nginx/html/metrics &&
+                echo "clickhouse_backup_last_backup_duration 0" >> /usr/share/nginx/html/metrics &&
+                echo "# HELP clickhouse_backup_last_create_duration Backup create duration in nanoseconds" >> /usr/share/nginx/html/metrics &&
+                echo "# TYPE clickhouse_backup_last_create_duration gauge" >> /usr/share/nginx/html/metrics &&
+                echo "clickhouse_backup_last_create_duration 14400000000001" >> /usr/share/nginx/html/metrics &&
+                echo "# HELP clickhouse_backup_last_download_duration Backup download duration in nanoseconds" >> /usr/share/nginx/html/metrics &&
+                echo "# TYPE clickhouse_backup_last_download_duration gauge" >> /usr/share/nginx/html/metrics &&
+                echo "clickhouse_backup_last_download_duration 0" >> /usr/share/nginx/html/metrics &&
+                echo "# HELP clickhouse_backup_last_restore_duration Backup restore duration in nanoseconds" >> /usr/share/nginx/html/metrics &&
+                echo "# TYPE clickhouse_backup_last_restore_duration gauge" >> /usr/share/nginx/html/metrics &&
+                echo "clickhouse_backup_last_restore_duration 0" >> /usr/share/nginx/html/metrics &&
+                echo "# HELP clickhouse_backup_last_upload_duration Backup upload duration in nanoseconds" >> /usr/share/nginx/html/metrics &&
+                echo "# TYPE clickhouse_backup_last_upload_duration gauge" >> /usr/share/nginx/html/metrics &&
+                echo "clickhouse_backup_last_upload_duration 0" >> /usr/share/nginx/html/metrics &&
+                echo "# HELP clickhouse_backup_last_create_status Last backup create status: 0=failed, 1=success, 2=unknown" >> /usr/share/nginx/html/metrics &&
+                echo "# TYPE clickhouse_backup_last_create_status gauge" >> /usr/share/nginx/html/metrics &&
+                echo "clickhouse_backup_last_create_status 1" >> /usr/share/nginx/html/metrics &&
+                echo "# HELP clickhouse_backup_last_backup_success Last backup success boolean: 0=failed, 1=success, 2=unknown." >> /usr/share/nginx/html/metrics &&
+                echo "# TYPE clickhouse_backup_last_backup_success gauge" >> /usr/share/nginx/html/metrics &&
+                echo "clickhouse_backup_last_backup_success 1" >> /usr/share/nginx/html/metrics &&
+                nginx -g "daemon off;"'
+              # require to avoid double scraping clickhouse and clickhouse-backup containers
+              ports:
+                - name: backup-rest
+                  containerPort: 7171
+

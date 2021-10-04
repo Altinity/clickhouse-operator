@@ -10,7 +10,7 @@ spec:
       containers:
         - name: minio-client
           image: "minio/mc:${MINIO_CLIENT_VERSION}"
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           command:
             - /bin/bash
             - -xc
