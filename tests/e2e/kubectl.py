@@ -150,11 +150,15 @@ def count_objects(label="", ns=namespace):
 
 def apply(config, ns=namespace, validate=True, timeout=600):
     with When(f"{config} is applied"):
-        launch(f"apply --validate={validate} -f \"{config}\"", ns=ns, timeout=timeout)
+        if "<(" not in config:
+            config = f"\"{config}\""
+        launch(f"apply --validate={validate} -f {config}", ns=ns, timeout=timeout)
 
 
 def delete(config, ns=namespace, timeout=600):
     with When(f"{config} is deleted"):
+        if "<(" not in config:
+            config = f"\"{config}\""
         launch(f"delete -f {config}", ns=ns, timeout=timeout)
 
 

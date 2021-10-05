@@ -51,5 +51,5 @@ prometheus_operator_version = "0.50"
 prometheus_scrape_interval = 10
 
 clickhouse_operator_install = os.getenv('CLICKHOUSE_OPERATOR_INSTALL') if 'CLICKHOUSE_OPERATOR_INSTALL' in os.environ else \
-    '../deploy/operator/clickhouse-operator-install-template.yaml'
+    '../../deploy/operator/clickhouse-operator-install-template.yaml'
 minio_version = "latest"

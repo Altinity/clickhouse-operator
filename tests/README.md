@@ -9,10 +9,12 @@ To execute tests, you will need:
 * Python 3.8 or higher
 * TestFlows Python library (`pip3 install -r ./tests/image/requirements.txt`)
 * To run tests in docker container (approximately 2 times slower, but does not require any additional configuration):
-    - `docker` and `docker-compose`
+    - `docker` 
+    - `docker-compose`
+    - `python3`
 * To run tests natively on your machine:
     - `kubectl`
-    - `docker`
+    - `python3`
 
 ## Build test image
 
@@ -32,7 +34,8 @@ Be aware that building an image, as well as pulling it, will require about 5 GB 
 To execute the test suite (that currently involves only operator tests, not tests for third-party tools used by operator), execute the following command:
 
 ```bash
-python3 regression.py --only "/clickhouse_operator/test/main/operator*"
+pip3 install -U -r ./tests/image/requirements.txt
+python3 ./tests/regression.py --only "/regression/e2e.test_operator/*"
 ```
 
 To execute tests natively (not in docker), you need to add `--native` parameter
@@ -40,7 +43,7 @@ To execute tests natively (not in docker), you need to add `--native` parameter
 If you need only one certain test, you may execute
 
 ```bash
-python3 regression.py --only "/clickhouse_operator/test/main/operator/test_009*"
+python3 ./tests/regression.py --only "/regression/e2e.test_operator/test_009*"
 ```
 
 where `009` may be substituted by the number of the test you need. Tests --- numbers correspondence may be found in `tests/test.py` and `tests/test_operator.py` source code files.
