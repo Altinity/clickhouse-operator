@@ -1636,13 +1636,24 @@ def test_028(self):
                     print(out)
                     # print("Waiting 5 seconds")
                     time.sleep(5)
-            # with And("Restart attribute is cleaned up upon completion"):
-            #     restart = kubectl.get_field("chi", chi, ".spec.restart")
-            #     assert restart == ""
+        with Then("Check restart attribute"):
+            restart = kubectl.get_field("chi", chi, ".spec.restart")
+            if restart == "":
+                note("Restart is cleaned automatically")
+            else:
+                note("Restart needs to be cleaned")
+                start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+                with Then("Re-apply the original config. CHI should not be restarted"):
+                    kubectl.create_and_check(config=config, check={"do_not_delete": 1} )
+                    new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+                    assert start_time == new_start_time
+    
 
-    note("After restart")
-    out = clickhouse.query_with_error(chi, sql)
-    note(out)
+    with When("Stop installation"):
+        cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"add\",\"path\":\"/spec/stop\",\"value\":\"yes\"}}]'"
+        kubectl.launch(cmd)
+        kubectl.wait_chi_status(chi, "Completed")
+
     kubectl.delete_chi(chi)
 
 @TestScenario
