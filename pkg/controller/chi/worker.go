@@ -937,19 +937,31 @@ func (w *worker) excludeHost(ctx context.Context, host *chiv1.ChiHost) error {
 	return nil
 }
 
-// Always include host back to ClickHouse clusters
+// shouldIncludeHost determines whether host to be included into cluster after reconciling
+func (w *worker) shouldIncludeHost(host *chiv1.ChiHost) bool {
+	switch {
+	case host.GetCHI().IsStopped():
+		// No need to include stopped host
+		return false
+	}
+	return true
+}
+
+// includeHost includes host back back into ClickHouse clusters
 func (w *worker) includeHost(ctx context.Context, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
 	}
 
-	w.a.V(1).
-		M(host).F().
-		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+	if w.shouldIncludeHost(host) {
+		w.a.V(1).
+			M(host).F().
+			Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
-	w.includeHostIntoClickHouseCluster(ctx, host)
-	_ = w.includeHostIntoService(ctx, host)
+		w.includeHostIntoClickHouseCluster(ctx, host)
+		_ = w.includeHostIntoService(ctx, host)
+	}
 
 	return nil
 }
@@ -1022,7 +1034,10 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 func (w *worker) shouldExcludeHost(host *chiv1.ChiHost) bool {
 	status := host.ReconcileAttributes.GetStatus()
 	switch {
-	case host.CHI.IsRollingUpdate():
+	case host.GetCHI().IsStopped():
+		// No need to exclude stopped host
+		return false
+	case host.GetCHI().IsRollingUpdate():
 		// While rolling update host would be restarted
 		return true
 	case status == chiv1.StatefulSetStatusNew:
@@ -1837,6 +1852,47 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 	return err
 }
 
+// waitConfigMapPropagation
+func (w *worker) waitConfigMapPropagation(ctx context.Context, host *chiv1.ChiHost) bool {
+	// No need to wait for ConfigMap propagation on stopped host
+	if host.GetCHI().IsStopped() {
+		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - on stopped host")
+		return false
+	}
+
+	// No need to wait on unchanged ConfigMap
+	if w.cmUpdate.IsZero() {
+		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - no changes in ConfigMap")
+		return false
+	}
+
+	// What timeout is expected to be enough for ConfigMap propagation?
+	// In case timeout is not specified, no need to wait
+	timeout := host.GetCHI().GetReconciling().GetConfigMapPropagationTimeoutDuration()
+	if timeout == 0 {
+		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable")
+		return false
+	}
+
+	// How much time has elapsed since last ConfigMap update?
+	// May be there is not need to wait already
+	elapsed := time.Now().Sub(w.cmUpdate)
+	if elapsed >= timeout {
+		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. %s/%s", elapsed, timeout)
+		return false
+	}
+
+	// Looks like we need to wait for Configmap propagation, after all
+	wait := timeout - elapsed
+	w.a.V(1).M(host).F().Info("Wait for ConfigMap propagation for %s %s/%s", wait, elapsed, timeout)
+	if util.WaitContextDoneOrTimeout(ctx, wait) {
+		log.V(2).Info("ctx is done")
+		return true
+	}
+
+	return false
+}
+
 // updateStatefulSet
 func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
@@ -1860,20 +1916,9 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		M(host).F().
 		Info("Update StatefulSet(%s/%s) - started", namespace, name)
 
-	if timeout := host.GetCHI().GetReconciling().GetConfigMapPropagationTimeoutDuration(); (timeout == 0) || w.cmUpdate.IsZero() {
-		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable")
-	} else {
-		elapsed := time.Now().Sub(w.cmUpdate)
-		if elapsed < timeout {
-			wait := timeout - elapsed
-			w.a.V(1).M(host).F().Info("Wait for ConfigMap propagation for %s %s/%s", wait, elapsed, timeout)
-			if util.WaitContextDoneOrTimeout(ctx, wait) {
-				log.V(2).Info("ctx is done")
-				return nil
-			}
-		} else {
-			w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. %s/%s", elapsed, timeout)
-		}
+	if w.waitConfigMapPropagation(ctx, host) {
+		log.V(2).Info("ctx is done")
+		return nil
 	}
 
 	if chopmodel.IsStatefulSetReady(curStatefulSet) {
