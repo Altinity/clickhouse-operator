@@ -647,7 +647,8 @@ def test_014(self):
         'test_view',
         'test_mv',
         'test_buffer',
-        'a_view'
+        'a_view',
+        'test_local2'
     ]
     with Given("Create schema objects"):
         clickhouse.query(
@@ -673,6 +674,14 @@ def test_014(self):
         clickhouse.query(
             chi,
             "CREATE TABLE test_buffer(a Int8) Engine = Buffer(default, test_local, 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
+            host=f"chi-{chi}-{cluster}-0-0")
+        clickhouse.query(
+            chi,
+            "CREATE DATABASE test_db Engine = Atomic",
+            host=f"chi-{chi}-{cluster}-0-0")
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_db.test_local2 (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
             host=f"chi-{chi}-{cluster}-0-0")
 
     with Given("Replicated table is created on a first replica and data is inserted"):
@@ -713,18 +722,27 @@ def test_014(self):
             for replica in [2, 3, 4]:
                 host = f"chi-{chi}-{cluster}-0-{replica}"
                 print(f"Checking replica {host}")
+                print("Checking tables and views")
                 for obj in schema_objects:
                     out = clickhouse.query(
                         chi,
                         f"SELECT count() FROM system.tables WHERE name = '{obj}'",
                         host=host)
                     assert out == "1"
-                    # Check dictionary
-                    out = clickhouse.query(
-                        chi,
-                        f"SELECT count() FROM system.dictionaries WHERE name = 'test_dict'",
-                        host=host)
-                    assert out == "1"
+
+                print("Checking dictionaries")
+                out = clickhouse.query(
+                    chi,
+                    f"SELECT count() FROM system.dictionaries WHERE name = 'test_dict'",
+                    host=host)
+                assert out == "1"
+ 
+                print("Checking database engine")
+                out =  clickhouse.query(
+                    chi,
+                    f"SELECT engine FROM system.databases WHERE name = 'test_db'",
+                    host=host)
+                assert out == "Atomic"
 
         with And("Replicated table should have the data"):
             out = clickhouse.query(
