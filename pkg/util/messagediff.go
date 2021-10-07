@@ -49,9 +49,11 @@ func MessageDiffString(diff *messagediff.Diff, equal bool) string {
 // MessageDiffItemString stringifies one map[*messagediff.Path]interface{} item
 func MessageDiffItemString(banner string, items map[*messagediff.Path]interface{}) string {
 	var str string
+	str += fmt.Sprintf("AP start -------------------------\n")
 	str += fmt.Sprintf("%s: %d\n", banner, len(items))
+	i := 0
 	for pathPtr := range items {
-		str += fmt.Sprintf("ap item path:")
+		str += fmt.Sprintf("ap item path [%d]:", i)
 		for _, pathNode := range *pathPtr {
 			// Format
 			//	.Template
@@ -66,10 +68,11 @@ func MessageDiffItemString(banner string, items map[*messagediff.Path]interface{
 			str += fmt.Sprintf("%v", pathNode)
 		}
 		str += fmt.Sprintf("\n")
-		str += fmt.Sprintf("ap item value:")
+		str += fmt.Sprintf("ap item value[%d]:", i)
 		str += fmt.Sprintf("'%+v'\n", items[pathPtr])
+		i++
 	}
-	str += fmt.Sprintf("-------------------------\n")
+	str += fmt.Sprintf("AP end -------------------------\n")
 
 	return str
 }

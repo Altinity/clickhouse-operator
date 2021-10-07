@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -276,8 +277,12 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 
 	old = w.normalize(old)
 	new = w.normalize(new)
-
 	actionPlan := chopmodel.NewActionPlan(old, new)
+	oldjson, _ := json.MarshalIndent(old, "", "  ")
+	newjson, _ := json.MarshalIndent(new, "", "  ")
+	w.a.V(3).M(new).A().Info("AP worker---------------------------------------------:\n%s\n", actionPlan)
+	w.a.V(3).M(new).A().Info("old worker--------------------------------------------:\n%s\n", string(oldjson))
+	w.a.V(3).M(new).A().Info("new worker--------------------------------------------:\n%s\n", string(newjson))
 	if !actionPlan.HasActionsToDo() {
 		// Nothing to do - no changes found - no need to react
 		w.a.V(3).M(new).F().Info("ResourceVersion changed, but no actual changes found")
@@ -376,7 +381,8 @@ func (w *worker) clear(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
 }
 
 func (w *worker) dropReplicas(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
-	w.a.V(1).M(chi).F().Info("drop replicas based on AP")
+	w.a.V(1).M(chi).F().S().Info("drop replicas based on AP")
+	cnt := 0
 	ap.WalkRemoved(
 		func(cluster *chiv1.ChiCluster) {
 		},
@@ -393,8 +399,10 @@ func (w *worker) dropReplicas(ctx context.Context, chi *chiv1.ClickHouseInstalla
 			}
 
 			_ = w.dropReplica(ctx, run, host)
+			cnt++
 		},
 	)
+	w.a.V(1).M(chi).F().E().Info("processed replicas: %d", cnt)
 }
 
 func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {

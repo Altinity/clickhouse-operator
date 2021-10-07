@@ -465,11 +465,11 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 			enqueue = actionPlan.HasActionsToDo()
 			if enqueue {
 				log.V(2).Info("actionPlan:\n%s", actionPlan)
-				//oldjson, _ := json.MarshalIndent(command.old, "", "  ")
-				//newjson, _ := json.MarshalIndent(command.new, "", "  ")
-				//log.V(3).Infof("AP---------------------------------------------:\n%s\n", actionPlan)
-				//log.V(3).Infof("old--------------------------------------------:\n%s\n", string(oldjson))
-				//log.V(3).Infof("new--------------------------------------------:\n%s\n", string(newjson))
+				oldjson, _ := json.MarshalIndent(command.old, "", "  ")
+				newjson, _ := json.MarshalIndent(command.new, "", "  ")
+				log.V(3).Info("AP enqueue---------------------------------------------:\n%s\n", actionPlan)
+				log.V(3).Info("old enqueue--------------------------------------------:\n%s\n", string(oldjson))
+				log.V(3).Info("new enqueue--------------------------------------------:\n%s\n", string(newjson))
 
 				//if len(command.old.Spec.Configuration.Clusters) > 0 {
 				//	if command.old.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
