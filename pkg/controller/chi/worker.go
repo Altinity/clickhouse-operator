@@ -376,6 +376,7 @@ func (w *worker) clear(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
 }
 
 func (w *worker) dropReplicas(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
+	w.a.V(1).M(chi).F().Info("drop replicas based on AP")
 	ap.WalkRemoved(
 		func(cluster *chiv1.ChiCluster) {
 		},
@@ -528,25 +529,33 @@ func (w *worker) purge(
 		case chopmodel.StatefulSet:
 			if purgeStatefulSet(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete StatefulSet %s/%s", m.Namespace, m.Name)
-				_ = w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
+				if err := w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+					w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet %s/%s, err: %v", m.Namespace, m.Name, err)
+				}
 				cnt++
 			}
 		case chopmodel.PVC:
 			if purgePVC(chi, reconcileFailedObjs, m) {
 				if chopmodel.GetReclaimPolicy(m) == chiv1.PVCReclaimPolicyDelete {
 					w.a.V(1).M(m).F().Info("Delete PVC %s/%s", m.Namespace, m.Name)
-					_ = w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
+					if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+						w.a.V(1).M(m).F().Error("FAILED to delete PVC %s/%s, err: %v", m.Namespace, m.Name, err)
+					}
 				}
 			}
 		case chopmodel.ConfigMap:
 			if purgeConfigMap(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete ConfigMap %s/%s", m.Namespace, m.Name)
-				_ = w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
+				if err := w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+					w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap %s/%s, err: %v", m.Namespace, m.Name, err)
+				}
 			}
 		case chopmodel.Service:
 			if purgeService(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete Service %s/%s", m.Namespace, m.Name)
-				_ = w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
+				if err := w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+					w.a.V(1).M(m).F().Error("FAILED to delete Service %s/%s, err: %v", m.Namespace, m.Name, err)
+				}
 			}
 		}
 	})
@@ -1257,7 +1266,12 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 func (w *worker) canDropReplica(host *chiv1.ChiHost) (can bool) {
 	can = true
 	w.c.walkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
-		can = false
+		// Replica's state has to be kept in Zookeeper for retained volumes.
+		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
+		if chopmodel.GetReclaimPolicy(pvc.ObjectMeta) == chiv1.PVCReclaimPolicyRetain {
+			w.a.V(1).F().Info("PVC %s/%s blocks drop replica. Reclaim policy: %s", chiv1.PVCReclaimPolicyRetain.String())
+			can = false
+		}
 	})
 	return can
 }
@@ -1265,13 +1279,16 @@ func (w *worker) canDropReplica(host *chiv1.ChiHost) (can bool) {
 // dropReplica
 func (w *worker) dropReplica(ctx context.Context, hostToRun, hostToDrop *chiv1.ChiHost) error {
 	if (hostToRun == nil) || (hostToDrop == nil) {
+		w.a.V(1).F().Error("FAILED to drop replica. hostToRun:%s, hostToDrop:%s", hostToRun.GetName(), hostToDrop.GetName())
 		return nil
 	}
+
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
 	}
 	if !w.canDropReplica(hostToDrop) {
+		w.a.V(1).F().Warning("UNABLE to drop replica. hostToRun:%s, hostToDrop:%s", hostToRun.GetName(), hostToDrop.GetName())
 		return nil
 	}
 
