@@ -361,7 +361,8 @@ func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
 			LabelObjectVersion: util.Fingerprint(statefulSet),
 		},
 	)
-	c.a.V(2).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
+	// TODO fix this with verbosity update
+	// c.a.V(3).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
 }
 
 // GetStatefulSetVersion gets version of the StatefulSet

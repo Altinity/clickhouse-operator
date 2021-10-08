@@ -33,8 +33,11 @@ type ActionPlan struct {
 	labelsDiff  *messagediff.Diff
 	labelsEqual bool
 
+	deletionTimestampDiff  *messagediff.Diff
 	deletionTimestampEqual bool
-	finalizersEqual        bool
+
+	finalizersDiff  *messagediff.Diff
+	finalizersEqual bool
 }
 
 // NewActionPlan makes new ActionPlan out of two CHIs
@@ -48,17 +51,20 @@ func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.Spec, ap.new.Spec)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.Labels, ap.new.Labels)
 		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, ap.new.DeletionTimestamp)
-		_, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, ap.new.Finalizers)
+		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.DeletionTimestamp, ap.new.DeletionTimestamp)
+		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, ap.new.Finalizers)
 	} else if old == nil {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(nil, ap.new.Spec)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(nil, ap.new.Labels)
 		ap.deletionTimestampEqual = ap.timestampEqual(nil, ap.new.DeletionTimestamp)
-		_, ap.finalizersEqual = messagediff.DeepDiff(nil, ap.new.Finalizers)
+		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(nil, ap.new.DeletionTimestamp)
+		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(nil, ap.new.Finalizers)
 	} else if new == nil {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.Spec, nil)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.Labels, nil)
 		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, nil)
-		_, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, nil)
+		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.DeletionTimestamp, nil)
+		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, nil)
 	} else {
 		// Both are nil
 		ap.specDiff = nil
@@ -67,9 +73,11 @@ func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
 		ap.labelsDiff = nil
 		ap.labelsEqual = true
 
+		ap.deletionTimestampDiff = nil
 		ap.deletionTimestampEqual = true
-		ap.finalizersEqual = true
 
+		ap.finalizersDiff = nil
+		ap.finalizersEqual = true
 	}
 
 	ap.excludePaths()
@@ -206,10 +214,12 @@ func (ap *ActionPlan) String() string {
 
 	if !ap.deletionTimestampEqual {
 		str += "modified deletion timestamp\n"
+		str += util.MessageDiffItemString("modified deletion timestamp", ap.deletionTimestampDiff.Modified)
 	}
 
 	if !ap.finalizersEqual {
 		str += "modified finalizer\n"
+		str += util.MessageDiffItemString("modified finalizers", ap.finalizersDiff.Modified)
 	}
 
 	return str

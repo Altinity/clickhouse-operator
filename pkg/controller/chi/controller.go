@@ -440,87 +440,84 @@ func (c *Controller) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
+func prepareCHIAdd(command *ReconcileCHI) bool {
+	newjs, _ := json.Marshal(command.new)
+	newchi := chi.ClickHouseInstallation{
+		TypeMeta: meta.TypeMeta{
+			APIVersion: chi.SchemeGroupVersion.String(),
+			Kind:       chi.ClickHouseInstallationCRDResourceKind,
+		},
+	}
+	_ = json.Unmarshal(newjs, &newchi)
+	command.new = &newchi
+	logCommand(command)
+	return true
+}
+
+func prepareCHIUpdate(command *ReconcileCHI) bool {
+	actionPlan := chopmodels.NewActionPlan(command.old, command.new)
+	if !actionPlan.HasActionsToDo() {
+		return false
+	}
+	oldjson, _ := json.MarshalIndent(command.old, "", "  ")
+	newjson, _ := json.MarshalIndent(command.new, "", "  ")
+	log.V(2).Info("AP enqueue---------------------------------------------:\n%s\n", actionPlan)
+	log.V(3).Info("old enqueue--------------------------------------------:\n%s\n", string(oldjson))
+	log.V(3).Info("new enqueue--------------------------------------------:\n%s\n", string(newjson))
+
+	oldjs, _ := json.Marshal(command.old)
+	newjs, _ := json.Marshal(command.new)
+	oldchi := chi.ClickHouseInstallation{}
+	newchi := chi.ClickHouseInstallation{
+		TypeMeta: meta.TypeMeta{
+			APIVersion: chi.SchemeGroupVersion.String(),
+			Kind:       chi.ClickHouseInstallationCRDResourceKind,
+		},
+	}
+	_ = json.Unmarshal(oldjs, &oldchi)
+	_ = json.Unmarshal(newjs, &newchi)
+	command.old = &oldchi
+	command.new = &newchi
+	logCommand(command)
+	return true
+}
+
+func logCommand(command *ReconcileCHI) {
+	namespace := "uns"
+	name := "un"
+	switch {
+	case command.new != nil:
+		namespace = command.new.Namespace
+		name = command.new.Name
+	case command.old != nil:
+		namespace = command.old.Namespace
+		name = command.old.Name
+	}
+	log.V(1).Info("ENQUEUE new ReconcileCHI cmd=%s for %s/%s", command.cmd, namespace, name)
+}
+
 // enqueueObject adds ClickHouseInstallation object to the work queue
 func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 	handle := []byte(obj.Handle().(string))
 	index := 0
-	enqueue := true
+	enqueue := false
 	switch command := obj.(type) {
 	case *ReconcileCHI:
 		variants := len(c.queues) - chi.DefaultReconcileSystemThreadsNumber
 		index = chi.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(handle, variants)
 		switch command.cmd {
 		case reconcileAdd:
-			newjs, _ := json.Marshal(command.new)
-			newchi := chi.ClickHouseInstallation{
-				TypeMeta: meta.TypeMeta{
-					APIVersion: chi.SchemeGroupVersion.String(),
-					Kind:       chi.ClickHouseInstallationCRDResourceKind,
-				},
-			}
-			_ = json.Unmarshal(newjs, &newchi)
-			command.new = &newchi
+			enqueue = prepareCHIAdd(command)
 		case reconcileUpdate:
-			actionPlan := chopmodels.NewActionPlan(command.old, command.new)
-			enqueue = actionPlan.HasActionsToDo()
-			if enqueue {
-				log.V(2).Info("actionPlan:\n%s", actionPlan)
-				oldjson, _ := json.MarshalIndent(command.old, "", "  ")
-				newjson, _ := json.MarshalIndent(command.new, "", "  ")
-				log.V(3).Info("AP enqueue---------------------------------------------:\n%s\n", actionPlan)
-				log.V(3).Info("old enqueue--------------------------------------------:\n%s\n", string(oldjson))
-				log.V(3).Info("new enqueue--------------------------------------------:\n%s\n", string(newjson))
-
-				//if len(command.old.Spec.Configuration.Clusters) > 0 {
-				//	if command.old.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
-				//		command.old.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
-				//		command.old.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
-				//		log.V(1).Error("ERROR CHI: NON-EMPTY CHI OLD")
-				//	}
-				//}
-				//if len(command.new.Spec.Configuration.Clusters) > 0 {
-				//	if command.new.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
-				//		command.new.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
-				//		command.new.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
-				//		log.V(1).Error("ERROR CHI: NON-EMPTY CHI NEW")
-				//	}
-				//}
-
-				oldjs, _ := json.Marshal(command.old)
-				newjs, _ := json.Marshal(command.new)
-				oldchi := chi.ClickHouseInstallation{}
-				newchi := chi.ClickHouseInstallation{
-					TypeMeta: meta.TypeMeta{
-						APIVersion: chi.SchemeGroupVersion.String(),
-						Kind:       chi.ClickHouseInstallationCRDResourceKind,
-					},
-				}
-				_ = json.Unmarshal(oldjs, &oldchi)
-				_ = json.Unmarshal(newjs, &newchi)
-				command.old = &oldchi
-				command.new = &newchi
-			}
+			enqueue = prepareCHIUpdate(command)
 		}
-		if enqueue {
-			namespace := "uns"
-			name := "un"
-			switch {
-			case command.new != nil:
-				namespace = command.new.Namespace
-				name = command.new.Name
-			case command.old != nil:
-				namespace = command.old.Namespace
-				name = command.old.Name
-			}
-			log.V(1).Info("ENQUEUE new ReconcileCHI cmd=%s for %s/%s", command.cmd, namespace, name)
-		}
-
 	case
 		*ReconcileCHIT,
 		*ReconcileChopConfig,
 		*DropDns:
 		variants := chi.DefaultReconcileSystemThreadsNumber
 		index = util.HashIntoIntTopped(handle, variants)
+		enqueue = true
 	}
 	if enqueue {
 		//c.queues[index].AddRateLimited(obj)
@@ -630,21 +627,14 @@ func (c *Controller) updateCHIObject(ctx context.Context, chi *chi.ClickHouseIns
 		return nil
 	}
 
+	// TODO fix this with verbosity update
 	// Start Debug object
-	js, err := json.MarshalIndent(chi, "", "  ")
-	if err != nil {
-		log.V(1).M(chi).A().Error("%q", err)
-	}
-	log.V(3).M(chi).F().Info("\n%s\n", js)
-	// End Debug object
-
-	//if len(chi.Spec.Configuration.Clusters) > 0 {
-	//	if chi.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
-	//		chi.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
-	//		chi.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
-	//		log.V(1).M(chi).A().Error("ERROR update CHI: NON-EMPTY CHI OLD ")
-	//	}
+	//js, err := json.MarshalIndent(chi, "", "  ")
+	//if err != nil {
+	//	log.V(1).M(chi).A().Error("%q", err)
 	//}
+	//log.V(3).M(chi).F().Info("\n%s\n", js)
+	// End Debug object
 
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(ctx, chi, newUpdateOptions())
 	if err != nil {
@@ -652,14 +642,6 @@ func (c *Controller) updateCHIObject(ctx context.Context, chi *chi.ClickHouseIns
 		log.V(1).M(chi).A().Error("%q", err)
 		return err
 	}
-
-	//if len(_new.Spec.Configuration.Clusters) > 0 {
-	//	if _new.Spec.Configuration.Clusters[0].Address.Namespace != "" ||
-	//		_new.Spec.Configuration.Clusters[0].Address.CHIName != "" ||
-	//		_new.Spec.Configuration.Clusters[0].Address.ClusterName != "" {
-	//		log.V(1).M(chi).A().Error("ERROR update CHI: NON-EMPTY CHI NEW ")
-	//	}
-	//}
 
 	if chi.ObjectMeta.ResourceVersion != _new.ObjectMeta.ResourceVersion {
 		// Updated
@@ -702,7 +684,33 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 	// Update status of a real object.
 	// TODO DeepCopy depletes stack here
 	cur.Status = chi.Status
-	return c.updateCHIObject(ctx, cur)
+
+	// TODO fix this with verbosity update
+	// Start Debug object
+	//js, err := json.MarshalIndent(chi, "", "  ")
+	//if err != nil {
+	//	log.V(1).M(chi).A().Error("%q", err)
+	//}
+	//log.V(3).M(chi).F().Info("\n%s\n", js)
+	// End Debug object
+
+	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).UpdateStatus(ctx, cur, newUpdateOptions())
+	if err != nil {
+		// Error update
+		log.V(1).M(chi).A().Error("%q", err)
+		return err
+	}
+
+	if chi.ObjectMeta.ResourceVersion != _new.ObjectMeta.ResourceVersion {
+		// Updated
+		log.V(2).M(chi).F().Info("ResourceVersion change: %s to %s", chi.ObjectMeta.ResourceVersion, _new.ObjectMeta.ResourceVersion)
+		chi.ObjectMeta.ResourceVersion = _new.ObjectMeta.ResourceVersion
+		return nil
+	}
+
+	// ResourceVersion not changed - no update performed?
+
+	return nil
 }
 
 // installFinalizer
