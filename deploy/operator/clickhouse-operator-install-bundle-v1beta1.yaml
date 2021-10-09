@@ -2742,6 +2742,18 @@ rules:
     verbs:
       - update
   - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhouseinstallations/status
+      - clickhouseinstallationtemplates/status
+      - clickhouseoperatorconfigurations/status
+    verbs:
+      - create
+      - delete
+      - get
+      - update
+      - patch
+  - apiGroups:
       - ""
     resources:
       - secrets
