@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -620,8 +621,14 @@ func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfigur
 	return nil
 }
 
-// updateCHIObject updates ClickHouseInstallation object
-func (c *Controller) updateCHIObject(ctx context.Context, chi *chi.ClickHouseInstallation) error {
+type patchFinalizers struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value []string `json:"value"`
+}
+
+// patchCHIFinalizers patch ClickHouseInstallation finalizers
+func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chi.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -636,7 +643,13 @@ func (c *Controller) updateCHIObject(ctx context.Context, chi *chi.ClickHouseIns
 	//log.V(3).M(chi).F().Info("\n%s\n", js)
 	// End Debug object
 
-	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(ctx, chi, newUpdateOptions())
+	payload, _ := json.Marshal([]patchFinalizers{{
+		Op:    "replace",
+		Path:  "/metadata/finalizers",
+		Value: chi.ObjectMeta.Finalizers,
+	}})
+
+	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Patch(ctx, chi.Name, types.JSONPatchType, payload, newPatchOptions())
 	if err != nil {
 		// Error update
 		log.V(1).M(chi).A().Error("%q", err)
@@ -738,7 +751,7 @@ func (c *Controller) installFinalizer(ctx context.Context, chi *chi.ClickHouseIn
 	log.V(3).M(chi).F().Info("no finalizer found, need to install one")
 
 	cur.ObjectMeta.Finalizers = append(cur.ObjectMeta.Finalizers, FinalizerName)
-	return c.updateCHIObject(ctx, cur)
+	return c.patchCHIFinalizers(ctx, cur)
 }
 
 // uninstallFinalizer
@@ -761,7 +774,7 @@ func (c *Controller) uninstallFinalizer(ctx context.Context, chi *chi.ClickHouse
 
 	cur.ObjectMeta.Finalizers = util.RemoveFromArray(FinalizerName, cur.ObjectMeta.Finalizers)
 
-	return c.updateCHIObject(ctx, cur)
+	return c.patchCHIFinalizers(ctx, cur)
 }
 
 // handleObject enqueues CHI which is owner of `obj` into reconcile loop

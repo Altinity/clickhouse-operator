@@ -42,5 +42,3 @@ spec:
                   containerPort: 9001
                 - name: interserver
                   containerPort: 9010
-status:
-  a: b
