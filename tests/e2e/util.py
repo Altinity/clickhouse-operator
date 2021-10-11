@@ -124,3 +124,18 @@ def make_http_get_request(host, port, path):
     return f"bash -c '{cmd}'"
 
 
+def install_operator_if_not_exist():
+    with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
+        if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
+            config = get_full_path(settings.clickhouse_operator_install)
+            kubectl.apply(
+                ns=settings.operator_namespace,
+                config=f"<(cat {config} | "
+                       f"OPERATOR_IMAGE=\"{settings.operator_docker_repo}:{settings.operator_version}\" "
+                       f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
+                       f"METRICS_EXPORTER_IMAGE=\"{settings.metrics_exporter_docker_repo}:{settings.operator_version}\" "
+                       f"METRICS_EXPORTER_NAMESPACE=\"{settings.operator_namespace}\" "
+                       f"envsubst)",
+                validate=False
+            )
+        set_operator_version(settings.operator_version)
