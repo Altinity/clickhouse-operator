@@ -11,6 +11,7 @@ for YAML in "${ALL_YAML[@]}"; do
   yq eval -e --inplace '(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .apiVersion) = "apiextensions.k8s.io/v1beta1"' "${YAML}"
   yq eval -e --inplace '(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.version) = .spec.versions[0].name' "${YAML}"
   yq eval -e --inplace '(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.additionalPrinterColumns) = .spec.versions[0].additionalPrinterColumns' "${YAML}"
+  yq eval -e --inplace '(select(documentIndex == 0) | .spec.subresources) = .spec.versions[0].subresources' "${YAML}"
   # sed -i -e 's/jsonPath/JSONPath/g' "${YAML}"
   yq eval -e --inplace 'with(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.additionalPrinterColumns.[]; .JSONPath = .jsonPath )' "${YAML}"
   yq eval -e --inplace 'del(select(documentIndex == 0 or documentIndex == 1 or documentIndex == 2) | .spec.additionalPrinterColumns[].jsonPath)' "${YAML}"

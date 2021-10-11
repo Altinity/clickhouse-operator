@@ -68,6 +68,8 @@ spec:
       description: Client access endpoint
       priority: 1 # show in wide view
       JSONPath: .status.endpoint
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more ClickHouse clusters"
