@@ -1385,8 +1385,12 @@ def test_022(self):
 @TestScenario
 @Name("test_023. Test auto templates")
 def test_023(self):
+    config = "configs/test-001.yaml"
+    chi = manifest.get_chi_name(util.get_full_path(config))
+    
     chit_data = manifest.get_chit_data(util.get_full_path("templates/tpl-clickhouse-auto.yaml"))
     expected_image = chit_data['spec']['templates']['podTemplates'][0]['spec']['containers'][0]['image']
+    
     kubectl.create_and_check(
         config="configs/test-001.yaml",
         check={
@@ -1394,13 +1398,19 @@ def test_023(self):
             "apply_templates": {
                 settings.clickhouse_template,
                 "templates/tpl-clickhouse-auto.yaml",
+                "templates/tpl-clickhouse-auto-2.yaml"
             },
             # test-001.yaml does not have a template reference but should get correct ClickHouse version
             "pod_image": expected_image,
+            "do_not_delete": 1
         }
     )
+    with Then("Annotation from a template should be populated"):
+        assert kubectl.get_field("chi", chi, ".metadata.annotations.test") == "test"
 
-    kubectl.launch(f"delete chit {chit_data['metadata']['name']}")
+    kubectl.delete_chi(chi)
+    kubectl.delete(util.get_full_path("templates/tpl-clickhouse-auto.yaml"))
+    kubectl.delete(util.get_full_path("templates/tpl-clickhouse-auto-2.yaml"))
 
 
 @TestScenario
