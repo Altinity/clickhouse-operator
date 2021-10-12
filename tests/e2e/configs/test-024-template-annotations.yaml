@@ -2,13 +2,15 @@ apiVersion: clickhouse.altinity.com/v1
 kind: ClickHouseInstallation
 metadata:
   name: test-024
+  annotations:
+    chi/test: "test"
 spec:
   templates:
     podTemplates:
     - name: default-pod-template
       metadata:
         annotations:
-          test: "test"
+          podtemplate/test: "test"
       spec:
         containers:
         - name: clickhouse-pod
@@ -18,7 +20,7 @@ spec:
       reclaimPolicy: Delete
       metadata:
         annotations:
-          test: "test"
+          pvc/test: "test"
       spec:
         accessModes:
         - ReadWriteOnce
@@ -30,7 +32,7 @@ spec:
       generateName: clickhouse-{chi}
       metadata:
         annotations:
-          test: "test"
+          servicetemplate/test: "test"
       spec:
         ports:
           - name: http

@@ -1426,12 +1426,19 @@ def test_024(self):
         },
     )
 
-    with Then("Pod annotations should be populated"):
-        assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", ".metadata.annotations.test") == "test"
-    with And("Service annotations should be populated"):
-        assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.test") == "test"
-    with And("PVC annotations should be populated"):
-        assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", ".metadata.annotations.test") == "test"
+    with Then("Pod annotation should populated from a podTemplate"):
+        assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", ".metadata.annotations.podtemplate/test") == "test"
+    with And("Service annotation should be populated from a serviceTemplate"):
+        assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.servicetemplate/test") == "test"
+    with And("PVC annotation should be populated from a volumeTemplate"):
+        assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", ".metadata.annotations.pvc/test") == "test"
+
+    with And("Pod annotation should populated from a CHI"):
+        assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", ".metadata.annotations.chi/test") == "test"
+    # with And("Service annotation should be populated from a CHI"):
+    #    assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.chi/test") == "test"
+    # with And("PVC annotation should be populated from a CHI"):
+     #   assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", ".metadata.annotations.chi/test") == "test"
 
     kubectl.delete_chi(chi)
 
