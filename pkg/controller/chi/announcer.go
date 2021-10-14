@@ -51,7 +51,7 @@ type Announcer struct {
 	writeStatusError bool
 }
 
-// New creates new announcer
+// NewAnnouncer creates new announcer
 func NewAnnouncer() Announcer {
 	return Announcer{
 		Announcer: a.New(),
@@ -254,7 +254,7 @@ func (a Announcer) WithStatusActions(chi *chop.ClickHouseInstallation) Announcer
 	return b
 }
 
-// WithStatusAction is used in chained calls in order to produce error in ClickHouseInstallation.Status.Error
+// WithStatusError is used in chained calls in order to produce error in ClickHouseInstallation.Status.Error
 func (a Announcer) WithStatusError(chi *chop.ClickHouseInstallation) Announcer {
 	b := a
 	if chi == nil {

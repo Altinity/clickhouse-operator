@@ -48,7 +48,7 @@ func (c *Controller) walkPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolum
 	}
 }
 
-func (c *Controller) walkActualPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolumeClaim)) {
+func (c *Controller) walkDiscoveredPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolumeClaim)) {
 	namespace := host.Address.Namespace
 
 	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newContext(), newListOptions(chopmodel.GetSelectorHostScope(host)))

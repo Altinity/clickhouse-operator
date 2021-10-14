@@ -19,7 +19,7 @@ const (
 	defaultMaxTries = 10
 )
 
-// QueryOptions
+// QueryOptions specifies options of a query
 type QueryOptions struct {
 	Retry    bool
 	Tries    int
@@ -28,23 +28,22 @@ type QueryOptions struct {
 	*Timeouts
 }
 
-// NewQueryOptions
+// NewQueryOptions creates new query options
 func NewQueryOptions() *QueryOptions {
 	opts := new(QueryOptions)
 	opts.Timeouts = NewTimeouts()
 	return opts
 }
 
-// QueryOptionsNormalize
+// QueryOptionsNormalize normalizes options
 func QueryOptionsNormalize(opts ...*QueryOptions) *QueryOptions {
 	if len(opts) == 0 {
 		return NewQueryOptions().Normalize()
-	} else {
-		return opts[0].Normalize()
 	}
+	return opts[0].Normalize()
 }
 
-// Normalize
+// Normalize normalizes options
 func (o *QueryOptions) Normalize() *QueryOptions {
 	if o == nil {
 		o = NewQueryOptions()
@@ -59,7 +58,7 @@ func (o *QueryOptions) Normalize() *QueryOptions {
 	return o
 }
 
-// GetRetry
+// GetRetry gets retry option
 func (o *QueryOptions) GetRetry() bool {
 	if o == nil {
 		return false
@@ -67,7 +66,7 @@ func (o *QueryOptions) GetRetry() bool {
 	return o.Retry
 }
 
-// SetRetry
+// SetRetry sets retry option
 func (o *QueryOptions) SetRetry(retry bool) *QueryOptions {
 	if o == nil {
 		return nil
@@ -76,7 +75,7 @@ func (o *QueryOptions) SetRetry(retry bool) *QueryOptions {
 	return o
 }
 
-// GetSilent
+// GetSilent gets silent option
 func (o *QueryOptions) GetSilent() bool {
 	if o == nil {
 		return false
@@ -84,7 +83,7 @@ func (o *QueryOptions) GetSilent() bool {
 	return o.Silent
 }
 
-// SetSilent
+// SetSilent sets silent option
 func (o *QueryOptions) SetSilent(silent bool) *QueryOptions {
 	if o == nil {
 		return nil

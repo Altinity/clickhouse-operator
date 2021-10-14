@@ -30,17 +30,20 @@ const (
 	ignoreThreshold = 0.001
 )
 
+// SettingsSection specifies settings section
 type SettingsSection string
 
+// Configuration sections
+// Each section translates into separate ConfigMap mapped into Pod
 var (
-	// Configuration sections
-	// Each section translates into separate ConfigMap mapped into Pod
 	SectionEmpty  SettingsSection = ""
 	SectionCommon SettingsSection = "COMMON"
 	SectionUsers  SettingsSection = "USERS"
 	SectionHost   SettingsSection = "HOST"
+)
 
-	// Specify returned errors for being re-used
+// Specify returned errors for being re-used
+var (
 	errorNoSectionSpecified  = fmt.Errorf("no section specified")
 	errorNoFilenameSpecified = fmt.Errorf("no filename specified")
 )
@@ -122,12 +125,12 @@ func (s *Setting) String() string {
 	return strings.Join(s.vector, ",")
 }
 
-// Settings
+// Settings specifies settings
 type Settings struct {
 	m map[string]*Setting
 }
 
-// NewSettings
+// NewSettings creates new settings
 func NewSettings() *Settings {
 	return &Settings{
 		m: makeM(),
@@ -146,12 +149,12 @@ func (settings *Settings) Len() int {
 	return len(settings.m)
 }
 
-// IsZero
+// IsZero checks whether settings is zero
 func (settings *Settings) IsZero() bool {
 	return settings.Len() == 0
 }
 
-// Walk
+// Walk walks over settings
 func (settings *Settings) Walk(f func(name string, setting *Setting)) {
 	if settings.Len() == 0 {
 		return
@@ -161,7 +164,7 @@ func (settings *Settings) Walk(f func(name string, setting *Setting)) {
 	}
 }
 
-// Has
+// Has checks whether named setting exists
 func (settings *Settings) Has(name string) bool {
 	if settings.Len() == 0 {
 		return false
@@ -170,7 +173,7 @@ func (settings *Settings) Has(name string) bool {
 	return ok
 }
 
-// Get
+// Get gets named setting
 func (settings *Settings) Get(name string) *Setting {
 	if settings.Len() == 0 {
 		return nil
@@ -197,7 +200,7 @@ func (settings *Settings) SetIfNotExists(name string, setting *Setting) {
 	}
 }
 
-// Delete
+// Delete deletes named setting
 func (settings *Settings) Delete(name string) {
 	if !settings.Has(name) {
 		return
@@ -205,7 +208,7 @@ func (settings *Settings) Delete(name string) {
 	delete(settings.m, name)
 }
 
-// UnmarshalJSON
+// UnmarshalJSON unmarshal JSON
 func (settings *Settings) UnmarshalJSON(data []byte) error {
 	type untypedMapType map[string]interface{}
 	var untypedMap untypedMapType
@@ -230,7 +233,7 @@ func (settings *Settings) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalJSON
+// MarshalJSON marshals JSON
 func (settings *Settings) MarshalJSON() ([]byte, error) {
 	if settings == nil {
 		return json.Marshal(nil)
@@ -300,9 +303,8 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 
 	if knownType {
 		return res, true
-	} else {
-		return "", false
 	}
+	return "", false
 }
 
 // unmarshalVector
@@ -329,9 +331,8 @@ func unmarshalVector(untyped interface{}) ([]string, bool) {
 
 	if knownType {
 		return res, true
-	} else {
-		return nil, false
 	}
+	return nil, false
 }
 
 // getValueAsScalar
@@ -378,17 +379,17 @@ func (settings *Settings) fetchPort(name string) int32 {
 	return int32(settings.getValueAsInt(name))
 }
 
-// GetTCPPort
+// GetTCPPort gets TCP port from settings
 func (settings *Settings) GetTCPPort() int32 {
 	return settings.fetchPort("tcp_port")
 }
 
-// GetHTTPPort
+// GetHTTPPort gets HTTP port from settings
 func (settings *Settings) GetHTTPPort() int32 {
 	return settings.fetchPort("http_port")
 }
 
-// GetInterserverHTTPPort
+// GetInterserverHTTPPort gets interserver HTTP port from settings
 func (settings *Settings) GetInterserverHTTPPort() int32 {
 	return settings.fetchPort("interserver_http_port")
 }
@@ -430,7 +431,7 @@ func (settings *Settings) MergeFromCB(src *Settings, filter func(path string, se
 	return settings
 }
 
-// GetSectionStringMap
+// GetSectionStringMap returns map of settings sections
 func (settings *Settings) GetSectionStringMap(section SettingsSection, includeUnspecified bool) map[string]string {
 	if settings == nil {
 		return nil
@@ -526,7 +527,7 @@ func (settings *Settings) Filter(
 	return res
 }
 
-// AsSortedSliceOfStrings
+// AsSortedSliceOfStrings return settings as sorted strings
 func (settings *Settings) AsSortedSliceOfStrings() []string {
 	if settings == nil {
 		return nil
@@ -550,7 +551,7 @@ func (settings *Settings) AsSortedSliceOfStrings() []string {
 	return res
 }
 
-// Normalize
+// Normalize normalizes settings
 func (settings *Settings) Normalize() {
 	settings.normalizePaths()
 }
@@ -595,6 +596,7 @@ func normalizeSettingsKeyAsPath(path string) string {
 	return strings.Trim(path, "/")
 }
 
+// getSectionFromPath
 func getSectionFromPath(path string) (SettingsSection, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 {
@@ -606,6 +608,7 @@ func getSectionFromPath(path string) (SettingsSection, error) {
 	return string2Section(section)
 }
 
+// string2Section
 func string2Section(section string) (SettingsSection, error) {
 	if strings.EqualFold(section, string(SectionCommon)) || strings.EqualFold(section, CommonConfigDir) {
 		return SectionCommon, nil
@@ -620,6 +623,7 @@ func string2Section(section string) (SettingsSection, error) {
 	return SectionEmpty, fmt.Errorf("unknown section specified %v", section)
 }
 
+// getFilenameFromPath
 func getFilenameFromPath(path string) (string, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 1 {

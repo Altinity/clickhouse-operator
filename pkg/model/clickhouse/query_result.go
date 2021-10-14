@@ -22,7 +22,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 )
 
-// QueryResult
+// QueryResult specifies result of a query
 type QueryResult struct {
 	// Query execution context
 	ctx        context.Context
@@ -31,7 +31,7 @@ type QueryResult struct {
 	Rows *databasesql.Rows
 }
 
-// NewQueryResult
+// NewQueryResult creates new query result
 func NewQueryResult(ctx context.Context, cancelFunc context.CancelFunc, rows *databasesql.Rows) *QueryResult {
 	return &QueryResult{
 		ctx:        ctx,
@@ -40,7 +40,8 @@ func NewQueryResult(ctx context.Context, cancelFunc context.CancelFunc, rows *da
 	}
 }
 
-// Close
+// Close closes query result and releases all allocated resources.
+// Should be called on each query result
 func (q *QueryResult) Close() {
 	if q == nil {
 		return
@@ -60,7 +61,7 @@ func (q *QueryResult) Close() {
 	}
 }
 
-// UnzipColumnsAsStrings splits result table into columns
+// UnzipColumnsAsStrings splits result table into string columns
 func (q *QueryResult) UnzipColumnsAsStrings(columns ...*[]string) error {
 	if q == nil {
 		return fmt.Errorf("empty query")
@@ -87,4 +88,24 @@ func (q *QueryResult) UnzipColumnsAsStrings(columns ...*[]string) error {
 		}
 	}
 	return nil
+}
+
+// Int fetches one int from the query result
+func (q *QueryResult) Int() (int, error) {
+	if q == nil {
+		return 0, fmt.Errorf("empty query")
+	}
+	if q.Rows == nil {
+		return 0, fmt.Errorf("no rows")
+	}
+
+	var result int
+	for q.Rows.Next() {
+		if err := q.Rows.Scan(&result); err != nil {
+			log.V(1).A().Error("UNABLE to scan row err: %v", err)
+			return 0, err
+		}
+		return result, nil
+	}
+	return 0, fmt.Errorf("found no rows")
 }

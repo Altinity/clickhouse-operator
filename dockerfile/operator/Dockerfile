@@ -7,13 +7,10 @@ FROM golang:1.13 AS builder
 # Install required packages
 RUN apt-get update && apt-get install -y apt-utils gettext-base
 
-# Check $GOPATH, for convenience
-RUN echo "GOPATH=$GOPATH"
-RUN echo "WORKDIR=$GOPATH/src/github.com/altinity/clickhouse-operator"
-
 # Reconstruct source tree inside docker
-WORKDIR $GOPATH/src/github.com/altinity/clickhouse-operator
+WORKDIR /clickhouse-operator
 ADD . .
+
 # ./vendor is excluded in .dockerignore, reconstruct it with 'mod' tool
 RUN GO111MODULE=on go mod tidy
 RUN GO111MODULE=on go mod vendor
@@ -25,9 +22,20 @@ RUN OPERATOR_BIN=/tmp/clickhouse-operator ./dev/go_build_operator.sh
 # ===== Operator =====
 # ====================
 
-FROM alpine:3.10 AS operator
+FROM registry.access.redhat.com/ubi7/ubi-minimal AS ubi7
+RUN microdnf update && microdnf clean all
 
-RUN apk add --no-cache ca-certificates
+MAINTAINER "Altinity <support@altinity.com>"
+
+LABEL name="ClickHouse operator" \
+      maintainer="support@altinity.com" \
+      vendor="Altinity" \
+      version="0.16.0" \
+      release="1" \
+      summary="ClickHouse operator" \
+      description="ClickHouse operator operates ClickHouse clusters in kubernetes"
+
+ADD LICENSE /licenses/
 
 WORKDIR /
 
@@ -40,6 +48,8 @@ ADD config/users.d/*     /etc/clickhouse-operator/users.d/
 
 # Copy clickhouse-operator binary into operator image from builder
 COPY --from=builder /tmp/clickhouse-operator .
+
+USER nobody
 
 # Run /clickhouse-operator -alsologtostderr=true -v=1
 # We can specify additional options, such as:

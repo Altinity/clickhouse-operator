@@ -1,3 +1,4 @@
+# main test runner
 import kubectl
 import settings
 import test_clickhouse
@@ -15,7 +16,7 @@ if main():
 
         with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
             if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
-                config = util.get_full_path('../deploy/operator/clickhouse-operator-install-template.yaml')
+                config = util.get_full_path(settings.clickhouse_operator_install)
                 kubectl.apply(
                     ns=settings.operator_namespace,
                     config=f"<(cat {config} | "
@@ -44,12 +45,13 @@ if main():
             all_tests = [
                 test_operator.test_001,
                 test_operator.test_002,
+                test_operator.test_003,
                 test_operator.test_004,
                 test_operator.test_005,
                 test_operator.test_006,
                 test_operator.test_007,
                 test_operator.test_008,
-                (test_operator.test_009, {"version_from": "0.14.1"}),
+                (test_operator.test_009, {"version_from": "0.15.0"}),
                 test_operator.test_010,
                 test_operator.test_011,
                 test_operator.test_011_1,
@@ -69,6 +71,8 @@ if main():
                 test_operator.test_025,
                 test_operator.test_026,
                 test_operator.test_027,
+                test_operator.test_028,
+                test_operator.test_029,
             ]
             run_tests = all_tests
 

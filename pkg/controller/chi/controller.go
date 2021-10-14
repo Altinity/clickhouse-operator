@@ -111,10 +111,8 @@ func (c *Controller) initQueues() {
 	}
 }
 
-// addEventHandlers
-func (c *Controller) addEventHandlers(
+func (c *Controller) addEventHandlersCHI(
 	chopInformerFactory chopinformers.SharedInformerFactory,
-	kubeInformerFactory kubeinformers.SharedInformerFactory,
 ) {
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -143,7 +141,11 @@ func (c *Controller) addEventHandlers(
 			c.enqueueObject(NewReconcileCHI(reconcileDelete, chi, nil))
 		},
 	})
+}
 
+func (c *Controller) addEventHandlersCHIT(
+	chopInformerFactory chopinformers.SharedInformerFactory,
+) {
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chit := obj.(*chi.ClickHouseInstallationTemplate)
@@ -171,7 +173,11 @@ func (c *Controller) addEventHandlers(
 			c.enqueueObject(NewReconcileCHIT(reconcileDelete, chit, nil))
 		},
 	})
+}
 
+func (c *Controller) addEventHandlersChopConfig(
+	chopInformerFactory chopinformers.SharedInformerFactory,
+) {
 	chopInformerFactory.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			chopConfig := obj.(*chi.ClickHouseOperatorConfiguration)
@@ -199,7 +205,11 @@ func (c *Controller) addEventHandlers(
 			c.enqueueObject(NewReconcileChopConfig(reconcileDelete, chopConfig, nil))
 		},
 	})
+}
 
+func (c *Controller) addEventHandlersService(
+	kubeInformerFactory kubeinformers.SharedInformerFactory,
+) {
 	kubeInformerFactory.Core().V1().Services().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
@@ -223,7 +233,11 @@ func (c *Controller) addEventHandlers(
 			log.V(3).M(service).Info("serviceInformer.DeleteFunc")
 		},
 	})
+}
 
+func (c *Controller) addEventHandlersEndpoint(
+	kubeInformerFactory kubeinformers.SharedInformerFactory,
+) {
 	kubeInformerFactory.Core().V1().Endpoints().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			endpoints := obj.(*core.Endpoints)
@@ -276,7 +290,11 @@ func (c *Controller) addEventHandlers(
 			log.V(2).M(endpoints).Info("endpointsInformer.DeleteFunc")
 		},
 	})
+}
 
+func (c *Controller) addEventHandlersConfigMap(
+	kubeInformerFactory kubeinformers.SharedInformerFactory,
+) {
 	kubeInformerFactory.Core().V1().ConfigMaps().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			configMap := obj.(*core.ConfigMap)
@@ -300,7 +318,11 @@ func (c *Controller) addEventHandlers(
 			log.V(3).M(configMap).Info("configMapInformer.DeleteFunc")
 		},
 	})
+}
 
+func (c *Controller) addEventHandlersStatefulSet(
+	kubeInformerFactory kubeinformers.SharedInformerFactory,
+) {
 	kubeInformerFactory.Apps().V1().StatefulSets().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			statefulSet := obj.(*apps.StatefulSet)
@@ -326,7 +348,11 @@ func (c *Controller) addEventHandlers(
 			//controller.handleObject(obj)
 		},
 	})
+}
 
+func (c *Controller) addEventHandlersPod(
+	kubeInformerFactory kubeinformers.SharedInformerFactory,
+) {
 	kubeInformerFactory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
@@ -350,6 +376,21 @@ func (c *Controller) addEventHandlers(
 			log.V(3).M(pod).Info("podInformer.DeleteFunc")
 		},
 	})
+}
+
+// addEventHandlers
+func (c *Controller) addEventHandlers(
+	chopInformerFactory chopinformers.SharedInformerFactory,
+	kubeInformerFactory kubeinformers.SharedInformerFactory,
+) {
+	c.addEventHandlersCHI(chopInformerFactory)
+	c.addEventHandlersCHIT(chopInformerFactory)
+	c.addEventHandlersChopConfig(chopInformerFactory)
+	c.addEventHandlersService(kubeInformerFactory)
+	c.addEventHandlersEndpoint(kubeInformerFactory)
+	c.addEventHandlersConfigMap(kubeInformerFactory)
+	c.addEventHandlersStatefulSet(kubeInformerFactory)
+	c.addEventHandlersPod(kubeInformerFactory)
 }
 
 // isTrackedObject checks whether operator is interested in changes of this object
@@ -417,7 +458,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 					Kind:       chi.ClickHouseInstallationCRDResourceKind,
 				},
 			}
-			json.Unmarshal(newjs, &newchi)
+			_ = json.Unmarshal(newjs, &newchi)
 			command.new = &newchi
 		case reconcileUpdate:
 			actionPlan := chopmodels.NewActionPlan(command.old, command.new)
@@ -454,8 +495,8 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 						Kind:       chi.ClickHouseInstallationCRDResourceKind,
 					},
 				}
-				json.Unmarshal(oldjs, &oldchi)
-				json.Unmarshal(newjs, &newchi)
+				_ = json.Unmarshal(oldjs, &oldchi)
+				_ = json.Unmarshal(newjs, &newchi)
 				command.old = &oldchi
 				command.new = &newchi
 			}

@@ -16,10 +16,12 @@ package model
 
 import (
 	"fmt"
+
 	// "net/url"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -302,13 +304,12 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 }
 
 // CreateStatefulSet creates new apps.StatefulSet
-func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
+func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost, shutdown bool) *apps.StatefulSet {
 	statefulSetName := CreateStatefulSetName(host)
 	serviceName := CreateStatefulSetServiceName(host)
 	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
 
 	// Create apps.StatefulSet object
-	replicasNum := host.GetStatefulSetReplicasNum()
 	revisionHistoryLimit := int32(10)
 	// StatefulSet has additional label - ZK config fingerprint
 	statefulSet := &apps.StatefulSet{
@@ -319,7 +320,7 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost) *apps.StatefulSet {
 			OwnerReferences: ownerReferences,
 		},
 		Spec: apps.StatefulSetSpec{
-			Replicas:    &replicasNum,
+			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
 			ServiceName: serviceName,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: GetSelectorHostScope(host),
@@ -461,28 +462,36 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 
 // setupTroubleshoot
 func (c *Creator) setupTroubleshoot(statefulSet *apps.StatefulSet) {
-	container, ok := getClickHouseContainer(statefulSet)
-	if !ok {
+	if !c.chi.IsTroubleshoot() {
+		// We are not troubleshooting
 		return
 	}
 
-	if c.chi.IsTroubleshoot() {
-		sleep := " || sleep 1800"
-		if len(container.Command) > 0 {
-			// Append troubleshooting-capable tail to command and hope for the best
-			container.Command[len(container.Command)-1] += sleep
-		} else {
-			// Substitute entrypoint with troubleshooting-capable command
-			container.Command = []string{
-				"/bin/sh",
-				"-c",
-				"/entrypoint.sh" + sleep,
-			}
-		}
-		// Sleep is not able to respond to probes
-		container.LivenessProbe = nil
-		container.ReadinessProbe = nil
+	container, ok := getClickHouseContainer(statefulSet)
+	if !ok {
+		// Unable to locate ClickHouse container
+		return
 	}
+
+	// Let's setup troubleshooting in ClickHouse container
+
+	sleep := " || sleep 1800"
+	if len(container.Command) > 0 {
+		// In case we have user-specified command, let's
+		// append troubleshooting-capable tail and hope for the best
+		container.Command[len(container.Command)-1] += sleep
+	} else {
+		// Assume standard ClickHouse container is used
+		// Substitute entrypoint with troubleshooting-capable command
+		container.Command = []string{
+			"/bin/sh",
+			"-c",
+			"/entrypoint.sh" + sleep,
+		}
+	}
+	// Sleep is not able to respond to probes
+	container.LivenessProbe = nil
+	container.ReadinessProbe = nil
 }
 
 // setupLogContainer
@@ -608,6 +617,11 @@ func (c *Creator) statefulSetApplyPodTemplate(
 		},
 		Spec: *template.Spec.DeepCopy(),
 	}
+
+	if statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds == nil {
+		terminationGracePeriod := int64(60)
+		statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds = &terminationGracePeriod
+	}
 }
 
 // getClickHouseContainer
@@ -729,6 +743,28 @@ func ensurePortByName(container *corev1.Container, name string, port int32) {
 		Name:          name,
 		ContainerPort: port,
 	})
+}
+
+// NewPodDisruptionBudget creates new PodDisruptionBudget
+func (c *Creator) NewPodDisruptionBudget() *v1beta1.PodDisruptionBudget {
+	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
+	return &v1beta1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            c.chi.Name,
+			Namespace:       c.chi.Namespace,
+			Labels:          c.labeler.getLabelsCHIScope(),
+			OwnerReferences: ownerReferences,
+		},
+		Spec: v1beta1.PodDisruptionBudgetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: c.labeler.GetSelectorCHIScope(),
+			},
+			MaxUnavailable: &intstr.IntOrString{
+				Type:   intstr.Int,
+				IntVal: 1,
+			},
+		},
+	}
 }
 
 // setupStatefulSetApplyVolumeMount applies .templates.volumeClaimTemplates.* to a StatefulSet
@@ -1044,7 +1080,7 @@ func getContainerByName(statefulSet *apps.StatefulSet, name string) *corev1.Cont
 
 func getOwnerReferences(t metav1.TypeMeta, o metav1.ObjectMeta, controller, blockOwnerDeletion bool) []metav1.OwnerReference {
 	return []metav1.OwnerReference{
-		metav1.OwnerReference{
+		{
 			APIVersion:         t.APIVersion,
 			Kind:               t.Kind,
 			Name:               o.Name,
