@@ -529,14 +529,15 @@ def test_013(self):
             "CREATE TABLE \\\"test-db\\\".\\\"events-distr\\\" as system.events "
             "ENGINE = Distributed('all-sharded', system, events)")
 
-    with Then("Add shards"):
+    nShards = 2
+    with Then(f"Add {nShards-1} shards"):
         kubectl.create_and_check(
             config="configs/test-013-add-shards-2.yaml",
             check={
                 "object_counts": {
-                    "statefulset": 3,
-                    "pod": 3,
-                    "service": 4,
+                    "statefulset": nShards,
+                    "pod": nShards,
+                    "service": nShards+1,
                 },
                 "do_not_delete": 1,
             },
@@ -545,16 +546,16 @@ def test_013(self):
 
     # wait for cluster to start
     out = ""
-    for _ in range(20):
-        time.sleep(10)
+    for _ in range(10):
         out = clickhouse.query_with_error(
             chi,
             "SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
         note(f"cluster out:\n{out}")
-        if out == "3":
+        if out == str(nShards):
             break
+        time.sleep(10)
     else:
-        assert out == "3"
+        assert out == str(nShards)
 
     with Then("Unaffected pod should not be restarted"):
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
@@ -566,12 +567,6 @@ def test_013(self):
                 chi,
                 f"SELECT count() FROM system.tables WHERE name = '{obj}'",
                 host=f"chi-{chi}-{cluster}-1-0"
-            )
-            assert out == "1"
-            out = clickhouse.query(
-                chi,
-                f"SELECT count() FROM system.tables WHERE name = '{obj}'",
-                host=f"chi-{chi}-{cluster}-2-0"
             )
             assert out == "1"
 
@@ -589,14 +584,14 @@ def test_013(self):
         )
 
         # wait for cluster to start
-        for _ in range(20):
-            time.sleep(10)
+        for _ in range(10):
             out = clickhouse.query_with_error(
                 chi,
                 "SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
             note(f"cluster out:\n{out}")
             if out == "1":
                 break
+            time.sleep(10)
         else:
             assert out == "1"
 
