@@ -71,6 +71,7 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
      ) 
 		`,
 		host.Address.ClusterName,
+		host.Address.ClusterName,
 	)
 	sqlTables := heredoc.Docf(`
 		SELECT DISTINCT 
