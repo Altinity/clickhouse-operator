@@ -232,7 +232,7 @@ def test_008(self):
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
-def test_009(self, version_from="0.15.0", version_to=settings.operator_version):
+def test_009(self, version_from="0.16.0", version_to=settings.operator_version):
     with Then("Test simple chi for operator upgrade"):
         test_operator_upgrade("configs/test-009-operator-upgrade-1.yaml", version_from, version_to)
     with Then("Test advanced chi for operator upgrade"):
@@ -1646,7 +1646,10 @@ def test_028(self):
         },
     )
 
-    sql = "select groupArray(hostName()) online_hosts from cluster('all-sharded', system.one)"
+    sql = """select 
+     (select count() from system.clusters where cluster='all-sharded') as total_hosts,
+     (select count() online_hosts from cluster('all-sharded', system.one) settings skip_unavailable_shards=1) as online_hosts
+     FORMAT CSV"""
     note("Before restart")
     out = clickhouse.query_with_error(chi, sql)
     note(out)
@@ -1660,12 +1663,30 @@ def test_028(self):
         with Then("Operator should start processing a change"):
             # TODO: Test needs to be improved
             kubectl.wait_chi_status(chi, "InProgress")
+            start_time = time.time()
+            ch1_downtime = 0
+            ch2_downtime = 0
+            chi_downtime = 0
             with And("Queries keep running"):
                 while kubectl.get_field("chi", chi, ".status.status") == "InProgress":
-                    out = clickhouse.query_with_error(chi, sql)
-                    print(out)
+                    ch1 = clickhouse.query_with_error(chi, sql, host = "chi-test-014-replication-default-0-0-0")
+                    ch2 = clickhouse.query_with_error(chi, sql, host = "chi-test-014-replication-default-0-1-0")
+                    print(ch1 + "   " + ch2)
+                    if "error" in ch1 or "Exception" in ch1 or ch2.endswith("1"):
+                        ch1_downtime = ch1_downtime + 5 
+                    if "error" in ch2 or "Exception" in ch2 or ch1.endswith("1"):
+                        ch2_downtime = ch2_downtime + 5
+                    if ("error" in ch1 or "Exception" in ch1) and ("error" in ch2 or "Exception" in ch2):
+                        chi_downtime = chi_downtime + 5
                     # print("Waiting 5 seconds")
                     time.sleep(5)
+            end_time = time.time()
+            print(f"Total restart time: {str(round(end_time - start_time))}")
+            print(f"First replica downtime: {ch1_downtime}")
+            print(f"Second replica downtime: {ch2_downtime}")
+            print(f"CHI downtime: {chi_downtime}")
+            assert chi_downtime == 0
+
         with Then("Check restart attribute"):
             restart = kubectl.get_field("chi", chi, ".spec.restart")
             if restart == "":
@@ -1734,7 +1755,7 @@ def test(self):
         test_006,
         test_007,
         test_008,
-        (test_009, {"version_from": "0.15.0"}),
+        (test_009, {"version_from": "0.16.0"}),
         test_010,
         test_011,
         test_011_1,
