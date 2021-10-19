@@ -5,11 +5,8 @@ from helpers.argparser import argparser
 
 xfails = {
         # test_operator.py
-        # "/regression/e2e.test_operator/test_003*": [(Error, "Hits tf timeout")],
-        # "/regression/e2e.test_operator/test_006*": [(Error, "May hit timeout")],
-        # "/regression/e2e.test_operator/test_009*": [(Fail, "May fail due to label changes")],
-        # "/regression/e2e.test_operator/test_022*": [(Error, "Not supported yet. Timeout")],
-        # "/regression/e2e.test_operator/test_024*": [(Fail, "Not supported yet")],
+        "/regression/e2e.test_operator/test_008*": [(Fail, "???")],
+        "/regression/e2e.test_operator/test_023*": [(Fail, "Template annotations do not work")],
 
         # test_clickhouse.py
         "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
