@@ -622,8 +622,8 @@ func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfigur
 }
 
 type patchFinalizers struct {
-	Op    string `json:"op"`
-	Path  string `json:"path"`
+	Op    string   `json:"op"`
+	Path  string   `json:"path"`
 	Value []string `json:"value"`
 }
 

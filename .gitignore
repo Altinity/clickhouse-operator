@@ -38,3 +38,6 @@ dockerfile/actions
 
 # python virtualenv
 venv
+
+# Skip tmp folder
+/tmp/

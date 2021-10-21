@@ -1,3 +1,10 @@
+# Template Parameters:
+#
+# KIND=ClickHouseInstallation
+# SINGULAR=clickhouseinstallation
+# PLURAL=clickhouseinstallations
+# SHORT=chi
+#
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -1223,6 +1230,13 @@ spec:
                           - ""
                           - "merge"
 ---
+# Template Parameters:
+#
+# KIND=ClickHouseInstallationTemplate
+# SINGULAR=clickhouseinstallationtemplate
+# PLURAL=clickhouseinstallationtemplates
+# SHORT=chit
+#
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -1296,9 +1310,11 @@ spec:
           description: Client access endpoint
           priority: 1 # show in wide view
           jsonPath: .status.endpoint
+      subresources:
+        status: {}
       schema:
         openAPIV3Schema:
-          description: "define a template which describe Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more ClickHouse clusters, would be used in `chi.spec.useTemplates`"
+          description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more ClickHouse clusters"
           type: object
           required:
             - spec
@@ -2446,6 +2462,10 @@ spec:
                           - ""
                           - "merge"
 ---
+# Template Parameters:
+#
+# NONE
+#
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -2533,7 +2553,7 @@ spec:
                   description: "ClickHouse server configuration `<quota>...</quota>` for any <user>"
                 chConfigUserDefaultNetworksIP:
                   type: array
-                  description: "ClickHouse server configuration `<networks><ip>...</ip></netrworks>` for any <user>"
+                  description: "ClickHouse server configuration `<networks><ip>...</ip></networks>` for any <user>"
                   items:
                     type: string
                 chConfigUserDefaultPassword:
@@ -2564,7 +2584,7 @@ spec:
                   description: "boolean, allows logs to stderr"
                 alsologtostderr:
                   type: string
-                  description: "booleanm allows logs to stderr and files both"
+                  description: "boolean allows logs to stderr and files both"
                 v:
                   type: string
                   description: "verbosity level of clickhouse-operator log, default - 1 max - 9"
@@ -2629,22 +2649,33 @@ spec:
                     - "LabelClusterScopeCycleIndex"
                     - "LabelClusterScopeCycleOffset"
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# $OPERATOR_NAMESPACE
+# COMMENT=
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# NAME=clickhouse-operator
 #
 # Setup ServiceAccount
-# ServiceAccount would be created in kubectl-specified namespace
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: clickhouse-operator
-  namespace: $OPERATOR_NAMESPACE
+  namespace: ${OPERATOR_NAMESPACE}
 ---
+# Template Parameters:
+#
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=#
+# ROLE_KIND=ClusterRole
+# ROLE_NAME=clickhouse-operator-${OPERATOR_NAMESPACE}
+# ROLE_BINDING_KIND=ClusterRoleBinding
+# ROLE_BINDING_NAME=clickhouse-operator-${OPERATOR_NAMESPACE}
+#
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: clickhouse-operator-$OPERATOR_NAMESPACE
+  name: clickhouse-operator-${OPERATOR_NAMESPACE}
+  #namespace: ${OPERATOR_NAMESPACE}
 rules:
 - apiGroups:
     - ""
@@ -2791,27 +2822,28 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: clickhouse-operator-$OPERATOR_NAMESPACE
+  name: clickhouse-operator-${OPERATOR_NAMESPACE}
+  #namespace: ${OPERATOR_NAMESPACE}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: clickhouse-operator-$OPERATOR_NAMESPACE
+  name: clickhouse-operator-${OPERATOR_NAMESPACE}
 subjects:
 - kind: ServiceAccount
   name: clickhouse-operator
-  namespace: $OPERATOR_NAMESPACE
+  namespace: ${OPERATOR_NAMESPACE}
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# $OPERATOR_NAMESPACE
-# $OPERATOR_IMAGE
-# etc-clickhouse-operator-files
+# NAME=etc-clickhouse-operator-files
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-files
-  namespace: $OPERATOR_NAMESPACE
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     app: clickhouse-operator
 data:
@@ -2824,11 +2856,8 @@ data:
     
     # List of namespaces where clickhouse-operator watches for events.
     # Concurrently running operators should watch on different namespaces
-    #watchNamespaces:
-    #  - dev
-    #  - test
-    #  - info
-    #  - onemore
+    #watchNamespaces: ["dev", "test", "info", "onemore"]
+    watchNamespaces: []
     
     ################################################
     ##
@@ -2973,32 +3002,32 @@ data:
     appendScopeLabels: "no"
 
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# $OPERATOR_NAMESPACE
-# $OPERATOR_IMAGE
-# etc-clickhouse-operator-confd-files
+# NAME=etc-clickhouse-operator-confd-files
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-confd-files
-  namespace: $OPERATOR_NAMESPACE
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     app: clickhouse-operator
 data:
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# $OPERATOR_NAMESPACE
-# $OPERATOR_IMAGE
-# etc-clickhouse-operator-configd-files
+# NAME=etc-clickhouse-operator-configd-files
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-configd-files
-  namespace: $OPERATOR_NAMESPACE
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     app: clickhouse-operator
 data:
@@ -3046,17 +3075,17 @@ data:
     </yandex>
 
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# $OPERATOR_NAMESPACE
-# $OPERATOR_IMAGE
-# etc-clickhouse-operator-templatesd-files
+# NAME=etc-clickhouse-operator-templatesd-files
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-templatesd-files
-  namespace: $OPERATOR_NAMESPACE
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     app: clickhouse-operator
 data:
@@ -3145,17 +3174,17 @@ data:
   readme: |
     Templates in this folder are packaged with an operator and available via 'useTemplate'
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# $OPERATOR_NAMESPACE
-# $OPERATOR_IMAGE
-# etc-clickhouse-operator-usersd-files
+# NAME=etc-clickhouse-operator-usersd-files
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-usersd-files
-  namespace: $OPERATOR_NAMESPACE
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     app: clickhouse-operator
 data:
@@ -3203,11 +3232,12 @@ data:
         </profiles>
     </yandex>
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# $OPERATOR_NAMESPACE
-# $OPERATOR_IMAGE
-# $METRICS_EXPORTER_IMAGE
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
+# OPERATOR_IMAGE=${OPERATOR_IMAGE}
+# METRICS_EXPORTER_IMAGE=${METRICS_EXPORTER_IMAGE}
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -3215,7 +3245,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: clickhouse-operator
-  namespace: $OPERATOR_NAMESPACE
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     app: clickhouse-operator
 spec:
@@ -3250,7 +3280,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: $OPERATOR_IMAGE
+          image: ${OPERATOR_IMAGE}
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3315,7 +3345,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: $METRICS_EXPORTER_IMAGE
+          image: ${METRICS_EXPORTER_IMAGE}
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3329,9 +3359,10 @@ spec:
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/users.d
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# $OPERATOR_NAMESPACE
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
 #
 # Setup ClusterIP Service to provide monitoring metrics for Prometheus
 # Service would be created in kubectl-specified namespace
@@ -3342,7 +3373,7 @@ kind: Service
 apiVersion: v1
 metadata:
   name: clickhouse-operator-metrics
-  namespace: $OPERATOR_NAMESPACE
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     app: clickhouse-operator
 spec:

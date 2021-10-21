@@ -2651,6 +2651,7 @@ spec:
 ---
 # Template Parameters:
 #
+# COMMENT=
 # NAMESPACE=dev
 # NAME=clickhouse-operator
 #
@@ -2674,6 +2675,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: clickhouse-operator-dev
+  #namespace: dev
 rules:
 - apiGroups:
     - ""
@@ -2821,6 +2823,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: clickhouse-operator-dev
+  #namespace: dev
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -2853,11 +2856,8 @@ data:
     
     # List of namespaces where clickhouse-operator watches for events.
     # Concurrently running operators should watch on different namespaces
-    #watchNamespaces:
-    #  - dev
-    #  - test
-    #  - info
-    #  - onemore
+    #watchNamespaces: ["dev", "test", "info", "onemore"]
+    watchNamespaces: []
     
     ################################################
     ##

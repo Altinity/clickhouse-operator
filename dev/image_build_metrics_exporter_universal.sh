@@ -17,7 +17,7 @@ DOCKERFILE_DIR="${SRC_ROOT}/dockerfile/metrics-exporter"
 DOCKERFILE="${DOCKERFILE_DIR}/Dockerfile"
 
 # Build clickhouse-operator install .yaml manifest
-"${MANIFESTS_ROOT}/operator/build-clickhouse-operator-install-yaml.sh"
+"${MANIFESTS_ROOT}/builder/build-clickhouse-operator-install-yaml.sh"
 
 # Build image with Docker
 if [[ "${MINIKUBE}" == "yes" ]]; then
