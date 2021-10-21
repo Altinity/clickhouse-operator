@@ -17,6 +17,8 @@ DOCKERFILE_DIR="${SRC_ROOT}/dockerfile/metrics-exporter"
 DOCKERFILE="${DOCKERFILE_DIR}/Dockerfile"
 
 # Build clickhouse-operator install .yaml manifest
+"${MANIFESTS_ROOT}/builder/build-clickhouse-operator-configs.sh"
+# Build clickhouse-operator install .yaml manifest
 "${MANIFESTS_ROOT}/builder/build-clickhouse-operator-install-yaml.sh"
 
 # Build image with Docker
