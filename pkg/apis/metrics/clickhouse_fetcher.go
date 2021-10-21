@@ -76,17 +76,17 @@ const (
 	    FROM system.dictionaries
 	    UNION ALL
 	    SELECT
-		'metric.LongestRunningQuery' AS metric,
-		toString(max(elapsed))       AS value,
-		'Longest running query time' AS description,
-		'gauge'                      AS type
+            'metric.LongestRunningQuery' AS metric,
+            toString(max(elapsed))       AS value,
+            'Longest running query time' AS description,
+            'gauge'                      AS type
 	    FROM system.processes
 		UNION ALL
 		SELECT
-		'metric.ChangedSettingsHash'       AS metric,
-		toString(groupBitXor(cityHash64(name,value))) AS value,
-		'Control sum for changed settings' AS description,
-		'gauge'                            AS type
+            'metric.ChangedSettingsHash'       AS metric,
+            toString(groupBitXor(cityHash64(name,value))) AS value,
+            'Control sum for changed settings' AS description,
+            'gauge'                            AS type
 		FROM system.settings WHERE changed
 	`
 	queryTableSizesSQL = `

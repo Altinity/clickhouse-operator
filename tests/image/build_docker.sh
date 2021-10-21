@@ -7,7 +7,7 @@ OPERATOR_IMAGE="altinity/clickhouse-operator:${OPERATOR_VERSION}"
 OPERATOR_IMAGE_OLD="altinity/clickhouse-operator:${OPERATOR_VERSION_OLD}"
 METRICS_EXPORTER_IMAGE="altinity/metrics-exporter:${OPERATOR_VERSION}"
 METRICS_EXPORTER_IMAGE_OLD="altinity/metrics-exporter:${OPERATOR_VERSION_OLD}"
-CLICKHOUSE_BACKUP_IMAGE="altinity/clickhouse-backup:1.0.16"
+CLICKHOUSE_BACKUP_IMAGE="altinity/clickhouse-backup:1.1.0"
 CLICKHOUSE_IMAGE=${CLICKHOUSE_IMAGE:="yandex/clickhouse-server:21.8"}
 CLICKHOUSE_IMAGE_OLD=${CLICKHOUSE_IMAGE_OLD:="yandex/clickhouse-server:21.3"}
 CLICKHOUSE_IMAGE_LATEST=${CLICKHOUSE_IMAGE_LATEST:="yandex/clickhouse-server:latest"}
