@@ -140,6 +140,7 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
     with Given(f"clickhouse-operator FROM {version_from}"):
         util.set_operator_version(version_from)
         chi = manifest.get_chi_name(util.get_full_path(config, True))
+        cluster = "test-009"
 
         kubectl.create_and_check(
             config=config,
@@ -152,11 +153,12 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
                 "do_not_delete": 1,
             }
         )
-        kubectl.wait_chi_status(chi, "Completed", retries=20)
-        start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
+        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
         with Then("Create a table"):
             clickhouse.query(chi, "CREATE TABLE test_local Engine = Log as SELECT 1")
+            clickhouse.query(chi, "CREATE TABLE test_dist as system.one Engine = Distributed('test-009', system, one)")
+
 
         with When(f"upgrade operator TO {version_to}"):
             util.set_operator_version(version_to, timeout=120)
@@ -171,7 +173,7 @@ def test_operator_upgrade(config, version_from, version_to=settings.operator_ver
                 assert "1" == out
 
             with Then("ClickHouse pods should not be restarted"):
-                new_start_time = kubectl.get_field("pod", f"chi-{chi}-{chi}-0-0-0", ".status.startTime")
+                new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
                 if start_time != new_start_time:
                     kubectl.launch(f"describe chi -n {settings.test_namespace} {chi}")
                     kubectl.launch(
@@ -1645,6 +1647,8 @@ def test_028(self):
             "do_not_delete": 1,
         },
     )
+    
+    clickhouse.query(chi, "CREATE TABLE test_dist as system.one Engine = Distributed('default', system, one)")
 
     sql = """select 
      (select count() from system.clusters where cluster='all-sharded') as total_hosts,
@@ -1755,7 +1759,7 @@ def test(self):
         test_006,
         test_007,
         test_008,
-        (test_009, {"version_from": "0.16.0"}),
+        (test_009, {"version_from": "0.15.0"}),
         test_010,
         test_011,
         test_011_1,

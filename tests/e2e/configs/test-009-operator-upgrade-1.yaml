@@ -9,7 +9,7 @@ spec:
     - name: clickhouse-version
   configuration:
     clusters:
-      - name: test-009-1
+      - name: test-009
         layout:
           shardsCount: 1
   defaults:
