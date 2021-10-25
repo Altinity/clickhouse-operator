@@ -113,8 +113,10 @@ func (w *PrometheusWriter) WriteTableSizes(data [][]string) {
 func (w *PrometheusWriter) WriteSystemParts(data [][]string) {
 	var diskDataBytes, memoryPrimaryKeyBytesAllocated int64
 	var err error
+	m := make([]int64, 2)
 	for _, t := range data {
-		m := make([]int64, 2)
+		m[0] = 0
+		m[1] = 0
 		for i, v := range t[len(t)-len(m):] {
 			m[i], err = strconv.ParseInt(v, 10, 64)
 			if err != nil {
