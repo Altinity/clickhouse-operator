@@ -55,20 +55,6 @@ const (
 	    FROM system.events
 	    UNION ALL
 	    SELECT 
-	        'metric.DiskDataBytes'                      AS metric,
-	        toString(sum(bytes_on_disk))                AS value,
-	        'Total data size for all ClickHouse tables' AS description,
-		    'gauge'                                     AS type
-	    FROM system.parts
-	    UNION ALL
-	    SELECT 
-	        'metric.MemoryPrimaryKeyBytesAllocated'              AS metric,
-	        toString(sum(primary_key_bytes_in_memory_allocated)) AS value,
-	        'Memory size allocated for primary keys'             AS description,
-	        'gauge'                                              AS type
-	    FROM system.parts
-	    UNION ALL
-	    SELECT 
 	        'metric.MemoryDictionaryBytesAllocated'  AS metric,
 	        toString(sum(bytes_allocated))           AS value,
 	        'Memory size allocated for dictionaries' AS description,
@@ -76,20 +62,20 @@ const (
 	    FROM system.dictionaries
 	    UNION ALL
 	    SELECT
-		'metric.LongestRunningQuery' AS metric,
-		toString(max(elapsed))       AS value,
-		'Longest running query time' AS description,
-		'gauge'                      AS type
+            'metric.LongestRunningQuery' AS metric,
+            toString(max(elapsed))       AS value,
+            'Longest running query time' AS description,
+            'gauge'                      AS type
 	    FROM system.processes
 		UNION ALL
 		SELECT
-		'metric.ChangedSettingsHash'       AS metric,
-		toString(groupBitXor(cityHash64(name,value))) AS value,
-		'Control sum for changed settings' AS description,
-		'gauge'                            AS type
+            'metric.ChangedSettingsHash'       AS metric,
+            toString(groupBitXor(cityHash64(name,value))) AS value,
+            'Control sum for changed settings' AS description,
+            'gauge'                            AS type
 		FROM system.settings WHERE changed
 	`
-	queryTableSizesSQL = `
+	querySystemPartsSQL = `
 		SELECT
 			database,
 			table,
@@ -98,7 +84,9 @@ const (
 			toString(count())                      AS parts, 
 			toString(sum(bytes))                   AS bytes, 
 			toString(sum(data_uncompressed_bytes)) AS uncompressed_bytes, 
-			toString(sum(rows))                    AS rows 
+			toString(sum(rows))                    AS rows,
+	        toString(sum(bytes_on_disk))           AS metric_DiskDataBytes,
+	        toString(sum(primary_key_bytes_in_memory_allocated)) AS metric_MemoryPrimaryKeyBytesAllocated
 		FROM system.parts
 		GROUP BY active, database, table
 	`
@@ -174,14 +162,21 @@ func (f *ClickHouseFetcher) getClickHouseQueryMetrics() ([][]string, error) {
 	)
 }
 
-// getClickHouseQueryTableSizes requests data sizes from ClickHouse
-func (f *ClickHouseFetcher) getClickHouseQueryTableSizes() ([][]string, error) {
+// getClickHouseSystemParts requests data sizes from ClickHouse
+func (f *ClickHouseFetcher) getClickHouseSystemParts() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
-		queryTableSizesSQL,
+		querySystemPartsSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
-			var database, table, active, partitions, parts, bytes, uncompressed, _rows string
-			if err := rows.Scan(&database, &table, &active, &partitions, &parts, &bytes, &uncompressed, &_rows); err == nil {
-				*data = append(*data, []string{database, table, active, partitions, parts, bytes, uncompressed, _rows})
+			var database, table, active, partitions, parts, bytes, uncompressed, _rows,
+				metricDiskDataBytes, metricMemoryPrimaryKeyBytesAllocated string
+			if err := rows.Scan(
+				&database, &table, &active, &partitions, &parts, &bytes, &uncompressed, &_rows,
+				&metricDiskDataBytes, metricMemoryPrimaryKeyBytesAllocated,
+			); err == nil {
+				*data = append(*data, []string{
+					database, table, active, partitions, parts, bytes, uncompressed, _rows,
+					metricDiskDataBytes, metricMemoryPrimaryKeyBytesAllocated,
+				})
 			}
 			return nil
 		},

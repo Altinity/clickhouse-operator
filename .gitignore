@@ -38,3 +38,6 @@ dockerfile/actions
 
 # python virtualenv
 venv
+
+# Tests cached files
+tests/image/cache

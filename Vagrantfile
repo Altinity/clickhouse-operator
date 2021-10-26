@@ -28,7 +28,7 @@ Vagrant.configure(2) do |config|
   end
 
   if Vagrant.has_plugin?("vagrant-vbguest")
-    config.vbguest.auto_update = false
+    config.vbguest.auto_update = true
   end
 
   if Vagrant.has_plugin?("vagrant-timezone")
@@ -104,7 +104,7 @@ Vagrant.configure(2) do |config|
     apt-get install --no-install-recommends -y clickhouse-client
 
     # golang
-    export GOLANG_VERSION=1.16
+    export GOLANG_VERSION=1.17
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F6BC817356A3D45E
     add-apt-repository ppa:longsleep/golang-backports
     apt-get install --no-install-recommends -y golang-${GOLANG_VERSION}-go
@@ -140,7 +140,7 @@ Vagrant.configure(2) do |config|
     # MINIKUBE_VERSION=1.18.1
     # MINIKUBE_VERSION=1.19.0
     # MINIKUBE_VERSION=1.20.0
-    MINIKUBE_VERSION=1.22.0
+    MINIKUBE_VERSION=1.23.2
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -157,7 +157,7 @@ Vagrant.configure(2) do |config|
 #    https://github.com/kubernetes/kubeadm/issues/2395
 #    K8S_VERSION=${K8S_VERSION:-1.20.10}
 #    K8S_VERSION=${K8S_VERSION:-1.21.4}
-    K8S_VERSION=${K8S_VERSION:-1.22.1}
+    K8S_VERSION=${K8S_VERSION:-1.22.2}
     export VALIDATE_YAML=true
 
     killall kubectl || true
@@ -210,6 +210,8 @@ EOF
     # look to https://kubernetes.io/docs/tasks/debug-application-cluster/debug-running-pod/#ephemeral-container
     # kubectl krew install debug
     chown -R vagrant:vagrant /home/vagrant/.krew
+
+    export NO_WAIT=1
 
     cd /vagrant/
 
@@ -275,12 +277,7 @@ EOF
 
     pip3 install -r /vagrant/tests/requirements.txt
 
-    python3 /vagrant/tests/test_metrics_alerts.py
-    python3 /vagrant/tests/test_zookeeper.py
-    python3 /vagrant/tests/test_backup_alerts.py
-    python3 /vagrant/tests/test_examples.py
-    python3 /vagrant/tests/test_metrics_exporter.py
-    python3 /vagrant/tests/test.py
+    python3 /vagrant/tests/regression.py --native
 
     # audit2rbac
     kubectl logs kube-apiserver-minikube -n kube-system | grep audit.k8s.io/v1 > /tmp/audit2rbac.log

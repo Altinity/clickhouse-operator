@@ -1,0 +1,34 @@
+apiVersion: "clickhouse.altinity.com/v1"
+
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-025-rescaling
+
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  useTemplates:
+    - name: persistent-volume
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:21.8
+              command:
+                - "/bin/bash"
+                - "-c"
+                - "sleep 15 && /entrypoint.sh"
