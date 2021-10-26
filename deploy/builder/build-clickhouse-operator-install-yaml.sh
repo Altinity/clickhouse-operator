@@ -48,3 +48,11 @@ chPassword="\${password}" \
 OPERATOR_NAMESPACE="\${namespace}" \
 MANIFEST_PRINT_RBAC_NAMESPACED=yes \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-tf.yaml"
+
+# Build ansible-templated installation .yaml manifest
+watchNamespaces="{{ namespace }}" \
+password_sha256_hex="{{ password | password_hash('sha256') }}" \
+chPassword="{{ password }}" \
+OPERATOR_NAMESPACE="{{ namespace }}" \
+MANIFEST_PRINT_RBAC_NAMESPACED=yes \
+"${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-ansible.yaml"
