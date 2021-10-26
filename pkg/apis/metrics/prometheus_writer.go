@@ -15,6 +15,7 @@
 package metrics
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -106,6 +107,35 @@ func (w *PrometheusWriter) WriteTableSizes(data [][]string) {
 			[]string{"chi", "namespace", "hostname", "database", "table", "active"},
 			w.chi.Name, w.chi.Namespace, w.hostname, metric[0], metric[1], metric[2])
 	}
+}
+
+// WriteSystemParts pushesh set of prometheus.Metric object related to system.parts
+func (w *PrometheusWriter) WriteSystemParts(data [][]string) {
+	var diskDataBytes, memoryPrimaryKeyBytesAllocated int64
+	var err error
+	m := make([]int64, 2)
+	for _, t := range data {
+		m[0] = 0
+		m[1] = 0
+		for i, v := range t[len(t)-len(m):] {
+			m[i], err = strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				log.V(2).Infof("Error parsing metrics value for chi_metric_DiskDataBytes, chi_metric_MemoryPrimaryKeyBytesAllocated: %s\n", v)
+			}
+		}
+		diskDataBytes += m[0]
+		memoryPrimaryKeyBytesAllocated += m[1]
+	}
+	w.WriteMetrics([][]string{
+		{
+			"metric.DiskDataBytes", fmt.Sprintf("%d", diskDataBytes),
+			"Total data size for all ClickHouse tables", "gauge",
+		},
+		{
+			"metric.MemoryPrimaryKeyBytesAllocated", fmt.Sprintf("%d", memoryPrimaryKeyBytesAllocated),
+			"Memory size allocated for primary keys", "gauge",
+		},
+	})
 }
 
 // WriteSystemReplicas writes system replicas
