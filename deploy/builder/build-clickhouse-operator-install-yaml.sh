@@ -31,15 +31,18 @@ METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-"altinity/metrics-exporter:${O
 # Build namespace:kube-system installation .yaml manifest
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-bundle.yaml"
 
-# Build namespace:dev installation .yaml manifest
-OPERATOR_NAMESPACE="dev" \
-"${CUR_DIR}/cat-clickhouse-operator-install-yaml.s"h > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-dev.yaml"
-
 # Build templated installation .yaml manifest
 OPERATOR_IMAGE="\${OPERATOR_IMAGE}" \
 METRICS_EXPORTER_IMAGE="\${METRICS_EXPORTER_IMAGE}" \
 OPERATOR_NAMESPACE="\${OPERATOR_NAMESPACE}" \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-template.yaml"
+
+# Build v1beta1 bundle and template manifests
+"${CUR_DIR}"/build-clickhouse-operator-install-v1beta1-yaml.sh
+
+# Build namespace:dev installation .yaml manifest
+OPERATOR_NAMESPACE="dev" \
+"${CUR_DIR}/cat-clickhouse-operator-install-yaml.s"h > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-dev.yaml"
 
 # Build terraform-templated installation .yaml manifest
 watchNamespaces="\${namespace}" \
@@ -56,3 +59,4 @@ chPassword="{{ password }}" \
 OPERATOR_NAMESPACE="{{ namespace }}" \
 MANIFEST_PRINT_RBAC_NAMESPACED=yes \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-ansible.yaml"
+
