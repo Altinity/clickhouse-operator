@@ -68,6 +68,8 @@ const (
 
 	// defaultTerminationGracePeriod specifies default value for TerminationGracePeriod
 	defaultTerminationGracePeriod = 30
+	// defaultRevisionHistoryLimit specifies default value for RevisionHistoryLimit
+	defaultRevisionHistoryLimit = 10
 )
 
 // OperatorConfig specifies operator configuration
@@ -170,6 +172,8 @@ type OperatorConfig struct {
 
 	// Grace period for Pod termination.
 	TerminationGracePeriod int `json:"terminationGracePeriod" yaml:"terminationGracePeriod"`
+	// Revision history limit
+	RevisionHistoryLimit int `json:"revisionHistoryLimit" yaml:"revisionHistoryLimit"`
 	//
 	// The end of OperatorConfig
 	//
@@ -472,6 +476,9 @@ func (config *OperatorConfig) normalizePodManagementSection() {
 	if config.TerminationGracePeriod == 0 {
 		config.TerminationGracePeriod = defaultTerminationGracePeriod
 	}
+	if config.RevisionHistoryLimit == 0 {
+		config.RevisionHistoryLimit = defaultRevisionHistoryLimit
+	}
 }
 
 // normalize() makes fully-and-correctly filled OperatorConfig
@@ -694,4 +701,11 @@ func (config *OperatorConfig) GetLogLevel() (log.Level, error) {
 func (config *OperatorConfig) GetTerminationGracePeriod() *int64 {
 	terminationGracePeriod := int64(config.TerminationGracePeriod)
 	return &terminationGracePeriod
+}
+
+// GetRevisionHistoryLimit gets pointer to revisionHistoryLimit, as expected by
+// statefulSet.Spec.Template.Spec.RevisionHistoryLimit
+func (config *OperatorConfig) GetRevisionHistoryLimit() *int32 {
+	revisionHistoryLimit := int32(config.RevisionHistoryLimit)
+	return &revisionHistoryLimit
 }
