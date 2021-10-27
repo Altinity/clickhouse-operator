@@ -102,7 +102,95 @@ spec:
             status:
               type: object
               description: "Current ClickHouseInstallation manifest status, contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other"
-              x-kubernetes-preserve-unknown-fields: true
+              properties:
+                version:
+                  type: string
+                  description: "Version"
+                clusters:
+                  type: integer
+                  minimum: 0
+                  description: "Clusters count"
+                shards:
+                  type: integer
+                  minimum: 0
+                  description: "Shards count"
+                replicas:
+                  type: integer
+                  minimum: 0
+                  description: "Replicas count"
+                hosts:
+                  type: integer
+                  minimum: 0
+                  description: "Hosts count"
+                status:
+                  type: string
+                  description: "Status"
+                taskID:
+                  type: string
+                  description: "Current task id"
+                taskIDsStarted:
+                  type: array
+                  description: "Started task ids"
+                  items:
+                    type: string
+                taskIDsCompleted:
+                  type: array
+                  description: "Completed task ids"
+                  items:
+                    type: string
+                action:
+                  type: string
+                  description: "Action"
+                actions:
+                  type: array
+                  description: "Actions"
+                  items:
+                    type: string
+                error:
+                  type: string
+                  description: "Last error"
+                errors:
+                  type: array
+                  description: "Errors"
+                  items:
+                    type: string
+                updated:
+                  type: integer
+                  minimum: 0
+                  description: "Updated Hosts count"
+                added:
+                  type: integer
+                  minimum: 0
+                  description: "Added Hosts count"
+                deleted:
+                  type: integer
+                  minimum: 0
+                  description: "Deleted Hosts count"
+                delete:
+                  type: integer
+                  minimum: 0
+                  description: "About to delete Hosts count"
+                pods:
+                  type: array
+                  description: "Pods"
+                  items:
+                    type: string
+                fqdns:
+                  type: array
+                  description: "Pods FQDNs"
+                  items:
+                    type: string
+                endpoint:
+                  type: string
+                  description: "Endpoint"
+                generation:
+                  type: integer
+                  minimum: 0
+                  description: "Generation"
+                normalized:
+                  type: object
+                  description: "Normalized CHI"
+                  x-kubernetes-preserve-unknown-fields: true
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
@@ -1334,7 +1422,95 @@ spec:
             status:
               type: object
               description: "Current ClickHouseInstallation manifest status, contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other"
-              x-kubernetes-preserve-unknown-fields: true
+              properties:
+                version:
+                  type: string
+                  description: "Version"
+                clusters:
+                  type: integer
+                  minimum: 0
+                  description: "Clusters count"
+                shards:
+                  type: integer
+                  minimum: 0
+                  description: "Shards count"
+                replicas:
+                  type: integer
+                  minimum: 0
+                  description: "Replicas count"
+                hosts:
+                  type: integer
+                  minimum: 0
+                  description: "Hosts count"
+                status:
+                  type: string
+                  description: "Status"
+                taskID:
+                  type: string
+                  description: "Current task id"
+                taskIDsStarted:
+                  type: array
+                  description: "Started task ids"
+                  items:
+                    type: string
+                taskIDsCompleted:
+                  type: array
+                  description: "Completed task ids"
+                  items:
+                    type: string
+                action:
+                  type: string
+                  description: "Action"
+                actions:
+                  type: array
+                  description: "Actions"
+                  items:
+                    type: string
+                error:
+                  type: string
+                  description: "Last error"
+                errors:
+                  type: array
+                  description: "Errors"
+                  items:
+                    type: string
+                updated:
+                  type: integer
+                  minimum: 0
+                  description: "Updated Hosts count"
+                added:
+                  type: integer
+                  minimum: 0
+                  description: "Added Hosts count"
+                deleted:
+                  type: integer
+                  minimum: 0
+                  description: "Deleted Hosts count"
+                delete:
+                  type: integer
+                  minimum: 0
+                  description: "About to delete Hosts count"
+                pods:
+                  type: array
+                  description: "Pods"
+                  items:
+                    type: string
+                fqdns:
+                  type: array
+                  description: "Pods FQDNs"
+                  items:
+                    type: string
+                endpoint:
+                  type: string
+                  description: "Endpoint"
+                generation:
+                  type: integer
+                  minimum: 0
+                  description: "Generation"
+                normalized:
+                  type: object
+                  description: "Normalized CHI"
+                  x-kubernetes-preserve-unknown-fields: true
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
