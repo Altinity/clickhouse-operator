@@ -620,8 +620,7 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	}
 
 	if statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds == nil {
-		terminationGracePeriod := int64(60)
-		statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds = &terminationGracePeriod
+		statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds = chop.Config().GetTerminationGracePeriod()
 	}
 }
 

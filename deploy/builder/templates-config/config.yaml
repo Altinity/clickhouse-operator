@@ -150,3 +150,14 @@ reconcileWaitInclude: false
 #  LabelClusterScopeCycleIndex
 #  LabelClusterScopeCycleOffset
 appendScopeLabels: "no"
+
+################################################
+##
+## Pod management parameters
+##
+################################################
+# Grace period for Pod termination.
+# How many seconds to wait between sending
+# SIGTERM and SIGKILL during Pod termination process.
+# Increase this number is case of slow shutdown.
+terminationGracePeriod: 30
