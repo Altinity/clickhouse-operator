@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -276,8 +277,12 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 
 	old = w.normalize(old)
 	new = w.normalize(new)
-
 	actionPlan := chopmodel.NewActionPlan(old, new)
+	oldjson, _ := json.MarshalIndent(old, "", "  ")
+	newjson, _ := json.MarshalIndent(new, "", "  ")
+	w.a.V(3).M(new).A().Info("AP worker---------------------------------------------:\n%s\n", actionPlan)
+	w.a.V(3).M(new).A().Info("old worker--------------------------------------------:\n%s\n", string(oldjson))
+	w.a.V(3).M(new).A().Info("new worker--------------------------------------------:\n%s\n", string(newjson))
 	if !actionPlan.HasActionsToDo() {
 		// Nothing to do - no changes found - no need to react
 		w.a.V(3).M(new).F().Info("ResourceVersion changed, but no actual changes found")
@@ -376,6 +381,8 @@ func (w *worker) clear(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
 }
 
 func (w *worker) dropReplicas(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
+	w.a.V(1).M(chi).F().S().Info("drop replicas based on AP")
+	cnt := 0
 	ap.WalkRemoved(
 		func(cluster *chiv1.ChiCluster) {
 		},
@@ -392,8 +399,10 @@ func (w *worker) dropReplicas(ctx context.Context, chi *chiv1.ClickHouseInstalla
 			}
 
 			_ = w.dropReplica(ctx, run, host)
+			cnt++
 		},
 	)
+	w.a.V(1).M(chi).F().E().Info("processed replicas: %d", cnt)
 }
 
 func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
@@ -528,25 +537,33 @@ func (w *worker) purge(
 		case chopmodel.StatefulSet:
 			if purgeStatefulSet(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete StatefulSet %s/%s", m.Namespace, m.Name)
-				_ = w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
+				if err := w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+					w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet %s/%s, err: %v", m.Namespace, m.Name, err)
+				}
 				cnt++
 			}
 		case chopmodel.PVC:
 			if purgePVC(chi, reconcileFailedObjs, m) {
 				if chopmodel.GetReclaimPolicy(m) == chiv1.PVCReclaimPolicyDelete {
 					w.a.V(1).M(m).F().Info("Delete PVC %s/%s", m.Namespace, m.Name)
-					_ = w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
+					if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+						w.a.V(1).M(m).F().Error("FAILED to delete PVC %s/%s, err: %v", m.Namespace, m.Name, err)
+					}
 				}
 			}
 		case chopmodel.ConfigMap:
 			if purgeConfigMap(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete ConfigMap %s/%s", m.Namespace, m.Name)
-				_ = w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
+				if err := w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+					w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap %s/%s, err: %v", m.Namespace, m.Name, err)
+				}
 			}
 		case chopmodel.Service:
 			if purgeService(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete Service %s/%s", m.Namespace, m.Name)
-				_ = w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions())
+				if err := w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+					w.a.V(1).M(m).F().Error("FAILED to delete Service %s/%s, err: %v", m.Namespace, m.Name, err)
+				}
 			}
 		}
 	})
@@ -937,19 +954,31 @@ func (w *worker) excludeHost(ctx context.Context, host *chiv1.ChiHost) error {
 	return nil
 }
 
-// Always include host back to ClickHouse clusters
+// shouldIncludeHost determines whether host to be included into cluster after reconciling
+func (w *worker) shouldIncludeHost(host *chiv1.ChiHost) bool {
+	switch {
+	case host.GetCHI().IsStopped():
+		// No need to include stopped host
+		return false
+	}
+	return true
+}
+
+// includeHost includes host back back into ClickHouse clusters
 func (w *worker) includeHost(ctx context.Context, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
 	}
 
-	w.a.V(1).
-		M(host).F().
-		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+	if w.shouldIncludeHost(host) {
+		w.a.V(1).
+			M(host).F().
+			Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
-	w.includeHostIntoClickHouseCluster(ctx, host)
-	_ = w.includeHostIntoService(ctx, host)
+		w.includeHostIntoClickHouseCluster(ctx, host)
+		_ = w.includeHostIntoService(ctx, host)
+	}
 
 	return nil
 }
@@ -1022,7 +1051,10 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 func (w *worker) shouldExcludeHost(host *chiv1.ChiHost) bool {
 	status := host.ReconcileAttributes.GetStatus()
 	switch {
-	case host.CHI.IsRollingUpdate():
+	case host.GetCHI().IsStopped():
+		// No need to exclude stopped host
+		return false
+	case host.GetCHI().IsRollingUpdate():
 		// While rolling update host would be restarted
 		return true
 	case status == chiv1.StatefulSetStatusNew:
@@ -1242,7 +1274,12 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 func (w *worker) canDropReplica(host *chiv1.ChiHost) (can bool) {
 	can = true
 	w.c.walkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
-		can = false
+		// Replica's state has to be kept in Zookeeper for retained volumes.
+		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
+		if chopmodel.GetReclaimPolicy(pvc.ObjectMeta) == chiv1.PVCReclaimPolicyRetain {
+			w.a.V(1).F().Info("PVC %s/%s blocks drop replica. Reclaim policy: %s", chiv1.PVCReclaimPolicyRetain.String())
+			can = false
+		}
 	})
 	return can
 }
@@ -1250,13 +1287,16 @@ func (w *worker) canDropReplica(host *chiv1.ChiHost) (can bool) {
 // dropReplica
 func (w *worker) dropReplica(ctx context.Context, hostToRun, hostToDrop *chiv1.ChiHost) error {
 	if (hostToRun == nil) || (hostToDrop == nil) {
+		w.a.V(1).F().Error("FAILED to drop replica. hostToRun:%s, hostToDrop:%s", hostToRun.GetName(), hostToDrop.GetName())
 		return nil
 	}
+
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
 	}
 	if !w.canDropReplica(hostToDrop) {
+		w.a.V(1).F().Warning("UNABLE to drop replica. hostToRun:%s, hostToDrop:%s", hostToRun.GetName(), hostToDrop.GetName())
 		return nil
 	}
 
@@ -1837,6 +1877,47 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 	return err
 }
 
+// waitConfigMapPropagation
+func (w *worker) waitConfigMapPropagation(ctx context.Context, host *chiv1.ChiHost) bool {
+	// No need to wait for ConfigMap propagation on stopped host
+	if host.GetCHI().IsStopped() {
+		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - on stopped host")
+		return false
+	}
+
+	// No need to wait on unchanged ConfigMap
+	if w.cmUpdate.IsZero() {
+		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - no changes in ConfigMap")
+		return false
+	}
+
+	// What timeout is expected to be enough for ConfigMap propagation?
+	// In case timeout is not specified, no need to wait
+	timeout := host.GetCHI().GetReconciling().GetConfigMapPropagationTimeoutDuration()
+	if timeout == 0 {
+		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable")
+		return false
+	}
+
+	// How much time has elapsed since last ConfigMap update?
+	// May be there is not need to wait already
+	elapsed := time.Now().Sub(w.cmUpdate)
+	if elapsed >= timeout {
+		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. %s/%s", elapsed, timeout)
+		return false
+	}
+
+	// Looks like we need to wait for Configmap propagation, after all
+	wait := timeout - elapsed
+	w.a.V(1).M(host).F().Info("Wait for ConfigMap propagation for %s %s/%s", wait, elapsed, timeout)
+	if util.WaitContextDoneOrTimeout(ctx, wait) {
+		log.V(2).Info("ctx is done")
+		return true
+	}
+
+	return false
+}
+
 // updateStatefulSet
 func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
@@ -1860,20 +1941,9 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		M(host).F().
 		Info("Update StatefulSet(%s/%s) - started", namespace, name)
 
-	if timeout := host.GetCHI().GetReconciling().GetConfigMapPropagationTimeoutDuration(); (timeout == 0) || w.cmUpdate.IsZero() {
-		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable")
-	} else {
-		elapsed := time.Now().Sub(w.cmUpdate)
-		if elapsed < timeout {
-			wait := timeout - elapsed
-			w.a.V(1).M(host).F().Info("Wait for ConfigMap propagation for %s %s/%s", wait, elapsed, timeout)
-			if util.WaitContextDoneOrTimeout(ctx, wait) {
-				log.V(2).Info("ctx is done")
-				return nil
-			}
-		} else {
-			w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. %s/%s", elapsed, timeout)
-		}
+	if w.waitConfigMapPropagation(ctx, host) {
+		log.V(2).Info("ctx is done")
+		return nil
 	}
 
 	if chopmodel.IsStatefulSetReady(curStatefulSet) {

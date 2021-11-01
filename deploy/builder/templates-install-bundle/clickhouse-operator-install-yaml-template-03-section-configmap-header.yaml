@@ -1,0 +1,14 @@
+# Template Parameters:
+#
+# NAME=${NAME}
+# NAMESPACE=${NAMESPACE}
+# COMMENT=${COMMENT}
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${NAME}
+  ${COMMENT}namespace: ${NAMESPACE}
+  labels:
+    app: clickhouse-operator
+data:

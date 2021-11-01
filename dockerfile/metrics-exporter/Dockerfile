@@ -30,7 +30,7 @@ MAINTAINER "Altinity <support@altinity.com>"
 LABEL name="ClickHouse operator. Metrics exporter" \
       maintainer="support@altinity.com" \
       vendor="Altinity" \
-      version="0.16.0" \
+      version="0.16.1" \
       release="1" \
       summary="Metrics Exporter" \
       description="Metrics exporter for Altinity ClickHouse operator"

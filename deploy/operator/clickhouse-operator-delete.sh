@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
+OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-"kube-system"}"
 
 
 if [[ "${OPERATOR_NAMESPACE}" == "kube-system" ]]; then

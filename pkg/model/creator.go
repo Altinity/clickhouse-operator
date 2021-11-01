@@ -305,23 +305,16 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 
 // CreateStatefulSet creates new apps.StatefulSet
 func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost, shutdown bool) *apps.StatefulSet {
-	statefulSetName := CreateStatefulSetName(host)
-	serviceName := CreateStatefulSetServiceName(host)
-	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
-
-	// Create apps.StatefulSet object
-	revisionHistoryLimit := int32(10)
-	// StatefulSet has additional label - ZK config fingerprint
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            statefulSetName,
+			Name:            CreateStatefulSetName(host),
 			Namespace:       host.Address.Namespace,
 			Labels:          c.labeler.getLabelsHostScope(host, true),
-			OwnerReferences: ownerReferences,
+			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
-			ServiceName: serviceName,
+			ServiceName: CreateStatefulSetServiceName(host),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: GetSelectorHostScope(host),
 			},
@@ -338,7 +331,7 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost, shutdown bool) *apps.St
 			UpdateStrategy: apps.StatefulSetUpdateStrategy{
 				Type: apps.RollingUpdateStatefulSetStrategyType,
 			},
-			RevisionHistoryLimit: &revisionHistoryLimit,
+			RevisionHistoryLimit: chop.Config().GetRevisionHistoryLimit(),
 		},
 	}
 
@@ -355,13 +348,16 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost, shutdown bool) *apps.St
 // setupStatefulSetVersion
 // TODO property of the labeler?
 func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
+	// Version can drift from instance to instance of the CHI StatefulSet even for the same CHI because
+	// StatefulSet has owner already specified, which has UID of owner, which is different for different CHIs
 	statefulSet.Labels = util.MergeStringMapsOverwrite(
 		statefulSet.Labels,
 		map[string]string{
 			LabelObjectVersion: util.Fingerprint(statefulSet),
 		},
 	)
-	c.a.V(2).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
+	// TODO fix this with verbosity update
+	// c.a.V(3).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
 }
 
 // GetStatefulSetVersion gets version of the StatefulSet
@@ -619,8 +615,7 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	}
 
 	if statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds == nil {
-		terminationGracePeriod := int64(60)
-		statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds = &terminationGracePeriod
+		statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds = chop.Config().GetTerminationGracePeriod()
 	}
 }
 

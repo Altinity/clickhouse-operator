@@ -40,6 +40,7 @@ type ClickHouseInstallationsGetter interface {
 type ClickHouseInstallationInterface interface {
 	Create(ctx context.Context, clickHouseInstallation *v1.ClickHouseInstallation, opts metav1.CreateOptions) (*v1.ClickHouseInstallation, error)
 	Update(ctx context.Context, clickHouseInstallation *v1.ClickHouseInstallation, opts metav1.UpdateOptions) (*v1.ClickHouseInstallation, error)
+	UpdateStatus(ctx context.Context, clickHouseInstallation *v1.ClickHouseInstallation, opts metav1.UpdateOptions) (*v1.ClickHouseInstallation, error)
 	Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.ClickHouseInstallation, error)
@@ -128,6 +129,22 @@ func (c *clickHouseInstallations) Update(ctx context.Context, clickHouseInstalla
 		Namespace(c.ns).
 		Resource("clickhouseinstallations").
 		Name(clickHouseInstallation.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(clickHouseInstallation).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *clickHouseInstallations) UpdateStatus(ctx context.Context, clickHouseInstallation *v1.ClickHouseInstallation, opts metav1.UpdateOptions) (result *v1.ClickHouseInstallation, err error) {
+	result = &v1.ClickHouseInstallation{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("clickhouseinstallations").
+		Name(clickHouseInstallation.Name).
+		SubResource("status").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(clickHouseInstallation).
 		Do(ctx).

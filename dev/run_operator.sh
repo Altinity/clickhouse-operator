@@ -10,7 +10,7 @@ source "${CUR_DIR}/go_build_config.sh"
 # Setup paths
 LOG_DIR="${CUR_DIR}/log"
 
-echo -n "Building ${OPERATOR_BIN}, please wait..."
+echo "Building ${OPERATOR_BIN}, please wait..."
 if [[ $1 == "nobuild" ]]; then
     echo "Build step skipped, starting old binary"
 else

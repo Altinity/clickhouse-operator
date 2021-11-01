@@ -65,6 +65,11 @@ const (
 	// DefaultReconcileSystemThreadsNumber specifies default number of system controller threads running concurrently.
 	// Used in case no other specified in config
 	DefaultReconcileSystemThreadsNumber = 1
+
+	// defaultTerminationGracePeriod specifies default value for TerminationGracePeriod
+	defaultTerminationGracePeriod = 30
+	// defaultRevisionHistoryLimit specifies default value for RevisionHistoryLimit
+	defaultRevisionHistoryLimit = 10
 )
 
 // OperatorConfig specifies operator configuration
@@ -165,6 +170,10 @@ type OperatorConfig struct {
 	AppendScopeLabelsString string `json:"appendScopeLabels" yaml:"appendScopeLabels"`
 	AppendScopeLabels       bool
 
+	// Grace period for Pod termination.
+	TerminationGracePeriod int `json:"terminationGracePeriod" yaml:"terminationGracePeriod"`
+	// Revision history limit
+	RevisionHistoryLimit int `json:"revisionHistoryLimit" yaml:"revisionHistoryLimit"`
 	//
 	// The end of OperatorConfig
 	//
@@ -354,10 +363,7 @@ func (config *OperatorConfig) Postprocess() {
 	config.applyDefaultWatchNamespace()
 }
 
-// normalize() makes fully-and-correctly filled OperatorConfig
-func (config *OperatorConfig) normalize() {
-	config.Namespace = os.Getenv(OPERATOR_POD_NAMESPACE)
-
+func (config *OperatorConfig) normalizeAdditionalConfigurationFilesSection() {
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
 	util.PreparePath(&config.CHCommonConfigsPath, config.ConfigFolderPath, CommonConfigDir)
@@ -366,7 +372,9 @@ func (config *OperatorConfig) normalize() {
 
 	// Process ClickHouseInstallation templates section
 	util.PreparePath(&config.CHITemplatesPath, config.ConfigFolderPath, TemplatesDir)
+}
 
+func (config *OperatorConfig) normalizeUpdateSection() {
 	// Process Create/Update section
 
 	// Timeouts
@@ -391,7 +399,9 @@ func (config *OperatorConfig) normalize() {
 	if config.OnStatefulSetUpdateFailureAction == "" {
 		config.OnStatefulSetUpdateFailureAction = OnStatefulSetUpdateFailureActionRollback
 	}
+}
 
+func (config *OperatorConfig) normalizeSettingsSection() {
 	// Default values for ClickHouse user configuration
 	// 1. user/profile
 	// 2. user/quota
@@ -410,6 +420,10 @@ func (config *OperatorConfig) normalize() {
 		config.CHConfigUserDefaultPassword = defaultChConfigUserDefaultPassword
 	}
 
+	// chConfigNetworksHostRegexpTemplate
+}
+
+func (config *OperatorConfig) normalizeAccessSection() {
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
 	// 2. Schema maintenance
@@ -433,20 +447,52 @@ func (config *OperatorConfig) normalize() {
 	if config.CHPort == 0 {
 		config.CHPort = defaultChPort
 	}
+}
 
+func (config *OperatorConfig) normalizeLogSection() {
 	// Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
 	// Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`
 	// V                string `json:"v"                yaml:"v"`
 	// Stderrthreshold  string `json:"stderrthreshold"  yaml:"stderrthreshold"`
 	// Vmodule          string `json:"vmodule"          yaml:"vmodule"`
 	// Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
+}
 
+func (config *OperatorConfig) normalizeRuntimeSection() {
 	if config.ReconcileThreadsNumber == 0 {
 		config.ReconcileThreadsNumber = defaultReconcileThreadsNumber
 	}
 
+	//reconcileWaitExclude: true
+	//reconcileWaitInclude: false
+}
+
+func (config *OperatorConfig) normalizeLabelsSection() {
 	// Whether to append *Scope* labels to StatefulSet and Pod.
 	config.AppendScopeLabels = util.IsStringBoolTrue(config.AppendScopeLabelsString)
+}
+
+func (config *OperatorConfig) normalizePodManagementSection() {
+	if config.TerminationGracePeriod == 0 {
+		config.TerminationGracePeriod = defaultTerminationGracePeriod
+	}
+	if config.RevisionHistoryLimit == 0 {
+		config.RevisionHistoryLimit = defaultRevisionHistoryLimit
+	}
+}
+
+// normalize() makes fully-and-correctly filled OperatorConfig
+func (config *OperatorConfig) normalize() {
+	config.Namespace = os.Getenv(OPERATOR_POD_NAMESPACE)
+
+	config.normalizeAdditionalConfigurationFilesSection()
+	config.normalizeUpdateSection()
+	config.normalizeSettingsSection()
+	config.normalizeAccessSection()
+	config.normalizeLogSection()
+	config.normalizeRuntimeSection()
+	config.normalizeLabelsSection()
+	config.normalizePodManagementSection()
 }
 
 // applyEnvVarParams applies ENV VARS over config
@@ -599,6 +645,8 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 	util.Fprintf(b, "%s", util.Slice2String("ExcludeFromPropagationLabels", config.ExcludeFromPropagationLabels))
 	util.Fprintf(b, "appendScopeLabels: %s (%t)\n", config.AppendScopeLabelsString, config.AppendScopeLabels)
 
+	util.Fprintf(b, "terminationGracePeriod: %d\n", config.TerminationGracePeriod)
+
 	return b.String()
 }
 
@@ -645,5 +693,19 @@ func (config *OperatorConfig) GetLogLevel() (log.Level, error) {
 	if i, err := strconv.Atoi(config.V); err == nil {
 		return log.Level(i), nil
 	}
-	return 0, fmt.Errorf("incorreect V value")
+	return 0, fmt.Errorf("incorrect V value")
+}
+
+// GetTerminationGracePeriod gets pointer to terminationGracePeriod, as expected by
+// statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds
+func (config *OperatorConfig) GetTerminationGracePeriod() *int64 {
+	terminationGracePeriod := int64(config.TerminationGracePeriod)
+	return &terminationGracePeriod
+}
+
+// GetRevisionHistoryLimit gets pointer to revisionHistoryLimit, as expected by
+// statefulSet.Spec.Template.Spec.RevisionHistoryLimit
+func (config *OperatorConfig) GetRevisionHistoryLimit() *int32 {
+	revisionHistoryLimit := int32(config.RevisionHistoryLimit)
+	return &revisionHistoryLimit
 }
