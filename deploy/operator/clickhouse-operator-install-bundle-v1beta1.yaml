@@ -3390,8 +3390,8 @@ data:
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.16.1
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.16.1
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.17.0
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.17.0
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -3434,7 +3434,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.16.1
+          image: altinity/clickhouse-operator:0.17.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3497,7 +3497,7 @@ spec:
                   containerName: clickhouse-operator
                   resource: limits.memory
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.16.1
+          image: altinity/metrics-exporter:0.17.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder

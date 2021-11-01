@@ -29,7 +29,7 @@
             "containers" : [
               {
                 "name": "clickhouse",
-                "image": "yandex/clickhouse-server:21.3",
+                "image": "yandex/clickhouse-server:19.3.7",
                 "ports": [
                   {
                     "name": "http",
