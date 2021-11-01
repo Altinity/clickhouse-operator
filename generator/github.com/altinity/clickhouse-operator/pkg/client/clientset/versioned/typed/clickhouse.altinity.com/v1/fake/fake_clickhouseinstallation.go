@@ -102,6 +102,18 @@ func (c *FakeClickHouseInstallations) Update(ctx context.Context, clickHouseInst
 	return obj.(*clickhousealtinitycomv1.ClickHouseInstallation), err
 }
 
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *FakeClickHouseInstallations) UpdateStatus(ctx context.Context, clickHouseInstallation *clickhousealtinitycomv1.ClickHouseInstallation, opts v1.UpdateOptions) (*clickhousealtinitycomv1.ClickHouseInstallation, error) {
+	obj, err := c.Fake.
+		Invokes(testing.NewUpdateSubresourceAction(clickhouseinstallationsResource, "status", c.ns, clickHouseInstallation), &clickhousealtinitycomv1.ClickHouseInstallation{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*clickhousealtinitycomv1.ClickHouseInstallation), err
+}
+
 // Delete takes name of the clickHouseInstallation and deletes it. Returns an error if one occurs.
 func (c *FakeClickHouseInstallations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.

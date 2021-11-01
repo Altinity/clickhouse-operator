@@ -1,6 +1,8 @@
 #!/bin/bash
 
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+PROJECT_ROOT="$(realpath "${CUR_DIR}/../..")"
+MANIFEST_ROOT="$(realpath ${PROJECT_ROOT}/deploy)"
 
 source "${CUR_DIR}/dev-config.sh"
 
@@ -25,7 +27,7 @@ kubectl -n "${OPERATOR_NAMESPACE}" apply -f <( \
     METRICS_EXPORTER_NAMESPACE="${METRICS_EXPORTER_NAMESPACE}" \
     METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
     MANIFEST_PRINT_DEPLOYMENT="no" \
-    "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" \
+    "${MANIFEST_ROOT}/builder/cat-clickhouse-operator-install-yaml.sh" \
 )
 
 #
@@ -40,8 +42,9 @@ if [[ "${DEPLOY_OPERATOR}" == "yes" ]]; then
         METRICS_EXPORTER_NAMESPACE="${METRICS_EXPORTER_NAMESPACE}" \
         METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
         MANIFEST_PRINT_CRD="no" \
-        MANIFEST_PRINT_RBAC="no" \
-        "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" \
+        MANIFEST_PRINT_RBAC_CLUSTERED="no" \
+        MANIFEST_PRINT_RBAC_NAMESPACED="no" \
+    "${MANIFEST_ROOT}/builder/cat-clickhouse-operator-install-yaml.sh" \
     )
 else
     echo "------------------------------"

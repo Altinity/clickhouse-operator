@@ -1,0 +1,54 @@
+{
+  "apiVersion": "clickhouse.altinity.com/v1",
+  "kind": "ClickHouseInstallationTemplate",
+  "metadata": {
+    "name": "01-default-volumeclaimtemplate"
+  },
+  "spec": {
+    "templates": {
+      "volumeClaimTemplates": [
+        {
+          "name": "chi-default-volume-claim-template",
+          "spec": {
+            "accessModes": [
+              "ReadWriteOnce"
+            ],
+            "resources": {
+              "requests": {
+                "storage": "2Gi"
+              }
+            }
+          }
+        }
+      ],
+      "podTemplates": [
+        {
+          "name": "chi-default-oneperhost-pod-template",
+          "distribution": "OnePerHost",
+          "spec": {
+            "containers" : [
+              {
+                "name": "clickhouse",
+                "image": "yandex/clickhouse-server:21.3",
+                "ports": [
+                  {
+                    "name": "http",
+                    "containerPort": 8123
+                  },
+                  {
+                    "name": "client",
+                    "containerPort": 9000
+                  },
+                  {
+                    "name": "interserver",
+                    "containerPort": 9009
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

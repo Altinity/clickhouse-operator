@@ -1,3 +1,10 @@
+# Template Parameters:
+#
+# KIND=ClickHouseInstallation
+# SINGULAR=clickhouseinstallation
+# PLURAL=clickhouseinstallations
+# SHORT=chi
+#
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -71,6 +78,8 @@ spec:
           description: Client access endpoint
           priority: 1 # show in wide view
           jsonPath: .status.endpoint
+      subresources:
+        status: {}
       schema:
         openAPIV3Schema:
           description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more ClickHouse clusters"
@@ -93,7 +102,95 @@ spec:
             status:
               type: object
               description: "Current ClickHouseInstallation manifest status, contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other"
-              x-kubernetes-preserve-unknown-fields: true
+              properties:
+                version:
+                  type: string
+                  description: "Version"
+                clusters:
+                  type: integer
+                  minimum: 0
+                  description: "Clusters count"
+                shards:
+                  type: integer
+                  minimum: 0
+                  description: "Shards count"
+                replicas:
+                  type: integer
+                  minimum: 0
+                  description: "Replicas count"
+                hosts:
+                  type: integer
+                  minimum: 0
+                  description: "Hosts count"
+                status:
+                  type: string
+                  description: "Status"
+                taskID:
+                  type: string
+                  description: "Current task id"
+                taskIDsStarted:
+                  type: array
+                  description: "Started task ids"
+                  items:
+                    type: string
+                taskIDsCompleted:
+                  type: array
+                  description: "Completed task ids"
+                  items:
+                    type: string
+                action:
+                  type: string
+                  description: "Action"
+                actions:
+                  type: array
+                  description: "Actions"
+                  items:
+                    type: string
+                error:
+                  type: string
+                  description: "Last error"
+                errors:
+                  type: array
+                  description: "Errors"
+                  items:
+                    type: string
+                updated:
+                  type: integer
+                  minimum: 0
+                  description: "Updated Hosts count"
+                added:
+                  type: integer
+                  minimum: 0
+                  description: "Added Hosts count"
+                deleted:
+                  type: integer
+                  minimum: 0
+                  description: "Deleted Hosts count"
+                delete:
+                  type: integer
+                  minimum: 0
+                  description: "About to delete Hosts count"
+                pods:
+                  type: array
+                  description: "Pods"
+                  items:
+                    type: string
+                fqdns:
+                  type: array
+                  description: "Pods FQDNs"
+                  items:
+                    type: string
+                endpoint:
+                  type: string
+                  description: "Endpoint"
+                generation:
+                  type: integer
+                  minimum: 0
+                  description: "Generation"
+                normalized:
+                  type: object
+                  description: "Normalized CHI"
+                  x-kubernetes-preserve-unknown-fields: true
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
@@ -1221,6 +1318,13 @@ spec:
                           - ""
                           - "merge"
 ---
+# Template Parameters:
+#
+# KIND=ClickHouseInstallationTemplate
+# SINGULAR=clickhouseinstallationtemplate
+# PLURAL=clickhouseinstallationtemplates
+# SHORT=chit
+#
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -1294,9 +1398,11 @@ spec:
           description: Client access endpoint
           priority: 1 # show in wide view
           jsonPath: .status.endpoint
+      subresources:
+        status: {}
       schema:
         openAPIV3Schema:
-          description: "define a template which describe Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more ClickHouse clusters, would be used in `chi.spec.useTemplates`"
+          description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one or more ClickHouse clusters"
           type: object
           required:
             - spec
@@ -1316,7 +1422,95 @@ spec:
             status:
               type: object
               description: "Current ClickHouseInstallation manifest status, contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other"
-              x-kubernetes-preserve-unknown-fields: true
+              properties:
+                version:
+                  type: string
+                  description: "Version"
+                clusters:
+                  type: integer
+                  minimum: 0
+                  description: "Clusters count"
+                shards:
+                  type: integer
+                  minimum: 0
+                  description: "Shards count"
+                replicas:
+                  type: integer
+                  minimum: 0
+                  description: "Replicas count"
+                hosts:
+                  type: integer
+                  minimum: 0
+                  description: "Hosts count"
+                status:
+                  type: string
+                  description: "Status"
+                taskID:
+                  type: string
+                  description: "Current task id"
+                taskIDsStarted:
+                  type: array
+                  description: "Started task ids"
+                  items:
+                    type: string
+                taskIDsCompleted:
+                  type: array
+                  description: "Completed task ids"
+                  items:
+                    type: string
+                action:
+                  type: string
+                  description: "Action"
+                actions:
+                  type: array
+                  description: "Actions"
+                  items:
+                    type: string
+                error:
+                  type: string
+                  description: "Last error"
+                errors:
+                  type: array
+                  description: "Errors"
+                  items:
+                    type: string
+                updated:
+                  type: integer
+                  minimum: 0
+                  description: "Updated Hosts count"
+                added:
+                  type: integer
+                  minimum: 0
+                  description: "Added Hosts count"
+                deleted:
+                  type: integer
+                  minimum: 0
+                  description: "Deleted Hosts count"
+                delete:
+                  type: integer
+                  minimum: 0
+                  description: "About to delete Hosts count"
+                pods:
+                  type: array
+                  description: "Pods"
+                  items:
+                    type: string
+                fqdns:
+                  type: array
+                  description: "Pods FQDNs"
+                  items:
+                    type: string
+                endpoint:
+                  type: string
+                  description: "Endpoint"
+                generation:
+                  type: integer
+                  minimum: 0
+                  description: "Generation"
+                normalized:
+                  type: object
+                  description: "Normalized CHI"
+                  x-kubernetes-preserve-unknown-fields: true
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
@@ -2444,6 +2638,10 @@ spec:
                           - ""
                           - "merge"
 ---
+# Template Parameters:
+#
+# NONE
+#
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -2531,7 +2729,7 @@ spec:
                   description: "ClickHouse server configuration `<quota>...</quota>` for any <user>"
                 chConfigUserDefaultNetworksIP:
                   type: array
-                  description: "ClickHouse server configuration `<networks><ip>...</ip></netrworks>` for any <user>"
+                  description: "ClickHouse server configuration `<networks><ip>...</ip></networks>` for any <user>"
                   items:
                     type: string
                 chConfigUserDefaultPassword:
@@ -2562,7 +2760,7 @@ spec:
                   description: "boolean, allows logs to stderr"
                 alsologtostderr:
                   type: string
-                  description: "booleanm allows logs to stderr and files both"
+                  description: "boolean allows logs to stderr and files both"
                 v:
                   type: string
                   description: "verbosity level of clickhouse-operator log, default - 1 max - 9"
@@ -2627,22 +2825,33 @@ spec:
                     - "LabelClusterScopeCycleIndex"
                     - "LabelClusterScopeCycleOffset"
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# kube-system
+# COMMENT=
+# NAMESPACE=kube-system
+# NAME=clickhouse-operator
 #
 # Setup ServiceAccount
-# ServiceAccount would be created in kubectl-specified namespace
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: clickhouse-operator
   namespace: kube-system
 ---
+# Template Parameters:
+#
+# NAMESPACE=kube-system
+# COMMENT=#
+# ROLE_KIND=ClusterRole
+# ROLE_NAME=clickhouse-operator-kube-system
+# ROLE_BINDING_KIND=ClusterRoleBinding
+# ROLE_BINDING_NAME=clickhouse-operator-kube-system
+#
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: clickhouse-operator-kube-system
+  #namespace: kube-system
 rules:
 - apiGroups:
     - ""
@@ -2765,6 +2974,18 @@ rules:
   verbs:
     - update
 - apiGroups:
+    - clickhouse.altinity.com
+  resources:
+    - clickhouseinstallations/status
+    - clickhouseinstallationtemplates/status
+    - clickhouseoperatorconfigurations/status
+  verbs:
+    - create
+    - delete
+    - get
+    - update
+    - patch
+- apiGroups:
     - ""
   resources:
     - secrets
@@ -2778,6 +2999,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: clickhouse-operator-kube-system
+  #namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -2787,11 +3009,11 @@ subjects:
   name: clickhouse-operator
   namespace: kube-system
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:0.17.0
-# etc-clickhouse-operator-files
+# NAME=etc-clickhouse-operator-files
+# NAMESPACE=kube-system
+# COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
@@ -2810,11 +3032,8 @@ data:
     
     # List of namespaces where clickhouse-operator watches for events.
     # Concurrently running operators should watch on different namespaces
-    #watchNamespaces:
-    #  - dev
-    #  - test
-    #  - info
-    #  - onemore
+    #watchNamespaces: ["dev", "test"]
+    watchNamespaces: []
     
     ################################################
     ##
@@ -2897,8 +3116,8 @@ data:
     # 3. DROP DNS CACHE
     # User with such credentials can be specified in additional ClickHouse .xml config files,
     # located in `chUsersConfigsPath` folder
-    chUsername: clickhouse_operator
-    chPassword: clickhouse_operator_password
+    chUsername: "clickhouse_operator"
+    chPassword: "clickhouse_operator_password"
     
     # Location of k8s Secret with username and password to be used by operator to connect to ClickHouse instances
     # Can be used instead of explicitly specified username and password
@@ -2957,13 +3176,24 @@ data:
     #  LabelClusterScopeCycleIndex
     #  LabelClusterScopeCycleOffset
     appendScopeLabels: "no"
+    
+    ################################################
+    ##
+    ## Pod management parameters
+    ##
+    ################################################
+    # Grace period for Pod termination.
+    # How many seconds to wait between sending
+    # SIGTERM and SIGKILL during Pod termination process.
+    # Increase this number is case of slow shutdown.
+    terminationGracePeriod: 30
 
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:0.17.0
-# etc-clickhouse-operator-confd-files
+# NAME=etc-clickhouse-operator-confd-files
+# NAMESPACE=kube-system
+# COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
@@ -2974,11 +3204,11 @@ metadata:
     app: clickhouse-operator
 data:
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:0.17.0
-# etc-clickhouse-operator-configd-files
+# NAME=etc-clickhouse-operator-configd-files
+# NAMESPACE=kube-system
+# COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
@@ -3032,11 +3262,11 @@ data:
     </yandex>
 
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:0.17.0
-# etc-clickhouse-operator-templatesd-files
+# NAME=etc-clickhouse-operator-templatesd-files
+# NAMESPACE=kube-system
+# COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
@@ -3078,7 +3308,7 @@ data:
                 "containers" : [
                   {
                     "name": "clickhouse",
-                    "image": "yandex/clickhouse-server:21.3",
+                    "image": "yandex/clickhouse-server:19.3.7",
                     "ports": [
                       {
                         "name": "http",
@@ -3131,11 +3361,11 @@ data:
   readme: |
     Templates in this folder are packaged with an operator and available via 'useTemplate'
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:0.17.0
-# etc-clickhouse-operator-usersd-files
+# NAME=etc-clickhouse-operator-usersd-files
+# NAMESPACE=kube-system
+# COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
@@ -3189,11 +3419,12 @@ data:
         </profiles>
     </yandex>
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# kube-system
-# altinity/clickhouse-operator:0.17.0
-# altinity/metrics-exporter:0.17.0
+# NAMESPACE=kube-system
+# COMMENT=
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.17.0
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.17.0
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -3315,9 +3546,10 @@ spec:
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/users.d
 ---
-# Possible Template Parameters:
+# Template Parameters:
 #
-# kube-system
+# NAMESPACE=kube-system
+# COMMENT=
 #
 # Setup ClusterIP Service to provide monitoring metrics for Prometheus
 # Service would be created in kubectl-specified namespace

@@ -6,11 +6,8 @@
 
 # List of namespaces where clickhouse-operator watches for events.
 # Concurrently running operators should watch on different namespaces
-#watchNamespaces:
-#  - dev
-#  - test
-#  - info
-#  - onemore
+#watchNamespaces: ["dev", "test"]
+watchNamespaces: []
 
 ################################################
 ##
@@ -93,8 +90,8 @@ chConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi
 # 3. DROP DNS CACHE
 # User with such credentials can be specified in additional ClickHouse .xml config files,
 # located in `chUsersConfigsPath` folder
-chUsername: clickhouse_operator
-chPassword: clickhouse_operator_password
+chUsername: "clickhouse_operator"
+chPassword: "clickhouse_operator_password"
 
 # Location of k8s Secret with username and password to be used by operator to connect to ClickHouse instances
 # Can be used instead of explicitly specified username and password
@@ -153,3 +150,14 @@ reconcileWaitInclude: false
 #  LabelClusterScopeCycleIndex
 #  LabelClusterScopeCycleOffset
 appendScopeLabels: "no"
+
+################################################
+##
+## Pod management parameters
+##
+################################################
+# Grace period for Pod termination.
+# How many seconds to wait between sending
+# SIGTERM and SIGKILL during Pod termination process.
+# Increase this number is case of slow shutdown.
+terminationGracePeriod: 30

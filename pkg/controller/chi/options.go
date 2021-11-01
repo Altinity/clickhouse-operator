@@ -42,6 +42,11 @@ func newUpdateOptions() metav1.UpdateOptions {
 	return metav1.UpdateOptions{}
 }
 
+// newPatchOptions returns filled metav1.PatchOptions
+func newPatchOptions() metav1.PatchOptions {
+	return metav1.PatchOptions{}
+}
+
 // newDeleteOptions returns filled *metav1.DeleteOptions
 func newDeleteOptions() metav1.DeleteOptions {
 	gracePeriodSeconds := int64(0)
