@@ -156,8 +156,19 @@ func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
 	return cluster.Zookeeper
 }
 
+// GetName gets name
+func (host *ChiHost) GetName() string {
+	if host == nil {
+		return "host-is-nil"
+	}
+	return host.Name
+}
+
 // GetCHI gets CHI
 func (host *ChiHost) GetCHI() *ClickHouseInstallation {
+	if host == nil {
+		return nil
+	}
 	return host.CHI
 }
 

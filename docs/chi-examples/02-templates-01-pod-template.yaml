@@ -2,6 +2,8 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
   name: "template-pod"
+  finalizers:
+    - finalizer.clickhouseinstallation.altinity.com
 spec:
   defaults:
     templates:
@@ -11,6 +13,11 @@ spec:
       http_port: 8124
       tcp_port: 9001
       interserver_http_port: 9010
+    clusters:
+      - name: "temp-pod"
+        layout:
+          shardsCount: 1
+          replicasCount: 1
   templates:
     podTemplates:
       - name: pod-template
@@ -23,6 +30,11 @@ spec:
           containers:
             - name: clickhouse
               image: yandex/clickhouse-server:20.7
+              # Container has explicitly specified resource requests
+              resources:
+                requests:
+                  cpu: "1000m"
+              # Container has explicitly specified ports
               ports:
                 - name: http
                   containerPort: 8124
