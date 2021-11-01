@@ -1385,7 +1385,7 @@ def test_023(self):
     config = "configs/test-001.yaml"
     chi = manifest.get_chi_name(util.get_full_path(config))
     
-    chit_data = manifest.get_chit_data(util.get_full_path("templates/tpl-clickhouse-auto.yaml"))
+    chit_data = manifest.get_manifest_data(util.get_full_path("templates/tpl-clickhouse-auto.yaml"))
     expected_image = chit_data['spec']['templates']['podTemplates'][0]['spec']['containers'][0]['image']
     
     kubectl.create_and_check(

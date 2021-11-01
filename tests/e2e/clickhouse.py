@@ -83,9 +83,12 @@ def drop_table_on_cluster(chi, cluster_name='all-sharded', table='default.test')
 
 
 def create_table_on_cluster(chi, cluster_name='all-sharded', table='default.test',
-                            create_definition='(event_time DateTime, test UInt64) ENGINE MergeTree() ORDER BY tuple()'):
-    create_local_sql = f'CREATE TABLE {table} ON CLUSTER \'{cluster_name}\' {create_definition}'
-    query(chi["metadata"]["name"], create_local_sql, timeout=240)
+                            create_definition='(event_time DateTime, test UInt64) ENGINE MergeTree() ORDER BY tuple()', if_not_exists=False):
+    create_sql = 'CREATE TABLE'
+    if if_not_exists:
+        create_sql += ' IF NOT EXISTS'
+    create_sql = f'{create_sql} {table} ON CLUSTER \'{cluster_name}\' {create_definition}'
+    query(chi["metadata"]["name"], create_sql, timeout=240)
 
 
 def drop_distributed_table_on_cluster(chi, cluster_name='all-sharded', distr_table='default.test_distr', local_table='default.test'):

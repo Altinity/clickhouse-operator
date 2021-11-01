@@ -26,7 +26,9 @@ def wait_zookeeper_ready(svc_name='zookeeper', pod_count=3, retries=10):
             Fail(f"Zookeeper failed, ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}")
 
 
-def wait_clickhouse_readonly_replicas(expected_replicas='[0,0]', retries=10):
+def wait_clickhouse_no_readonly_replicas(chi, retries=10):
+    expected_replicas = chi["spec"]["configuration"]["clusters"][0]["layout"]["replicasCount"]
+    expected_replicas = "[" + ",".join(["0"] * expected_replicas) + "]"
     for i in range(retries):
         readonly_replicas=clickhouse.query(
             chi['metadata']['name'],
@@ -43,86 +45,104 @@ def wait_clickhouse_readonly_replicas(expected_replicas='[0,0]', retries=10):
 
 @TestScenario
 @Name("test_zookeeper_rescale. Check ZK scale-up / scale-down cases")
-def test_zookeeper_rescale(self, chi):
-    with When('create replicated table #1'):
-        clickhouse.create_table_on_cluster(
-            chi, 'all-sharded', 'default.zk_repl',
-            '(id UInt64) ENGINE=ReplicatedMergeTree(\'/clickhouse/tables/default.zk_repl/{shard}\',\'{replica}\') ORDER BY (id)'
+def test_zookeeper_rescale(self):
+    """
+    test scenario for ZK
+
+    CH 1 -> 2 wait complete + ZK 1 -> 3 nowait
+    CH 2 -> 1 wait complete + ZK 3 -> 1 nowait
+    CH 1 -> 2 wait complete + ZK 1 -> 3 nowait
+    """
+    def insert_replicated_data(chi, create_tables, insert_tables):
+        with When(f'create if not exists replicated tables {create_tables}'):
+            for table in create_tables:
+                clickhouse.create_table_on_cluster(
+                    chi, 'all-sharded', f'default.{table}',
+                    f'(id UInt64) ENGINE=ReplicatedMergeTree(\'/clickhouse/tables/default.{table}/{{shard}}\',\'{{replica}}\') ORDER BY (id)',
+                    if_not_exists=True,
+                )
+        with When(f'insert tables data {insert_tables}'):
+            for table in insert_tables:
+                clickhouse.query(
+                    chi['metadata']['name'], f'INSERT INTO default.{table} SELECT rand()+number FROM numbers(1000)',
+                    pod="chi-test-cluster-for-zk-default-0-1-0"
+                )
+
+    def check_zk_is_ready(chi, pod_count):
+        for pod_num in range(pod_count):
+            out = clickhouse.query(chi["metadata"]["name"], "SELECT count() FROM system.zookeeper WHERE path='/'")
+            assert "2" == out.strip(" \t\r\n"), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
+            out = kubectl.launch(f"exec zookeeper-{pod_num} -- /apache-zookeeper-3.6.1-bin/bin/zkCli.sh ls /", ns=settings.test_namespace)
+            assert "[clickhouse, zookeeper]" in out, "Unexpected `zkCli.sh ls /` output"
+
+    def rescale_zk_and_clickhouse(ch_node_count, zk_node_count, first_install=False):
+        zk_manifest = 'zookeeper-1-node-1GB-for-tests-only.yaml' if zk_node_count == 1 else 'zookeeper-3-nodes-1GB-for-tests-only.yaml'
+        _, chi = util.install_clickhouse_and_zookeeper(
+            chi_file=f'configs/test-cluster-for-zookeeper-{ch_node_count}.yaml',
+            chi_template_file='templates/tpl-clickhouse-latest.yaml',
+            chi_name='test-cluster-for-zk',
+            zk_manifest=zk_manifest,
+            clean_ns=False,
+            force_zk_install=True,
+            zk_install_first=first_install,
+            make_object_count=False,
         )
+        return chi
 
-    with Then('insert data x1 to table #1'):
-        clickhouse.query(
-            chi['metadata']['name'], 'INSERT INTO default.zk_repl SELECT number FROM numbers(1000)',
-            pod="chi-test-cluster-for-zk-default-0-0-0"
-        )
-
-    with Then('scale up zookeeper to 3 nodes'):
-        util.require_zookeeper('zookeeper-3-nodes-1GB-for-tests-only.yaml', force_install=True)
-        wait_zookeeper_ready(pod_count=3)
-        wait_clickhouse_readonly_replicas()
-
-    with When('create replicated table #2'):
-        clickhouse.create_table_on_cluster(
-            chi, 'all-sharded', 'default.zk_repl2',
-            '(id UInt64) ENGINE=ReplicatedMergeTree(\'/clickhouse/tables/default.zk_repl2/{shard}\',\'{replica}\') ORDER BY (id)'
-        )
-
-    with Then('insert data x2 to table #1 and #2'):
-        for table in ('zk_repl', 'zk_repl2'):
-            clickhouse.query(
-                chi['metadata']['name'], f'INSERT INTO default.{table} SELECT number*2 FROM numbers(1000)',
-                pod="chi-test-cluster-for-zk-default-0-1-0"
-            )
-
-    with Then('scale down zookeeper to 1 nodes'):
-        util.require_zookeeper('zookeeper-1-node-1GB-for-tests-only.yaml', force_install=True)
+    with When("Install CH 1 node ZK 1 node"):
+        chi = rescale_zk_and_clickhouse(ch_node_count=1, zk_node_count=1, first_install=True)
+        util.wait_clickhouse_cluster_ready(chi)
         wait_zookeeper_ready(pod_count=1)
-        wait_clickhouse_readonly_replicas()
+        check_zk_is_ready(chi, pod_count=1)
 
-    with When('create replicated table #3'):
-        clickhouse.create_table_on_cluster(
-            chi, 'all-sharded', 'default.zk_repl3',
-            '(id UInt64) ENGINE=ReplicatedMergeTree(\'/clickhouse/tables/default.zk_repl3/{shard}\',\'{replica}\') ORDER BY (id)'
-        )
+        util.wait_clickhouse_cluster_ready(chi)
+        wait_clickhouse_no_readonly_replicas(chi)
+        insert_replicated_data(chi, create_tables=['test_repl1',], insert_tables=['test_repl1'])
 
-    with Then('insert data x3 to table #1, #2, #3'):
-        for table in ('zk_repl', 'zk_repl2', 'zk_repl3'):
-            clickhouse.query(
-                chi['metadata']['name'], f'INSERT INTO default.{table} SELECT number*3 FROM numbers(1000)',
-                pod="chi-test-cluster-for-zk-default-0-0-0"
-            )
+    total_iterations = 10
+    for iteration in range(total_iterations):
+        with When(f"ITERATION {iteration}"):
+            with Then("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
+                rescale_zk_and_clickhouse(ch_node_count=2, zk_node_count=3)
+                wait_zookeeper_ready(pod_count=1)
+                check_zk_is_ready(chi, pod_count=1)
 
-    with Then('check data in table #1, #2, #3'):
-        for table, rows in {"zk_repl": "3000", "zk_repl2": "2000", "zk_repl3": "1000"}.items():
-            assert clickhouse.query(
+                util.wait_clickhouse_cluster_ready(chi)
+                insert_replicated_data(chi, create_tables=['test_repl2'], insert_tables=['test_repl1', 'test_repl2'])
+
+            with Then("CH 2 -> 1 wait complete + ZK 3 -> 1 nowait"):
+                rescale_zk_and_clickhouse(ch_node_count=1, zk_node_count=1)
+                wait_zookeeper_ready(pod_count=1)
+                check_zk_is_ready(chi, pod_count=1)
+
+                util.wait_clickhouse_cluster_ready(chi)
+                insert_replicated_data(chi, create_tables=['test_repl3'], insert_tables=['test_repl1', 'test_repl2', 'test_repl3'])
+
+    with When("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
+        chi = rescale_zk_and_clickhouse(ch_node_count=2, zk_node_count=3)
+        check_zk_is_ready(chi, pod_count=3)
+
+    with Then('check data in tables'):
+        for table, exptected_rows in {"test_repl1": str(1000 + 2000 * total_iterations) , "test_repl2": str(2000*total_iterations), "test_repl3": str(1000*total_iterations)}.items():
+            actual_rows = clickhouse.query(
                 chi['metadata']['name'], f'SELECT count() FROM default.{table}', pod="chi-test-cluster-for-zk-default-0-1-0"
-            ) == rows, "Invalid rows counter after inserts"
+            )
+            assert actual_rows == exptected_rows, f"Invalid rows counter after inserts {table} expected={exptected_rows} actual={actual_rows}"
 
     with Then('drop all created tables'):
-        clickhouse.drop_table_on_cluster(chi, 'all-sharded', 'default.zk_repl')
-        clickhouse.drop_table_on_cluster(chi, 'all-sharded', 'default.zk_repl2')
-        clickhouse.drop_table_on_cluster(chi, 'all-sharded', 'default.zk_repl3')
+        for i in range(3):
+            clickhouse.drop_table_on_cluster(chi, 'all-sharded', f'default.test_repl{i+1}')
 
 
 @TestModule
 @Name("e2e.test_zookeeper")
 def test(self):
-    """
-    Perform test for zookeeper scale-up / scale-down scenarios
-    """
-    _, chi = util.install_clickhouse_and_zookeeper(
-        chi_file='configs/test-cluster-for-zookeeper.yaml',
-        chi_template_file='templates/tpl-clickhouse-latest.yaml',
-        chi_name='test-cluster-for-zk',
-    )
-    util.wait_clickhouse_cluster_ready(chi)
+    kubectl.delete_ns(settings.test_namespace, ok_to_fail=True, timeout=600)
+    kubectl.create_ns(settings.test_namespace)
 
     all_tests = [
         test_zookeeper_rescale
     ]
 
     for t in all_tests:
-        if callable(t):
-            Scenario(test=t)(chi=chi)
-        else:
-            Scenario(test=t[0])(args=t[1], chi=chi)
+        Scenario(test=t)()

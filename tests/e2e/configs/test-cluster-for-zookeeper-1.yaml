@@ -7,7 +7,7 @@ metadata:
 
 spec:
   useTemplates:
-    - name: clickhouse-version
+    - name: clickhouse-latest-version
     - name: persistent-volume
   configuration:
     zookeeper:
@@ -18,4 +18,4 @@ spec:
       - name: default
         layout:
           shardsCount: 1
-          replicasCount: 2
+          replicasCount: 1

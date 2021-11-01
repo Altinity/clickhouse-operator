@@ -86,16 +86,16 @@ def create_and_check(config, check, ns=namespace, timeout=900):
 
     apply(util.get_full_path(config, False), ns=ns, timeout=timeout)
 
+    if "chi_status" in check:
+        wait_chi_status(chi_name, check["chi_status"], ns=ns)
+    else:
+        wait_chi_status(chi_name, "Completed", ns=ns)
+
     if "object_counts" in check:
         wait_objects(chi_name, check["object_counts"], ns=ns)
 
     if "pod_count" in check:
         wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi_name}", count=check["pod_count"], ns=ns)
-
-    if "chi_status" in check:
-        wait_chi_status(chi_name, check["chi_status"], ns=ns)
-    else:
-        wait_chi_status(chi_name, "Completed", ns=ns)
 
     if "pod_image" in check:
         check_pod_image(chi_name, check["pod_image"], ns=ns)
