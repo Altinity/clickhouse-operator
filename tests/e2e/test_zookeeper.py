@@ -13,9 +13,11 @@ def wait_zookeeper_ready(svc_name='zookeeper', pod_count=3, retries=10):
         kubectl.wait_pod_status(f'{svc_name}-{pod_num}', 'Running', settings.test_namespace)
     for i in range(retries):
         ready_pods = kubectl.launch(f"get pods | grep {svc_name} | grep Running | grep 1/1 | wc -l")
-        ready_endpoints = kubectl.launch(f"get endpoints {svc_name} -o json | jq '.subsets[].addresses[].ip' | wc -l")
-        if ready_pods == str(pod_count) and ready_endpoints == str(pod_count):
-            break
+        ready_endpoints = "0"
+        if ready_pods == str(pod_count):
+            ready_endpoints = kubectl.launch(f"get endpoints {svc_name} -o json | jq '.subsets[].addresses[].ip' | wc -l")
+            if ready_endpoints == str(pod_count):
+                break
         else:
             with Then(
                 f"Zookeeper Not ready yet ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}. "
@@ -68,12 +70,20 @@ def test_zookeeper_rescale(self):
                     pod="chi-test-cluster-for-zk-default-0-1-0"
                 )
 
-    def check_zk_is_ready(chi, pod_count):
+    def check_zk_root_znode(chi, pod_count):
         for pod_num in range(pod_count):
-            out = clickhouse.query(chi["metadata"]["name"], "SELECT count() FROM system.zookeeper WHERE path='/'")
-            assert "2" == out.strip(" \t\r\n"), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
-            out = kubectl.launch(f"exec zookeeper-{pod_num} -- /apache-zookeeper-3.6.1-bin/bin/zkCli.sh ls /", ns=settings.test_namespace)
+            out = ""
+            for i in range(10):
+                out = kubectl.launch(f"exec zookeeper-{pod_num} -- /apache-zookeeper-3.6.1-bin/bin/zkCli.sh ls /", ns=settings.test_namespace, ok_to_fail=True)
+                if "[clickhouse, zookeeper]" in out:
+                    break
+                else:
+                    with Then(f"Zookeeper ROOT NODE not ready, wait {i*3} sec"):
+                        time.sleep(i*3)
             assert "[clickhouse, zookeeper]" in out, "Unexpected `zkCli.sh ls /` output"
+
+        out = clickhouse.query(chi["metadata"]["name"], "SELECT count() FROM system.zookeeper WHERE path='/'")
+        assert "2" == out.strip(" \t\r\n"), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
 
     def rescale_zk_and_clickhouse(ch_node_count, zk_node_count, first_install=False):
         zk_manifest = 'zookeeper-1-node-1GB-for-tests-only.yaml' if zk_node_count == 1 else 'zookeeper-3-nodes-1GB-for-tests-only.yaml'
@@ -93,34 +103,34 @@ def test_zookeeper_rescale(self):
         chi = rescale_zk_and_clickhouse(ch_node_count=1, zk_node_count=1, first_install=True)
         util.wait_clickhouse_cluster_ready(chi)
         wait_zookeeper_ready(pod_count=1)
-        check_zk_is_ready(chi, pod_count=1)
+        check_zk_root_znode(chi, pod_count=1)
 
         util.wait_clickhouse_cluster_ready(chi)
         wait_clickhouse_no_readonly_replicas(chi)
-        insert_replicated_data(chi, create_tables=['test_repl1',], insert_tables=['test_repl1'])
+        insert_replicated_data(chi, create_tables=['test_repl1'], insert_tables=['test_repl1'])
 
     total_iterations = 10
     for iteration in range(total_iterations):
         with When(f"ITERATION {iteration}"):
             with Then("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
-                rescale_zk_and_clickhouse(ch_node_count=2, zk_node_count=3)
-                wait_zookeeper_ready(pod_count=1)
-                check_zk_is_ready(chi, pod_count=1)
+                chi = rescale_zk_and_clickhouse(ch_node_count=2, zk_node_count=3)
+                wait_zookeeper_ready(pod_count=3)
+                check_zk_root_znode(chi, pod_count=3)
 
                 util.wait_clickhouse_cluster_ready(chi)
                 insert_replicated_data(chi, create_tables=['test_repl2'], insert_tables=['test_repl1', 'test_repl2'])
 
             with Then("CH 2 -> 1 wait complete + ZK 3 -> 1 nowait"):
-                rescale_zk_and_clickhouse(ch_node_count=1, zk_node_count=1)
+                chi = rescale_zk_and_clickhouse(ch_node_count=1, zk_node_count=1)
                 wait_zookeeper_ready(pod_count=1)
-                check_zk_is_ready(chi, pod_count=1)
+                check_zk_root_znode(chi, pod_count=1)
 
                 util.wait_clickhouse_cluster_ready(chi)
                 insert_replicated_data(chi, create_tables=['test_repl3'], insert_tables=['test_repl1', 'test_repl2', 'test_repl3'])
 
     with When("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
         chi = rescale_zk_and_clickhouse(ch_node_count=2, zk_node_count=3)
-        check_zk_is_ready(chi, pod_count=3)
+        check_zk_root_znode(chi, pod_count=3)
 
     with Then('check data in tables'):
         for table, exptected_rows in {"test_repl1": str(1000 + 2000 * total_iterations) , "test_repl2": str(2000*total_iterations), "test_repl3": str(1000*total_iterations)}.items():

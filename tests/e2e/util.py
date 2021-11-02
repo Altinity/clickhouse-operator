@@ -98,13 +98,13 @@ def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name,
         chi_manifest_data = manifest.get_manifest_data(get_full_path(chi_file))
         layout = chi_manifest_data["spec"]["configuration"]["clusters"][0]["layout"]
         expected_nodes = 1 * layout["shardsCount"] * layout["replicasCount"]
-        check={
-                "apply_templates": [
-                    chi_template_file,
-                    "templates/tpl-persistent-volume-100Mi.yaml"
-                ],
-                "do_not_delete": 1
-            }
+        check = {
+            "apply_templates": [
+                chi_template_file,
+                "templates/tpl-persistent-volume-100Mi.yaml"
+            ],
+            "do_not_delete": 1
+        }
         if make_object_count:
             check["object_counts"] = {
                 "statefulset": expected_nodes,
