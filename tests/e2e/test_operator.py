@@ -1759,7 +1759,7 @@ def test(self):
         test_006,
         test_007,
         test_008,
-        (test_009, {"version_from": "0.15.0"}),
+        (test_009, {"version_from": "0.16.1"}),
         test_010,
         test_011,
         test_011_1,
