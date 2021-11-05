@@ -5,4 +5,7 @@ metadata:
 #  labels:
 #    l1: v1
 #    l2: v2
-
+spec:
+  configuration:
+    clusters:
+      - name: "simple"
