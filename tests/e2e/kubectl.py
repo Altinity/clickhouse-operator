@@ -74,6 +74,18 @@ def delete_all_chi(ns=namespace):
                 delete_chi(chi["metadata"]["name"], ns)
 
 
+def delete_all_zookeeper(ns=namespace):
+    for resource_type in ("sts", "pvc"):
+        try:
+            zks = get(resource_type, "", label="-l app=zookeeper", ns=ns, ok_to_fail=True)
+        except Exception as e:
+            zks = {}
+        if "items" in zks:
+            for item in zks["items"]:
+                name = item['metadata']['name']
+                launch(f"delete {resource_type} -n {ns} {name}")
+
+
 def create_and_check(config, check, ns=namespace, timeout=900):
     chi_name = manifest.get_chi_name(util.get_full_path(f'{config}'))
 

@@ -59,6 +59,8 @@ kind: StatefulSet
 metadata:
   # nodes would be named as zookeeper-0, zookeeper-1, zookeeper-2
   name: zookeeper
+  labels:
+    app: zookeeper
 spec:
   selector:
     matchLabels:
@@ -92,7 +94,7 @@ spec:
       containers:
         - name: kubernetes-zookeeper
           imagePullPolicy: IfNotPresent
-          image: "docker.io/zookeeper:3.6.1"
+          image: "docker.io/zookeeper:3.7.0"
           resources:
             requests:
               memory: "512M"
@@ -155,7 +157,7 @@ spec:
                 echo "log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout"
                 echo "log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n"
               } > /conf/log4j.properties &&
-              echo 'JVMFLAGS="-Xms128M -Xmx4G -XX:+UseG1GC -XX:+CMSParallelRemarkEnabled"' > /conf/java.env &&
+              echo 'JVMFLAGS="-Xms128M -Xmx4G -XX:+UseG1GC -XX:+CMSParallelRemarkEnabled -XX:ActiveProcessorCount=8"' > /conf/java.env &&
               if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
                   NAME=${BASH_REMATCH[1]}
                   ORD=${BASH_REMATCH[2]}
@@ -196,14 +198,16 @@ spec:
                       if [[ \"$STATE\" == \"leader\" ]]; then
                         SYNCED_FOLLOWERS=$(echo mntr | nc 127.0.0.1 2181 | grep zk_synced_followers | cut -d \" \" -f 2 | cut -d \".\" -f 1);
                         if [[ $SYNCED_FOLLOWERS == $(( $SERVERS - 1 )) ]]; then
-                          exit 0;
+                          ./bin/zkCli.sh ls /;
+                          exit $?;
                         else
                           exit 1;
                         fi;
                       elif [[ \"$STATE\" == \"follower\" ]]; then
                         PEER_STATE=$(echo mntr | nc 127.0.0.1 2181 | grep zk_peer_state);
                         if [[ \"$PEER_STATE\" == \"following - broadcast\" ]]; then
-                          exit 0;
+                          ./bin/zkCli.sh ls /;
+                          exit $?;
                         else
                           exit 1;
                         fi;

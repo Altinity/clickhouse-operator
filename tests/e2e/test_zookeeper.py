@@ -9,10 +9,8 @@ from testflows.core import *
 
 
 def wait_zookeeper_ready(svc_name='zookeeper', pod_count=3, retries=10):
-    for pod_num in range(pod_count):
-        kubectl.wait_pod_status(f'{svc_name}-{pod_num}', 'Running', settings.test_namespace)
     for i in range(retries):
-        ready_pods = kubectl.launch(f"get pods | grep {svc_name} | grep Running | grep 1/1 | wc -l")
+        ready_pods = kubectl.launch(f"get pods | grep {svc_name} | grep Running | grep '1/1' | wc -l")
         ready_endpoints = "0"
         if ready_pods == str(pod_count):
             ready_endpoints = kubectl.launch(f"get endpoints {svc_name} -o json | jq '.subsets[].addresses[].ip' | wc -l")
@@ -70,11 +68,11 @@ def test_zookeeper_rescale(self):
                     pod="chi-test-cluster-for-zk-default-0-1-0"
                 )
 
-    def check_zk_root_znode(chi, pod_count):
+    def check_zk_root_znode(chi, pod_count, zk_retry=3):
         for pod_num in range(pod_count):
             out = ""
-            for i in range(10):
-                out = kubectl.launch(f"exec zookeeper-{pod_num} -- /apache-zookeeper-3.6.1-bin/bin/zkCli.sh ls /", ns=settings.test_namespace, ok_to_fail=True)
+            for i in range(zk_retry):
+                out = kubectl.launch(f"exec zookeeper-{pod_num} -- bash -ce './bin/zkCli.sh ls /'", ns=settings.test_namespace, ok_to_fail=True)
                 if "[clickhouse, zookeeper]" in out:
                     break
                 else:
@@ -99,6 +97,10 @@ def test_zookeeper_rescale(self):
         )
         return chi
 
+    with When("Clean exists ClickHouse and Zookeeper"):
+        kubectl.delete_all_zookeeper(settings.test_namespace)
+        kubectl.delete_all_chi(settings.test_namespace)
+
     with When("Install CH 1 node ZK 1 node"):
         chi = rescale_zk_and_clickhouse(ch_node_count=1, zk_node_count=1, first_install=True)
         util.wait_clickhouse_cluster_ready(chi)
@@ -109,7 +111,7 @@ def test_zookeeper_rescale(self):
         wait_clickhouse_no_readonly_replicas(chi)
         insert_replicated_data(chi, create_tables=['test_repl1'], insert_tables=['test_repl1'])
 
-    total_iterations = 10
+    total_iterations = 5
     for iteration in range(total_iterations):
         with When(f"ITERATION {iteration}"):
             with Then("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
@@ -147,9 +149,6 @@ def test_zookeeper_rescale(self):
 @TestModule
 @Name("e2e.test_zookeeper")
 def test(self):
-    kubectl.delete_ns(settings.test_namespace, ok_to_fail=True, timeout=600)
-    kubectl.create_ns(settings.test_namespace)
-
     all_tests = [
         test_zookeeper_rescale
     ]
