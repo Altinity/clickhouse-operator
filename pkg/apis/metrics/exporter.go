@@ -197,14 +197,18 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 	}
 
 	log.V(2).Infof("Querying table sizes for %s\n", hostname)
-	if tableSizes, err := fetcher.getClickHouseQueryTableSizes(); err == nil {
-		log.V(2).Infof("Extracted %d table sizes for %s\n", len(tableSizes), hostname)
-		writer.WriteTableSizes(tableSizes)
+	if systemPartsData, err := fetcher.getClickHouseSystemParts(); err == nil {
+		log.V(2).Infof("Extracted %d table sizes for %s\n", len(systemPartsData), hostname)
+		writer.WriteTableSizes(systemPartsData)
 		writer.WriteOKFetch("table sizes")
+		writer.WriteSystemParts(systemPartsData)
+		writer.WriteOKFetch("system parts")
+
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.V(2).Infof("Error querying table sizes for %s: %s\n", hostname, err)
+		log.V(2).Infof("Error querying system.parts for %s: %s\n", hostname, err)
 		writer.WriteErrorFetch("table sizes")
+		writer.WriteErrorFetch("system parts")
 	}
 
 	log.V(2).Infof("Querying system replicas for %s\n", hostname)

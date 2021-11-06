@@ -1,0 +1,75 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-026-mixed-replicas"
+spec:
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    clusters:
+    - name: default
+      layout:
+        shardsCount: 1
+        replicas:
+          - templates:
+              podTemplate: single-volume
+          - templates:
+              podTemplate: multi-volume
+            settings:
+              storage_configuration/disks/disk2/path: /var/lib/clickhouse2/
+              storage_configuration/disks/default/keep_free_space_bytes: 100000000000
+              storage_configuration/policies/default/volumes/default/disk: default
+              storage_configuration/policies/default/volumes/disk2/disk: disk2
+              storage_configuration/policies/default/move_factor: 1.0
+  defaults:
+    templates:
+      podTemplate: multi-volume
+  templates:
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Mi
+      - name: disk1
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 50Mi
+      - name: disk2
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 50Mi
+    podTemplates:
+      - name: single-volume
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:21.8
+      - name: multi-volume
+        spec:
+          securityContext:
+            runAsUser: 101
+            runAsGroup: 101
+            fsGroup: 101
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:21.8
+              volumeMounts:
+                - name: disk1
+                  mountPath: /var/lib/clickhouse
+                - name: disk2
+                  mountPath: /var/lib/clickhouse2
+              command:
+                - /bin/bash
+                - '-c'
+                - /usr/bin/clickhouse-server --config-file=/etc/clickhouse-server/config.xml

@@ -1,4 +1,6 @@
 vendor/
 docs/
 .vagrant/
+.idea/
 *.log
+./tests/image/cache/

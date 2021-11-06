@@ -30,7 +30,7 @@ MAINTAINER "Altinity <support@altinity.com>"
 LABEL name="ClickHouse operator" \
       maintainer="support@altinity.com" \
       vendor="Altinity" \
-      version="0.16.1" \
+      version="0.17.0" \
       release="1" \
       summary="ClickHouse operator" \
       description="ClickHouse operator operates ClickHouse clusters in kubernetes"

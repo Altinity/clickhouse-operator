@@ -48,7 +48,7 @@ metadata:
 spec:
   ## Registry location and Tag to download MinIO Server image
   image: minio/minio:${MINIO_VERSION}
-  imagePullPolicy: Always
+  imagePullPolicy: IfNotPresent
 
   ## Secret with credentials to be used by MinIO Tenant.
   ## Refers to the secret object created above.
@@ -214,6 +214,7 @@ spec:
   ## Refer https://github.com/minio/console
   console:
     image: minio/console:${MINIO_CONSOLE_VERSION}
+    imagePullPolicy: IfNotPresent
     replicas: 1
     consoleSecret:
       name: minio-console-secret

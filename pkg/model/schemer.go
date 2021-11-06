@@ -61,17 +61,16 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 	log.V(1).M(host).F().Info("Extracting distributed table definitions from hosts %v", hosts)
 
 	sqlDBs := heredoc.Docf(`
-		SELECT 
-			DISTINCT database AS name, 
-			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_db_query
-		FROM 
-		(
-			SELECT DISTINCT arrayJoin([database, extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+')]) database
-			FROM clusterAllReplicas('%s', system.tables) tables
-			WHERE engine = 'Distributed'
-			SETTINGS skip_unavailable_shards = 1
-		)
+	SELECT DISTINCT name, 'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine AS create_db_query
+	  FROM (SELECT * FROM clusterAllReplicas('%s', system.databases) databases SETTINGS skip_unavailable_shards = 1)
+     WHERE name IN (
+		SELECT DISTINCT arrayJoin([database, extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+')]) database
+	      FROM clusterAllReplicas('%s', system.tables) tables
+	     WHERE engine = 'Distributed'
+      SETTINGS skip_unavailable_shards = 1
+     ) 
 		`,
+		host.Address.ClusterName,
 		host.Address.ClusterName,
 	)
 	sqlTables := heredoc.Docf(`
@@ -158,11 +157,11 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 
 	sqlDBs := heredoc.Docf(`
 		SELECT 
-			DISTINCT database AS name, 
-			concat('CREATE DATABASE IF NOT EXISTS "', name, '"') AS create_db_query
-		FROM clusterAllReplicas('%s', system.tables) tables
-		WHERE database != 'system'
-		SETTINGS skip_unavailable_shards = 1
+			DISTINCT name, 
+			'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine  AS create_db_query
+		  FROM clusterAllReplicas('%s', system.databases) databases
+		 WHERE name != 'system'
+	  SETTINGS skip_unavailable_shards = 1
 		`,
 		host.Address.ClusterName,
 	)
