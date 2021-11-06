@@ -5,8 +5,4 @@ metadata:
 spec:
   configuration:
     clusters:
-      - name: "shard1-repl1"
-        layout:
-          shardsCount: 1
-          replicasCount: 1
-
+      - name: "simple"
