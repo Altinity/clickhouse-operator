@@ -47,7 +47,8 @@ def restart_operator(ns=settings.operator_namespace, timeout=600):
 
 def require_zookeeper(zk_manifest='zookeeper-1-node-1GB-for-tests-only.yaml', force_install=False):
     if force_install or kubectl.get_count("service", name="zookeeper") == 0:
-        zk = manifest.get_multidoc_manifest_data(get_full_path(f"../../deploy/zookeeper/quick-start-persistent-volume/{zk_manifest}", lookup_in_host=True))
+        zk_manifest = f"../../deploy/zookeeper/quick-start-persistent-volume/{zk_manifest}"
+        zk = manifest.get_multidoc_manifest_data(get_full_path(zk_manifest, lookup_in_host=True))
         zk_nodes = 1
         i = 0
         for doc in zk:
@@ -56,8 +57,7 @@ def require_zookeeper(zk_manifest='zookeeper-1-node-1GB-for-tests-only.yaml', fo
                 zk_nodes = doc["spec"]["replicas"]
         assert i == 4, "invalid zookeeper manifest, expected 4 documents in yaml file"
         with Given(f"Install Zookeeper {zk_nodes} nodes"):
-            config = get_full_path(f"../../deploy/zookeeper/quick-start-persistent-volume/{zk_manifest}", lookup_in_host=False)
-            kubectl.apply(config)
+            kubectl.apply(get_full_path(zk_manifest, lookup_in_host=False))
             for i in range(zk_nodes):
                 kubectl.wait_object("pod", f"zookeeper-{i}")
             for i in range(zk_nodes):
