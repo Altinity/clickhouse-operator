@@ -63,7 +63,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 			template,
 			c.chi.Namespace,
 			serviceName,
-			c.labels.getServiceCHI(),
+			c.labels.getServiceCHI(c.chi),
 			c.annotations.getServiceCHI(),
 			c.labels.getSelectorCHIScopeReady(),
 			ownerReferences,
@@ -76,7 +76,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            serviceName,
 			Namespace:       c.chi.Namespace,
-			Labels:          c.labels.getServiceCHI(),
+			Labels:          c.labels.getServiceCHI(c.chi),
 			Annotations:     c.annotations.getServiceCHI(),
 			OwnerReferences: ownerReferences,
 		},
