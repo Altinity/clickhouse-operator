@@ -419,8 +419,8 @@ func getNamePartReplicaScopeIndex(host *chop.ChiHost) string {
 
 var namesNamer = newNamer(namerContextNames)
 
-// newNameMacroReplacerChi
-func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
+// newLineMacroReplacerChi
+func newLineMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
 	n := namesNamer
 	return strings.NewReplacer(
 		macrosNamespace, n.namePartNamespace(chi.Namespace),
@@ -431,11 +431,11 @@ func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer
 
 // newMapMacroReplacerChi
 func newMapMacroReplacerChi(chi *chop.ClickHouseInstallation) *util.MapReplacer {
-	return util.NewMapReplacer(newNameMacroReplacerChi(chi))
+	return util.NewMapReplacer(newLineMacroReplacerChi(chi))
 }
 
-// newNameMacroReplacerCluster
-func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
+// newLineMacroReplacerCluster
+func newLineMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 	n := namesNamer
 	return strings.NewReplacer(
 		macrosNamespace, n.namePartNamespace(cluster.Address.Namespace),
@@ -449,11 +449,11 @@ func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 
 // newMapMacroReplacerCluster
 func newMapMacroReplacerCluster(cluster *chop.ChiCluster) *util.MapReplacer {
-	return util.NewMapReplacer(newNameMacroReplacerCluster(cluster))
+	return util.NewMapReplacer(newLineMacroReplacerCluster(cluster))
 }
 
-// newNameMacroReplacerShard
-func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
+// newLineMacroReplacerShard
+func newLineMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 	n := namesNamer
 	return strings.NewReplacer(
 		macrosNamespace, n.namePartNamespace(shard.Address.Namespace),
@@ -470,7 +470,7 @@ func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 
 // newMapMacroReplacerShard
 func newMapMacroReplacerShard(shard *chop.ChiShard) *util.MapReplacer {
-	return util.NewMapReplacer(newNameMacroReplacerShard(shard))
+	return util.NewMapReplacer(newLineMacroReplacerShard(shard))
 }
 
 // clusterScopeIndexOfPreviousCycleTail gets cluster-scope index of previous cycle tail
@@ -495,8 +495,8 @@ func clusterScopeIndexOfPreviousCycleTail(host *chop.ChiHost) int {
 	return host.Address.ClusterScopeIndex
 }
 
-// newNameMacroReplacerHost
-func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
+// newLineMacroReplacerHost
+func newLineMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
 	n := namesNamer
 	return strings.NewReplacer(
 		macrosNamespace, n.namePartNamespace(host.Address.Namespace),
@@ -527,22 +527,22 @@ func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
 
 // newMapMacroReplacerHost
 func newMapMacroReplacerHost(host *chop.ChiHost) *util.MapReplacer {
-	return util.NewMapReplacer(newNameMacroReplacerHost(host))
+	return util.NewMapReplacer(newLineMacroReplacerHost(host))
 }
 
 // CreateConfigMapPersonalName returns a name for a ConfigMap for replica's personal config
 func CreateConfigMapPersonalName(host *chop.ChiHost) string {
-	return newNameMacroReplacerHost(host).Replace(configMapDeploymentNamePattern)
+	return newLineMacroReplacerHost(host).Replace(configMapDeploymentNamePattern)
 }
 
 // CreateConfigMapCommonName returns a name for a ConfigMap for replica's common config
 func CreateConfigMapCommonName(chi *chop.ClickHouseInstallation) string {
-	return newNameMacroReplacerChi(chi).Replace(configMapCommonNamePattern)
+	return newLineMacroReplacerChi(chi).Replace(configMapCommonNamePattern)
 }
 
 // CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common users config
 func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
-	return newNameMacroReplacerChi(chi).Replace(configMapCommonUsersNamePattern)
+	return newLineMacroReplacerChi(chi).Replace(configMapCommonUsersNamePattern)
 }
 
 // CreateCHIServiceName creates a name of a root ClickHouseInstallation Service resource
@@ -563,7 +563,7 @@ func CreateCHIServiceName(chi *chop.ClickHouseInstallation) string {
 	}
 
 	// Create Service name based on name pattern available
-	return newNameMacroReplacerChi(chi).Replace(pattern)
+	return newLineMacroReplacerChi(chi).Replace(pattern)
 }
 
 // CreateCHIServiceFQDN creates a FQD name of a root ClickHouseInstallation Service resource
@@ -605,7 +605,7 @@ func CreateClusterServiceName(cluster *chop.ChiCluster) string {
 	}
 
 	// Create Service name based on name pattern available
-	return newNameMacroReplacerCluster(cluster).Replace(pattern)
+	return newLineMacroReplacerCluster(cluster).Replace(pattern)
 }
 
 // CreateShardServiceName returns a name of a shard's Service
@@ -626,7 +626,7 @@ func CreateShardServiceName(shard *chop.ChiShard) string {
 	}
 
 	// Create Service name based on name pattern available
-	return newNameMacroReplacerShard(shard).Replace(pattern)
+	return newLineMacroReplacerShard(shard).Replace(pattern)
 }
 
 // CreateShardName return a name of a shard
@@ -724,7 +724,7 @@ func CreateStatefulSetName(host *chop.ChiHost) string {
 	}
 
 	// Create StatefulSet name based on name pattern available
-	return newNameMacroReplacerHost(host).Replace(pattern)
+	return newLineMacroReplacerHost(host).Replace(pattern)
 }
 
 // CreateStatefulSetServiceName returns a name of a StatefulSet-related Service for ClickHouse instance
@@ -745,7 +745,7 @@ func CreateStatefulSetServiceName(host *chop.ChiHost) string {
 	}
 
 	// Create Service name based on name pattern available
-	return newNameMacroReplacerHost(host).Replace(pattern)
+	return newLineMacroReplacerHost(host).Replace(pattern)
 }
 
 // CreatePodHostname returns a name of a Pod of a ClickHouse instance
@@ -846,7 +846,7 @@ func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string 
 // template is defined in operator config:
 // CHConfigNetworksHostRegexpTemplate: chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
 func CreatePodRegexp(chi *chop.ClickHouseInstallation, template string) string {
-	return newNameMacroReplacerChi(chi).Replace(template)
+	return newLineMacroReplacerChi(chi).Replace(template)
 }
 
 // CreatePodName create Pod name based on specified StatefulSet or Host
