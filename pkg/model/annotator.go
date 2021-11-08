@@ -17,18 +17,18 @@ package model
 import (
 	v1 "k8s.io/api/core/v1"
 
-	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Annotator is an entity which can annotate CHI artifacts
 type Annotator struct {
-	chi *chi.ClickHouseInstallation
+	chi *chiv1.ClickHouseInstallation
 }
 
 // NewAnnotator creates new annotator with context
-func NewAnnotator(chi *chi.ClickHouseInstallation) *Annotator {
+func NewAnnotator(chi *chiv1.ClickHouseInstallation) *Annotator {
 	return &Annotator{
 		chi: chi,
 	}
@@ -51,7 +51,7 @@ func (a *Annotator) getConfigMapCHICommonUsers() map[string]string {
 }
 
 // getConfigMapHost
-func (a *Annotator) getConfigMapHost(host *chi.ChiHost) map[string]string {
+func (a *Annotator) getConfigMapHost(host *chiv1.ChiHost) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getHostScope(host),
 		nil,
@@ -59,7 +59,7 @@ func (a *Annotator) getConfigMapHost(host *chi.ChiHost) map[string]string {
 }
 
 // getServiceCHI
-func (a *Annotator) getServiceCHI() map[string]string {
+func (a *Annotator) getServiceCHI(chi *chiv1.ClickHouseInstallation) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getCHIScope(),
 		nil,
@@ -67,7 +67,7 @@ func (a *Annotator) getServiceCHI() map[string]string {
 }
 
 // getServiceCluster
-func (a *Annotator) getServiceCluster(cluster *chi.ChiCluster) map[string]string {
+func (a *Annotator) getServiceCluster(cluster *chiv1.ChiCluster) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getClusterScope(cluster),
 		nil,
@@ -75,7 +75,7 @@ func (a *Annotator) getServiceCluster(cluster *chi.ChiCluster) map[string]string
 }
 
 // getServiceShard
-func (a *Annotator) getServiceShard(shard *chi.ChiShard) map[string]string {
+func (a *Annotator) getServiceShard(shard *chiv1.ChiShard) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getShardScope(shard),
 		nil,
@@ -83,7 +83,7 @@ func (a *Annotator) getServiceShard(shard *chi.ChiShard) map[string]string {
 }
 
 // getServiceHost
-func (a *Annotator) getServiceHost(host *chi.ChiHost) map[string]string {
+func (a *Annotator) getServiceHost(host *chiv1.ChiHost) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getHostScope(host),
 		nil,
@@ -97,19 +97,19 @@ func (a *Annotator) getCHIScope() map[string]string {
 }
 
 // getClusterScope gets annotations for Cluster-scoped object
-func (a *Annotator) getClusterScope(cluster *chi.ChiCluster) map[string]string {
+func (a *Annotator) getClusterScope(cluster *chiv1.ChiCluster) map[string]string {
 	// Combine generated annotations and CHI-provided annotations
 	return a.appendCHIProvidedTo(nil)
 }
 
 // getShardScope gets annotations for Shard-scoped object
-func (a *Annotator) getShardScope(shard *chi.ChiShard) map[string]string {
+func (a *Annotator) getShardScope(shard *chiv1.ChiShard) map[string]string {
 	// Combine generated annotations and CHI-provided annotations
 	return a.appendCHIProvidedTo(nil)
 }
 
 // getHostScope gets annotations for Host-scoped object
-func (a *Annotator) getHostScope(host *chi.ChiHost) map[string]string {
+func (a *Annotator) getHostScope(host *chiv1.ChiHost) map[string]string {
 	return a.appendCHIProvidedTo(host.GetAnnotations())
 }
 
@@ -120,15 +120,15 @@ func (a *Annotator) appendCHIProvidedTo(dst map[string]string) map[string]string
 }
 
 // getPV
-func (a *Annotator) getPV(pv *v1.PersistentVolume, host *chi.ChiHost) map[string]string {
+func (a *Annotator) getPV(pv *v1.PersistentVolume, host *chiv1.ChiHost) map[string]string {
 	return util.MergeStringMapsOverwrite(pv.Annotations, a.getHostScope(host))
 }
 
 // getPVC
 func (a *Annotator) getPVC(
 	pvc *v1.PersistentVolumeClaim,
-	host *chi.ChiHost,
-	template *chi.ChiVolumeClaimTemplate,
+	host *chiv1.ChiHost,
+	template *chiv1.ChiVolumeClaimTemplate,
 ) map[string]string {
 	annotations := util.MergeStringMapsOverwrite(pvc.Annotations, template.ObjectMeta.Annotations)
 	return util.MergeStringMapsOverwrite(annotations, a.getHostScope(host))
