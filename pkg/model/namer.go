@@ -429,6 +429,11 @@ func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer
 	)
 }
 
+// newMapMacroReplacerChi
+func newMapMacroReplacerChi(chi *chop.ClickHouseInstallation) *util.MapReplacer {
+	return util.NewMapReplacer(newNameMacroReplacerChi(chi))
+}
+
 // newNameMacroReplacerCluster
 func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 	n := namesNamer
@@ -440,6 +445,11 @@ func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
 		macrosClusterID, n.namePartClusterNameID(cluster.Address.ClusterName),
 		macrosClusterIndex, strconv.Itoa(cluster.Address.ClusterIndex),
 	)
+}
+
+// newMapMacroReplacerCluster
+func newMapMacroReplacerCluster(cluster *chop.ChiCluster) *util.MapReplacer {
+	return util.NewMapReplacer(newNameMacroReplacerCluster(cluster))
 }
 
 // newNameMacroReplacerShard
@@ -456,6 +466,11 @@ func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
 		macrosShardID, n.namePartShardNameID(shard.Address.ShardName),
 		macrosShardIndex, strconv.Itoa(shard.Address.ShardIndex),
 	)
+}
+
+// newMapMacroReplacerShard
+func newMapMacroReplacerShard(shard *chop.ChiShard) *util.MapReplacer {
+	return util.NewMapReplacer(newNameMacroReplacerShard(shard))
 }
 
 // clusterScopeIndexOfPreviousCycleTail gets cluster-scope index of previous cycle tail
@@ -508,6 +523,11 @@ func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
 		macrosClusterScopeCycleOffset, strconv.Itoa(host.Address.ClusterScopeCycleOffset), // TODO use appropriate namePart function
 		macrosClusterScopeCycleHeadPointsToPreviousCycleTail, strconv.Itoa(clusterScopeIndexOfPreviousCycleTail(host)),
 	)
+}
+
+// newMapMacroReplacerHost
+func newMapMacroReplacerHost(host *chop.ChiHost) *util.MapReplacer {
+	return util.NewMapReplacer(newNameMacroReplacerHost(host))
 }
 
 // CreateConfigMapPersonalName returns a name for a ConfigMap for replica's personal config

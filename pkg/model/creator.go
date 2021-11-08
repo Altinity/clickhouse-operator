@@ -64,6 +64,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 			c.chi.Namespace,
 			serviceName,
 			c.labels.getServiceCHI(),
+			c.annotations.getServiceCHI(),
 			c.labels.getSelectorCHIScopeReady(),
 			ownerReferences,
 		)
@@ -117,6 +118,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 			cluster.Address.Namespace,
 			serviceName,
 			c.labels.getServiceCluster(cluster),
+			c.annotations.getServiceCluster(cluster),
 			getSelectorClusterScopeReady(cluster),
 			ownerReferences,
 		)
@@ -138,6 +140,7 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 			shard.Address.Namespace,
 			serviceName,
 			c.labels.getServiceShard(shard),
+			c.annotations.getServiceShard(shard),
 			getSelectorShardScopeReady(shard),
 			ownerReferences,
 		)
@@ -160,6 +163,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			host.Address.Namespace,
 			serviceName,
 			c.labels.getServiceHost(host),
+			c.annotations.getServiceHost(host),
 			GetSelectorHostScope(host),
 			ownerReferences,
 		)
@@ -225,6 +229,7 @@ func (c *Creator) createServiceFromTemplate(
 	namespace string,
 	name string,
 	labels map[string]string,
+	annotations map[string]string,
 	selector map[string]string,
 	ownerReferences []metav1.OwnerReference,
 ) *corev1.Service {
@@ -245,8 +250,9 @@ func (c *Creator) createServiceFromTemplate(
 	service.Namespace = namespace
 	service.OwnerReferences = ownerReferences
 
-	// Append provided Labels to already specified Labels in template
+	// Combine labels and annotations
 	service.Labels = util.MergeStringMapsOverwrite(service.Labels, labels)
+	service.Annotations = util.MergeStringMapsOverwrite(service.Annotations, annotations)
 
 	// Append provided Selector to already specified Selector in template
 	service.Spec.Selector = util.MergeStringMapsOverwrite(service.Spec.Selector, selector)
@@ -381,7 +387,7 @@ func (c *Creator) GetStatefulSetVersion(statefulSet *apps.StatefulSet) (string, 
 // PreparePersistentVolume prepares PV labels
 func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chiv1.ChiHost) *corev1.PersistentVolume {
 	pv.Labels = c.labels.getPV(pv, host)
-	pv.Annotations = util.MergeStringMapsOverwrite(pv.Annotations, c.annotations.getHostScope(host))
+	pv.Annotations = c.annotations.getPV(pv, host)
 	// And after the object is ready we can put version label
 	MakeObjectVersionLabel(&pv.ObjectMeta, pv)
 	return pv
