@@ -3153,15 +3153,33 @@ data:
     
     ################################################
     ##
+    ## Annotations management parameters
+    ##
+    ################################################
+    
+    # Applied when:
+    #  1. Propagating annotations from the CHI's `metadata.annotations` to child objects' `metadata.annotations`,
+    #  2. Propagating annotations from the CHI Template's `metadata.annotations` to CHI's `metadata.annotations`,
+    # Include annotations from the following list:
+    # Applied only when not empty. Empty list means "include all, no selection"
+    includeIntoPropagationAnnotations: []
+    # Exclude annotations from the following list:
+    excludeFromPropagationAnnotations: []
+    
+    ################################################
+    ##
     ## Labels management parameters
     ##
     ################################################
     
-    # When propagating labels from the chi's `metadata.labels` section to child objects' `metadata.labels`,
-    # exclude labels from the following list:
-    #excludeFromPropagationLabels:
-    #  - "labelA"
-    #  - "labelB"
+    # Applied when:
+    #  1. Propagating labels from the CHI's `metadata.labels` to child objects' `metadata.labels`,
+    #  2. Propagating labels from the CHI Template's `metadata.labels` to CHI's `metadata.labels`,
+    # Include labels from the following list:
+    # Applied only when not empty. Empty list means "include all, no selection"
+    includeIntoPropagationLabels: []
+    # Exclude labels from the following list:
+    excludeFromPropagationLabels: []
     
     # Whether to append *Scope* labels to StatefulSet and Pod.
     # Full list of available *scope* labels check in labeler.go
@@ -3308,7 +3326,7 @@ data:
                 "containers" : [
                   {
                     "name": "clickhouse",
-                    "image": "yandex/clickhouse-server:19.3.7",
+                    "image": "yandex/clickhouse-server:21.3",
                     "ports": [
                       {
                         "name": "http",

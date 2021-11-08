@@ -104,6 +104,8 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 			log.V(1).M(chi).A().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			(&n.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
+			n.chi.Labels = util.MergeStringMapsOverwrite(n.chi.Labels, util.CopyMapFilter(template.Labels, chop.Config().IncludeIntoPropagationLabels, chop.Config().ExcludeFromPropagationLabels))
+			n.chi.Annotations = util.MergeStringMapsOverwrite(n.chi.Annotations, util.CopyMapFilter(template.Annotations, chop.Config().IncludeIntoPropagationAnnotations, chop.Config().ExcludeFromPropagationAnnotations))
 			log.V(2).M(chi).F().Info("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
 		}
 	}

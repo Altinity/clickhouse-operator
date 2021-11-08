@@ -1204,6 +1204,21 @@ func (in *OperatorConfig) DeepCopyInto(out *OperatorConfig) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.IncludeIntoPropagationAnnotations != nil {
+		in, out := &in.IncludeIntoPropagationAnnotations, &out.IncludeIntoPropagationAnnotations
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.ExcludeFromPropagationAnnotations != nil {
+		in, out := &in.ExcludeFromPropagationAnnotations, &out.ExcludeFromPropagationAnnotations
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.IncludeIntoPropagationLabels != nil {
+		in, out := &in.IncludeIntoPropagationLabels, &out.IncludeIntoPropagationLabels
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.ExcludeFromPropagationLabels != nil {
 		in, out := &in.ExcludeFromPropagationLabels, &out.ExcludeFromPropagationLabels
 		*out = make([]string, len(*in))
