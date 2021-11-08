@@ -64,7 +64,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 			c.chi.Namespace,
 			serviceName,
 			c.labels.getServiceCHI(c.chi),
-			c.annotations.getServiceCHI(),
+			c.annotations.getServiceCHI(c.chi),
 			c.labels.getSelectorCHIScopeReady(),
 			ownerReferences,
 		)
@@ -77,7 +77,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 			Name:            serviceName,
 			Namespace:       c.chi.Namespace,
 			Labels:          c.labels.getServiceCHI(c.chi),
-			Annotations:     c.annotations.getServiceCHI(),
+			Annotations:     c.annotations.getServiceCHI(c.chi),
 			OwnerReferences: ownerReferences,
 		},
 		Spec: corev1.ServiceSpec{
