@@ -41,60 +41,6 @@ const (
 )
 
 const (
-	// macrosNamespace is a sanitized namespace name where ClickHouseInstallation runs
-	macrosNamespace = "{namespace}"
-
-	// macrosChiName is a sanitized ClickHouseInstallation name
-	macrosChiName = "{chi}"
-	// macrosChiID is a sanitized ID made of original ClickHouseInstallation name
-	macrosChiID = "{chiID}"
-
-	// macrosClusterName is a sanitized cluster name
-	macrosClusterName = "{cluster}"
-	// macrosClusterID is a sanitized ID made of original cluster name
-	macrosClusterID = "{clusterID}"
-	// macrosClusterIndex is an index of the cluster in the CHI - integer number, converted into string
-	macrosClusterIndex = "{clusterIndex}"
-
-	// macrosShardName is a sanitized shard name
-	macrosShardName = "{shard}"
-	// macrosShardID is a sanitized ID made of original shard name
-	macrosShardID = "{shardID}"
-	// macrosShardIndex is an index of the shard in the cluster - integer number, converted into string
-	macrosShardIndex = "{shardIndex}"
-
-	// macrosReplicaName is a sanitized replica name
-	macrosReplicaName = "{replica}"
-	// macrosReplicaID is a sanitized ID made of original replica name
-	macrosReplicaID = "{replicaID}"
-	// macrosReplicaIndex is an index of the replica in the cluster - integer number, converted into string
-	macrosReplicaIndex = "{replicaIndex}"
-
-	// macrosHostName is a sanitized host name
-	macrosHostName = "{host}"
-	// macrosHostID is a sanitized ID made of original host name
-	macrosHostID = "{hostID}"
-	// macrosChiScopeIndex is an index of the host on the CHI-scope
-	macrosChiScopeIndex = "{chiScopeIndex}"
-	// macrosChiScopeCycleIndex is an index of the host in the CHI-scope cycle - integer number, converted into string
-	macrosChiScopeCycleIndex = "{chiScopeCycleIndex}"
-	// macrosChiScopeCycleOffset is an offset of the host in the CHI-scope cycle - integer number, converted into string
-	macrosChiScopeCycleOffset = "{chiScopeCycleOffset}"
-	// macrosClusterScopeIndex is an index of the host on the cluster-scope
-	macrosClusterScopeIndex = "{clusterScopeIndex}"
-	// macrosClusterScopeCycleIndex is an index of the host in the Cluster-scope cycle - integer number, converted into string
-	macrosClusterScopeCycleIndex = "{clusterScopeCycleIndex}"
-	// macrosClusterScopeCycleOffset is an offset of the host in the Cluster-scope cycle - integer number, converted into string
-	macrosClusterScopeCycleOffset = "{clusterScopeCycleOffset}"
-	// macrosShardScopeIndex is an index of the host on the shard-scope
-	macrosShardScopeIndex = "{shardScopeIndex}"
-	// macrosReplicaScopeIndex is an index of the host on the replica-scope
-	macrosReplicaScopeIndex = "{replicaScopeIndex}"
-	// macrosClusterScopeCycleHeadPointsToPreviousCycleTail is {clusterScopeIndex} of previous Cycle Tail
-	macrosClusterScopeCycleHeadPointsToPreviousCycleTail = "{clusterScopeCycleHeadPointsToPreviousCycleTail}"
-)
-
-const (
 	// chiServiceNamePattern is a template of CHI Service name. "clickhouse-{chi}"
 	chiServiceNamePattern = "clickhouse-" + macrosChiName
 
@@ -417,132 +363,19 @@ func getNamePartReplicaScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ReplicaScopeIndex)
 }
 
-var namesNamer = newNamer(namerContextNames)
-
-// newLineMacroReplacerChi
-func newLineMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
-	n := namesNamer
-	return strings.NewReplacer(
-		macrosNamespace, n.namePartNamespace(chi.Namespace),
-		macrosChiName, n.namePartChiName(chi.Name),
-		macrosChiID, n.namePartChiNameID(chi.Name),
-	)
-}
-
-// newMapMacroReplacerChi
-func newMapMacroReplacerChi(chi *chop.ClickHouseInstallation) *util.MapReplacer {
-	return util.NewMapReplacer(newLineMacroReplacerChi(chi))
-}
-
-// newLineMacroReplacerCluster
-func newLineMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
-	n := namesNamer
-	return strings.NewReplacer(
-		macrosNamespace, n.namePartNamespace(cluster.Address.Namespace),
-		macrosChiName, n.namePartChiName(cluster.Address.CHIName),
-		macrosChiID, n.namePartChiNameID(cluster.Address.CHIName),
-		macrosClusterName, n.namePartClusterName(cluster.Address.ClusterName),
-		macrosClusterID, n.namePartClusterNameID(cluster.Address.ClusterName),
-		macrosClusterIndex, strconv.Itoa(cluster.Address.ClusterIndex),
-	)
-}
-
-// newMapMacroReplacerCluster
-func newMapMacroReplacerCluster(cluster *chop.ChiCluster) *util.MapReplacer {
-	return util.NewMapReplacer(newLineMacroReplacerCluster(cluster))
-}
-
-// newLineMacroReplacerShard
-func newLineMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
-	n := namesNamer
-	return strings.NewReplacer(
-		macrosNamespace, n.namePartNamespace(shard.Address.Namespace),
-		macrosChiName, n.namePartChiName(shard.Address.CHIName),
-		macrosChiID, n.namePartChiNameID(shard.Address.CHIName),
-		macrosClusterName, n.namePartClusterName(shard.Address.ClusterName),
-		macrosClusterID, n.namePartClusterNameID(shard.Address.ClusterName),
-		macrosClusterIndex, strconv.Itoa(shard.Address.ClusterIndex),
-		macrosShardName, n.namePartShardName(shard.Address.ShardName),
-		macrosShardID, n.namePartShardNameID(shard.Address.ShardName),
-		macrosShardIndex, strconv.Itoa(shard.Address.ShardIndex),
-	)
-}
-
-// newMapMacroReplacerShard
-func newMapMacroReplacerShard(shard *chop.ChiShard) *util.MapReplacer {
-	return util.NewMapReplacer(newLineMacroReplacerShard(shard))
-}
-
-// clusterScopeIndexOfPreviousCycleTail gets cluster-scope index of previous cycle tail
-func clusterScopeIndexOfPreviousCycleTail(host *chop.ChiHost) int {
-	if host.Address.ClusterScopeCycleOffset == 0 {
-		// This is the cycle head - the first host of the cycle
-		// We need to point to previous host in this cluster - which would be previous cycle tail
-
-		if host.Address.ClusterScopeIndex == 0 {
-			// This is the very first host in the cluster - head of the first cycle
-			// No previous host available, so just point to the same host, mainly because label must be an empty string
-			// or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character
-			// So we can't set it to "-1"
-			return host.Address.ClusterScopeIndex
-		}
-
-		// This is head of non-first cycle, point to previous host in the cluster - which would be previous cycle tail
-		return host.Address.ClusterScopeIndex - 1
-	}
-
-	// This is not cycle head - just point to the same host
-	return host.Address.ClusterScopeIndex
-}
-
-// newLineMacroReplacerHost
-func newLineMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
-	n := namesNamer
-	return strings.NewReplacer(
-		macrosNamespace, n.namePartNamespace(host.Address.Namespace),
-		macrosChiName, n.namePartChiName(host.Address.CHIName),
-		macrosChiID, n.namePartChiNameID(host.Address.CHIName),
-		macrosClusterName, n.namePartClusterName(host.Address.ClusterName),
-		macrosClusterID, n.namePartClusterNameID(host.Address.ClusterName),
-		macrosClusterIndex, strconv.Itoa(host.Address.ClusterIndex),
-		macrosShardName, n.namePartShardName(host.Address.ShardName),
-		macrosShardID, n.namePartShardNameID(host.Address.ShardName),
-		macrosShardIndex, strconv.Itoa(host.Address.ShardIndex),
-		macrosShardScopeIndex, strconv.Itoa(host.Address.ShardScopeIndex), // TODO use appropriate namePart function
-		macrosReplicaName, n.namePartReplicaName(host.Address.ReplicaName),
-		macrosReplicaID, n.namePartReplicaNameID(host.Address.ReplicaName),
-		macrosReplicaIndex, strconv.Itoa(host.Address.ReplicaIndex),
-		macrosReplicaScopeIndex, strconv.Itoa(host.Address.ReplicaScopeIndex), // TODO use appropriate namePart function
-		macrosHostName, n.namePartHostName(host.Address.HostName),
-		macrosHostID, n.namePartHostNameID(host.Address.HostName),
-		macrosChiScopeIndex, strconv.Itoa(host.Address.CHIScopeIndex), // TODO use appropriate namePart function
-		macrosChiScopeCycleIndex, strconv.Itoa(host.Address.CHIScopeCycleIndex), // TODO use appropriate namePart function
-		macrosChiScopeCycleOffset, strconv.Itoa(host.Address.CHIScopeCycleOffset), // TODO use appropriate namePart function
-		macrosClusterScopeIndex, strconv.Itoa(host.Address.ClusterScopeIndex), // TODO use appropriate namePart function
-		macrosClusterScopeCycleIndex, strconv.Itoa(host.Address.ClusterScopeCycleIndex), // TODO use appropriate namePart function
-		macrosClusterScopeCycleOffset, strconv.Itoa(host.Address.ClusterScopeCycleOffset), // TODO use appropriate namePart function
-		macrosClusterScopeCycleHeadPointsToPreviousCycleTail, strconv.Itoa(clusterScopeIndexOfPreviousCycleTail(host)),
-	)
-}
-
-// newMapMacroReplacerHost
-func newMapMacroReplacerHost(host *chop.ChiHost) *util.MapReplacer {
-	return util.NewMapReplacer(newLineMacroReplacerHost(host))
-}
-
 // CreateConfigMapPersonalName returns a name for a ConfigMap for replica's personal config
 func CreateConfigMapPersonalName(host *chop.ChiHost) string {
-	return newLineMacroReplacerHost(host).Replace(configMapDeploymentNamePattern)
+	return macro(host).Line(configMapDeploymentNamePattern)
 }
 
 // CreateConfigMapCommonName returns a name for a ConfigMap for replica's common config
 func CreateConfigMapCommonName(chi *chop.ClickHouseInstallation) string {
-	return newLineMacroReplacerChi(chi).Replace(configMapCommonNamePattern)
+	return macro(chi).Line(configMapCommonNamePattern)
 }
 
 // CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common users config
 func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
-	return newLineMacroReplacerChi(chi).Replace(configMapCommonUsersNamePattern)
+	return macro(chi).Line(configMapCommonUsersNamePattern)
 }
 
 // CreateCHIServiceName creates a name of a root ClickHouseInstallation Service resource
@@ -563,7 +396,7 @@ func CreateCHIServiceName(chi *chop.ClickHouseInstallation) string {
 	}
 
 	// Create Service name based on name pattern available
-	return newLineMacroReplacerChi(chi).Replace(pattern)
+	return macro(chi).Line(pattern)
 }
 
 // CreateCHIServiceFQDN creates a FQD name of a root ClickHouseInstallation Service resource
@@ -605,7 +438,7 @@ func CreateClusterServiceName(cluster *chop.ChiCluster) string {
 	}
 
 	// Create Service name based on name pattern available
-	return newLineMacroReplacerCluster(cluster).Replace(pattern)
+	return macro(cluster).Line(pattern)
 }
 
 // CreateShardServiceName returns a name of a shard's Service
@@ -626,7 +459,7 @@ func CreateShardServiceName(shard *chop.ChiShard) string {
 	}
 
 	// Create Service name based on name pattern available
-	return newLineMacroReplacerShard(shard).Replace(pattern)
+	return macro(shard).Line(pattern)
 }
 
 // CreateShardName return a name of a shard
@@ -724,7 +557,7 @@ func CreateStatefulSetName(host *chop.ChiHost) string {
 	}
 
 	// Create StatefulSet name based on name pattern available
-	return newLineMacroReplacerHost(host).Replace(pattern)
+	return macro(host).Line(pattern)
 }
 
 // CreateStatefulSetServiceName returns a name of a StatefulSet-related Service for ClickHouse instance
@@ -745,7 +578,7 @@ func CreateStatefulSetServiceName(host *chop.ChiHost) string {
 	}
 
 	// Create Service name based on name pattern available
-	return newLineMacroReplacerHost(host).Replace(pattern)
+	return macro(host).Line(pattern)
 }
 
 // CreatePodHostname returns a name of a Pod of a ClickHouse instance
@@ -846,7 +679,7 @@ func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string 
 // template is defined in operator config:
 // CHConfigNetworksHostRegexpTemplate: chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
 func CreatePodRegexp(chi *chop.ClickHouseInstallation, template string) string {
-	return newLineMacroReplacerChi(chi).Replace(template)
+	return macro(chi).Line(template)
 }
 
 // CreatePodName create Pod name based on specified StatefulSet or Host
