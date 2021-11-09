@@ -657,10 +657,10 @@ func processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm, host *chiV1.
 
 // processNodeSelectorRequirement
 func processNodeSelectorRequirement(nodeSelectorRequirement *v1.NodeSelectorRequirement, host *chiV1.ChiHost) {
-	nodeSelectorRequirement.Key = newLineMacroReplacerHost(host).Replace(nodeSelectorRequirement.Key)
+	nodeSelectorRequirement.Key = macro(host).Line(nodeSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
 	for i := range nodeSelectorRequirement.Values {
-		nodeSelectorRequirement.Values[i] = newLineMacroReplacerHost(host).Replace(nodeSelectorRequirement.Values[i])
+		nodeSelectorRequirement.Values[i] = macro(host).Line(nodeSelectorRequirement.Values[i])
 	}
 }
 
@@ -683,7 +683,7 @@ func processWeightedPodAffinityTerms(weightedPodAffinityTerms []v1.WeightedPodAf
 // processPodAffinityTerm
 func processPodAffinityTerm(podAffinityTerm *v1.PodAffinityTerm, host *chiV1.ChiHost) {
 	processLabelSelector(podAffinityTerm.LabelSelector, host)
-	podAffinityTerm.TopologyKey = newLineMacroReplacerHost(host).Replace(podAffinityTerm.TopologyKey)
+	podAffinityTerm.TopologyKey = macro(host).Line(podAffinityTerm.TopologyKey)
 }
 
 // processLabelSelector
@@ -693,7 +693,7 @@ func processLabelSelector(labelSelector *metaV1.LabelSelector, host *chiV1.ChiHo
 	}
 
 	for k := range labelSelector.MatchLabels {
-		labelSelector.MatchLabels[k] = newLineMacroReplacerHost(host).Replace(labelSelector.MatchLabels[k])
+		labelSelector.MatchLabels[k] = macro(host).Line(labelSelector.MatchLabels[k])
 	}
 	for j := range labelSelector.MatchExpressions {
 		labelSelectorRequirement := &labelSelector.MatchExpressions[j]
@@ -703,9 +703,9 @@ func processLabelSelector(labelSelector *metaV1.LabelSelector, host *chiV1.ChiHo
 
 // processLabelSelectorRequirement
 func processLabelSelectorRequirement(labelSelectorRequirement *metaV1.LabelSelectorRequirement, host *chiV1.ChiHost) {
-	labelSelectorRequirement.Key = newLineMacroReplacerHost(host).Replace(labelSelectorRequirement.Key)
+	labelSelectorRequirement.Key = macro(host).Line(labelSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
 	for i := range labelSelectorRequirement.Values {
-		labelSelectorRequirement.Values[i] = newLineMacroReplacerHost(host).Replace(labelSelectorRequirement.Values[i])
+		labelSelectorRequirement.Values[i] = macro(host).Line(labelSelectorRequirement.Values[i])
 	}
 }
