@@ -41,10 +41,10 @@ func GenerateXML(w io.Writer, settings *chiv1.Settings, prefix string) {
 		return
 	}
 
-	// paths is a sorted set of normalized paths (maps keys) from settings
+	// `paths` is a sorted set of normalized paths (maps keys) from settings
 	paths := make([]string, 0, settings.Len())
 
-	// data is copy of settings with:
+	// `data` is a copy of settings with:
 	// 1. paths (map keys) are normalized in terms of trimmed '/'
 	// 2. all map keys listed in 'excludes' are excluded
 	data := make(map[string]string)
@@ -61,7 +61,7 @@ func GenerateXML(w io.Writer, settings *chiv1.Settings, prefix string) {
 	})
 	sort.Strings(paths)
 
-	// xmlTreeRoot - root of the XML tree data structure
+	// `xmlTreeRoot` - root of the XML tree data structure
 	xmlTreeRoot := new(xmlNode)
 
 	// Read all tags and values into the tree structure
