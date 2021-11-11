@@ -155,7 +155,18 @@ spec:
                     type: string
                 appendScopeLabels:
                   type: string
-                  description: "Whether to append *Scope* labels to StatefulSet and Pod"
+                  description: |
+                    Whether to append *Scope* labels to StatefulSet and Pod
+                    - "LabelShardScopeIndex"
+                    - "LabelReplicaScopeIndex"
+                    - "LabelCHIScopeIndex"
+                    - "LabelCHIScopeCycleSize"
+                    - "LabelCHIScopeCycleIndex"
+                    - "LabelCHIScopeCycleOffset"
+                    - "LabelClusterScopeIndex"
+                    - "LabelClusterScopeCycleSize"
+                    - "LabelClusterScopeCycleIndex"
+                    - "LabelClusterScopeCycleOffset"
                   enum:
                     # List StringBoolXXX constants from model
                     - ""
@@ -181,13 +192,3 @@ spec:
                     - "disabled"
                     - "Enabled"
                     - "enabled"
-                    - "LabelShardScopeIndex"
-                    - "LabelReplicaScopeIndex"
-                    - "LabelCHIScopeIndex"
-                    - "LabelCHIScopeCycleSize"
-                    - "LabelCHIScopeCycleIndex"
-                    - "LabelCHIScopeCycleOffset"
-                    - "LabelClusterScopeIndex"
-                    - "LabelClusterScopeCycleSize"
-                    - "LabelClusterScopeCycleIndex"
-                    - "LabelClusterScopeCycleOffset"
