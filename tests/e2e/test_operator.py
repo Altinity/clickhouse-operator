@@ -375,9 +375,9 @@ def test_011(self):
 @TestScenario
 @Name("test_011_1. Test default user security")
 def test_011_1(self):
-    with Given("test-011-secured-default.yaml with password_sha256_hex for default user"):
+    with Given("test-011-secured-default-1.yaml with password_sha256_hex for default user"):
         kubectl.create_and_check(
-            config="configs/test-011-secured-default.yaml",
+            config="configs/test-011-secured-default-1.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -386,8 +386,8 @@ def test_011_1(self):
 
         with Then("Default user password should be '_removed_'"):
             chi = kubectl.get("chi", "test-011-secured-default")
-            assert "default/password" in chi["status"]["normalized"]["configuration"]["users"]
-            assert chi["status"]["normalized"]["configuration"]["users"]["default/password"] == "_removed_"
+            assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
+            assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == "_removed_"
 
         with And("Connection to localhost should succeed with default user"):
             out = clickhouse.query_with_error(
@@ -406,8 +406,8 @@ def test_011_1(self):
             )
             with Then("Default user password should be '_removed_'"):
                 chi = kubectl.get("chi", "test-011-secured-default")
-                assert "default/password" in chi["status"]["normalized"]["configuration"]["users"]
-                assert chi["status"]["normalized"]["configuration"]["users"]["default/password"] == "_removed_"
+                assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
+                assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == "_removed_"
 
         with When("Default user is assigned the different profile"):
             kubectl.create_and_check(
@@ -1403,7 +1403,7 @@ def test_023(self):
         }
     )
     with Then("Annotation from a template should be populated"):
-        assert kubectl.get_field("chi", chi, ".metadata.annotations.test") == "test"
+        assert kubectl.get_field("chi", chi, ".status.normalized.metadata.annotations.test") == "test"
 
     kubectl.delete_chi(chi)
     kubectl.delete(util.get_full_path("templates/tpl-clickhouse-auto.yaml"))
