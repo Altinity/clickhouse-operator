@@ -432,7 +432,11 @@ func (c *Controller) Run(ctx context.Context) {
 	log.V(1).A().Info("ClickHouseInstallation controller: starting workers number: %d", workersNum)
 	for i := 0; i < workersNum; i++ {
 		log.V(1).A().Info("ClickHouseInstallation controller: starting worker %d out of %d", i+1, workersNum)
-		worker := c.newWorker(c.queues[i])
+		sys := false
+		if i < chi.DefaultReconcileSystemThreadsNumber {
+			sys = true
+		}
+		worker := c.newWorker(c.queues[i], sys)
 		go wait.Until(worker.run, runWorkerPeriod, ctx.Done())
 	}
 	defer log.V(1).A().Info("ClickHouseInstallation controller: shutting down workers")
