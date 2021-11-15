@@ -80,7 +80,7 @@ def prepare_table_for_backup(backup_pod, chi, rows=1000):
 def apply_fake_backup(message):
     with Given(message):
         kubectl.create_and_check(
-            config="configs/test-cluster-for-backups-fake.yaml",
+            manifest="tests/test-cluster-for-backups-fake.yaml",
             check={
                 "apply_templates": [
                     "templates/tpl-clickhouse-backups-fake.yaml",
@@ -99,7 +99,7 @@ def apply_fake_backup(message):
 def apply_normal_backup():
     with Then("apply back normal backup"):
         kubectl.create_and_check(
-            config="configs/test-cluster-for-backups.yaml",
+            manifest="tests/test-cluster-for-backups.yaml",
             check={
                 "apply_templates": [
                     "templates/tpl-clickhouse-backups.yaml",
@@ -371,7 +371,7 @@ def test_backup_not_run(self, chi, minio_spec):
 @Name("e2e.test_backup_alerts")
 def test(self):
     _, _, _, _, chi = alerts.initialize(
-        chi_file='configs/test-cluster-for-backups.yaml',
+        chi_file='tests/test-cluster-for-backups.yaml',
         chi_template_file='templates/tpl-clickhouse-backups.yaml',
         chi_name='test-cluster-for-backups',
     )

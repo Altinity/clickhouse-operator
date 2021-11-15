@@ -47,8 +47,8 @@ def restart_operator(ns=settings.operator_namespace, timeout=600):
 def require_zookeeper(manifest='zookeeper-1-node-1GB-for-tests-only.yaml', force_install=False):
     if force_install or kubectl.get_count("service", name="zookeeper") == 0:
         with Given("Zookeeper is missing, installing"):
-            config = get_full_path(f"../../deploy/zookeeper/quick-start-persistent-volume/{manifest}", lookup_in_host=False)
-            kubectl.apply(config)
+            manifest = get_full_path(f"../../deploy/zookeeper/quick-start-persistent-volume/{manifest}", lookup_in_host=False)
+            kubectl.apply(manifest)
             kubectl.wait_object("pod", "zookeeper-0")
             kubectl.wait_pod_status("zookeeper-0", "Running")
 
@@ -80,7 +80,7 @@ def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name):
         require_zookeeper()
 
         kubectl.create_and_check(
-            config=chi_file,
+            manifest=chi_file,
             check={
                 "apply_templates": [
                     chi_template_file,
@@ -127,10 +127,10 @@ def make_http_get_request(host, port, path):
 def install_operator_if_not_exist():
     with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
         if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
-            config = get_full_path(settings.clickhouse_operator_install)
+            manifest = get_full_path(settings.clickhouse_operator_install)
             kubectl.apply(
                 ns=settings.operator_namespace,
-                config=f"<(cat {config} | "
+                manifest=f"<(cat {manifest} | "
                        f"OPERATOR_IMAGE=\"{settings.operator_docker_repo}:{settings.operator_version}\" "
                        f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
                        f"METRICS_EXPORTER_IMAGE=\"{settings.metrics_exporter_docker_repo}:{settings.operator_version}\" "

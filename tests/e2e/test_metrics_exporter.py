@@ -56,9 +56,9 @@ def test_metrics_exporter_reboot(self):
         kubectl.create_ns(kubectl.namespace)
         check_monitoring_chi(operator_namespace, operator_pod, [])
         with And("created simple clickhouse installation"):
-            config = "../../docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml"
+            manifest = "../../docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml"
             kubectl.create_and_check(
-                config=config,
+                manifest=manifest,
                 check={
                     "object_counts": {
                         "statefulset": 1,
@@ -79,7 +79,7 @@ def test_metrics_exporter_reboot(self):
                                    ns=settings.operator_namespace)
                 with Then("check metrics exporter still contains chi objects"):
                     check_monitoring_chi(operator_namespace, operator_pod, expected_chi)
-                    kubectl.delete(util.get_full_path(config, lookup_in_host=False), timeout=600)
+                    kubectl.delete(util.get_full_path(manifest, lookup_in_host=False), timeout=600)
                     check_monitoring_chi(operator_namespace, operator_pod, [])
 
 
@@ -119,9 +119,9 @@ def test_metrics_exporter_with_multiple_clickhouse_version(self):
             })
 
         with Then("Install multiple clickhouse version"):
-            config = "configs/test-017-multi-version.yaml"
+            manifest = "tests/test-017-multi-version.yaml"
             kubectl.create_and_check(
-                config=config,
+                manifest=manifest,
                 check={
                     "object_counts": {
                         "statefulset": 2,

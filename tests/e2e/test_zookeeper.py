@@ -54,7 +54,7 @@ def test(self):
     Perform test for zookeeper scale-up / scale-down scenarios
     """
     _, chi = util.install_clickhouse_and_zookeeper(
-        chi_file='configs/test-cluster-for-zookeeper.yaml',
+        chi_file='tests/test-cluster-for-zookeeper.yaml',
         chi_template_file='templates/tpl-clickhouse-latest.yaml',
         chi_name='test-cluster-for-zk',
     )

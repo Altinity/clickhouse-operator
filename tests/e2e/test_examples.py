@@ -6,7 +6,7 @@ import e2e.util as util
 @Name("test_examples01_1. Empty installation, creates 1 node")
 def test_examples01_1(self):
     kubectl.create_and_check(
-        config="../../docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml",
+        manifest="../../docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml",
         check={
             "object_counts": {
                 "statefulset": 1,
@@ -20,7 +20,7 @@ def test_examples01_1(self):
 @Name("test_examples01_2. 1 shard 2 replicas")
 def test_examples01_2(self):
     kubectl.create_and_check(
-        config="../../docs/chi-examples/01-simple-layout-02-1shard-2repl.yaml",
+        manifest="../../docs/chi-examples/01-simple-layout-02-1shard-2repl.yaml",
         check={
             "object_counts": {
                 "statefulset": 2,
@@ -34,7 +34,7 @@ def test_examples01_2(self):
 @Name("test_examples02_1. Persistent volume mapping via defaults")
 def test_examples02_1(self):
     kubectl.create_and_check(
-        config="../../docs/chi-examples/03-persistent-volume-01-default-volume.yaml",
+        manifest="../../docs/chi-examples/03-persistent-volume-01-default-volume.yaml",
         check={
             "pod_count": 1,
             "pod_volumes": {
@@ -48,7 +48,7 @@ def test_examples02_1(self):
 @Name("test_examples02_2. Persistent volume mapping via podTemplate")
 def test_examples02_2(self):
     kubectl.create_and_check(
-        config="../../docs/chi-examples/03-persistent-volume-02-pod-template.yaml",
+        manifest="../../docs/chi-examples/03-persistent-volume-02-pod-template.yaml",
         check={
             "pod_count": 1,
             "pod_image": "yandex/clickhouse-server:21.8",

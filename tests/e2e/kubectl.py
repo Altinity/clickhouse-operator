@@ -7,7 +7,7 @@ from testflows.asserts import error
 from testflows.connect import Shell
 
 import e2e.settings as settings
-import e2e.manifest as manifest
+import e2e.yaml_manifest as yaml_manifest
 import e2e.util as util
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -74,8 +74,8 @@ def delete_all_chi(ns=namespace):
                 delete_chi(chi["metadata"]["name"], ns)
 
 
-def create_and_check(config, check, ns=namespace, timeout=900):
-    chi_name = manifest.get_chi_name(util.get_full_path(f'{config}'))
+def create_and_check(manifest, check, ns=namespace, timeout=900):
+    chi_name = yaml_manifest.get_chi_name(util.get_full_path(f'{manifest}'))
 
     if "apply_templates" in check:
         debug("Need to apply additional templates")
@@ -84,7 +84,7 @@ def create_and_check(config, check, ns=namespace, timeout=900):
             apply(util.get_full_path(t, False), ns=ns)
         time.sleep(5)
 
-    apply(util.get_full_path(config, False), ns=ns, timeout=timeout)
+    apply(util.get_full_path(manifest, False), ns=ns, timeout=timeout)
 
     if "object_counts" in check:
         wait_objects(chi_name, check["object_counts"], ns=ns)
@@ -148,18 +148,18 @@ def count_objects(label="", ns=namespace):
     }
 
 
-def apply(config, ns=namespace, validate=True, timeout=600):
-    with When(f"{config} is applied"):
-        if "<(" not in config:
-            config = f"\"{config}\""
-        launch(f"apply --validate={validate} -f {config}", ns=ns, timeout=timeout)
+def apply(manifest, ns=namespace, validate=True, timeout=600):
+    with When(f"{manifest} is applied"):
+        if "<(" not in manifest:
+            manifest = f"\"{manifest}\""
+        launch(f"apply --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
 
 
-def delete(config, ns=namespace, timeout=600):
-    with When(f"{config} is deleted"):
-        if "<(" not in config:
-            config = f"\"{config}\""
-        launch(f"delete -f {config}", ns=ns, timeout=timeout)
+def delete(manifest, ns=namespace, timeout=600):
+    with When(f"{manifest} is deleted"):
+        if "<(" not in manifest:
+            manifest = f"\"{manifest}\""
+        launch(f"delete -f {manifest}", ns=ns, timeout=timeout)
 
 
 def wait_objects(chi, object_counts, ns=namespace):
