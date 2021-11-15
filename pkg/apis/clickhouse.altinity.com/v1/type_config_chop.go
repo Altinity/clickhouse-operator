@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -289,12 +290,51 @@ func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string
 
 // FindAutoTemplates finds auto templates
 func (config *OperatorConfig) FindAutoTemplates() []*ClickHouseInstallation {
-	var res []*ClickHouseInstallation
+	// Extract auto-templates from all templates listed
+	var auto []*ClickHouseInstallation
 	for _, _template := range config.CHITemplates {
 		if _template.IsAuto() {
-			res = append(res, _template)
+			auto = append(auto, _template)
 		}
 	}
+
+	// Sort namespaces
+	var namespaces []string
+	for _, _template := range auto {
+		found := false
+		for _, namespace := range namespaces {
+			if namespace == _template.Namespace {
+				// Already has it
+				found = true
+				break
+			}
+		}
+		if !found {
+			namespaces = append(namespaces, _template.Namespace)
+		}
+	}
+	sort.Strings(namespaces)
+
+	var res []*ClickHouseInstallation
+	for _, namespace := range namespaces {
+		// Sort names
+		var names []string
+		for _, _template := range auto {
+			if _template.Namespace == namespace {
+				names = append(names, _template.Name)
+			}
+		}
+		sort.Strings(names)
+
+		for _, name := range names {
+			for _, _template := range auto {
+				if (_template.Namespace == namespace) && (_template.Name == name) {
+					res = append(res, _template)
+				}
+			}
+		}
+	}
+
 	return res
 }
 
