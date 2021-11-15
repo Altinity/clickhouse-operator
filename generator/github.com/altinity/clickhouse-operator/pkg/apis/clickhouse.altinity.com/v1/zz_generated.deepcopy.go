@@ -661,7 +661,7 @@ func (in *ChiStatus) DeepCopyInto(out *ChiStatus) {
 	}
 	if in.NormalizedCHI != nil {
 		in, out := &in.NormalizedCHI, &out.NormalizedCHI
-		*out = new(ChiSpec)
+		*out = new(ClickHouseInstallation)
 		(*in).DeepCopyInto(*out)
 	}
 	return

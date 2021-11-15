@@ -16,28 +16,28 @@ package v1
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	Version           string   `json:"version,omitempty"          yaml:"version,omitempty"`
-	ClustersCount     int      `json:"clusters"                   yaml:"clusters"`
-	ShardsCount       int      `json:"shards"                     yaml:"shards"`
-	ReplicasCount     int      `json:"replicas"                   yaml:"replicas"`
-	HostsCount        int      `json:"hosts"                      yaml:"hosts"`
-	Status            string   `json:"status"                     yaml:"status"`
-	TaskID            string   `json:"taskID,omitempty"           yaml:"taskID,omitempty"`
-	TaskIDsStarted    []string `json:"taskIDsStarted,omitempty"   yaml:"taskIDsStarted,omitempty"`
-	TaskIDsCompleted  []string `json:"taskIDsCompleted,omitempty" yaml:"taskIDsCompleted,omitempty"`
-	Action            string   `json:"action,omitempty"           yaml:"action,omitempty"`
-	Actions           []string `json:"actions,omitempty"          yaml:"actions,omitempty"`
-	Error             string   `json:"error,omitempty"            yaml:"error,omitempty"`
-	Errors            []string `json:"errors,omitempty"           yaml:"errors,omitempty"`
-	UpdatedHostsCount int      `json:"updated,omitempty"          yaml:"updated,omitempty"`
-	AddedHostsCount   int      `json:"added,omitempty"            yaml:"added,omitempty"`
-	DeletedHostsCount int      `json:"deleted,omitempty"          yaml:"deleted,omitempty"`
-	DeleteHostsCount  int      `json:"delete,omitempty"           yaml:"delete,omitempty"`
-	Pods              []string `json:"pods,omitempty"             yaml:"pods,omitempty"`
-	FQDNs             []string `json:"fqdns,omitempty"            yaml:"fqdns,omitempty"`
-	Endpoint          string   `json:"endpoint,omitempty"         yaml:"endpoint,omitempty"`
-	Generation        int64    `json:"generation,omitempty"       yaml:"generation,omitempty"`
-	NormalizedCHI     *ChiSpec `json:"normalized,omitempty"       yaml:"normalized,omitempty"`
+	Version           string                  `json:"version,omitempty"          yaml:"version,omitempty"`
+	ClustersCount     int                     `json:"clusters"                   yaml:"clusters"`
+	ShardsCount       int                     `json:"shards"                     yaml:"shards"`
+	ReplicasCount     int                     `json:"replicas"                   yaml:"replicas"`
+	HostsCount        int                     `json:"hosts"                      yaml:"hosts"`
+	Status            string                  `json:"status"                     yaml:"status"`
+	TaskID            string                  `json:"taskID,omitempty"           yaml:"taskID,omitempty"`
+	TaskIDsStarted    []string                `json:"taskIDsStarted,omitempty"   yaml:"taskIDsStarted,omitempty"`
+	TaskIDsCompleted  []string                `json:"taskIDsCompleted,omitempty" yaml:"taskIDsCompleted,omitempty"`
+	Action            string                  `json:"action,omitempty"           yaml:"action,omitempty"`
+	Actions           []string                `json:"actions,omitempty"          yaml:"actions,omitempty"`
+	Error             string                  `json:"error,omitempty"            yaml:"error,omitempty"`
+	Errors            []string                `json:"errors,omitempty"           yaml:"errors,omitempty"`
+	UpdatedHostsCount int                     `json:"updated,omitempty"          yaml:"updated,omitempty"`
+	AddedHostsCount   int                     `json:"added,omitempty"            yaml:"added,omitempty"`
+	DeletedHostsCount int                     `json:"deleted,omitempty"          yaml:"deleted,omitempty"`
+	DeleteHostsCount  int                     `json:"delete,omitempty"           yaml:"delete,omitempty"`
+	Pods              []string                `json:"pods,omitempty"             yaml:"pods,omitempty"`
+	FQDNs             []string                `json:"fqdns,omitempty"            yaml:"fqdns,omitempty"`
+	Endpoint          string                  `json:"endpoint,omitempty"         yaml:"endpoint,omitempty"`
+	Generation        int64                   `json:"generation,omitempty"       yaml:"generation,omitempty"`
+	NormalizedCHI     *ClickHouseInstallation `json:"normalized,omitempty"       yaml:"normalized,omitempty"`
 }
 
 const (
