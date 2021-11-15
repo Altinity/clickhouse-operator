@@ -74,10 +74,9 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 	// TODO
 
 	// Apply CHI-specified templates
-
 	var useTemplates []chiV1.ChiUseTemplate
-
-	if autoTemplates := chop.Config().FindAutoTemplates(); len(autoTemplates) > 0 {
+	// 1. Get list of auto templates to be applied
+	if autoTemplates := chop.Config().GetAutoTemplates(); len(autoTemplates) > 0 {
 		log.V(2).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
 		for _, template := range autoTemplates {
 			log.V(3).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Name, template.Namespace)
@@ -88,7 +87,7 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 			})
 		}
 	}
-
+	// 2. Append templates, explicitly requested in CHI to the list of templates to be applied
 	if len(chi.Spec.UseTemplates) > 0 {
 		useTemplates = append(useTemplates, chi.Spec.UseTemplates...)
 	}
@@ -98,11 +97,13 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 		n.normalizeUseTemplates(useTemplates)
 	}
 
+	// Apply templates (auto and explicitly requested)
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		if template := chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
 			log.V(1).M(chi).A().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
 		} else {
+			// Apply template
 			(&n.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
 			n.chi.Labels = util.MergeStringMapsOverwrite(
 				n.chi.Labels,

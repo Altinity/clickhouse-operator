@@ -288,8 +288,9 @@ func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string
 	return nil
 }
 
-// FindAutoTemplates finds auto templates
-func (config *OperatorConfig) FindAutoTemplates() []*ClickHouseInstallation {
+// GetAutoTemplates gets all auto templates.
+// Auto templates are sorted alphabetically by tuple: namespace, name
+func (config *OperatorConfig) GetAutoTemplates() []*ClickHouseInstallation {
 	// Extract auto-templates from all templates listed
 	var auto []*ClickHouseInstallation
 	for _, _template := range config.CHITemplates {
