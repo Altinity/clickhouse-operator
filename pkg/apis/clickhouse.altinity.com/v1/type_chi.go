@@ -460,9 +460,9 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 	}
 	// Exclude skipped annotations
 	chi.Annotations = util.CopyMapFilter(
-			chi.Annotations,
-			nil,
-			util.ListSkippedAnnotations(),
+		chi.Annotations,
+		nil,
+		util.ListSkippedAnnotations(),
 	)
 
 	// Do actual merge for Spec

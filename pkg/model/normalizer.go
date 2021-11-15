@@ -116,7 +116,7 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 				n.chi.Annotations, util.CopyMapFilter(
 					template.Annotations,
 					chop.Config().IncludeIntoPropagationAnnotations,
-					append(chop.Config().ExcludeFromPropagationAnnotations,util.ListSkippedAnnotations()...),
+					append(chop.Config().ExcludeFromPropagationAnnotations, util.ListSkippedAnnotations()...),
 				),
 			)
 			log.V(2).M(chi).F().Info("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
