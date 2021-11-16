@@ -1404,6 +1404,8 @@ def test_023(self):
     )
     with Then("Annotation from a template should be populated"):
         assert kubectl.get_field("chi", chi, ".status.normalized.metadata.annotations.test") == "test"
+    with Then("Pod annotation should populated from template"):
+        assert kubectl.get_field("pod", "chi-test-001-single-0-0-0", ".metadata.annotations.test") == "test"
 
     kubectl.delete_chi(chi)
     kubectl.delete(util.get_full_path("templates/tpl-clickhouse-auto-1.yaml"))
@@ -1432,10 +1434,10 @@ def test_024(self):
 
     with And("Pod annotation should populated from a CHI"):
         assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", ".metadata.annotations.chi/test") == "test"
-    # with And("Service annotation should be populated from a CHI"):
-    #    assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.chi/test") == "test"
-    # with And("PVC annotation should be populated from a CHI"):
-     #   assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", ".metadata.annotations.chi/test") == "test"
+    with And("Service annotation should be populated from a CHI"):
+        assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.chi/test") == "test"
+    with And("PVC annotation should be populated from a CHI"):
+        assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", ".metadata.annotations.chi/test") == "test"
 
     kubectl.delete_chi(chi)
 
