@@ -4,6 +4,7 @@ import time
 import e2e.clickhouse as clickhouse
 import e2e.kubectl as kubectl
 import e2e.settings as settings
+import e2e.yaml_manifest as yaml_manifest
 
 from testflows.core import fail, Given, Then, current
 
@@ -44,13 +45,23 @@ def restart_operator(ns=settings.operator_namespace, timeout=600):
     kubectl.wait_pod_status(pod_name, "Running", ns=ns)
 
 
-def require_zookeeper(manifest='zookeeper-1-node-1GB-for-tests-only.yaml', force_install=False):
+def require_zookeeper(zk_manifest='zookeeper-1-node-1GB-for-tests-only.yaml', force_install=False):
     if force_install or kubectl.get_count("service", name="zookeeper") == 0:
-        with Given("Zookeeper is missing, installing"):
-            manifest = get_full_path(f"../../deploy/zookeeper/quick-start-persistent-volume/{manifest}", lookup_in_host=False)
-            kubectl.apply(manifest)
-            kubectl.wait_object("pod", "zookeeper-0")
-            kubectl.wait_pod_status("zookeeper-0", "Running")
+        zk_manifest = f"../../deploy/zookeeper/quick-start-persistent-volume/{zk_manifest}"
+        zk = yaml_manifest.get_multidoc_manifest_data(get_full_path(zk_manifest, lookup_in_host=True))
+        zk_nodes = 1
+        i = 0
+        for doc in zk:
+            i += 1
+            if i == 4:
+                zk_nodes = doc["spec"]["replicas"]
+        assert i == 4, "invalid zookeeper manifest, expected 4 documents in yaml file"
+        with Given(f"Install Zookeeper {zk_nodes} nodes"):
+            kubectl.apply(get_full_path(zk_manifest, lookup_in_host=False))
+            for i in range(zk_nodes):
+                kubectl.wait_object("pod", f"zookeeper-{i}")
+            for i in range(zk_nodes):
+                kubectl.wait_pod_status(f"zookeeper-{i}", "Running")
 
 
 def wait_clickhouse_cluster_ready(chi):
@@ -73,31 +84,45 @@ def wait_clickhouse_cluster_ready(chi):
                             time.sleep(5)
 
 
-def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name):
+def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name,
+                                     zk_manifest='zookeeper-1-node-1GB-for-tests-only.yaml', force_zk_install=False, clean_ns=True, zk_install_first=True,
+                                     make_object_count=True):
     with Given("install zookeeper+clickhouse"):
-        kubectl.delete_ns(settings.test_namespace, ok_to_fail=True, timeout=600)
-        kubectl.create_ns(settings.test_namespace)
-        require_zookeeper()
+        if clean_ns:
+            kubectl.delete_ns(settings.test_namespace, ok_to_fail=True, timeout=600)
+            kubectl.create_ns(settings.test_namespace)
+        # when create clickhouse, need install ZK before CH
+        if zk_install_first:
+            require_zookeeper(zk_manifest=zk_manifest, force_install=force_zk_install)
 
+        chi_manifest_data = yaml_manifest.get_manifest_data(get_full_path(chi_file))
+        layout = chi_manifest_data["spec"]["configuration"]["clusters"][0]["layout"]
+        expected_nodes = 1 * layout["shardsCount"] * layout["replicasCount"]
+        check = {
+            "apply_templates": [
+                chi_template_file,
+                "templates/tpl-persistent-volume-100Mi.yaml"
+            ],
+            "do_not_delete": 1
+        }
+        if make_object_count:
+            check["object_counts"] = {
+                "statefulset": expected_nodes,
+                "pod": expected_nodes,
+                "service": expected_nodes + 1,
+            }
         kubectl.create_and_check(
             manifest=chi_file,
-            check={
-                "apply_templates": [
-                    chi_template_file,
-                    "templates/tpl-persistent-volume-100Mi.yaml"
-                ],
-                "object_counts": {
-                    "statefulset": 2,
-                    "pod": 2,
-                    "service": 3,
-                },
-                "do_not_delete": 1
-            }
+            check=check,
         )
         clickhouse_operator_spec = kubectl.get(
             "pod", name="", ns=settings.operator_namespace, label="-l app=clickhouse-operator"
         )
         chi = kubectl.get("chi", ns=settings.test_namespace, name=chi_name)
+
+        # when re-scale clickhouse, need install ZK after CH to follow ACM logic
+        if not zk_install_first:
+            require_zookeeper(zk_manifest=zk_manifest, force_install=force_zk_install)
 
         return clickhouse_operator_spec, chi
 

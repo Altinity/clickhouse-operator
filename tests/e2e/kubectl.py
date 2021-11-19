@@ -74,6 +74,18 @@ def delete_all_chi(ns=namespace):
                 delete_chi(chi["metadata"]["name"], ns)
 
 
+def delete_all_zookeeper(ns=namespace):
+    for resource_type in ("sts", "pvc"):
+        try:
+            zks = get(resource_type, "", label="-l app=zookeeper", ns=ns, ok_to_fail=True)
+        except Exception as e:
+            zks = {}
+        if "items" in zks:
+            for item in zks["items"]:
+                name = item['metadata']['name']
+                launch(f"delete {resource_type} -n {ns} {name}")
+
+
 def create_and_check(manifest, check, ns=namespace, timeout=900):
     chi_name = yaml_manifest.get_chi_name(util.get_full_path(f'{manifest}'))
 
@@ -86,16 +98,16 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
 
     apply(util.get_full_path(manifest, False), ns=ns, timeout=timeout)
 
+    if "chi_status" in check:
+        wait_chi_status(chi_name, check["chi_status"], ns=ns)
+    else:
+        wait_chi_status(chi_name, "Completed", ns=ns)
+
     if "object_counts" in check:
         wait_objects(chi_name, check["object_counts"], ns=ns)
 
     if "pod_count" in check:
         wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi_name}", count=check["pod_count"], ns=ns)
-
-    if "chi_status" in check:
-        wait_chi_status(chi_name, check["chi_status"], ns=ns)
-    else:
-        wait_chi_status(chi_name, "Completed", ns=ns)
 
     if "pod_image" in check:
         check_pod_image(chi_name, check["pod_image"], ns=ns)

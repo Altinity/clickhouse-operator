@@ -15,7 +15,7 @@ from testflows.asserts import error
 def test_ch_001(self):
     util.require_zookeeper()
     quorum_template = "templates/tpl-clickhouse-21.8.yaml"
-    chit_data = yaml_manifest.get_chit_data(util.get_full_path(quorum_template))
+    chit_data = yaml_manifest.get_manifest_data(util.get_full_path(quorum_template))
 
     kubectl.launch(f"delete chit {chit_data['metadata']['name']}", ns=settings.test_namespace, ok_to_fail=True)
     kubectl.create_and_check(
