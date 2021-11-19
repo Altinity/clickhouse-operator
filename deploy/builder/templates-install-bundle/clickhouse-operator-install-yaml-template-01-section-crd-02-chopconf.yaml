@@ -128,8 +128,15 @@ spec:
                   type: string
                 vmodule:
                   type: string
+                  description: |
+                    Comma-separated list of filename=N, where filename (can be a pattern) must have no .go ext, and N is a V level.
+                    Ex.: file*=2 sets the 'V' to 2 in all files with names like file*.
                 log_backtrace_at:
                   type: string
+                  description: |
+                    It can be set to a file and line number with a logging line.
+                    Ex.: file.go:123
+                    Each time when this line is being executed, a stack trace will be written to the Info log.
                 reconcileThreadsNumber:
                   type: integer
                   description: "how much goroutines will use to reconcile in parallel, 10 by default"
@@ -148,7 +155,18 @@ spec:
                     type: string
                 appendScopeLabels:
                   type: string
-                  description: "Whether to append *Scope* labels to StatefulSet and Pod"
+                  description: |
+                    Whether to append *Scope* labels to StatefulSet and Pod
+                    - "LabelShardScopeIndex"
+                    - "LabelReplicaScopeIndex"
+                    - "LabelCHIScopeIndex"
+                    - "LabelCHIScopeCycleSize"
+                    - "LabelCHIScopeCycleIndex"
+                    - "LabelCHIScopeCycleOffset"
+                    - "LabelClusterScopeIndex"
+                    - "LabelClusterScopeCycleSize"
+                    - "LabelClusterScopeCycleIndex"
+                    - "LabelClusterScopeCycleOffset"
                   enum:
                     # List StringBoolXXX constants from model
                     - ""
@@ -174,13 +192,3 @@ spec:
                     - "disabled"
                     - "Enabled"
                     - "enabled"
-                    - "LabelShardScopeIndex"
-                    - "LabelReplicaScopeIndex"
-                    - "LabelCHIScopeIndex"
-                    - "LabelCHIScopeCycleSize"
-                    - "LabelCHIScopeCycleIndex"
-                    - "LabelCHIScopeCycleOffset"
-                    - "LabelClusterScopeIndex"
-                    - "LabelClusterScopeCycleSize"
-                    - "LabelClusterScopeCycleIndex"
-                    - "LabelClusterScopeCycleOffset"

@@ -59,7 +59,11 @@ type worker struct {
 
 // newWorker
 //func (c *Controller) newWorker(q workqueue.RateLimitingInterface) *worker {
-func (c *Controller) newWorker(q queue.PriorityQueue) *worker {
+func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
+	start := time.Now()
+	if !sys {
+		start = start.Add(chiv1.DefaultReconcileThreadsWarmup)
+	}
 	return &worker{
 		c:          c,
 		a:          NewAnnouncer().WithController(c),
@@ -71,7 +75,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue) *worker {
 			chop.Config().CHPort,
 		),
 		creator: nil,
-		start:   time.Now().Add(chiv1.DefaultReconcileThreadsWarmup),
+		start:   start,
 	}
 }
 

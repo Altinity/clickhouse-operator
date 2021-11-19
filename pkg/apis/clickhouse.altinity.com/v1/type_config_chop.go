@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -163,7 +164,12 @@ type OperatorConfig struct {
 	ReconcileWaitExclude   bool `json:"reconcileWaitExclude"   yaml:"reconcileWaitExclude"`
 	ReconcileWaitInclude   bool `json:"reconcileWaitInclude"   yaml:"reconcileWaitInclude"`
 
-	// When transferring labels from the chi.metadata.labels section to child objects, ignore these labels.
+	// When transferring annotations from the chi/chit.metadata to CHI objects, use these filters.
+	IncludeIntoPropagationAnnotations []string `json:"includeIntoPropagationAnnotations" yaml:"includeIntoPropagationAnnotations"`
+	ExcludeFromPropagationAnnotations []string `json:"excludeFromPropagationAnnotations" yaml:"excludeFromPropagationAnnotations"`
+
+	// When transferring labels from the chi/chit.metadata to child objects, use these filters.
+	IncludeIntoPropagationLabels []string `json:"includeIntoPropagationLabels" yaml:"includeIntoPropagationLabels"`
 	ExcludeFromPropagationLabels []string `json:"excludeFromPropagationLabels" yaml:"excludeFromPropagationLabels"`
 
 	// Whether to append *Scope* labels to StatefulSet and Pod.
@@ -282,14 +288,54 @@ func (config *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string
 	return nil
 }
 
-// FindAutoTemplates finds auto templates
-func (config *OperatorConfig) FindAutoTemplates() []*ClickHouseInstallation {
-	var res []*ClickHouseInstallation
+// GetAutoTemplates gets all auto templates.
+// Auto templates are sorted alphabetically by tuple: namespace, name
+func (config *OperatorConfig) GetAutoTemplates() []*ClickHouseInstallation {
+	// Extract auto-templates from all templates listed
+	var auto []*ClickHouseInstallation
 	for _, _template := range config.CHITemplates {
 		if _template.IsAuto() {
-			res = append(res, _template)
+			auto = append(auto, _template)
 		}
 	}
+
+	// Sort namespaces
+	var namespaces []string
+	for _, _template := range auto {
+		found := false
+		for _, namespace := range namespaces {
+			if namespace == _template.Namespace {
+				// Already has it
+				found = true
+				break
+			}
+		}
+		if !found {
+			namespaces = append(namespaces, _template.Namespace)
+		}
+	}
+	sort.Strings(namespaces)
+
+	var res []*ClickHouseInstallation
+	for _, namespace := range namespaces {
+		// Sort names
+		var names []string
+		for _, _template := range auto {
+			if _template.Namespace == namespace {
+				names = append(names, _template.Name)
+			}
+		}
+		sort.Strings(names)
+
+		for _, name := range names {
+			for _, _template := range auto {
+				if (_template.Namespace == namespace) && (_template.Name == name) {
+					res = append(res, _template)
+				}
+			}
+		}
+	}
+
 	return res
 }
 
@@ -468,6 +514,10 @@ func (config *OperatorConfig) normalizeRuntimeSection() {
 }
 
 func (config *OperatorConfig) normalizeLabelsSection() {
+	//config.IncludeIntoPropagationAnnotations
+	//config.ExcludeFromPropagationAnnotations
+	//config.IncludeIntoPropagationLabels
+	//config.ExcludeFromPropagationLabels
 	// Whether to append *Scope* labels to StatefulSet and Pod.
 	config.AppendScopeLabels = util.IsStringBoolTrue(config.AppendScopeLabelsString)
 }
@@ -642,6 +692,9 @@ func (config *OperatorConfig) String(hideCredentials bool) string {
 
 	util.Fprintf(b, "ReconcileThreadsNumber: %d\n", config.ReconcileThreadsNumber)
 
+	util.Fprintf(b, "%s", util.Slice2String("IncludeIntoPropagationAnnotations", config.IncludeIntoPropagationAnnotations))
+	util.Fprintf(b, "%s", util.Slice2String("ExcludeFromPropagationAnnotations", config.ExcludeFromPropagationAnnotations))
+	util.Fprintf(b, "%s", util.Slice2String("IncludeIntoPropagationLabels", config.IncludeIntoPropagationLabels))
 	util.Fprintf(b, "%s", util.Slice2String("ExcludeFromPropagationLabels", config.ExcludeFromPropagationLabels))
 	util.Fprintf(b, "appendScopeLabels: %s (%t)\n", config.AppendScopeLabelsString, config.AppendScopeLabels)
 

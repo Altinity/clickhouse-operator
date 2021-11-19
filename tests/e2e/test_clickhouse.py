@@ -2,7 +2,7 @@ import time
 
 import e2e.clickhouse as clickhouse
 import e2e.kubectl as kubectl
-import e2e.manifest as manifest
+import e2e.yaml_manifest as yaml_manifest
 import e2e.settings as settings
 import e2e.util as util
 
@@ -15,18 +15,18 @@ from testflows.asserts import error
 def test_ch_001(self):
     util.require_zookeeper()
     quorum_template = "templates/tpl-clickhouse-21.8.yaml"
-    chit_data = manifest.get_manifest_data(util.get_full_path(quorum_template))
+    chit_data = yaml_manifest.get_manifest_data(util.get_full_path(quorum_template))
 
     kubectl.launch(f"delete chit {chit_data['metadata']['name']}", ns=settings.test_namespace, ok_to_fail=True)
     kubectl.create_and_check(
-        "configs/test-ch-001-insert-quorum.yaml",
+        "tests/test-ch-001-insert-quorum.yaml",
         {
             "apply_templates": {quorum_template},
             "pod_count": 2,
             "do_not_delete": 1,
         })
 
-    chi = manifest.get_chi_name(util.get_full_path("configs/test-ch-001-insert-quorum.yaml"))
+    chi = yaml_manifest.get_chi_name(util.get_full_path("tests/test-ch-001-insert-quorum.yaml"))
     chi_data = kubectl.get("chi", ns=settings.test_namespace, name=chi)
     util.wait_clickhouse_cluster_ready(chi_data)
 
@@ -131,7 +131,7 @@ def test_ch_001(self):
 @Name("test_ch_002. Row-level security")
 def test_ch_002(self):
     kubectl.create_and_check(
-        "configs/test-ch-002-row-level.yaml",
+        "tests/test-ch-002-row-level.yaml",
         {
             "apply_templates": {"templates/tpl-clickhouse-21.8.yaml"},
             "do_not_delete": 1,

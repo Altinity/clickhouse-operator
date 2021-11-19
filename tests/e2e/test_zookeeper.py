@@ -68,7 +68,7 @@ def test_zookeeper_rescale(self):
                     pod="chi-test-cluster-for-zk-default-0-1-0"
                 )
 
-    def check_zk_root_znode(chi, pod_count, zk_retry=3):
+    def check_zk_root_znode(chi, pod_count, zk_retry=5):
         for pod_num in range(pod_count):
             out = ""
             for i in range(zk_retry):
@@ -76,8 +76,8 @@ def test_zookeeper_rescale(self):
                 if "[clickhouse, zookeeper]" in out:
                     break
                 else:
-                    with Then(f"Zookeeper ROOT NODE not ready, wait {i*3} sec"):
-                        time.sleep(i*3)
+                    with Then(f"Zookeeper ROOT NODE not ready, wait { (i+1)*3} sec"):
+                        time.sleep((i+1)*3)
             assert "[clickhouse, zookeeper]" in out, "Unexpected `zkCli.sh ls /` output"
 
         out = clickhouse.query(chi["metadata"]["name"], "SELECT count() FROM system.zookeeper WHERE path='/'")
@@ -86,11 +86,11 @@ def test_zookeeper_rescale(self):
     def rescale_zk_and_clickhouse(ch_node_count, zk_node_count, first_install=False):
         zk_manifest = 'zookeeper-1-node-1GB-for-tests-only.yaml' if zk_node_count == 1 else 'zookeeper-3-nodes-1GB-for-tests-only.yaml'
         _, chi = util.install_clickhouse_and_zookeeper(
-            chi_file=f'configs/test-cluster-for-zookeeper-{ch_node_count}.yaml',
+            chi_file=f'tests/test-cluster-for-zookeeper-{ch_node_count}.yaml',
             chi_template_file='templates/tpl-clickhouse-latest.yaml',
             chi_name='test-cluster-for-zk',
             zk_manifest=zk_manifest,
-            clean_ns=False,
+            clean_ns=first_install,
             force_zk_install=True,
             zk_install_first=first_install,
             make_object_count=False,

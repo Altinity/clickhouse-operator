@@ -4,7 +4,7 @@ import time
 import e2e.clickhouse as clickhouse
 import e2e.kubectl as kubectl
 import e2e.settings as settings
-import e2e.manifest as manifest
+import e2e.yaml_manifest as yaml_manifest
 
 from testflows.core import fail, Given, Then, current
 
@@ -48,7 +48,7 @@ def restart_operator(ns=settings.operator_namespace, timeout=600):
 def require_zookeeper(zk_manifest='zookeeper-1-node-1GB-for-tests-only.yaml', force_install=False):
     if force_install or kubectl.get_count("service", name="zookeeper") == 0:
         zk_manifest = f"../../deploy/zookeeper/quick-start-persistent-volume/{zk_manifest}"
-        zk = manifest.get_multidoc_manifest_data(get_full_path(zk_manifest, lookup_in_host=True))
+        zk = yaml_manifest.get_multidoc_manifest_data(get_full_path(zk_manifest, lookup_in_host=True))
         zk_nodes = 1
         i = 0
         for doc in zk:
@@ -95,7 +95,7 @@ def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name,
         if zk_install_first:
             require_zookeeper(zk_manifest=zk_manifest, force_install=force_zk_install)
 
-        chi_manifest_data = manifest.get_manifest_data(get_full_path(chi_file))
+        chi_manifest_data = yaml_manifest.get_manifest_data(get_full_path(chi_file))
         layout = chi_manifest_data["spec"]["configuration"]["clusters"][0]["layout"]
         expected_nodes = 1 * layout["shardsCount"] * layout["replicasCount"]
         check = {
@@ -112,7 +112,7 @@ def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name,
                 "service": expected_nodes + 1,
             }
         kubectl.create_and_check(
-            config=chi_file,
+            manifest=chi_file,
             check=check,
         )
         clickhouse_operator_spec = kubectl.get(
@@ -152,10 +152,10 @@ def make_http_get_request(host, port, path):
 def install_operator_if_not_exist():
     with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
         if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
-            config = get_full_path(settings.clickhouse_operator_install)
+            manifest = get_full_path(settings.clickhouse_operator_install)
             kubectl.apply(
                 ns=settings.operator_namespace,
-                config=f"<(cat {config} | "
+                manifest=f"<(cat {manifest} | "
                        f"OPERATOR_IMAGE=\"{settings.operator_docker_repo}:{settings.operator_version}\" "
                        f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
                        f"METRICS_EXPORTER_IMAGE=\"{settings.metrics_exporter_docker_repo}:{settings.operator_version}\" "

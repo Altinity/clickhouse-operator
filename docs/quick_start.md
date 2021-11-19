@@ -141,6 +141,10 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
   name: "simple-01"
+spec:
+  configuration:
+    clusters:
+      - name: "simple"
 ```
 
 Once cluster is created, there are two checks to be made.
