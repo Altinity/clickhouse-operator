@@ -104,6 +104,11 @@ func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*v12
 		log.V(1).M(namespace, name).A().Error("ERROR get Pod %s/%s %v", namespace, name, err)
 		return nil, err
 	}
+	if pod == nil {
+		str := fmt.Sprintf("ERROR get Pod is nil %s/%s ", namespace, name)
+		log.V(1).M(namespace, name).A().Error(str)
+		return nil, errors.New(str)
+	}
 
 	// Put label on the Pod
 	pod.Labels = c.addLabels(pod.Labels)
@@ -111,6 +116,11 @@ func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*v12
 	if err != nil {
 		log.V(1).M(namespace, name).A().Error("ERROR put label on Pod %s/%s %v", namespace, name, err)
 		return nil, err
+	}
+	if pod == nil {
+		str := fmt.Sprintf("ERROR update Pod is nil %s/%s ", namespace, name)
+		log.V(1).M(namespace, name).A().Error(str)
+		return nil, errors.New(str)
 	}
 
 	return pod, nil
@@ -141,6 +151,11 @@ func (c *Controller) labelReplicaSet(ctx context.Context, pod *v12.Pod) (*v13.Re
 		log.V(1).M(pod.Namespace, replicaSetName).A().Error("ERROR get ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
 		return nil, err
 	}
+	if replicaSet == nil {
+		str := fmt.Sprintf("ERROR get ReplicaSet is nil %s/%s ", pod.Namespace, replicaSetName)
+		log.V(1).M(pod.Namespace, replicaSetName).A().Error(str)
+		return nil, errors.New(str)
+	}
 
 	// Put label on the ReplicaSet
 	replicaSet.Labels = c.addLabels(replicaSet.Labels)
@@ -148,6 +163,11 @@ func (c *Controller) labelReplicaSet(ctx context.Context, pod *v12.Pod) (*v13.Re
 	if err != nil {
 		log.V(1).M(pod.Namespace, replicaSetName).A().Error("ERROR put label on ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
 		return nil, err
+	}
+	if replicaSet == nil {
+		str := fmt.Sprintf("ERROR update ReplicaSet is nil %s/%s ", pod.Namespace, replicaSetName)
+		log.V(1).M(pod.Namespace, replicaSetName).A().Error(str)
+		return nil, errors.New(str)
 	}
 
 	return replicaSet, nil
@@ -178,6 +198,11 @@ func (c *Controller) labelDeployment(ctx context.Context, rs *v13.ReplicaSet) er
 		log.V(1).M(rs.Namespace, deploymentName).A().Error("ERROR get Deployment %s/%s", rs.Namespace, deploymentName)
 		return err
 	}
+	if deployment == nil {
+		str := fmt.Sprintf("ERROR get Deployment is nil %s/%s ", rs.Namespace, deploymentName)
+		log.V(1).M(rs.Namespace, deploymentName).A().Error(str)
+		return errors.New(str)
+	}
 
 	// Put label on the Deployment
 	deployment.Labels = c.addLabels(deployment.Labels)
@@ -185,6 +210,11 @@ func (c *Controller) labelDeployment(ctx context.Context, rs *v13.ReplicaSet) er
 	if err != nil {
 		log.V(1).M(rs.Namespace, deploymentName).A().Error("ERROR put label on Deployment %s/%s %v", rs.Namespace, deploymentName, err)
 		return err
+	}
+	if deployment == nil {
+		str := fmt.Sprintf("ERROR update Deployment is nil %s/%s ", rs.Namespace, deploymentName)
+		log.V(1).M(rs.Namespace, deploymentName).A().Error(str)
+		return errors.New(str)
 	}
 
 	return nil
