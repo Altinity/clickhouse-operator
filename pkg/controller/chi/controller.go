@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"k8s.io/apimachinery/pkg/types"
+	"time"
 
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
@@ -423,7 +424,14 @@ func (c *Controller) Run(ctx context.Context) {
 	}
 
 	// Label controller runtime objects with proper labels
-	c.labelMyObjectsTree(ctx)
+	for cnt := 0; cnt < 10; cnt++ {
+		if err := c.labelMyObjectsTree(ctx); err == nil {
+			break
+		} else {
+			log.V(1).A().Error("ERROR label objects, will retry. Err: %v", err)
+			util.WaitContextDoneOrTimeout(ctx, 5*time.Second)
+		}
+	}
 
 	//
 	// Start threads
