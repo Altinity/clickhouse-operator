@@ -557,11 +557,11 @@ def test_system_settings_changed(self, prometheus_operator_spec, clickhouse_oper
 
     with When("apply changed settings"):
         kubectl.create_and_check(
-            manifest="tests/test-cluster-for-alerts-changed-settings.yaml",
+            manifest="manifests/chi/test-cluster-for-alerts-changed-settings.yaml",
             check={
                 "apply_templates": [
-                    "templates/tpl-clickhouse-stable.yaml",
-                    "templates/tpl-persistent-volume-100Mi.yaml"
+                    "manifests/chit/tpl-clickhouse-stable.yaml",
+                    "manifests/chit/tpl-persistent-volume-100Mi.yaml"
                 ],
                 "object_counts": {
                     "statefulset": 2,
@@ -579,12 +579,12 @@ def test_system_settings_changed(self, prometheus_operator_spec, clickhouse_oper
 
     with When("rollback changed settings"):
         kubectl.create_and_check(
-            manifest="tests/test-cluster-for-alerts.yaml",
+            manifest="manifests/chi/test-cluster-for-alerts.yaml",
             check={
                 "apply_templates": [
-                    "templates/tpl-clickhouse-latest.yaml",
-                    "templates/tpl-clickhouse-alerts.yaml",
-                    "templates/tpl-persistent-volume-100Mi.yaml"
+                    "manifests/chit/tpl-clickhouse-latest.yaml",
+                    "manifests/chit/tpl-clickhouse-alerts.yaml",
+                    "manifests/chit/tpl-persistent-volume-100Mi.yaml"
                 ],
                 "object_counts": {
                     "statefulset": 2,
@@ -607,11 +607,11 @@ def test_version_changed(self, prometheus_operator_spec, clickhouse_operator_spe
 
     with When("apply changed settings"):
         kubectl.create_and_check(
-            manifest="tests/test-cluster-for-alerts-changed-settings.yaml",
+            manifest="manifests/chi/test-cluster-for-alerts-changed-settings.yaml",
             check={
                 "apply_templates": [
-                    "templates/tpl-clickhouse-stable.yaml",
-                    "templates/tpl-persistent-volume-100Mi.yaml"
+                    "manifests/chit/tpl-clickhouse-stable.yaml",
+                    "manifests/chit/tpl-persistent-volume-100Mi.yaml"
                 ],
                 "object_counts": {
                     "statefulset": 2,
@@ -633,12 +633,12 @@ def test_version_changed(self, prometheus_operator_spec, clickhouse_operator_spe
 
     with When("rollback changed settings"):
         kubectl.create_and_check(
-            manifest="tests/test-cluster-for-alerts.yaml",
+            manifest="manifests/chi/test-cluster-for-alerts.yaml",
             check={
                 "apply_templates": [
-                    "templates/tpl-clickhouse-latest.yaml",
-                    "templates/tpl-clickhouse-alerts.yaml",
-                    "templates/tpl-persistent-volume-100Mi.yaml"
+                    "manifests/chit/tpl-clickhouse-latest.yaml",
+                    "manifests/chit/tpl-clickhouse-alerts.yaml",
+                    "manifests/chit/tpl-persistent-volume-100Mi.yaml"
                 ],
                 "object_counts": {
                     "statefulset": 2,
@@ -797,8 +797,8 @@ def test_zookeeper_alerts(self, prometheus_operator_spec, clickhouse_operator_sp
 @Name("e2e.test_metrics_alerts")
 def test(self):
     prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi = alerts.initialize(
-        chi_file='tests/test-cluster-for-alerts.yaml',
-        chi_template_file='templates/tpl-clickhouse-alerts.yaml',
+        chi_file='manifests/chi/test-cluster-for-alerts.yaml',
+        chi_template_file='manifests/chit/tpl-clickhouse-alerts.yaml',
         chi_name='test-cluster-for-alerts',
     )
 

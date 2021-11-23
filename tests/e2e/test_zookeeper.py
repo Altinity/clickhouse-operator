@@ -86,8 +86,8 @@ def test_zookeeper_rescale(self):
     def rescale_zk_and_clickhouse(ch_node_count, zk_node_count, first_install=False):
         zk_manifest = 'zookeeper-1-node-1GB-for-tests-only.yaml' if zk_node_count == 1 else 'zookeeper-3-nodes-1GB-for-tests-only.yaml'
         _, chi = util.install_clickhouse_and_zookeeper(
-            chi_file=f'tests/test-cluster-for-zookeeper-{ch_node_count}.yaml',
-            chi_template_file='templates/tpl-clickhouse-latest.yaml',
+            chi_file=f'manifests/chi/test-cluster-for-zookeeper-{ch_node_count}.yaml',
+            chi_template_file='manifests/chit/tpl-clickhouse-latest.yaml',
             chi_name='test-cluster-for-zk',
             zk_manifest=zk_manifest,
             clean_ns=first_install,

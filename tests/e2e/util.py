@@ -101,7 +101,7 @@ def install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name,
         check = {
             "apply_templates": [
                 chi_template_file,
-                "templates/tpl-persistent-volume-100Mi.yaml"
+                "manifests/chit/tpl-persistent-volume-100Mi.yaml"
             ],
             "do_not_delete": 1
         }

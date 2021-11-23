@@ -80,11 +80,11 @@ def prepare_table_for_backup(backup_pod, chi, rows=1000):
 def apply_fake_backup(message):
     with Given(message):
         kubectl.create_and_check(
-            manifest="tests/test-cluster-for-backups-fake.yaml",
+            manifest="manifests/chi/test-cluster-for-backups-fake.yaml",
             check={
                 "apply_templates": [
-                    "templates/tpl-clickhouse-backups-fake.yaml",
-                    "templates/tpl-persistent-volume-100Mi.yaml"
+                    "manifests/chit/tpl-clickhouse-backups-fake.yaml",
+                    "manifests/chit/tpl-persistent-volume-100Mi.yaml"
                 ],
                 "object_counts": {
                     "statefulset": 2,
@@ -99,11 +99,11 @@ def apply_fake_backup(message):
 def apply_normal_backup():
     with Then("apply back normal backup"):
         kubectl.create_and_check(
-            manifest="tests/test-cluster-for-backups.yaml",
+            manifest="manifests/chi/test-cluster-for-backups.yaml",
             check={
                 "apply_templates": [
-                    "templates/tpl-clickhouse-backups.yaml",
-                    "templates/tpl-persistent-volume-100Mi.yaml"
+                    "manifests/chit/tpl-clickhouse-backups.yaml",
+                    "manifests/chit/tpl-persistent-volume-100Mi.yaml"
                 ],
                 "object_counts": {
                     "statefulset": 2,
@@ -371,8 +371,8 @@ def test_backup_not_run(self, chi, minio_spec):
 @Name("e2e.test_backup_alerts")
 def test(self):
     _, _, _, _, chi = alerts.initialize(
-        chi_file='tests/test-cluster-for-backups.yaml',
-        chi_template_file='templates/tpl-clickhouse-backups.yaml',
+        chi_file='manifests/chi/test-cluster-for-backups.yaml',
+        chi_template_file='manifests/chit/tpl-clickhouse-backups.yaml',
         chi_name='test-cluster-for-backups',
     )
     minio_spec = get_minio_spec()

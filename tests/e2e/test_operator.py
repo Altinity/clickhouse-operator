@@ -14,7 +14,7 @@ from testflows.asserts import error
 @Name("test_001. 1 node")
 def test_001(self):
     kubectl.create_and_check(
-        manifest="tests/test-001.yaml",
+        manifest="manifests/chi/test-001.yaml",
         check={
             "object_counts": {
                 "statefulset": 1,
@@ -30,13 +30,13 @@ def test_001(self):
 @Name("test_002. useTemplates for pod, volume templates, and distribution")
 def test_002(self):
     kubectl.create_and_check(
-        manifest="tests/test-002-tpl.yaml",
+        manifest="manifests/chi/test-002-tpl.yaml",
         check={
             "pod_count": 1,
             "apply_templates": {
                 settings.clickhouse_template,
-                "templates/tpl-log-volume.yaml",
-                "templates/tpl-one-per-host.yaml",
+                "manifests/chit/tpl-log-volume.yaml",
+                "manifests/chit/tpl-one-per-host.yaml",
             },
             "pod_image": settings.clickhouse_version,
             "pod_volumes": {
@@ -51,7 +51,7 @@ def test_002(self):
 @Name("test_003. 4 nodes with custom layout definition")
 def test_003(self):
     kubectl.create_and_check(
-        manifest="tests/test-003-complex-layout.yaml",
+        manifest="manifests/chi/test-003-complex-layout.yaml",
         check={
             "object_counts": {
                 "statefulset": 4,
@@ -66,7 +66,7 @@ def test_003(self):
 @Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
 def test_004(self):
     kubectl.create_and_check(
-        manifest="tests/test-004-tpl.yaml",
+        manifest="manifests/chi/test-004-tpl.yaml",
         check={
             "pod_count": 1,
             "pod_volumes": {
@@ -80,7 +80,7 @@ def test_004(self):
 @Name("test_005. Test manifest created by ACM")
 def test_005(self):
     kubectl.create_and_check(
-        manifest="tests/test-005-acm.yaml",
+        manifest="manifests/chi/test-005-acm.yaml",
         check={
             "pod_count": 1,
             "pod_volumes": {
@@ -98,7 +98,7 @@ def test_006(self):
     new_version = "yandex/clickhouse-server:21.8"
     with Then("Create initial position"):
         kubectl.create_and_check(
-            manifest="tests/test-006-ch-upgrade-1.yaml",
+            manifest="manifests/chi/test-006-ch-upgrade-1.yaml",
             check={
                 "pod_count": 2,
                 "pod_image": old_version,
@@ -107,7 +107,7 @@ def test_006(self):
         )
     with Then("Use different podTemplate and confirm that pod image is updated"):
         kubectl.create_and_check(
-            manifest="tests/test-006-ch-upgrade-2.yaml",
+            manifest="manifests/chi/test-006-ch-upgrade-2.yaml",
             check={
                 "pod_count": 2,
                 "pod_image": new_version,
@@ -116,7 +116,7 @@ def test_006(self):
         )
     with Then("Change image in podTemplate itself and confirm that pod image is updated"):
         kubectl.create_and_check(
-            manifest="tests/test-006-ch-upgrade-3.yaml",
+            manifest="manifests/chi/test-006-ch-upgrade-3.yaml",
             check={
                 "pod_count": 2,
                 "pod_image": old_version,
@@ -128,7 +128,7 @@ def test_006(self):
 @Name("test_007. Test template with custom clickhouse ports")
 def test_007(self):
     kubectl.create_and_check(
-        manifest="tests/test-007-custom-ports.yaml",
+        manifest="manifests/chi/test-007-custom-ports.yaml",
         check={
             "pod_count": 1,
             "pod_ports": [8124, 9001, 9010],
@@ -227,18 +227,18 @@ def test_operator_restart(manifest, version=settings.operator_version):
 @Name("test_008. Test operator restart")
 def test_008(self):
     with Then("Test simple chi for operator restart"):
-        test_operator_restart("tests/test-008-operator-restart-1.yaml")
+        test_operator_restart("manifests/chi/test-008-operator-restart-1.yaml")
     with Then("Test advanced chi for operator restart"):
-        test_operator_restart("tests/test-008-operator-restart-2.yaml")
+        test_operator_restart("manifests/chi/test-008-operator-restart-2.yaml")
 
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
 def test_009(self, version_from="0.16.0", version_to=settings.operator_version):
     with Then("Test simple chi for operator upgrade"):
-        test_operator_upgrade("tests/test-009-operator-upgrade-1.yaml", version_from, version_to)
+        test_operator_upgrade("manifests/chi/test-009-operator-upgrade-1.yaml", version_from, version_to)
     with Then("Test advanced chi for operator upgrade"):
-        test_operator_upgrade("tests/test-009-operator-upgrade-2.yaml", version_from, version_to)
+        test_operator_upgrade("manifests/chi/test-009-operator-upgrade-2.yaml", version_from, version_to)
 
 
 @TestScenario
@@ -248,7 +248,7 @@ def test_010(self):
     util.require_zookeeper()
 
     kubectl.create_and_check(
-        manifest="tests/test-010-zkroot.yaml",
+        manifest="manifests/chi/test-010-zkroot.yaml",
         check={
             "apply_templates": {
                 settings.clickhouse_template,
@@ -270,7 +270,7 @@ def test_010(self):
 def test_011(self):
     with Given("test-011-secured-cluster.yaml and test-011-insecured-cluster.yaml"):
         kubectl.create_and_check(
-            manifest="tests/test-011-secured-cluster.yaml",
+            manifest="manifests/chi/test-011-secured-cluster.yaml",
             check={
                 "pod_count": 2,
                 "service": [
@@ -279,14 +279,14 @@ def test_011(self):
                 ],
                 "apply_templates": {
                     settings.clickhouse_template,
-                    "templates/tpl-log-volume.yaml",
+                    "manifests/chit/tpl-log-volume.yaml",
                 },
                 "do_not_delete": 1,
             }
         )
 
         kubectl.create_and_check(
-            manifest="tests/test-011-insecured-cluster.yaml",
+            manifest="manifests/chi/test-011-insecured-cluster.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -377,7 +377,7 @@ def test_011(self):
 def test_011_1(self):
     with Given("test-011-secured-default-1.yaml with password_sha256_hex for default user"):
         kubectl.create_and_check(
-            manifest="tests/test-011-secured-default-1.yaml",
+            manifest="manifests/chi/test-011-secured-default-1.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -399,7 +399,7 @@ def test_011_1(self):
 
         with When("Trigger installation update"):
             kubectl.create_and_check(
-                manifest="tests/test-011-secured-default-2.yaml",
+                manifest="manifests/chi/test-011-secured-default-2.yaml",
                 check={
                     "do_not_delete": 1,
                 }
@@ -411,7 +411,7 @@ def test_011_1(self):
 
         with When("Default user is assigned the different profile"):
             kubectl.create_and_check(
-                manifest="tests/test-011-secured-default-3.yaml",
+                manifest="manifests/chi/test-011-secured-default-3.yaml",
                 check={
                     "do_not_delete": 1,
                 }
@@ -434,7 +434,7 @@ def test_011_1(self):
 @Name("test_012. Test service templates")
 def test_012(self):
     kubectl.create_and_check(
-        manifest="tests/test-012-service-template.yaml",
+        manifest="manifests/chi/test-012-service-template.yaml",
         check={
             "object_counts": {
                 "statefulset": 2,
@@ -457,7 +457,7 @@ def test_012(self):
 
     with Then("Update chi"):
         kubectl.create_and_check(
-            manifest="tests/test-012-service-template-2.yaml",
+            manifest="manifests/chi/test-012-service-template-2.yaml",
             check={
                 "object_counts": {
                     "statefulset": 1,
@@ -479,7 +479,7 @@ def test_012(self):
 @TestScenario
 @Name("test_013. Test adding shards and creating local and distributed tables automatically")
 def test_013(self):
-    manifest = "tests/test-013-add-shards-1.yaml"
+    manifest = "manifests/chi/test-013-add-shards-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     cluster = "default"
 
@@ -534,7 +534,7 @@ def test_013(self):
     nShards = 2
     with Then(f"Add {nShards-1} shards"):
         kubectl.create_and_check(
-            manifest="tests/test-013-add-shards-2.yaml",
+            manifest="manifests/chi/test-013-add-shards-2.yaml",
             check={
                 "object_counts": {
                     "statefulset": nShards,
@@ -616,7 +616,7 @@ def test_014(self):
     ORDER BY a
     """.replace('\r', '').replace('\n', '')
 
-    manifest = "tests/test-014-replication-1.yaml"
+    manifest = "manifests/chi/test-014-replication-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     cluster = "default"
 
@@ -625,7 +625,7 @@ def test_014(self):
         check={
             "apply_templates": {
                 settings.clickhouse_template,
-                "templates/tpl-persistent-volume-100Mi.yaml",
+                "manifests/chit/tpl-persistent-volume-100Mi.yaml",
             },
             "object_counts": {
                 "statefulset": 2,
@@ -702,7 +702,7 @@ def test_014(self):
 
     with When("Add 3 more replica"):
         kubectl.create_and_check(
-            manifest="tests/test-014-replication-2.yaml",
+            manifest="manifests/chi/test-014-replication-2.yaml",
             check={
                 "pod_count": 5,
                 "do_not_delete": 1,
@@ -808,7 +808,7 @@ def test_014(self):
 @Name("test_015. Test circular replication with hostNetwork")
 def test_015(self):
     kubectl.create_and_check(
-        manifest="tests/test-015-host-network.yaml",
+        manifest="manifests/chi/test-015-host-network.yaml",
         check={
             "pod_count": 2,
             "do_not_delete": 1,
@@ -847,7 +847,7 @@ def test_015(self):
 def test_016(self):
     chi = "test-016-settings"
     kubectl.create_and_check(
-        manifest="tests/test-016-settings-01.yaml",
+        manifest="manifests/chi/test-016-settings-01.yaml",
         check={
             "apply_templates": {
                 settings.clickhouse_template,
@@ -892,7 +892,7 @@ def test_016(self):
     with When("Update usersd settings"):
         start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         kubectl.create_and_check(
-            manifest="tests/test-016-settings-02.yaml",
+            manifest="manifests/chi/test-016-settings-02.yaml",
             check={
                 "do_not_delete": 1,
             },
@@ -920,7 +920,7 @@ def test_016(self):
     with When("Update custom.xml settings"):
         start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         kubectl.create_and_check(
-            manifest="tests/test-016-settings-03.yaml",
+            manifest="manifests/chi/test-016-settings-03.yaml",
             check={
                 "do_not_delete": 1,
             })
@@ -941,7 +941,7 @@ def test_016(self):
     with When("Add new custom2.xml config file"):
         start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         kubectl.create_and_check(
-            manifest="tests/test-016-settings-04.yaml",
+            manifest="manifests/chi/test-016-settings-04.yaml",
             check={
                 "do_not_delete": 1,
             })
@@ -966,7 +966,7 @@ def test_016(self):
 def test_017(self):
     pod_count = 2
     kubectl.create_and_check(
-        manifest="tests/test-017-multi-version.yaml",
+        manifest="manifests/chi/test-017-multi-version.yaml",
         check={
             "pod_count": pod_count,
             "do_not_delete": 1,
@@ -1004,7 +1004,7 @@ def test_017(self):
 def test_018(self):
     chi = "test-018-configmap"
     kubectl.create_and_check(
-        manifest="tests/test-018-configmap-1.yaml",
+        manifest="manifests/chi/test-018-configmap-1.yaml",
         check={
             "pod_count": 1,
             "do_not_delete": 1,
@@ -1013,7 +1013,7 @@ def test_018(self):
 
     with When("Update settings"):
         kubectl.create_and_check(
-            manifest="tests/test-018-configmap-2.yaml",
+            manifest="manifests/chi/test-018-configmap-2.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1037,7 +1037,7 @@ def test_018(self):
 @Name("test_019. Test that volume is correctly retained and can be re-attached")
 def test_019(self):
     util.require_zookeeper()
-    manifest = "tests/test-019-retain-volume-1.yaml"
+    manifest = "manifests/chi/test-019-retain-volume-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
@@ -1089,7 +1089,7 @@ def test_019(self):
 
     with When("Stop the Installation"):
         kubectl.create_and_check(
-            manifest="tests/test-019-retain-volume-2.yaml",
+            manifest="manifests/chi/test-019-retain-volume-2.yaml",
             check={
                 "object_counts": {
                     "statefulset": 1,  # When stopping, pod is removed but StatefulSet and all volumes are in place
@@ -1102,7 +1102,7 @@ def test_019(self):
 
         with And("Re-start the Installation"):
             kubectl.create_and_check(
-                manifest="tests/test-019-retain-volume-1.yaml",
+                manifest="manifests/chi/test-019-retain-volume-1.yaml",
                 check={
                     "pod_count": 1,
                     "do_not_delete": 1,
@@ -1120,7 +1120,7 @@ def test_019(self):
 
     with When("Add a second replica"):
         kubectl.create_and_check(
-            manifest="tests/test-019-retain-volume-3.yaml",
+            manifest="manifests/chi/test-019-retain-volume-3.yaml",
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
@@ -1135,7 +1135,7 @@ def test_019(self):
             pv_count = kubectl.get_count("pv")
 
             kubectl.create_and_check(
-                manifest="tests/test-019-retain-volume-1.yaml",
+                manifest="manifests/chi/test-019-retain-volume-1.yaml",
                 check={
                     "pod_count": 1,
                     "do_not_delete": 1,
@@ -1151,7 +1151,7 @@ def test_019(self):
 
     with When("Add a second replica one more time"):
         kubectl.create_and_check(
-            manifest="tests/test-019-retain-volume-3.yaml",
+            manifest="manifests/chi/test-019-retain-volume-3.yaml",
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
@@ -1164,7 +1164,7 @@ def test_019(self):
 
         with When("Set reclaim policy to Delete but do not wait for completion"):
             kubectl.create_and_check(
-                manifest="tests/test-019-retain-volume-4.yaml",
+                manifest="manifests/chi/test-019-retain-volume-4.yaml",
                 check={
                     "pod_count": 2,
                     "do_not_delete": 1,
@@ -1177,7 +1177,7 @@ def test_019(self):
                 pv_count = kubectl.get_count("pv")
 
                 kubectl.create_and_check(
-                    manifest="tests/test-019-retain-volume-1.yaml",
+                    manifest="manifests/chi/test-019-retain-volume-1.yaml",
                     check={
                         "pod_count": 1,
                         "do_not_delete": 1,
@@ -1198,7 +1198,7 @@ def test_019(self):
 @TestScenario
 @Name("test_020. Test multi-volume configuration")
 def test_020(self):
-    manifest = "tests/test-020-multi-volume.yaml"
+    manifest = "manifests/chi/test-020-multi-volume.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
@@ -1233,7 +1233,7 @@ def test_020(self):
 @TestScenario
 @Name("test_021. Test rescaling storage")
 def test_021(self):
-    manifest = "tests/test-021-rescale-volume-01.yaml"
+    manifest = "manifests/chi/test-021-rescale-volume-01.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
     with Given("Default storage class is expandable"):
@@ -1261,7 +1261,7 @@ def test_021(self):
 
     with When("Re-scale volume configuration to 2Gi"):
         kubectl.create_and_check(
-            manifest="tests/test-021-rescale-volume-02-enlarge-disk.yaml",
+            manifest="manifests/chi/test-021-rescale-volume-02-enlarge-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1279,7 +1279,7 @@ def test_021(self):
 
     with When("Add a second disk"):
         kubectl.create_and_check(
-            manifest="tests/test-021-rescale-volume-03-add-disk.yaml",
+            manifest="manifests/chi/test-021-rescale-volume-03-add-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1314,7 +1314,7 @@ def test_021(self):
 
     with When("Try reducing the disk size and also change a version to recreate the stateful set"):
         kubectl.create_and_check(
-            manifest="tests/test-021-rescale-volume-04-decrease-disk.yaml",
+            manifest="manifests/chi/test-021-rescale-volume-04-decrease-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1335,7 +1335,7 @@ def test_021(self):
 
     with When("Revert disk size back to 2Gi"):
         kubectl.create_and_check(
-            manifest="tests/test-021-rescale-volume-03-add-disk.yaml",
+            manifest="manifests/chi/test-021-rescale-volume-03-add-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1357,7 +1357,7 @@ def test_021(self):
 @TestScenario
 @Name("test_022. Test that chi with broken image can be deleted")
 def test_022(self):
-    manifest = "tests/test-022-broken-image.yaml"
+    manifest = "manifests/chi/test-022-broken-image.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
@@ -1382,20 +1382,20 @@ def test_022(self):
 @TestScenario
 @Name("test_023. Test auto templates")
 def test_023(self):
-    manifest = "tests/test-001.yaml"
+    manifest = "manifests/chi/test-001.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     
-    chit_data = yaml_manifest.get_manifest_data(util.get_full_path("templates/tpl-clickhouse-auto-1.yaml"))
+    chit_data = yaml_manifest.get_manifest_data(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
     expected_image = chit_data['spec']['templates']['podTemplates'][0]['spec']['containers'][0]['image']
     
     kubectl.create_and_check(
-        manifest="tests/test-001.yaml",
+        manifest="manifests/chi/test-001.yaml",
         check={
             "pod_count": 1,
             "apply_templates": {
                 settings.clickhouse_template,
-                "templates/tpl-clickhouse-auto-1.yaml",
-                "templates/tpl-clickhouse-auto-2.yaml"
+                "manifests/chit/tpl-clickhouse-auto-1.yaml",
+                "manifests/chit/tpl-clickhouse-auto-2.yaml"
             },
             # test-001.yaml does not have a template reference but should get correct ClickHouse version
             "pod_image": expected_image,
@@ -1408,14 +1408,14 @@ def test_023(self):
         assert kubectl.get_field("pod", "chi-test-001-single-0-0-0", ".metadata.annotations.test") == "test"
 
     kubectl.delete_chi(chi)
-    kubectl.delete(util.get_full_path("templates/tpl-clickhouse-auto-1.yaml"))
-    kubectl.delete(util.get_full_path("templates/tpl-clickhouse-auto-2.yaml"))
+    kubectl.delete(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
+    kubectl.delete(util.get_full_path("manifests/chit/tpl-clickhouse-auto-2.yaml"))
 
 
 @TestScenario
 @Name("test_024. Test annotations for various template types")
 def test_024(self):
-    manifest = "tests/test-024-template-annotations.yaml"
+    manifest = "manifests/chi/test-024-template-annotations.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
@@ -1454,7 +1454,7 @@ def test_025(self):
     ORDER BY a
     """.replace('\r', '').replace('\n', '')
 
-    manifest = "tests/test-025-rescaling.yaml"
+    manifest = "manifests/chi/test-025-rescaling.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
     kubectl.create_and_check(
@@ -1462,7 +1462,7 @@ def test_025(self):
         check={
             "apply_templates": {
                 settings.clickhouse_template,
-                "templates/tpl-persistent-volume-100Mi.yaml",
+                "manifests/chit/tpl-persistent-volume-100Mi.yaml",
             },
             "object_counts": {
                 "statefulset": 1,
@@ -1486,7 +1486,7 @@ def test_025(self):
 
     with When("Add one more replica, but do not wait for completion"):
         kubectl.create_and_check(
-            manifest="tests/test-025-rescaling-2.yaml",
+            manifest="manifests/chi/test-025-rescaling-2.yaml",
             check={
                 "do_not_delete": 1,
                 "pod_count": 2,
@@ -1537,7 +1537,7 @@ def test_025(self):
 def test_026(self):
     util.require_zookeeper()
 
-    manifest = "tests/test-026-mixed-replicas.yaml"
+    manifest = "manifests/chi/test-026-mixed-replicas.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
@@ -1592,7 +1592,7 @@ def test_026(self):
 @Name("test_027. Test troubleshooting mode")
 def test_027(self):
     # TODO: Add a case for a custom endpoint
-    manifest = "tests/test-027-troubleshooting-1-bad-config.yaml"
+    manifest = "manifests/chi/test-027-troubleshooting-1-bad-config.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
@@ -1611,7 +1611,7 @@ def test_027(self):
         )
         with Then("We can start in troubleshooting mode"):
             kubectl.create_and_check(
-                manifest="tests/test-027-troubleshooting-2-troubleshoot.yaml",
+                manifest="manifests/chi/test-027-troubleshooting-2-troubleshoot.yaml",
                 check={
                     "object_counts": {
                         "statefulset": 1,
@@ -1627,7 +1627,7 @@ def test_027(self):
 
         with Then("We can start in normal mode after correcting the problem"):
             kubectl.create_and_check(
-                manifest="tests/test-027-troubleshooting-3-fixed-config.yaml",
+                manifest="manifests/chi/test-027-troubleshooting-3-fixed-config.yaml",
                 check={
                     "pod_count": 1,
                 },
@@ -1639,7 +1639,7 @@ def test_027(self):
 def test_028(self):
     util.require_zookeeper()
 
-    manifest = "tests/test-014-replication-1.yaml"
+    manifest = "manifests/chi/test-014-replication-1.yaml"
 
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
@@ -1717,7 +1717,7 @@ def test_028(self):
 @Name("test_029. Test different distribution settings")
 def test_029(self):
     # TODO: this test needs to be extended in order to handle more distribution types
-    manifest = "tests/test-029-distribution.yaml"
+    manifest = "manifests/chi/test-029-distribution.yaml"
 
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest, lookup_in_host=True))
     kubectl.create_and_check(

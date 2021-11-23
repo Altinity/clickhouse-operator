@@ -34,13 +34,13 @@ operator_docker_repo = os.getenv('OPERATOR_DOCKER_REPO') if 'OPERATOR_DOCKER_REP
     "altinity/clickhouse-operator"
 metrics_exporter_docker_repo = "altinity/metrics-exporter"
 
-# clickhouse_template = "templates/tpl-clickhouse-stable.yaml"
-# clickhouse_template = "templates/tpl-clickhouse-19.17.yaml"
-# clickhouse_template = "templates/tpl-clickhouse-20.3.yaml"
-# clickhouse_template = "templates/tpl-clickhouse-20.8.yaml"
-# clickhouse_template = "templates/tpl-clickhouse-21.3.yaml"
-clickhouse_template = "templates/tpl-clickhouse-21.8.yaml"
-clickhouse_template_old = "templates/tpl-clickhouse-21.3.yaml"
+# clickhouse_template = "manifests/chit/tpl-clickhouse-stable.yaml"
+# clickhouse_template = "manifests/chit/tpl-clickhouse-19.17.yaml"
+# clickhouse_template = "manifests/chit/tpl-clickhouse-20.3.yaml"
+# clickhouse_template = "manifests/chit/tpl-clickhouse-20.8.yaml"
+# clickhouse_template = "manifests/chit/tpl-clickhouse-21.3.yaml"
+clickhouse_template = "manifests/chit/tpl-clickhouse-21.8.yaml"
+clickhouse_template_old = "manifests/chit/tpl-clickhouse-21.3.yaml"
 
 clickhouse_version = get_ch_version(clickhouse_template)
 clickhouse_version_old = get_ch_version(clickhouse_template_old)

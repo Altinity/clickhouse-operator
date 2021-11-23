@@ -119,7 +119,7 @@ def test_metrics_exporter_with_multiple_clickhouse_version(self):
             })
 
         with Then("Install multiple clickhouse version"):
-            manifest = "tests/test-017-multi-version.yaml"
+            manifest = "manifests/chi/test-017-multi-version.yaml"
             kubectl.create_and_check(
                 manifest=manifest,
                 check={
