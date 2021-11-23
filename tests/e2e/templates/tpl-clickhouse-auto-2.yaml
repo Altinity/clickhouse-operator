@@ -5,6 +5,7 @@ metadata:
   name: extension-annotations
   annotations:
     test: "test"
+    macro: "macro-{chi}"
 spec:
   templating:
     policy: auto
