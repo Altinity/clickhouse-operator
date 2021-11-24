@@ -259,7 +259,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:19.3.7
+              image: yandex/clickhouse-server:latest
               ports:
                 - name: http
                   containerPort: 8123
