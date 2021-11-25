@@ -1,3 +1,10 @@
+#
+# Ansible template parameters available:
+#
+# 1. namespace - namespace to install the operator into and to be watched by the operator.
+# 2. password  - password of the clickhouse's user, used by the operator.
+#
+#
 # Template Parameters:
 #
 # KIND=ClickHouseInstallation
