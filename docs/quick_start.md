@@ -206,30 +206,30 @@ metadata:
 spec:
   defaults:
     templates:
-      dataVolumeClaimTemplate: volume-template
-      logVolumeClaimTemplate: volume-template
+      dataVolumeClaimTemplate: data-volume-template
+      logVolumeClaimTemplate: log-volume-template
   configuration:
     clusters:
       - name: "simple"
         layout:
           shardsCount: 1
           replicasCount: 1
-      - name: "replicas"
-        layout:
-          shardsCount: 1
-          replicasCount: 2
-      - name: "shards"
-        layout:
-          shardsCount: 2
   templates:
     volumeClaimTemplates:
-      - name: volume-template
+      - name: data-volume-template
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 123Mi
+              storage: 1Gi
+      - name: log-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Mi
 ```
 
 ## Custom Deployment with Pod and VolumeClaim Templates
@@ -254,8 +254,8 @@ spec:
         templates:
           podTemplate: pod-template-with-volumes
         layout:
-          shardsCount: 1
-          replicasCount: 1
+          shardsCount: 2
+          replicasCount: 2
 
   templates:
     podTemplates:
@@ -263,14 +263,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:19.3.7
-              ports:
-                - name: http
-                  containerPort: 8123
-                - name: client
-                  containerPort: 9000
-                - name: interserver
-                  containerPort: 9009
+              image: yandex/clickhouse-server:21.8
               volumeMounts:
                 - name: data-storage-vc-template
                   mountPath: /var/lib/clickhouse
@@ -296,9 +289,19 @@ spec:
 
 ## Custom Deployment with Specific ClickHouse Configuration
 
-You can tell operator to configure your ClickHouse, as shown in the example below ([link to the manifest][05-settings-01-overview.yaml]):
+You can tell the operator to configure your ClickHouse, as shown in the example below ([link to the manifest][05-settings-01-overview.yaml]):
 
 ```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-credentials
+type: Opaque
+stringData:
+  testpwduser1: password
+  testpwduser2: 65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5
+  testpwduser3: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
+---
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
@@ -317,6 +320,11 @@ spec:
         - "dbname1"
         - "dbname2"
         - "dbname3"
+      # reference to namespace/name/field in the secret with plain password
+      testpwduser1/k8s_secret_password: dev/clickhouse-credentials/testpwduser1
+      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password
+      testpwduser2/k8s_secret_password_sha256_hex: clickhouse-credentials/testpwduser2
+      testpwduser3/k8s_secret_password_double_sha1_hex: clickhouse-credentials/testpwduser3
       # admin use has 'password_sha256_hex' so actual password value is not published
       admin/password_sha256_hex: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
       admin/networks/ip: "127.0.0.1/32"
@@ -327,11 +335,11 @@ spec:
       readonly/profile: readonly
       readonly/quota: default
     profiles:
-      test_profile/max_memory_usage: "1000000000"
-      test_profile/readonly: "1"
-      readonly/readonly: "1"
+      test_profile/max_memory_usage: 1000000000
+      test_profile/readonly: 1
+      readonly/readonly: 1
     quotas:
-      test_quota/interval/duration: "3600"
+      test_quota/interval/duration: 3600
     settings:
       compression/case/method: zstd
       disable_internal_dns_cache: 1
