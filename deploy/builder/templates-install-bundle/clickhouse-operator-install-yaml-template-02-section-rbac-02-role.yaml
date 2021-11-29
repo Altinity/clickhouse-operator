@@ -12,6 +12,8 @@ kind: ${ROLE_KIND}
 metadata:
   name: ${ROLE_NAME}
   ${COMMENT}namespace: ${NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: ${OPERATOR_VERSION}
 rules:
 - apiGroups:
     - ""
@@ -160,6 +162,8 @@ kind: ${ROLE_BINDING_KIND}
 metadata:
   name: ${ROLE_BINDING_NAME}
   ${COMMENT}namespace: ${NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: ${OPERATOR_VERSION}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ${ROLE_KIND}
