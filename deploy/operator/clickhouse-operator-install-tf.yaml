@@ -16,6 +16,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
+  labels:
+    clickhouse.altinity.com/chop: 0.17.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1336,6 +1338,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
+  labels:
+    clickhouse.altinity.com/chop: 0.17.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2653,6 +2657,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
+  labels:
+    clickhouse.altinity.com/chop: 0.17.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2852,6 +2858,8 @@ kind: ServiceAccount
 metadata:
   name: clickhouse-operator
   namespace: ${namespace}
+  labels:
+    clickhouse.altinity.com/chop: 0.17.0
 ---
 # Template Parameters:
 #
@@ -2867,6 +2875,8 @@ kind: Role
 metadata:
   name: clickhouse-operator
   namespace: ${namespace}
+  labels:
+    clickhouse.altinity.com/chop: 0.17.0
 rules:
 - apiGroups:
     - ""
@@ -3015,6 +3025,8 @@ kind: RoleBinding
 metadata:
   name: clickhouse-operator
   namespace: ${namespace}
+  labels:
+    clickhouse.altinity.com/chop: 0.17.0
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -3036,6 +3048,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: ${namespace}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -3234,6 +3247,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: ${namespace}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 data:
 ---
@@ -3249,6 +3263,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: ${namespace}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3307,6 +3322,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: ${namespace}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -3406,6 +3422,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: ${namespace}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 data:
   01-clickhouse-user.xml: |
@@ -3467,6 +3484,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -3595,6 +3613,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: ${namespace}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 spec:
   ports:
