@@ -2852,13 +2852,13 @@ rules:
       - configmaps
       - services
     verbs:
-      - create
-      - delete
       - get
+      - list
       - patch
       - update
-      - list
       - watch
+      - create
+      - delete
   - apiGroups:
       - ""
     resources:
@@ -2878,12 +2878,12 @@ rules:
     resources:
       - persistentvolumeclaims
     verbs:
-      - delete
       - get
       - list
       - patch
       - update
       - watch
+      - delete
   - apiGroups:
       - ""
     resources:
@@ -2900,22 +2900,22 @@ rules:
     resources:
       - statefulsets
     verbs:
-      - create
-      - delete
       - get
+      - list
       - patch
       - update
-      - list
       - watch
+      - create
+      - delete
   - apiGroups:
       - apps
     resources:
       - replicasets
     verbs:
-      - delete
       - get
       - patch
       - update
+      - delete
   - apiGroups:
       - apps
     resourceNames:
@@ -2932,22 +2932,22 @@ rules:
     resources:
       - poddisruptionbudgets
     verbs:
-      - create
-      - delete
       - get
+      - list
       - patch
       - update
-      - list
       - watch
+      - create
+      - delete
   - apiGroups:
       - clickhouse.altinity.com
     resources:
       - clickhouseinstallations
     verbs:
-      - delete
       - get
       - patch
       - update
+      - delete
   - apiGroups:
       - clickhouse.altinity.com
     resources:
@@ -2973,11 +2973,11 @@ rules:
       - clickhouseinstallationtemplates/status
       - clickhouseoperatorconfigurations/status
     verbs:
-      - create
-      - delete
       - get
       - update
       - patch
+      - create
+      - delete
   - apiGroups:
       - ""
     resources:
