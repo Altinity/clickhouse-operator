@@ -33,6 +33,7 @@ spec:
       metadata:
         annotations:
           servicetemplate/test: "test"
+          servicetemplate/macro-test: "{chi}-{shard}-{replica}.example.com"
       spec:
         ports:
           - name: http
