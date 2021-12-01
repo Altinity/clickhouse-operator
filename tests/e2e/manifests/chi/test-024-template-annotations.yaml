@@ -33,6 +33,19 @@ spec:
       metadata:
         annotations:
           servicetemplate/test: "test"
+          servicetemplate/macro-test: "{chi}.example.com"
+      spec:
+        ports:
+          - name: http
+            port: 8123
+          - name: tcp
+            port: 9000
+        type: ClusterIP
+        clusterIP: None
+    - name: replica-service-template
+      generateName: "service-{chi}-{shard}-{replica}"
+      metadata:
+        annotations:
           servicetemplate/macro-test: "{chi}-{shard}-{replica}.example.com"
       spec:
         ports:
@@ -47,6 +60,7 @@ spec:
       podTemplate: default-pod-template
       volumeClaimTemplate: default-volumeclaim-template
       serviceTemplate: default-service-template
+      replicaServiceTemplate: replica-service-template
   configuration:
     clusters:
     - name: default

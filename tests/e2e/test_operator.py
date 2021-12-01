@@ -1440,7 +1440,9 @@ def test_024(self):
         assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", ".metadata.annotations.chi/test") == "test"
 
     with And("Service annotation macros should be resolved"):
-        assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.servicetemplate/macro-test") == "test-024-0-0.example.com"
+        assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.servicetemplate/macro-test") == "test-024.example.com"
+        assert kubectl.get_field("service", "service-test-024-0-0", ".metadata.annotations.servicetemplate/macro-test") == "test-024-0-0.example.com"
+
 
     kubectl.delete_chi(chi)
 
