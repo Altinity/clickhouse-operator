@@ -2,10 +2,13 @@
 # ===== Builder =====
 # ===================
 
-FROM golang:1.13 AS builder
+FROM golang:1.17 AS builder
 
 # Install required packages
-RUN apt-get update && apt-get install -y apt-utils gettext-base
+RUN echo "deb http://ppa.launchpad.net/rmescandon/yq/ubuntu focal main" > /etc/apt/sources.list.d/yq.list && \
+    echo "deb-src http://ppa.launchpad.net/rmescandon/yq/ubuntu focal main" >> /etc/apt/sources.list.d/yq.list && \
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys CC86BB64
+RUN apt-get update && apt-get install -y apt-utils gettext-base yq
 
 # Reconstruct source tree inside docker
 WORKDIR /clickhouse-operator
