@@ -9,6 +9,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
+  labels:
+    clickhouse.altinity.com/chop: 0.17.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1329,6 +1331,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
+  labels:
+    clickhouse.altinity.com/chop: 0.17.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2646,6 +2650,8 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
+  labels:
+    clickhouse.altinity.com/chop: 0.17.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2768,8 +2774,15 @@ spec:
                   type: string
                 vmodule:
                   type: string
+                  description: |
+                    Comma-separated list of filename=N, where filename (can be a pattern) must have no .go ext, and N is a V level.
+                    Ex.: file*=2 sets the 'V' to 2 in all files with names like file*.
                 log_backtrace_at:
                   type: string
+                  description: |
+                    It can be set to a file and line number with a logging line.
+                    Ex.: file.go:123
+                    Each time when this line is being executed, a stack trace will be written to the Info log.
                 reconcileThreadsNumber:
                   type: integer
                   description: "how much goroutines will use to reconcile in parallel, 10 by default"
@@ -2788,7 +2801,18 @@ spec:
                     type: string
                 appendScopeLabels:
                   type: string
-                  description: "Whether to append *Scope* labels to StatefulSet and Pod"
+                  description: |
+                    Whether to append *Scope* labels to StatefulSet and Pod
+                    - "LabelShardScopeIndex"
+                    - "LabelReplicaScopeIndex"
+                    - "LabelCHIScopeIndex"
+                    - "LabelCHIScopeCycleSize"
+                    - "LabelCHIScopeCycleIndex"
+                    - "LabelCHIScopeCycleOffset"
+                    - "LabelClusterScopeIndex"
+                    - "LabelClusterScopeCycleSize"
+                    - "LabelClusterScopeCycleIndex"
+                    - "LabelClusterScopeCycleOffset"
                   enum:
                     # List StringBoolXXX constants from model
                     - ""
@@ -2814,16 +2838,6 @@ spec:
                     - "disabled"
                     - "Enabled"
                     - "enabled"
-                    - "LabelShardScopeIndex"
-                    - "LabelReplicaScopeIndex"
-                    - "LabelCHIScopeIndex"
-                    - "LabelCHIScopeCycleSize"
-                    - "LabelCHIScopeCycleIndex"
-                    - "LabelCHIScopeCycleOffset"
-                    - "LabelClusterScopeIndex"
-                    - "LabelClusterScopeCycleSize"
-                    - "LabelClusterScopeCycleIndex"
-                    - "LabelClusterScopeCycleOffset"
 ---
 # Template Parameters:
 #
@@ -2837,6 +2851,8 @@ kind: ServiceAccount
 metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: 0.17.0
 ---
 # Template Parameters:
 #
@@ -2852,6 +2868,8 @@ kind: ClusterRole
 metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: 0.17.0
 rules:
 - apiGroups:
     - ""
@@ -2859,13 +2877,13 @@ rules:
     - configmaps
     - services
   verbs:
-    - create
-    - delete
     - get
+    - list
     - patch
     - update
-    - list
     - watch
+    - create
+    - delete
 - apiGroups:
     - ""
   resources:
@@ -2885,12 +2903,12 @@ rules:
   resources:
     - persistentvolumeclaims
   verbs:
-    - delete
     - get
     - list
     - patch
     - update
     - watch
+    - delete
 - apiGroups:
     - ""
   resources:
@@ -2907,22 +2925,22 @@ rules:
   resources:
     - statefulsets
   verbs:
-    - create
-    - delete
     - get
+    - list
     - patch
     - update
-    - list
     - watch
+    - create
+    - delete
 - apiGroups:
     - apps
   resources:
     - replicasets
   verbs:
-    - delete
     - get
     - patch
     - update
+    - delete
 - apiGroups:
     - apps
   resourceNames:
@@ -2939,22 +2957,22 @@ rules:
   resources:
     - poddisruptionbudgets
   verbs:
-    - create
-    - delete
     - get
+    - list
     - patch
     - update
-    - list
     - watch
+    - create
+    - delete
 - apiGroups:
     - clickhouse.altinity.com
   resources:
     - clickhouseinstallations
   verbs:
-    - delete
     - get
     - patch
     - update
+    - delete
 - apiGroups:
     - clickhouse.altinity.com
   resources:
@@ -2980,11 +2998,11 @@ rules:
     - clickhouseinstallationtemplates/status
     - clickhouseoperatorconfigurations/status
   verbs:
-    - create
-    - delete
     - get
     - update
     - patch
+    - create
+    - delete
 - apiGroups:
     - ""
   resources:
@@ -3000,6 +3018,8 @@ kind: ClusterRoleBinding
 metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: 0.17.0
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -3021,6 +3041,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -3153,15 +3174,33 @@ data:
     
     ################################################
     ##
+    ## Annotations management parameters
+    ##
+    ################################################
+    
+    # Applied when:
+    #  1. Propagating annotations from the CHI's `metadata.annotations` to child objects' `metadata.annotations`,
+    #  2. Propagating annotations from the CHI Template's `metadata.annotations` to CHI's `metadata.annotations`,
+    # Include annotations from the following list:
+    # Applied only when not empty. Empty list means "include all, no selection"
+    includeIntoPropagationAnnotations: []
+    # Exclude annotations from the following list:
+    excludeFromPropagationAnnotations: []
+    
+    ################################################
+    ##
     ## Labels management parameters
     ##
     ################################################
     
-    # When propagating labels from the chi's `metadata.labels` section to child objects' `metadata.labels`,
-    # exclude labels from the following list:
-    #excludeFromPropagationLabels:
-    #  - "labelA"
-    #  - "labelB"
+    # Applied when:
+    #  1. Propagating labels from the CHI's `metadata.labels` to child objects' `metadata.labels`,
+    #  2. Propagating labels from the CHI Template's `metadata.labels` to CHI's `metadata.labels`,
+    # Include labels from the following list:
+    # Applied only when not empty. Empty list means "include all, no selection"
+    includeIntoPropagationLabels: []
+    # Exclude labels from the following list:
+    excludeFromPropagationLabels: []
     
     # Whether to append *Scope* labels to StatefulSet and Pod.
     # Full list of available *scope* labels check in labeler.go
@@ -3201,6 +3240,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 data:
 ---
@@ -3216,6 +3256,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3274,6 +3315,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -3308,7 +3350,7 @@ data:
                 "containers" : [
                   {
                     "name": "clickhouse",
-                    "image": "yandex/clickhouse-server:19.3.7",
+                    "image": "yandex/clickhouse-server:21.3",
                     "ports": [
                       {
                         "name": "http",
@@ -3373,6 +3415,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 data:
   01-clickhouse-user.xml: |
@@ -3434,6 +3477,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -3562,6 +3606,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: ${OPERATOR_NAMESPACE}
   labels:
+    clickhouse.altinity.com/chop: 0.17.0
     app: clickhouse-operator
 spec:
   ports:

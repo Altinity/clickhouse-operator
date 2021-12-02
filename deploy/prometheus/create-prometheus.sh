@@ -6,7 +6,7 @@ echo "External value for \$VALIDATE_YAML=$VALIDATE_YAML"
 
 export PROMETHEUS_NAMESPACE="${PROMETHEUS_NAMESPACE:-prometheus}"
 export OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
-export PROMETHEUS_OPERATOR_BRANCH="${PROMETHEUS_OPERATOR_BRANCH:-release-0.43}"
+export PROMETHEUS_OPERATOR_BRANCH="${PROMETHEUS_OPERATOR_BRANCH:-release-0.50}"
 export ALERT_MANAGER_EXTERNAL_URL="${ALERT_MANAGER_EXTERNAL_URL:-http://localhost:9093}"
 # Possible values for "validate yaml" are values from --validate=XXX kubectl option. They are true/false ATM
 export VALIDATE_YAML="${VALIDATE_YAML:-true}"
@@ -20,7 +20,9 @@ echo "Validate .yaml file   \$VALIDATE_YAML=${VALIDATE_YAML}"
 echo ""
 echo "!!! IMPORTANT !!!"
 echo "If you do not agree with specified options, press ctrl-c now"
-sleep 10
+if [[ "" == "${NO_WAIT}" ]]; then
+  sleep 10
+fi
 echo "Apply options now..."
 
 # Let's setup all prometheus-related stuff into dedicated namespace called "prometheus"
@@ -28,32 +30,23 @@ kubectl create namespace "${PROMETHEUS_NAMESPACE}" || true
 
 BASE_PATH="https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}"
 
-echo "Create prometheus-operator's CRDs"
-CRD_PATH="${BASE_PATH}/example/prometheus-operator-crd"
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    "${CRD_PATH}"/monitoring.coreos.com_alertmanagers.yaml
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    "${CRD_PATH}"/monitoring.coreos.com_podmonitors.yaml
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    "${CRD_PATH}"/monitoring.coreos.com_prometheuses.yaml
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    "${CRD_PATH}"/monitoring.coreos.com_prometheusrules.yaml
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    "${CRD_PATH}"/monitoring.coreos.com_servicemonitors.yaml
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
-    "${CRD_PATH}"/monitoring.coreos.com_thanosrulers.yaml
-
 echo "Setup prometheus-operator into '${PROMETHEUS_NAMESPACE}' namespace."
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f  <( \
     wget -qO- "${BASE_PATH}"/bundle.yaml | \
-    PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
+    sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
+)
+
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f  <( \
+    wget -qO- "${BASE_PATH}"/bundle.yaml | \
+    sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" | \
+    yq -M eval '. | select(.kind == "Deployment") | .spec.template.spec.containers[0].imagePullPolicy = "IfNotPresent" ' - \
 )
 
 echo "Setup RBAC"
 RBAC_PATH="${BASE_PATH}/example/rbac/prometheus"
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
     wget -qO- "${RBAC_PATH}"/prometheus-cluster-role-binding.yaml | \
-    PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
+    sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
 )
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
     "${RBAC_PATH}"/prometheus-cluster-role.yaml
@@ -62,7 +55,7 @@ kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}
 
 echo "Setup Prometheus instance via prometheus-operator into '${PROMETHEUS_NAMESPACE}' namespace"
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
-    cat "${CUR_DIR}/prometheus-template.yaml" | PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE} envsubst \
+    envsubst < "${CUR_DIR}/prometheus-template.yaml" \
 )
 
 echo "Setup Prometheus -> AlertManager -> Slack integration"
@@ -78,8 +71,7 @@ if [[ ! -f ${CUR_DIR}/prometheus-sensitive-data.sh ]]; then
 else
     source "${CUR_DIR}/prometheus-sensitive-data.sh"
     kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
-        cat "${CUR_DIR}/prometheus-alertmanager-template.yaml" | \
-        envsubst \
+        envsubst < "${CUR_DIR}/prometheus-alertmanager-template.yaml" \
     )
 
     for rules_file in "${CUR_DIR}"/prometheus-alert-rules*.yaml; do

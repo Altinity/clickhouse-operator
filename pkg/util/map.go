@@ -36,18 +36,45 @@ func IncludeNonEmpty(dst map[string]string, key, src string) {
 // It doesn't perform a deep-copy.
 func CopyMap(src map[string]string) map[string]string {
 	result := make(map[string]string, len(src))
-	for k, v := range src {
-		result[k] = v
+	for key, value := range src {
+		result[key] = value
 	}
 	return result
 }
 
-// CopyMapExcept creates a copy of the given map but will exclude the given set of keys.
-func CopyMapExcept(src map[string]string, exceptKeys ...string) map[string]string {
+// CopyMapFilter copies maps with keys filtering.
+// Keys specified in 'include' are included,
+// keys specified in 'exclude' are excluded.
+// However, 'include' keys are applied only in case 'include' list is not empty.
+func CopyMapFilter(src map[string]string, include, exclude []string) map[string]string {
+	return CopyMapExclude(CopyMapInclude(src, include...), exclude...)
+}
+
+// CopyMapInclude creates a copy of the given map but will include the given set of keys only.
+// However, keys are applied only in case list is not empty.
+// In case of an empty list, no filtering is performed and all keys are copied.
+func CopyMapInclude(src map[string]string, keys ...string) map[string]string {
+	if len(keys) == 0 {
+		// No include list specified, just copy the whole map
+		return CopyMap(src)
+	}
+
+	// Include list specified, copy listed keys only
+	result := make(map[string]string, len(keys))
+	for _, key := range keys {
+		if value, ok := src[key]; ok {
+			result[key] = value
+		}
+	}
+	return result
+}
+
+// CopyMapExclude creates a copy of the given map but will exclude the given set of keys.
+func CopyMapExclude(src map[string]string, exceptKeys ...string) map[string]string {
 	result := CopyMap(src)
 
-	for _, k := range exceptKeys {
-		delete(result, k)
+	for _, key := range exceptKeys {
+		delete(result, key)
 	}
 
 	return result

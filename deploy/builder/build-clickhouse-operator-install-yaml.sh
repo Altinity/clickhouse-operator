@@ -45,18 +45,47 @@ OPERATOR_NAMESPACE="dev" \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.s"h > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-dev.yaml"
 
 # Build terraform-templated installation .yaml manifest
+cat <<EOF > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-tf.yaml"
+#
+# Terraform template parameters available:
+#
+# 1. namespace - namespace to install the operator into and to be watched by the operator.
+# 2. password  - password of the clickhouse's user, used by the operator.
+#
+#
+EOF
 watchNamespaces="\${namespace}" \
 password_sha256_hex="\${sha256(password)}" \
 chPassword="\${password}" \
 OPERATOR_NAMESPACE="\${namespace}" \
 MANIFEST_PRINT_RBAC_NAMESPACED=yes \
-"${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-tf.yaml"
+"${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" >> "${MANIFEST_ROOT}/operator/clickhouse-operator-install-tf.yaml"
 
 # Build ansible-templated installation .yaml manifest
+cat <<EOF > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-ansible.yaml"
+#
+# Ansible template parameters available:
+#
+# 1. namespace - namespace to install the operator into and to be watched by the operator.
+# 2. password  - password of the clickhouse's user, used by the operator.
+#
+#
+EOF
 watchNamespaces="{{ namespace }}" \
 password_sha256_hex="{{ password | password_hash('sha256') }}" \
 chPassword="{{ password }}" \
 OPERATOR_NAMESPACE="{{ namespace }}" \
 MANIFEST_PRINT_RBAC_NAMESPACED=yes \
-"${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-ansible.yaml"
+"${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" >> "${MANIFEST_ROOT}/operator/clickhouse-operator-install-ansible.yaml"
 
+
+# Build partial .yaml manifest(s)
+OPERATOR_IMAGE="\${OPERATOR_IMAGE}" \
+METRICS_EXPORTER_IMAGE="\${METRICS_EXPORTER_IMAGE}" \
+OPERATOR_NAMESPACE="\${OPERATOR_NAMESPACE}" \
+MANIFEST_PRINT_CRD="yes" \
+MANIFEST_PRINT_RBAC_CLUSTERED="no" \
+MANIFEST_PRINT_RBAC_NAMESPACED="no" \
+MANIFEST_PRINT_DEPLOYMENT="no" \
+MANIFEST_PRINT_SERVICE="no" \
+"${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/parts/crd.yaml"

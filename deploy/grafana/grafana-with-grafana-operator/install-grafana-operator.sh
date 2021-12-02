@@ -13,7 +13,9 @@ echo "\$GRAFANA_OPERATOR_VERSION=${GRAFANA_OPERATOR_VERSION}"
 echo ""
 echo "!!! IMPORTANT !!!"
 echo "If you do not agree with specified options, press ctrl-c now"
-sleep 10
+if [[ "" == "${NO_WAIT}" ]]; then
+  sleep 10
+fi
 echo "Apply options now..."
 
 ##

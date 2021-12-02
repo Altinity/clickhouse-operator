@@ -10,3 +10,5 @@ kind: ServiceAccount
 metadata:
   name: ${NAME}
   ${COMMENT}namespace: ${NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: ${OPERATOR_VERSION}

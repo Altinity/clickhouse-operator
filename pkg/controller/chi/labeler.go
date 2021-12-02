@@ -16,10 +16,11 @@ package chi
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	v13 "k8s.io/api/apps/v1"
 	v12 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -28,7 +29,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (c *Controller) labelMyObjectsTree(ctx context.Context) {
+func (c *Controller) labelMyObjectsTree(ctx context.Context) error {
 
 	// Operator is running in the Pod. We need to label this Pod
 	// Pod is owned by ReplicaSet. We need to label this ReplicaSet also.
@@ -57,48 +58,75 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) {
 
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
-		return
-	}
-
-	// Label operator's Pod with version label
-	podName, ok1 := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAME)
-	namespace, ok2 := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
-
-	if !ok1 || !ok2 {
-		log.V(1).M(namespace, podName).A().Error("ERROR fetch Pod name out of %s/%s", namespace, podName)
-		return
-	}
-
-	// Pod namespaced name found, find and label the Pod
-	pod := c.labelPod(ctx, namespace, podName)
-	if pod == nil {
-		return
-	}
-
-	replicaSet := c.labelReplicaSet(ctx, pod)
-	if replicaSet == nil {
-		return
-	}
-
-	c.labelDeployment(ctx, replicaSet)
-}
-
-func (c *Controller) labelPod(ctx context.Context, namespace, name string) *v12.Pod {
-	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, newGetOptions())
-	if err != nil {
-		log.V(1).M(namespace, name).A().Error("ERROR get Pod %s/%s", namespace, name)
 		return nil
 	}
 
-	// Put label on the Pod
-	c.addLabels(&pod.ObjectMeta)
-	if _, err := c.kubeClient.CoreV1().Pods(namespace).Update(ctx, pod, newUpdateOptions()); err != nil {
-		log.V(1).M(namespace, name).A().Error("ERROR put label on Pod %s/%s %v", namespace, name, err)
+	// What pod does operator run in?
+	name, ok1 := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAME)
+	namespace, ok2 := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
+
+	if !ok1 || !ok2 {
+		str := fmt.Sprintf("ERROR read env vars: %s/%s ", chiv1.OPERATOR_POD_NAME, chiv1.OPERATOR_POD_NAMESPACE)
+		log.V(1).M(namespace, name).A().Error(str)
+		return errors.New(str)
 	}
-	return pod
+
+	// Put labels on the pod
+	pod, err := c.labelPod(ctx, namespace, name)
+	if err != nil {
+		return err
+	}
+	if pod == nil {
+		return fmt.Errorf("ERROR label pod %s/%s", namespace, name)
+	}
+
+	// Put labels on the ReplicaSet
+	replicaSet, err := c.labelReplicaSet(ctx, pod)
+	if err != nil {
+		return err
+	}
+	if replicaSet == nil {
+		return fmt.Errorf("ERROR label ReplicaSet for pod %s/%s", pod.Namespace, pod.Name)
+	}
+
+	// Put labels on the Deployment
+	err = c.labelDeployment(ctx, replicaSet)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (c *Controller) labelReplicaSet(ctx context.Context, pod *v12.Pod) *v13.ReplicaSet {
+func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*v12.Pod, error) {
+	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, newGetOptions())
+	if err != nil {
+		log.V(1).M(namespace, name).A().Error("ERROR get Pod %s/%s %v", namespace, name, err)
+		return nil, err
+	}
+	if pod == nil {
+		str := fmt.Sprintf("ERROR get Pod is nil %s/%s ", namespace, name)
+		log.V(1).M(namespace, name).A().Error(str)
+		return nil, errors.New(str)
+	}
+
+	// Put label on the Pod
+	pod.Labels = c.addLabels(pod.Labels)
+	pod, err = c.kubeClient.CoreV1().Pods(namespace).Update(ctx, pod, newUpdateOptions())
+	if err != nil {
+		log.V(1).M(namespace, name).A().Error("ERROR put label on Pod %s/%s %v", namespace, name, err)
+		return nil, err
+	}
+	if pod == nil {
+		str := fmt.Sprintf("ERROR update Pod is nil %s/%s ", namespace, name)
+		log.V(1).M(namespace, name).A().Error(str)
+		return nil, errors.New(str)
+	}
+
+	return pod, nil
+}
+
+func (c *Controller) labelReplicaSet(ctx context.Context, pod *v12.Pod) (*v13.ReplicaSet, error) {
 	// Find parent ReplicaSet
 	replicaSetName := ""
 	for i := range pod.OwnerReferences {
@@ -112,27 +140,40 @@ func (c *Controller) labelReplicaSet(ctx context.Context, pod *v12.Pod) *v13.Rep
 
 	if replicaSetName == "" {
 		// ReplicaSet not found
-		log.V(1).M(pod.Namespace, pod.Name).A().Error("ERROR ReplicaSet for Pod %s/%s not found", pod.Namespace, pod.Name)
-		return nil
+		str := fmt.Sprintf("ERROR ReplicaSet for Pod %s/%s not found", pod.Namespace, pod.Name)
+		log.V(1).M(pod.Namespace, pod.Name).A().Error(str)
+		return nil, errors.New(str)
 	}
 
 	// ReplicaSet namespaced name found, fetch the ReplicaSet
 	replicaSet, err := c.kubeClient.AppsV1().ReplicaSets(pod.Namespace).Get(ctx, replicaSetName, newGetOptions())
 	if err != nil {
 		log.V(1).M(pod.Namespace, replicaSetName).A().Error("ERROR get ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
-		return replicaSet
+		return nil, err
+	}
+	if replicaSet == nil {
+		str := fmt.Sprintf("ERROR get ReplicaSet is nil %s/%s ", pod.Namespace, replicaSetName)
+		log.V(1).M(pod.Namespace, replicaSetName).A().Error(str)
+		return nil, errors.New(str)
 	}
 
 	// Put label on the ReplicaSet
-	c.addLabels(&replicaSet.ObjectMeta)
-	if _, err := c.kubeClient.AppsV1().ReplicaSets(pod.Namespace).Update(ctx, replicaSet, newUpdateOptions()); err != nil {
+	replicaSet.Labels = c.addLabels(replicaSet.Labels)
+	replicaSet, err = c.kubeClient.AppsV1().ReplicaSets(pod.Namespace).Update(ctx, replicaSet, newUpdateOptions())
+	if err != nil {
 		log.V(1).M(pod.Namespace, replicaSetName).A().Error("ERROR put label on ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
+		return nil, err
+	}
+	if replicaSet == nil {
+		str := fmt.Sprintf("ERROR update ReplicaSet is nil %s/%s ", pod.Namespace, replicaSetName)
+		log.V(1).M(pod.Namespace, replicaSetName).A().Error(str)
+		return nil, errors.New(str)
 	}
 
-	return replicaSet
+	return replicaSet, nil
 }
 
-func (c *Controller) labelDeployment(ctx context.Context, rs *v13.ReplicaSet) {
+func (c *Controller) labelDeployment(ctx context.Context, rs *v13.ReplicaSet) error {
 	// Find parent Deployment
 	deploymentName := ""
 	for i := range rs.OwnerReferences {
@@ -146,28 +187,43 @@ func (c *Controller) labelDeployment(ctx context.Context, rs *v13.ReplicaSet) {
 
 	if deploymentName == "" {
 		// Deployment not found
-		log.V(1).M(rs.Namespace, rs.Name).A().Error("ERROR find Deployment for ReplicaSet %s/%s not found", rs.Namespace, rs.Name)
-		return
+		str := fmt.Sprintf("ERROR find Deployment for ReplicaSet %s/%s not found", rs.Namespace, rs.Name)
+		log.V(1).M(rs.Namespace, rs.Name).A().Error(str)
+		return errors.New(str)
 	}
 
 	// Deployment namespaced name found, fetch the Deployment
 	deployment, err := c.kubeClient.AppsV1().Deployments(rs.Namespace).Get(ctx, deploymentName, newGetOptions())
 	if err != nil {
 		log.V(1).M(rs.Namespace, deploymentName).A().Error("ERROR get Deployment %s/%s", rs.Namespace, deploymentName)
-		return
+		return err
+	}
+	if deployment == nil {
+		str := fmt.Sprintf("ERROR get Deployment is nil %s/%s ", rs.Namespace, deploymentName)
+		log.V(1).M(rs.Namespace, deploymentName).A().Error(str)
+		return errors.New(str)
 	}
 
 	// Put label on the Deployment
-	c.addLabels(&deployment.ObjectMeta)
-	if _, err := c.kubeClient.AppsV1().Deployments(rs.Namespace).Update(ctx, deployment, newUpdateOptions()); err != nil {
+	deployment.Labels = c.addLabels(deployment.Labels)
+	deployment, err = c.kubeClient.AppsV1().Deployments(rs.Namespace).Update(ctx, deployment, newUpdateOptions())
+	if err != nil {
 		log.V(1).M(rs.Namespace, deploymentName).A().Error("ERROR put label on Deployment %s/%s %v", rs.Namespace, deploymentName, err)
+		return err
 	}
+	if deployment == nil {
+		str := fmt.Sprintf("ERROR update Deployment is nil %s/%s ", rs.Namespace, deploymentName)
+		log.V(1).M(rs.Namespace, deploymentName).A().Error(str)
+		return errors.New(str)
+	}
+
+	return nil
 }
 
 // addLabels adds app and version labels
-func (c *Controller) addLabels(meta *v1.ObjectMeta) {
-	util.MergeStringMapsOverwrite(
-		meta.Labels,
+func (c *Controller) addLabels(labels map[string]string) map[string]string {
+	return util.MergeStringMapsOverwrite(
+		labels,
 		// Add the following labels
 		map[string]string{
 			model.LabelAppName: model.LabelAppValue,

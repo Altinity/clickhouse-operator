@@ -661,7 +661,7 @@ func (in *ChiStatus) DeepCopyInto(out *ChiStatus) {
 	}
 	if in.NormalizedCHI != nil {
 		in, out := &in.NormalizedCHI, &out.NormalizedCHI
-		*out = new(ChiSpec)
+		*out = new(ClickHouseInstallation)
 		(*in).DeepCopyInto(*out)
 	}
 	return
@@ -1201,6 +1201,21 @@ func (in *OperatorConfig) DeepCopyInto(out *OperatorConfig) {
 	}
 	if in.CHConfigUserDefaultNetworksIP != nil {
 		in, out := &in.CHConfigUserDefaultNetworksIP, &out.CHConfigUserDefaultNetworksIP
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.IncludeIntoPropagationAnnotations != nil {
+		in, out := &in.IncludeIntoPropagationAnnotations, &out.IncludeIntoPropagationAnnotations
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.ExcludeFromPropagationAnnotations != nil {
+		in, out := &in.ExcludeFromPropagationAnnotations, &out.ExcludeFromPropagationAnnotations
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.IncludeIntoPropagationLabels != nil {
+		in, out := &in.IncludeIntoPropagationLabels, &out.IncludeIntoPropagationLabels
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

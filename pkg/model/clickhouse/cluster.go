@@ -160,8 +160,8 @@ func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts
 					sqlAttach := strings.ReplaceAll(sql, "CREATE TABLE", "ATTACH TABLE")
 					err = conn.Exec(ctx, sqlAttach, opts)
 				}
-				if err == nil {
-					queries[i] = "" // Query is executed, removing from the list
+				if err == nil || strings.Contains(err.Error(), "ALREADY_EXISTS") {
+					queries[i] = "" // Query is executed or object already exists, removing from the list
 				} else {
 					errors = append(errors, err)
 				}

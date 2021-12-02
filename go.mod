@@ -7,7 +7,6 @@ require (
 	github.com/altinity/queue v0.0.0-20210114142043-ddb7da66064f
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/d4l3k/messagediff v1.2.1 // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/google/uuid v1.3.0
 	github.com/imdario/mergo v0.3.11
@@ -22,15 +21,15 @@ require (
 	golang.org/x/tools v0.1.5 // indirect
 	gopkg.in/d4l3k/messagediff.v1 v1.2.1
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.20.5
-	k8s.io/apimachinery v0.20.5
+	k8s.io/api v0.21.7
+	k8s.io/apimachinery v0.21.7
 	k8s.io/client-go v0.0.0-00010101000000-000000000000
 	k8s.io/code-generator v0.0.0-00010101000000-000000000000
 )
 
 replace (
-	k8s.io/api => k8s.io/api v0.20.5
-	k8s.io/apimachinery => k8s.io/apimachinery v0.20.5
-	k8s.io/client-go => k8s.io/client-go v0.20.5
-	k8s.io/code-generator => k8s.io/code-generator v0.20.5
+	k8s.io/api => k8s.io/api v0.21.7
+	k8s.io/apimachinery => k8s.io/apimachinery v0.21.7
+	k8s.io/client-go => k8s.io/client-go v0.21.7
+	k8s.io/code-generator => k8s.io/code-generator v0.21.7
 )

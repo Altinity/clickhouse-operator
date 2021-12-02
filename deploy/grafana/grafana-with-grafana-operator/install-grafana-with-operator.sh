@@ -50,7 +50,9 @@ echo "\$GRAFANA_ROOT_URL=$GRAFANA_ROOT_URL"
 echo ""
 echo "!!! IMPORTANT !!!"
 echo "If you do not agree with specified options, press ctrl-c now"
-sleep 10
+if [[ "" == "${NO_WAIT}" ]]; then
+  sleep 10
+fi
 echo "Apply options now..."
 
 ###########################

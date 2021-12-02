@@ -34,3 +34,10 @@ func IsAnnotationToBeSkipped(annotation string) bool {
 	}
 	return false
 }
+
+// ListSkippedAnnotations provides list of annotations that should be skipped
+func ListSkippedAnnotations() []string {
+	return []string{
+		"kubectl.kubernetes.io/last-applied-configuration",
+	}
+}

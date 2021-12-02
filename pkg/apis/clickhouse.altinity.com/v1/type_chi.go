@@ -19,6 +19,8 @@ import (
 	"math"
 	"strings"
 
+	"github.com/imdario/mergo"
+
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
@@ -38,7 +40,12 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.Status.Endpoint = endpoint
 	chi.Status.Generation = chi.Generation
 	if normalized {
-		chi.Status.NormalizedCHI = &chi.Spec
+		chi.Status.NormalizedCHI = &ClickHouseInstallation{
+			TypeMeta:   chi.TypeMeta,
+			ObjectMeta: chi.ObjectMeta,
+			Spec:       chi.Spec,
+			// Skip status
+		}
 	} else {
 		chi.Status.NormalizedCHI = nil
 	}
@@ -447,9 +454,21 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 		return
 	}
 
-	// Copy metadata for now
-	chi.TypeMeta = from.TypeMeta
-	chi.ObjectMeta = from.ObjectMeta
+	// Merge Meta
+	switch _type {
+	case MergeTypeFillEmptyValues:
+		_ = mergo.Merge(&chi.TypeMeta, from.TypeMeta)
+		_ = mergo.Merge(&chi.ObjectMeta, from.ObjectMeta)
+	case MergeTypeOverrideByNonEmptyValues:
+		_ = mergo.Merge(&chi.TypeMeta, from.TypeMeta, mergo.WithOverride)
+		_ = mergo.Merge(&chi.ObjectMeta, from.ObjectMeta, mergo.WithOverride)
+	}
+	// Exclude skipped annotations
+	chi.Annotations = util.CopyMapFilter(
+		chi.Annotations,
+		nil,
+		util.ListSkippedAnnotations(),
+	)
 
 	// Do actual merge for Spec
 	(&chi.Spec).MergeFrom(&from.Spec, _type)

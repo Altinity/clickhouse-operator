@@ -35,7 +35,8 @@ import (
 type Creator struct {
 	chi                    *chiv1.ClickHouseInstallation
 	chConfigFilesGenerator *ClickHouseConfigFilesGenerator
-	labeler                *Labeler
+	labels                 *Labeler
+	annotations            *Annotator
 	a                      log.Announcer
 }
 
@@ -44,7 +45,8 @@ func NewCreator(chi *chiv1.ClickHouseInstallation) *Creator {
 	return &Creator{
 		chi:                    chi,
 		chConfigFilesGenerator: NewClickHouseConfigFilesGenerator(NewClickHouseConfigGenerator(chi), chop.Config()),
-		labeler:                NewLabeler(chi),
+		labels:                 NewLabeler(chi),
+		annotations:            NewAnnotator(chi),
 		a:                      log.M(chi),
 	}
 }
@@ -61,9 +63,11 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 			template,
 			c.chi.Namespace,
 			serviceName,
-			c.labeler.getLabelsServiceCHI(),
-			c.labeler.getSelectorCHIScopeReady(),
+			c.labels.getServiceCHI(c.chi),
+			c.annotations.getServiceCHI(c.chi),
+			c.labels.getSelectorCHIScopeReady(),
 			ownerReferences,
+			macro(c.chi),
 		)
 	}
 
@@ -73,7 +77,8 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            serviceName,
 			Namespace:       c.chi.Namespace,
-			Labels:          c.labeler.getLabelsServiceCHI(),
+			Labels:          macro(c.chi).Map(c.labels.getServiceCHI(c.chi)),
+			Annotations:     macro(c.chi).Map(c.annotations.getServiceCHI(c.chi)),
 			OwnerReferences: ownerReferences,
 		},
 		Spec: corev1.ServiceSpec{
@@ -92,7 +97,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 					TargetPort: intstr.FromString(chDefaultTCPPortName),
 				},
 			},
-			Selector:              c.labeler.getSelectorCHIScopeReady(),
+			Selector:              c.labels.getSelectorCHIScopeReady(),
 			Type:                  corev1.ServiceTypeLoadBalancer,
 			ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
 		},
@@ -113,9 +118,11 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 			template,
 			cluster.Address.Namespace,
 			serviceName,
-			c.labeler.getLabelsServiceCluster(cluster),
+			c.labels.getServiceCluster(cluster),
+			c.annotations.getServiceCluster(cluster),
 			getSelectorClusterScopeReady(cluster),
 			ownerReferences,
+			macro(cluster),
 		)
 	}
 	// No template specified, no need to create service
@@ -134,9 +141,11 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 			template,
 			shard.Address.Namespace,
 			serviceName,
-			c.labeler.getLabelsServiceShard(shard),
+			c.labels.getServiceShard(shard),
+			c.annotations.getServiceShard(shard),
 			getSelectorShardScopeReady(shard),
 			ownerReferences,
+			macro(shard),
 		)
 	}
 	// No template specified, no need to create service
@@ -156,9 +165,11 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			template,
 			host.Address.Namespace,
 			serviceName,
-			c.labeler.getLabelsServiceHost(host),
+			c.labels.getServiceHost(host),
+			c.annotations.getServiceHost(host),
 			GetSelectorHostScope(host),
 			ownerReferences,
+			macro(host),
 		)
 	}
 
@@ -168,7 +179,8 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            serviceName,
 			Namespace:       host.Address.Namespace,
-			Labels:          c.labeler.getLabelsServiceHost(host),
+			Labels:          macro(host).Map(c.labels.getServiceHost(host)),
+			Annotations:     macro(host).Map(c.annotations.getServiceHost(host)),
 			OwnerReferences: ownerReferences,
 		},
 		Spec: corev1.ServiceSpec{
@@ -221,8 +233,10 @@ func (c *Creator) createServiceFromTemplate(
 	namespace string,
 	name string,
 	labels map[string]string,
+	annotations map[string]string,
 	selector map[string]string,
 	ownerReferences []metav1.OwnerReference,
+	macro *macrosEngine,
 ) *corev1.Service {
 
 	// Verify Ports
@@ -241,8 +255,9 @@ func (c *Creator) createServiceFromTemplate(
 	service.Namespace = namespace
 	service.OwnerReferences = ownerReferences
 
-	// Append provided Labels to already specified Labels in template
-	service.Labels = util.MergeStringMapsOverwrite(service.Labels, labels)
+	// Combine labels and annotations
+	service.Labels = macro.Map(util.MergeStringMapsOverwrite(service.Labels, labels))
+	service.Annotations = macro.Map(util.MergeStringMapsOverwrite(service.Annotations, annotations))
 
 	// Append provided Selector to already specified Selector in template
 	service.Spec.Selector = util.MergeStringMapsOverwrite(service.Spec.Selector, selector)
@@ -259,7 +274,8 @@ func (c *Creator) CreateConfigMapCHICommon(options *ClickHouseConfigFilesGenerat
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            CreateConfigMapCommonName(c.chi),
 			Namespace:       c.chi.Namespace,
-			Labels:          c.labeler.getLabelsConfigMapCHICommon(),
+			Labels:          macro(c.chi).Map(c.labels.getConfigMapCHICommon()),
+			Annotations:     macro(c.chi).Map(c.annotations.getConfigMapCHICommon()),
 			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
@@ -276,7 +292,8 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            CreateConfigMapCommonUsersName(c.chi),
 			Namespace:       c.chi.Namespace,
-			Labels:          c.labeler.getLabelsConfigMapCHICommonUsers(),
+			Labels:          macro(c.chi).Map(c.labels.getConfigMapCHICommonUsers()),
+			Annotations:     macro(c.chi).Map(c.annotations.getConfigMapCHICommonUsers()),
 			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
@@ -293,7 +310,8 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            CreateConfigMapPersonalName(host),
 			Namespace:       host.Address.Namespace,
-			Labels:          c.labeler.getLabelsConfigMapHost(host),
+			Labels:          macro(host).Map(c.labels.getConfigMapHost(host)),
+			Annotations:     macro(host).Map(c.annotations.getConfigMapHost(host)),
 			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
 		},
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host),
@@ -309,7 +327,8 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost, shutdown bool) *apps.St
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            CreateStatefulSetName(host),
 			Namespace:       host.Address.Namespace,
-			Labels:          c.labeler.getLabelsHostScope(host, true),
+			Labels:          macro(host).Map(c.labels.getHostScope(host, true)),
+			Annotations:     macro(host).Map(c.annotations.getHostScope(host)),
 			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
 		},
 		Spec: apps.StatefulSetSpec{
@@ -372,7 +391,8 @@ func (c *Creator) GetStatefulSetVersion(statefulSet *apps.StatefulSet) (string, 
 
 // PreparePersistentVolume prepares PV labels
 func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chiv1.ChiHost) *corev1.PersistentVolume {
-	pv.Labels = util.MergeStringMapsOverwrite(pv.Labels, c.labeler.getLabelsHostScope(host, false))
+	pv.Labels = macro(host).Map(c.labels.getPV(pv, host))
+	pv.Annotations = macro(host).Map(c.annotations.getPV(pv, host))
 	// And after the object is ready we can put version label
 	MakeObjectVersionLabel(&pv.ObjectMeta, pv)
 	return pv
@@ -384,9 +404,8 @@ func (c *Creator) PreparePersistentVolumeClaim(
 	host *chiv1.ChiHost,
 	template *chiv1.ChiVolumeClaimTemplate,
 ) *corev1.PersistentVolumeClaim {
-	pvc.Labels = util.MergeStringMapsOverwrite(pvc.Labels, template.ObjectMeta.Labels)
-	pvc.Labels = util.MergeStringMapsOverwrite(pvc.Labels, c.labeler.getLabelsHostScopeReclaimPolicy(host, template, false))
-	pvc.Annotations = util.MergeStringMapsOverwrite(pvc.Annotations, template.ObjectMeta.Annotations)
+	pvc.Labels = macro(host).Map(c.labels.getPVC(pvc, host, template))
+	pvc.Annotations = macro(host).Map(c.annotations.getPVC(pvc, host, template))
 	// And after the object is ready we can put version label
 	MakeObjectVersionLabel(&pvc.ObjectMeta, pvc)
 	return pvc
@@ -602,14 +621,14 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	statefulSet.Spec.Template = corev1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: template.Name,
-			Labels: util.MergeStringMapsOverwrite(
-				c.labeler.getLabelsHostScopeReady(host, true),
+			Labels: macro(host).Map(util.MergeStringMapsOverwrite(
+				c.labels.getHostScopeReady(host, true),
 				template.ObjectMeta.Labels,
-			),
-			Annotations: util.MergeStringMapsOverwrite(
-				getAnnotationsHostScope(host),
+			)),
+			Annotations: macro(host).Map(util.MergeStringMapsOverwrite(
+				c.annotations.getHostScope(host),
 				template.ObjectMeta.Annotations,
-			),
+			)),
 		},
 		Spec: *template.Spec.DeepCopy(),
 	}
@@ -747,12 +766,13 @@ func (c *Creator) NewPodDisruptionBudget() *v1beta1.PodDisruptionBudget {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            c.chi.Name,
 			Namespace:       c.chi.Namespace,
-			Labels:          c.labeler.getLabelsCHIScope(),
+			Labels:          macro(c.chi).Map(c.labels.getCHIScope()),
+			Annotations:     macro(c.chi).Map(c.annotations.getCHIScope()),
 			OwnerReferences: ownerReferences,
 		},
 		Spec: v1beta1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: c.labeler.GetSelectorCHIScope(),
+				MatchLabels: c.labels.GetSelectorCHIScope(),
 			},
 			MaxUnavailable: &intstr.IntOrString{
 				Type:   intstr.Int,
@@ -896,7 +916,8 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 			//  we are close to proper disk inheritance
 			// Right now we hit the following error:
 			// "Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
-			Labels: c.labeler.getLabelsHostScope(host, false),
+			Labels:      macro(host).Map(c.labels.getHostScope(host, false)),
+			Annotations: macro(host).Map(c.annotations.getHostScope(host)),
 		},
 		Spec: *volumeClaimTemplate.Spec.DeepCopy(),
 	}

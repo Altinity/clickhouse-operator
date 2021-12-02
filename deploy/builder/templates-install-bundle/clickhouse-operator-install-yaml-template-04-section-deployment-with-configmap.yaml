@@ -13,6 +13,7 @@ metadata:
   name: clickhouse-operator
   ${COMMENT}namespace: ${NAMESPACE}
   labels:
+    clickhouse.altinity.com/chop: ${OPERATOR_VERSION}
     app: clickhouse-operator
 spec:
   replicas: 1
