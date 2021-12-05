@@ -165,11 +165,14 @@ wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 
 # TODO get clickhouse password from Vault-k8s secrets ?
 # more precise but required yq
-# OPERATOR_CH_USER=$(yq r ${CUR_DIR}/../../../config/config.yaml chUsername)
-# OPERATOR_CH_PASS=$(yq r ${CUR_DIR}/../../../config/config.yaml chPassword)
 
-OPERATOR_CH_USER=$(grep chUsername ${CUR_DIR}/../../../config/config.yaml | cut -d " " -f 2-)
-OPERATOR_CH_PASS=$(grep chPassword ${CUR_DIR}/../../../config/config.yaml | cut -d " " -f 2-)
+if ! command -v yq &> /dev/null; then
+  export OPERATOR_CH_USER=$(grep chUsername ${CUR_DIR}/../../../config/config.yaml | cut -d " " -f 2- | tr -d '"')
+  export OPERATOR_CH_PASS=$(grep chPassword ${CUR_DIR}/../../../config/config.yaml | cut -d " " -f 2- | tr -d '"')
+else
+  export OPERATOR_CH_USER=$(yq eval .chUsername ${CUR_DIR}/../../../config/config.yaml)
+  export OPERATOR_CH_PASS=$(yq eval .chPassword ${CUR_DIR}/../../../config/config.yaml)
+fi
 
 echo "Create ClickHouse DataSource for each ClickHouseInstallation"
 IFS=$'\n'
