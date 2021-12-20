@@ -1,0 +1,20 @@
+{{ if .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "clickhouse-operator.serviceAccountName" . }}
+  labels:
+    app.kubernetes.io/name: {{ template "clickhouse-operator.name" . }}
+    helm.sh/chart: {{ template "clickhouse-operator.chart" . }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "clickhouse-operator.serviceAccountName" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "clickhouse-operator.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{ end }}
+

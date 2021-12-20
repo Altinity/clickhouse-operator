@@ -1,0 +1,73 @@
+# Default values for clickhouse-operator.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: altinity/clickhouse-operator
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+metrics_exporter_image:
+  repository: altinity/metrics-exporter
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 8888
+
+clickhouse_operator_credentials: plain
+# ClickHouse credentials (username, password and port) to be used by operator to connect to ClickHouse instances
+clickhouse_operator_username: "clichouse_operator"
+clickhouse_operator_password_sha256_hex: "e84214995be5cab19f1685ca55933b9ddd9c62cf57ede6ba8c61442711743ec0"
+clickhouse_operator_password: "clichouse_operator_password"
+# Location of k8s Secret with username and password to be used by operator to connect to ClickHouse instances
+clickhouse_operator_secret_namespace: "clickhouse-operator"
+clickhouse_operator_secret: "clickhouse_operator_secret"
+
+# List of namespaces where clickhouse-operator watches for events.
+# Concurrently running operators should watch on different namespaces
+watchNamespaces:
+  - clickhouse
+#  - test
+#  - info
+#  - onemore
+
+rbac:
+  # Specifies whether RBAC resources should be created
+  create: true
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: "clickhouse-operator"
+
+podAnnotations: {}
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

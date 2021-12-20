@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: "{{ include "clickhouse-operator.fullname" . }}-metrics"
+  labels:
+    {{- include "clickhouse-operator.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: clickhouse-operator-metrics
+  selector:
+    {{- include "clickhouse-operator.selectorLabels" . | nindent 4 }}
