@@ -1,6 +1,8 @@
 # Quick Start Guides
 
 # Table of Contents
+
+* [Prerequisites](#prerequisites)
 * [ClickHouse Operator Installation](#clickhouse-operator-installation)
 * [Building ClickHouse Operator from Sources](#building-clickhouse-operator-from-sources)
 * [Examples](#examples)
@@ -11,7 +13,10 @@
   * [Custom Deployment with Specific ClickHouse Configuration](#custom-deployment-with-specific-clickhouse-configuration)
 
 # Prerequisites
-1. Operational Kubernetes instance
+
+1. Kubernetes instance with the following version considerations:
+    1. `clickhouse-operator` versions **before** `0.16.0` requires [Kubernetes prior to `1.16`](https://kubernetes.io/releases/).
+    1. `clickhouse-operator` versions `0.16.0` **and after** require [Kubernetes version `1.23` and after](https://kubernetes.io/releases/).
 1. Properly configured `kubectl`
 1. `curl`
 
