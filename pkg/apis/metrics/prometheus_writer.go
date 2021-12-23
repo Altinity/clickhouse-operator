@@ -238,5 +238,8 @@ func convertMetricName(in string) string {
 		out = append(out, unicode.ToLower(runes[i]))
 	}*/
 
-	return strings.Replace(in, ".", "_", -1)
+//	return strings.Replace(in, ".", "_", -1)
+	tmp := strings.Replace(in, ".", "_", -1)
+	res := strings.Replace(tmp, "-", "_", -1)
+	return res
 }
