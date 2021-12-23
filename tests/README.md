@@ -25,6 +25,7 @@ You may also build the image locally. To do it, make the following steps:
 ```bash
 docker login registry.gitlab.com
 bash -xe ./tests/image/build_docker.sh
+docker push registry.gitlab.com/altinity-qa/clickhouse/cicd/clickhouse-operator:latest
 ```
 
 Be aware that building an image, as well as pulling it, will require about 5 GB of downloaded data.
