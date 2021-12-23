@@ -3,12 +3,13 @@
 # ====================
 
 FROM golang:1.17 AS builder
+ARG TARGETOS
+ARG TARGETARCH
 
 # Install required packages
-RUN echo "deb http://ppa.launchpad.net/rmescandon/yq/ubuntu focal main" > /etc/apt/sources.list.d/yq.list && \
-    echo "deb-src http://ppa.launchpad.net/rmescandon/yq/ubuntu focal main" >> /etc/apt/sources.list.d/yq.list && \
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys CC86BB64
-RUN apt-get update && apt-get install -y apt-utils gettext-base yq
+RUN apt-get update && apt-get install -y apt-utils && apt-get install -y gettext-base curl
+RUN curl -o /usr/bin/yq -sL https://github.com/mikefarah/yq/releases/download/v4.16.2/yq_$${q}{TARGETOS}_$${q}{TARGETARCH} && \
+    chmod +x /usr/bin/yq
 
 # Reconstruct source tree inside docker
 WORKDIR /clickhouse-operator
@@ -25,7 +26,7 @@ RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter ./dev/go_build_metrics_exporter.s
 # ===== Metrics exporter =====
 # ============================
 
-FROM registry.access.redhat.com/ubi7/ubi-minimal AS ubi7
+FROM registry.access.redhat.com/ubi8/ubi-minimal AS ubi8
 RUN microdnf update && microdnf clean all
 
 MAINTAINER "Altinity <support@altinity.com>"
