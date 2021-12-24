@@ -1,15 +1,18 @@
 # ===================
 # ===== Builder =====
-# ====================
+# ===================
 
-FROM golang:1.17 AS builder
+FROM --platform=${BUILDPLATFORM} golang:1.17 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
 # Install required packages
 RUN apt-get update && apt-get install -y apt-utils && apt-get install -y gettext-base curl
-RUN curl -o /usr/bin/yq -sL https://github.com/mikefarah/yq/releases/download/v4.16.2/yq_$${q}{TARGETOS}_$${q}{TARGETARCH} && \
+RUN curl -o /usr/bin/yq -sL https://github.com/mikefarah/yq/releases/download/v4.16.2/yq_${TARGETOS}_${TARGETARCH} && \
     chmod +x /usr/bin/yq
+
+ENV GOOS=${TARGETOS}
+ENV GOARCH=${TARGETARCH}
 
 # Reconstruct source tree inside docker
 WORKDIR /clickhouse-operator
