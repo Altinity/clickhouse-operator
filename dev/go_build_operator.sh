@@ -19,8 +19,8 @@ GO111MODULE=on go mod "${MODULES_DIR}"
 OUTPUT_BINARY="${OPERATOR_BIN}"
 MAIN_SRC_FILE="${SRC_ROOT}/cmd/operator/main.go"
 
-GOOS=linux
-GOARCH=amd64
+GOOS=${GOOS:-linux}
+GOARCH=${GOARCH:-amd64}
 
 if CGO_ENABLED=0 GO111MODULE=on GOOS="${GOOS}" GOARCH="${GOARCH}" go build \
     -mod="${MODULES_DIR}" \

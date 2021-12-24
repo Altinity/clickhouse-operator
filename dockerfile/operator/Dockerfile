@@ -2,7 +2,7 @@
 # ===== Builder =====
 # ===================
 
-FROM golang:1.17 AS builder
+FROM --platform=linux/amd64 golang:1.17 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -10,6 +10,9 @@ ARG TARGETARCH
 RUN apt-get update && apt-get install -y apt-utils && apt-get install -y gettext-base curl
 RUN curl -o /usr/bin/yq -sL https://github.com/mikefarah/yq/releases/download/v4.16.2/yq_${TARGETOS}_${TARGETARCH} && \
     chmod +x /usr/bin/yq
+
+ENV GOOS=${TARGETOS}
+ENV GOARCH=${TARGETARCH}
 
 # Reconstruct source tree inside docker
 WORKDIR /clickhouse-operator
@@ -34,8 +37,8 @@ MAINTAINER "Altinity <support@altinity.com>"
 LABEL name="ClickHouse operator" \
       maintainer="support@altinity.com" \
       vendor="Altinity" \
-      version="0.18.0" \
-      release="1" \
+      version="$VERSION" \
+      release="$RELEASE" \
       summary="ClickHouse operator" \
       description="ClickHouse operator operates ClickHouse clusters in kubernetes"
 
