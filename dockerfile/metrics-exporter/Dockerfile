@@ -2,7 +2,7 @@
 # ===== Builder =====
 # ===================
 
-FROM --platform=linux/amd64 golang:1.17 AS builder
+FROM --platform=${BUILDPLATFORM} golang:1.17 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
