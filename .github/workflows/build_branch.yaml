@@ -7,7 +7,7 @@ on:
 
 jobs:
   build_master:
-    name: Build master
+    name: Build branch
     runs-on: ubuntu-latest
     steps:
       - name: Checkout project
