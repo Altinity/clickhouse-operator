@@ -54,7 +54,7 @@ func NewCreator(chi *chiv1.ClickHouseInstallation) *Creator {
 // CreateServiceCHI creates new corev1.Service for specified CHI
 func (c *Creator) CreateServiceCHI() *corev1.Service {
 	serviceName := CreateCHIServiceName(c.chi)
-	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
+	ownerReferences := getOwnerReferences(c.chi)
 
 	c.a.V(1).F().Info("%s/%s", c.chi.Namespace, serviceName)
 	if template, ok := c.chi.GetCHIServiceTemplate(); ok {
@@ -109,7 +109,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 // CreateServiceCluster creates new corev1.Service for specified Cluster
 func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
 	serviceName := CreateClusterServiceName(cluster)
-	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
+	ownerReferences := getOwnerReferences(c.chi)
 
 	c.a.V(1).F().Info("%s/%s", cluster.Address.Namespace, serviceName)
 	if template, ok := cluster.GetServiceTemplate(); ok {
@@ -132,7 +132,7 @@ func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Servic
 // CreateServiceShard creates new corev1.Service for specified Shard
 func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 	serviceName := CreateShardServiceName(shard)
-	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
+	ownerReferences := getOwnerReferences(c.chi)
 
 	c.a.V(1).F().Info("%s/%s", shard.Address.Namespace, serviceName)
 	if template, ok := shard.GetServiceTemplate(); ok {
@@ -156,7 +156,7 @@ func (c *Creator) CreateServiceShard(shard *chiv1.ChiShard) *corev1.Service {
 func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 	serviceName := CreateStatefulSetServiceName(host)
 	statefulSetName := CreateStatefulSetName(host)
-	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
+	ownerReferences := getOwnerReferences(c.chi)
 
 	c.a.V(1).F().Info("%s/%s for Set %s", host.Address.Namespace, serviceName, statefulSetName)
 	if template, ok := host.GetServiceTemplate(); ok {
@@ -276,7 +276,7 @@ func (c *Creator) CreateConfigMapCHICommon(options *ClickHouseConfigFilesGenerat
 			Namespace:       c.chi.Namespace,
 			Labels:          macro(c.chi).Map(c.labels.getConfigMapCHICommon()),
 			Annotations:     macro(c.chi).Map(c.annotations.getConfigMapCHICommon()),
-			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
+			OwnerReferences: getOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupCommon(options),
@@ -294,7 +294,7 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 			Namespace:       c.chi.Namespace,
 			Labels:          macro(c.chi).Map(c.labels.getConfigMapCHICommonUsers()),
 			Annotations:     macro(c.chi).Map(c.annotations.getConfigMapCHICommonUsers()),
-			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
+			OwnerReferences: getOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupUsers(),
@@ -312,7 +312,7 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 			Namespace:       host.Address.Namespace,
 			Labels:          macro(host).Map(c.labels.getConfigMapHost(host)),
 			Annotations:     macro(host).Map(c.annotations.getConfigMapHost(host)),
-			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
+			OwnerReferences: getOwnerReferences(c.chi),
 		},
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host),
 	}
@@ -329,7 +329,7 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost, shutdown bool) *apps.St
 			Namespace:       host.Address.Namespace,
 			Labels:          macro(host).Map(c.labels.getHostScope(host, true)),
 			Annotations:     macro(host).Map(c.annotations.getHostScope(host)),
-			OwnerReferences: getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true),
+			OwnerReferences: getOwnerReferences(c.chi),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
@@ -762,7 +762,7 @@ func ensurePortByName(container *corev1.Container, name string, port int32) {
 
 // NewPodDisruptionBudget creates new PodDisruptionBudget
 func (c *Creator) NewPodDisruptionBudget() *v1beta1.PodDisruptionBudget {
-	ownerReferences := getOwnerReferences(c.chi.TypeMeta, c.chi.ObjectMeta, true, true)
+	ownerReferences := getOwnerReferences(c.chi)
 	return &v1beta1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            c.chi.Name,
@@ -1095,15 +1095,20 @@ func getContainerByName(statefulSet *apps.StatefulSet, name string) *corev1.Cont
 	return nil
 }
 
-func getOwnerReferences(t metav1.TypeMeta, o metav1.ObjectMeta, controller, blockOwnerDeletion bool) []metav1.OwnerReference {
+func getOwnerReferences(chi *chiv1.ClickHouseInstallation)[]metav1.OwnerReference{
+	return nil
+/*
+	controller := true
+	blockOwnerDeletion := true
 	return []metav1.OwnerReference{
 		{
-			APIVersion:         t.APIVersion,
-			Kind:               t.Kind,
-			Name:               o.Name,
-			UID:                o.UID,
+			APIVersion:         chi.APIVersion,
+			Kind:               chi.Kind,
+			Name:               chi.Name,
+			UID:                chi.UID,
 			Controller:         &controller,
 			BlockOwnerDeletion: &blockOwnerDeletion,
 		},
 	}
+ */
 }
