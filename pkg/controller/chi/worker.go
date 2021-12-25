@@ -757,13 +757,17 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiv1.ChiHo
 		return nil
 	}
 
+	// RollingUpdate is made with always shutting the host down.
+	// It is such an interesting policy.
+	// We'll do it via replicas: 0 in StatefulSet.
 	if host.CHI.IsRollingUpdate() {
-		// First stage of rolling update
 		w.prepareHostStatefulSetWithStatus(ctx, host, true)
 		_ = w.reconcileStatefulSet(ctx, host)
+		// At this moment StatefulSet has 0 replicas.
+		// First stage of RollingUpdate completed.
 	}
 
-	// Reconcile to desired configuration
+	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
 	err := w.reconcileStatefulSet(ctx, host)
 	if err == nil {
