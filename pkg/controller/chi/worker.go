@@ -1158,35 +1158,59 @@ func (w *worker) deleteCHI(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 		return false
 	}
 
+	// Do we have pending request for CHI to be deleted?
 	if chi.ObjectMeta.DeletionTimestamp.IsZero() {
-		// CHI is not being deleted
+		// CHI is not being deleted and operator has not deleted anything.
 		return false
 	}
 
 	w.a.V(3).M(chi).S().P()
 	defer w.a.V(3).M(chi).E().P()
 
-	cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(ctx, chi.Name, newGetOptions())
-	if cur == nil {
-		return false
-	}
-	if err != nil {
-		return false
+	// Ok, we have pending request for CHI to be deleted.
+	// However, we need to decide, should CHI's child resources be deleted or not.
+	// There is a curious situation, when CRD is deleted and k8s starts to delete all resources,
+	// of the type, described by CRD being deleted. This is may be very painful situation,
+	// so in this case we should agreed to delete CHI itself, but has to keep all CHI's child resources.
+
+	var clear bool
+	crd, err := w.c.extClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, "clickhouseinstallations.clickhouse.altinity.com", newGetOptions())
+	if err == nil {
+		if crd.ObjectMeta.DeletionTimestamp.IsZero() {
+			// CRD is not being deleted and operator can delete all child resources.
+			w.a.V(1).M(chi).F().Info("CRD %s/%s is not being deleted, operator will delete child resources", crd.Namespace, crd.Name)
+			clear = true
+		} else {
+			// CRD is being deleted. This may be a mistake, operator should not delete data
+			w.a.V(1).M(chi).F().Info("CRD %s/%s BEING DELETED, operator will NOT delete child resources", crd.Namespace, crd.Name)
+			clear = false
+		}
 	}
 
-	if !util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
-		// No finalizer found, unexpected behavior
-		return false
+	if clear {
+		cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(ctx, chi.Name, newGetOptions())
+		if cur == nil {
+			return false
+		}
+		if err != nil {
+			return false
+		}
+
+		if !util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
+			// No finalizer found, unexpected behavior
+			return false
+		}
+
+		_ = w.deleteCHIProtocol(ctx, chi)
 	}
 
-	_ = w.deleteCHIProtocol(ctx, chi)
-
-	// Uninstall finalizer
+	// We need to uninstall finalizer in order to allow k8s to delete CHI resource
 	w.a.V(2).M(chi).F().Info("uninstall finalizer")
 	if err := w.c.uninstallFinalizer(ctx, chi); err != nil {
 		w.a.V(1).M(chi).A().Error("unable to uninstall finalizer: err:%v", err)
 	}
 
+	// CHI's child resources were deleted
 	return true
 }
 

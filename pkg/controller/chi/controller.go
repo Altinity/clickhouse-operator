@@ -24,6 +24,7 @@ import (
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -50,6 +51,7 @@ import (
 // NewController creates instance of Controller
 func NewController(
 	chopClient chopclientset.Interface,
+	extClient apiextensions.Interface,
 	kubeClient kube.Interface,
 	chopInformerFactory chopinformers.SharedInformerFactory,
 	kubeInformerFactory kubeinformers.SharedInformerFactory,
@@ -76,6 +78,7 @@ func NewController(
 	// Create Controller instance
 	controller := &Controller{
 		kubeClient:              kubeClient,
+		extClient:               extClient,
 		chopClient:              chopClient,
 		chiLister:               chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Lister(),
 		chiListerSynced:         chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().HasSynced,

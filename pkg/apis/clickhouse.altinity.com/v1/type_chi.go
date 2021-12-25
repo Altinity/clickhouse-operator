@@ -676,7 +676,7 @@ func (chi *ClickHouseInstallation) IsStopped() bool {
 
 // Restart const presents possible values for .spec.restart
 const (
-	RestartAll           = "Restart"
+	RestartAll = "Restart"
 	// RestartRollingUpdate requires to roll over all hosts in the cluster and shutdown and reconcile each of it.
 	// This restart policy means that all hosts in the cluster would pass through shutdown/reconcile cycle.
 	RestartRollingUpdate = "RollingUpdate"

@@ -95,7 +95,7 @@ func Run() {
 	log.A().Info("Starting clickhouse-operator. Version:%s GitSHA:%s BuiltAt:%s", version.Version, version.GitSHA, version.BuiltAt)
 
 	// Initialize k8s API clients
-	kubeClient, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
+	kubeClient, extClient, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
 
 	// Create operator instance
 	chop.New(kubeClient, chopClient, chopConfigFile)
@@ -117,6 +117,7 @@ func Run() {
 	// Create Controller
 	chiController := chi.NewController(
 		chopClient,
+		extClient,
 		kubeClient,
 		chopInformerFactory,
 		kubeInformerFactory,

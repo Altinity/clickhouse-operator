@@ -20,6 +20,7 @@ import (
 	"os/user"
 	"path/filepath"
 
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	kube "k8s.io/client-go/kubernetes"
 	kuberest "k8s.io/client-go/rest"
 	kubeclientcmd "k8s.io/client-go/tools/clientcmd"
@@ -63,7 +64,11 @@ func getKubeConfig(kubeConfigFile, masterURL string) (*kuberest.Config, error) {
 }
 
 // GetClientset gets k8s API clients - both kube native client and our custom client
-func GetClientset(kubeConfigFile, masterURL string) (*kube.Clientset, *chopclientset.Clientset) {
+func GetClientset(kubeConfigFile, masterURL string) (
+	*kube.Clientset,
+	*apiextensions.Clientset,
+	*chopclientset.Clientset,
+) {
 	kubeConfig, err := getKubeConfig(kubeConfigFile, masterURL)
 	if err != nil {
 		log.A().Fatal("Unable to build kubeconf: %s", err.Error())
@@ -75,12 +80,17 @@ func GetClientset(kubeConfigFile, masterURL string) (*kube.Clientset, *chopclien
 		log.A().Fatal("Unable to initialize kubernetes API clientset: %s", err.Error())
 	}
 
+	apiextensionsClientset, err := apiextensions.NewForConfig(kubeConfig)
+	if err != nil {
+		log.A().Fatal("Unable to initialize kubernetes API extensions clientset: %s", err.Error())
+	}
+
 	chopClientset, err := chopclientset.NewForConfig(kubeConfig)
 	if err != nil {
 		log.A().Fatal("Unable to initialize clickhouse-operator API clientset: %s", err.Error())
 	}
 
-	return kubeClientset, chopClientset
+	return kubeClientset, apiextensionsClientset, chopClientset
 }
 
 var chop *CHOp
