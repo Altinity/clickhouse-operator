@@ -504,7 +504,8 @@ func (c *Creator) setupTroubleshoot(statefulSet *apps.StatefulSet) {
 			"/entrypoint.sh" + sleep,
 		}
 	}
-	// Sleep is not able to respond to probes
+	// Appended `sleep` is not able to respond to probes, and probes would cause unexpected restart.
+	// Thus we need to disable all probes.
 	container.LivenessProbe = nil
 	container.ReadinessProbe = nil
 }
