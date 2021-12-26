@@ -39,6 +39,8 @@ type ClickHouseInstallation struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Spec              ChiSpec   `json:"spec"     yaml:"spec"`
 	Status            ChiStatus `json:"status"   yaml:"status"`
+
+	ExchangeEnv []corev1.EnvVar `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 // +genclient
