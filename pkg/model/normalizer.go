@@ -859,31 +859,43 @@ func (n *Normalizer) substWithSecretField(users *chiV1.Settings, username string
 
 // substWithSecretEnvField substitute users settings field with value from k8s secret stored in ENV var
 func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username string, userSettingsField, userSettingsK8SSecretField string) bool {
-	if n.substWithSecretField(users, username, userSettingsField, userSettingsK8SSecretField) {
-		// Replace setting with empty value abd reference to ENV VAR
-		if setting := users.Get(username + "/" + userSettingsField); setting != nil {
-			// ENV VAR name and value
-			envVarName := username+"_"+userSettingsField
-			// Replace value with empty value and ref to ENV VAR
-			if _, name, key, err := parseSecretFieldAddress(users, username, userSettingsK8SSecretField); err == nil {
-				env := corev1.EnvVar{}
-				env.Name = envVarName
-				env.ValueFrom = &corev1.EnvVarSource{
-					SecretKeyRef: &v1.SecretKeySelector{
-						LocalObjectReference: v1.LocalObjectReference{
-							Name: name,
-						},
-						Key: key,
-					},
-				}
+	// Fetch secret name and key within secret
+	_, secretName, key, err := parseSecretFieldAddress(users, username, userSettingsK8SSecretField)
+	if err != nil {
+		return false
+	}
 
-				n.chi.ExchangeEnv = append(n.chi.ExchangeEnv, env)
-				users.Set(username + "/" + userSettingsField, chiV1.NewSettingScalar("").SetAttribute("from_env", name ))
-				return true
-			}
+	// Subst plaintext field with secret field
+	if !n.substWithSecretField(users, username, userSettingsField, userSettingsK8SSecretField) {
+		return false
+	}
+
+	// ENV VAR name and value
+	envVarName := username + "_" + userSettingsField
+
+	for _, envVar := range n.chi.ExchangeEnv {
+		if envVar.Name == envVarName {
+			// Such a variable already exists
+			return false
 		}
 	}
-	return false
+
+	envVar := corev1.EnvVar{
+		Name: envVarName,
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &v1.SecretKeySelector{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: secretName,
+				},
+				Key: key,
+			},
+		},
+	}
+	n.chi.ExchangeEnv = append(n.chi.ExchangeEnv, envVar)
+
+	// Replace setting with empty value and reference to ENV VAR
+	users.Set(username+"/"+userSettingsField, chiV1.NewSettingScalar("").SetAttribute("from_env", envVarName))
+	return true
 }
 
 var (
@@ -995,6 +1007,16 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 
 	// Normalize each user in the list of users
 	for _, username := range usernames {
+		// Ensure each user has mandatory sections:
+		// 1. user/profile
+		// 2. user/quota
+		// 3. user/networks/ip
+		// 4. user/networks/host_regexp
+		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultProfile))
+		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultQuota))
+		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().CHConfigUserDefaultNetworksIP))
+		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().CHConfigNetworksHostRegexpTemplate)))
+
 		// Deal with password
 
 		// Values from secret have higher priority
@@ -1007,59 +1029,49 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		n.substWithSecretEnvField(users, username, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
 		n.substWithSecretEnvField(users, username, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
 
-		// Ot of all passwords, password_double_sha1_hex has top priority, keep it only
+		// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
 		if users.Has(username + "/password_double_sha1_hex") {
 			users.Delete(username + "/password_sha256_hex")
 			users.Delete(username + "/password")
+			continue // move to the next user
 		}
-		// Than goes password_sha256_hex, keep it only
+
+		// Than goes password_sha256_hex, thus keep it only
 		if users.Has(username + "/password_sha256_hex") {
 			users.Delete(username + "/password")
+			continue // move to the next user
 		}
 
-		if users.Has(username + "/password") {
-			// Have no encrypted passwords explicitly
-			// However, it still may be passed via ENV
+		// From now on we either have a plaintext password specified, or no password at all
 
-			if users.Get(username + "/password").HasAttributes() {
-				// Password would be transferred via ENV VARs
-			} else {
-				// Has plain password specified
-				passwordPlaintext := users.Get(username + "/password").String()
-				// Apply default password for password-less non-default users
-				if (passwordPlaintext == "") && (username != defaultUsername) {
-					passwordPlaintext = chop.Config().CHConfigUserDefaultPassword
-				}
-
-				// default user may keep empty password in here
-
-				if passwordPlaintext != "" {
-					// Replace plaintext password with encrypted
-					passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-					users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
-					// Keep plain password field for default username, it will be used later
-					// Delete plain password field for all other users
-					if username != defaultUsername {
-						users.Delete(username+"/password")
-					}
-				}
-			}
+		if users.Get(username + "/password").HasAttributes() {
+			// Have plaintext password explicitly specified via ENV vars
+			// This is still OK
+			continue // move to the next user
 		}
 
-		// Ensure "must have" sections are in place
-		// 1. user/profile
-		// 2. user/quota
-		// 3. user/networks/ip
-		// 4. user/networks/host_regexp
-		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultProfile))
-		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultQuota))
-		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().CHConfigUserDefaultNetworksIP))
-		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().CHConfigNetworksHostRegexpTemplate)))
+		// From now on we either have plaintext password specified as an explicit string, or no password at all
+
+		passwordPlaintext := users.Get(username + "/password").String()
+
+		// Apply default password for password-less non-default users
+		if (passwordPlaintext == "") && (username != defaultUsername) {
+			passwordPlaintext = chop.Config().CHConfigUserDefaultPassword
+		}
+
+		// NB `default` user may keep empty password in here.
+
+		if passwordPlaintext != "" {
+			// Replace plaintext password with encrypted
+			passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
+			users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+			users.Delete(username + "/password")
+		}
 	}
 
-	if users.Has(defaultUsername + "/password_double_sha1_hex") || users.Has(defaultUsername + "/password_sha256_hex") {
-		// Set remove password flag for default user that is empty in stock ClickHouse users.xml
-		// TODO fix it
+	if users.Has(defaultUsername+"/password_double_sha1_hex") || users.Has(defaultUsername+"/password_sha256_hex") {
+		// As `default` user has encrypted password provided, we need to delete existing pre-configured password.
+		// Set remove password flag for `default` user that is empty in stock ClickHouse users.xml
 		users.Set(defaultUsername+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
 	}
 
