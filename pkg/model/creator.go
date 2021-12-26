@@ -419,6 +419,7 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 
 	// Post-process StatefulSet
 	ensureStatefulSetTemplateIntegrity(statefulSet, host)
+	setupEnvVars(statefulSet, host)
 	c.personalizeStatefulSetTemplate(statefulSet, host)
 }
 
@@ -427,6 +428,15 @@ func ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chi
 	ensureClickHouseContainerSpecified(statefulSet)
 	ensureProbesSpecified(statefulSet)
 	ensureNamedPortsSpecified(statefulSet, host)
+}
+
+func setupEnvVars(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	container, ok := getClickHouseContainer(statefulSet)
+	if !ok {
+		return
+	}
+
+	container.Env = append(container.Env, host.GetCHI().ExchangeEnv...)
 }
 
 // ensureClickHouseContainerSpecified
