@@ -61,9 +61,10 @@ var (
 
 // Setting represents one settings, which can be either a sting or a vector of strings
 type Setting struct {
-	isScalar bool
-	scalar   string
-	vector   []string
+	isScalar   bool
+	scalar     string
+	vector     []string
+	attributes map[string]string
 }
 
 // NewSettingScalar makes new scalar Setting
@@ -110,6 +111,26 @@ func (s *Setting) AsVector() []string {
 		}
 	}
 	return s.vector
+}
+
+func (s *Setting) SetAttribute(name, value string) *Setting {
+	if s.attributes == nil {
+		s.attributes = make(map[string]string)
+	}
+	s.attributes[name] = value
+	return s
+}
+
+func (s *Setting) HasAttributes() bool {
+	return len(s.attributes) > 0
+}
+
+func (s *Setting) Attributes() string {
+	a := ""
+	for name, value := range s.attributes {
+		a += fmt.Sprintf(` %s="%s"`, name, value)
+	}
+	return a
 }
 
 // String gets string value of a setting. Vector is combined into one string
