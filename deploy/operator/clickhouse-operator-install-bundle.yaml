@@ -238,7 +238,7 @@ spec:
                     - "enabled"
                 restart:
                   type: string
-                  description: "restart policy for StatefulSets. When value `RollingUpdate` it allow graceful restart one by one instead of restart all StatefulSet simultaneously"
+                  description: "This is a 'soft restart' button. When set to 'RollingUpdate' operator will restart ClickHouse pods in a graceful way. Remove it after the use in order to avoid unneeded restarts"
                   enum:
                     - ""
                     - "RollingUpdate"
@@ -1560,7 +1560,7 @@ spec:
                     - "enabled"
                 restart:
                   type: string
-                  description: "restart policy for StatefulSets. When value `RollingUpdate` it allow graceful restart one by one instead of restart all StatefulSet simultaneously"
+                  description: "This is a 'soft restart' button. When set to 'RollingUpdate' operator will restart ClickHouse pods in a graceful way. Remove it after the use in order to avoid unneeded restarts"
                   enum:
                     - ""
                     - "RollingUpdate"
