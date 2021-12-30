@@ -61,21 +61,32 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 	log.V(1).M(host).F().Info("Extracting distributed table definitions from hosts %v", hosts)
 
 	sqlDBs := heredoc.Docf(`
-	SELECT DISTINCT name, 'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine AS create_db_query
-	  FROM (SELECT * FROM clusterAllReplicas('%s', system.databases) databases SETTINGS skip_unavailable_shards = 1)
-     WHERE name IN (
-		SELECT DISTINCT arrayJoin([database, extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+')]) database
-	      FROM clusterAllReplicas('%s', system.tables) tables
-	     WHERE engine = 'Distributed'
-      SETTINGS skip_unavailable_shards = 1
-     ) 
+		SELECT
+			DISTINCT name,
+			'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine AS create_db_query
+		FROM (
+			SELECT
+				* 
+			FROM
+				clusterAllReplicas('%s', system.databases) databases 
+			SETTINGS skip_unavailable_shards = 1
+		)
+		WHERE name IN (
+			SELECT
+				DISTINCT arrayJoin([database, extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+')]) database
+			FROM
+				clusterAllReplicas('%s', system.tables) tables
+			WHERE
+				engine = 'Distributed'
+			SETTINGS skip_unavailable_shards = 1
+		) 
 		`,
 		host.Address.ClusterName,
 		host.Address.ClusterName,
 	)
 	sqlTables := heredoc.Docf(`
-		SELECT DISTINCT 
-			concat(database, '.', name) as name, 
+		SELECT
+			DISTINCT concat(database, '.', name) AS name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
 		FROM 
 		(
@@ -84,8 +95,10 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 				name,
 				create_table_query,
 				2 AS order
-			FROM clusterAllReplicas('%s', system.tables) tables
-			WHERE engine = 'Distributed'
+			FROM
+				clusterAllReplicas('%s', system.tables) tables
+			WHERE
+				engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
 			SELECT 
@@ -93,18 +106,21 @@ func (s *Schemer) getCreateDistributedObjects(ctx context.Context, host *chop.Ch
 				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
 				t.create_table_query,
 				1 AS order
-			FROM clusterAllReplicas('%s', system.tables) tables
-			LEFT JOIN 
-			(
-				SELECT 
-					DISTINCT database, 
-					name, 
-					create_table_query 
-				FROM clusterAllReplicas('%s', system.tables)
-				SETTINGS skip_unavailable_shards = 1
-			) t 
-			USING (database, name)
-			WHERE engine = 'Distributed' AND t.create_table_query != ''
+			FROM
+				clusterAllReplicas('%s', system.tables) tables
+				LEFT JOIN 
+				(
+					SELECT 
+						DISTINCT database, 
+						name, 
+						create_table_query 
+					FROM
+						clusterAllReplicas('%s', system.tables)
+					SETTINGS skip_unavailable_shards = 1
+				) t 
+				USING (database, name)
+			WHERE
+				engine = 'Distributed' AND t.create_table_query != ''
 			SETTINGS skip_unavailable_shards = 1
 		) tables
 		ORDER BY order
@@ -159,9 +175,11 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 		SELECT 
 			DISTINCT name, 
 			'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine  AS create_db_query
-		  FROM clusterAllReplicas('%s', system.databases) databases
-		 WHERE name != 'system'
-	  SETTINGS skip_unavailable_shards = 1
+		FROM
+			clusterAllReplicas('%s', system.databases) databases
+		WHERE
+			name != 'system'
+		SETTINGS skip_unavailable_shards = 1
 		`,
 		host.Address.ClusterName,
 	)
@@ -169,8 +187,12 @@ func (s *Schemer) getCreateReplicaObjects(ctx context.Context, host *chop.ChiHos
 		SELECT 
 			DISTINCT name, 
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
-		FROM clusterAllReplicas('%s', system.tables) tables
-		WHERE database != 'system' AND create_table_query != '' AND name NOT LIKE '.inner.%%'
+		FROM
+			clusterAllReplicas('%s', system.tables) tables
+		WHERE
+			database != 'system' AND 
+			create_table_query != '' AND 
+			name NOT LIKE '.inner.%%'
 		SETTINGS skip_unavailable_shards = 1
 		`,
 		host.Address.ClusterName,
@@ -189,8 +211,11 @@ func (s *Schemer) hostGetDropTables(ctx context.Context, host *chop.ChiHost) ([]
 		SELECT
 			DISTINCT name, 
 			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
-		FROM system.tables
-		WHERE engine LIKE 'Replicated%'`,
+		FROM
+			system.tables
+		WHERE
+			engine LIKE 'Replicated%'
+		`,
 	)
 
 	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
@@ -203,8 +228,11 @@ func (s *Schemer) hostGetSyncTables(ctx context.Context, host *chop.ChiHost) ([]
 		SELECT
 			DISTINCT name, 
 			concat('SYSTEM SYNC REPLICA "', database, '"."', name, '"') AS sync_table_query
-		FROM system.tables
-		WHERE engine LIKE 'Replicated%'`,
+		FROM
+			system.tables
+		WHERE
+			engine LIKE 'Replicated%'
+		`,
 	)
 
 	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)

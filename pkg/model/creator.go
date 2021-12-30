@@ -1106,19 +1106,16 @@ func getContainerByName(statefulSet *apps.StatefulSet, name string) *corev1.Cont
 }
 
 func getOwnerReferences(chi *chiv1.ClickHouseInstallation) []metav1.OwnerReference {
-	return nil
-	/*
-		controller := true
-		blockOwnerDeletion := true
-		return []metav1.OwnerReference{
-			{
-				APIVersion:         chi.APIVersion,
-				Kind:               chi.Kind,
-				Name:               chi.Name,
-				UID:                chi.UID,
-				Controller:         &controller,
-				BlockOwnerDeletion: &blockOwnerDeletion,
-			},
-		}
-	*/
+	controller := true
+	blockOwnerDeletion := true
+	return []metav1.OwnerReference{
+		{
+			APIVersion:         chi.APIVersion,
+			Kind:               chi.Kind,
+			Name:               chi.Name,
+			UID:                chi.UID,
+			Controller:         &controller,
+			BlockOwnerDeletion: &blockOwnerDeletion,
+		},
+	}
 }
