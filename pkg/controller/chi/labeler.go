@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	v13 "k8s.io/api/apps/v1"
 	v12 "k8s.io/api/core/v1"
@@ -229,7 +230,7 @@ func (c *Controller) addLabels(labels map[string]string) map[string]string {
 			model.LabelAppName:    model.LabelAppValue,
 			model.LabelCHOP:       chop.Get().Version,
 			model.LabelCHOPCommit: chop.Get().Commit,
-			model.LabelCHOPDate:   chop.Get().Date,
+			model.LabelCHOPDate:   strings.ReplaceAll(chop.Get().Date, ":", "."),
 		},
 	)
 }
