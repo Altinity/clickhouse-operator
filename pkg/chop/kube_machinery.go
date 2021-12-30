@@ -99,7 +99,7 @@ var chop *CHOp
 // chopClient can be nil, in this case CHOp will not be able to use any ConfigMap(s) with configuration
 func New(kubeClient *kube.Clientset, chopClient *chopclientset.Clientset, initCHOpConfigFilePath string) {
 	// Create operator instance
-	chop = NewCHOp(version.Version, kubeClient, chopClient, initCHOpConfigFilePath)
+	chop = NewCHOp(version.Version, version.GitSHA, version.BuiltAt, kubeClient, chopClient, initCHOpConfigFilePath)
 	if err := chop.Init(); err != nil {
 		log.A().Fatal("Unable to init CHOP instance %v", err)
 		os.Exit(1)

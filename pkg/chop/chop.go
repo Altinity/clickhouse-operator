@@ -29,6 +29,10 @@ import (
 type CHOp struct {
 	// Version specifies version of the operator
 	Version string
+	// Commit specifies git commit of the operator
+	Commit string
+	// Date specified date when operator was built
+	Date string
 	// ConfigManager specifies configuration manager in charge of operator's configuration
 	ConfigManager *ConfigManager
 }
@@ -36,12 +40,16 @@ type CHOp struct {
 // NewCHOp creates new CHOp
 func NewCHOp(
 	version string,
+	commit string,
+	date string,
 	kubeClient *kube.Clientset,
 	chopClient *chopclientset.Clientset,
 	initConfigFilePath string,
 ) *CHOp {
 	return &CHOp{
 		Version:       version,
+		Commit:        commit,
+		Date:          date,
 		ConfigManager: NewConfigManager(kubeClient, chopClient, initConfigFilePath),
 	}
 }

@@ -128,6 +128,7 @@ func (s *Setting) AsVector() []string {
 	return s.vector
 }
 
+// SetAttribute sets attribute of the setting
 func (s *Setting) SetAttribute(name, value string) *Setting {
 	if s == nil {
 		return nil
@@ -139,6 +140,7 @@ func (s *Setting) SetAttribute(name, value string) *Setting {
 	return s
 }
 
+// HasAttributes checks whether setting has attributes
 func (s *Setting) HasAttributes() bool {
 	if s == nil {
 		return false
@@ -146,6 +148,7 @@ func (s *Setting) HasAttributes() bool {
 	return len(s.attributes) > 0
 }
 
+// Attributes returns string form of attributes - used to config tag creation
 func (s *Setting) Attributes() string {
 	if s == nil {
 		return ""

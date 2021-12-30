@@ -226,8 +226,10 @@ func (c *Controller) addLabels(labels map[string]string) map[string]string {
 		labels,
 		// Add the following labels
 		map[string]string{
-			model.LabelAppName: model.LabelAppValue,
-			model.LabelCHOP:    chop.Get().Version,
+			model.LabelAppName:    model.LabelAppValue,
+			model.LabelCHOP:       chop.Get().Version,
+			model.LabelCHOPCommit: chop.Get().Commit,
+			model.LabelCHOPDate:   chop.Get().Date,
 		},
 	)
 }

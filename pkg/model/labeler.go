@@ -36,6 +36,8 @@ const (
 	LabelAppName                      = clickhousealtinitycom.GroupName + "/app"
 	LabelAppValue                     = "chop"
 	LabelCHOP                         = clickhousealtinitycom.GroupName + "/chop"
+	LabelCHOPCommit                   = clickhousealtinitycom.GroupName + "/chop-commit"
+	LabelCHOPDate                     = clickhousealtinitycom.GroupName + "/chop-date"
 	LabelNamespace                    = clickhousealtinitycom.GroupName + "/namespace"
 	LabelCHIName                      = clickhousealtinitycom.GroupName + "/chi"
 	LabelClusterName                  = clickhousealtinitycom.GroupName + "/cluster"
