@@ -30,7 +30,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-var ErrOperatorPodNotSpecified = fmt.Errorf("operator pod not specfied")
+var (
+	// ErrOperatorPodNotSpecified specifies error when there is not namespace/name pair provided pointing to operator pod
+	ErrOperatorPodNotSpecified = fmt.Errorf("operator pod not specfied")
+)
 
 func (c *Controller) labelMyObjectsTree(ctx context.Context) error {
 
