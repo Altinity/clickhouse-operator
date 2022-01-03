@@ -1111,10 +1111,10 @@ func getOwnerReferences(chi *chiv1.ClickHouseInstallation) []metav1.OwnerReferen
 	}
 	return []metav1.OwnerReference{
 		{
-			APIVersion:         chi.APIVersion,
-			Kind:               chi.Kind,
-			Name:               chi.Name,
-			UID:                chi.UID,
+			APIVersion: chi.APIVersion,
+			Kind:       chi.Kind,
+			Name:       chi.Name,
+			UID:        chi.UID,
 		},
 	}
 }
