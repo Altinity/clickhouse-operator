@@ -279,6 +279,12 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		return nil
 	}
 
+	if (time.Since(w.start) < 1*time.Minute) && (new.Generation == new.Status.Generation) {
+		// First minute after restart do not reconcile already reconciled generations
+		w.a.V(1).M(new).F().Info("Will not reconcile known generation after restart. Generation %d", new.Generation)
+		return nil
+	}
+
 	// CHI is being reconciled
 	return w.reconcileCHI(ctx, old, new)
 }
@@ -1187,7 +1193,7 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		_ = w.deleteCHIProtocol(ctx, new)
 	} else {
 		new.Attributes.SkipOwnerRef = true
-		w.reconcileCHI(ctx, old, new)
+		_ = w.reconcileCHI(ctx, old, new)
 	}
 
 	// We need to uninstall finalizer in order to allow k8s to delete CHI resource
