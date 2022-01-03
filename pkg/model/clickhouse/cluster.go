@@ -88,11 +88,11 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error
 			return query, nil
 		}
 		// Still need to iterate more
-		c.l.V(1).A().Warning("FAILED to run query on: %s of %v skip to next. err: %v", host, c.Hosts, err)
+		c.l.V(1).F().Warning("FAILED to run query on: %s of %v skip to next. err: %v", host, c.Hosts, err)
 	}
 
 	str := fmt.Sprintf("FAILED to run query on all hosts %v", c.Hosts)
-	c.l.V(1).A().Error(str)
+	c.l.V(1).F().Error(str)
 	return nil, fmt.Errorf(str)
 }
 

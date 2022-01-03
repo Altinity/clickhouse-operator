@@ -170,7 +170,7 @@ func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
 		_ = w.schemer.CHIDropDnsCache(ctx, chi)
 	} else {
-		w.a.M(cmd.initiator).A().Error("unable to find CHI by %v", cmd.initiator.Labels)
+		w.a.M(cmd.initiator).F().Error("unable to find CHI by %v", cmd.initiator.Labels)
 	}
 	return nil
 }
@@ -211,7 +211,7 @@ func (w *worker) normalize(c *chiv1.ClickHouseInstallation) *chiv1.ClickHouseIns
 	if err != nil {
 		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("FAILED to normalize CHI : %v", err)
 	}
 
@@ -239,7 +239,7 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *chiv1.ClickHouseInsta
 	// No finalizer found - need to install it
 
 	if err := w.c.installFinalizer(ctx, chi); err != nil {
-		w.a.V(1).M(chi).A().Error("unable to install finalizer. err: %v", err)
+		w.a.V(1).M(chi).F().Error("unable to install finalizer. err: %v", err)
 		return false
 	}
 
@@ -295,9 +295,9 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 	actionPlan := chopmodel.NewActionPlan(old, new)
 	oldjson, _ := json.MarshalIndent(old, "", "  ")
 	newjson, _ := json.MarshalIndent(new, "", "  ")
-	w.a.V(3).M(new).A().Info("AP worker---------------------------------------------:\n%s\n", actionPlan)
-	w.a.V(3).M(new).A().Info("old worker--------------------------------------------:\n%s\n", string(oldjson))
-	w.a.V(3).M(new).A().Info("new worker--------------------------------------------:\n%s\n", string(newjson))
+	w.a.V(3).M(new).F().Info("AP worker---------------------------------------------:\n%s\n", actionPlan)
+	w.a.V(3).M(new).F().Info("old worker--------------------------------------------:\n%s\n", string(oldjson))
+	w.a.V(3).M(new).F().Info("new worker--------------------------------------------:\n%s\n", string(newjson))
 	if !actionPlan.HasActionsToDo() {
 		// Nothing to do - no changes found - no need to react
 		w.a.V(3).M(new).F().Info("ResourceVersion changed, but no actual changes found")
@@ -311,7 +311,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 	if err := w.reconcile(ctx, new); err != nil {
 		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(new).
-			M(new).A().
+			M(new).F().
 			Error("FAILED update: %v", err)
 		return nil
 	}
@@ -618,11 +618,11 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 			),
 		)
 	if err := w.reconcileCHIConfigMapCommon(ctx, chi, options); err != nil {
-		w.a.A().Error("failed to reconcile config map common. err: %v", err)
+		w.a.F().Error("failed to reconcile config map common. err: %v", err)
 	}
 	// 3. CHI users ConfigMap
 	if err := w.reconcileCHIConfigMapUsers(ctx, chi); err != nil {
-		w.a.A().Error("failed to reconcile config map users. err: %v", err)
+		w.a.F().Error("failed to reconcile config map users. err: %v", err)
 	}
 
 	return nil
@@ -914,7 +914,7 @@ func (w *worker) migrateTables(ctx context.Context, host *chiv1.ChiHost) error {
 		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
 	err := w.schemer.HostCreateTables(ctx, host)
 	if err != nil {
-		w.a.M(host).A().Error("ERROR create tables on host %s. err: %v", host.Name, err)
+		w.a.M(host).F().Error("ERROR create tables on host %s. err: %v", host.Name, err)
 	}
 	return err
 }
@@ -1199,7 +1199,7 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 	// We need to uninstall finalizer in order to allow k8s to delete CHI resource
 	w.a.V(2).M(new).F().Info("uninstall finalizer")
 	if err := w.c.uninstallFinalizer(ctx, new); err != nil {
-		w.a.V(1).M(new).A().Error("unable to uninstall finalizer: err:%v", err)
+		w.a.V(1).M(new).F().Error("unable to uninstall finalizer: err:%v", err)
 	}
 
 	// CHI's child resources were deleted
@@ -1239,7 +1239,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 	if err != nil {
 		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("Delete CHI failed - unable to normalize: %q", err)
 		return err
 	}
@@ -1253,7 +1253,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 
 	(&chi.Status).DeleteStart()
 	if err := w.c.updateCHIObjectStatus(ctx, chi, true); err != nil {
-		w.a.V(1).M(chi).A().Error("UNABLE to write normalized CHI. err:%q", err)
+		w.a.V(1).M(chi).F().Error("UNABLE to write normalized CHI. err:%q", err)
 		return nil
 	}
 
@@ -1335,7 +1335,7 @@ func (w *worker) dropReplica(ctx context.Context, hostToRun, hostToDrop *chiv1.C
 	} else {
 		w.a.WithEvent(hostToRun.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(hostToRun.CHI).
-			M(hostToRun).A().
+			M(hostToRun).F().
 			Error("FAILED to drop replica on host %s with error %v", hostToDrop.Name, err)
 	}
 
@@ -1365,7 +1365,7 @@ func (w *worker) deleteTables(ctx context.Context, host *chiv1.ChiHost) error {
 	} else {
 		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(host.CHI).
-			M(host).A().
+			M(host).F().
 			Error("FAILED to delete tables on host %s with error %v", host.Name, err)
 	}
 
@@ -1559,7 +1559,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *chiv1.ClickHouseInsta
 		w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("Update ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
 	}
 
@@ -1584,7 +1584,7 @@ func (w *worker) createConfigMap(ctx context.Context, chi *chiv1.ClickHouseInsta
 		w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("Create ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
 	}
 
@@ -1622,7 +1622,7 @@ func (w *worker) reconcileConfigMap(
 		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("FAILED to reconcile ConfigMap: %s CHI: %s ", configMap.Name, chi.Name)
 	}
 
@@ -1706,7 +1706,7 @@ func (w *worker) updateService(
 		w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("Update Service %s/%s failed with error %v", newService.Namespace, newService.Name, err)
 	}
 
@@ -1731,7 +1731,7 @@ func (w *worker) createService(ctx context.Context, chi *chiv1.ClickHouseInstall
 		w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("Create Service %s/%s failed with error %v", service.Namespace, service.Name, err)
 	}
 
@@ -1766,7 +1766,7 @@ func (w *worker) reconcileService(ctx context.Context, chi *chiv1.ClickHouseInst
 		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("FAILED to reconcile Service: %s CHI: %s ", service.Name, chi.Name)
 	}
 
@@ -1849,7 +1849,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiv1.ChiHost) 
 		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusAction(host.CHI).
 			WithStatusError(host.CHI).
-			M(host).A().
+			M(host).F().
 			Error("FAILED to reconcile StatefulSet: %s CHI: %s ", newStatefulSet.Name, host.CHI.Name)
 	}
 
@@ -1888,13 +1888,13 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 	} else if err == errIgnore {
 		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
 			WithStatusAction(host.CHI).
-			M(host).A().
+			M(host).F().
 			Warning("Create StatefulSet %s/%s - error ignored", statefulSet.Namespace, statefulSet.Name)
 	} else {
 		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
 			WithStatusAction(host.CHI).
 			WithStatusError(host.CHI).
-			M(host).A().
+			M(host).F().
 			Error("Create StatefulSet %s/%s - failed with error %v", statefulSet.Namespace, statefulSet.Name, err)
 	}
 
@@ -1986,7 +1986,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
 			WithStatusAction(host.CHI).
 			WithStatusError(host.CHI).
-			M(host).A().
+			M(host).F().
 			Error("Update StatefulSet(%s/%s) - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
 
 		diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, newStatefulSet.Spec)
@@ -2053,14 +2053,14 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiv1.ChiHost) error {
 			if apierrors.IsNotFound(err) {
 				// This is not an error per se, means PVC is not created (yet)?
 			} else {
-				w.a.M(host).A().Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
+				w.a.M(host).F().Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
 			}
 			return
 		}
 
 		pvc, err = w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
 		if err != nil {
-			w.a.M(host).A().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvcName, err)
+			w.a.M(host).F().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvcName, err)
 			w.registryFailed.RegisterPVC(pvc.ObjectMeta)
 			return
 		}

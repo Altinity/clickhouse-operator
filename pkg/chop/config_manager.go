@@ -128,7 +128,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 	// Get list of ClickHouseOperatorConfiguration objects
 	var err error
 	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(context.TODO(), metav1.ListOptions{}); err != nil {
-		log.V(1).A().Error("Error read ClickHouseOperatorConfigurations %v", err)
+		log.V(1).F().Error("Error read ClickHouseOperatorConfigurations %v", err)
 		return
 	}
 

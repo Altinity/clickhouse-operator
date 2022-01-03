@@ -433,10 +433,10 @@ func (c *Controller) Run(ctx context.Context) {
 		case nil:
 			cnt = max
 		case ErrOperatorPodNotSpecified:
-			log.V(1).A().Error("Since operator pod is not specified, will not perform labeling")
+			log.V(1).F().Error("Since operator pod is not specified, will not perform labeling")
 			cnt = max
 		default:
-			log.V(1).A().Error("ERROR label objects, will retry. Err: %v", err)
+			log.V(1).F().Error("ERROR label objects, will retry. Err: %v", err)
 			util.WaitContextDoneOrTimeout(ctx, 5*time.Second)
 		}
 	}
@@ -445,9 +445,9 @@ func (c *Controller) Run(ctx context.Context) {
 	// Start threads
 	//
 	workersNum := len(c.queues)
-	log.V(1).A().Info("ClickHouseInstallation controller: starting workers number: %d", workersNum)
+	log.V(1).F().Info("ClickHouseInstallation controller: starting workers number: %d", workersNum)
 	for i := 0; i < workersNum; i++ {
-		log.V(1).A().Info("ClickHouseInstallation controller: starting worker %d out of %d", i+1, workersNum)
+		log.V(1).F().Info("ClickHouseInstallation controller: starting worker %d out of %d", i+1, workersNum)
 		sys := false
 		if i < chi.DefaultReconcileSystemThreadsNumber {
 			sys = true
@@ -455,9 +455,9 @@ func (c *Controller) Run(ctx context.Context) {
 		worker := c.newWorker(c.queues[i], sys)
 		go wait.Until(worker.run, runWorkerPeriod, ctx.Done())
 	}
-	defer log.V(1).A().Info("ClickHouseInstallation controller: shutting down workers")
+	defer log.V(1).F().Info("ClickHouseInstallation controller: shutting down workers")
 
-	log.V(1).A().Info("ClickHouseInstallation controller: workers started")
+	log.V(1).F().Info("ClickHouseInstallation controller: workers started")
 	<-ctx.Done()
 }
 
@@ -554,7 +554,7 @@ func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
 // updateWatchAsync
 func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string) {
 	if err := metrics.InformMetricsExporterAboutWatchedCHI(namespace, name, hostnames); err != nil {
-		log.V(1).A().Info("FAIL update watch (%s/%s): %q", namespace, name, err)
+		log.V(1).F().Info("FAIL update watch (%s/%s): %q", namespace, name, err)
 	} else {
 		log.V(2).Info("OK update watch (%s/%s)", namespace, name)
 	}
@@ -568,7 +568,7 @@ func (c *Controller) deleteWatch(namespace, name string) {
 // deleteWatchAsync
 func (c *Controller) deleteWatchAsync(namespace, name string) {
 	if err := metrics.InformMetricsExporterToDeleteWatchedCHI(namespace, name); err != nil {
-		log.V(1).A().Info("FAIL delete watch (%s/%s): %q", namespace, name, err)
+		log.V(1).F().Info("FAIL delete watch (%s/%s): %q", namespace, name, err)
 	} else {
 		log.V(2).Info("OK delete watch (%s/%s)", namespace, name)
 	}
@@ -658,7 +658,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chi.ClickHouse
 	// Start Debug object
 	//js, err := json.MarshalIndent(chi, "", "  ")
 	//if err != nil {
-	//	log.V(1).M(chi).A().Error("%q", err)
+	//	log.V(1).M(chi).F().Error("%q", err)
 	//}
 	//log.V(3).M(chi).F().Info("\n%s\n", js)
 	// End Debug object
@@ -672,7 +672,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chi.ClickHouse
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Patch(ctx, chi.Name, types.JSONPatchType, payload, newPatchOptions())
 	if err != nil {
 		// Error update
-		log.V(1).M(chi).A().Error("%q", err)
+		log.V(1).M(chi).F().Error("%q", err)
 		return err
 	}
 
@@ -703,14 +703,14 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 		if tolerateAbsence {
 			return nil
 		}
-		log.V(1).M(chi).A().Error("%q", err)
+		log.V(1).M(chi).F().Error("%q", err)
 		return err
 	}
 	if cur == nil {
 		if tolerateAbsence {
 			return nil
 		}
-		log.V(1).M(chi).A().Error("NULL returned")
+		log.V(1).M(chi).F().Error("NULL returned")
 		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
 	}
 
@@ -722,7 +722,7 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 	// Start Debug object
 	//js, err := json.MarshalIndent(chi, "", "  ")
 	//if err != nil {
-	//	log.V(1).M(chi).A().Error("%q", err)
+	//	log.V(1).M(chi).F().Error("%q", err)
 	//}
 	//log.V(3).M(chi).F().Info("\n%s\n", js)
 	// End Debug object
@@ -730,7 +730,7 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).UpdateStatus(ctx, cur, newUpdateOptions())
 	if err != nil {
 		// Error update
-		log.V(1).M(chi).A().Error("%q", err)
+		log.V(1).M(chi).F().Error("%q", err)
 		return err
 	}
 

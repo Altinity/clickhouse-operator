@@ -70,7 +70,7 @@ func (c *Controller) updateStatefulSet(
 	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).Update(ctx, newStatefulSet, newUpdateOptions())
 	if err != nil {
 		// Update failed
-		log.V(1).M(host).A().Error("%v", err)
+		log.V(1).M(host).F().Error("%v", err)
 		return err
 	}
 
@@ -106,7 +106,7 @@ func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.Persiste
 	pv, err = c.kubeClient.CoreV1().PersistentVolumes().Update(ctx, pv, newUpdateOptions())
 	if err != nil {
 		// Update failed
-		log.V(1).M(pv).A().Error("%v", err)
+		log.V(1).M(pv).F().Error("%v", err)
 		return nil, err
 	}
 
@@ -126,7 +126,7 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *v1.Pe
 		//if strings.Contains(err.Error(), "field can not be less than previous value") {
 		//	return pvc, nil
 		//} else {
-		log.V(1).M(pvc).A().Error("unable to update PVC %v", err)
+		log.V(1).M(pvc).F().Error("unable to update PVC %v", err)
 		//	return nil, err
 		//}
 	}
@@ -165,7 +165,7 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatef
 		return errIgnore
 
 	default:
-		log.V(1).M(host).A().Error("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", chop.Config().OnStatefulSetCreateFailureAction)
+		log.V(1).M(host).F().Error("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", chop.Config().OnStatefulSetCreateFailureAction)
 		return errIgnore
 	}
 
@@ -217,7 +217,7 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 		return errIgnore
 
 	default:
-		log.V(1).M(host).A().Error("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", chop.Config().OnStatefulSetUpdateFailureAction)
+		log.V(1).M(host).F().Error("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", chop.Config().OnStatefulSetUpdateFailureAction)
 		return errIgnore
 	}
 

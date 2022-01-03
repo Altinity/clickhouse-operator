@@ -241,7 +241,7 @@ func (c *Controller) pollStatefulSet(
 			log.V(1).M(namespace, name).F().Info("WAIT: object not found. Not created yet?")
 		} else {
 			// Some kind of total error
-			log.M(namespace, name).A().Error("%s/%s Get() FAILED", namespace, name)
+			log.M(namespace, name).F().Error("%s/%s Get() FAILED", namespace, name)
 			return err
 		}
 

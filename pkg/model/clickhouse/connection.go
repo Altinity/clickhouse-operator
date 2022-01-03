@@ -65,7 +65,7 @@ func (c *Connection) connect(ctx context.Context) {
 	c.l.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
 	dbConnection, err := databasesql.Open("clickhouse", c.params.GetDSN())
 	if err != nil {
-		c.l.V(1).A().Error("FAILED Open(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
+		c.l.V(1).F().Error("FAILED Open(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
 		return
 	}
 
@@ -80,7 +80,7 @@ func (c *Connection) connect(ctx context.Context) {
 	defer cancel()
 
 	if err := dbConnection.PingContext(pingCtx); err != nil {
-		c.l.V(1).A().Error("FAILED Ping(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
+		c.l.V(1).F().Error("FAILED Ping(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
 		_ = dbConnection.Close()
 		return
 	}
@@ -117,7 +117,7 @@ func (c *Connection) QueryContext(ctx context.Context, sql string) (*QueryResult
 	if !c.ensureConnected(queryCtx) {
 		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
-		c.l.V(1).A().Error(s)
+		c.l.V(1).F().Error(s)
 		return nil, fmt.Errorf(s)
 	}
 
@@ -125,7 +125,7 @@ func (c *Connection) QueryContext(ctx context.Context, sql string) (*QueryResult
 	if err != nil {
 		cancel()
 		s := fmt.Sprintf("FAILED Query(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
-		c.l.V(1).A().Error(s)
+		c.l.V(1).F().Error(s)
 		return nil, err
 	}
 
@@ -167,7 +167,7 @@ func (c *Connection) Exec(_ctx context.Context, sql string, opts *QueryOptions) 
 	if !c.ensureConnected(ctx) {
 		cancel()
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
-		c.l.V(1).A().Error(s)
+		c.l.V(1).F().Error(s)
 		return fmt.Errorf(s)
 	}
 
@@ -175,7 +175,7 @@ func (c *Connection) Exec(_ctx context.Context, sql string, opts *QueryOptions) 
 
 	if err != nil {
 		cancel()
-		c.l.V(1).A().Error("FAILED Exec(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
+		c.l.V(1).F().Error("FAILED Exec(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
 		return err
 	}
 

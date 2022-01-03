@@ -71,23 +71,23 @@ func GetClientset(kubeConfigFile, masterURL string) (
 ) {
 	kubeConfig, err := getKubeConfig(kubeConfigFile, masterURL)
 	if err != nil {
-		log.A().Fatal("Unable to build kubeconf: %s", err.Error())
+		log.F().Fatal("Unable to build kubeconf: %s", err.Error())
 		os.Exit(1)
 	}
 
 	kubeClientset, err := kube.NewForConfig(kubeConfig)
 	if err != nil {
-		log.A().Fatal("Unable to initialize kubernetes API clientset: %s", err.Error())
+		log.F().Fatal("Unable to initialize kubernetes API clientset: %s", err.Error())
 	}
 
 	apiextensionsClientset, err := apiextensions.NewForConfig(kubeConfig)
 	if err != nil {
-		log.A().Fatal("Unable to initialize kubernetes API extensions clientset: %s", err.Error())
+		log.F().Fatal("Unable to initialize kubernetes API extensions clientset: %s", err.Error())
 	}
 
 	chopClientset, err := chopclientset.NewForConfig(kubeConfig)
 	if err != nil {
-		log.A().Fatal("Unable to initialize clickhouse-operator API clientset: %s", err.Error())
+		log.F().Fatal("Unable to initialize clickhouse-operator API clientset: %s", err.Error())
 	}
 
 	return kubeClientset, apiextensionsClientset, chopClientset
@@ -101,7 +101,7 @@ func New(kubeClient *kube.Clientset, chopClient *chopclientset.Clientset, initCH
 	// Create operator instance
 	chop = NewCHOp(version.Version, version.GitSHA, version.BuiltAt, kubeClient, chopClient, initCHOpConfigFilePath)
 	if err := chop.Init(); err != nil {
-		log.A().Fatal("Unable to init CHOP instance %v", err)
+		log.F().Fatal("Unable to init CHOP instance %v", err)
 		os.Exit(1)
 	}
 	chop.SetupLog()
