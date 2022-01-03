@@ -260,14 +260,14 @@ func (c *Controller) addEventHandlersEndpoint(
 
 			diff, equal := messagediff.DeepDiff(oldEndpoints, newEndpoints)
 			if equal {
-				log.V(2).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: no changes found")
+				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: no changes found")
 				// No need to react
 				return
 			}
 
 			added := false
 			for path := range diff.Added {
-				log.V(2).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: added %v", path)
+				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: added %v", path)
 				for _, pathnode := range *path {
 					s := pathnode.String()
 					if s == ".Addresses" {
@@ -276,10 +276,10 @@ func (c *Controller) addEventHandlersEndpoint(
 				}
 			}
 			for path := range diff.Removed {
-				log.V(2).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: removed %v", path)
+				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: removed %v", path)
 			}
 			for path := range diff.Modified {
-				log.V(2).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: modified %v", path)
+				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: modified %v", path)
 			}
 
 			if added {
@@ -292,7 +292,7 @@ func (c *Controller) addEventHandlersEndpoint(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			log.V(2).M(endpoints).Info("endpointsInformer.DeleteFunc")
+			log.V(3).M(endpoints).Info("endpointsInformer.DeleteFunc")
 		},
 	})
 }
