@@ -230,7 +230,7 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *chiv1.ClickHouseInsta
 		return false
 	}
 
-	// Check whether finalizer is already listed in CHI
+	// Finalizer can already be listed in CHI, do nothing in this case
 	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
 		w.a.V(2).M(chi).F().Info("finalizer already installed")
 		return false
@@ -274,11 +274,16 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		return nil
 	}
 
-	if w.deleteCHI(ctx, new) {
+	if w.deleteCHI(ctx, old, new) {
 		// CHI is being deleted
 		return nil
 	}
 
+	// CHI is being reconciled
+	return w.reconcileCHI(ctx, old, new)
+}
+
+func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseInstallation) error {
 	old = w.normalize(old)
 	new = w.normalize(new)
 	actionPlan := chopmodel.NewActionPlan(old, new)
@@ -311,28 +316,6 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		WithStatusAction(new).
 		M(new).F().
 		Info("remove items scheduled for deletion")
-	actionPlan.WalkAdded(
-		func(cluster *chiv1.ChiCluster) {
-		},
-		func(shard *chiv1.ChiShard) {
-		},
-		func(host *chiv1.ChiHost) {
-			//
-			//if update {
-			//	w.a.V(1).
-			//		WithEvent(new, eventActionCreate, eventReasonCreateStarted).
-			//		WithStatusAction(new).
-			//		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
-			//	if err := w.schemer.HostCreateTables(host); err != nil {
-			//		w.a.Error("ERROR create tables on host %s. err: %v", host.Name, err)
-			//	}
-			//} else {
-			//	w.a.V(1).
-			//		Info("As CHI is just created, not need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-			//}
-		},
-	)
-
 	w.clear(ctx, new)
 	w.dropReplicas(ctx, new, actionPlan)
 	w.includeStopped(new)
@@ -1152,43 +1135,43 @@ func (w *worker) deletePDB(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 }
 
 // deleteCHI
-func (w *worker) deleteCHI(ctx context.Context, chi *chiv1.ClickHouseInstallation) bool {
+func (w *worker) deleteCHI(ctx context.Context, old, new *chiv1.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return false
 	}
 
 	// Do we have pending request for CHI to be deleted?
-	if chi.ObjectMeta.DeletionTimestamp.IsZero() {
+	if new.ObjectMeta.DeletionTimestamp.IsZero() {
 		// CHI is not being deleted and operator has not deleted anything.
 		return false
 	}
 
-	w.a.V(3).M(chi).S().P()
-	defer w.a.V(3).M(chi).E().P()
+	w.a.V(3).M(new).S().P()
+	defer w.a.V(3).M(new).E().P()
 
 	// Ok, we have pending request for CHI to be deleted.
 	// However, we need to decide, should CHI's child resources be deleted or not.
-	// There is a curious situation, when CRD is deleted and k8s starts to delete all resources,
-	// of the type, described by CRD being deleted. This is may be very painful situation,
-	// so in this case we should agreed to delete CHI itself, but has to keep all CHI's child resources.
+	// There is a curious situation, when CRD is deleted and k8s starts to delete all resources of the type,
+	// described by CRD being deleted. This is may be unexpected and very painful situation,
+	// so in this case we should agree to delete CHI itself, but has to keep all CHI's child resources.
 
 	var clear bool
 	crd, err := w.c.extClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, "clickhouseinstallations.clickhouse.altinity.com", newGetOptions())
 	if err == nil {
 		if crd.ObjectMeta.DeletionTimestamp.IsZero() {
 			// CRD is not being deleted and operator can delete all child resources.
-			w.a.V(1).M(chi).F().Info("CRD %s/%s is not being deleted, operator will delete child resources", crd.Namespace, crd.Name)
+			w.a.V(1).M(new).F().Info("CRD %s/%s is not being deleted, operator will delete child resources", crd.Namespace, crd.Name)
 			clear = true
 		} else {
 			// CRD is being deleted. This may be a mistake, operator should not delete data
-			w.a.V(1).M(chi).F().Info("CRD %s/%s BEING DELETED, operator will NOT delete child resources", crd.Namespace, crd.Name)
+			w.a.V(1).M(new).F().Info("CRD %s/%s BEING DELETED, operator will NOT delete child resources", crd.Namespace, crd.Name)
 			clear = false
 		}
 	}
 
 	if clear {
-		cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(ctx, chi.Name, newGetOptions())
+		cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(ctx, new.Name, newGetOptions())
 		if cur == nil {
 			return false
 		}
@@ -1196,18 +1179,21 @@ func (w *worker) deleteCHI(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 			return false
 		}
 
-		if !util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
+		if !util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
 			// No finalizer found, unexpected behavior
 			return false
 		}
 
-		_ = w.deleteCHIProtocol(ctx, chi)
+		_ = w.deleteCHIProtocol(ctx, new)
+	} else {
+		new.Attributes.SkipOwnerRef = true
+		w.reconcileCHI(ctx, old, new)
 	}
 
 	// We need to uninstall finalizer in order to allow k8s to delete CHI resource
-	w.a.V(2).M(chi).F().Info("uninstall finalizer")
-	if err := w.c.uninstallFinalizer(ctx, chi); err != nil {
-		w.a.V(1).M(chi).A().Error("unable to uninstall finalizer: err:%v", err)
+	w.a.V(2).M(new).F().Info("uninstall finalizer")
+	if err := w.c.uninstallFinalizer(ctx, new); err != nil {
+		w.a.V(1).M(new).A().Error("unable to uninstall finalizer: err:%v", err)
 	}
 
 	// CHI's child resources were deleted
