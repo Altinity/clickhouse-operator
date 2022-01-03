@@ -36,7 +36,7 @@ spec:
           type: string
           description: Operator version
           priority: 1 # show in wide view
-          jsonPath: .status.version
+          jsonPath: .status.chop-version
         - name: clusters
           type: integer
           description: Clusters count
@@ -112,9 +112,15 @@ spec:
               type: object
               description: "Current ClickHouseInstallation manifest status, contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other"
               properties:
-                version:
+                chop-version:
                   type: string
-                  description: "Version"
+                  description: "ClickHouse operator version"
+                chop-commit:
+                  type: string
+                  description: "ClickHouse operator git commit SHA"
+                chop-date:
+                  type: string
+                  description: "ClickHouse operator build date"
                 clusters:
                   type: integer
                   minimum: 0
@@ -1358,7 +1364,7 @@ spec:
           type: string
           description: Operator version
           priority: 1 # show in wide view
-          jsonPath: .status.version
+          jsonPath: .status.chop-version
         - name: clusters
           type: integer
           description: Clusters count
@@ -1434,9 +1440,15 @@ spec:
               type: object
               description: "Current ClickHouseInstallation manifest status, contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other"
               properties:
-                version:
+                chop-version:
                   type: string
-                  description: "Version"
+                  description: "ClickHouse operator version"
+                chop-commit:
+                  type: string
+                  description: "ClickHouse operator git commit SHA"
+                chop-date:
+                  type: string
+                  description: "ClickHouse operator build date"
                 clusters:
                   type: integer
                   minimum: 0
