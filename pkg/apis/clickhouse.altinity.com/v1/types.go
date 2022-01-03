@@ -215,7 +215,7 @@ func (c *ChiObjectsCleanup) GetStatefulSet() string {
 	return c.StatefulSet
 }
 
-// SetStatefulSet sets stetaful set
+// SetStatefulSet sets stateful set
 func (c *ChiObjectsCleanup) SetStatefulSet(v string) *ChiObjectsCleanup {
 	if c == nil {
 		return nil
