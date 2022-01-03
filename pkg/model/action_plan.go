@@ -158,26 +158,25 @@ func (ap *ActionPlan) isExcludedPath(prev, cur string) bool {
 
 // HasActionsToDo checks whether there are any actions to do - meaning changes between states to reconcile
 func (ap *ActionPlan) HasActionsToDo() bool {
-
-	if ap.specEqual && ap.labelsEqual && ap.deletionTimestampEqual && ap.finalizersEqual && ap.attributesEqual{
+	if ap.specEqual && ap.labelsEqual && ap.deletionTimestampEqual && ap.finalizersEqual && ap.attributesEqual {
 		// All is equal - no actions to do
 		return false
 	}
 
-	if (ap.specDiff == nil) && (ap.labelsDiff == nil) {
-		// No diffs available
-		return !ap.deletionTimestampEqual || !ap.finalizersEqual || !ap.attributesEqual
+	// Something is not equal
+
+	if ap.specDiff != nil {
+		if len(ap.specDiff.Added)+len(ap.specDiff.Removed)+len(ap.specDiff.Modified) > 0 {
+			// Spec section has some modifications
+			return true
+		}
 	}
 
-	// Looks like have some changes in diffs
-
-	if (ap.specDiff != nil) && (len(ap.specDiff.Added)+len(ap.specDiff.Removed)+len(ap.specDiff.Modified) > 0) {
-		// Has some modifications
-		return true
-	}
-	if (ap.labelsDiff != nil) && (len(ap.labelsDiff.Added)+len(ap.labelsDiff.Removed)+len(ap.labelsDiff.Modified) > 0) {
-		// Has some modifications
-		return true
+	if ap.labelsDiff != nil {
+		if len(ap.labelsDiff.Added)+len(ap.labelsDiff.Removed)+len(ap.labelsDiff.Modified) > 0 {
+			// Labels section has some modifications
+			return true
+		}
 	}
 
 	return !ap.deletionTimestampEqual || !ap.finalizersEqual || !ap.attributesEqual
