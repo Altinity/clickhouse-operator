@@ -38,6 +38,9 @@ type ActionPlan struct {
 
 	finalizersDiff  *messagediff.Diff
 	finalizersEqual bool
+
+	attributesDiff  *messagediff.Diff
+	attributesEqual bool
 }
 
 // NewActionPlan makes new ActionPlan out of two CHIs
@@ -53,18 +56,21 @@ func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
 		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, ap.new.DeletionTimestamp)
 		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.DeletionTimestamp, ap.new.DeletionTimestamp)
 		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, ap.new.Finalizers)
+		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.Attributes, ap.new.Attributes)
 	} else if old == nil {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(nil, ap.new.Spec)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(nil, ap.new.Labels)
 		ap.deletionTimestampEqual = ap.timestampEqual(nil, ap.new.DeletionTimestamp)
 		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(nil, ap.new.DeletionTimestamp)
 		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(nil, ap.new.Finalizers)
+		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(nil, ap.new.Attributes)
 	} else if new == nil {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.Spec, nil)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.Labels, nil)
 		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, nil)
 		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.DeletionTimestamp, nil)
 		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, nil)
+		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.Attributes, nil)
 	} else {
 		// Both are nil
 		ap.specDiff = nil
@@ -78,6 +84,9 @@ func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
 
 		ap.finalizersDiff = nil
 		ap.finalizersEqual = true
+
+		ap.attributesDiff = nil
+		ap.attributesEqual = true
 	}
 
 	ap.excludePaths()
@@ -150,14 +159,14 @@ func (ap *ActionPlan) isExcludedPath(prev, cur string) bool {
 // HasActionsToDo checks whether there are any actions to do - meaning changes between states to reconcile
 func (ap *ActionPlan) HasActionsToDo() bool {
 
-	if ap.specEqual && ap.labelsEqual && ap.deletionTimestampEqual && ap.finalizersEqual {
+	if ap.specEqual && ap.labelsEqual && ap.deletionTimestampEqual && ap.finalizersEqual && ap.attributesEqual{
 		// All is equal - no actions to do
 		return false
 	}
 
 	if (ap.specDiff == nil) && (ap.labelsDiff == nil) {
 		// No diffs available
-		return !ap.deletionTimestampEqual || !ap.finalizersEqual
+		return !ap.deletionTimestampEqual || !ap.finalizersEqual || !ap.attributesEqual
 	}
 
 	// Looks like have some changes in diffs
@@ -171,7 +180,7 @@ func (ap *ActionPlan) HasActionsToDo() bool {
 		return true
 	}
 
-	return !ap.deletionTimestampEqual || !ap.finalizersEqual
+	return !ap.deletionTimestampEqual || !ap.finalizersEqual || !ap.attributesEqual
 }
 
 // String stringifies ActionPlan
