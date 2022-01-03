@@ -40,7 +40,12 @@ type ClickHouseInstallation struct {
 	Spec              ChiSpec   `json:"spec"     yaml:"spec"`
 	Status            ChiStatus `json:"status"   yaml:"status"`
 
-	ExchangeEnv []corev1.EnvVar `json:"-" yaml:"-" testdiff:"ignore"`
+	Attributes ComparableAttributes `json:"-" yaml:"-"`
+}
+
+type ComparableAttributes struct {
+	ExchangeEnv []corev1.EnvVar `json:"-" yaml:"-"`
+	SkipOwnerRef bool `json:"-" yaml:"-"`
 }
 
 // +genclient

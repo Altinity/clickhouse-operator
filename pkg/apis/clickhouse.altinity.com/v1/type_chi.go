@@ -475,6 +475,9 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 
 	// Copy Status for now
 	chi.Status = from.Status
+
+	// Copy service attributes
+	chi.Attributes = from.Attributes
 }
 
 // MergeFrom merges from spec
