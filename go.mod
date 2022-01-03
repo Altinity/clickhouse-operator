@@ -30,6 +30,7 @@ require (
 )
 
 replace (
+	github.com/golang/glog => github.com/sunsingerus/glog v1.0.1-0.20220103184348-48242e35873d
 	k8s.io/api => k8s.io/api v0.21.7
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.21.7
 	k8s.io/apimachinery => k8s.io/apimachinery v0.21.7
