@@ -873,7 +873,7 @@ func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username str
 	// ENV VAR name and value
 	envVarName := username + "_" + userSettingsField
 
-	for _, envVar := range n.chi.ExchangeEnv {
+	for _, envVar := range n.chi.Attributes.ExchangeEnv {
 		if envVar.Name == envVarName {
 			// Such a variable already exists
 			return false
@@ -891,7 +891,7 @@ func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username str
 			},
 		},
 	}
-	n.chi.ExchangeEnv = append(n.chi.ExchangeEnv, envVar)
+	n.chi.Attributes.ExchangeEnv = append(n.chi.Attributes.ExchangeEnv, envVar)
 
 	// Replace setting with empty value and reference to ENV VAR
 	users.Set(username+"/"+userSettingsField, chiV1.NewSettingScalar("").SetAttribute("from_env", envVarName))
