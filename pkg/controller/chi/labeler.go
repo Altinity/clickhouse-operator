@@ -30,6 +30,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+var ErrOperatorPodNotSpecified = fmt.Errorf("operator pod not specfied")
+
 func (c *Controller) labelMyObjectsTree(ctx context.Context) error {
 
 	// Operator is running in the Pod. We need to label this Pod
@@ -70,6 +72,11 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) error {
 		str := fmt.Sprintf("ERROR read env vars: %s/%s ", chiv1.OPERATOR_POD_NAME, chiv1.OPERATOR_POD_NAMESPACE)
 		log.V(1).M(namespace, name).A().Error(str)
 		return errors.New(str)
+	}
+
+	log.V(1).Info("OPERATOR_POD_NAMESPACE=%s OPERATOR_POD_NAME=%s", namespace, name)
+	if len(namespace) == 0 || len(name) == 0 {
+		return ErrOperatorPodNotSpecified
 	}
 
 	// Put labels on the pod
