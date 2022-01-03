@@ -427,10 +427,15 @@ func (c *Controller) Run(ctx context.Context) {
 	}
 
 	// Label controller runtime objects with proper labels
-	for cnt := 0; cnt < 10; cnt++ {
-		if err := c.labelMyObjectsTree(ctx); err == nil {
-			break
-		} else {
+	max := 10
+	for cnt := 0; cnt < max; cnt++ {
+		switch err := c.labelMyObjectsTree(ctx); err {
+		case nil:
+			cnt = max
+		case ErrOperatorPodNotSpecified:
+			log.V(1).A().Error("Since operator pod is not specified, will not perform labeling")
+			cnt = max
+		default:
 			log.V(1).A().Error("ERROR label objects, will retry. Err: %v", err)
 			util.WaitContextDoneOrTimeout(ctx, 5*time.Second)
 		}
