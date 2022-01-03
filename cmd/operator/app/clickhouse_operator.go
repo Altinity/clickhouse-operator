@@ -92,14 +92,14 @@ func Run() {
 		chopInformerFactoryResyncPeriod = defaultInformerFactoryResyncDebugPeriod
 	}
 
-	log.A().Info("Starting clickhouse-operator. Version:%s GitSHA:%s BuiltAt:%s", version.Version, version.GitSHA, version.BuiltAt)
+	log.F().Info("Starting clickhouse-operator. Version:%s GitSHA:%s BuiltAt:%s", version.Version, version.GitSHA, version.BuiltAt)
 
 	// Initialize k8s API clients
 	kubeClient, extClient, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
 
 	// Create operator instance
 	chop.New(kubeClient, chopClient, chopConfigFile)
-	log.V(1).A().Info("Log options parsed")
+	log.V(1).F().Info("Log options parsed")
 	log.Info(chop.Config().String(true))
 
 	// Create Informers
@@ -143,7 +143,7 @@ func Run() {
 	//
 	// Start Controller
 	//
-	log.V(1).A().Info("Starting CHI controller")
+	log.V(1).F().Info("Starting CHI controller")
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
