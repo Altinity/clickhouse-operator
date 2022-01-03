@@ -436,7 +436,7 @@ func setupEnvVars(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 		return
 	}
 
-	container.Env = append(container.Env, host.GetCHI().ExchangeEnv...)
+	container.Env = append(container.Env, host.GetCHI().Attributes.ExchangeEnv...)
 }
 
 // ensureClickHouseContainerSpecified
@@ -1106,16 +1106,15 @@ func getContainerByName(statefulSet *apps.StatefulSet, name string) *corev1.Cont
 }
 
 func getOwnerReferences(chi *chiv1.ClickHouseInstallation) []metav1.OwnerReference {
-	controller := true
-	blockOwnerDeletion := true
+	if chi.Attributes.SkipOwnerRef {
+		return nil
+	}
 	return []metav1.OwnerReference{
 		{
 			APIVersion:         chi.APIVersion,
 			Kind:               chi.Kind,
 			Name:               chi.Name,
 			UID:                chi.UID,
-			Controller:         &controller,
-			BlockOwnerDeletion: &blockOwnerDeletion,
 		},
 	}
 }
