@@ -899,6 +899,7 @@ func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username str
 }
 
 var (
+	// ErrSecretFieldNotFound specifies error when secret key is not found
 	ErrSecretFieldNotFound = fmt.Errorf("not found")
 )
 
