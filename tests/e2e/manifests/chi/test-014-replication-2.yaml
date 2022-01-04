@@ -6,6 +6,8 @@ metadata:
   name: test-014-replication
 
 spec:
+  #reconciling:
+  #  policy: wait
   useTemplates:
     - name: clickhouse-version
     - name: persistent-volume
@@ -20,4 +22,3 @@ spec:
       - name: default
         layout:
           replicasCount: 5
-
