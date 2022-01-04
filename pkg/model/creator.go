@@ -308,7 +308,7 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            CreateConfigMapPersonalName(host),
+			Name:            CreateConfigMapHostName(host),
 			Namespace:       host.Address.Namespace,
 			Labels:          macro(host).Map(c.labels.getConfigMapHost(host)),
 			Annotations:     macro(host).Map(c.annotations.getConfigMapHost(host)),
@@ -557,7 +557,7 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
 func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
-	configMapPersonalName := CreateConfigMapPersonalName(host)
+	configMapPersonalName := CreateConfigMapHostName(host)
 	configMapCommonName := CreateConfigMapCommonName(c.chi)
 	configMapCommonUsersName := CreateConfigMapCommonUsersName(c.chi)
 
@@ -1109,12 +1109,16 @@ func getOwnerReferences(chi *chiv1.ClickHouseInstallation) []metav1.OwnerReferen
 	if chi.Attributes.SkipOwnerRef {
 		return nil
 	}
+	controller := true
+	block := true
 	return []metav1.OwnerReference{
 		{
-			APIVersion: chi.APIVersion,
-			Kind:       chi.Kind,
-			Name:       chi.Name,
-			UID:        chi.UID,
+			APIVersion:         chi.APIVersion,
+			Kind:               chi.Kind,
+			Name:               chi.Name,
+			UID:                chi.UID,
+			Controller:         &controller,
+			BlockOwnerDeletion: &block,
 		},
 	}
 }
