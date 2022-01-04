@@ -181,7 +181,7 @@ func (a Announcer) M(m ...interface{}) Announcer {
 				return a
 			}
 			b.meta = typed.Namespace + "/" + typed.Name
-			if  typed.Spec.TaskID != nil {
+			if typed.Spec.TaskID != nil {
 				if len(*typed.Spec.TaskID) > 0 {
 					b.meta += "/" + *typed.Spec.TaskID
 				}
@@ -397,11 +397,11 @@ func (a Announcer) findInCHI(m interface{}) (string, bool) {
 	}
 
 	typed, ok := chi.Interface().(v1.ClickHouseInstallation)
-	if ! ok {
+	if !ok {
 		return "", false
 	}
 	res := typed.Namespace + "/" + typed.Name
-	if  typed.Spec.TaskID != nil {
+	if typed.Spec.TaskID != nil {
 		if len(*typed.Spec.TaskID) > 0 {
 			res += "/" + *typed.Spec.TaskID
 		}
