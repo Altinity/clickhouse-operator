@@ -723,8 +723,35 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiv1.ChiHost
 		w.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
 	} else {
 		w.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
+		return err
 	}
-	return err
+
+	replicatedObjectNames,
+		replicatedCreateSQLs,
+		distributedObjectNames,
+		distributedCreateSQLs := w.schemer.HostCreateTablesSQLs(ctx, host)
+
+	// ConfigMap for a host
+	configMap = w.creator.CreateConfigMapHostMigrationReplicated(host, w.creator.MakeConfigMapData(replicatedObjectNames, replicatedCreateSQLs))
+	err = w.reconcileConfigMap(ctx, host.CHI, configMap)
+	if err == nil {
+		w.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
+	} else {
+		w.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
+		return err
+	}
+
+	// ConfigMap for a host
+	configMap = w.creator.CreateConfigMapHostMigrationDistributed(host, w.creator.MakeConfigMapData(distributedObjectNames, distributedCreateSQLs))
+	err = w.reconcileConfigMap(ctx, host.CHI, configMap)
+	if err == nil {
+		w.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
+	} else {
+		w.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
+		return err
+	}
+
+	return nil
 }
 
 // prepareHostStatefulSetWithStatus prepares host's StatefulSet status
