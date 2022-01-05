@@ -298,6 +298,7 @@ spec:
                   properties:
                     policy:
                       type: string
+                      description: DEPRECATED
                     configMapPropagationTimeout:
                       type: integer
                       description: |
