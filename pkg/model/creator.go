@@ -304,21 +304,49 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 	return cm
 }
 
-// CreateConfigMapHost creates new corev1.ConfigMap
-func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
+// createConfigMapHost creates new corev1.ConfigMap
+func (c *Creator) createConfigMapHost(host *chiv1.ChiHost, name string, data map[string]string) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            CreateConfigMapHostName(host),
+			Name:            name,
 			Namespace:       host.Address.Namespace,
 			Labels:          macro(host).Map(c.labels.getConfigMapHost(host)),
 			Annotations:     macro(host).Map(c.annotations.getConfigMapHost(host)),
 			OwnerReferences: getOwnerReferences(c.chi),
 		},
-		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host),
+		Data: data,
 	}
 	// And after the object is ready we can put version label
 	MakeObjectVersionLabel(&cm.ObjectMeta, cm)
 	return cm
+}
+
+// CreateConfigMapHost creates new corev1.ConfigMap
+func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
+	return c.createConfigMapHost(host, CreateConfigMapHostName(host), c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host))
+}
+
+// CreateConfigMapHostMigrationReplicated creates new corev1.ConfigMap
+func (c *Creator) CreateConfigMapHostMigrationReplicated(host *chiv1.ChiHost, data map[string]string) *corev1.ConfigMap {
+	return c.createConfigMapHost(host, CreateConfigMapHostMigrationReplicatedName(host), data)
+}
+
+// CreateConfigMapHostMigrationDistributeed creates new corev1.ConfigMap
+func (c *Creator) CreateConfigMapHostMigrationDistributed(host *chiv1.ChiHost, data map[string]string) *corev1.ConfigMap {
+	return c.createConfigMapHost(host, CreateConfigMapHostMigrationDistributedName(host), data)
+}
+
+func (c *Creator) MakeConfigMapData(names, files []string) map[string]string {
+	if len(names) < 1 {
+		return nil
+	}
+	res := make(map[string]string)
+	for i := range names {
+		name := fmt.Sprintf("%08d_%s", i, names[i])
+		file := files[i]
+		res[name] = file
+	}
+	return res
 }
 
 // CreateStatefulSet creates new apps.StatefulSet
