@@ -17,7 +17,7 @@ package model
 import (
 	"fmt"
 
-	// "net/url"
+	"github.com/gosimple/slug"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -326,23 +326,19 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 	return c.createConfigMapHost(host, CreateConfigMapHostName(host), c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host))
 }
 
-// CreateConfigMapHostMigrationReplicated creates new corev1.ConfigMap
-func (c *Creator) CreateConfigMapHostMigrationReplicated(host *chiv1.ChiHost, data map[string]string) *corev1.ConfigMap {
-	return c.createConfigMapHost(host, CreateConfigMapHostMigrationReplicatedName(host), data)
+// CreateConfigMapHostMigration creates new corev1.ConfigMap
+func (c *Creator) CreateConfigMapHostMigration(host *chiv1.ChiHost, data map[string]string) *corev1.ConfigMap {
+	return c.createConfigMapHost(host, CreateConfigMapHostMigrationName(host), data)
 }
 
-// CreateConfigMapHostMigrationDistributeed creates new corev1.ConfigMap
-func (c *Creator) CreateConfigMapHostMigrationDistributed(host *chiv1.ChiHost, data map[string]string) *corev1.ConfigMap {
-	return c.createConfigMapHost(host, CreateConfigMapHostMigrationDistributedName(host), data)
-}
-
+// MakeConfigMapData makes data for a config mao
 func (c *Creator) MakeConfigMapData(names, files []string) map[string]string {
 	if len(names) < 1 {
 		return nil
 	}
 	res := make(map[string]string)
 	for i := range names {
-		name := fmt.Sprintf("%08d_%s", i, names[i])
+		name := fmt.Sprintf("%08d_%s.sql", i+1, slug.Make(names[i]))
 		file := files[i]
 		res[name] = file
 	}
@@ -585,7 +581,8 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
 func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
-	configMapPersonalName := CreateConfigMapHostName(host)
+	configMapHostName := CreateConfigMapHostName(host)
+	configMapHostMigrationName := CreateConfigMapHostMigrationName(host)
 	configMapCommonName := CreateConfigMapCommonName(c.chi)
 	configMapCommonUsersName := CreateConfigMapCommonUsersName(c.chi)
 
@@ -594,7 +591,8 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 		statefulSetObject.Spec.Template.Spec.Volumes,
 		newVolumeForConfigMap(configMapCommonName),
 		newVolumeForConfigMap(configMapCommonUsersName),
-		newVolumeForConfigMap(configMapPersonalName),
+		newVolumeForConfigMap(configMapHostName),
+		newVolumeForConfigMap(configMapHostMigrationName),
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
@@ -607,7 +605,8 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 			container.VolumeMounts,
 			newVolumeMount(configMapCommonName, dirPathCommonConfig),
 			newVolumeMount(configMapCommonUsersName, dirPathUsersConfig),
-			newVolumeMount(configMapPersonalName, dirPathHostConfig),
+			newVolumeMount(configMapHostName, dirPathHostConfig),
+			newVolumeMount(configMapHostMigrationName, dirPathDockerEntrypointInit),
 		)
 	}
 }

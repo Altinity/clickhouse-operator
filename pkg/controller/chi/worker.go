@@ -726,23 +726,12 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiv1.ChiHost
 		return err
 	}
 
-	replicatedObjectNames,
-		replicatedCreateSQLs,
-		distributedObjectNames,
-		distributedCreateSQLs := w.schemer.HostCreateTablesSQLs(ctx, host)
+	replicatedObjectNames, replicatedCreateSQLs, distributedObjectNames, distributedCreateSQLs := w.schemer.HostCreateTablesSQLs(ctx, host)
+	names := append(replicatedObjectNames, distributedObjectNames...)
+	sql := append(replicatedCreateSQLs, distributedCreateSQLs...)
 
 	// ConfigMap for a host
-	configMap = w.creator.CreateConfigMapHostMigrationReplicated(host, w.creator.MakeConfigMapData(replicatedObjectNames, replicatedCreateSQLs))
-	err = w.reconcileConfigMap(ctx, host.CHI, configMap)
-	if err == nil {
-		w.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
-	} else {
-		w.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
-		return err
-	}
-
-	// ConfigMap for a host
-	configMap = w.creator.CreateConfigMapHostMigrationDistributed(host, w.creator.MakeConfigMapData(distributedObjectNames, distributedCreateSQLs))
+	configMap = w.creator.CreateConfigMapHostMigration(host, w.creator.MakeConfigMapData(names, sql))
 	err = w.reconcileConfigMap(ctx, host.CHI, configMap)
 	if err == nil {
 		w.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
@@ -1633,7 +1622,7 @@ func (w *worker) reconcileConfigMap(
 	defer w.a.V(2).M(chi).E().P()
 
 	// Check whether this object already exists in k8s
-	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, false)
+	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, true)
 
 	if curConfigMap != nil {
 		// We have ConfigMap - try to update it

@@ -158,6 +158,7 @@ func (s *Schemer) HostDropReplica(ctx context.Context, hostToRun, hostToDrop *ch
 	return s.ExecHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateReplicaHostname(hostToDrop))})
 }
 
+// HostCreateTablesSQLs makes all SQL for migrating tables
 func (s *Schemer) HostCreateTablesSQLs(ctx context.Context, host *chop.ChiHost) (
 	replicatedObjectNames []string,
 	replicatedCreateSQLs []string,

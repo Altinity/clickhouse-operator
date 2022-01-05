@@ -68,11 +68,8 @@ const (
 	// configMapHostNamePattern is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
 	configMapHostNamePattern = "chi-" + macrosChiName + "-deploy-confd-" + macrosClusterName + "-" + macrosHostName
 
-	// configMapHostMigrationReplicatedNamePattern is a template of macros ConfigMap. "chi-{chi}-migration-replicated-{cluster}-{shard}-{host}"
-	configMapHostMigrationReplicatedNamePattern = "chi-" + macrosChiName + "-migration-replicated-" + macrosClusterName + "-" + macrosHostName
-
-	// configMapHostMigrationDistributedNamePattern is a template of macros ConfigMap. "chi-{chi}-migration-distributed-{cluster}-{shard}-{host}"
-	configMapHostMigrationDistributedNamePattern = "chi-" + macrosChiName + "-migration-distributed-" + macrosClusterName + "-" + macrosHostName
+	// configMapHostMigrationNamePattern is a template of macros ConfigMap. "chi-{chi}-migration-{cluster}-{shard}-{host}"
+	configMapHostMigrationNamePattern = "chi-" + macrosChiName + "-migration-" + macrosClusterName + "-" + macrosHostName
 
 	// namespaceDomainPattern presents Domain Name pattern of a namespace
 	// In this pattern "%s" is substituted namespace name's value
@@ -374,14 +371,9 @@ func CreateConfigMapHostName(host *chop.ChiHost) string {
 	return macro(host).Line(configMapHostNamePattern)
 }
 
-// CreateConfigMapHostMigrationReplicatedName returns a name for a ConfigMap for replica's personal config
-func CreateConfigMapHostMigrationReplicatedName(host *chop.ChiHost) string {
-	return macro(host).Line(configMapHostMigrationReplicatedNamePattern)
-}
-
-// CreateConfigMapHostMigrationDistributedName returns a name for a ConfigMap for replica's personal config
-func CreateConfigMapHostMigrationDistributedName(host *chop.ChiHost) string {
-	return macro(host).Line(configMapHostMigrationDistributedNamePattern)
+// CreateConfigMapHostMigrationName returns a name for a ConfigMap for replica's personal config
+func CreateConfigMapHostMigrationName(host *chop.ChiHost) string {
+	return macro(host).Line(configMapHostMigrationNamePattern)
 }
 
 // CreateConfigMapCommonName returns a name for a ConfigMap for replica's common config
