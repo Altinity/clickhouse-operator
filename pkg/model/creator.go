@@ -327,9 +327,9 @@ func (c *Creator) CreateConfigMapHost(host *chiv1.ChiHost) *corev1.ConfigMap {
 }
 
 // CreateConfigMapHostMigration creates new corev1.ConfigMap
-func (c *Creator) CreateConfigMapHostMigration(host *chiv1.ChiHost, data map[string]string) *corev1.ConfigMap {
-	return c.createConfigMapHost(host, CreateConfigMapHostMigrationName(host), data)
-}
+//func (c *Creator) CreateConfigMapHostMigration(host *chiv1.ChiHost, data map[string]string) *corev1.ConfigMap {
+//	return c.createConfigMapHost(host, CreateConfigMapHostMigrationName(host), data)
+//}
 
 // MakeConfigMapData makes data for a config mao
 func (c *Creator) MakeConfigMapData(names, files []string) map[string]string {
@@ -582,7 +582,7 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
 func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
 	configMapHostName := CreateConfigMapHostName(host)
-	configMapHostMigrationName := CreateConfigMapHostMigrationName(host)
+	//configMapHostMigrationName := CreateConfigMapHostMigrationName(host)
 	configMapCommonName := CreateConfigMapCommonName(c.chi)
 	configMapCommonUsersName := CreateConfigMapCommonUsersName(c.chi)
 
@@ -592,7 +592,7 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 		newVolumeForConfigMap(configMapCommonName),
 		newVolumeForConfigMap(configMapCommonUsersName),
 		newVolumeForConfigMap(configMapHostName),
-		newVolumeForConfigMap(configMapHostMigrationName),
+		//newVolumeForConfigMap(configMapHostMigrationName),
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
@@ -606,7 +606,7 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 			newVolumeMount(configMapCommonName, dirPathCommonConfig),
 			newVolumeMount(configMapCommonUsersName, dirPathUsersConfig),
 			newVolumeMount(configMapHostName, dirPathHostConfig),
-			newVolumeMount(configMapHostMigrationName, dirPathDockerEntrypointInit),
+			//newVolumeMount(configMapHostMigrationName, dirPathDockerEntrypointInit),
 		)
 	}
 }

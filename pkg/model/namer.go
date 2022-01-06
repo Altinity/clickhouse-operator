@@ -69,7 +69,7 @@ const (
 	configMapHostNamePattern = "chi-" + macrosChiName + "-deploy-confd-" + macrosClusterName + "-" + macrosHostName
 
 	// configMapHostMigrationNamePattern is a template of macros ConfigMap. "chi-{chi}-migration-{cluster}-{shard}-{host}"
-	configMapHostMigrationNamePattern = "chi-" + macrosChiName + "-migration-" + macrosClusterName + "-" + macrosHostName
+	//configMapHostMigrationNamePattern = "chi-" + macrosChiName + "-migration-" + macrosClusterName + "-" + macrosHostName
 
 	// namespaceDomainPattern presents Domain Name pattern of a namespace
 	// In this pattern "%s" is substituted namespace name's value
@@ -372,9 +372,9 @@ func CreateConfigMapHostName(host *chop.ChiHost) string {
 }
 
 // CreateConfigMapHostMigrationName returns a name for a ConfigMap for replica's personal config
-func CreateConfigMapHostMigrationName(host *chop.ChiHost) string {
-	return macro(host).Line(configMapHostMigrationNamePattern)
-}
+//func CreateConfigMapHostMigrationName(host *chop.ChiHost) string {
+//	return macro(host).Line(configMapHostMigrationNamePattern)
+//}
 
 // CreateConfigMapCommonName returns a name for a ConfigMap for replica's common config
 func CreateConfigMapCommonName(chi *chop.ClickHouseInstallation) string {

@@ -236,17 +236,17 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) er
 		log.V(1).M(host).F().Error("FAIL delete ConfigMap %s/%s err:%v", namespace, name, err)
 	}
 
-	name = chopmodel.CreateConfigMapHostMigrationName(host)
-	namespace = host.Address.Namespace
-	log.V(1).M(host).F().Info("%s/%s", namespace, name)
-
-	if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, newDeleteOptions()); err == nil {
-		log.V(1).M(host).Info("OK delete ConfigMap %s/%s", namespace, name)
-	} else if apierrors.IsNotFound(err) {
-		log.V(1).M(host).Info("NEUTRAL not found ConfigMap %s/%s", namespace, name)
-	} else {
-		log.V(1).M(host).F().Error("FAIL delete ConfigMap %s/%s err:%v", namespace, name, err)
-	}
+	//name = chopmodel.CreateConfigMapHostMigrationName(host)
+	//namespace = host.Address.Namespace
+	//log.V(1).M(host).F().Info("%s/%s", namespace, name)
+	//
+	//if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, newDeleteOptions()); err == nil {
+	//	log.V(1).M(host).Info("OK delete ConfigMap %s/%s", namespace, name)
+	//} else if apierrors.IsNotFound(err) {
+	//	log.V(1).M(host).Info("NEUTRAL not found ConfigMap %s/%s", namespace, name)
+	//} else {
+	//	log.V(1).M(host).F().Error("FAIL delete ConfigMap %s/%s err:%v", namespace, name, err)
+	//}
 
 	return nil
 }
