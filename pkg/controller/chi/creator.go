@@ -147,7 +147,7 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatef
 	}
 
 	// What to do with StatefulSet - look into chop configuration settings
-	switch chop.Config().OnStatefulSetCreateFailureAction {
+	switch chop.Config().Reconcile.StatefulSet.Create.OnFailure {
 	case chiv1.OnStatefulSetCreateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
 		log.V(1).M(host).F().Info("abort")
@@ -165,7 +165,7 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatef
 		return errIgnore
 
 	default:
-		log.V(1).M(host).F().Error("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", chop.Config().OnStatefulSetCreateFailureAction)
+		log.V(1).M(host).F().Error("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", chop.Config().Reconcile.StatefulSet.Create.OnFailure)
 		return errIgnore
 	}
 
@@ -185,7 +185,7 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	name := rollbackStatefulSet.Name
 
 	// What to do with StatefulSet - look into chop configuration settings
-	switch chop.Config().OnStatefulSetUpdateFailureAction {
+	switch chop.Config().Reconcile.StatefulSet.Update.OnFailure {
 	case chiv1.OnStatefulSetUpdateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
 		log.V(1).M(host).F().Info("abort StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
@@ -217,7 +217,7 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 		return errIgnore
 
 	default:
-		log.V(1).M(host).F().Error("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", chop.Config().OnStatefulSetUpdateFailureAction)
+		log.V(1).M(host).F().Error("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", chop.Config().Reconcile.StatefulSet.Update.OnFailure)
 		return errIgnore
 	}
 

@@ -62,12 +62,12 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 	}
 
 	// What base should be used to create CHI
-	if chop.Config().CHITemplate == nil {
+	if chop.Config().Template.CHI.Runtime.Template == nil {
 		// No template specified - start with clear page
 		n.chi = new(chiV1.ClickHouseInstallation)
 	} else {
 		// Template specified - start with template
-		n.chi = chop.Config().CHITemplate.DeepCopy()
+		n.chi = chop.Config().Template.CHI.Runtime.Template.DeepCopy()
 	}
 
 	// At this moment n.chi is either empty CHI or a system-wide template
@@ -112,15 +112,15 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 				n.chi.Labels,
 				util.CopyMapFilter(
 					template.Labels,
-					chop.Config().IncludeIntoPropagationLabels,
-					chop.Config().ExcludeFromPropagationLabels,
+					chop.Config().Label.Include,
+					chop.Config().Label.Exclude,
 				),
 			)
 			n.chi.Annotations = util.MergeStringMapsOverwrite(
 				n.chi.Annotations, util.CopyMapFilter(
 					template.Annotations,
-					chop.Config().IncludeIntoPropagationAnnotations,
-					append(chop.Config().ExcludeFromPropagationAnnotations, util.ListSkippedAnnotations()...),
+					chop.Config().Annotation.Include,
+					append(chop.Config().Annotation.Exclude, util.ListSkippedAnnotations()...),
 				),
 			)
 			log.V(2).M(chi).F().Info("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
@@ -913,7 +913,7 @@ func parseSecretFieldAddress(users *chiV1.Settings, username, userSettingsK8SSec
 	switch tags := strings.Split(secretFieldAddress, "/"); len(tags) {
 	case 2:
 		// Assume namespace is omitted
-		namespace = chop.Config().Namespace
+		namespace = chop.Config().Runtime.Namespace
 		name = tags[0]
 		key = tags[1]
 	case 3:
@@ -1013,10 +1013,10 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		// 2. user/quota
 		// 3. user/networks/ip
 		// 4. user/networks/host_regexp
-		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultProfile))
-		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultQuota))
-		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().CHConfigUserDefaultNetworksIP))
-		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().CHConfigNetworksHostRegexpTemplate)))
+		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().ClickHouse.Config.User.Default.Profile))
+		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(chop.Config().ClickHouse.Config.User.Default.Quota))
+		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().ClickHouse.Config.User.Default.NetworkIP))
+		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)))
 
 		// Deal with password
 
@@ -1057,7 +1057,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 
 		// Apply default password for password-less non-default users
 		if (passwordPlaintext == "") && (username != defaultUsername) {
-			passwordPlaintext = chop.Config().CHConfigUserDefaultPassword
+			passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
 		}
 
 		// NB `default` user may keep empty password in here.

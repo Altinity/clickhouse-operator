@@ -151,8 +151,8 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 			chOperatorConfiguration := &cm.chopConfigList.Items[i]
 			if chOperatorConfiguration.Name == name {
 				// Save location info into OperatorConfig itself
-				chOperatorConfiguration.Spec.ConfigFolderPath = namespace
-				chOperatorConfiguration.Spec.ConfigFilePath = name
+				chOperatorConfiguration.Spec.Runtime.ConfigFolderPath = namespace
+				chOperatorConfiguration.Spec.Runtime.ConfigFilePath = name
 
 				cm.crConfigs = append(cm.crConfigs, &chOperatorConfiguration.Spec)
 				continue
@@ -164,7 +164,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 // logCRBasedConfigs writes all ClickHouseOperatorConfiguration objects into log
 func (cm *ConfigManager) logCRBasedConfigs() {
 	for _, chOperatorConfiguration := range cm.crConfigs {
-		log.V(1).Info("chop config %s/%s :", chOperatorConfiguration.ConfigFolderPath, chOperatorConfiguration.ConfigFilePath)
+		log.V(1).Info("chop config %s/%s :", chOperatorConfiguration.Runtime.ConfigFolderPath, chOperatorConfiguration.Runtime.ConfigFilePath)
 		log.V(1).Info(chOperatorConfiguration.String(true))
 	}
 }
@@ -257,8 +257,8 @@ func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.Oper
 	}
 
 	// Fill OperatorConfig's paths
-	config.ConfigFilePath, _ = filepath.Abs(configFilePath)
-	config.ConfigFolderPath = filepath.Dir(config.ConfigFilePath)
+	config.Runtime.ConfigFilePath, _ = filepath.Abs(configFilePath)
+	config.Runtime.ConfigFolderPath = filepath.Dir(config.Runtime.ConfigFilePath)
 
 	return config, nil
 
@@ -340,7 +340,7 @@ func (cm *ConfigManager) GetRuntimeParam(name string) (string, bool) {
 // fetchSecretCredentials
 func (cm *ConfigManager) fetchSecretCredentials() {
 	// Secret name where to look for credentials
-	name := cm.config.CHCredentialsSecretName
+	name := cm.config.ClickHouse.Access.Secret.Name
 
 	// Do we need to fetch credentials from the secret?
 	if name == "" {
@@ -351,7 +351,7 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 	// We have secret name specified, let's move on and read credentials
 
 	// Figure out namespace where to look for the secret
-	namespace := cm.config.CHCredentialsSecretNamespace
+	namespace := cm.config.ClickHouse.Access.Secret.Namespace
 	if namespace == "" {
 		// No namespace explicitly specified, let's look into namespace where pod is running
 		if cm.HasRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE) {
@@ -373,9 +373,9 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 	for key, value := range secret.Data {
 		switch key {
 		case "username":
-			cm.config.CHCredentialsSecretUsername = string(value)
+			cm.config.ClickHouse.Access.Secret.Runtime.Username = string(value)
 		case "password":
-			cm.config.CHCredentialsSecretPassword = string(value)
+			cm.config.ClickHouse.Access.Secret.Runtime.Password = string(value)
 		}
 	}
 }

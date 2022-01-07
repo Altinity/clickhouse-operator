@@ -70,9 +70,9 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		queue:      q,
 		normalizer: chopmodel.NewNormalizer(c.kubeClient),
 		schemer: chopmodel.NewSchemer(
-			chop.Config().CHUsername,
-			chop.Config().CHPassword,
-			chop.Config().CHPort,
+			chop.Config().ClickHouse.Access.Username,
+			chop.Config().ClickHouse.Access.Password,
+			chop.Config().ClickHouse.Access.Port,
 		),
 		creator: nil,
 		start:   start,
@@ -1094,7 +1094,7 @@ func (w *worker) shouldWaitExcludeHost(host *chiv1.ChiHost) bool {
 	}
 
 	// Fallback to operator's settings
-	return chop.Config().ReconcileWaitExclude
+	return chop.Config().Reconcile.Host.Wait.Exclude
 }
 
 // shouldWaitIncludeHost determines whether reconciler should wait for host to be included into cluster
@@ -1118,7 +1118,7 @@ func (w *worker) shouldWaitIncludeHost(host *chiv1.ChiHost) bool {
 	}
 
 	// Fallback to operator's settings
-	return chop.Config().ReconcileWaitInclude
+	return chop.Config().Reconcile.Host.Wait.Include
 }
 
 // waitHostInCluster

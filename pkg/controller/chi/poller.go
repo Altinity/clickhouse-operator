@@ -117,7 +117,7 @@ func (c *Controller) waitHostRunning(host *chiv1.ChiHost) error {
 			log.V(1).M(host).F().Info("%s/%s-WAIT", namespace, name)
 		}
 
-		if time.Since(start) >= (time.Duration(chop.Config().StatefulSetUpdateTimeout) * time.Second) {
+		if time.Since(start) >= (time.Duration(chop.Config().Reconcile.StatefulSet.Update.Timeout) * time.Second) {
 			// Timeout reached, no good result available, time to quit
 			log.V(1).M(host).F().Error("%s/%s-TIMEOUT reached", namespace, name)
 			return fmt.Errorf("waitHostRunning(%s/%s) - wait timeout", namespace, name)
@@ -126,7 +126,7 @@ func (c *Controller) waitHostRunning(host *chiv1.ChiHost) error {
 		// Wait some more time
 		log.V(2).M(host).F().Info("%s/%s", namespace, name)
 		select {
-		case <-time.After(time.Duration(chop.Config().StatefulSetUpdatePollPeriod) * time.Second):
+		case <-time.After(time.Duration(chop.Config().Reconcile.StatefulSet.Update.PollInterval) * time.Second):
 		}
 	}
 
@@ -162,8 +162,8 @@ func (o *StatefulSetPollOptions) FromConfig(config *chiv1.OperatorConfig) *State
 	}
 	o.StartBotheringAfterTimeout = time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second
 	o.CreateTimeout = time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second
-	o.Timeout = time.Duration(config.StatefulSetUpdateTimeout) * time.Second
-	o.MainInterval = time.Duration(config.StatefulSetUpdatePollPeriod) * time.Second
+	o.Timeout = time.Duration(config.Reconcile.StatefulSet.Update.Timeout) * time.Second
+	o.MainInterval = time.Duration(config.Reconcile.StatefulSet.Update.PollInterval) * time.Second
 	o.BackgroundInterval = 1 * time.Second
 	return o
 }

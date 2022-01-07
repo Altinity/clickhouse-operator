@@ -104,7 +104,7 @@ func NewController(
 
 // initQueues
 func (c *Controller) initQueues() {
-	for i := 0; i < chop.Config().ReconcileThreadsNumber+chi.DefaultReconcileSystemThreadsNumber; i++ {
+	for i := 0; i < chop.Config().Reconcile.Runtime.ThreadsNumber+chi.DefaultReconcileSystemThreadsNumber; i++ {
 		c.queues = append(
 			c.queues,
 			queue.New(),

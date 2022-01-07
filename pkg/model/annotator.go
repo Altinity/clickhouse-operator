@@ -115,7 +115,7 @@ func (a *Annotator) getHostScope(host *chiv1.ChiHost) map[string]string {
 
 // appendCHIProvidedTo appends CHI-provided annotations to specified annotations
 func (a *Annotator) appendCHIProvidedTo(dst map[string]string) map[string]string {
-	source := util.CopyMapFilter(a.chi.Annotations, chop.Config().IncludeIntoPropagationAnnotations, chop.Config().ExcludeFromPropagationAnnotations)
+	source := util.CopyMapFilter(a.chi.Annotations, chop.Config().Annotation.Include, chop.Config().Annotation.Exclude)
 	return util.MergeStringMapsOverwrite(dst, source)
 }
 
