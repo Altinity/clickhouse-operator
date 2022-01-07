@@ -2705,11 +2705,11 @@ spec:
                 watch:
                   type: object
                   properties:
-                    Namespaces:
-                    type: array
-                    description: "List of namespaces where clickhouse-operator watches for events."
-                    items:
-                      type: string
+                    namespaces:
+                      type: array
+                      description: "List of namespaces where clickhouse-operator watches for events."
+                      items:
+                        type: string
                 clickhouse:
                   type: object
                   properties:
@@ -2743,7 +2743,7 @@ spec:
                                 quota:
                                   type: string
                                   description: "ClickHouse server configuration `<quota>...</quota>` for any <user>"
-                                networkIP:
+                                networksIP:
                                   type: array
                                   description: "ClickHouse server configuration `<networks><ip>...</ip></networks>` for any <user>"
                                   items:
@@ -3190,7 +3190,7 @@ data:
             # 4. user/password - string
             profile: default
             quota: default
-            networkIP:
+            networksIP:
               - "::1"
               - "127.0.0.1"
             password: "default"
@@ -3711,6 +3711,9 @@ spec:
               mountPath: /etc/clickhouse-operator/templates.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/users.d
+          ports:
+            - containerPort: 8888
+              name: metrics
 ---
 # Template Parameters:
 #
