@@ -41,7 +41,7 @@ clickhouse:
         # 4. user/password - string
         profile: default
         quota: default
-        networkIP:
+        networksIP:
           - "::1"
           - "127.0.0.1"
         password: "default"
