@@ -130,10 +130,10 @@ type OperatorConfigDefault struct {
 	// 2. user/quota - string
 	// 3. user/networks/ip - multiple strings
 	// 4. user/password - string
-	Profile   string   `json:"profile"   yaml:"profile"`
-	Quota     string   `json:"quota"     yaml:"quota"`
-	NetworkIP []string `json:"networkIP" yaml:"networkIP"`
-	Password  string   `json:"password"  yaml:"password"`
+	Profile    string   `json:"profile"   yaml:"profile"`
+	Quota      string   `json:"quota"     yaml:"quota"`
+	NetworksIP []string `json:"networksIP" yaml:"networksIP"`
+	Password   string   `json:"password"  yaml:"password"`
 }
 
 // OperatorConfigClickHouse specifies ClickHouse section
@@ -630,8 +630,8 @@ func (c *OperatorConfig) normalizeSettingsSection() {
 	if c.ClickHouse.Config.User.Default.Quota == "" {
 		c.ClickHouse.Config.User.Default.Quota = defaultChConfigUserDefaultQuota
 	}
-	if len(c.ClickHouse.Config.User.Default.NetworkIP) == 0 {
-		c.ClickHouse.Config.User.Default.NetworkIP = []string{defaultChConfigUserDefaultNetworkIP}
+	if len(c.ClickHouse.Config.User.Default.NetworksIP) == 0 {
+		c.ClickHouse.Config.User.Default.NetworksIP = []string{defaultChConfigUserDefaultNetworkIP}
 	}
 	if c.ClickHouse.Config.User.Default.Password == "" {
 		c.ClickHouse.Config.User.Default.Password = defaultChConfigUserDefaultPassword
@@ -926,7 +926,7 @@ func (c *OperatorConfig) move() {
 		c.ClickHouse.Config.User.Default.Quota = c.CHConfigUserDefaultQuota
 	}
 	if len(c.CHConfigUserDefaultNetworksIP) > 0 {
-		c.ClickHouse.Config.User.Default.NetworkIP = c.CHConfigUserDefaultNetworksIP
+		c.ClickHouse.Config.User.Default.NetworksIP = c.CHConfigUserDefaultNetworksIP
 	}
 	if c.CHConfigUserDefaultPassword != "" {
 		c.ClickHouse.Config.User.Default.Password = c.CHConfigUserDefaultPassword

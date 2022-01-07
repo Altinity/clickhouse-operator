@@ -1015,7 +1015,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		// 4. user/networks/host_regexp
 		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().ClickHouse.Config.User.Default.Profile))
 		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(chop.Config().ClickHouse.Config.User.Default.Quota))
-		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().ClickHouse.Config.User.Default.NetworkIP))
+		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().ClickHouse.Config.User.Default.NetworksIP))
 		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)))
 
 		// Deal with password
