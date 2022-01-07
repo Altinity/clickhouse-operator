@@ -28,6 +28,7 @@ require (
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/d4l3k/messagediff v1.2.1 // indirect
 	github.com/gosimple/slug v1.12.0
+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 )
 
 replace (
