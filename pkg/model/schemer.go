@@ -32,7 +32,7 @@ type Schemer struct {
 	*Cluster
 }
 
-const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'` 
+const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 
 // NewSchemer creates new Schemer object
 func NewSchemer(username, password string, port int) *Schemer {
