@@ -70,7 +70,7 @@ CMD ["--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclie
 # ======================
 # ===== Image Prod =====
 # ======================
-FROM image AS image-prod
+FROM image-base AS image-prod
 RUN echo "Building PROD image"
 
 USER nobody
