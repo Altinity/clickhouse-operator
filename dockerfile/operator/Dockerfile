@@ -2,17 +2,20 @@
 # ===== Builder =====
 # ===================
 
-FROM golang:1.14.3 AS builder-operator
+FROM --platform=${BUILDPLATFORM} golang:1.17 AS builder-operator
+ARG TARGETOS
+ARG TARGETARCH
 
 # Install required packages
-RUN apt-get update && apt-get install -y apt-utils gettext-base
+RUN apt-get update && apt-get install -y apt-utils && apt-get install -y gettext-base curl
+RUN curl -o /usr/bin/yq -sL https://github.com/mikefarah/yq/releases/download/v4.16.2/yq_${TARGETOS}_${TARGETARCH} && \
+    chmod +x /usr/bin/yq
 
-# Check $GOPATH, for convenience
-RUN echo "GOPATH=$GOPATH"
-RUN echo "WORKDIR=$GOPATH/src/github.com/altinity/clickhouse-operator"
+ENV GOOS=${TARGETOS}
+ENV GOARCH=${TARGETARCH}
 
 # Reconstruct source tree inside docker
-WORKDIR $GOPATH/src/github.com/altinity/clickhouse-operator
+WORKDIR /clickhouse-operator
 ADD . .
 
 # speedup docker build if vendor exists
@@ -41,9 +44,20 @@ CMD ["/go/bin/dlv", "--listen=:40001", "--headless=true", "--api-version=2", "ex
 # ===== Operator =====
 # ====================
 
-FROM alpine:3.10 AS operator
+FROM registry.access.redhat.com/ubi8/ubi-minimal AS operator
+RUN microdnf update && microdnf clean all
 
-RUN apk add --no-cache ca-certificates
+MAINTAINER "Altinity <support@altinity.com>"
+
+LABEL name="ClickHouse operator" \
+      maintainer="support@altinity.com" \
+      vendor="Altinity" \
+      version="0.18.0" \
+      release="1" \
+      summary="ClickHouse operator" \
+      description="ClickHouse operator operates ClickHouse clusters in kubernetes"
+
+ADD LICENSE /licenses/
 
 WORKDIR /
 
@@ -56,6 +70,8 @@ ADD config/users.d/*     /etc/clickhouse-operator/users.d/
 
 # Copy clickhouse-operator binary into operator image from builder
 COPY --from=builder-operator /tmp/clickhouse-operator .
+
+USER nobody
 
 # Run /clickhouse-operator -alsologtostderr=true -v=1
 # We can specify additional options, such as:

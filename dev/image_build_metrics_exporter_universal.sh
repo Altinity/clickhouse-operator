@@ -17,23 +17,38 @@ DOCKERFILE_DIR="${SRC_ROOT}/dockerfile/metrics-exporter"
 DOCKERFILE="${DOCKERFILE_DIR}/Dockerfile"
 
 # Build clickhouse-operator install .yaml manifest
-"${MANIFESTS_ROOT}/operator/build-clickhouse-operator-install-yaml.sh"
+"${MANIFESTS_ROOT}/builder/build-clickhouse-operator-configs.sh"
+# Build clickhouse-operator install .yaml manifest
+"${MANIFESTS_ROOT}/builder/build-clickhouse-operator-install-yaml.sh"
 
 # Build image with Docker
 if [[ "${MINIKUBE}" == "yes" ]]; then
     # We'd like to build for minikube
-    eval $(minikube docker-env)
+    eval "$(minikube docker-env)"
 fi
 
-if docker build -t "${TAG}" -f "${DOCKERFILE}" "${SRC_ROOT}"; then
-    # Image ready, time to publish it
-    if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
-        if [[ ! -z "${DOCKERHUB_LOGIN}" ]]; then
-            echo "Dockerhub login specified: '${DOCKERHUB_LOGIN}', perform login"
-            docker login -u "${DOCKERHUB_LOGIN}"
-        fi
-        docker push "${TAG}"
+if ! docker run --rm --privileged multiarch/qemu-user-static --reset -p yes; then
+  sudo apt-get install -y qemu binfmt-support qemu-user-static
+fi
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+DOCKER_CMD="docker buildx build --platform=linux/amd64,linux/arm64"
+
+if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
+  DOCKER_CMD="${DOCKER_CMD} --push"
+fi
+
+DOCKER_CMD="${DOCKER_CMD} -t ${TAG} -f ${DOCKERFILE} ${SRC_ROOT}"
+
+if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
+    if [[ -n "${DOCKERHUB_LOGIN}" ]]; then
+        echo "Dockerhub login specified: '${DOCKERHUB_LOGIN}', perform login"
+        docker login -u "${DOCKERHUB_LOGIN}"
     fi
+fi
+
+if ${DOCKER_CMD}; then
+    echo "ALL DONE docker image published."
 else
     echo "FAILED docker build! Abort."
     exit 1

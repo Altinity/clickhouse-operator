@@ -19,7 +19,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// ClickHouseConfigFilesGenerator
+// ClickHouseConfigFilesGenerator specifies clickhouse configuration generator object
 type ClickHouseConfigFilesGenerator struct {
 	// ClickHouse config generator
 	chConfigGenerator *ClickHouseConfigGenerator
@@ -27,7 +27,7 @@ type ClickHouseConfigFilesGenerator struct {
 	chopConfig *chi.OperatorConfig
 }
 
-// NewClickHouseConfigFilesGenerator
+// NewClickHouseConfigFilesGenerator creates new clickhouse configuration generator object
 func NewClickHouseConfigFilesGenerator(
 	chConfigGenerator *ClickHouseConfigGenerator,
 	chopConfig *chi.OperatorConfig,
@@ -38,14 +38,17 @@ func NewClickHouseConfigFilesGenerator(
 	}
 }
 
+// ClickHouseConfigFilesGeneratorOptions specifies options for clickhouse configuration generator
 type ClickHouseConfigFilesGeneratorOptions struct {
 	RemoteServersGeneratorOptions *RemoteServersGeneratorOptions
 }
 
+// NewClickHouseConfigFilesGeneratorOptions creates new options for clickhouse configuration generator
 func NewClickHouseConfigFilesGeneratorOptions() *ClickHouseConfigFilesGeneratorOptions {
 	return &ClickHouseConfigFilesGeneratorOptions{}
 }
 
+// GetRemoteServersGeneratorOptions gets remote-servers generator options
 func (o *ClickHouseConfigFilesGeneratorOptions) GetRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	if o == nil {
 		return nil
@@ -53,6 +56,7 @@ func (o *ClickHouseConfigFilesGeneratorOptions) GetRemoteServersGeneratorOptions
 	return o.RemoteServersGeneratorOptions
 }
 
+// SetRemoteServersGeneratorOptions sets remote-servers generator options
 func (o *ClickHouseConfigFilesGeneratorOptions) SetRemoteServersGeneratorOptions(opts *RemoteServersGeneratorOptions) *ClickHouseConfigFilesGeneratorOptions {
 	if o == nil {
 		return nil
@@ -62,11 +66,12 @@ func (o *ClickHouseConfigFilesGeneratorOptions) SetRemoteServersGeneratorOptions
 	return o
 }
 
+// defaultClickHouseConfigFilesGeneratorOptions creates new default options for clickhouse config generator
 func defaultClickHouseConfigFilesGeneratorOptions() *ClickHouseConfigFilesGeneratorOptions {
 	return NewClickHouseConfigFilesGeneratorOptions()
 }
 
-// CreateConfigFilesGroupCommon
+// CreateConfigFilesGroupCommon creates common config files
 func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupCommon(options *ClickHouseConfigFilesGeneratorOptions) map[string]string {
 	if options == nil {
 		options = defaultClickHouseConfigFilesGeneratorOptions()
@@ -80,12 +85,12 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupCommon(options *C
 	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings(nil))
 	util.MergeStringMapsOverwrite(commonConfigSections, c.chConfigGenerator.GetFiles(chi.SectionCommon, true, nil))
 	// Extra user-specified config files
-	util.MergeStringMapsOverwrite(commonConfigSections, c.chopConfig.CHCommonConfigs)
+	util.MergeStringMapsOverwrite(commonConfigSections, c.chopConfig.ClickHouse.Config.File.Runtime.CommonConfigFiles)
 
 	return commonConfigSections
 }
 
-// CreateConfigFilesGroupUsers
+// CreateConfigFilesGroupUsers creates users config files
 func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupUsers() map[string]string {
 	commonUsersConfigSections := make(map[string]string)
 	// commonUsersConfigSections maps section name to section XML chopConfig of the following sections:
@@ -98,12 +103,12 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupUsers() map[strin
 	util.IncludeNonEmpty(commonUsersConfigSections, createConfigSectionFilename(configProfiles), c.chConfigGenerator.GetProfiles())
 	util.MergeStringMapsOverwrite(commonUsersConfigSections, c.chConfigGenerator.GetFiles(chi.SectionUsers, false, nil))
 	// Extra user-specified config files
-	util.MergeStringMapsOverwrite(commonUsersConfigSections, c.chopConfig.CHUsersConfigs)
+	util.MergeStringMapsOverwrite(commonUsersConfigSections, c.chopConfig.ClickHouse.Config.File.Runtime.UsersConfigFiles)
 
 	return commonUsersConfigSections
 }
 
-// CreateConfigFilesGroupHost
+// CreateConfigFilesGroupHost creates host config files
 func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *chi.ChiHost) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	hostConfigSections := make(map[string]string)
@@ -113,12 +118,13 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *chi.Ch
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings(host))
 	util.MergeStringMapsOverwrite(hostConfigSections, c.chConfigGenerator.GetFiles(chi.SectionHost, true, host))
 	// Extra user-specified config files
-	util.MergeStringMapsOverwrite(hostConfigSections, c.chopConfig.CHHostConfigs)
+	util.MergeStringMapsOverwrite(hostConfigSections, c.chopConfig.ClickHouse.Config.File.Runtime.HostConfigFiles)
 
 	return hostConfigSections
 }
 
-// createConfigSectionFilename
+// createConfigSectionFilename creates filename of a configuration file.
+// filename depends on a section which it will contain
 func createConfigSectionFilename(section string) string {
 	return "chop-generated-" + section + ".xml"
 }

@@ -1,0 +1,220 @@
+## Secret to be used as MinIO Root Credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-creds-secret
+type: Opaque
+data:
+  ## Access Key for MinIO Tenant, base64 encoded (echo -n 'minio' | base64)
+  accesskey: "$MINIO_ACCESS_KEY_B64"
+  ## Secret Key for MinIO Tenant, base64 encoded (echo -n 'minio123' | base64)
+  secretkey: "$MINIO_SECRET_KEY_B64"
+---
+## Secret to be used for MinIO Console
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-console-secret
+type: Opaque
+data:
+  ## Passphrase to encrypt jwt payload, base64 encoded (echo -n 'SECRET' | base64)
+  CONSOLE_PBKDF_PASSPHRASE: "$MINIO_CONSOLE_PBKDF_PASSPHRASE_B64"
+  ## Salt to encrypt jwt payload, base64 encoded (echo -n 'SECRET' | base64)
+  CONSOLE_PBKDF_SALT: "$MINIO_CONSOLE_PBKDF_SALT_B64"
+  ## MinIO User Access Key (used for Console Login), base64 encoded (echo -n 'YOURCONSOLEACCESS' | base64)
+  CONSOLE_ACCESS_KEY: "$MINIO_CONSOLE_ACCESS_KEY_B64"
+  ## MinIO User Secret Key (used for Console Login), base64 encoded (echo -n 'YOURCONSOLESECRET' | base64)
+  CONSOLE_SECRET_KEY: "$MINIO_CONSOLE_SECRET_KEY_B64"
+---
+## MinIO Tenant Definition
+apiVersion: minio.min.io/v2
+kind: Tenant
+metadata:
+  name: minio
+  ## Optionally pass labels to be applied to the statefulset pods
+  labels:
+    app: minio
+  ## Annotations for MinIO Tenant Pods
+  annotations:
+    prometheus.io/path: /minio/v2/metrics/cluster
+    prometheus.io/port: "9000"
+    prometheus.io/scrape: "true"
+
+## If a scheduler is specified here, Tenant pods will be dispatched by specified scheduler.
+## If not specified, the Tenant pods will be dispatched by default scheduler.
+# scheduler:
+#  name: my-custom-scheduler
+
+spec:
+  ## Registry location and Tag to download MinIO Server image
+  image: minio/minio:${MINIO_VERSION}
+  imagePullPolicy: IfNotPresent
+
+  ## Secret with credentials to be used by MinIO Tenant.
+  ## Refers to the secret object created above.
+  credsSecret:
+    name: minio-creds-secret
+
+  ## prometheus endpoint
+  env:
+  - name: MINIO_PROMETHEUS_AUTH_TYPE
+    value: public
+
+
+  ## Specification for MinIO Pool(s) in this Tenant.
+  pools:
+      ## Servers specifies the number of MinIO Tenant Pods / Servers in this pool.
+      ## For standalone mode, supply 1. For distributed mode, supply 4 or more.
+      ## Note that the operator does not support upgrading from standalone to distributed mode.
+    - servers: 1
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: v1.min.io/tenant
+                    operator: In
+                    values:
+                      - minio
+                  - key: v1.min.io/pool
+                    operator: In
+                    values:
+                      - pool-0
+              topologyKey: kubernetes.io/hostname
+      name: pool-0
+      ## volumesPerServer specifies the number of volumes attached per MinIO Tenant Pod / Server.
+      volumesPerServer: 4
+
+      ## This VolumeClaimTemplate is used across all the volumes provisioned for MinIO Tenant in this
+      ## Pool.
+      volumeClaimTemplate:
+        metadata:
+          name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+
+      ## Used to specify a toleration for a pod
+      # tolerations:
+      #  - effect: NoSchedule
+      #    key: dedicated
+      #    operator: Equal
+      #    value: storage
+
+      ## nodeSelector parameters for MinIO Pods. It specifies a map of key-value pairs. For the pod to be
+      ## eligible to run on a node, the node must have each of the
+      ## indicated key-value pairs as labels.
+      ## Read more here: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
+      # nodeSelector:
+      #   disktype: ssd
+
+      ## Affinity settings for MinIO pods. Read more about affinity
+      ## here: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity.
+      # affinity:
+      #   nodeAffinity:
+      #     requiredDuringSchedulingIgnoredDuringExecution:
+      #       nodeSelectorTerms:
+      #       - matchExpressions:
+      #         - key: kubernetes.io/hostname
+      #           operator: In
+      #           values:
+      #           - hostname1
+      #           - hostname2
+      #   podAntiAffinity:
+      #     requiredDuringSchedulingIgnoredDuringExecution:
+      #     - labelSelector:
+      #         matchExpressions:
+      #         - key: app
+      #           operator: In
+      #           values:
+      #           - store
+      #       topologyKey: "kubernetes.io/hostname"
+
+      ## Configure resource requests and limits for MinIO containers
+      # resources:
+      #   requests:
+      #     cpu: 250m
+      #     memory: 16Gi
+      #   limits:
+      #     cpu: 500m
+      #      memory: 16Gi
+
+  ## Mount path where PV will be mounted inside container(s).
+  mountPath: /export
+  ## Sub path inside Mount path where MinIO stores data.
+  # subPath: /data
+
+  ## Use this field to provide a list of Secrets with external certificates. This can be used to to configure
+  ## TLS for MinIO Tenant pods. Create secrets as explained here:
+  ## https://github.com/minio/minio/tree/master/docs/tls/kubernetes#2-create-kubernetes-secret
+  # externalCertSecret:
+  #   - name: tls-ssl-minio
+  #     type: kubernetes.io/tls
+
+  ## Enable automatic Kubernetes based certificate generation and signing as explained in
+  ## https://kubernetes.io/docs/tasks/tls/managing-tls-in-a-cluster
+  requestAutoCert: true
+
+  ## Enable S3 specific features such as Bucket DNS which would allow `buckets` to be
+  ## accessible as DNS entries of form `<bucketname>.minio.<minio-namespace>.svc.cluster.local`
+  s3:
+    ## This feature is turned off by default
+    bucketDNS: true
+
+  ## This field is used only when "requestAutoCert" is set to true. Use this field to set CommonName
+  ## for the auto-generated certificate. Internal DNS name for the pod will be used if CommonName is
+  ## not provided. DNS name format is *.minio.default.svc.cluster.local
+#  certConfig:
+#    commonName: ""
+#    organizationName: []
+#    dnsNames: []
+
+  ## PodManagement policy for MinIO Tenant Pods. Can be "OrderedReady" or "Parallel"
+  ## Refer https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/#pod-management-policy
+  ## for details.
+  podManagementPolicy: Parallel
+
+  ## serviceMetadata allows passing additional labels and annotations to MinIO and Console specific
+  ## services created by the operator.
+  serviceMetadata:
+    minioServiceLabels:
+      label: minio-svc
+    minioServiceAnnotations:
+      v2.min.io: minio-svc
+    consoleServiceLabels:
+      label: console-svc
+    consoleServiceAnnotations:
+      v2.min.io: console-svc
+
+  ## Add environment variables to be set in MinIO container (https://github.com/minio/minio/tree/master/docs/config)
+  # env:
+  # - name: MINIO_BROWSER
+  #   value: "off" # to turn-off browser
+  # - name: MINIO_STORAGE_CLASS_STANDARD
+  #   value: "EC:2"
+  #   ## For secure env vars like passwords, create an opaque Kubernetes secret and specify the secret in
+  #   ## the `valueFrom` field. The `valueFrom` object must contain the following fields:
+  #   ## `name` - the secret from which MinIO extracts the password, `key` - the data field
+  #   ## within secret, whose value will be set to the env variable's value
+  # - name: MINIO_IDENTITY_LDAP_LOOKUP_BIND_PASSWORD
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: ldap-minio-secret
+  #       key: MINIO_IDENTITY_LDAP_LOOKUP_BIND_PASSWORD
+
+  ## PriorityClassName indicates the Pod priority and hence importance of a Pod relative to other Pods.
+  ## This is applied to MinIO pods only.
+  ## Refer Kubernetes documentation for details https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#priorityclass/
+  # priorityClassName: high-priority
+
+  ## Define configuration for Console (Graphical user interface for MinIO)
+  ## Refer https://github.com/minio/console
+  console:
+    image: minio/console:${MINIO_CONSOLE_VERSION}
+    imagePullPolicy: IfNotPresent
+    replicas: 1
+    consoleSecret:
+      name: minio-console-secret

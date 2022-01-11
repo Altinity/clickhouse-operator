@@ -15,134 +15,293 @@
 package chi
 
 import (
+	"context"
 	"fmt"
 
 	log "github.com/golang/glog"
-	// log "k8s.io/klog"
 
+	a "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // Announcer handler all log/event/status messages going outside of controller/worker
 type Announcer struct {
-	c                  *Controller
-	chi                *chop.ClickHouseInstallation
-	v                  log.Level
-	writeLog           bool
-	writeEvent         bool
-	eventAction        string
-	eventReason        string
-	writeStatusAction  bool
+	a.Announcer
+
+	ctrl *Controller
+	chi  *chop.ClickHouseInstallation
+
+	// writeEvent specifies whether to produce k8s event into chi, therefore requires chi to be specified
+	// See k8s event for details.
+	// https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/event-v1/
+	writeEvent bool
+	// eventAction specifies k8s event action
+	eventAction string
+	// event reason specifies k8s event reason
+	eventReason string
+
+	// writeStatusAction specifies whether to produce action into `ClickHouseInstallation.Status.Action` of chi,
+	// therefore requires chi to be specified
+	writeStatusAction bool
+	// writeStatusAction specifies whether to produce action into `ClickHouseInstallation.Status.Actions` of chi,
+	// therefore requires chi to be specified
 	writeStatusActions bool
-	writeStatusError   bool
+	// writeStatusAction specifies whether to produce action into `ClickHouseInstallation.Status.Error` of chi,
+	// therefore requires chi to be specified
+	writeStatusError bool
 }
 
 // NewAnnouncer creates new announcer
-func NewAnnouncer(c *Controller) Announcer {
+func NewAnnouncer() Announcer {
 	return Announcer{
-		c:        c,
-		writeLog: true,
+		Announcer: a.New(),
 	}
+}
+
+// Silence produces silent announcer
+func (a Announcer) Silence() Announcer {
+	b := a
+	b.Announcer = b.Announcer.Silence()
+	return b
 }
 
 // V is inspired by log.V()
 func (a Announcer) V(level log.Level) Announcer {
 	b := a
-	b.v = level
-	b.writeLog = true
+	b.Announcer = b.Announcer.V(level)
 	return b
 }
 
-// WithEvent is used in chained calls in order to produce event
+// F adds function name
+func (a Announcer) F() Announcer {
+	b := a
+	b.Announcer = b.Announcer.F()
+	return b
+}
+
+// L adds line number
+func (a Announcer) L() Announcer {
+	b := a
+	b.Announcer = b.Announcer.L()
+	return b
+}
+
+// FL adds filename
+func (a Announcer) FL() Announcer {
+	b := a
+	b.Announcer = b.Announcer.FL()
+	return b
+}
+
+// A adds full code address as 'file:line:function'
+func (a Announcer) A() Announcer {
+	b := a
+	b.Announcer = b.Announcer.A()
+	return b
+}
+
+// S adds 'start of the function' tag
+func (a Announcer) S() Announcer {
+	b := a
+	b.Announcer = b.Announcer.S()
+	return b
+}
+
+// E adds 'end of the function' tag
+func (a Announcer) E() Announcer {
+	b := a
+	b.Announcer = b.Announcer.E()
+	return b
+}
+
+// M adds object meta as 'namespace/name'
+func (a Announcer) M(m ...interface{}) Announcer {
+	b := a
+	b.Announcer = b.Announcer.M(m...)
+	return b
+}
+
+// P triggers log to print line
+func (a Announcer) P() {
+	a.Info("")
+}
+
+// Info is inspired by log.Infof()
+func (a Announcer) Info(format string, args ...interface{}) {
+	// Produce classic log line
+	a.Announcer.Info(format, args...)
+
+	// Produce k8s event
+	if a.writeEvent && a.chiCapable() {
+		if len(args) > 0 {
+			a.ctrl.EventInfo(a.chi, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
+		} else {
+			a.ctrl.EventInfo(a.chi, a.eventAction, a.eventReason, fmt.Sprint(format))
+		}
+	}
+
+	// Produce chi status record
+	a.writeCHIStatus(format, args...)
+}
+
+// Warning is inspired by log.Warningf()
+func (a Announcer) Warning(format string, args ...interface{}) {
+	// Produce classic log line
+	a.Announcer.Warning(format, args...)
+
+	// Produce k8s event
+	if a.writeEvent && a.chiCapable() {
+		if len(args) > 0 {
+			a.ctrl.EventWarning(a.chi, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
+		} else {
+			a.ctrl.EventWarning(a.chi, a.eventAction, a.eventReason, fmt.Sprint(format))
+		}
+	}
+
+	// Produce chi status record
+	a.writeCHIStatus(format, args...)
+}
+
+// Error is inspired by log.Errorf()
+func (a Announcer) Error(format string, args ...interface{}) {
+	// Produce classic log line
+	a.Announcer.Error(format, args...)
+
+	// Produce k8s event
+	if a.writeEvent && a.chiCapable() {
+		if len(args) > 0 {
+			a.ctrl.EventError(a.chi, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
+		} else {
+			a.ctrl.EventError(a.chi, a.eventAction, a.eventReason, fmt.Sprint(format))
+		}
+	}
+
+	// Produce chi status record
+	a.writeCHIStatus(format, args...)
+}
+
+// Fatal is inspired by log.Fatalf()
+func (a Announcer) Fatal(format string, args ...interface{}) {
+	// Produce k8s event
+	if a.writeEvent && a.chiCapable() {
+		if len(args) > 0 {
+			a.ctrl.EventError(a.chi, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
+		} else {
+			a.ctrl.EventError(a.chi, a.eventAction, a.eventReason, fmt.Sprint(format))
+		}
+	}
+
+	// Produce chi status record
+	a.writeCHIStatus(format, args...)
+
+	// Write and exit
+	a.Announcer.Fatal(format, args...)
+}
+
+// WithController specifies controller to be used in case `chi`-related announces need to be done
+func (a Announcer) WithController(ctrl *Controller) Announcer {
+	b := a
+	b.ctrl = ctrl
+	return b
+}
+
+// WithEvent is used in chained calls in order to produce event into `chi`
 func (a Announcer) WithEvent(
 	chi *chop.ClickHouseInstallation,
 	action string,
 	reason string,
 ) Announcer {
 	b := a
-	b.writeEvent = true
-	b.chi = chi
-	b.eventAction = action
-	b.eventReason = reason
+	if chi == nil {
+		b.writeEvent = false
+		b.chi = nil
+		b.eventAction = ""
+		b.eventReason = ""
+	} else {
+		b.writeEvent = true
+		b.chi = chi
+		b.eventAction = action
+		b.eventReason = reason
+	}
 	return b
 }
 
-// WithStatusAction is used in chained calls in order to produce action in ClickHouseInstallation.Status.Action
+// WithStatusAction is used in chained calls in order to produce action into `ClickHouseInstallation.Status.Action`
 func (a Announcer) WithStatusAction(chi *chop.ClickHouseInstallation) Announcer {
 	b := a
-	b.writeStatusAction = true
-	b.writeStatusActions = true
-	b.chi = chi
+	if chi == nil {
+		b.chi = nil
+		b.writeStatusAction = false
+		b.writeStatusActions = false
+	} else {
+		b.chi = chi
+		b.writeStatusAction = true
+		b.writeStatusActions = true
+	}
 	return b
 }
 
 // WithStatusActions is used in chained calls in order to produce action in ClickHouseInstallation.Status.Actions
 func (a Announcer) WithStatusActions(chi *chop.ClickHouseInstallation) Announcer {
 	b := a
-	b.writeStatusActions = true
-	b.chi = chi
+	if chi == nil {
+		b.chi = nil
+		b.writeStatusActions = false
+	} else {
+		b.chi = chi
+		b.writeStatusActions = true
+	}
 	return b
 }
 
-// WithStatusAction is used in chained calls in order to produce error in ClickHouseInstallation.Status.Error
+// WithStatusError is used in chained calls in order to produce error in ClickHouseInstallation.Status.Error
 func (a Announcer) WithStatusError(chi *chop.ClickHouseInstallation) Announcer {
 	b := a
-	b.writeStatusError = true
-	b.chi = chi
+	if chi == nil {
+		b.chi = nil
+		b.writeStatusError = false
+	} else {
+		b.chi = chi
+		b.writeStatusError = true
+	}
 	return b
 }
 
-// Info is inspired by log.Infof()
-func (a Announcer) Info(format string, args ...interface{}) {
-	if a.writeLog {
-		if a.v > 0 {
-			log.V(a.v).Infof(format, args...)
-		} else {
-			log.Infof(format, args...)
-		}
-	}
-	if a.writeEvent {
-		a.c.eventInfo(a.chi, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
-	}
-	a.writeCHIStatus(format, args...)
-}
-
-// Warning is inspired by log.Warningf()
-func (a Announcer) Warning(format string, args ...interface{}) {
-	if a.writeLog {
-		log.Warningf(format, args...)
-	}
-	if a.writeEvent {
-		a.c.eventWarning(a.chi, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
-	}
-	a.writeCHIStatus(format, args...)
-}
-
-// Error is inspired by log.Errorf()
-func (a Announcer) Error(format string, args ...interface{}) {
-	if a.writeLog {
-		log.Errorf(format, args...)
-	}
-	if a.writeEvent {
-		a.c.eventError(a.chi, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
-	}
-	a.writeCHIStatus(format, args...)
+// chiCapable checks whether announcer is capable to produce chi-based announcements
+func (a Announcer) chiCapable() bool {
+	return (a.ctrl != nil) && (a.chi != nil)
 }
 
 // writeCHIStatus is internal function which writes ClickHouseInstallation.Status
 func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
+	if !a.chiCapable() {
+		return
+	}
+
 	if a.writeStatusAction {
-		a.chi.Status.Action = fmt.Sprintf(format, args...)
+		if len(args) > 0 {
+			a.chi.Status.Action = fmt.Sprintf(format, args...)
+		} else {
+			a.chi.Status.Action = fmt.Sprint(format)
+		}
 	}
 	if a.writeStatusActions {
-		(&a.chi.Status).PushAction(fmt.Sprintf(format, args...))
+		if len(args) > 0 {
+			(&a.chi.Status).PushAction(fmt.Sprintf(format, args...))
+		} else {
+			(&a.chi.Status).PushAction(fmt.Sprint(format))
+		}
 	}
 	if a.writeStatusError {
-		(&a.chi.Status).SetAndPushError(fmt.Sprintf(format, args...))
+		if len(args) > 0 {
+			(&a.chi.Status).SetAndPushError(fmt.Sprintf(format, args...))
+		} else {
+			(&a.chi.Status).SetAndPushError(fmt.Sprint(format))
+		}
 	}
 
 	// Propagate status updates into object
 	if a.writeStatusAction || a.writeStatusActions || a.writeStatusError {
-		_ = a.c.updateCHIObjectStatus(a.chi, true)
+		_ = a.ctrl.updateCHIObjectStatus(context.Background(), a.chi, true)
 	}
 }

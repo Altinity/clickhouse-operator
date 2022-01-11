@@ -62,7 +62,7 @@ clickhouse-installation-max   23h
 `.spec.configuration.zookeeper` refers to [&lt;yandex&gt;&lt;zookeeper&gt;&lt;/zookeeper&gt;&lt;/yandex&gt;][server-settings_zookeeper] config section
 
 ## .spec.configuration.profiles
-`.spec.configuration.profiles` refers to [&lt;yandex&gt;&lt;profiles&gt;&lt;/profiles&gt;&lt;/yandex&gt;][settings] settings sections.
+`.spec.configuration.profiles` refers to [&lt;yandex&gt;&lt;profiles&gt;&lt;/profiles&gt;&lt;/yandex&gt;][profiles] settings sections.
 ```yaml
     profiles:
       readonly/readonly: 1
@@ -77,8 +77,28 @@ expands into
       </profiles>
 ```
 
+## .spec.configuration.quotas
+`.spec.configuration.quotas` refers to [&lt;yandex&gt;&lt;quotas&gt;&lt;/quotas&gt;&lt;/yandex&gt;][quotas] settings sections.
+```yaml
+    quotas:
+      default/interval/duration: 3600
+      default/interval/queries: 10000
+```
+
+expands into
+```xml
+      <quotas>
+        <default>
+          <interval>
+              <duration>3600</duration>
+              <queries>3600</queries>
+          </interval>
+        </default>
+      </quotas>
+```
+
 ## .spec.configuration.users
-`.spec.configuration.users` refers to [&lt;yandex&gt;&lt;users&gt;&lt;/users&gt;&lt;/yandex&gt;][settings] settings sections.
+`.spec.configuration.users` refers to [&lt;yandex&gt;&lt;users&gt;&lt;/users&gt;&lt;/yandex&gt;][users] settings sections.
 ```yaml
   users:
     test/networks/ip:
@@ -97,6 +117,8 @@ expands into
         </test>
      </users>
 ```
+when you skip user/password, or setup it as empty value then `chConfigUserDefaultPassword` parameter value from `etc-clickhouse-operator-files` ConfigMap will use. 
+
 ## .spec.configuration.settings
 ```yaml
     settings:
@@ -576,10 +598,12 @@ Example - how to place ClickHouse instances on nodes labeled as `clickhouse=allo
 
 [custom-resource]: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/
 [99-clickhouseinstallation-max.yaml]: ./chi-examples/99-clickhouseinstallation-max.yaml
-[server-settings_zookeeper]: https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper
-[settings]: https://clickhouse.yandex/docs/en/operations/settings/settings/
-[settings]: https://clickhouse.yandex/docs/en/operations/settings/settings/
-[external_dicts_dict]: https://clickhouse.yandex/docs/en/query_language/dicts/external_dicts_dict/
+[server-settings_zookeeper]: https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings_zookeeper
+[settings]: https://clickhouse.tech/docs/en/operations/settings/settings/
+[quotas]: https://clickhouse.tech/docs/en/operations/quotas/
+[profiles]: https://clickhouse.tech/docs/en/operations/settings/settings-profiles/
+[users]: https://clickhouse.tech/docs/en/operations/settings/settings-users/
+[external_dicts_dict]: https://clickhouse.tech/docs/en/query_language/dicts/external_dicts_dict/
 [service]: https://kubernetes.io/docs/concepts/services-networking/service/
 [persistentvolumeclaims]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
 [pod-templates]: https://kubernetes.io/docs/concepts/workloads/pods/pod-overview/#pod-templates 

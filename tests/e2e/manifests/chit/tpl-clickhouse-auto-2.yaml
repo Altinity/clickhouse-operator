@@ -1,0 +1,11 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: extension-annotations
+  annotations:
+    test: "test"
+    macro: "macro-{chi}"
+spec:
+  templating:
+    policy: auto

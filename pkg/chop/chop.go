@@ -16,65 +16,90 @@ package chop
 
 import (
 	"flag"
+	"fmt"
+
+	kube "k8s.io/client-go/kubernetes"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
 )
 
+// CHOp defines ClickHouse Operator
 type CHOp struct {
-	Version       string
+	// Version specifies version of the operator
+	Version string
+	// Commit specifies git commit of the operator
+	Commit string
+	// Date specified date when operator was built
+	Date string
+	// ConfigManager specifies configuration manager in charge of operator's configuration
 	ConfigManager *ConfigManager
 }
 
+// NewCHOp creates new CHOp
 func NewCHOp(
 	version string,
+	commit string,
+	date string,
+	kubeClient *kube.Clientset,
 	chopClient *chopclientset.Clientset,
 	initConfigFilePath string,
 ) *CHOp {
 	return &CHOp{
 		Version:       version,
-		ConfigManager: NewConfigManager(chopClient, initConfigFilePath),
+		Commit:        commit,
+		Date:          date,
+		ConfigManager: NewConfigManager(kubeClient, chopClient, initConfigFilePath),
 	}
 }
 
+// Init initializes CHOp
 func (c *CHOp) Init() error {
+	if c == nil {
+		return fmt.Errorf("chop not created")
+	}
 	return c.ConfigManager.Init()
 }
 
+// Config returns operator config
 func (c *CHOp) Config() *v1.OperatorConfig {
+	if c == nil {
+		return nil
+	}
 	return c.ConfigManager.Config()
 }
 
+// SetupLog sets up loggging options
 func (c *CHOp) SetupLog() {
 	updated := false
-	if c.Config().Logtostderr != "" {
-		log.V(1).Infof("Log option cur value %s=%s\n", "logtostderr", flag.Lookup("logtostderr").Value)
-		log.V(1).Infof("Log option new value %s=%s\n", "logtostderr", c.Config().Logtostderr)
+	if c.Config().Logger.LogToStderr != "" {
+		c.logUpdate("logtostderr", c.Config().Logger.LogToStderr)
 		updated = true
-		_ = flag.Set("logtostderr", c.Config().Logtostderr)
+		_ = flag.Set("logtostderr", c.Config().Logger.LogToStderr)
 	}
-	if c.Config().Alsologtostderr != "" {
-		log.V(1).Infof("Log option cur value %s=%s\n", "alsologtostderr", flag.Lookup("alsologtostderr").Value)
-		log.V(1).Infof("Log option new value %s=%s\n", "alsologtostderr", c.Config().Alsologtostderr)
+	if c.Config().Logger.AlsoLogToStderr != "" {
+		c.logUpdate("alsologtostderr", c.Config().Logger.AlsoLogToStderr)
 		updated = true
-		_ = flag.Set("alsologtostderr", c.Config().Alsologtostderr)
+		_ = flag.Set("alsologtostderr", c.Config().Logger.AlsoLogToStderr)
 	}
-	if c.Config().Stderrthreshold != "" {
-		log.V(1).Infof("Log option cur value %s=%s\n", "stderrthreshold", flag.Lookup("stderrthreshold").Value)
-		log.V(1).Infof("Log option new value %s=%s\n", "stderrthreshold", c.Config().Stderrthreshold)
+	if c.Config().Logger.StderrThreshold != "" {
+		c.logUpdate("stderrthreshold", c.Config().Logger.StderrThreshold)
 		updated = true
-		_ = flag.Set("stderrthreshold", c.Config().Stderrthreshold)
+		_ = flag.Set("stderrthreshold", c.Config().Logger.StderrThreshold)
 	}
-	if c.Config().V != "" {
-		log.V(1).Infof("Log option cur value %s=%s\n", "v", flag.Lookup("v").Value)
-		log.V(1).Infof("Log option new value %s=%s\n", "v", c.Config().V)
+	if c.Config().Logger.V != "" {
+		c.logUpdate("v", c.Config().Logger.V)
 		updated = true
-		_ = flag.Set("v", c.Config().V)
+		_ = flag.Set("v", c.Config().Logger.V)
 	}
 
 	if updated {
-		log.V(1).Infof("Additional log options applied\n")
+		log.V(1).Info("Additional log options applied")
 	}
+}
+
+// logUpdate
+func (c *CHOp) logUpdate(name, value string) {
+	log.V(1).Info("Log option '%s' change value from '%s' to '%s'", name, flag.Lookup(name).Value, value)
 }

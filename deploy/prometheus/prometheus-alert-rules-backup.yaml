@@ -1,0 +1,220 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: prometheus
+    role: alert-rules
+  name: prometheus-clickhouse-backup-rules
+spec:
+  groups:
+    - name: ClickHouseBackupRules
+      rules:
+        - alert: ClickHouseBackupDown
+          expr: up{container_name='clickhouse-backup'} == 0
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "clickhouse-backup possible down"
+            description: |-
+              `clickhouse-backup` can't be scraped via prometheus.
+
+              Check clickhouse-backup status
+              ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=24h```
+
+        - alert: ClickHouseBackupRecentlyRestart
+          expr: (clickhouse_backup_last_backup_success{container_name='clickhouse-backup'} == 2 or clickhouse_backup_last_create_status{container_name='clickhouse-backup'} == 2) and time() - process_start_time_seconds{container_name='clickhouse-backup'}  < 180
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "clickhouse-backup restart less than 3 minutes ago"
+            description: |-
+              `clickhouse-backup` possible was restarted
+
+              Check clickhouse-backup status
+              ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=24h```
+
+        - alert: ClickHouseBackupFailed
+          expr: |-
+            (increase(clickhouse_backup_failed_backups{container_name='clickhouse-backup'}[24h]) > 0 and clickhouse_backup_last_backup_success != 1)
+            or (clickhouse_backup_last_backup_success{container_name='clickhouse-backup'} == 0)
+            or (increase(clickhouse_backup_failed_creates{container_name='clickhouse-backup'}[24h]) > 0 and clickhouse_backup_last_create_status != 1)
+            or (clickhouse_backup_last_create_status{container_name='clickhouse-backup'} == 0)
+            or (increase(clickhouse_backup_failed_downloads{container_name='clickhouse-backup'}[24h]) > 0 and clickhouse_backup_last_download_status != 1)
+            or (clickhouse_backup_last_download_status{container_name='clickhouse-backup'} == 0)
+            or (increase(clickhouse_backup_failed_restores{container_name='clickhouse-backup'}[24h]) > 0 and clickhouse_backup_last_restore_status != 1)
+            or (clickhouse_backup_last_restore_status{container_name='clickhouse-backup'} == 0)
+            or (increase(clickhouse_backup_failed_uploads{container_name='clickhouse-backup'}[24h]) > 0 and clickhouse_backup_last_upload_status != 1)
+            or (clickhouse_backup_last_upload_status{container_name='clickhouse-backup'} == 0)
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "clickhouse-backup last backup possible failed"
+            description: |-
+              status legend
+              - 0 - failed
+              - 1 - success
+              - 2 - unknown
+
+              `increase(clickhouse_backup_failed_backups{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[24h])` = {{ with printf "increase(clickhouse_backup_failed_backups{pod_name='%s',namespace='%s'}[24h])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse_backup_last_backup_success{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_success{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+
+              `increase(clickhouse_backup_failed_creates{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[24h])` = {{ with printf "increase(clickhouse_backup_failed_creates{pod_name='%s',namespace='%s'}[24h])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse_backup_last_create_status{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_create_status{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+
+              `increase(clickhouse_backup_failed_downloads{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[24h])` = {{ with printf "increase(clickhouse_backup_failed_downloads{pod_name='%s',namespace='%s'}[24h])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse_backup_last_download_status{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_download_status{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+
+              `increase(clickhouse_backup_failed_restores{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[24h])` = {{ with printf "increase(clickhouse_backup_failed_restores{pod_name='%s',namespace='%s'}[24h])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse_backup_last_restore_status{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_restore_status{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+
+              `increase(clickhouse_backup_failed_uploads{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}[24h])` = {{ with printf "increase(clickhouse_backup_failed_uploads{pod_name='%s',namespace='%s'}[24h])" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse_backup_last_upload_status{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_upload_status{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+
+              Check clickhouse-backup logs
+              ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=24h```
+
+              Check backup list
+              ```kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -c {{ $labels.container_name }} -- wget -qO- http://127.0.0.1:7171/backup/list```
+
+              Check backup commands status
+              ```kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -c {{ $labels.container_name }} -- wget -qO- http://127.0.0.1:7171/backup/status```
+
+              Run backup manually
+              ```kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -c {{ $labels.container_name }} -- clickhouse-backup create [-t, --tables=<db>.<table>] [--diff-from=<backup_name>] [--delete] <backup_name>```
+
+
+        - alert: ClickHouseBackupTooLong
+          # duration in nanoseconds so we expect 3600 * 4 * 10^9
+          expr: |-
+            clickhouse_backup_last_backup_duration{container_name='clickhouse-backup'} > 14400000000000
+            or clickhouse_backup_last_create_duration{container_name='clickhouse-backup'} > 14400000000000
+            or clickhouse_backup_last_download_duration{container_name='clickhouse-backup'} > 14400000000000
+            or clickhouse_backup_last_restore_duration{container_name='clickhouse-backup'} > 14400000000000
+            or clickhouse_backup_last_upload_duration{container_name='clickhouse-backup'} > 14400000000000
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "clickhouse-backup last backup duration was more 4 hours"
+            description: |-
+              `clickhouse_backup_last_backup_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_duration{pod_name='%s',namespace='%s'} / 1000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanizeDuration }}{{ end }}
+              `clickhouse_backup_last_create_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_create_duration{pod_name='%s',namespace='%s'} / 1000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanizeDuration }}{{ end }}
+              `clickhouse_backup_last_download_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_download_duration{pod_name='%s',namespace='%s'} / 1000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanizeDuration }}{{ end }}
+              `clickhouse_backup_last_restore_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_restore_duration{pod_name='%s',namespace='%s'} / 1000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanizeDuration }}{{ end }}
+              `clickhouse_backup_last_upload_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_upload_duration{pod_name='%s',namespace='%s'} / 1000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanizeDuration }}{{ end }}
+
+              Check clickhouse-backup logs
+              ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=24h```
+
+        - alert: ClickHouseBackupTooShort
+          expr: |-
+            (clickhouse_backup_last_backup_success{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_backup_duration{container_name='clickhouse-backup'} < clickhouse_backup_last_backup_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
+            or (clickhouse_backup_last_create_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_create_duration{container_name='clickhouse-backup'} < clickhouse_backup_last_create_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
+            or (clickhouse_backup_last_download_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_download_duration{container_name='clickhouse-backup'} < clickhouse_backup_last_download_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
+            or (clickhouse_backup_last_restore_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_restore_duration{container_name='clickhouse-backup'} < clickhouse_backup_last_restore_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
+            or (clickhouse_backup_last_upload_status{container_name='clickhouse-backup'} == 1 and clickhouse_backup_last_upload_duration{container_name='clickhouse-backup'} < clickhouse_backup_last_upload_duration{container_name='clickhouse-backup'} offset 1m * 0.70)
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "clickhouse-backup last backup duration time is 30% less than the time of the previous one"
+            description: |-
+              `clickhouse_backup_last_backup_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_duration{pod_name='%s',namespace='%s'} / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }} minutes
+              `clickhouse_backup_last_backup_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"} offset 1m` = {{ with printf "clickhouse_backup_last_backup_duration{pod_name='%s',namespace='%s'} offset 1m / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }} minutes
+
+              `clickhouse_backup_last_create_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_create_duration{pod_name='%s',namespace='%s'} / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }} minutes
+              `clickhouse_backup_last_create_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"} offset 1m` = {{ with printf "clickhouse_backup_last_create_duration{pod_name='%s',namespace='%s'} offset 1m / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }} minutes
+
+              `clickhouse_backup_last_download_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_download_duration{pod_name='%s',namespace='%s'} / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }} minutes
+              `clickhouse_backup_last_download_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"} offset 1m` = {{ with printf "clickhouse_backup_last_download_duration{pod_name='%s',namespace='%s'} offset 1m / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }} minutes
+
+              `clickhouse_backup_last_restore_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_restore_duration{pod_name='%s',namespace='%s'} / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }} minutes
+              `clickhouse_backup_last_restore_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"} offset 1m` = {{ with printf "clickhouse_backup_last_restore_duration{pod_name='%s',namespace='%s'} offset 1m / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }} minutes
+
+              `clickhouse_backup_last_upload_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_upload_duration{pod_name='%s',namespace='%s'} / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }} minutes
+              `clickhouse_backup_last_upload_duration{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"} offset 1m` = {{ with printf "clickhouse_backup_last_upload_duration{pod_name='%s',namespace='%s'} offset 1m / 60000000000 " .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }} minutes
+
+              Check clickhouse-backup logs
+              ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=24h```
+
+              ClickHouse data size
+              ```kubectl exec -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }}-- wget -qO- "http://127.0.0.1:8123/?query=SELECT+formatReadableSize(sum(total_bytes))+FROM+system.tables+WHERE+database!='system'"```
+
+        - alert: ClickHouseBackupSizeChanged
+          expr: |-
+            (
+              clickhouse_backup_last_create_status{container_name='clickhouse-backup'} == 1
+              and clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} offset 1m > 0
+              and clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} < clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} offset 1m * 0.60
+            ) or (
+              clickhouse_backup_last_create_status{container_name='clickhouse-backup'} == 1
+              and clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} offset 1m > 0
+              and clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} > clickhouse_backup_last_backup_size_local{container_name='clickhouse-backup'} offset 1m * 1.40)
+            or (
+              clickhouse_backup_last_upload_status{container_name='clickhouse-backup'} == 1
+              and clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} offset 1m > 0
+              and clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} < clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} offset 1m * 0.60
+            )
+            or (
+              clickhouse_backup_last_upload_status{container_name='clickhouse-backup'} == 1
+              and clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} offset 1m > 0
+              and clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} > clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} offset 1m * 1.40
+            )
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "clickhouse-backup last backup size is changed more than 40% than the size of the previous one"
+            description: |-
+              `clickhouse_backup_last_backup_size_local{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s',container_name='clickhouse-backup'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
+              `clickhouse_backup_last_backup_size_local{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"} offset 1m` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s',container_name='clickhouse-backup'} offset 1m" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
+
+              `clickhouse_backup_last_backup_size_remote{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s',container_name='clickhouse-backup'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
+              `clickhouse_backup_last_backup_size_remote{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"} offset 1m` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s',container_name='clickhouse-backup'} offset 1m" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
+
+              Check clickhouse-backup logs
+              ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=24h```
+
+              ClickHouse data size
+              ```kubectl exec -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }}-- wget -qO- "http://127.0.0.1:8123/?query=SELECT+formatReadableSize(sum(total_bytes))+FROM+system.tables+WHERE+database!='system'"```
+
+        - alert: ClickHouseRemoteBackupSizeZero
+          for: "36h"
+          expr: clickhouse_backup_last_backup_size_remote{container_name='clickhouse-backup'} == 0
+          labels:
+            severity: warning
+            team: ClickHouse
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "clickhouse-backup last backup size is zero last 36 hours"
+            description: |-
+              `clickhouse_backup_last_backup_size_remote{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_size_remote{pod_name='%s',namespace='%s',container_name='clickhouse-backup'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
+              `clickhouse_backup_last_backup_size_local{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "clickhouse_backup_last_backup_size_local{pod_name='%s',namespace='%s',container_name='clickhouse-backup'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanize1024 }}B{{ end }}
+
+              Check clickhouse-backup logs
+              ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=24h```
+
+              ClickHouse data size
+              ```kubectl exec -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }}-- wget -qO- "http://127.0.0.1:8123/?query=SELECT+formatReadableSize(sum(total_bytes))+FROM+system.tables+WHERE+database!='system'"```
+
+        - alert: ClickhouseBackupDoesntRunTooLong
+          expr: |-
+            (clickhouse_backup_last_backup_end{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_backup_end{container_name='clickhouse-backup'} > 129600)
+            or (clickhouse_backup_last_create_finish{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_create_finish{container_name='clickhouse-backup'} > 129600)
+            or (clickhouse_backup_last_upload_finish{container_name='clickhouse-backup'} > 0 and time() - clickhouse_backup_last_upload_finish{container_name='clickhouse-backup'} > 129600)
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "clickhouse-backup didn't run last 24h"
+            description: |-
+              `time() - clickhouse_backup_last_backup_end{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "time() - clickhouse_backup_last_backup_end{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanizeDuration }}{{ end }}
+              `time() - clickhouse_backup_last_create_finish{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "time() - clickhouse_backup_last_create_finish{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanizeDuration }}{{ end }}
+              `time() - clickhouse_backup_last_backup_finish{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "time() - clickhouse_backup_last_backup_finish{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | humanizeDuration }}{{ end }}
+
+              Check clickhouse-backup logs
+              ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=48h```

@@ -59,7 +59,7 @@
         "name": "prometheus alerts",
         "showIn": 0,
         "step": "30s",
-        "tagKeys": "chi,pod,hostname,exported_namespace,namespace",
+        "tagKeys": "chi,pod_name,hostname,exported_namespace,namespace",
         "tags": [],
         "textFormat": "{{alertstate}}",
         "titleFormat": "{{alertname}}",
@@ -81,7 +81,7 @@
   "gnetId": 882,
   "graphTooltip": 1,
   "id": null,
-  "iteration": 1602226784521,
+  "iteration": 1624001415165,
   "links": [],
   "panels": [
     {
@@ -611,7 +611,8 @@
           "legendFormat": "ZooKeeperUserExceptions  {{hostname}}",
           "metric": "chi_clickhouse_event_ZooKeeperUserExceptions",
           "refId": "B",
-          "step": 120
+          "step": 120,
+          "hide": true
         },
         {
           "expr": "increase(chi_clickhouse_event_ZooKeeperInit{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
@@ -1541,20 +1542,29 @@
       "renderer": "flot",
       "seriesOverrides": [
         {
+          "$$hashKey": "object:227",
           "alias": "/^max.+/",
-          "color": "#F2495C"
+          "color": "#FFA6B0"
         },
         {
+          "$$hashKey": "object:228",
           "alias": "/^check.+/",
           "color": "#FF9830"
         },
         {
+          "$$hashKey": "object:229",
           "alias": "/^fetch.+/",
           "color": "#B877D9"
         },
         {
-          "alias": "/^send.+/",
-          "color": "#5794F2"
+          "$$hashKey": "object:338",
+          "alias": "/^(data loss|fetch fail|check fail).+/",
+          "color": "#C4162A"
+        },
+        {
+          "$$hashKey": "object:1252",
+          "alias": "/^replicated merge.+/",
+          "color": "#DEB6F2"
         }
       ],
       "spaceLength": 10,
@@ -1562,31 +1572,78 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_ReplicasMaxQueueSize{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "max queue size {{hostname}}",
-          "refId": "D"
-        },
-        {
-          "expr": "chi_clickhouse_metric_ReplicatedChecks{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedDataLoss{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "check {{hostname}}",
+          "legendFormat": "data loss {{hostname}}",
           "refId": "A",
           "step": 20
         },
         {
-          "expr": "chi_clickhouse_metric_ReplicatedFetch{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedPartChecks{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
           "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "fetch {{hostname}}",
+          "legendFormat": "check {{hostname}}",
           "refId": "B",
           "step": 20
         },
         {
-          "expr": "chi_clickhouse_metric_ReplicatedSend{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedPartChecksFailed{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
+          "interval": "",
           "intervalFactor": 2,
-          "legendFormat": "send {{hostname}}",
+          "legendFormat": "check fail {{hostname}}",
           "refId": "C",
           "step": 20
+        },
+        {
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedPartFetches{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "fetch {{hostname}}",
+          "refId": "D",
+          "step": 20
+        },
+        {
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedPartFailedFetches{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "fetch fail {{hostname}}",
+          "refId": "E",
+          "step": 20
+        },
+        {
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedPartFetchesOfMerged{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "fetch merged {{hostname}}",
+          "refId": "F",
+          "step": 20
+        },
+        {
+          "exemplar": true,
+          "expr": "irate(chi_clickhouse_event_ReplicatedPartMerges{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "hide": false,
+          "interval": "",
+          "intervalFactor": 2,
+          "legendFormat": "replicated merge {{hostname}}",
+          "refId": "G",
+          "step": 20
+        },
+        {
+          "expr": "chi_clickhouse_metric_ReplicasMaxQueueSize{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "max queue size {{hostname}}",
+          "refId": "Z"
         }
       ],
       "thresholds": [],
@@ -2338,13 +2395,8 @@
       "links": [
         {
           "targetBlank": true,
-          "title": "system.parts",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-parts"
-        },
-        {
-          "targetBlank": true,
-          "title": "parts_to_delay_insert",
-          "url": "https://github.com/ClickHouse/ClickHouse/search?q=parts_to_delay_insert"
+          "title": "system.detached_parts",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/detached_parts/"
         }
       ],
       "nullPointMode": "null",
@@ -2355,22 +2407,51 @@
       "pointradius": 5,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [],
+      "seriesOverrides": [
+        {
+          "$$hashKey": "object:254",
+          "alias": "/.*detached_by_user.*/",
+          "color": "#CA95E5"
+        },
+        {
+          "$$hashKey": "object:285",
+          "alias": "/.*broken.*/",
+          "color": "#E02F44"
+        },
+        {
+          "$$hashKey": "object:355",
+          "alias": "/.*(clone|ignored).*/",
+          "color": "#FFEE52"
+        },
+        {
+          "$$hashKey": "object:447",
+          "alias": "/^Inactive/",
+          "yaxis": 2
+        }
+      ],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",active=\"0\"})",
-          "legendFormat": "Parts {{hostname}}",
+          "expr": "sum by(hostname,reason) (chi_clickhouse_metric_DetachedParts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "interval": "",
+          "legendFormat": "{{reason}} {{hostname}} ",
           "refId": "C"
+        },
+        {
+          "expr": "sum by(hostname) (chi_clickhouse_table_parts{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\",active=\"0\"})",
+          "hide": true,
+          "interval": "",
+          "legendFormat": "Inactive {{hostname}} ",
+          "refId": "A"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Inactive Parts",
+      "title": "Detached parts",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -2403,8 +2484,8 @@
         }
       ],
       "yaxis": {
-        "align": false,
-        "alignLevel": null
+        "align": true,
+        "alignLevel": 0
       }
     },
     {
@@ -3231,12 +3312,12 @@
         {
           "targetBlank": true,
           "title": "FETCH PARTITION",
-          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_fetch-partition"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/partition/#alter_fetch-partition"
         },
         {
           "targetBlank": true,
           "title": "Mutations of data",
-          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter-mutations"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#mutations"
         },
         {
           "targetBlank": true,
@@ -3246,7 +3327,7 @@
         {
           "targetBlank": true,
           "title": "MOVE PARTITION",
-          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter_move-partition"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/partition/#alter_move-partition"
         }
       ],
       "nullPointMode": "null",
@@ -3332,7 +3413,7 @@
       "dashLength": 10,
       "dashes": false,
       "datasource": "${DS_PROMETHEUS}",
-      "description": "Number of mutations (ALTER DELETE/ALTER UPDATE)",
+      "description": "Number of active mutations (ALTER DELETE/ALTER UPDATE) and parts to mutate",
       "fill": 1,
       "fillGradient": 0,
       "gridPos": {
@@ -3358,10 +3439,20 @@
         {
           "targetBlank": true,
           "title": "Mutations",
-          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#alter-mutations"
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/alter/#mutations"
+        },
+        {
+          "targetBlank": true,
+          "title": "system.mutations",
+          "url": "https://clickhouse.tech/docs/en/operations/system-tables/mutations/"
+        },
+        {
+          "targetBlank": true,
+          "title": "KILL MUTATION",
+          "url": "https://clickhouse.tech/docs/en/sql-reference/statements/kill/#kill-mutation"
         }
       ],
-      "nullPointMode": "null",
+      "nullPointMode": "null as zero",
       "options": {
         "dataLinks": []
       },
@@ -3372,12 +3463,17 @@
       "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
-      "steppedLine": false,
+      "steppedLine": true,
       "targets": [
         {
-          "expr": "chi_clickhouse_metric_PartMutation{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "{{hostname}}",
+          "expr": "sum by (hostname) (chi_clickhouse_table_mutations{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "legendFormat": "mutations {{hostname}}",
           "refId": "A"
+        },
+        {
+          "expr": "sum by (hostname) (chi_clickhouse_table_mutations_parts_to_do{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"})",
+          "legendFormat": "parts_to_do {{hostname}}",
+          "refId": "B"
         }
       ],
       "thresholds": [],
@@ -3481,7 +3577,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(chi_clickhouse_event_MarkCacheHits[1m]) / (irate(chi_clickhouse_event_MarkCacheHits[1m]) + irate(chi_clickhouse_event_MarkCacheMisses[1m]))",
+          "expr": "irate(chi_clickhouse_event_MarkCacheHits{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) / (irate(chi_clickhouse_event_MarkCacheHits{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]) + irate(chi_clickhouse_event_MarkCacheMisses{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m]))",
           "hide": false,
           "intervalFactor": 2,
           "legendFormat": "{{hostname}}",
@@ -3914,13 +4010,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(go_memstats_alloc_bytes_total{app=\"clickhouse-operator\",namespace=~\"$exported_namespace|kube-system\"}[1m])",
+          "expr": "irate(go_memstats_alloc_bytes_total{app=\"clickhouse-operator\",namespace=~\"$namespace|kube-system\"}[1m])",
           "hide": false,
           "legendFormat": "{{ namespace }} GO malloc bytes / sec",
           "refId": "A"
         },
         {
-          "expr": "process_resident_memory_bytes{app=\"clickhouse-operator\",namespace=~\"$exported_namespace|kube-system\"}",
+          "expr": "process_resident_memory_bytes{app=\"clickhouse-operator\",namespace=~\"$namespace|kube-system\"}",
           "legendFormat": "{{ namespace }} RSS Memory",
           "refId": "B"
         }
@@ -3982,14 +4078,14 @@
         "allValue": null,
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(chi_clickhouse_metric_Uptime, exported_namespace)",
+        "definition": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\"}, exported_namespace)",
         "hide": 0,
         "includeAll": true,
         "label": "K8S Namespace",
         "multi": true,
         "name": "exported_namespace",
         "options": [],
-        "query": "label_values(chi_clickhouse_metric_Uptime, exported_namespace)",
+        "query": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\"}, exported_namespace)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -4004,14 +4100,14 @@
         "allValue": null,
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(chi_clickhouse_metric_Uptime{exported_namespace=~\"$exported_namespace\"}, chi)",
+        "definition": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\", exported_namespace=~\"$exported_namespace\"}, chi)",
         "hide": 0,
         "includeAll": true,
         "label": "K8S Clickhouse Installation",
         "multi": true,
         "name": "chi",
         "options": [],
-        "query": "label_values(chi_clickhouse_metric_Uptime{exported_namespace=~\"$exported_namespace\"}, chi)",
+        "query": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\", exported_namespace=~\"$exported_namespace\"}, chi)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -4026,14 +4122,14 @@
         "allValue": null,
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(chi_clickhouse_metric_Uptime{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\"}, hostname)",
+        "definition": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\",exported_namespace=~\"$exported_namespace\",chi=~\"$chi\"}, hostname)",
         "hide": 0,
         "includeAll": true,
         "label": "Server",
         "multi": true,
         "name": "hostname",
         "options": [],
-        "query": "label_values(chi_clickhouse_metric_Uptime{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\"}, hostname)",
+        "query": "label_values({__name__ =~ \"chi_clickhouse_metric_Uptime|chi_clickhouse_metric_fetch_errors\",exported_namespace=~\"$exported_namespace\",chi=~\"$chi\"}, hostname)",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -4052,7 +4148,6 @@
   },
   "timepicker": {
     "refresh_intervals": [
-      "5s",
       "10s",
       "30s",
       "1m",
@@ -4078,5 +4173,5 @@
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
   "uid": "80bd73d2a243583a9ec0d1b3fdf86e98",
-  "version": 20201009
+  "version": 20210618
 }

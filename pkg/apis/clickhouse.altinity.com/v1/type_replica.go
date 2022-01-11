@@ -14,28 +14,33 @@
 
 package v1
 
+// InheritSettingsFrom inherits settings from specified cluster
 func (replica *ChiReplica) InheritSettingsFrom(cluster *ChiCluster) {
-	(&replica.Settings).MergeFrom(cluster.Settings)
+	replica.Settings = replica.Settings.MergeFrom(cluster.Settings)
 }
 
+// InheritFilesFrom inherits files from specified cluster
 func (replica *ChiReplica) InheritFilesFrom(cluster *ChiCluster) {
-	(&replica.Files).MergeFrom(cluster.Files)
+	replica.Files = replica.Files.MergeFrom(cluster.Files)
 }
 
+// InheritTemplatesFrom inherits templates from specified cluster
 func (replica *ChiReplica) InheritTemplatesFrom(cluster *ChiCluster) {
-	(&replica.Templates).MergeFrom(&cluster.Templates, MergeTypeFillEmptyValues)
-	(&replica.Templates).HandleDeprecatedFields()
+	replica.Templates = replica.Templates.MergeFrom(cluster.Templates, MergeTypeFillEmptyValues)
+	replica.Templates.HandleDeprecatedFields()
 }
 
+// GetServiceTemplate gets service template
 func (replica *ChiReplica) GetServiceTemplate() (*ChiServiceTemplate, bool) {
-	name := replica.Templates.ReplicaServiceTemplate
-	template, ok := replica.CHI.GetServiceTemplate(name)
-	return template, ok
+	if !replica.Templates.HasReplicaServiceTemplate() {
+		return nil, false
+	}
+	name := replica.Templates.GetReplicaServiceTemplate()
+	return replica.CHI.GetServiceTemplate(name)
 }
 
-func (replica *ChiReplica) WalkHosts(
-	f func(host *ChiHost) error,
-) []error {
+// WalkHosts walks over hosts
+func (replica *ChiReplica) WalkHosts(f func(host *ChiHost) error) []error {
 	res := make([]error, 0)
 
 	for shardIndex := range replica.Hosts {
@@ -46,6 +51,7 @@ func (replica *ChiReplica) WalkHosts(
 	return res
 }
 
+// HostsCount returns number of hosts
 func (replica *ChiReplica) HostsCount() int {
 	count := 0
 	replica.WalkHosts(func(host *ChiHost) error {

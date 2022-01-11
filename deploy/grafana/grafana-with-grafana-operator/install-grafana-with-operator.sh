@@ -11,6 +11,9 @@ echo "External value for \$GRAFANA_QUERIES_DASHBOARD_NAME=$GRAFANA_QUERIES_DASHB
 echo "External value for \$GRAFANA_ZOOKEEPER_DASHBOARD_NAME=$GRAFANA_ZOOKEEPER_DASHBOARD_NAME"
 echo "External value for \$GRAFANA_PROMETHEUS_DATASOURCE_NAME=$GRAFANA_PROMETHEUS_DATASOURCE_NAME"
 echo "External value for \$PROMETHEUS_URL=$PROMETHEUS_URL"
+echo "External value for \$GRAFANA_ROOT_URL=$GRAFANA_ROOT_URL"
+echo "External value for \$VALIDATE_YAML=$VALIDATE_YAML"
+
 
 GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-grafana}"
 
@@ -18,15 +21,17 @@ GRAFANA_NAME="${GRAFANA_NAME:-grafana}"
 GRAFANA_ADMIN_USER="${GRAFANA_ADMIN_USER:-admin}"
 GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-admin}"
 GRAFANA_DISABLE_LOGIN_FORM="${GRAFANA_DISABLE_LOGIN_FORM:-False}"
-GRAFANA_DISABLE_SIGNOUT_MENU="${GRAFANA_DISABLE_SIGNOUT_MENU:-True}"
+GRAFANA_DISABLE_SIGNOUT_MENU="${GRAFANA_DISABLE_SIGNOUT_MENU:-False}"
 
 GRAFANA_OPERATOR_DASHBOARD_NAME="${GRAFANA_OPERATOR_DASHBOARD_NAME:-clickhouse-operator-dashboard}"
+GRAFANA_QUERIES_DASHBOARD_NAME=${GRAFANA_QUERIES_DASHBOARD_NAME:-clickhouse-queries-dashboard}
 GRAFANA_QUERIES_DASHBOARD_NAME=${GRAFANA_QUERIES_DASHBOARD_NAME:-clickhouse-queries-dashboard}
 GRAFANA_ZOOKEEPER_DASHBOARD_NAME=${GRAFANA_ZOOKEEPER_DASHBOARD_NAME:-zookeeper-dashboard}
 
 GRAFANA_PROMETHEUS_DATASOURCE_NAME="${GRAFANA_PROMETHEUS_DATASOURCE_NAME:-clickhouse-operator-prometheus}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://prometheus.prometheus:9090}"
-
+GRAFANA_ROOT_URL="${GRAFANA_ROOT_URL:-http://localhost:3000}"
+VALIDATE_YAML=${VALIDATE_YAML:-true}
 
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
@@ -41,10 +46,13 @@ echo "\$GRAFANA_OPERATOR_DASHBOARD_NAME=$GRAFANA_OPERATOR_DASHBOARD_NAME"
 echo "\$GRAFANA_QUERIES_DASHBOARD_NAME=$GRAFANA_QUERIES_DASHBOARD_NAME"
 echo "\$GRAFANA_PROMETHEUS_DATASOURCE_NAME=$GRAFANA_PROMETHEUS_DATASOURCE_NAME"
 echo "\$PROMETHEUS_URL=$PROMETHEUS_URL"
+echo "\$GRAFANA_ROOT_URL=$GRAFANA_ROOT_URL"
 echo ""
 echo "!!! IMPORTANT !!!"
 echo "If you do not agree with specified options, press ctrl-c now"
-sleep ${SLEEP_BEFORE_RUN:-10}
+if [[ "" == "${NO_WAIT}" ]]; then
+  sleep 10
+fi
 echo "Apply options now..."
 
 ###########################
@@ -107,6 +115,10 @@ function wait_grafana_datasource_to_start() {
 ##                       ##
 ###########################
 
+if [[ -f "${CUR_DIR}/sensitive-data.sh" ]]; then
+  source $CUR_DIR/sensitive-data.sh
+fi
+
 echo "Install Grafana"
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
     cat ${CUR_DIR}/grafana-cr-template.yaml | \
@@ -115,6 +127,12 @@ kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
     GRAFANA_ADMIN_PASSWORD="$GRAFANA_ADMIN_PASSWORD" \
     GRAFANA_DISABLE_LOGIN_FORM="$GRAFANA_DISABLE_LOGIN_FORM" \
     GRAFANA_DISABLE_SIGNOUT_MENU="$GRAFANA_DISABLE_SIGNOUT_MENU" \
+    OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
+    OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" \
+    OAUTH_DOMAIN="$OAUTH_DOMAIN" \
+    OAUTH_ALLOWED_DOMAINS="$OAUTH_ALLOWED_DOMAINS" \
+    OAUTH_ALLOWED_ORGANIZATIONS="$OAUTH_ALLOWED_ORGANIZATIONS" \
+    OAUTH_ALLOWED_TEAM_IDS="$OAUTH_ALLOWED_TEAM_IDS" \
     envsubst \
 )
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
@@ -124,7 +142,7 @@ wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 #
 
 echo "Install Prometheus DataSource"
-kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
+kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-data-source-prometheus-cr-template.yaml | \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
     PROMETHEUS_URL="$PROMETHEUS_URL" \
@@ -134,7 +152,7 @@ wait_grafana_datasource_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_PROMETHEUS_DA
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 
 echo "Install Operator dashboard"
-kubectl apply --namespace="${GRAFANA_NAMESPACE}" -f <( \
+kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-operator-cr-template.yaml | \
     GRAFANA_DASHBOARD_NAME="$GRAFANA_OPERATOR_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
@@ -147,11 +165,14 @@ wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 
 # TODO get clickhouse password from Vault-k8s secrets ?
 # more precise but required yq
-# OPERATOR_CH_USER=$(yq r ${CUR_DIR}/../../../config/config.yaml chUsername)
-# OPERATOR_CH_PASS=$(yq r ${CUR_DIR}/../../../config/config.yaml chPassword)
 
-OPERATOR_CH_USER=$(grep chUsername ${CUR_DIR}/../../../config/config.yaml | cut -d " " -f 2-)
-OPERATOR_CH_PASS=$(grep chPassword ${CUR_DIR}/../../../config/config.yaml | cut -d " " -f 2-)
+if ! command -v yq &> /dev/null; then
+  export OPERATOR_CH_USER=$(grep chUsername ${CUR_DIR}/../../../config/config.yaml | cut -d " " -f 2- | tr -d '"')
+  export OPERATOR_CH_PASS=$(grep chPassword ${CUR_DIR}/../../../config/config.yaml | cut -d " " -f 2- | tr -d '"')
+else
+  export OPERATOR_CH_USER=$(yq eval .chUsername ${CUR_DIR}/../../../config/config.yaml)
+  export OPERATOR_CH_PASS=$(yq eval .chPassword ${CUR_DIR}/../../../config/config.yaml)
+fi
 
 echo "Create ClickHouse DataSource for each ClickHouseInstallation"
 IFS=$'\n'
@@ -172,7 +193,7 @@ for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.meta
     GRAFANA_CLICKHOUSE_DATASOURCE_NAME="k8s-${NAMESPACE}-${CHI}"
     CLICKHOUSE_URL="http://${ENDPOINT}:${PORT}"
     echo "Create ClickHouse DataSource for ClickHouseInstallation ${CHI} '${GRAFANA_NAMESPACE}/${GRAFANA_CLICKHOUSE_DATASOURCE_NAME}'"
-    kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
+    kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
         cat ${CUR_DIR}/grafana-data-source-clickhouse-cr-template.yaml | \
         GRAFANA_CLICKHOUSE_DATASOURCE_NAME="$GRAFANA_CLICKHOUSE_DATASOURCE_NAME" \
         CLICKHOUSE_URL="$CLICKHOUSE_URL" \
@@ -186,7 +207,7 @@ done
 wait_grafana_to_start "${GRAFANA_NAMESPACE}" "${GRAFANA_NAME}"
 
 echo "Install Queries dashboard"
-kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
+kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-queries-cr-template.yaml | \
     GRAFANA_DASHBOARD_NAME="$GRAFANA_QUERIES_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \
@@ -194,7 +215,7 @@ kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
 )
 
 echo "Install Zookeeper dashboard"
-kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
+kubectl apply --validate=${VALIDATE_YAML} --namespace="${GRAFANA_NAMESPACE}" -f <( \
     cat ${CUR_DIR}/grafana-dashboard-zookeeper-cr-template.yaml | \
     GRAFANA_ZOOKEEPER_DASHBOARD_NAME="$GRAFANA_ZOOKEEPER_DASHBOARD_NAME" \
     GRAFANA_PROMETHEUS_DATASOURCE_NAME="$GRAFANA_PROMETHEUS_DATASOURCE_NAME" \

@@ -1,0 +1,10 @@
+<yandex>
+  <profiles>
+    <default>
+      <log_queries>1</log_queries>
+      <connect_timeout_with_failover_ms>1000</connect_timeout_with_failover_ms>
+      <distributed_aggregation_memory_efficient>1</distributed_aggregation_memory_efficient>
+      <parallel_view_processing>1</parallel_view_processing>
+    </default>
+  </profiles>
+</yandex>

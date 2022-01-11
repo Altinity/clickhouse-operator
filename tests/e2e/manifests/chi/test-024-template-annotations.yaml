@@ -1,0 +1,66 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-024
+  annotations:
+    chi/test: "test"
+spec:
+  templates:
+    podTemplates:
+    - name: default-pod-template
+      metadata:
+        annotations:
+          podtemplate/test: "test"
+      spec:
+        containers:
+        - name: clickhouse-pod
+          image: yandex/clickhouse-server:21.8
+    volumeClaimTemplates:
+    - name: default-volumeclaim-template
+      reclaimPolicy: Delete
+      metadata:
+        annotations:
+          pvc/test: "test"
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+    serviceTemplates:
+    - name: default-service-template
+      generateName: clickhouse-{chi}
+      metadata:
+        annotations:
+          servicetemplate/test: "test"
+          servicetemplate/macro-test: "{chi}.example.com"
+      spec:
+        ports:
+          - name: http
+            port: 8123
+          - name: tcp
+            port: 9000
+        type: ClusterIP
+        clusterIP: None
+    - name: replica-service-template
+      generateName: "service-{chi}-{shard}-{replica}"
+      metadata:
+        annotations:
+          servicetemplate/macro-test: "{chi}-{shard}-{replica}.example.com"
+      spec:
+        ports:
+          - name: http
+            port: 8123
+          - name: tcp
+            port: 9000
+        type: ClusterIP
+        clusterIP: None
+  defaults:
+    templates:
+      podTemplate: default-pod-template
+      volumeClaimTemplate: default-volumeclaim-template
+      serviceTemplate: default-service-template
+      replicaServiceTemplate: replica-service-template
+  configuration:
+    clusters:
+    - name: default

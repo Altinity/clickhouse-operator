@@ -32,6 +32,54 @@ func IncludeNonEmpty(dst map[string]string, key, src string) {
 	return
 }
 
+// CopyMap creates a copy of the given map by copying over key by key.
+// It doesn't perform a deep-copy.
+func CopyMap(src map[string]string) map[string]string {
+	result := make(map[string]string, len(src))
+	for key, value := range src {
+		result[key] = value
+	}
+	return result
+}
+
+// CopyMapFilter copies maps with keys filtering.
+// Keys specified in 'include' are included,
+// keys specified in 'exclude' are excluded.
+// However, 'include' keys are applied only in case 'include' list is not empty.
+func CopyMapFilter(src map[string]string, include, exclude []string) map[string]string {
+	return CopyMapExclude(CopyMapInclude(src, include...), exclude...)
+}
+
+// CopyMapInclude creates a copy of the given map but will include the given set of keys only.
+// However, keys are applied only in case list is not empty.
+// In case of an empty list, no filtering is performed and all keys are copied.
+func CopyMapInclude(src map[string]string, keys ...string) map[string]string {
+	if len(keys) == 0 {
+		// No include list specified, just copy the whole map
+		return CopyMap(src)
+	}
+
+	// Include list specified, copy listed keys only
+	result := make(map[string]string, len(keys))
+	for _, key := range keys {
+		if value, ok := src[key]; ok {
+			result[key] = value
+		}
+	}
+	return result
+}
+
+// CopyMapExclude creates a copy of the given map but will exclude the given set of keys.
+func CopyMapExclude(src map[string]string, exceptKeys ...string) map[string]string {
+	result := CopyMap(src)
+
+	for _, key := range exceptKeys {
+		delete(result, key)
+	}
+
+	return result
+}
+
 // MergeStringMapsOverwrite inserts (and overwrites) data into dst map object from src
 func MergeStringMapsOverwrite(dst, src map[string]string, keys ...string) map[string]string {
 	if len(src) == 0 {
@@ -63,9 +111,9 @@ func MergeStringMapsOverwrite(dst, src map[string]string, keys ...string) map[st
 
 	if created && (len(dst) == 0) {
 		return nil
-	} else {
-		return dst
 	}
+
+	return dst
 }
 
 // MergeStringMapsPreserve inserts (and preserved existing) data into dst map object from src
@@ -103,9 +151,51 @@ func MergeStringMapsPreserve(dst, src map[string]string, keys ...string) map[str
 
 	if created && (len(dst) == 0) {
 		return nil
-	} else {
-		return dst
 	}
+
+	return dst
+}
+
+// SubtractStringMaps subtracts "delta" from "base" by keys
+func SubtractStringMaps(base, delta map[string]string) map[string]string {
+	if len(delta) == 0 {
+		// Nothing to delete
+		return base
+	}
+	if len(base) == 0 {
+		// Nowhere to delete from
+		return base
+	}
+
+	// Extract keys from delta and delete them from base
+	for key := range delta {
+		if _, ok := base[key]; ok {
+			delete(base, key)
+		}
+	}
+
+	return base
+}
+
+// MapDeleteKeys deletes multiple keys from the map
+func MapDeleteKeys(base map[string]string, keys ...string) map[string]string {
+	if len(keys) == 0 {
+		// Nothing to delete
+		return base
+	}
+	if len(base) == 0 {
+		// Nowhere to delete from
+		return base
+	}
+
+	// Extract delete keys from base
+	for _, key := range keys {
+		if _, ok := base[key]; ok {
+			delete(base, key)
+		}
+	}
+
+	return base
 }
 
 // MapHasKeys checks whether map has all keys from specified list

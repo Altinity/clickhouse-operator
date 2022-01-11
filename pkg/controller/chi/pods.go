@@ -15,21 +15,66 @@
 package chi
 
 import (
+	"context"
 	"k8s.io/api/core/v1"
 
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
-
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Container)) {
-	namespace := host.Address.Namespace
-	name := chopmodel.CreatePodName(host)
-	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(name, newGetOptions())
+func (c *Controller) appendLabelReady(ctx context.Context, host *chop.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	pod, err := c.getPod(host)
 	if err != nil {
-		log.Errorf("FAIL get pod for host %s/%s err:%v", namespace, host.Name, err)
+		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
+		return err
+	}
+
+	chopmodel.AppendLabelReady(&pod.ObjectMeta)
+	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
+	if err != nil {
+		log.M(host).F().Error("FAIL setting 'ready' label for host %s err:%v", host.Address.NamespaceNameString(), err)
+		return err
+	}
+	return err
+}
+
+func (c *Controller) deleteLabelReady(ctx context.Context, host *chop.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	if host == nil {
+		return nil
+	}
+	if host.StatefulSet.Spec.Replicas != nil {
+		if *host.StatefulSet.Spec.Replicas == 0 {
+			return nil
+		}
+	}
+
+	pod, err := c.getPod(host)
+	if err != nil {
+		log.V(1).M(host).F().Info("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
+		return err
+	}
+
+	chopmodel.DeleteLabelReady(&pod.ObjectMeta)
+	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
+	return err
+}
+
+func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Container)) {
+	pod, err := c.getPod(host)
+	if err != nil {
+		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
 		return
 	}
 
@@ -40,11 +85,9 @@ func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Con
 }
 
 func (c *Controller) walkContainerStatuses(host *chop.ChiHost, f func(status *v1.ContainerStatus)) {
-	namespace := host.Address.Namespace
-	name := chopmodel.CreatePodName(host)
-	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(name, newGetOptions())
+	pod, err := c.getPod(host)
 	if err != nil {
-		log.Errorf("FAIL get pod for host %s/%s err:%v", namespace, host.Name, err)
+		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
 		return
 	}
 

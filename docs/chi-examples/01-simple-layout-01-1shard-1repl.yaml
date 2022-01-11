@@ -2,7 +2,7 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
   name: "simple-01"
-#  labels:
-#    l1: v1
-#    l2: v2
-
+spec:
+  configuration:
+    clusters:
+      - name: "simple"

@@ -65,7 +65,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1607017745582,
+  "iteration": 1622185085598,
   "links": [],
   "panels": [
     {
@@ -5276,6 +5276,8 @@
         "rightSide": true,
         "show": true,
         "sideWidth": null,
+        "sort": "max",
+        "sortDesc": true,
         "total": false,
         "values": true
       },
@@ -5283,6 +5285,9 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
       "percentage": false,
       "pluginVersion": "7.1.1",
       "pointradius": 2,
@@ -5292,7 +5297,11 @@
         {
           "$$hashKey": "object:2339",
           "alias": "/.+fsynctime quantile.*/",
-          "color": "#E02F44",
+          "color": "#E02F44"
+        },
+        {
+          "$$hashKey": "object:306",
+          "alias": "/.+fsynctime_count_rate/",
           "yaxis": 2
         }
       ],
@@ -5349,7 +5358,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "fsync_time",
+      "title": "fsync_time / fsync_rate",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -5367,7 +5376,7 @@
         {
           "$$hashKey": "object:2321",
           "decimals": null,
-          "format": "short",
+          "format": "ms",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -5377,7 +5386,7 @@
         {
           "$$hashKey": "object:2322",
           "decimals": null,
-          "format": "ms",
+          "format": "short",
           "label": "",
           "logBase": 1,
           "max": null,
@@ -5421,6 +5430,8 @@
         "min": true,
         "rightSide": true,
         "show": true,
+        "sort": "max",
+        "sortDesc": true,
         "total": false,
         "values": true
       },
@@ -5428,6 +5439,9 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
       "percentage": false,
       "pluginVersion": "7.1.1",
       "pointradius": 2,
@@ -5573,6 +5587,9 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
+      "options": {
+        "alertThreshold": true
+      },
       "percentage": false,
       "pluginVersion": "7.1.1",
       "pointradius": 2,
@@ -5672,6 +5689,9 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
+      "options": {
+        "alertThreshold": true
+      },
       "percentage": false,
       "pluginVersion": "7.1.1",
       "pointradius": 2,
@@ -5768,6 +5788,9 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
+      "options": {
+        "alertThreshold": true
+      },
       "percentage": false,
       "pluginVersion": "7.1.1",
       "pointradius": 2,
@@ -5865,6 +5888,9 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
+      "options": {
+        "alertThreshold": true
+      },
       "percentage": false,
       "pluginVersion": "7.1.1",
       "pointradius": 2,
@@ -5962,6 +5988,9 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "connected",
+      "options": {
+        "alertThreshold": true
+      },
       "percentage": false,
       "pluginVersion": "7.1.1",
       "pointradius": 2,
@@ -6066,6 +6095,9 @@
       "linewidth": 2,
       "links": [],
       "nullPointMode": "null as zero",
+      "options": {
+        "alertThreshold": true
+      },
       "percentage": false,
       "pluginVersion": "7.1.1",
       "pointradius": 2,
@@ -10213,5 +10245,5 @@
   "timezone": "",
   "title": "ZooKeeper Dashboard",
   "uid": "309a682046bad930887fdb05de642f51",
-  "version": 5
+  "version": 6
 }

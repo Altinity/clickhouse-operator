@@ -1,0 +1,15 @@
+# Template Parameters:
+#
+# NAME=${NAME}
+# NAMESPACE=${NAMESPACE}
+# COMMENT=${COMMENT}
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${NAME}
+  ${COMMENT}namespace: ${NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: ${OPERATOR_VERSION}
+    app: clickhouse-operator
+data:

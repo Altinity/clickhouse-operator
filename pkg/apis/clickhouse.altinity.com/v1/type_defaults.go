@@ -14,9 +14,19 @@
 
 package v1
 
-func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults, _type MergeType) {
+// NewChiDefaults creates new ChiDefaults object
+func NewChiDefaults() *ChiDefaults {
+	return new(ChiDefaults)
+}
+
+// MergeFrom merges from specified object
+func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults, _type MergeType) *ChiDefaults {
 	if from == nil {
-		return
+		return defaults
+	}
+
+	if defaults == nil {
+		defaults = NewChiDefaults()
 	}
 
 	switch _type {
@@ -31,7 +41,8 @@ func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults, _type MergeType) {
 		}
 	}
 
-	(&defaults.DistributedDDL).MergeFrom(&from.DistributedDDL, _type)
-	(&defaults.Templates).MergeFrom(&from.Templates, _type)
+	defaults.DistributedDDL = defaults.DistributedDDL.MergeFrom(from.DistributedDDL, _type)
+	defaults.Templates = defaults.Templates.MergeFrom(from.Templates, _type)
 
+	return defaults
 }

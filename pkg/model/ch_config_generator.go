@@ -17,18 +17,19 @@ package model
 import (
 	"bytes"
 	"fmt"
+
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	xmlbuilder "github.com/altinity/clickhouse-operator/pkg/model/builder/xml"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 const (
+	// Pattern for string path used in <distributed_ddl><path>XXX</path></distributed_ddl>
 	distributedDDLPathPattern = "/clickhouse/%s/task_queue/ddl"
 
 	// Special auto-generated clusters. Each of these clusters lay over all replicas in CHI
 	// 1. Cluster with one shard and all replicas. Used to duplicate data over all replicas.
 	// 2. Cluster with all shards (1 replica). Used to gather/scatter data over all replicas.
-
 	oneShardAllReplicasClusterName = "all-replicated"
 	allShardsOneReplicaClusterName = "all-sharded"
 )
@@ -65,15 +66,16 @@ func (c *ClickHouseConfigGenerator) GetQuotas() string {
 // GetSettings creates data for "settings.xml"
 func (c *ClickHouseConfigGenerator) GetSettings(host *chiv1.ChiHost) string {
 	if host == nil {
+		// No host specified means request to generate common config
 		return c.generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
-	} else {
-		return c.generateXMLConfig(host.Settings, "")
 	}
+	// Generate config for the specified host
+	return c.generateXMLConfig(host.Settings, "")
 }
 
 // GetFiles creates data for custom common config files
 func (c *ClickHouseConfigGenerator) GetFiles(section chiv1.SettingsSection, includeUnspecified bool, host *chiv1.ChiHost) map[string]string {
-	var files chiv1.Settings
+	var files *chiv1.Settings
 	if host == nil {
 		// We are looking into Common files
 		files = c.chi.Spec.Configuration.Files
@@ -143,8 +145,8 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string
 	//      <profile>X</profile>
 	util.Iline(b, 4, "<distributed_ddl>")
 	util.Iline(b, 4, "    <path>%s</path>", c.getDistributedDDLPath())
-	if c.chi.Spec.Defaults.DistributedDDL.Profile != "" {
-		util.Iline(b, 4, "    <profile>%s</profile>", c.chi.Spec.Defaults.DistributedDDL.Profile)
+	if c.chi.Spec.Defaults.DistributedDDL.HasProfile() {
+		util.Iline(b, 4, "    <profile>%s</profile>", c.chi.Spec.Defaults.DistributedDDL.GetProfile())
 	}
 	//		</distributed_ddl>
 	// </yandex>
@@ -154,6 +156,7 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string
 	return b.String()
 }
 
+// RemoteServersGeneratorOptions specifies options for remote-servers generator
 type RemoteServersGeneratorOptions struct {
 	exclude struct {
 		reconcileAttributes *chiv1.ChiHostReconcileAttributes
@@ -161,10 +164,12 @@ type RemoteServersGeneratorOptions struct {
 	}
 }
 
+// NewRemoteServersGeneratorOptions creates new remote-servers generator options
 func NewRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return &RemoteServersGeneratorOptions{}
 }
 
+// ExcludeHost specifies to exclude host
 func (o *RemoteServersGeneratorOptions) ExcludeHost(host *chiv1.ChiHost) *RemoteServersGeneratorOptions {
 	if (o == nil) || (host == nil) {
 		return o
@@ -174,6 +179,7 @@ func (o *RemoteServersGeneratorOptions) ExcludeHost(host *chiv1.ChiHost) *Remote
 	return o
 }
 
+// ExcludeReconcileAttributes specifies to exclude reconcile attributes
 func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *chiv1.ChiHostReconcileAttributes) *RemoteServersGeneratorOptions {
 	if (o == nil) || (attrs == nil) {
 		return o
@@ -183,6 +189,7 @@ func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *chiv1.
 	return o
 }
 
+// Skip specifies to skip the host
 func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
 	if o == nil {
 		return false
@@ -201,6 +208,7 @@ func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
 	return false
 }
 
+// Include specifies to include the host
 func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 	if o == nil {
 		return false
@@ -219,10 +227,12 @@ func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 	return true
 }
 
+// defaultRemoteServersGeneratorOptions
 func defaultRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return NewRemoteServersGeneratorOptions()
 }
 
+// CHIHostsNum count hosts according to the options
 func (c *ClickHouseConfigGenerator) CHIHostsNum(options *RemoteServersGeneratorOptions) int {
 	num := 0
 	c.chi.WalkHosts(func(host *chiv1.ChiHost) error {
@@ -234,6 +244,7 @@ func (c *ClickHouseConfigGenerator) CHIHostsNum(options *RemoteServersGeneratorO
 	return num
 }
 
+// ClusterHostsNum count hosts according to the options
 func (c *ClickHouseConfigGenerator) ClusterHostsNum(cluster *chiv1.ChiCluster, options *RemoteServersGeneratorOptions) int {
 	num := 0
 	// Build each shard XML
@@ -244,6 +255,7 @@ func (c *ClickHouseConfigGenerator) ClusterHostsNum(cluster *chiv1.ChiCluster, o
 	return num
 }
 
+// ShardHostsNum count hosts according to the options
 func (c *ClickHouseConfigGenerator) ShardHostsNum(shard *chiv1.ChiShard, options *RemoteServersGeneratorOptions) int {
 	num := 0
 	shard.WalkHosts(func(host *chiv1.ChiHost) error {
@@ -431,6 +443,7 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *chiv1.ChiHost) string {
 	return b.String()
 }
 
+// noCustomPorts
 func noCustomPorts(host *chiv1.ChiHost) bool {
 	if host.TCPPort != chDefaultTCPPortNumber {
 		return false
@@ -476,8 +489,8 @@ func (c *ClickHouseConfigGenerator) GetHostPorts(host *chiv1.ChiHost) string {
 }
 
 // generateXMLConfig creates XML using map[string]string definitions
-func (c *ClickHouseConfigGenerator) generateXMLConfig(settings chiv1.Settings, prefix string) string {
-	if len(settings) == 0 {
+func (c *ClickHouseConfigGenerator) generateXMLConfig(settings *chiv1.Settings, prefix string) string {
+	if settings.Len() == 0 {
 		return ""
 	}
 
@@ -504,14 +517,7 @@ func (c *ClickHouseConfigGenerator) getDistributedDDLPath() string {
 // getRemoteServersReplicaHostname returns hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
 func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(host *chiv1.ChiHost) string {
-	if util.IsStringBoolTrue(c.chi.Spec.Defaults.ReplicasUseFQDN) {
-		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
-		// otherwise hostname+service name (unique within namespace) would be used
-		// .my-dev-namespace.svc.cluster.local
-		return CreatePodFQDN(host)
-	} else {
-		return CreatePodHostname(host)
-	}
+	return CreateReplicaHostname(host)
 }
 
 // getMacrosInstallation returns macros value for <installation-name> macros

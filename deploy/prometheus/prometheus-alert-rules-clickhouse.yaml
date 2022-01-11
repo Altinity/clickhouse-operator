@@ -1,0 +1,511 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: prometheus
+    role: alert-rules
+  name: prometheus-clickhouse-operator-rules
+spec:
+  groups:
+    - name: ClickHouseOperatorRules
+      rules:
+        - alert: ClickHouseMetricsExporterDown
+          expr: up{app='clickhouse-operator'} == 0
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "metrics-exporter possible down"
+            description: |-
+              `metrics-exporter` not sent data more than 1 minutes.
+              Please check instance status
+              ```kubectl logs -n {{ $labels.namespace }} {{ $labels.pod_name }} -c metrics-exporter -f```
+
+        - alert: ClickHouseServerDown
+          expr: chi_clickhouse_metric_fetch_errors{fetch_type='system.metrics'} > 0
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "clickhouse-server possible down"
+            description: |-
+              `metrics-exporter` failed metrics fetch `{{ $labels.fetch_type }}`.
+              Please check instance status
+              ```kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1)```
+
+        - alert: ClickHouseMetricsExporterFetchErrors
+          expr: chi_clickhouse_metric_fetch_errors{fetch_type!='system.metrics'} > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "clickhouse-server possible down"
+            description: |-
+              `metrics-exporter` failed metrics fetch `{{ $labels.fetch_type }}`.
+              Please check instance status
+              ```kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1)```
+
+        - alert: ClickHouseServerRestartRecently
+          expr: chi_clickhouse_metric_Uptime > 1 < 180
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "clickhouse-server started recently"
+            description: |-
+              `chi_clickhouse_metric_Uptime` = {{ with printf "chi_clickhouse_metric_Uptime{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} seconds {{ end }}
+              `clickhouse-server` process has been start less than 3 minutes ago.
+              Look to previous ClickHouse pod log to investigate restart reason
+              ```
+              kubectl logs -n {{ $labels.exported_namespace }} $( echo {{ $labels.hostname }} | cut -d '.' -f 1)-0 --previous```
+              ```
+
+        - alert: ClickHouseDNSErrors
+          expr: increase(chi_clickhouse_event_DNSError[1m]) > 0 or increase(chi_clickhouse_event_NetworkErrors[1m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "DNS errors occurred"
+            description: |-
+              `increase(chi_clickhouse_event_DNSError[1m])` = {{ with printf "increase(chi_clickhouse_event_DNSError{hostname='%s',exported_namespace='%s'}[1m]) or increase(chi_clickhouse_event_NetworkErrors{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} errors{{ end }}
+              Please check DNS settings in `/etc/resolve.conf` and `<remote_servers>` part of `/etc/clickhouse-server/`
+              See documentation:
+              - https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
+              - https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-disable-internal-dns-cache
+              - https://clickhouse.tech/docs/en/query_language/system/#query_language-system-drop-dns-cache
+
+        - alert: ClickHouseDistributedFilesToInsertHigh
+          expr: chi_clickhouse_metric_DistributedFilesToInsert > 50
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "clickhouse-server have Distributed Files to Insert > 50"
+            description: |-
+              `chi_clickhouse_metric_DistributedFilesToInsert` = {{ with printf "chi_clickhouse_metric_DistributedFilesToInsert{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} files{{ end }}
+              `clickhouse-server` have too much files which not insert to `*MergeTree` tables via `Distributed` table engine
+              Check not synced .bin files via ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- ls -la /var/lib/clickhouse/data/*/*/*/*.bin```
+
+              Also, check documentation:
+              https://clickhouse.tech/docs/en/operations/table_engines/distributed/
+              When you insert data to `Distributed` table.
+              Data is written to target `*MergreTree` tables asynchronously.
+              When inserted in the table, the data block is just written to the local file system.
+              The data is sent to the remote servers in the background as soon as possible.
+              The period for sending data is managed by the `distributed_directory_monitor_sleep_time_ms` and `distributed_directory_monitor_max_sleep_time_ms` settings.
+              The Distributed engine sends each file with inserted data separately, but you can enable batch sending of files with the `distributed_directory_monitor_batch_inserts` setting
+
+              Also, you can manage distributed tables:
+              https://clickhouse.tech/docs/en/sql-reference/statements/system/#query-language-system-distributed
+
+        - alert: ClickHouseDistributedConnectionExceptions
+          expr: increase(chi_clickhouse_event_DistributedConnectionFailTry[1m]) > 0 or increase(chi_clickhouse_event_DistributedConnectionFailAtAll[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Distributed connections fails occurred"
+            description: |-
+              `increase(chi_clickhouse_event_DistributedConnectionFailTry[1m])` = {{ with printf "increase(chi_clickhouse_event_DistributedConnectionFailTry{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} errors{{ end }}
+              `increase(chi_clickhouse_event_DistributedConnectionFailAtAll[1m])` = {{ with printf "increase(chi_clickhouse_event_DistributedConnectionFailAtAll{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} errors{{ end }}
+
+              Please, check communications between clickhouse server and host `remote_servers` in `/etc/clickhouse-server/`
+              https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
+
+              Also, you can check logs:
+              ```kubectl logs -n {{ $labels.exported_namespace }} $( echo {{ $labels.hostname }} | cut -d '.' -f 1)-0 -f```
+
+        - alert: ClickHouseRejectedInsert
+          expr: increase(chi_clickhouse_event_RejectedInserts[1m]) > 0
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Rejected INSERT queries occurred"
+            description: |-
+              `increase(chi_clickhouse_event_RejectedInserts[1m])` = {{ with printf "increase(chi_clickhouse_event_RejectedInserts{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} queries{{ end }}
+              `clickhouse-server` have INSERT queries that are rejected due to high number of active data parts for partition in a MergeTree, please decrease INSERT frequency
+              MergeTreeArchitecture
+              https://clickhouse.tech/docs/en/development/architecture/#merge-tree
+              system.parts_log
+              https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log
+              system.merge_tree_settings
+              https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings
+
+
+        - alert: ClickHouseDelayedInsertThrottling
+          expr: increase(chi_clickhouse_event_DelayedInserts[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Delayed INSERT queries occurred"
+            description: |-
+              `increase(chi_clickhouse_event_DelayedInserts[1m])` = {{ with printf "increase(chi_clickhouse_event_DelayedInserts{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} queries{{ end }}
+              `clickhouse-server` have INSERT queries that are throttled due to high number of active data parts for partition in a MergeTree, please decrease INSERT frequency
+              https://clickhouse.tech/docs/en/development/architecture/#merge-tree
+
+        - alert: ClickHouseMaxPartCountForPartition
+          expr: chi_clickhouse_metric_MaxPartCountForPartition > 100
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Max parts per partition > 100"
+            description: |-
+              `chi_clickhouse_metric_MaxPartCountForPartition` = {{ with printf "chi_clickhouse_metric_MaxPartCountForPartition{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} parts{{ end }}
+              `clickhouse-server` have too many parts in one partition.
+              Clickhouse MergeTree table engine split each INSERT query to partitions (PARTITION BY expression)
+              and add one or more PARTS per INSERT inside each partition, after that background merge process run,
+              and when you have too much unmerged parts inside partition,
+              SELECT queries performance can significate degrade, so clickhouse try delay or reject INSERT
+
+        - alert: ClickHouseLowInsertedRowsPerQuery
+          expr: increase(chi_clickhouse_event_InsertQuery[1m]) > 0 and (increase(chi_clickhouse_event_InsertedRows[1m]) / increase(chi_clickhouse_event_InsertQuery[1m]) <= 1000)
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "please increase inserted rows per INSERT query"
+            description: |-
+              `increase(chi_clickhouse_event_InsertedRows[1m]) / increase(chi_clickhouse_event_InsertQuery[1m])` = {{ with printf "increase(chi_clickhouse_event_InsertedRows{hostname='%s',exported_namespace='%s'}[1m]) / increase(chi_clickhouse_event_InsertQuery{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} rows per query{{ end }}
+              `clickhouse-server` have low insert speed.
+              https://clickhouse.tech/docs/en/introduction/performance/#performance-when-inserting-data
+              Clickhouse team recommends inserting data in packets of at least 1000 rows or no more than a single request per second.
+
+              Please use Buffer table
+              https://clickhouse.tech/docs/en/operations/table_engines/buffer/
+              or
+              https://github.com/nikepan/clickhouse-bulk
+              or
+              https://github.com/VKCOM/kittenhouse
+
+        - alert: ClickHouseLongestRunningQuery
+          expr: chi_clickhouse_metric_LongestRunningQuery > 600
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Long running queries occurred"
+            description: |-
+              `clickhouse-server` have queries that running more than `chi_clickhouse_metric_LongestRunningQuery` = {{ with printf "chi_clickhouse_metric_LongestRunningQuery{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} seconds{{ end }}
+              try look to system.processes with long queries
+              https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-processes
+              ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- clickhouse-client -q "SELECT * FROM system.processes WHERE elapsed >= 600 FORMAT Vertical" | less```
+
+        - alert: ClickHouseQueryPreempted
+          expr: chi_clickhouse_metric_QueryPreempted > 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Preempted queries occurred"
+            description: |-
+              `clickhouse-server` have `chi_clickhouse_metric_QueryPreempted` = {{ with printf "chi_clickhouse_metric_QueryPreempted{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} queries{{ end }}
+              It mean queries that are stopped and waiting due to 'priority' setting.
+              try look to system.processes
+              https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-processes
+              ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- clickhouse-client -q "SELECT * FROM system.processes FORMAT Vertical" | less```
+
+
+        - alert: ClickHouseReadonlyReplica
+          expr: chi_clickhouse_metric_ReadonlyReplica > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "ReadOnly replica occurred"
+            description: |-
+              `chi_clickhouse_metric_ReadonlyReplica` = {{ with printf "chi_clickhouse_metric_ReadonlyReplica{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} replicas{{ end }}
+              `clickhouse-server` have ReplicatedMergeTree tables that are currently in readonly state due to re-initialization after ZooKeeper session loss or due to startup without ZooKeeper configured.
+              Please check following things:
+              - kubenetes nodes have free enough RAM and Disk via `kubectl top node`
+              - status of clickhouse-server pods ```kubectl describe -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1)```
+              - connection between clickhouse-server pods and zookeeper ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- clickhouse-client -q "SELECT * FROM system.zookeeper WHERE path='/' FORMAT Vertical"```
+              - connection between clickhouse-server pods via kubernetes services ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- clickhouse-client -q "SELECT host_name, errors_count FROM system.clusters WHERE errors_count > 0 FORMAT PrettyCompactMonoBlock"```
+              - status of PersistentVolumeClaims for pods ```kubectl get pvc -n {{ $labels.exported_namespace }}```
+              Also read documentation:
+              https://clickhouse.tech/docs/en/operations/table_engines/replication/#recovery-after-failures
+
+        - alert: ClickHouseReplicasMaxAbsoluteDelay
+          expr: chi_clickhouse_metric_ReplicasMaxAbsoluteDelay > 300
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Replication Lag more 300s occurred"
+            description: |-
+              `clickhouse-server` have replication lag `chi_clickhouse_metric_ReplicasMaxAbsoluteDelay` = {{ with printf "chi_clickhouse_metric_ReplicasMaxAbsoluteDelay{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} seconds{{ end }}.
+              When replica have too much lag, it can be skipped from Distributed SELECT Queries without errors and you will have wrong query results.
+              Check free disk space disks and network connection between clickhouse pod and zookeeper on monitored clickhouse-server pods
+
+              Also read documentation:
+              - https://clickhouse.tech/docs/en/operations/table_engines/replication/#recovery-after-failures
+              - https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries
+
+        - alert: ClickHouseTooManyConnections
+          expr: chi_clickhouse_metric_HTTPConnection + chi_clickhouse_metric_TCPConnection + chi_clickhouse_metric_MySQLConnection > 100
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Total connections > 100"
+            description: |-
+              `chi_clickhouse_metric_HTTPConnection` = {{ with printf "chi_clickhouse_metric_HTTPConnection{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} connections{{ end }}
+              `chi_clickhouse_metric_TCPConnection` = {{ with printf "chi_clickhouse_metric_TCPConnection{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} connections{{ end }}
+              `chi_clickhouse_metric_MySQLConnection` = {{ with printf "chi_clickhouse_metric_MySQLConnection{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} connections{{ end }}
+
+              `clickhouse-server` have many open connections.
+              The ClickHouse is adapted to run not a very large number of parallel SQL requests, not every HTTP/TCP(Native)/MySQL protocol connection means a running SQL request, but a large number of open connections can cause a spike in sudden SQL requests, resulting in performance degradation.
+
+              Also read documentation:
+              - https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-concurrent-queries
+
+
+        - alert: ClickHouseTooManyRunningQueries
+          expr: chi_clickhouse_metric_Query > 80
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Too much running queries"
+            description: |-
+              `clickhouse-server` have {{ with printf "chi_clickhouse_metric_Query{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }} running queries{{ end }}
+              Please analyze your workload.
+              Each concurrent SELECT query use memory in JOINs use CPU for running aggregation function and can read lot of data from disk when scan parts in partitions and utilize disk I/O.
+              Each concurrent INSERT query, allocate around 1MB per each column in an inserted table and utilize disk I/O.
+
+              Look at following documentation parts:
+              - https://clickhouse.tech/docs/en/operations/settings/query_complexity/
+              - https://clickhouse.tech/docs/en/operations/quotas/
+              - https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-concurrent-queries
+              - https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-query_log
+
+        - alert: ClickHouseSystemSettingsChanged
+          expr: delta(chi_clickhouse_metric_ChangedSettingsHash[5m]) != 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "`system.settings` changed"
+            description: |-
+              `clickhouse-server` changed `chi_clickhouse_metric_ChangedSettingsHash` = {{ with printf "chi_clickhouse_metric_ChangedSettingsHash{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+
+        - alert: ClickHouseVersionChanged
+          expr: delta(chi_clickhouse_metric_VersionInteger[5m]) != 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "ClickHouse version changed"
+            description: |-
+              `clickhouse-server` changed `chi_clickhouse_metric_VersionInteger` = {{ with printf "chi_clickhouse_metric_VersionInteger{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+
+        - alert: ClickHouseZooKeeperHardwareExceptions
+          expr: increase(chi_clickhouse_event_ZooKeeperHardwareExceptions[1m]) > 0
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "ZooKeeperHardwareExceptions > 1"
+            description: |-
+              `increase(chi_clickhouse_event_ZooKeeperHardwareExceptions[1m])` = {{ with printf "increase(chi_clickhouse_event_ZooKeeperHardwareExceptions{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} exceptions{{ end }}
+              `clickhouse-server` have unexpected Network errors and similar with communitation with Zookeeper.
+              Clickhouse should reinitialize ZooKeeper session in case of these errors.
+
+        - alert: ClickHouseZooKeeperSession
+          expr: chi_clickhouse_metric_ZooKeeperSession > 1
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "ZooKeeperSession > 1"
+            description: |-
+              `chi_clickhouse_metric_ZooKeeperSession` = {{ with printf "chi_clickhouse_metric_ZooKeeperSession{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }} sessions{{ end }}
+              Number of sessions (connections) from `clickhouse-server` to `ZooKeeper` shall be no more than one,
+              because using more than one connection to ZooKeeper may lead to bugs due to lack of linearizability (stale reads)
+              that ZooKeeper consistency model allows.
+
+        - alert: ClickHouseDiskUsage
+          expr: (chi_clickhouse_metric_DiskFreeBytes / chi_clickhouse_metric_DiskTotalBytes) < 0.1
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Disk Usage in `&lt;yandex&gt;&lt;path&gt;` > 90%"
+            description: |-
+              data size: {{ with printf "chi_clickhouse_metric_DiskDataBytes{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | humanize1024 }}B {{ end }}
+              disk free: {{ with printf "chi_clickhouse_metric_DiskFreeBytes{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | humanize1024 }}B {{ end }}
+              disk size: {{ with printf "chi_clickhouse_metric_DiskTotalBytes{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | humanize1024 }}B {{ end }}
+              currently k8s doesn't support resize of Persistent Volumes, but you can try add another volume to existing pod with restart pod
+              please read documentation:
+              - https://github.com/Altinity/clickhouse-operator/blob/master/docs/storage.md
+              - https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#table_engine-mergetree-multiple-volumes
+              - https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#mergetree-table-ttl
+
+# not well tested alerts which can't be triggered on e2e tests
+        - alert: ClickHouseReplicatedPartChecksFailed
+          expr: increase(chi_clickhouse_event_ReplicatedPartChecksFailed[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased ReplicatedPartCheckFailed"
+            description: |-
+              `increase(chi_clickhouse_event_ReplicatedPartChecksFailed[1m])` = {{ with printf "increase(chi_clickhouse_event_ReplicatedPartChecksFailed{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse-server` increase ReplicatedPartCheckFailed in `system.events` table.
+              Please check logs on clickhouse-server pods ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- cat /var/log/clickhouse-server/*.err.log | less```
+
+        - alert: ClickHouseReplicatedPartFailedFetches
+          expr: increase(chi_clickhouse_event_ReplicatedPartFailedFetches[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased ReplicatedPartFailedFetches"
+            description: |-
+              `increase(chi_clickhouse_event_ReplicatedPartFailedFetches[1m])` = {{ with printf "increase(chi_clickhouse_event_ReplicatedPartFailedFetches{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse-server` increase ReplicatedPartFailedFetches in `system.events` table.
+              It mean server was failed to download data part from replica of a ReplicatedMergeTree table.
+              Please check following things:
+              - connections between clickhouse-server pod and his replicas (see remote_server section in /etc/clickhouse-server/)
+              - logs on clickhouse-server pods ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- cat /var/log/clickhouse-server/*.err.log | less```
+
+        - alert: ClickHouseReplicatedDataLoss
+          expr: increase(chi_clickhouse_event_ReplicatedDataLoss[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased ReplicatedDataLoss"
+            description: |-
+              `increase(chi_clickhouse_event_ReplicatedDataLoss[1m])` = {{ with printf "increase(chi_clickhouse_event_ReplicatedDataLoss{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse-server` increase ReplicatedDataLoss in `system.events` table.
+              It mean data part that server wanted doesn't exist on any replica (even on replicas that are offline right now).
+              That data parts are definitely lost. This is normal due to asynchronous replication (if quorum inserts were not enabled),
+              when the replica on which the data part was written was failed and when it became online after fail
+              it doesn't contain that data part.
+
+              Please check logs on clickhouse-server pods ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- cat /var/log/clickhouse-server/*.err.log | less```
+
+        - alert: ClickHouseStorageBufferErrorOnFlush
+          expr: increase(chi_clickhouse_event_StorageBufferErrorOnFlush[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased StorageBufferErrorOnFlush"
+            description: |-
+              `increase(chi_clickhouse_event_StorageBufferErrorOnFlush[1m])` = {{ with printf "increase(chi_clickhouse_event_StorageBufferErrorOnFlush{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse-server` increase StorageBufferErrorOnFlush in `system.events` table.
+              It mean something went wrong when clickhouse-server try to flush memory buffers to disk.
+
+              Please check following things:
+              - check disks free space and hardware failures
+              - logs on clickhouse-server pods ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- cat /var/log/clickhouse-server/*.err.log | less```
+
+        - alert: ClickHouseDataAfterMergeDiffersFromReplica
+          expr: increase(chi_clickhouse_event_DataAfterMergeDiffersFromReplica[1m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased DataAfterMergeDiffersFromReplica"
+            description: |-
+              `increase(chi_clickhouse_event_DataAfterMergeDiffersFromReplica[1m])` = {{ with printf "increase(chi_clickhouse_event_DataAfterMergeDiffersFromReplica{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse-server` increase DataAfterMergeDiffersFromReplica in `system.events` table.
+              It mean Data after merge is not byte-identical to data on another replicas.
+              There could be several reasons:
+              - Using newer version of compression library after server update.
+              - Using another compression method.
+              - Non-deterministic compression algorithm (highly unlikely).
+              - Non-deterministic merge algorithm due to logical error in code.
+              - Data corruption in memory due to bug in code.
+              - Data corruption in memory due to hardware issue.
+              - Manual modification of source data after server startup.
+              - Manual modification of checksums stored in ZooKeeper.
+              - Part format related settings like 'enable_mixed_granularity_parts' are different on different replicas.
+
+              Server will download merged part from replica to force byte-identical result.
+
+        - alert: ClickHouseDistributedSyncInsertionTimeoutExceeded
+          expr: increase(chi_clickhouse_event_DistributedSyncInsertionTimeoutExceeded[1m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased DistributedSyncInsertionTimeoutExceeded"
+            description: |-
+              `increase(chi_clickhouse_event_DistributedSyncInsertionTimeoutExceeded[1m])` = {{ with printf "increase(chi_clickhouse_event_DistributedSyncInsertionTimeoutExceeded{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse-server` increase DistributedSyncInsertionTimeoutExceeded in `system.events` table.
+              It mean Synchronous distributed insert timeout exceeded after successfull distributed connection.
+              Please check documentation https://clickhouse.tech/docs/en/operations/settings/settings/#insert_distributed_sync
+              And check connection between `{{ $labels.hostname }}` and all nodes in shards from remote_servers config section
+
+        - alert: ClickHouseFileDescriptorBufferReadOrWriteFailed
+          expr: increase(chi_clickhouse_event_ReadBufferFromFileDescriptorReadFailed[1m]) > 0 or increase(chi_clickhouse_event_WriteBufferFromFileDescriptorWriteFailed[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased ReadBufferFromFileDescriptorReadFailed or WriteBufferFromFileDescriptorWriteFailed"
+            description: |-
+              `increase(chi_clickhouse_event_ReadBufferFromFileDescriptorReadFailed[1m])` = {{ with printf "increase(chi_clickhouse_event_ReadBufferFromFileDescriptorReadFailed{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `increase(chi_clickhouse_event_WriteBufferFromFileDescriptorWriteFailed[1m])` = {{ with printf "increase(chi_clickhouse_event_WriteBufferFromFileDescriptorWriteFailed{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse-server` increase ReadBufferFromFileDescriptorReadFailed or ReadBufferFromFileDescriptorReadFailed in `system.events` table.
+              It mean the read (read/pread) or writes (write/pwrite) to a file descriptor. Does not include sockets.
+              System can't read or write to some files.
+              Please check logs on clickhouse-server pods ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- bash -c 'cat /var/log/clickhouse-server/*.err.log | grep -E "Cannot write to file|Cannot read from file"'```
+
+        - alert: ClickHouseSlowRead
+          expr: increase(chi_clickhouse_event_SlowRead[1m]) > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Increased SlowRead"
+            description: |-
+              `increase(chi_clickhouse_event_SlowRead[1m])` = {{ with printf "increase(chi_clickhouse_event_SlowRead{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+              `clickhouse-server` increase SlowRead in `system.events` table.
+              It mean reads from a files that were slow. This indicate system overload. Thresholds are controlled by `SELECT * FROM system.settings WHERE name LIKE 'read_backoff_%'`.
+              System will reduce the number of threads which used for processing queries.
+              Check you disks utilization and hardware failures.
+
+        - alert: ClickHouseTooManyMutations
+          expr: chi_clickhouse_table_mutations > 100
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Too much incomplete system.mutations"
+            description: |-
+              `chi_clickhouse_table_mutations` = {{ with printf "chi_clickhouse_table_mutations{hostname='%s',exported_namespace='%s',database='%s',table='%s'}" .Labels.hostname .Labels.exported_namespace .Labels.database .Labels.table | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `chi_clickhouse_table_mutations_parts_to_do` = {{ with printf "chi_clickhouse_table_mutations_parts_to_do{hostname='%s',exported_namespace='%s',database='%s',table='%s'}" .Labels.hostname .Labels.exported_namespace .Labels.database .Labels.table | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `system.mutations` show too much active mutations.
+              It mean something wrong with ALTER TABLE DELETE/UPDATE queries.
+              Please check mutations errors ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- clickhouse-client -q "SELECT * FROM system.mutations WHERE is_done=0 FORMAT Vertical"```
+              Read about how to run KILL MUTATION
+              https://clickhouse.tech/docs/en/sql-reference/statements/kill/#kill-mutation
+
+        - alert: ClickHouseDetachedParts
+          expr: chi_clickhouse_metric_DetachedParts > 0
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Detached parts in system.detached_parts"
+            description: |-
+              `chi_clickhouse_metric_DetachedParts{hostname="{{ $labels.hostname }}",disk="{{ $labels.disk }}",reason="{{ $labels.reason }}"}` = {{ with printf "chi_clickhouse_metric_DetachedParts{hostname='%s',exported_namespace='%s',database='%s',table='%s',disk='%s',reason='%s'}" .Labels.hostname .Labels.exported_namespace .Labels.database .Labels.table .Labels.disk .Labels.reason | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              `system.detached_parts` show have detached parts.
+              Please check detached parts in log ```kubectl logs -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -c clickhouse-pod --since=1h | grep -i detach```
+              Read about how ATTACH / DROP detached parts
+              https://clickhouse.tech/docs/en/operations/system-tables/detached_parts/
+              Legend for reason:
+              `detached_by_user` - part was detached via ALTER TABLE ... DETACH ... query.
+              `clone` - old part was detached during clone replica (see `detach_old_local_parts_when_cloning_replica` system.settings)
+              `ignored` - part was unexpected with Zookeeper during restart clickhouse-server
+              `broken` - part was marks as broken during startup or merging (check disk, memory, network hardware faillures), look to clickhouse-server.log for details
+              `unexpected` - during replica startup, part was found in local file system, modification of part was less than 5 minutes, but not found in ZK
+              `noquorum` - part was detached, cause  part was created during insert into Distributed table with quorum, but quorum was failed.

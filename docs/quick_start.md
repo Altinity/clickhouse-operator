@@ -1,6 +1,8 @@
 # Quick Start Guides
 
 # Table of Contents
+
+* [Prerequisites](#prerequisites)
 * [ClickHouse Operator Installation](#clickhouse-operator-installation)
 * [Building ClickHouse Operator from Sources](#building-clickhouse-operator-from-sources)
 * [Examples](#examples)
@@ -11,7 +13,10 @@
   * [Custom Deployment with Specific ClickHouse Configuration](#custom-deployment-with-specific-clickhouse-configuration)
 
 # Prerequisites
-1. Operational Kubernetes instance
+
+1. Kubernetes instance with the following version considerations:
+    1. `clickhouse-operator` versions **before** `0.16.0` is compatible with [Kubenetes after `1.16` and prior `1.22`](https://kubernetes.io/releases/).
+    1. `clickhouse-operator` versions `0.16.0` **and after** is compatible [Kubernetes version `1.16` and after](https://kubernetes.io/releases/).
 1. Properly configured `kubectl`
 1. `curl`
 
@@ -23,8 +28,14 @@ Apply `clickhouse-operator` installation manifest. The simplest way - directly f
 
 just run:
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install.yaml
-``` 
+kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-bundle.yaml
+```
+## **If you want to install operator on kubernetes version prior `1.17` in `kube-system` namespace**
+
+just run:
+```bash
+kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-bundle-v1beta1.yaml
+```
 
 ## **In case you'd like to customize installation parameters**,
 
@@ -38,21 +49,23 @@ OPERATOR_NAMESPACE=test-clickhouse-operator
 ```
 This namespace would be created and used to install `clickhouse-operator` into.
 Install script would download some `.yaml` and `.xml` files and install `clickhouse-operator` into specified namespace.
+After installation **clickhouse-operator** will watch custom resources like a `kind: ClickhouseInstallation` only in `test-clickhouse-operator` namespace.
 
 If no `OPERATOR_NAMESPACE` specified, as:
 ```bash
 cd ~
 curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator-web-installer/clickhouse-operator-install.sh | bash
 ```
-installer will create namespace `clickhouse-operator` and install **clickhouse-operator** into it.
+installer will install **clickhouse-operator** into `kube-system` namespace and will watch custom resources like a `kind: ClickhouseInstallation` in all available namespaces.
 
-## **In case you can not run scripts from internet in your protected environment**, 
+
+## **In case you can not run scripts from internet in your protected environment**,
 
 you can download manually [this template file][clickhouse-operator-install-template.yaml]
 and edit it according to your choice. After that apply it with `kubectl`. Or you can use this snippet instead:
 ```bash
 # Namespace to install operator into
-OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-clickhouse-operator}"
+OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-test-clickhouse-operator}"
 # Namespace to install metrics-exporter into
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 
@@ -108,7 +121,7 @@ There are several ready-to-use [ClickHouseInstallation examples][chi-examples]. 
 ## Create Custom Namespace
 It is a good practice to have all components run in dedicated namespaces. Let's run examples in `test` namespace
 ```bash
-kubectl create namespace test
+kubectl create namespace test-clickhouse-operator
 ```
 ```text
 namespace/test created
@@ -133,6 +146,10 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
   name: "simple-01"
+spec:
+  configuration:
+    clusters:
+      - name: "simple"
 ```
 
 Once cluster is created, there are two checks to be made.
@@ -162,7 +179,7 @@ ClickHouse is up and running!
 
 There are two ways to connect to ClickHouse database
 
-1. In case previous command `kubectl get service -n test` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
+1. In case previous command `kubectl get service -n test-clickhouse-operator` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
 ```bash
 clickhouse-client -h abc-123.us-east-1.elb.amazonaws.com -u clickhouse_operator --password clickhouse_operator_password 
 ```
@@ -194,30 +211,30 @@ metadata:
 spec:
   defaults:
     templates:
-      dataVolumeClaimTemplate: volume-template
-      logVolumeClaimTemplate: volume-template
+      dataVolumeClaimTemplate: data-volume-template
+      logVolumeClaimTemplate: log-volume-template
   configuration:
     clusters:
       - name: "simple"
         layout:
           shardsCount: 1
           replicasCount: 1
-      - name: "replicas"
-        layout:
-          shardsCount: 1
-          replicasCount: 2
-      - name: "shards"
-        layout:
-          shardsCount: 2
   templates:
     volumeClaimTemplates:
-      - name: volume-template
+      - name: data-volume-template
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 123Mi
+              storage: 1Gi
+      - name: log-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Mi
 ```
 
 ## Custom Deployment with Pod and VolumeClaim Templates
@@ -242,8 +259,8 @@ spec:
         templates:
           podTemplate: pod-template-with-volumes
         layout:
-          shardsCount: 1
-          replicasCount: 1
+          shardsCount: 2
+          replicasCount: 2
 
   templates:
     podTemplates:
@@ -251,14 +268,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:19.3.7
-              ports:
-                - name: http
-                  containerPort: 8123
-                - name: client
-                  containerPort: 9000
-                - name: interserver
-                  containerPort: 9009
+              image: yandex/clickhouse-server:21.8
               volumeMounts:
                 - name: data-storage-vc-template
                   mountPath: /var/lib/clickhouse
@@ -284,9 +294,19 @@ spec:
 
 ## Custom Deployment with Specific ClickHouse Configuration
 
-You can tell operator to configure your ClickHouse, as shown in the example below ([link to the manifest][05-settings-01-overview.yaml]):
+You can tell the operator to configure your ClickHouse, as shown in the example below ([link to the manifest][05-settings-01-overview.yaml]):
 
 ```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-credentials
+type: Opaque
+stringData:
+  testpwduser1: password
+  testpwduser2: 65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5
+  testpwduser3: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
+---
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
@@ -305,6 +325,11 @@ spec:
         - "dbname1"
         - "dbname2"
         - "dbname3"
+      # reference to namespace/name/field in the secret with plain password
+      testpwduser1/k8s_secret_password: dev/clickhouse-credentials/testpwduser1
+      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password
+      testpwduser2/k8s_secret_password_sha256_hex: clickhouse-credentials/testpwduser2
+      testpwduser3/k8s_secret_password_double_sha1_hex: clickhouse-credentials/testpwduser3
       # admin use has 'password_sha256_hex' so actual password value is not published
       admin/password_sha256_hex: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
       admin/networks/ip: "127.0.0.1/32"
@@ -315,11 +340,11 @@ spec:
       readonly/profile: readonly
       readonly/quota: default
     profiles:
-      test_profile/max_memory_usage: "1000000000"
-      test_profile/readonly: "1"
-      readonly/readonly: "1"
+      test_profile/max_memory_usage: 1000000000
+      test_profile/readonly: 1
+      readonly/readonly: 1
     quotas:
-      test_quota/interval/duration: "3600"
+      test_quota/interval/duration: 3600
     settings:
       compression/case/method: zstd
       disable_internal_dns_cache: 1

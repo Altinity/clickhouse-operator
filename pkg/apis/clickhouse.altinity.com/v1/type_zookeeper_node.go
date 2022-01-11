@@ -14,6 +14,7 @@
 
 package v1
 
+// Equal checks whether zookeepr node is equal to another
 func (zkNode *ChiZookeeperNode) Equal(to *ChiZookeeperNode) bool {
 	if to == nil {
 		return false

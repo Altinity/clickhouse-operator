@@ -36,28 +36,32 @@ const (
 )
 
 // GenerateXML creates XML representation from the provided input
-func GenerateXML(w io.Writer, settings chiv1.Settings, prefix string) {
-	// paths is sorted set of normalized paths (maps keys) from 'input'
-	paths := make([]string, 0, len(settings))
+func GenerateXML(w io.Writer, settings *chiv1.Settings, prefix string) {
+	if settings.Len() == 0 {
+		return
+	}
 
-	// data is copy of 'input' with:
+	// `paths` is a sorted set of normalized paths (maps keys) from settings
+	paths := make([]string, 0, settings.Len())
+
+	// `data` is a copy of settings with:
 	// 1. paths (map keys) are normalized in terms of trimmed '/'
 	// 2. all map keys listed in 'excludes' are excluded
 	data := make(map[string]string)
 	// Skip excluded paths
-	for name := range settings {
-		// 'key' may be non-normalized, and may have starting or trailing '/'
+	settings.Walk(func(name string, setting *chiv1.Setting) {
+		// 'name' may be non-normalized, and may have starting or trailing '/'
 		// 'path' is normalized path without starting and trailing '/', ex.: 'test/quotas'
 		path := normalizePath(prefix, name)
 		if path == "" {
-			continue
+			return
 		}
 		paths = append(paths, path)
 		data[path] = name
-	}
+	})
 	sort.Strings(paths)
 
-	// xmlTreeRoot - root of the XML tree data structure
+	// `xmlTreeRoot` - root of the XML tree data structure
 	xmlTreeRoot := new(xmlNode)
 
 	// Read all tags and values into the tree structure
@@ -69,7 +73,7 @@ func GenerateXML(w io.Writer, settings chiv1.Settings, prefix string) {
 			continue
 		}
 		name := data[path]
-		xmlTreeRoot.addBranch(tags, settings[name])
+		xmlTreeRoot.addBranch(tags, settings.Get(name))
 	}
 
 	// return XML
@@ -86,12 +90,12 @@ func normalizePath(prefix, path string) string {
 	path = strings.Trim(path, "/")
 	if len(prefix) > 0 {
 		return prefix + "/" + path
-	} else {
-		return path
 	}
+
+	return path
 }
 
-// addBranch ensures branch esists and assign value to the last tagged node
+// addBranch ensures branch exists and assign value to the last tagged node
 func (n *xmlNode) addBranch(tags []string, setting *chiv1.Setting) {
 	node := n
 	for _, tag := range tags {
@@ -127,20 +131,20 @@ func (n *xmlNode) addChild(tag string) *xmlNode {
 func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) {
 	if n.value == nil {
 		// No value node, may have nested tags
-		n.writeTagNoValue(w, indent, tabsize)
+		n.writeTagNoValue(w, "", indent, tabsize)
 		return
 	}
 
 	if n.value.IsScalar() {
 		// Scalar node
-		n.writeTagWithValue(w, n.value.Scalar(), indent, tabsize)
+		n.writeTagWithValue(w, n.value.Scalar(), n.value.Attributes(), indent, tabsize)
 		return
 	}
 
 	// Vector node
 
 	for _, value := range n.value.Vector() {
-		n.writeTagWithValue(w, value, indent, tabsize)
+		n.writeTagWithValue(w, value, n.value.Attributes(), indent, tabsize)
 	}
 }
 
@@ -148,32 +152,35 @@ func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) {
 // <a>
 //  <b>...</b>
 // </a>
-func (n *xmlNode) writeTagNoValue(w io.Writer, indent, tabsize uint8) {
-	n.writeTag(w, indent, true, eol)
+func (n *xmlNode) writeTagNoValue(w io.Writer, attributes string, indent, tabsize uint8) {
+	n.writeTagOpen(w, indent, attributes, eol)
 	for i := range n.children {
 		n.children[i].buildXML(w, indent+tabsize, tabsize)
 	}
-	n.writeTag(w, indent, false, eol)
+	n.writeTagClose(w, indent, eol)
 }
 
 // writeTagWithValue prints tag with value. But it must have no children,
 // and children are not printed
 // <tag>value</tag>
-func (n *xmlNode) writeTagWithValue(w io.Writer, value string, indent, tabsize uint8) {
-	if value != "_removed_" {
-		n.writeTag(w, indent, true, noEol)
-		n.writeValue(w, value)
-		n.writeTag(w, 0, false, eol)
-	} else {
-		var removeTag xmlNode
-		removeTag.tag = n.tag + " remove=\"1\""
-		removeTag.writeTag(w, indent, true, noEol)
-		n.writeTag(w, 0, false, eol)
-	}
+func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string, indent, tabsize uint8) {
+	n.writeTagOpen(w, indent, attributes, noEol)
+	n.writeValue(w, value)
+	n.writeTagClose(w, 0, eol)
+}
+
+// writeTagOpen prints open XML tag into io.Writer
+func (n *xmlNode) writeTagOpen(w io.Writer, indent uint8, attributes string, eol string) {
+	n.writeTag(w, indent, attributes, true, eol)
+}
+
+// writeTagClose prints close XML tag into io.Writer
+func (n *xmlNode) writeTagClose(w io.Writer, indent uint8, eol string) {
+	n.writeTag(w, indent, "", false, eol)
 }
 
 // writeTag prints XML tag into io.Writer
-func (n *xmlNode) writeTag(w io.Writer, indent uint8, openTag bool, eol string) {
+func (n *xmlNode) writeTag(w io.Writer, indent uint8, attributes string, openTag bool, eol string) {
 	if n.tag == "" {
 		return
 	}
@@ -183,25 +190,26 @@ func (n *xmlNode) writeTag(w io.Writer, indent uint8, openTag bool, eol string) 
 	if indent > 0 {
 		pattern := ""
 		if openTag {
-			// pattern would be: %4s<%s>%s
-			pattern = fmt.Sprintf("%%%ds<%%s>%%s", indent)
+			// pattern would be: %4s<%s%s>%s
+			pattern = fmt.Sprintf("%%%ds<%%s%%s>%%s", indent)
+			_, _ = fmt.Fprintf(w, pattern, " ", n.tag, attributes, eol)
 		} else {
 			// pattern would be: %4s</%s>%s
 			pattern = fmt.Sprintf("%%%ds</%%s>%%s", indent)
+			_, _ = fmt.Fprintf(w, pattern, " ", n.tag, eol)
 		}
-		_, _ = fmt.Fprintf(w, pattern, " ", n.tag, eol)
 	} else {
 		if openTag {
-			// pattern would be: %4s<%s>%s
-			_, _ = fmt.Fprintf(w, "<%s>%s", n.tag, eol)
+			// pattern would be: <%s%s>%s
+			_, _ = fmt.Fprintf(w, "<%s%s>%s", n.tag, attributes, eol)
 		} else {
-			// pattern would be: %4s</%s>%s
+			// pattern would be: </%s>%s
 			_, _ = fmt.Fprintf(w, "</%s>%s", n.tag, eol)
 		}
 	}
 }
 
-// writeTag prints XML value into io.Writer
+// writeValue prints XML value into io.Writer
 func (n *xmlNode) writeValue(w io.Writer, value string) {
 	_, _ = fmt.Fprintf(w, "%s", value)
 }

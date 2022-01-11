@@ -1,121 +1,201 @@
-################################################
-##
-## Watch Namespaces Section
-##
-################################################
 
-# List of namespaces where clickhouse-operator watches for events.
-# Concurrently running operators should watch on different namespaces
-watchNamespaces:
-  - dev
-  - test
-#  - info
-#  - onemore
 
 ################################################
 ##
-## Additional Configuration Files Section
+## Watch Section
 ##
 ################################################
+watch:
+  # List of namespaces where clickhouse-operator watches for events.
+  # Concurrently running operators should watch on different namespaces
+  #namespaces: ["dev", "test"]
+  namespaces: [dev, test]
 
-# Path to folder where ClickHouse configuration files common for all instances within CHI are located.
-chCommonConfigsPath: config.d
-
-# Path to folder where ClickHouse configuration files unique for each instance (host) within CHI are located.
-chHostConfigsPath: conf.d
-
-# Path to folder where ClickHouse configuration files with users settings are located.
-# Files are common for all instances within CHI
-chUsersConfigsPath: users.d
-
-# Path to folder where ClickHouseInstallation .yaml manifests are located.
-# Manifests are applied in sorted alpha-numeric order
-chiTemplatesPath: templates.d
+clickhouse:
+  configuration:
+    ################################################
+    ##
+    ## Configuration Files Section
+    ##
+    ################################################
+    file:
+      path:
+        # Path to the folder where ClickHouse configuration files common for all instances within a CHI are located.
+        common: config.d
+        # Path to the folder where ClickHouse configuration files unique for each instance (host) within a CHI are located.
+        host: conf.d
+        # Path to the folder where ClickHouse configuration files with users settings are located.
+        # Files are common for all instances within a CHI.
+        user: users.d
+    ################################################
+    ##
+    ## Configuration Users Section
+    ##
+    ################################################
+    user:
+      default:
+        # Default values for ClickHouse user configuration
+        # 1. user/profile - string
+        # 2. user/quota - string
+        # 3. user/networks/ip - multiple strings
+        # 4. user/password - string
+        profile: default
+        quota: default
+        networksIP:
+          - "::1"
+          - "127.0.0.1"
+        password: "default"
+    ################################################
+    ##
+    ## Configuration Network Section
+    ##
+    ################################################
+    network:
+      # Default host_regexp to limit network connectivity from outside
+      hostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+  ################################################
+  ##
+  ## Access to ClickHouse instances
+  ##
+  ################################################
+  access:
+    # ClickHouse credentials (username, password and port) to be used by operator to connect to ClickHouse instances
+    # for:
+    # 1. Metrics requests
+    # 2. Schema maintenance
+    # 3. DROP DNS CACHE
+    # User with such credentials can be specified in additional ClickHouse .xml config files,
+    # located in `chUsersConfigsPath` folder
+    username: "clickhouse_operator"
+    password: "clickhouse_operator_password"
+    secret:
+      # Location of k8s Secret with username and password to be used by operator to connect to ClickHouse instances
+      # Can be used instead of explicitly specified username and password
+      namespace: "dev"
+      name: "chop-clickhouse-credentials"
+    # Port where to connect to ClickHouse instances to
+    port: 8123
 
 ################################################
 ##
-## Cluster Create/Update/Delete Objects Section
+## Templates Section
 ##
 ################################################
-
-# How many seconds to wait for created/updated StatefulSet to be Ready
-statefulSetUpdateTimeout: 600
-
-# How many seconds to wait between checks for created/updated StatefulSet status
-statefulSetUpdatePollPeriod: 10
-
-# What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
-# Possible options:
-# 1. abort - do nothing, just break the process and wait for admin
-# 2. delete - delete newly created problematic StatefulSet
-# 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
-onStatefulSetCreateFailureAction: delete
-
-# What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
-# Possible options:
-# 1. abort - do nothing, just break the process and wait for admin
-# 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
-# Pod would be recreated by StatefulSet based on rollback-ed configuration
-# 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
-onStatefulSetUpdateFailureAction: rollback
+template:
+  chi:
+    # Path to the folder where ClickHouseInstallation .yaml manifests are located.
+    # Manifests are applied in sorted alpha-numeric order.
+    path: templates.d
 
 ################################################
 ##
-## ClickHouse Settings Section
+## Reconcile Section
 ##
 ################################################
+reconcile:
+  runtime:
+    # Max number of concurrent reconciles in progress
+    threadsNumber: 1
 
-# Default values for ClickHouse user configuration
-# 1. user/profile - string
-# 2. user/quota - string
-# 3. user/networks/ip - multiple strings
-# 4. user/password - string
-chConfigUserDefaultProfile: default
-chConfigUserDefaultQuota: default
-chConfigUserDefaultNetworksIP:
-  - "::1"
-  - "127.0.0.1"
-chConfigUserDefaultPassword: "default"
+  statefulSet:
+    create:
+      # What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+      # Possible options:
+      # 1. abort - do nothing, just break the process and wait for admin
+      # 2. delete - delete newly created problematic StatefulSet
+      # 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
+      onFailure: ignore
 
-# Default host_regexp to limit network connectivity from outside
-chConfigNetworksHostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+    update:
+      # How many seconds to wait for created/updated StatefulSet to be Ready
+      timeout: 300
+      # How many seconds to wait between checks for created/updated StatefulSet status
+      pollInterval: 10
+      # What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+      # Possible options:
+      # 1. abort - do nothing, just break the process and wait for admin
+      # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
+      # Pod would be recreated by StatefulSet based on rollback-ed configuration
+      # 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
+      onFailure: rollback
+
+  host:
+    wait:
+      exclude: false
+      include: false
 
 ################################################
 ##
-## Access to ClickHouse instances
+## Annotations management
 ##
 ################################################
+annotation:
+  # Applied when:
+  #  1. Propagating annotations from the CHI's `metadata.annotations` to child objects' `metadata.annotations`,
+  #  2. Propagating annotations from the CHI Template's `metadata.annotations` to CHI's `metadata.annotations`,
+  # Include annotations from the following list:
+  # Applied only when not empty. Empty list means "include all, no selection"
+  include: []
+  # Exclude annotations from the following list:
+  exclude: []
 
-# ClickHouse credentials (username, password and port) to be used by operator to connect to ClickHouse instances for:
-# 1. Metrics requests
-# 2. Schema maintenance
-# 3. DROP DNS CACHE
-# User with such credentials can be specified in additional ClickHouse .xml config files,
-# located in `chUsersConfigsPath` folder
-chUsername: clickhouse_operator
-chPassword: clickhouse_operator_password
-chPort: 8123
+################################################
+##
+## Labels management
+##
+################################################
+label:
+  # Applied when:
+  #  1. Propagating labels from the CHI's `metadata.labels` to child objects' `metadata.labels`,
+  #  2. Propagating labels from the CHI Template's `metadata.labels` to CHI's `metadata.labels`,
+  # Include labels from the following list:
+  # Applied only when not empty. Empty list means "include all, no selection"
+  include: []
+  # Exclude labels from the following list:
+  exclude: []
+  # Whether to append *Scope* labels to StatefulSet and Pod.
+  # Full list of available *scope* labels check in labeler.go
+  #  LabelShardScopeIndex
+  #  LabelReplicaScopeIndex
+  #  LabelCHIScopeIndex
+  #  LabelCHIScopeCycleSize
+  #  LabelCHIScopeCycleIndex
+  #  LabelCHIScopeCycleOffset
+  #  LabelClusterScopeIndex
+  #  LabelClusterScopeCycleSize
+  #  LabelClusterScopeCycleIndex
+  #  LabelClusterScopeCycleOffset
+  appendScope: "yes"
+
+################################################
+##
+## StatefulSet management
+##
+################################################
+statefulSet:
+  revisionHistoryLimit: 0
+
+################################################
+##
+## Pod management
+##
+################################################
+pod:
+  # Grace period for Pod termination.
+  # How many seconds to wait between sending
+  # SIGTERM and SIGKILL during Pod termination process.
+  # Increase this number is case of slow shutdown.
+  terminationGracePeriod: 30
 
 ################################################
 ##
 ## Log parameters
 ##
 ################################################
-
-logtostderr: "true"
-alsologtostderr: "false"
-v: "2"
-stderrthreshold: ""
-vmodule: ""
-log_backtrace_at: ""
-
-################################################
-##
-## Runtime parameters
-##
-################################################
-
-# Max number of concurrent reconciles in progress
-reconcileThreadsNumber: 1
-reconcileWaitExclude: false
-reconcileWaitInclude: false
+logger:
+  logtostderr: "true"
+  alsologtostderr: "false"
+  v: "3"
+  stderrthreshold: ""
+  vmodule: ""
+  log_backtrace_at: ""

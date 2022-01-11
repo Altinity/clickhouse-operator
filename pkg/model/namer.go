@@ -16,13 +16,14 @@ package model
 
 import (
 	"fmt"
-	"k8s.io/api/core/v1"
 	"strconv"
 	"strings"
 
+	apps "k8s.io/api/apps/v1"
+	"k8s.io/api/core/v1"
+
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	apps "k8s.io/api/apps/v1"
 )
 
 const (
@@ -37,60 +38,6 @@ const (
 	namePartClusterMaxLenLabelsCtx = 63
 	namePartShardMaxLenLabelsCtx   = 63
 	namePartReplicaMaxLenLabelsCtx = 63
-)
-
-const (
-	// macrosNamespace is a sanitized namespace name where ClickHouseInstallation runs
-	macrosNamespace = "{namespace}"
-
-	// macrosChiName is a sanitized ClickHouseInstallation name
-	macrosChiName = "{chi}"
-	// macrosChiID is a sanitized ID made of original ClickHouseInstallation name
-	macrosChiID = "{chiID}"
-
-	// macrosClusterName is a sanitized cluster name
-	macrosClusterName = "{cluster}"
-	// macrosClusterID is a sanitized ID made of original cluster name
-	macrosClusterID = "{clusterID}"
-	// macrosClusterIndex is an index of the cluster in the CHI - integer number, converted into string
-	macrosClusterIndex = "{clusterIndex}"
-
-	// macrosShardName is a sanitized shard name
-	macrosShardName = "{shard}"
-	// macrosShardID is a sanitized ID made of original shard name
-	macrosShardID = "{shardID}"
-	// macrosShardIndex is an index of the shard in the cluster - integer number, converted into string
-	macrosShardIndex = "{shardIndex}"
-
-	// macrosReplicaName is a sanitized replica name
-	macrosReplicaName = "{replica}"
-	// macrosReplicaID is a sanitized ID made of original replica name
-	macrosReplicaID = "{replicaID}"
-	// macrosReplicaIndex is an index of the replica in the cluster - integer number, converted into string
-	macrosReplicaIndex = "{replicaIndex}"
-
-	// macrosHostName is a sanitized host name
-	macrosHostName = "{host}"
-	// macrosHostID is a sanitized ID made of original host name
-	macrosHostID = "{hostID}"
-	// macrosChiScopeIndex is an index of the host on the CHI-scope
-	macrosChiScopeIndex = "{chiScopeIndex}"
-	// macrosChiScopeCycleIndex is an index of the host in the CHI-scope cycle - integer number, converted into string
-	macrosChiScopeCycleIndex = "{chiScopeCycleIndex}"
-	// macrosChiScopeCycleOffset is an offset of the host in the CHI-scope cycle - integer number, converted into string
-	macrosChiScopeCycleOffset = "{chiScopeCycleOffset}"
-	// macrosClusterScopeIndex is an index of the host on the cluster-scope
-	macrosClusterScopeIndex = "{clusterScopeIndex}"
-	// macrosClusterScopeCycleIndex is an index of the host in the Cluster-scope cycle - integer number, converted into string
-	macrosClusterScopeCycleIndex = "{clusterScopeCycleIndex}"
-	// macrosClusterScopeCycleOffset is an offset of the host in the Cluster-scope cycle - integer number, converted into string
-	macrosClusterScopeCycleOffset = "{clusterScopeCycleOffset}"
-	// macrosShardScopeIndex is an index of the host on the shard-scope
-	macrosShardScopeIndex = "{shardScopeIndex}"
-	// macrosReplicaScopeIndex is an index of the host on the replica-scope
-	macrosReplicaScopeIndex = "{replicaScopeIndex}"
-	// macrosClusterScopeCycleHeadPointsToPreviousCycleTail is {clusterScopeIndex} of previous Cycle Tail
-	macrosClusterScopeCycleHeadPointsToPreviousCycleTail = "{clusterScopeCycleHeadPointsToPreviousCycleTail}"
 )
 
 const (
@@ -118,8 +65,11 @@ const (
 	// configMapCommonUsersNamePattern is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
 	configMapCommonUsersNamePattern = "chi-" + macrosChiName + "-common-usersd"
 
-	// configMapDeploymentNamePattern is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
-	configMapDeploymentNamePattern = "chi-" + macrosChiName + "-deploy-confd-" + macrosClusterName + "-" + macrosHostName
+	// configMapHostNamePattern is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
+	configMapHostNamePattern = "chi-" + macrosChiName + "-deploy-confd-" + macrosClusterName + "-" + macrosHostName
+
+	// configMapHostMigrationNamePattern is a template of macros ConfigMap. "chi-{chi}-migration-{cluster}-{shard}-{host}"
+	//configMapHostMigrationNamePattern = "chi-" + macrosChiName + "-migration-" + macrosClusterName + "-" + macrosHostName
 
 	// namespaceDomainPattern presents Domain Name pattern of a namespace
 	// In this pattern "%s" is substituted namespace name's value
@@ -157,12 +107,14 @@ type namer struct {
 	ctx namerContext
 }
 
+// newNamer
 func newNamer(ctx namerContext) *namer {
 	return &namer{
 		ctx: ctx,
 	}
 }
 
+// namePartNamespace
 func (n *namer) namePartNamespace(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -173,6 +125,7 @@ func (n *namer) namePartNamespace(name string) string {
 	return sanitize(util.StringHead(name, _len))
 }
 
+// namePartChiName
 func (n *namer) namePartChiName(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -183,6 +136,7 @@ func (n *namer) namePartChiName(name string) string {
 	return sanitize(util.StringHead(name, _len))
 }
 
+// namePartChiNameID
 func (n *namer) namePartChiNameID(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -193,6 +147,7 @@ func (n *namer) namePartChiNameID(name string) string {
 	return util.CreateStringID(name, _len)
 }
 
+// namePartClusterName
 func (n *namer) namePartClusterName(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -203,6 +158,7 @@ func (n *namer) namePartClusterName(name string) string {
 	return sanitize(util.StringHead(name, _len))
 }
 
+// namePartClusterNameID
 func (n *namer) namePartClusterNameID(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -213,6 +169,7 @@ func (n *namer) namePartClusterNameID(name string) string {
 	return util.CreateStringID(name, _len)
 }
 
+// namePartShardName
 func (n *namer) namePartShardName(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -223,6 +180,7 @@ func (n *namer) namePartShardName(name string) string {
 	return sanitize(util.StringHead(name, _len))
 }
 
+// namePartShardNameID
 func (n *namer) namePartShardNameID(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -233,6 +191,7 @@ func (n *namer) namePartShardNameID(name string) string {
 	return util.CreateStringID(name, _len)
 }
 
+// namePartReplicaName
 func (n *namer) namePartReplicaName(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -243,6 +202,7 @@ func (n *namer) namePartReplicaName(name string) string {
 	return sanitize(util.StringHead(name, _len))
 }
 
+// namePartReplicaNameID
 func (n *namer) namePartReplicaNameID(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -253,6 +213,7 @@ func (n *namer) namePartReplicaNameID(name string) string {
 	return util.CreateStringID(name, _len)
 }
 
+// namePartHostName
 func (n *namer) namePartHostName(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -263,6 +224,7 @@ func (n *namer) namePartHostName(name string) string {
 	return sanitize(util.StringHead(name, _len))
 }
 
+// namePartHostNameID
 func (n *namer) namePartHostNameID(name string) string {
 	var _len int
 	if n.ctx == namerContextLabels {
@@ -273,6 +235,7 @@ func (n *namer) namePartHostNameID(name string) string {
 	return util.CreateStringID(name, _len)
 }
 
+// getNamePartNamespace
 func (n *namer) getNamePartNamespace(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ClickHouseInstallation:
@@ -292,6 +255,7 @@ func (n *namer) getNamePartNamespace(obj interface{}) string {
 	return "ERROR"
 }
 
+// getNamePartCHIName
 func (n *namer) getNamePartCHIName(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ClickHouseInstallation:
@@ -311,6 +275,7 @@ func (n *namer) getNamePartCHIName(obj interface{}) string {
 	return "ERROR"
 }
 
+// getNamePartClusterName
 func (n *namer) getNamePartClusterName(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ChiCluster:
@@ -327,6 +292,7 @@ func (n *namer) getNamePartClusterName(obj interface{}) string {
 	return "ERROR"
 }
 
+// getNamePartShardName
 func (n *namer) getNamePartShardName(obj interface{}) string {
 	switch obj.(type) {
 	case *chop.ChiShard:
@@ -340,158 +306,87 @@ func (n *namer) getNamePartShardName(obj interface{}) string {
 	return "ERROR"
 }
 
+// getNamePartReplicaName
 func (n *namer) getNamePartReplicaName(host *chop.ChiHost) string {
 	return n.namePartReplicaName(host.Address.ReplicaName)
 }
 
+// getNamePartHostName
 func (n *namer) getNamePartHostName(host *chop.ChiHost) string {
 	return n.namePartHostName(host.Address.HostName)
 }
 
-func (n *namer) getNamePartCHIScopeCycleSize(host *chop.ChiHost) string {
+// getNamePartCHIScopeCycleSize
+func getNamePartCHIScopeCycleSize(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeCycleSize)
 }
 
-func (n *namer) getNamePartCHIScopeCycleIndex(host *chop.ChiHost) string {
+// getNamePartCHIScopeCycleIndex
+func getNamePartCHIScopeCycleIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeCycleIndex)
 }
 
-func (n *namer) getNamePartCHIScopeCycleOffset(host *chop.ChiHost) string {
+// getNamePartCHIScopeCycleOffset
+func getNamePartCHIScopeCycleOffset(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeCycleOffset)
 }
 
-func (n *namer) getNamePartClusterScopeCycleSize(host *chop.ChiHost) string {
+// getNamePartClusterScopeCycleSize
+func getNamePartClusterScopeCycleSize(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeCycleSize)
 }
 
-func (n *namer) getNamePartClusterScopeCycleIndex(host *chop.ChiHost) string {
+// getNamePartClusterScopeCycleIndex
+func getNamePartClusterScopeCycleIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeCycleIndex)
 }
 
-func (n *namer) getNamePartClusterScopeCycleOffset(host *chop.ChiHost) string {
+// getNamePartClusterScopeCycleOffset
+func getNamePartClusterScopeCycleOffset(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeCycleOffset)
 }
 
-func (n *namer) getNamePartCHIScopeIndex(host *chop.ChiHost) string {
+// getNamePartCHIScopeIndex
+func getNamePartCHIScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.CHIScopeIndex)
 }
 
-func (n *namer) getNamePartClusterScopeIndex(host *chop.ChiHost) string {
+// getNamePartClusterScopeIndex
+func getNamePartClusterScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ClusterScopeIndex)
 }
 
-func (n *namer) getNamePartShardScopeIndex(host *chop.ChiHost) string {
+// getNamePartShardScopeIndex
+func getNamePartShardScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ShardScopeIndex)
 }
 
-func (n *namer) getNamePartReplicaScopeIndex(host *chop.ChiHost) string {
+// getNamePartReplicaScopeIndex
+func getNamePartReplicaScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ReplicaScopeIndex)
 }
 
-func newNameMacroReplacerChi(chi *chop.ClickHouseInstallation) *strings.Replacer {
-	n := newNamer(namerContextNames)
-	return strings.NewReplacer(
-		macrosNamespace, n.namePartNamespace(chi.Namespace),
-		macrosChiName, n.namePartChiName(chi.Name),
-		macrosChiID, n.namePartChiNameID(chi.Name),
-	)
+// CreateConfigMapHostName returns a name for a ConfigMap for replica's personal config
+func CreateConfigMapHostName(host *chop.ChiHost) string {
+	return macro(host).Line(configMapHostNamePattern)
 }
 
-func newNameMacroReplacerCluster(cluster *chop.ChiCluster) *strings.Replacer {
-	n := newNamer(namerContextNames)
-	return strings.NewReplacer(
-		macrosNamespace, n.namePartNamespace(cluster.Address.Namespace),
-		macrosChiName, n.namePartChiName(cluster.Address.CHIName),
-		macrosChiID, n.namePartChiNameID(cluster.Address.CHIName),
-		macrosClusterName, n.namePartClusterName(cluster.Address.ClusterName),
-		macrosClusterID, n.namePartClusterNameID(cluster.Address.ClusterName),
-		macrosClusterIndex, strconv.Itoa(cluster.Address.ClusterIndex),
-	)
-}
+// CreateConfigMapHostMigrationName returns a name for a ConfigMap for replica's personal config
+//func CreateConfigMapHostMigrationName(host *chop.ChiHost) string {
+//	return macro(host).Line(configMapHostMigrationNamePattern)
+//}
 
-func newNameMacroReplacerShard(shard *chop.ChiShard) *strings.Replacer {
-	n := newNamer(namerContextNames)
-	return strings.NewReplacer(
-		macrosNamespace, n.namePartNamespace(shard.Address.Namespace),
-		macrosChiName, n.namePartChiName(shard.Address.CHIName),
-		macrosChiID, n.namePartChiNameID(shard.Address.CHIName),
-		macrosClusterName, n.namePartClusterName(shard.Address.ClusterName),
-		macrosClusterID, n.namePartClusterNameID(shard.Address.ClusterName),
-		macrosClusterIndex, strconv.Itoa(shard.Address.ClusterIndex),
-		macrosShardName, n.namePartShardName(shard.Address.ShardName),
-		macrosShardID, n.namePartShardNameID(shard.Address.ShardName),
-		macrosShardIndex, strconv.Itoa(shard.Address.ShardIndex),
-	)
-}
-
-// clusterScopeIndexOfPreviousCycleTail gets cluster-scope index of previous cycle tail
-func clusterScopeIndexOfPreviousCycleTail(host *chop.ChiHost) int {
-
-	if host.Address.ClusterScopeCycleOffset == 0 {
-		// This is the cycle head - the first host of the cycle
-		// We need to point to previous host in this cluster - which would be previous cycle tail
-
-		if host.Address.ClusterScopeIndex == 0 {
-			// This is the very first host in the cluster - head of the first cycle
-			// No previous host available, so just point to the same host, mainly because label must be an empty string
-			// or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character
-			// So we can't set it to "-1"
-			return host.Address.ClusterScopeIndex
-		}
-
-		// This is head of non-first cycle, point to previous host in the cluster - which would be previous cycle tail
-		return host.Address.ClusterScopeIndex - 1
-	}
-
-	// This is not cycle head - just point to the same host
-	return host.Address.ClusterScopeIndex
-}
-
-func newNameMacroReplacerHost(host *chop.ChiHost) *strings.Replacer {
-	n := newNamer(namerContextNames)
-	return strings.NewReplacer(
-		macrosNamespace, n.namePartNamespace(host.Address.Namespace),
-		macrosChiName, n.namePartChiName(host.Address.CHIName),
-		macrosChiID, n.namePartChiNameID(host.Address.CHIName),
-		macrosClusterName, n.namePartClusterName(host.Address.ClusterName),
-		macrosClusterID, n.namePartClusterNameID(host.Address.ClusterName),
-		macrosClusterIndex, strconv.Itoa(host.Address.ClusterIndex),
-		macrosShardName, n.namePartShardName(host.Address.ShardName),
-		macrosShardID, n.namePartShardNameID(host.Address.ShardName),
-		macrosShardIndex, strconv.Itoa(host.Address.ShardIndex),
-		macrosShardScopeIndex, strconv.Itoa(host.Address.ShardScopeIndex), // TODO use appropriate namePart function
-		macrosReplicaName, n.namePartReplicaName(host.Address.ReplicaName),
-		macrosReplicaID, n.namePartReplicaNameID(host.Address.ReplicaName),
-		macrosReplicaIndex, strconv.Itoa(host.Address.ReplicaIndex),
-		macrosReplicaScopeIndex, strconv.Itoa(host.Address.ReplicaScopeIndex), // TODO use appropriate namePart function
-		macrosHostName, n.namePartHostName(host.Address.HostName),
-		macrosHostID, n.namePartHostNameID(host.Address.HostName),
-		macrosChiScopeIndex, strconv.Itoa(host.Address.CHIScopeIndex), // TODO use appropriate namePart function
-		macrosChiScopeCycleIndex, strconv.Itoa(host.Address.CHIScopeCycleIndex), // TODO use appropriate namePart function
-		macrosChiScopeCycleOffset, strconv.Itoa(host.Address.CHIScopeCycleOffset), // TODO use appropriate namePart function
-		macrosClusterScopeIndex, strconv.Itoa(host.Address.ClusterScopeIndex), // TODO use appropriate namePart function
-		macrosClusterScopeCycleIndex, strconv.Itoa(host.Address.ClusterScopeCycleIndex), // TODO use appropriate namePart function
-		macrosClusterScopeCycleOffset, strconv.Itoa(host.Address.ClusterScopeCycleOffset), // TODO use appropriate namePart function
-		macrosClusterScopeCycleHeadPointsToPreviousCycleTail, strconv.Itoa(clusterScopeIndexOfPreviousCycleTail(host)),
-	)
-}
-
-// CreateConfigMapPodName returns a name for a ConfigMap for ClickHouse pod
-func CreateConfigMapPodName(host *chop.ChiHost) string {
-	return newNameMacroReplacerHost(host).Replace(configMapDeploymentNamePattern)
-}
-
-// CreateConfigMapCommonName returns a name for a ConfigMap for replica's common chopConfig
+// CreateConfigMapCommonName returns a name for a ConfigMap for replica's common config
 func CreateConfigMapCommonName(chi *chop.ClickHouseInstallation) string {
-	return newNameMacroReplacerChi(chi).Replace(configMapCommonNamePattern)
+	return macro(chi).Line(configMapCommonNamePattern)
 }
 
-// CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common chopConfig
+// CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common users config
 func CreateConfigMapCommonUsersName(chi *chop.ClickHouseInstallation) string {
-	return newNameMacroReplacerChi(chi).Replace(configMapCommonUsersNamePattern)
+	return macro(chi).Line(configMapCommonUsersNamePattern)
 }
 
-// CreateCHIServiceName creates a name of a Installation Service resource
+// CreateCHIServiceName creates a name of a root ClickHouseInstallation Service resource
 func CreateCHIServiceName(chi *chop.ClickHouseInstallation) string {
 	// Name can be generated either from default name pattern,
 	// or from personal name pattern provided in ServiceTemplate
@@ -509,10 +404,10 @@ func CreateCHIServiceName(chi *chop.ClickHouseInstallation) string {
 	}
 
 	// Create Service name based on name pattern available
-	return newNameMacroReplacerChi(chi).Replace(pattern)
+	return macro(chi).Line(pattern)
 }
 
-// CreateCHIServiceFQDN creates a name of a Installation Service resource
+// CreateCHIServiceFQDN creates a FQD name of a root ClickHouseInstallation Service resource
 func CreateCHIServiceFQDN(chi *chop.ClickHouseInstallation) string {
 	// FQDN can be generated either from default pattern,
 	// or from personal pattern provided
@@ -551,7 +446,7 @@ func CreateClusterServiceName(cluster *chop.ChiCluster) string {
 	}
 
 	// Create Service name based on name pattern available
-	return newNameMacroReplacerCluster(cluster).Replace(pattern)
+	return macro(cluster).Line(pattern)
 }
 
 // CreateShardServiceName returns a name of a shard's Service
@@ -572,7 +467,7 @@ func CreateShardServiceName(shard *chop.ChiShard) string {
 	}
 
 	// Create Service name based on name pattern available
-	return newNameMacroReplacerShard(shard).Replace(pattern)
+	return macro(shard).Line(pattern)
 }
 
 // CreateShardName return a name of a shard
@@ -580,15 +475,20 @@ func CreateShardName(shard *chop.ChiShard, index int) string {
 	return strconv.Itoa(index)
 }
 
+// IsAutoGeneratedShardName checks whether provided name is auto-generated
 func IsAutoGeneratedShardName(name string, shard *chop.ChiShard, index int) bool {
 	return name == CreateShardName(shard, index)
 }
 
-// CreateReplicaName return a name of a replica
+// CreateReplicaName return a name of a replica.
+// Here replica is a CHOp-internal replica - i.e. a vertical slice of hosts field.
+// In case you are looking for replica name in terms of a hostname to address particular host as in remote_servers.xml
+// you need to take a look on CreateReplicaHostname function
 func CreateReplicaName(replica *chop.ChiReplica, index int) string {
 	return strconv.Itoa(index)
 }
 
+// IsAutoGeneratedReplicaName checks whether provided name is auto-generated
 func IsAutoGeneratedReplicaName(name string, replica *chop.ChiReplica, index int) bool {
 	return name == CreateReplicaName(replica, index)
 }
@@ -598,6 +498,24 @@ func CreateHostName(host *chop.ChiHost, shard *chop.ChiShard, shardIndex int, re
 	return fmt.Sprintf("%s-%s", shard.Name, replica.Name)
 }
 
+// CreateReplicaHostname returns hostname (pod-hostname + service or FQDN) which can be used as a replica name
+// in all places where ClickHouse requires replica name. These are such places as:
+// 1. "remote_servers.xml" config file
+// 2. statements like SYSTEM DROP REPLICA <replica_name>
+// any other places
+// Function operations are based on .Spec.Defaults.ReplicasUseFQDN
+func CreateReplicaHostname(host *chop.ChiHost) string {
+	if util.IsStringBoolTrue(host.GetCHI().Spec.Defaults.ReplicasUseFQDN) {
+		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
+		// otherwise hostname+service name (unique within namespace) would be used
+		// .my-dev-namespace.svc.cluster.local
+		return createPodFQDN(host)
+	}
+
+	return CreatePodHostname(host)
+}
+
+// IsAutoGeneratedHostName checks whether name is auto-generated
 func IsAutoGeneratedHostName(
 	name string,
 	host *chop.ChiHost,
@@ -647,7 +565,7 @@ func CreateStatefulSetName(host *chop.ChiHost) string {
 	}
 
 	// Create StatefulSet name based on name pattern available
-	return newNameMacroReplacerHost(host).Replace(pattern)
+	return macro(host).Line(pattern)
 }
 
 // CreateStatefulSetServiceName returns a name of a StatefulSet-related Service for ClickHouse instance
@@ -668,18 +586,18 @@ func CreateStatefulSetServiceName(host *chop.ChiHost) string {
 	}
 
 	// Create Service name based on name pattern available
-	return newNameMacroReplacerHost(host).Replace(pattern)
+	return macro(host).Line(pattern)
 }
 
 // CreatePodHostname returns a name of a Pod of a ClickHouse instance
 func CreatePodHostname(host *chop.ChiHost) string {
-	// Pod has no own hostname - redirect to appropriate Service
+	// Do not use Pod own hostname - point to appropriate StatefulSet's Service
 	return CreateStatefulSetServiceName(host)
 }
 
-// CreatePodFQDN creates a fully qualified domain name of a pod
+// createPodFQDN creates a fully qualified domain name of a pod
 // ss-1eb454-2-0.my-dev-domain.svc.cluster.local
-func CreatePodFQDN(host *chop.ChiHost) string {
+func createPodFQDN(host *chop.ChiHost) string {
 	// FQDN can be generated either from default pattern,
 	// or from personal pattern provided
 
@@ -699,43 +617,80 @@ func CreatePodFQDN(host *chop.ChiHost) string {
 	)
 }
 
-// CreatePodFQDNsOfCluster creates fully qualified domain names of all pods in a cluster
-func CreatePodFQDNsOfCluster(cluster *chop.ChiCluster) []string {
+// createPodFQDNsOfCluster creates fully qualified domain names of all pods in a cluster
+func createPodFQDNsOfCluster(cluster *chop.ChiCluster) []string {
 	fqdns := make([]string, 0)
 	cluster.WalkHosts(func(host *chop.ChiHost) error {
-		fqdns = append(fqdns, CreatePodFQDN(host))
+		fqdns = append(fqdns, createPodFQDN(host))
 		return nil
 	})
 	return fqdns
 }
 
-// CreatePodFQDNsOfShards creates fully qualified domain names of all pods in a shard
-func CreatePodFQDNsOfShard(shard *chop.ChiShard) []string {
+// createPodFQDNsOfShard creates fully qualified domain names of all pods in a shard
+func createPodFQDNsOfShard(shard *chop.ChiShard) []string {
 	fqdns := make([]string, 0)
 	shard.WalkHosts(func(host *chop.ChiHost) error {
-		fqdns = append(fqdns, CreatePodFQDN(host))
+		fqdns = append(fqdns, createPodFQDN(host))
 		return nil
 	})
 	return fqdns
 }
 
-// CreatePodFQDNsOfCHI creates fully qualified domain names of all pods in a CHI
-func CreatePodFQDNsOfCHI(chi *chop.ClickHouseInstallation) []string {
+// createPodFQDNsOfCHI creates fully qualified domain names of all pods in a CHI
+func createPodFQDNsOfCHI(chi *chop.ClickHouseInstallation) []string {
 	fqdns := make([]string, 0)
 	chi.WalkHosts(func(host *chop.ChiHost) error {
-		fqdns = append(fqdns, CreatePodFQDN(host))
+		fqdns = append(fqdns, createPodFQDN(host))
 		return nil
 	})
 	return fqdns
 }
 
+// CreateFQDN is a wrapper over pod FQDN function
+func CreateFQDN(host *chop.ChiHost) string {
+	return createPodFQDN(host)
+}
+
+// CreateFQDNs is a wrapper over set of create FQDN functions
+// obj specifies source object to create FQDNs from
+// scope specifies target scope - what entity to create FQDNs for - be it CHI, cluster, shard or a host
+// excludeSelf specifies whether to exclude the host itself from the result. Applicable only in case obj is a host
+func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string {
+	switch typed := obj.(type) {
+	case *chop.ClickHouseInstallation:
+		return createPodFQDNsOfCHI(typed)
+	case *chop.ChiCluster:
+		return createPodFQDNsOfCluster(typed)
+	case *chop.ChiShard:
+		return createPodFQDNsOfShard(typed)
+	case *chop.ChiHost:
+		self := ""
+		if excludeSelf {
+			self = createPodFQDN(typed)
+		}
+		switch scope.(type) {
+		case chop.ChiHost:
+			return util.RemoveFromArray(self, []string{createPodFQDN(typed)})
+		case chop.ChiShard:
+			return util.RemoveFromArray(self, createPodFQDNsOfShard(typed.GetShard()))
+		case chop.ChiCluster:
+			return util.RemoveFromArray(self, createPodFQDNsOfCluster(typed.GetCluster()))
+		case chop.ClickHouseInstallation:
+			return util.RemoveFromArray(self, createPodFQDNsOfCHI(typed.GetCHI()))
+		}
+	}
+	return nil
+}
+
+// CreatePodRegexp creates pod regexp
 // template is defined in operator config:
 // CHConfigNetworksHostRegexpTemplate: chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
 func CreatePodRegexp(chi *chop.ClickHouseInstallation, template string) string {
-	return newNameMacroReplacerChi(chi).Replace(template)
+	return macro(chi).Line(template)
 }
 
-// CreatePodName create Pod name based on specified StatefulSet or Replica
+// CreatePodName create Pod name based on specified StatefulSet or Host
 func CreatePodName(obj interface{}) string {
 	switch obj.(type) {
 	case *apps.StatefulSet:

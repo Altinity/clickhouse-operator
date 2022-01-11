@@ -5,12 +5,12 @@ metadata:
   labels:
     app: grafana
 spec:
-  name: ${GRAFANA_DASHBOARD_NAME}.json
   url: https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/grafana-dashboard/ClickHouse_Queries_dashboard.json
+  # look to https://github.com/integr8ly/grafana-operator/issues/416#issuecomment-849498860, json used as fallback
+  json: ""
   datasources:
     - inputName: "DS_PROMETHEUS"
       datasourceName: "$GRAFANA_PROMETHEUS_DATASOURCE_NAME"
   plugins:
     - name: "vertamedia-clickhouse-datasource"
-      # update to 2.0.4 when resolve https://github.com/grafana/grafana-plugin-repository/pull/690
-      version: "1.9.5"
+      version: "2.3.1"

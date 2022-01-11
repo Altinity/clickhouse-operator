@@ -1,0 +1,70 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: clickhouse-backups-latest-version
+spec:
+  defaults:
+    templates:
+      podTemplate: clickhouse-alerts
+  templates:
+    podTemplates:
+      - name: clickhouse-alerts
+        metadata:
+          annotations:
+            prometheus.io/port: '8888'
+            prometheus.io/scrape: 'true'
+            # look to https://github.com/prometheus/prometheus/issues/3756
+            clickhouse.backup/scrape: 'true'
+            clickhouse.backup/port: '7171'
+            clickhouse.backup/path: '/metrics'
+        spec:
+          securityContext:
+            runAsUser: 101
+            runAsGroup: 101
+            fsGroup: 101
+          containers:
+            - name: clickhouse-pod
+              image: yandex/clickhouse-server:21.8
+              command:
+                - clickhouse-server
+                - --config-file=/etc/clickhouse-server/config.xml
+
+            - name: clickhouse-backup
+              image: alexakulov/clickhouse-backup:1.1.0
+              imagePullPolicy: IfNotPresent
+              command:
+                - bash
+                - -xc
+                - "/bin/clickhouse-backup server"
+              env:
+                - name: API_LISTEN
+                  value: "0.0.0.0:7171"
+                - name: API_ENABLE_METRICS
+                  value: "true"
+                - name: API_CREATE_INTEGRATION_TABLES
+                  value: "true"
+                - name: REMOTE_STORAGE
+                  value: "s3"
+                - name: BACKUPS_TO_KEEP_REMOTE
+                  value: "3"
+                - name: S3_ENDPOINT
+                  value: https://minio.minio
+                - name: S3_BUCKET
+                  value: clickhouse-backup
+                - name: S3_PATH
+                  value: backup
+                - name: S3_FORCE_PATH_STYLE
+                  value: "true"
+                # for tests only do not use in production
+                - name: S3_DISABLE_CERT_VERIFICATION
+                  value: "true"
+                # look to /deploy/minio/install-minio-tenant.sh
+                - name: S3_ACCESS_KEY
+                  value: minio-access-key
+                - name: S3_SECRET_KEY
+                  value: minio-secret-key
+              # require to avoid double scraping clickhouse and clickhouse-backup containers
+              ports:
+                - name: backup-rest
+                  containerPort: 7171

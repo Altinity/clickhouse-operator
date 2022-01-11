@@ -4,7 +4,7 @@ echo "External value for \$GRAFANA_NAMESPACE=$GRAFANA_NAMESPACE"
 echo "External value for \$GRAFANA_OPERATOR_VERSION=$GRAFANA_OPERATOR_VERSION"
 
 GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-grafana}"
-GRAFANA_OPERATOR_VERSION="${GRAFANA_OPERATOR_VERSION:-v3.5.0}"
+GRAFANA_OPERATOR_VERSION="${GRAFANA_OPERATOR_VERSION:-v3.9.0}"
 
 echo "Setup Grafana"
 echo "OPTIONS"
@@ -13,7 +13,9 @@ echo "\$GRAFANA_OPERATOR_VERSION=${GRAFANA_OPERATOR_VERSION}"
 echo ""
 echo "!!! IMPORTANT !!!"
 echo "If you do not agree with specified options, press ctrl-c now"
-sleep ${SLEEP_BEFORE_RUN:-10}
+if [[ "" == "${NO_WAIT}" ]]; then
+  sleep 10
+fi
 echo "Apply options now..."
 
 ##
@@ -24,7 +26,7 @@ function clean_dir() {
 
     echo "##############################"
     echo "Clean dir $DIR ..."
-    rm -rf $DIR
+    rm -rf "$DIR"
     echo "...DONE"
 }
 
@@ -43,17 +45,18 @@ GRAFANA_OPERATOR_DIR="${TMP_DIR}/grafana-operator"
 mkdir -p "${GRAFANA_OPERATOR_DIR}"
 
 # Temp dir must not contain any data
-if [[ ! -z "$(ls -A "${GRAFANA_OPERATOR_DIR}")" ]]; then
+if [[ -n "$(ls -A "${GRAFANA_OPERATOR_DIR}")" ]]; then
      echo "${GRAFANA_OPERATOR_DIR} is not empty. Abort"
      exit 1
 fi
 
 # Temp dir is empty, will clear it upon script termination
-trap "clean_dir ${TMP_DIR}" SIGHUP SIGINT SIGQUIT SIGFPE SIGKILL SIGALRM SIGTERM
+trap "clean_dir ${TMP_DIR}" SIGHUP SIGINT SIGQUIT SIGFPE SIGALRM SIGTERM
 
 # Continue with sources
 echo "Download Grafana operator sources into ${GRAFANA_OPERATOR_DIR}"
-git clone "https://github.com/integr8ly/grafana-operator" "${GRAFANA_OPERATOR_DIR}"
+git clone -b ${GRAFANA_OPERATOR_VERSION} --single-branch "https://github.com/integr8ly/grafana-operator" "${GRAFANA_OPERATOR_DIR}"
+
 
 echo "Setup Grafana operator into ${GRAFANA_NAMESPACE} namespace"
 
@@ -71,7 +74,7 @@ kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/dep
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f "${GRAFANA_OPERATOR_DIR}/deploy/cluster_roles"
 # 4. Deploy the operator of explicitly specified version
 kubectl --namespace="${GRAFANA_NAMESPACE}" apply -f <( \
-    cat "${GRAFANA_OPERATOR_DIR}/deploy/operator.yaml" | sed -e "s/:latest/:${GRAFANA_OPERATOR_VERSION}/g" \
+    cat "${GRAFANA_OPERATOR_DIR}/deploy/operatorMasterImage.yaml" | sed -e "s/:master/:${GRAFANA_OPERATOR_VERSION}/g" \
 )
 
 # Remove downloaded sources

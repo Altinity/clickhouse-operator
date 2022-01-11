@@ -16,9 +16,9 @@
 
 This process does not require `go-lang` compiler nor `dep` package manager. Instead it requires `kubernetes` and `docker`.
 
-1. Switch working dir to `src/github.com/altinity/clickhouse-operator`
-2. Build docker image with `docker`: `docker build -t altinity/clickhouse-operator ./`
-3. Register freshly build `docker` image inside `kubernetes` environment like so: `docker save altinity/clickhouse-operator | (eval $(minikube docker-env) && docker load)` 
-4. Install `clickhouse-operator` as described here: [Install ClickHouse Operator][install] 
+* Switch working dir to `src/github.com/altinity/clickhouse-operator`
+* Build docker image with `docker`: `docker build -t altinity/clickhouse-operator -f ./dockerfile/operator/Dockerfile ./`
+* Register freshly build `docker` image inside `kubernetes` environment like so: `docker save altinity/clickhouse-operator | (eval $(minikube docker-env) && docker load)` 
+* Install `clickhouse-operator` as described here: [Install ClickHouse Operator][install] 
 
 [install]: ./operator_installation_details.md

@@ -15,8 +15,10 @@
 package metrics
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
@@ -29,12 +31,19 @@ const (
 	subsystem = "clickhouse"
 )
 
+const (
+	// writeMetricWaitTimeout specifies how long to wait for metric being accepted by prometheus writer
+	writeMetricWaitTimeout = 10 * time.Second
+)
+
+// PrometheusWriter specifies write to prometheus
 type PrometheusWriter struct {
 	out      chan<- prometheus.Metric
 	chi      *WatchedCHI
 	hostname string
 }
 
+// NewPrometheusWriter creates new prometheus writer
 func NewPrometheusWriter(
 	out chan<- prometheus.Metric,
 	chi *WatchedCHI,
@@ -100,6 +109,36 @@ func (w *PrometheusWriter) WriteTableSizes(data [][]string) {
 	}
 }
 
+// WriteSystemParts pushesh set of prometheus.Metric object related to system.parts
+func (w *PrometheusWriter) WriteSystemParts(data [][]string) {
+	var diskDataBytes, memoryPrimaryKeyBytesAllocated int64
+	var err error
+	m := make([]int64, 2)
+	for _, t := range data {
+		m[0] = 0
+		m[1] = 0
+		for i, v := range t[len(t)-len(m):] {
+			m[i], err = strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				log.V(2).Infof("Error parsing metrics value for chi_metric_DiskDataBytes, chi_metric_MemoryPrimaryKeyBytesAllocated: %s\n", v)
+			}
+		}
+		diskDataBytes += m[0]
+		memoryPrimaryKeyBytesAllocated += m[1]
+	}
+	w.WriteMetrics([][]string{
+		{
+			"metric.DiskDataBytes", fmt.Sprintf("%d", diskDataBytes),
+			"Total data size for all ClickHouse tables", "gauge",
+		},
+		{
+			"metric.MemoryPrimaryKeyBytesAllocated", fmt.Sprintf("%d", memoryPrimaryKeyBytesAllocated),
+			"Memory size allocated for primary keys", "gauge",
+		},
+	})
+}
+
+// WriteSystemReplicas writes system replicas
 func (w *PrometheusWriter) WriteSystemReplicas(data [][]string) {
 	for _, metric := range data {
 		writeSingleMetricToPrometheus(w.out, "system_replicas_is_session_expired", "Number of expired Zookeeper sessions of the table", metric[2], prometheus.GaugeValue,
@@ -108,6 +147,7 @@ func (w *PrometheusWriter) WriteSystemReplicas(data [][]string) {
 	}
 }
 
+// WriteMutations writes mutations
 func (w *PrometheusWriter) WriteMutations(data [][]string) {
 	for _, metric := range data {
 		writeSingleMetricToPrometheus(w.out, "table_mutations", "Number of active mutations for the table", metric[2], prometheus.GaugeValue,
@@ -120,6 +160,7 @@ func (w *PrometheusWriter) WriteMutations(data [][]string) {
 	}
 }
 
+// WriteSystemDisks writes system disks
 func (w *PrometheusWriter) WriteSystemDisks(data [][]string) {
 	for _, metric := range data {
 		writeSingleMetricToPrometheus(w.out, "metric_DiskFreeBytes", "Free disk space available from system.disks", metric[1], prometheus.GaugeValue,
@@ -131,16 +172,27 @@ func (w *PrometheusWriter) WriteSystemDisks(data [][]string) {
 	}
 }
 
-func (w *PrometheusWriter) WriteErrorFetch(fetch_type string) {
-	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "1", prometheus.GaugeValue,
-		[]string{"chi", "namespace", "hostname", "fetch_type"},
-		w.chi.Name, w.chi.Namespace, w.hostname, fetch_type)
+// WriteDetachedParts writes detached parts
+func (w *PrometheusWriter) WriteDetachedParts(data [][]string) {
+	for _, metric := range data {
+		writeSingleMetricToPrometheus(w.out, "metric_DetachedParts", "Count of currently detached parts from system.detached_parts", metric[0], prometheus.GaugeValue,
+			[]string{"chi", "namespace", "hostname", "database", "table", "disk", "reason"},
+			w.chi.Name, w.chi.Namespace, w.hostname, metric[1], metric[2], metric[3], metric[4])
+	}
 }
 
-func (w *PrometheusWriter) WriteOKFetch(fetch_type string) {
+// WriteErrorFetch writes error fetch
+func (w *PrometheusWriter) WriteErrorFetch(fetchType string) {
+	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "1", prometheus.GaugeValue,
+		[]string{"chi", "namespace", "hostname", "fetch_type"},
+		w.chi.Name, w.chi.Namespace, w.hostname, fetchType)
+}
+
+// WriteOKFetch writes successful fetch
+func (w *PrometheusWriter) WriteOKFetch(fetchType string) {
 	writeSingleMetricToPrometheus(w.out, "metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "0", prometheus.GaugeValue,
 		[]string{"chi", "namespace", "hostname", "fetch_type"},
-		w.chi.Name, w.chi.Namespace, w.hostname, fetch_type)
+		w.chi.Name, w.chi.Namespace, w.hostname, fetchType)
 }
 
 func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, desc string, value string, metricType prometheus.ValueType, labels []string, labelValues ...string) {
@@ -157,8 +209,7 @@ func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, de
 	}
 	select {
 	case out <- m:
-
-	default:
+	case <-time.After(writeMetricWaitTimeout):
 		log.Infof("Error sending metric to the channel %s", name)
 	}
 }
@@ -187,5 +238,5 @@ func convertMetricName(in string) string {
 		out = append(out, unicode.ToLower(runes[i]))
 	}*/
 
-	return strings.Replace(string(in), ".", "_", -1)
+	return strings.NewReplacer("-", "_", ".", "_").Replace(in)
 }

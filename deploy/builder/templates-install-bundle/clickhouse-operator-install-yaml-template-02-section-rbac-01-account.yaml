@@ -1,0 +1,14 @@
+# Template Parameters:
+#
+# COMMENT=${COMMENT}
+# NAMESPACE=${NAMESPACE}
+# NAME=${NAME}
+#
+# Setup ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${NAME}
+  ${COMMENT}namespace: ${NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: ${OPERATOR_VERSION}

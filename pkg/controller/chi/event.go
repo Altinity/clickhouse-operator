@@ -17,11 +17,10 @@ package chi
 import (
 	"time"
 
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
@@ -60,7 +59,8 @@ const (
 	eventReasonDeleteFailed        = "DeleteFailed"
 )
 
-func (c *Controller) eventInfo(
+// EventInfo emits event Info
+func (c *Controller) EventInfo(
 	chi *chop.ClickHouseInstallation,
 	action string,
 	reason string,
@@ -69,7 +69,8 @@ func (c *Controller) eventInfo(
 	c.emitEvent(chi, eventTypeInfo, action, reason, message)
 }
 
-func (c *Controller) eventWarning(
+// EventWarning emits event Warning
+func (c *Controller) EventWarning(
 	chi *chop.ClickHouseInstallation,
 	action string,
 	reason string,
@@ -78,7 +79,8 @@ func (c *Controller) eventWarning(
 	c.emitEvent(chi, eventTypeWarning, action, reason, message)
 }
 
-func (c *Controller) eventError(
+// EventError emits event Error
+func (c *Controller) EventError(
 	chi *chop.ClickHouseInstallation,
 	action string,
 	reason string,
@@ -136,9 +138,9 @@ func (c *Controller) emitEvent(
 		// ID of the controller instance, e.g. `kubelet-xyzf`.
 		// ReportingInstance:
 	}
-	_, err := c.kubeClient.CoreV1().Events(namespace).Create(event)
+	_, err := c.kubeClient.CoreV1().Events(namespace).Create(newContext(), event, newCreateOptions())
 
 	if err != nil {
-		log.V(1).Infof("Create Event failed: %v", err)
+		log.M(chi).F().Error("Create Event failed: %v", err)
 	}
 }

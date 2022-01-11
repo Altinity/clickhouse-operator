@@ -1,3 +1,16 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-credentials
+type: Opaque
+stringData:
+  testpwduser1: password
+  testpwduser2: 65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5
+  testpwduser3: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
+  testenvpwduser1: password
+  testenvpwduser2: 65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5
+  testenvpwduser3: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
+---
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
@@ -5,6 +18,7 @@ metadata:
 spec:
   configuration:
     users:
+      default/password: qwerty
       # test user has 'password' specified, while admin user has 'password_sha256_hex' specified
       test/password: qwerty
       test/networks/ip:
@@ -16,6 +30,16 @@ spec:
         - "dbname1"
         - "dbname2"
         - "dbname3"
+      # reference to namespace/name/field in the secret with plain password
+      testpwduser1/k8s_secret_password: dev/clickhouse-credentials/testpwduser1
+      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password
+      testpwduser2/k8s_secret_password_sha256_hex: clickhouse-credentials/testpwduser2
+      testpwduser3/k8s_secret_password_double_sha1_hex: clickhouse-credentials/testpwduser3
+      # reference to namespace/name/field in the secret with plain password
+      testenvpwduser1/k8s_secret_env_password: dev/clickhouse-credentials/testenvpwduser1
+      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password
+      testenvpwduser2/k8s_secret_env_password_sha256_hex: clickhouse-credentials/testenvpwduser2
+      testenvpwduser3/k8s_secret_env_password_double_sha1_hex: clickhouse-credentials/testenvpwduser3
       # admin use has 'password_sha256_hex' so actual password value is not published
       admin/password_sha256_hex: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
       admin/networks/ip: "127.0.0.1/32"

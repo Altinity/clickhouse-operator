@@ -15,8 +15,28 @@ metadata:
 spec:
 
   stop: "no"
+  restart: "RollingUpdate"
+  troubleshoot: "no"
+
+  namespaceDomainPattern:  "%s.svc.my.test"
+
+  templating:
+    policy: "manual"
+
   reconciling:
     policy: "nowait"
+    configMapPropagationTimeout: 90
+    cleanup:
+      unknownObjects:
+        statefulSet: Delete
+        pvc: Delete
+        configMap: Delete
+        service: Delete
+      reconcileFailedObjects:
+        statefulSet: Retain
+        pvc: Retain
+        configMap: Retain
+        service: Retain
 
   # List of templates used by a CHI
   useTemplates:
@@ -31,10 +51,14 @@ spec:
     distributedDDL:
       profile: default
     templates:
+      hostTemplate: host-template-custom-ports
       podTemplate: clickhouse-v20.6
       dataVolumeClaimTemplate: default-volume-claim
       logVolumeClaimTemplate: default-volume-claim
       serviceTemplate: chi-service-template
+      clusterServiceTemplate: cluster-service-template
+      shardServiceTemplate: shard-service-template
+      replicaServiceTemplate: replica-service-template
 
   configuration:
     zookeeper:
@@ -178,6 +202,13 @@ spec:
                     replicaServiceTemplate: replica-service-template
 
   templates:
+    hostTemplates:
+      - name: host-template-custom-ports
+        spec:
+          tcpPort: 7000
+          httpPort: 7001
+          interserverHTTPPort: 7002
+
     serviceTemplates:
       - name: chi-service-template
         # generateName understands different sets of macroses,
@@ -331,44 +362,54 @@ spec:
         # Possible values for podDistribution are:
         # Unspecified - empty value
         # ClickHouseAntiAffinity - AntiAffinity by ClickHouse instances.
-        #   Pod pushes away other ClickHouse pods, which allows one ClickHouse instance per node
+        #   Pod pushes away other ClickHouse pods, which allows one ClickHouse instance per topologyKey-specified unit
         #   CH - (push away) - CH - (push away) - CH
         # ShardAntiAffinity - AntiAffinity by shard name.
-        #   Pod pushes away other pods of the same shard (replicas of this shard), which allows one replica of a shard per node.
-        #   Other shards are allowed - it does not push alll shards away, the same only.
-        #   Used for data loss avoidance - keeps all copies of the shard on different nodes.
+        #   Pod pushes away other pods of the same shard (replicas of this shard),
+        #   which allows one replica of a shard instance per topologyKey-specified unit.
+        #   Other shards are allowed - it does not push all shards away, but CH-instances of the same shard only.
+        #   Used for data loss avoidance - keeps all copies of the shard on different topologyKey-specified units.
         #   shard1,replica1 - (push away) - shard1,replica2 - (push away) - shard1,replica3
         # ReplicaAntiAffinity - AntiAffinity by replica name.
-        #   Pod pushes away other pods of the same replica (shards of this replica), which allows one shard of a replica per node.
-        #   Other replicas are allowed - it does not push all replicas away, the same only.
+        #   Pod pushes away other pods of the same replica (shards of this replica),
+        #   which allows one shard of a replica per topologyKey-specified unit.
+        #   Other replicas are allowed - it does not push all replicas away, but CH-instances of the same replica only.
         #   Used to evenly distribute load from "full cluster scan" queries.
         #   shard1,replica1 - (push away) - shard2,replica1 - (push away) - shard3,replica1
         # AnotherNamespaceAntiAffinity - AntiAffinity by "another" namespace.
-        #   Pod pushes away pods from another namespace, which allows same-namespace pods per node
+        #   Pod pushes away pods from another namespace, which allows same-namespace pods per topologyKey-specified unit.
         #   ns1 - (push away) - ns2 - (push away) - ns3
         # AnotherClickHouseInstallationAntiAffinity - AntiAffinity by "another" ClickHouseInstallation name.
-        #   Pod pushes away pods from another ClickHouseInstallation, which allows same-ClickHouseInstallation pods per node.
+        #   Pod pushes away pods from another ClickHouseInstallation,
+        #   which allows same-ClickHouseInstallation pods per topologyKey-specified unit.
         #   CHI1 - (push away) - CHI2 - (push away) - CHI3
         # AnotherClusterAntiAffinity - AntiAffinity by "another" cluster name.
-        #   Pod pushes away pods from another Cluster, which allows same-cluster pods per node
+        #   Pod pushes away pods from another Cluster,
+        #   which allows same-cluster pods per topologyKey-specified unit.
         #   cluster1 - (push away) - cluster2 - (push away) - cluster3
         # MaxNumberPerNode - AntiAffinity by cycle index.
-        #   Pod pushes away pods from the same cycle, which allows to specify maximum number of ClickHouse instances per node.
+        #   Pod pushes away pods from the same cycle,
+        #   which allows to specify maximum number of ClickHouse instances per topologyKey-specified unit.
         #   Used to setup circular replication.
         # NamespaceAffinity - Affinity by namespace.
-        #   Pod attracts pods from the same namespace, which allows pods from same namespace per node.
+        #   Pod attracts pods from the same namespace,
+        #   which allows pods from same namespace per topologyKey-specified unit.
         #   ns1 + (attracts) + ns1
         # ClickHouseInstallationAffinity - Affinity by ClickHouseInstallation name.
-        #   Pod attracts pods from the same ClickHouseInstallation, which allows pods from the same CHI per node.
+        #   Pod attracts pods from the same ClickHouseInstallation,
+        #   which allows pods from the same CHI per topologyKey-specified unit.
         #   CHI1 + (attracts) + CHI1
         # ClusterAffinity - Affinity by cluster name.
-        #   Pod attracts pods from the same cluster, which allows pods from the same Cluster per node.
+        #   Pod attracts pods from the same cluster,
+        #   which allows pods from the same Cluster per topologyKey-specified unit.
         #   cluster1 + (attracts) + cluster1
         # ShardAffinity - Affinity by shard name.
-        #   Pod attracts pods from the same shard, which allows pods from the same Shard per node.
+        #   Pod attracts pods from the same shard,
+        #   which allows pods from the same Shard per topologyKey-specified unit.
         #   shard1 + (attracts) + shard1
         # ReplicaAffinity - Affinity by replica name.
-        #   Pod attracts pods from the same replica, which allows pods from the same Replica per node.
+        #   Pod attracts pods from the same replica,
+        #   which allows pods from the same Replica per topologyKey-specified unit.
         #   replica1 + (attracts) + replica1
         # PreviousTailAffinity - Affinity to overlap cycles. Used to make cycle pod distribution
         #   cycle head + (attracts to) + previous cycle tail
@@ -376,6 +417,10 @@ spec:
           - type: ShardAntiAffinity
           - type: MaxNumberPerNode
             number: 2
+            # Apply podDistribution on per-host basis
+            topologyKey: "kubernetes.io/hostname"
+            # Apply podDistribution on per-zone basis
+            #topologyKey: "kubernetes.io/zone"
 
         # type PodSpec struct {} from k8s.io/core/v1
         spec:

@@ -6,14 +6,29 @@ def total_cpus
   Etc.nprocessors
 end
 
+def get_provider
+    provider='virtualbox'
+    for arg in ARGV
+        if ['hyperv','docker'].include? arg
+            provider=arg
+        end
+    end
+    return provider
+end
+
 
 Vagrant.configure(2) do |config|
-  config.vm.box = "ubuntu/focal64"
+  config.vm.box = "generic/ubuntu2004"
   config.vm.box_check_update = false
-  config.vm.synced_folder ".", "/vagrant"
+
+  if get_provider == "hyperv"
+    config.vm.synced_folder ".", "/vagrant", type: "smb", smb_username: ENV['USERNAME'], smb_password: ENV['PASSWORD'], mount_options: ["vers=3.0"]
+  else
+    config.vm.synced_folder ".", "/vagrant"
+  end
 
   if Vagrant.has_plugin?("vagrant-vbguest")
-    config.vbguest.auto_update = false
+    config.vbguest.auto_update = true
   end
 
   if Vagrant.has_plugin?("vagrant-timezone")
@@ -32,24 +47,37 @@ Vagrant.configure(2) do |config|
     vb.customize ["guestproperty", "set", :id, "/VirtualBox/GuestAdd/VBoxService/--timesync-set-threshold", 10000]
   end
 
+  config.vm.provider "hyperv" do |hv|
+    # hv.gui = false
+    # hv.default_nic_type = "virtio"
+    hv.cpus = total_cpus
+    hv.maxmemory = "6144"
+    hv.memory = "6144"
+    hv.enable_virtualization_extensions = true
+    hv.linked_clone = true
+    hv.vm_integration_services = {
+        time_synchronization: true,
+    }
+  end
+
   config.vm.define :clickhouse_operator do |clickhouse_operator|
     clickhouse_operator.vm.network "private_network", ip: "172.16.2.99", nic_type: "virtio"
     # port forwarding works only when pair with kubectl port-forward
     # grafana
-    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 3000, host_ip: "127.0.0.1", host: 3000
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 3000, host_ip: "127.0.0.1", host: 3000
     # mertics-exporter
-    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 8888, host_ip: "127.0.0.1", host: 8888
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 8888, host_ip: "127.0.0.1", host: 8888
     # prometheus
-    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 9090, host_ip: "127.0.0.1", host: 9090
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 9090, host_ip: "127.0.0.1", host: 9090
     # alertmanager
-    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 9093, host_ip: "127.0.0.1", host: 9093
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 9093, host_ip: "127.0.0.1", host: 9093
 
     # devspace UI
-    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 8090, host_ip: "127.0.0.1", host: 8090
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 8090, host_ip: "127.0.0.1", host: 8090
 
     # delve for devspace
-    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 40001, host_ip: "127.0.0.1", host: 40001
-    clickhouse_operator.vm.network "forwarded_port", guest_ip: "127.0.0.1", guest: 40002, host_ip: "127.0.0.1", host: 40002
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 40001, host_ip: "127.0.0.1", host: 40001
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 40002, host_ip: "127.0.0.1", host: 40002
 
     clickhouse_operator.vm.host_name = "local-altinity-clickhouse-operator"
     # vagrant plugin install vagrant-disksize
@@ -59,26 +87,41 @@ Vagrant.configure(2) do |config|
   config.vm.provision "shell", inline: <<-SHELL
     set -xeuo pipefail
     export DEBIAN_FRONTEND=noninteractive
-    export SLEEP_BEFORE_RUN=0
+    # make linux fast again
+    if [[ "0" == $(grep "mitigations" /etc/default/grub | wc -l) ]]; then
+        echo 'GRUB_CMDLINE_LINUX="noibrs noibpb nopti nospectre_v2 nospectre_v1 l1tf=off nospec_store_bypass_disable no_stf_barrier mds=off tsx=on tsx_async_abort=off mitigations=off"' >> /etc/default/grub
+        echo 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash noibrs noibpb nopti nospectre_v2 nospectre_v1 l1tf=off nospec_store_bypass_disable no_stf_barrier mds=off tsx=on tsx_async_abort=off mitigations=off"' >> /etc/default/grub
+        grub-mkconfig
+    fi
+    systemctl enable systemd-timesyncd
+    systemctl start systemd-timesyncd
 
     apt-get update
     apt-get install --no-install-recommends -y apt-transport-https ca-certificates software-properties-common curl
-    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git ntp
+    apt-get install --no-install-recommends -y htop ethtool mc curl wget jq socat git make gcc g++
 
     # yq
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys CC86BB64
+    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys CC86BB64
     add-apt-repository ppa:rmescandon/yq
     apt-get install --no-install-recommends -y yq
 
     # clickhouse
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E0C56BD4
+    apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv E0C56BD4
     add-apt-repository "deb http://repo.clickhouse.tech/deb/stable/ main/"
     apt-get install --no-install-recommends -y clickhouse-client
 
+    # golang
+    export GOLANG_VERSION=1.17
+    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F6BC817356A3D45E
+    add-apt-repository ppa:longsleep/golang-backports
+    apt-get install --no-install-recommends -y golang-${GOLANG_VERSION}-go
+    ln -nvsf /usr/lib/go-${GOLANG_VERSION}/bin/go /bin/go
+    ln -nvsf /usr/lib/go-${GOLANG_VERSION}/bin/gofmt /bin/gofmt
+
     # docker
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 8D81803C0EBFCD88
-    add-apt-repository "deb https://download.docker.com/linux/ubuntu focal edge"
-    apt-get install --no-install-recommends -y docker-ce
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+    add-apt-repository "deb https://download.docker.com/linux/ubuntu $(lsb_release -cs) test"
+    apt-get install --no-install-recommends -y docker-ce pigz
 
     # docker compose
     apt-get install -y --no-install-recommends python3-distutils
@@ -96,9 +139,15 @@ Vagrant.configure(2) do |config|
     sha256sum -c /usr/local/bin/k9s.sha256
     tar --verbose -zxvf /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz -C /usr/local/bin k9s
 
+    # audit2rbac
+    AUDIT2RBAC_VERSION=0.8.0
+    curl -sL https://github.com/liggitt/audit2rbac/releases/download/v${AUDIT2RBAC_VERSION}/audit2rbac-linux-amd64.tar.gz | tar -zxvf - -C /usr/local/bin
 
     # minikube
-    MINIKUBE_VERSION=1.12.3
+    # MINIKUBE_VERSION=1.18.1
+    # MINIKUBE_VERSION=1.19.0
+    # MINIKUBE_VERSION=1.20.0
+    MINIKUBE_VERSION=1.23.2
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -108,11 +157,17 @@ Vagrant.configure(2) do |config|
 #    export VALIDATE_YAML=false # only for 1.14
 #    K8S_VERSION=${K8S_VERSION:-1.15.12}
 #    K8S_VERSION=${K8S_VERSION:-1.16.15}
-#    K8S_VERSION=${K8S_VERSION:-1.17.12}
-#    K8S_VERSION=${K8S_VERSION:-1.18.9}
-    K8S_VERSION=${K8S_VERSION:-1.19.2}
+#    K8S_VERSION=${K8S_VERSION:-1.17.17}
+#    K8S_VERSION=${K8S_VERSION:-1.18.20}
+#    K8S_VERSION=${K8S_VERSION:-1.19.14}
+#    performance issue 1.20.x, 1.21.x
+#    https://github.com/kubernetes/kubeadm/issues/2395
+#    K8S_VERSION=${K8S_VERSION:-1.20.10}
+#    K8S_VERSION=${K8S_VERSION:-1.21.4}
+    K8S_VERSION=${K8S_VERSION:-1.22.2}
     export VALIDATE_YAML=true
 
+    killall kubectl || true
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl
     chmod +x /usr/local/bin/kubectl
 
@@ -120,24 +175,29 @@ Vagrant.configure(2) do |config|
     mkdir -p /home/vagrant/.minikube
     ln -svf /home/vagrant/.minikube /root/.minikube
 
+    mkdir -p /root/.minikube/files/etc/ssl/certs
+
+cat <<EOF >/root/.minikube/files/etc/ssl/certs/audit-policy.yaml
+    # Log all requests at the Metadata level.
+    apiVersion: audit.k8s.io/v1
+    kind: Policy
+    rules:
+    - level: Metadata
+EOF
+
     mkdir -p /home/vagrant/.kube
     ln -svf /home/vagrant/.kube /root/.kube
 
     chown vagrant:vagrant -R /home/vagrant/
 
-#    sudo -H -u vagrant minikube config set vm-driver docker
-#    sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
-#    sudo -H -u vagrant minikube start
-#    sudo -H -u vagrant minikube addons enable ingress
-#    sudo -H -u vagrant minikube addons enable ingress-dns
-#    sudo -H -u vagrant minikube addons enable metrics-server
-
-    minikube config set vm-driver none
-    minikube config set kubernetes-version ${K8S_VERSION}
-    minikube start --vm=true
-#    minikube addons enable ingress
-#    minikube addons enable ingress-dns
-    minikube addons enable metrics-server
+    sudo -H -u vagrant minikube delete
+    sudo -H -u vagrant minikube config set memory 5G
+    sudo -H -u vagrant minikube config set driver docker
+    sudo -H -u vagrant minikube config set kubernetes-version ${K8S_VERSION}
+    sudo -H -u vagrant minikube start --extra-config=apiserver.audit-policy-file=/etc/ssl/certs/audit-policy.yaml --extra-config=apiserver.audit-log-path=-
+    sudo -H -u vagrant minikube addons enable ingress
+    sudo -H -u vagrant minikube addons enable ingress-dns
+    sudo -H -u vagrant minikube addons enable metrics-server
 
     #krew
     (
@@ -151,9 +211,14 @@ Vagrant.configure(2) do |config|
     source $HOME/.bashrc
     export KREW_ROOT=/home/vagrant/.krew
     kubectl krew install tap
-    kubectl krew install debug
     kubectl krew install sniff
     kubectl krew install flame
+    kubectl krew install minio
+    # look to https://kubernetes.io/docs/tasks/debug-application-cluster/debug-running-pod/#ephemeral-container
+    # kubectl krew install debug
+    chown -R vagrant:vagrant /home/vagrant/.krew
+
+    export NO_WAIT=1
 
     cd /vagrant/
 
@@ -175,6 +240,8 @@ Vagrant.configure(2) do |config|
 
     # docker build
     export COMPANY_REPO=${COMPANY_REPO:-altinity}
+    go mod download -x
+    go mod vendor
     time docker build -f dockerfile/operator/Dockerfile --target operator -t $COMPANY_REPO/clickhouse-operator:$OPERATOR_RELEASE .
     time docker build -f dockerfile/metrics-exporter/Dockerfile --target metrics-exporter -t $COMPANY_REPO/metrics-exporter:$OPERATOR_RELEASE .
 
@@ -191,6 +258,17 @@ Vagrant.configure(2) do |config|
     cd /vagrant/deploy/prometheus/
     kubectl delete ns ${PROMETHEUS_NAMESPACE} || true
     bash -xe ./create-prometheus.sh
+    cd /vagrant/
+
+    export MINIO_NAMESPACE=${MINIO_NAMESPACE:-minio}
+    cd /vagrant/deploy/minio/
+    kubectl delete ns ${MINIO_NAMESPACE} || true
+    bash -xe ./install-minio-operator.sh
+    bash -xe ./install-minio-tenant.sh
+    # kubectl create ns ${MINIO_NAMESPACE}
+    # kubectl minio init --namespace ${MINIO_NAMESPACE}
+    # kubectl minio tenant create --name minio --namespace ${MINIO_NAMESPACE} --servers 1 --volumes 4 --capacity 10Gi --storage-class standard
+
     cd /vagrant/
 
     # install grafana-operator + grafana instance + GrafanaDashboard, GrafanaDatasource for clickhouse
@@ -226,9 +304,12 @@ Vagrant.configure(2) do |config|
 
     pip3 install -r /vagrant/tests/requirements.txt
 
-    python3 /vagrant/tests/test.py --only=operator/*
-    python3 /vagrant/tests/test_examples.py
-    python3 /vagrant/tests/test_metrics_exporter.py
-    python3 /vagrant/tests/test_metrics_alerts.py
+    python3 /vagrant/tests/regression.py --native
+
+    # audit2rbac
+    kubectl logs kube-apiserver-minikube -n kube-system | grep audit.k8s.io/v1 > /tmp/audit2rbac.log
+    audit2rbac -f /tmp/audit2rbac.log --serviceaccount kube-system:clickhouse-operator > /tmp/audit2rbac.yaml
+    # cp -fv /tmp/audit2rbac.yaml /vagrant/deploy/dev/clickhouse-operator-install-yaml-template-02-section-rbac-restricted.yaml
+
   SHELL
 end

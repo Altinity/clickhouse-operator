@@ -28,5 +28,22 @@ dev/log
 /.vagrant
 /.DS_Store
 
+# Skip vendor
+vendor
+
+operator_output
+.gitsecret/keys/random_seed
+!*.secret
+dockerfile/actions
+
+# python virtualenv
+venv
+
+# Tests cached files
+tests/image/cache
+
+# Skip tmp folder
+/tmp/
+
 # Ignore DevSpace cache and log folder
 /.devspace

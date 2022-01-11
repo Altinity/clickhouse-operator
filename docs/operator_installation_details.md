@@ -1,13 +1,31 @@
 # Install ClickHouse Operator
 
-Verify [clickhouse-operator-install.yaml][clickhouse-operator-install.yaml] file availability.
+# Prerequisites
+
+1. Kubernetes instance with the following version considerations:
+    1. `clickhouse-operator` versions **before** `0.16.0` is compatible with [Kubenetes after `1.16` and prior `1.22`](https://kubernetes.io/releases/).
+    1. `clickhouse-operator` versions `0.16.0` **and after** is compatible [Kubernetes version `1.16` and after](https://kubernetes.io/releases/).
+1. Properly configured `kubectl`
+1. `curl`
+
+Verify the Docker manifest is available based on the version table, replacing `{OPERATOR_VERSION}` with the specific version.  For example, for version `0.16.0`, the URL would be `https://github.com/Altinity/clickhouse-operator/raw/0.16.0/deploy/operator/clickhouse-operator-install-bundle.yaml`.
+
+| `clickhouse-operator` version | Kubernetes version | Docker manifest URL |
+|---|---|---|
+| Current | Kubernetes 1.16+ | https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-bundle.yaml |
+| Current | Kubernetes before 1.16 | **(Beta)** https://github.com/Altinity/clickhouse-operator/raw/master/deploy/operator/clickhouse-operator-install-bundle-v1beta1.yaml |
+| `0.16.0` and greater | Kubernetes 1.16+ | https://github.com/Altinity/clickhouse-operator/raw/{OPERATOR_VERSION}/deploy/operator/clickhouse-operator-install-bundle.yaml |
+| Before `0.16.0` | Kubernetes after 1.16 and before 1.22 | kubectl apply -f  https://github.com/Altinity/clickhouse-operator/raw/{OPERATOR_VERSION}/deploy/operator/clickhouse-operator-install.yaml |
+
+[clickhouse-operator-install-bundle.yaml][clickhouse-operator-install-bundle.yaml] file availability.
 In is located in `deploy/operator` folder inside `clickhouse-operator` sources.
 
 ## Install
+
 Operator installation process is quite straightforward and consists of one main step - deploy **ClickHouse operator**.
 We'll apply operator manifest directly from github repo
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install.yaml
+kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-bundle.yaml
 ```
 
 The following results are expected:
@@ -19,7 +37,9 @@ deployment.apps/clickhouse-operator configured
 ```
 
 ## Verify operator is up and running
-Operator is deployed in **kube-system** namespace 
+
+Operator is deployed in **kube-system** namespace.
+
 ```bash
 kubectl get pods --namespace kube-system
 ```
@@ -139,7 +159,7 @@ clickhouse-operator    1/1     1            1           31m
 
 ```
 
-[clickhouse-operator-install.yaml]: ../deploy/operator/clickhouse-operator-install.yaml
+[clickhouse-operator-install-bundle.yaml]: ../deploy/operator/clickhouse-operator-install-bundle.yaml
 [customresourcedefinitions]: https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions
 [configure-service-account]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
 [rolebinding-and-clusterrolebinding]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#rolebinding-and-clusterrolebinding

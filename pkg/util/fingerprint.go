@@ -14,6 +14,7 @@
 
 package util
 
+// Fingerprint creates object's fingerprint
 func Fingerprint(obj interface{}) string {
-	return HashIntoString(serialize(obj))
+	return HashIntoString(serializeRepeatable(obj))
 }

@@ -1,0 +1,29 @@
+name: build_branch
+
+on:
+  push:
+    branches:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  build_master:
+    name: Build branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build and push Docker images
+        env:
+          DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+        run: |
+          export CHO_RELEASE=$(cat release)
+
+          echo "${DOCKER_PASS}" | docker login -u $DOCKER_USER --password-stdin docker.io
+          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/operator/Dockerfile -t docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE} --pull --push  .
+          docker buildx build --progress plain --platform=linux/amd64,linux/arm64 -f dockerfile/metrics-exporter/Dockerfile -t docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE} --pull --push .

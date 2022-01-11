@@ -14,6 +14,7 @@
 
 package metrics
 
+// WatchedCHI specifies watched CLickHouseInstallation
 type WatchedCHI struct {
 	Namespace string   `json:"namespace"`
 	Name      string   `json:"name"`

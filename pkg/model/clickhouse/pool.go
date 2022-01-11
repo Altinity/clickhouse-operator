@@ -15,10 +15,9 @@
 package clickhouse
 
 import (
-	log "github.com/golang/glog"
-	// log "k8s.io/klog"
-
 	"sync"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 )
 
 var (
@@ -28,12 +27,12 @@ var (
 
 // GetPooledDBConnection gets connection out of the pool.
 // In case no connection available new connection is created and returned.
-func GetPooledDBConnection(params *CHConnectionParams) *CHConnection {
+func GetPooledDBConnection(params *ConnectionParams) *Connection {
 	key := makePoolKey(params)
 
 	if connection, existed := dbConnectionPool.Load(key); existed {
-		log.V(2).Infof("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
-		return connection.(*CHConnection)
+		log.V(2).F().Info("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
+		return connection.(*Connection)
 	}
 
 	// Pooled connection not found, need to add it to the pool
@@ -43,28 +42,29 @@ func GetPooledDBConnection(params *CHConnectionParams) *CHConnection {
 
 	// Double check for race condition
 	if connection, existed := dbConnectionPool.Load(key); existed {
-		log.V(2).Infof("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
-		return connection.(*CHConnection)
+		log.V(2).F().Info("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
+		return connection.(*Connection)
 	}
 
-	log.V(2).Infof("Add connection to the pool: %s", params.GetDSNWithHiddenCredentials())
+	log.V(2).F().Info("Add connection to the pool: %s", params.GetDSNWithHiddenCredentials())
 	dbConnectionPool.Store(key, NewConnection(params))
 
 	// Fetch from the pool
 	if connection, existed := dbConnectionPool.Load(key); existed {
-		log.V(2).Infof("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
-		return connection.(*CHConnection)
+		log.V(2).F().Info("Found pooled connection: %s", params.GetDSNWithHiddenCredentials())
+		return connection.(*Connection)
 	}
 
 	return nil
 }
 
+// DropHost deletes host from the pool
 // TODO we need to be able to remove entries from the pool
 func DropHost(host string) {
 
 }
 
 // makePoolKey makes key out of connection params to be used by the pool
-func makePoolKey(params *CHConnectionParams) string {
+func makePoolKey(params *ConnectionParams) string {
 	return params.GetDSN()
 }

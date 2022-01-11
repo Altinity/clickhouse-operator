@@ -15,20 +15,15 @@
 package util
 
 import (
+	// #nosec
+	// G505 (CWE-327): Blocklisted import crypto/sha1: weak cryptographic primitive
+	// It is good enough for string ID
 	"crypto/sha1"
 	"encoding/hex"
-	"math/rand"
 	"strings"
-	"time"
 )
 
-// RandomString generates random string
-func RandomString() string {
-	b := make([]byte, 3)
-	rand.New(rand.NewSource(time.Now().UnixNano())).Read(b)
-	return hex.EncodeToString(b)
-}
-
+// Set of string boolean constants
 const (
 	StringBool0                    = "0"
 	StringBool1                    = "1"
@@ -44,6 +39,10 @@ const (
 	StringBoolOffLowercase         = "off"
 	StringBoolOnFirstCapital       = "On"
 	StringBoolOnLowercase          = "on"
+	StringBoolDisableFirstCapital  = "Disable"
+	StringBoolDisableLowercase     = "disable"
+	StringBoolEnableFirstCapital   = "Enable"
+	StringBoolEnableLowercase      = "enable"
 	StringBoolDisabledFirstCapital = "Disabled"
 	StringBoolDisabledLowercase    = "disabled"
 	StringBoolEnabledFirstCapital  = "Enabled"
@@ -66,6 +65,9 @@ func IsStringBool(str string) bool {
 		StringBoolOffLowercase,
 		StringBoolOnLowercase,
 
+		StringBoolDisableLowercase,
+		StringBoolEnableLowercase,
+
 		StringBoolDisabledLowercase,
 		StringBoolEnabledLowercase:
 		return true
@@ -75,7 +77,7 @@ func IsStringBool(str string) bool {
 	}
 }
 
-// IsStringBool checks whether str is a string as bool "false" value
+// IsStringBoolFalse checks whether str is a string as bool "false" value
 func IsStringBoolFalse(str string) bool {
 	switch strings.ToLower(str) {
 	case
@@ -83,6 +85,7 @@ func IsStringBoolFalse(str string) bool {
 		StringBoolFalseLowercase,
 		StringBoolNoLowercase,
 		StringBoolOffLowercase,
+		StringBoolDisableLowercase,
 		StringBoolDisabledLowercase:
 		return true
 
@@ -91,7 +94,7 @@ func IsStringBoolFalse(str string) bool {
 	}
 }
 
-// IsStringBool checks whether str is a string as bool "true" value
+// IsStringBoolTrue checks whether str is a string as bool "true" value
 func IsStringBoolTrue(str string) bool {
 	switch strings.ToLower(str) {
 	case
@@ -99,6 +102,7 @@ func IsStringBoolTrue(str string) bool {
 		StringBoolTrueLowercase,
 		StringBoolYesLowercase,
 		StringBoolOnLowercase,
+		StringBoolEnableLowercase,
 		StringBoolEnabledLowercase:
 		return true
 
@@ -124,9 +128,9 @@ func CastStringBoolTo01(str string, defaultValue bool) string {
 
 	if defaultValue {
 		return _true
-	} else {
-		return _false
 	}
+
+	return _false
 }
 
 // CastStringBoolToStringTrueFalse casts string-bool into string "true/false"
@@ -146,14 +150,17 @@ func CastStringBoolToStringTrueFalse(str string, defaultValue bool) string {
 
 	if defaultValue {
 		return _true
-	} else {
-		return _false
 	}
+
+	return _false
 }
 
 // CreateStringID creates HEX hash ID out of string.
 // In case maxHashLen == 0 the whole hash is returned
 func CreateStringID(str string, maxHashLen int) string {
+	// #nosec
+	// G401 (CWE-326): Use of weak cryptographic primitive
+	// It is good enough for string ID
 	sha := sha1.New()
 	sha.Write([]byte(str))
 	hash := hex.EncodeToString(sha.Sum(nil))

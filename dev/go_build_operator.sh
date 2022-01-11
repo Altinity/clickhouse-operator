@@ -8,7 +8,9 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
 # Build clickhouse-operator install .yaml manifest
-"${MANIFESTS_ROOT}/operator/build-clickhouse-operator-install-yaml.sh"
+"${MANIFESTS_ROOT}/builder/build-clickhouse-operator-configs.sh"
+# Build clickhouse-operator install .yaml manifest
+"${MANIFESTS_ROOT}/builder/build-clickhouse-operator-install-yaml.sh"
 
 # Prepare modules
 if [[ "0" == "${BUILD_IN_DOCKER:-0}" ]]; then
@@ -20,8 +22,8 @@ fi
 OUTPUT_BINARY="${OPERATOR_BIN}"
 MAIN_SRC_FILE="${SRC_ROOT}/cmd/operator/main.go"
 
-GOOS=linux
-GOARCH=amd64
+GOOS=${GOOS:-linux}
+GOARCH=${GOARCH:-amd64}
 
 if CGO_ENABLED=0 GO111MODULE=on GOOS="${GOOS}" GOARCH="${GOARCH}" go build \
     -mod="${MODULES_DIR}" \

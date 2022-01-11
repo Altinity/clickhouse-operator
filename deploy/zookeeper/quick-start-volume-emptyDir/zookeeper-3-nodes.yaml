@@ -59,6 +59,8 @@ kind: StatefulSet
 metadata:
   # nodes would be named as zookeeper-0, zookeeper-1, zookeeper-2
   name: zookeeper
+  labels:
+    app: zookeeper
 spec:
   selector:
     matchLabels:
@@ -93,8 +95,11 @@ spec:
           image: "docker.io/zookeeper:3.6.1"
           resources:
             requests:
-              memory: "1Gi"
-              cpu: "0.5"
+              memory: "512M"
+              cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
           ports:
             - containerPort: 2181
               name: client
@@ -136,8 +141,8 @@ spec:
                 echo 'preAllocSize=131072'
                 echo 'snapCount=3000000'
                 echo 'leaderServes=yes'
-                echo 'standaloneEnabled=true'
-                echo '4lw.commands.whitelist=stat, ruok, conf, isro'
+                echo 'standaloneEnabled=false'
+                echo '4lw.commands.whitelist=*'
                 echo 'metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider'
                 echo "metricsProvider.httpPort=${PROMETHEUS_PORT}"
               } > /conf/zoo.cfg &&
@@ -150,7 +155,7 @@ spec:
                 echo "log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout"
                 echo "log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n"
               } > /conf/log4j.properties &&
-              echo 'JVMFLAGS="-Xms128M -Xmx1G -XX:+UseG1GC -XX:+CMSParallelRemarkEnabled"' > /conf/java.env &&
+              echo 'JVMFLAGS="-Xms128M -Xmx4G -XX:+UseG1GC -XX:+CMSParallelRemarkEnabled -XX:ActiveProcessorCount=8"' > /conf/java.env &&
               if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
                   NAME=${BASH_REMATCH[1]}
                   ORD=${BASH_REMATCH[2]}
@@ -162,11 +167,21 @@ spec:
               mkdir -p ${ZOO_DATA_LOG_DIR} &&
               export MY_ID=$((ORD+1)) &&
               echo $MY_ID > $ZOO_DATA_DIR/myid &&
-              if [[ $SERVERS -gt 1 ]]; then
-                for (( i=1; i<=$SERVERS; i++ )); do
-                    echo "server.$i=$NAME-$((i-1)).$DOMAIN:$SERVER_PORT:$ELECTION_PORT" >> /conf/zoo.cfg;
-                done
+              for (( i=1; i<=$SERVERS; i++ )); do
+                  echo "server.$i=$NAME-$((i-1)).$DOMAIN:$SERVER_PORT:$ELECTION_PORT" >> /conf/zoo.cfg;
+              done &&
+              if [[ $SERVERS -eq 1 ]]; then
+                  echo "group.1=1" >> /conf/zoo.cfg;
+              else
+                  echo "group.1=1:2:3" >> /conf/zoo.cfg;
               fi &&
+              for (( i=1; i<=$SERVERS; i++ )); do
+                  WEIGHT=1
+                  if [[ $i == 1 ]]; then
+                    WEIGHT=10
+                  fi
+                  echo "weight.$i=$WEIGHT" >> /conf/zoo.cfg;
+              done &&
               chown -Rv zookeeper "$ZOO_DATA_DIR" "$ZOO_DATA_LOG_DIR" "$ZOO_LOG_DIR" "$ZOO_CONF_DIR" &&
               zkServer.sh start-foreground
           readinessProbe:
@@ -174,7 +189,30 @@ spec:
               command:
                 - bash
                 - -c
-                - "OK=$(echo ruok | nc 127.0.0.1 2181); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
+                - "OK=$(echo ruok | nc 127.0.0.1 2181);
+                   if [[ \"$OK\" == \"imok\" ]];
+                   then
+                      STATE=$(echo mntr | nc 127.0.0.1 2181 | grep zk_server_state | cut -d \" \" -f 2);
+                      if [[ \"$STATE\" == \"leader\" ]]; then
+                        SYNCED_FOLLOWERS=$(echo mntr | nc 127.0.0.1 2181 | grep zk_synced_followers | cut -d \" \" -f 2 | cut -d \".\" -f 1);
+                        if [[ $SYNCED_FOLLOWERS == $(( $SERVERS - 1 )) ]]; then
+                          ./bin/zkCli.sh ls /;
+                          exit $?;
+                        else
+                          exit 1;
+                        fi;
+                      elif [[ \"$STATE\" == \"follower\" ]]; then
+                        PEER_STATE=$(echo mntr | nc 127.0.0.1 2181 | grep zk_peer_state);
+                        if [[ \"$PEER_STATE\" == \"following - broadcast\" ]]; then
+                          ./bin/zkCli.sh ls /;
+                          exit $?;
+                        else
+                          exit 1;
+                        fi;
+                      fi;
+                    else
+                      exit 1;
+                    fi"
             initialDelaySeconds: 10
             timeoutSeconds: 5
           livenessProbe:

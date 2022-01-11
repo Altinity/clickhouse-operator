@@ -1,0 +1,30 @@
+version: '2.3'
+
+services:
+  runner:
+    image: ${CLICKHOUSE_OPERATOR_TESTS_IMAGE:-registry.gitlab.com/altinity-qa/clickhouse/cicd/clickhouse-operator}:${CLICKHOUSE_OPERATOR_TESTS_VERSION:-latest}
+    build:
+      context: "../image/"
+      dockerfile: "../image/Dockerfile"
+    volumes:
+      - "../../:/home/master/clickhouse-operator/"
+      - "../image/dockerd-start.sh:/usr/local/bin/dockerd-start.sh"
+    privileged: true
+    network_mode: "host"
+    healthcheck:
+      test: kubectl get pods --namespace kube-system | grep clickhouse-operator | grep Running || exit 1
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+    cap_add:
+      - NET_ADMIN
+
+  # dummy service which does nothing, but allows to postpone
+  # 'docker-compose up -d' till all dependecies will go healthy
+  all_services_ready:
+    image: hello-world
+    privileged: true
+    depends_on:
+      runner:
+        condition: service_healthy
