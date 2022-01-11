@@ -72,9 +72,9 @@ func (c *Cluster) getConnection(host string) *Connection {
 
 // QueryAny walks over all endpoints and runs query sequentially on each of them.
 // In case endpoint returned result, walk is completed and result is returned.
-// In case endpoint failed, continue with next endpoint.
+// In case endpoint failed, continue with the next endpoint.
 func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error) {
-	// Try to fetch data from any of endpoints.
+	// Try to fetch data from any of the endpoints.
 	for _, host := range c.Hosts {
 		if util.IsContextDone(ctx) {
 			c.l.V(2).Info("ctx is done")
