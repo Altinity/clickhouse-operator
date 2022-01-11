@@ -1,0 +1,24 @@
+# Template Parameters:
+#
+# NAMESPACE=${NAMESPACE}
+# COMMENT=${COMMENT}
+#
+# Setup ClusterIP Service to provide dev options
+# for remote debugging by external IDEs.
+# In order to get access outside of k8s it should be exposed as:
+# kubectl --namespace dev port-forward service/clickhouse-operator-dev 2345
+# and point browser to localhost:2345
+kind: Service
+apiVersion: v1
+metadata:
+  name: clickhouse-operator-dev
+  ${COMMENT}namespace: ${NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: ${OPERATOR_VERSION}
+    app: clickhouse-operator
+spec:
+  ports:
+    - port: 2345
+      targetPort: 2345
+  selector:
+    app: clickhouse-operator
