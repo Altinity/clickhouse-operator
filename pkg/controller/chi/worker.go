@@ -1190,6 +1190,10 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 			w.a.V(1).M(new).F().Info("CRD %s/%s BEING DELETED, operator will NOT delete child resources", crd.Namespace, crd.Name)
 			clear = false
 		}
+	} else {
+		w.a.V(1).M(new).F().Error("unable to get CRD, got error: %v ", err)
+		w.a.V(1).M(new).F().Info("will delete chi %s/%s", new.Namespace, new.Name)
+		clear = true
 	}
 
 	if clear {
