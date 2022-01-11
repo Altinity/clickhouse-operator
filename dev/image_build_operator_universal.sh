@@ -7,6 +7,7 @@ TAG="${TAG:-sunsingerus/clickhouse-operator:dev}"
 DOCKERHUB_LOGIN="${DOCKERHUB_LOGIN}"
 DOCKERHUB_PUBLISH="${DOCKERHUB_PUBLISH:-yes}"
 MINIKUBE="${MINIKUBE:-no}"
+BUILD_TYPE="${BUILD_TYPE:-prod}"
 
 # Source-dependent options
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
@@ -28,17 +29,17 @@ if [[ "${MINIKUBE}" == "yes" ]]; then
 fi
 
 if ! docker run --rm --privileged multiarch/qemu-user-static --reset -p yes; then
-  sudo apt-get install -y qemu binfmt-support qemu-user-static
+    sudo apt-get install -y qemu binfmt-support qemu-user-static
 fi
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
 DOCKER_CMD="docker buildx build --platform=linux/amd64,linux/arm64"
 
 if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
-  DOCKER_CMD="${DOCKER_CMD} --push"
+    DOCKER_CMD="${DOCKER_CMD} --push"
 fi
 
-DOCKER_CMD="${DOCKER_CMD} -t ${TAG} -f ${DOCKERFILE} ${SRC_ROOT}"
+DOCKER_CMD="${DOCKER_CMD} -t ${TAG} -f ${DOCKERFILE} --build-arg BUILD_TYPE="${BUILD_TYPE}" ${SRC_ROOT}"
 
 if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
     if [[ -n "${DOCKERHUB_LOGIN}" ]]; then

@@ -14,7 +14,7 @@ source "${CUR_DIR}/go_build_config.sh"
 
 # Prepare modules
 GO111MODULE=on go mod tidy
-GO111MODULE=on go mod "${MODULES_DIR}"
+GO111MODULE=on go mod vendor
 
 OUTPUT_BINARY="${OPERATOR_BIN}"
 MAIN_SRC_FILE="${SRC_ROOT}/cmd/operator/main.go"
@@ -23,13 +23,14 @@ GOOS=${GOOS:-linux}
 GOARCH=${GOARCH:-amd64}
 
 if CGO_ENABLED=0 GO111MODULE=on GOOS="${GOOS}" GOARCH="${GOARCH}" go build \
-    -mod="${MODULES_DIR}" \
+    -mod=vendor \
     -a \
     -ldflags " \
         -X ${REPO}/pkg/version.Version=${VERSION} \
         -X ${REPO}/pkg/version.GitSHA=${GIT_SHA}  \
         -X ${REPO}/pkg/version.BuiltAt=${NOW}     \
     " \
+    -gcflags "all=-N -l"  \
     -o "${OUTPUT_BINARY}" \
     "${MAIN_SRC_FILE}"
 then
