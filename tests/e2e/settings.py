@@ -19,20 +19,31 @@ def get_docker_compose_path():
     return docker_compose_file_path, docker_compose_project_dir
 
 
-kubectl_cmd = "kubectl" if current().context.native else f"docker-compose -f {get_docker_compose_path()[0]} exec runner kubectl"
-
-test_namespace = os.getenv('TEST_NAMESPACE') if 'TEST_NAMESPACE' in os.environ else "test"
-
-# Default value
-operator_version = os.getenv('OPERATOR_VERSION') if 'OPERATOR_VERSION' in os.environ else \
-    open(os.path.join(pathlib.Path(__file__).parent.absolute(), "../../release")).read(1024).strip(" \r\n\t")
-operator_namespace = os.getenv('OPERATOR_NAMESPACE') if 'OPERATOR_NAMESPACE' in os.environ else \
-    'kube-system'
-minio_namespace = os.getenv('MINIO_NAMESPACE') if 'MINIO_NAMESPACE' in os.environ else 'minio'
-
-operator_docker_repo = os.getenv('OPERATOR_DOCKER_REPO') if 'OPERATOR_DOCKER_REPO' in os.environ else \
-    "altinity/clickhouse-operator"
+kubectl_cmd = "kubectl" \
+    if current().context.native \
+    else f"docker-compose -f {get_docker_compose_path()[0]} exec runner kubectl"
+test_namespace = os.getenv('TEST_NAMESPACE') \
+    if 'TEST_NAMESPACE' in os.environ \
+    else "test"
+operator_version = os.getenv('OPERATOR_VERSION') \
+    if 'OPERATOR_VERSION' in os.environ \
+    else open(os.path.join(pathlib.Path(__file__).parent.absolute(), "../../release")).read(1024).strip(" \r\n\t")
+operator_namespace = os.getenv('OPERATOR_NAMESPACE') \
+    if 'OPERATOR_NAMESPACE' in os.environ \
+    else 'kube-system'
+operator_install = os.getenv('OPERATOR_INSTALL') \
+    if 'OPERATOR_INSTALL' in os.environ \
+    else 'yes'
+minio_namespace = os.getenv('MINIO_NAMESPACE') \
+    if 'MINIO_NAMESPACE' in os.environ \
+    else 'minio'
+operator_docker_repo = os.getenv('OPERATOR_DOCKER_REPO') \
+    if 'OPERATOR_DOCKER_REPO' in os.environ \
+    else "altinity/clickhouse-operator"
 metrics_exporter_docker_repo = "altinity/metrics-exporter"
+clickhouse_operator_install_manifest = os.getenv('CLICKHOUSE_OPERATOR_INSTALL_MANIFEST') \
+    if 'CLICKHOUSE_OPERATOR_INSTALL_MANIFEST' in os.environ \
+    else '../../deploy/operator/clickhouse-operator-install-template.yaml'
 
 # clickhouse_template = "manifests/chit/tpl-clickhouse-stable.yaml"
 # clickhouse_template = "manifests/chit/tpl-clickhouse-19.17.yaml"
@@ -45,11 +56,8 @@ clickhouse_template_old = "manifests/chit/tpl-clickhouse-21.3.yaml"
 clickhouse_version = get_ch_version(clickhouse_template)
 clickhouse_version_old = get_ch_version(clickhouse_template_old)
 
-
 prometheus_namespace = "prometheus"
 prometheus_operator_version = "0.50"
 prometheus_scrape_interval = 10
 
-clickhouse_operator_install = os.getenv('CLICKHOUSE_OPERATOR_INSTALL') if 'CLICKHOUSE_OPERATOR_INSTALL' in os.environ else \
-    '../../deploy/operator/clickhouse-operator-install-template.yaml'
 minio_version = "latest"
