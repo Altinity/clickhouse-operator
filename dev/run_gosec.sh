@@ -11,7 +11,7 @@ set -o pipefail
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
-GOSEC_DIR_INSIDE_MODULES="${SRC_ROOT}/${MODULES_DIR}/github.com/securego/gosec/v2"
+GOSEC_DIR_INSIDE_MODULES="${SRC_ROOT}/vendor/github.com/securego/gosec/v2"
 GOSEC_DIR_INSIDE_GOPATH="${GOPATH}/src/github.com/securego/gosec/v2"
 
 GOSEC_DIR=$( \
