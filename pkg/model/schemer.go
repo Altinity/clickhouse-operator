@@ -32,6 +32,8 @@ type Schemer struct {
 	*Cluster
 }
 
+const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'` 
+
 // NewSchemer creates new Schemer object
 func NewSchemer(username, password string, port int) *Schemer {
 	credentials := &clickhouse.ClusterEndpointCredentials{
@@ -341,10 +343,11 @@ func createDatabaseReplicated(cluster string) string {
 		FROM
 			clusterAllReplicas('%s', system.databases) databases
 		WHERE
-			name != 'system'
+			name NOT IN (%s)
 		SETTINGS skip_unavailable_shards = 1
 		`,
 		cluster,
+		ignoredDBs,
 	)
 }
 
@@ -356,12 +359,13 @@ func createTableReplicated(cluster string) string {
 		FROM
 			clusterAllReplicas('%s', system.tables) tables
 		WHERE
-			database != 'system' AND
+			database NOT IN (%s) AND
 			create_table_query != '' AND
 			name NOT LIKE '.inner.%%'
 		SETTINGS skip_unavailable_shards = 1
 		`,
 		cluster,
+		ignoredDBs,
 	)
 }
 
