@@ -7,7 +7,7 @@ spec:
     - name: clickhouse-version
   configuration:
     settings:
-      logger/level: trace # We need to change settings in order to make sure all settings are propagated
+      logger/level: debug # We need to change settings in order to make sure pod is restarted
     users:
       default/profile: readonly
     clusters:

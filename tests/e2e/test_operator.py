@@ -384,10 +384,9 @@ def test_011_1(self):
             }
         )
 
-        with Then("Default user password should be '_removed_'"):
-            chi = kubectl.get("chi", "test-011-secured-default")
-            assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
-            assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == "_removed_"
+        with Then("Default user plain password should be removed"):
+            cfm = kubectl.get("configmap", "chi-test-011-secured-default-common-usersd")
+            assert "<password remove=\"1\"></password>" in cfm["data"]["chop-generated-users.xml"]
 
         with And("Connection to localhost should succeed with default user"):
             out = clickhouse.query_with_error(
@@ -404,23 +403,18 @@ def test_011_1(self):
                     "do_not_delete": 1,
                 }
             )
-            with Then("Default user password should be '_removed_'"):
-                chi = kubectl.get("chi", "test-011-secured-default")
-                assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
-                assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == "_removed_"
+            with Then("Default user password plain should be removed"):
+                cfm = kubectl.get("configmap", "chi-test-011-secured-default-common-usersd")
+                assert "<password remove=\"1\"></password>" in cfm["data"]["chop-generated-users.xml"]
 
-        with When("Default user is assigned the different profile"):
+        with When("Default user password is removed"):
             kubectl.create_and_check(
                 manifest="manifests/chi/test-011-secured-default-3.yaml",
                 check={
                     "do_not_delete": 1,
                 }
             )
-            with Then("Wait until configmap is reloaded"):
-                # Need to wait to make sure configuration is reloaded. For some reason it takes long here
-                # Maybe we can restart the pod to speed it up
-                time.sleep(120)
-            with Then("Connection to localhost should succeed with default user"):
+            with Then("Connection to localhost should succeed with default user and no password"):
                 out = clickhouse.query_with_error(
                     "test-011-secured-default",
                     "select 'OK'"
