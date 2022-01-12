@@ -114,13 +114,20 @@ func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Docf(`
+	    SELECT 
+	        DISTINCT name,
+	        concat('DROP DICTIONARY IF EXISTS "', database, '"."', name, '"') AS drop_table_query
+	    FROM
+	        system.dictionaries
+	    UNION ALL
 		SELECT
 			DISTINCT name, 
 			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
 		FROM
 			system.tables
 		WHERE
-			database NOT IN (%s) 
+			database NOT IN (%s) AND 
+			(engine like 'Replicated%' OR engine like '%View%')
 		`,
 		ignoredDBs,
 	)

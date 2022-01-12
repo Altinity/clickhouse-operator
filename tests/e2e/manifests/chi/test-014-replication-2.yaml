@@ -21,4 +21,4 @@ spec:
     clusters:
       - name: default
         layout:
-          replicasCount: 5
+          replicasCount: 4

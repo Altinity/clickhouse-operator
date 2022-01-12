@@ -700,11 +700,11 @@ def test_014(self):
                     host=f"chi-{chi}-{cluster}-0-1")
                 assert out == "1"
 
-    with When("Add 3 more replica"):
+    with When("Add more replicas"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-014-replication-2.yaml",
             check={
-                "pod_count": 5,
+                "pod_count": 4,
                 "do_not_delete": 1,
             },
             timeout=600,
@@ -716,7 +716,7 @@ def test_014(self):
         assert start_time == new_start_time
 
         with Then("Schema objects should be migrated to the new replicas"):
-            for replica in [2, 3, 4]:
+            for replica in [2, 3]:
                 host = f"chi-{chi}-{cluster}-0-{replica}"
                 print(f"Checking replica {host}")
                 print("Checking tables and views")
