@@ -127,7 +127,7 @@ func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]
 			system.tables
 		WHERE
 			database NOT IN (%s) AND 
-			(engine like 'Replicated%' OR engine like '%View%')
+			(engine like 'Replicated%%' OR engine like '%View%')
 		`,
 		ignoredDBs,
 	)
