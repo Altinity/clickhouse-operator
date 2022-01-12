@@ -113,15 +113,16 @@ func (s *Schemer) getReplicatedObjectsSQLs(ctx context.Context, host *chop.ChiHo
 func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
-	sql := heredoc.Doc(`
+	sql := heredoc.Docf(`
 		SELECT
 			DISTINCT name, 
 			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
 		FROM
 			system.tables
 		WHERE
-			engine LIKE 'Replicated%'
+			database NOT IN (%s) 
 		`,
+		ignoredDBs,
 	)
 
 	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
