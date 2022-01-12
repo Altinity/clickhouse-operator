@@ -29,10 +29,19 @@ fi
 
 if ! docker run --rm --privileged multiarch/qemu-user-static --reset -p yes; then
   sudo apt-get install -y qemu binfmt-support qemu-user-static
+  docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 fi
-docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 
-DOCKER_CMD="docker buildx build --platform=linux/amd64,linux/arm64"
+if [[ "0" == $(docker buildx ls | grep "\*" | grep -c "running") ]]; then
+  docker buildx create --use --name multi-platform --platform=linux/amd64,linux/arm64
+fi
+
+DOCKER_CMD="docker buildx build --progress plain --progress plain"
+if [[ "${TAG}" =~ ":dev" ]]; then
+ DOCKER_CMD="${DOCKER_CMD} --output type=image,name=${TAG} --platform=linux/amd64"
+else
+ DOCKER_CMD="${DOCKER_CMD} --platform=linux/amd64,linux/arm64"
+fi
 
 if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
   DOCKER_CMD="${DOCKER_CMD} --push"

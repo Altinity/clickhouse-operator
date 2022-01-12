@@ -13,7 +13,7 @@ source "${CUR_DIR}/go_build_config.sh"
 "${MANIFESTS_ROOT}/builder/build-clickhouse-operator-install-yaml.sh"
 
 # Prepare modules
-if [[ "0" == "${BUILD_IN_DOCKER:-0}" ]]; then
+if [[ ! -d "${MODULES_DIR}" ]]; then
     export GO111MODULE=on
     go mod tidy
     go mod "${MODULES_DIR}"

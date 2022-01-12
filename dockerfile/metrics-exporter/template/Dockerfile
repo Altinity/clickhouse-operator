@@ -18,12 +18,25 @@ ENV GOARCH=${TARGETARCH}
 WORKDIR /clickhouse-operator
 ADD . .
 
-# ./vendor is excluded in .dockerignore, reconstruct it with 'mod' tool
-RUN GO111MODULE=on go mod tidy
-RUN GO111MODULE=on go mod vendor
-
 # Build operator binary with explicitly specified output
 RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter ./dev/go_build_metrics_exporter.sh
+
+FROM --platform=${BUILDPLATFORM} golang:1.17 AS delve-builder
+WORKDIR /tmp/
+RUN go get -v github.com/go-delve/delve/cmd/dlv && rm -rf /root/.cache/go-build/ /go/pkg/mod/
+
+FROM ubuntu:20.04 AS delve
+WORKDIR /tmp/
+COPY --from=delve-builder /go/bin/dlv /go/bin/dlv
+
+# Add config files from local source dir into image
+ADD config/config.yaml   /etc/clickhouse-operator/
+ADD config/conf.d/*      /etc/clickhouse-operator/conf.d/
+ADD config/config.d/*    /etc/clickhouse-operator/config.d/
+ADD config/templates.d/* /etc/clickhouse-operator/templates.d/
+ADD config/users.d/*     /etc/clickhouse-operator/users.d/
+COPY --from=builder /tmp/metrics-exporter .
+CMD ["/go/bin/dlv", "--listen=:40002", "--headless=true", "--api-version=2", "exec", "/tmp/metrics-exporter","--","-logtostderr=true", "-v=5"]
 
 # ============================
 # ===== Metrics exporter =====

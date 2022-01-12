@@ -2,7 +2,7 @@
 # ===== Builder =====
 # ===================
 
-FROM --platform=${BUILDPLATFORM} golang:1.17 AS builder-metrics-exporter
+FROM --platform=${BUILDPLATFORM} golang:1.17 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -17,18 +17,17 @@ ENV GOARCH=${TARGETARCH}
 # Reconstruct source tree inside docker
 WORKDIR /clickhouse-operator
 ADD . .
-# speedup docker build if vendor exists
-# ./vendor is included in .dockerignore
-# RUN go mod tidy
-# RUN go mod vendor
-ENV BUILD_IN_DOCKER=1
 
 # Build operator binary with explicitly specified output
 RUN METRICS_EXPORTER_BIN=/tmp/metrics-exporter ./dev/go_build_metrics_exporter.sh
 
-FROM builder-metrics-exporter AS delve
+FROM --platform=${BUILDPLATFORM} golang:1.17 AS delve-builder
 WORKDIR /tmp/
-RUN go get -v github.com/go-delve/delve/cmd/dlv
+RUN go get -v github.com/go-delve/delve/cmd/dlv && rm -rf /root/.cache/go-build/ /go/pkg/mod/
+
+FROM ubuntu:20.04 AS delve
+WORKDIR /tmp/
+COPY --from=delve-builder /go/bin/dlv /go/bin/dlv
 
 # Add config files from local source dir into image
 ADD config/config.yaml   /etc/clickhouse-operator/
@@ -36,14 +35,14 @@ ADD config/conf.d/*      /etc/clickhouse-operator/conf.d/
 ADD config/config.d/*    /etc/clickhouse-operator/config.d/
 ADD config/templates.d/* /etc/clickhouse-operator/templates.d/
 ADD config/users.d/*     /etc/clickhouse-operator/users.d/
-
+COPY --from=builder /tmp/metrics-exporter .
 CMD ["/go/bin/dlv", "--listen=:40002", "--headless=true", "--api-version=2", "exec", "/tmp/metrics-exporter","--","-logtostderr=true", "-v=5"]
 
 # ============================
 # ===== Metrics exporter =====
 # ============================
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal AS metrics-exporter
+FROM registry.access.redhat.com/ubi8/ubi-minimal AS ubi8
 RUN microdnf update && microdnf clean all
 
 MAINTAINER "Altinity <support@altinity.com>"
@@ -68,7 +67,7 @@ ADD config/templates.d/* /etc/clickhouse-operator/templates.d/
 ADD config/users.d/*     /etc/clickhouse-operator/users.d/
 
 # Copy clickhouse-operator binary into operator image from builder
-COPY --from=builder-metrics-exporter /tmp/metrics-exporter .
+COPY --from=builder /tmp/metrics-exporter .
 
 USER nobody
 

@@ -162,9 +162,10 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.19.14}
 #    performance issue 1.20.x, 1.21.x
 #    https://github.com/kubernetes/kubeadm/issues/2395
-#    K8S_VERSION=${K8S_VERSION:-1.20.10}
-#    K8S_VERSION=${K8S_VERSION:-1.21.4}
-    K8S_VERSION=${K8S_VERSION:-1.22.2}
+#    K8S_VERSION=${K8S_VERSION:-1.20.14}
+#    K8S_VERSION=${K8S_VERSION:-1.21.8}
+#    K8S_VERSION=${K8S_VERSION:-1.22.5}
+    K8S_VERSION=${K8S_VERSION:-1.23.1}
     export VALIDATE_YAML=true
 
     killall kubectl || true
@@ -298,7 +299,7 @@ EOF
     # open http://localhost:8888/chi and check exists clickhouse installations
     kubectl --namespace="${OPERATOR_NAMESPACE}" port-forward --address 0.0.0.0 service/clickhouse-operator-metrics 8888 </dev/null &>/dev/null &
 
-    for image in $(cat ./tests/configs/test-017-multi-version.yaml | yq r - "spec.templates.podTemplates[*].spec.containers[*].image"); do
+    for image in $(cat ./tests/configs/test-017-multi-version.yaml | yq eval -e ".spec.templates.podTemplates[].spec.containers[].image"); do
         docker pull ${image}
     done
 

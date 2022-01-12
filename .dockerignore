@@ -7,3 +7,4 @@ hack/
 ./tests/image/cache/
 .devspace/
 devspace.yaml
+Vagrantfile
