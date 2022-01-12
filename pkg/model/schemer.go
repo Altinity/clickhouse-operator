@@ -127,7 +127,7 @@ func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]
 			system.tables
 		WHERE
 			database NOT IN (%s) AND 
-			(engine like 'Replicated%%' OR engine like '%View%')
+			(engine like 'Replicated%%' OR engine like '%%View%%')
 		`,
 		ignoredDBs,
 	)
@@ -277,7 +277,7 @@ func createDatabaseDistributed(cluster string) string {
 			SELECT
 				* 
 			FROM
-				clusterAllReplicas('%s', system.databases) databases 
+				clusterAllReplicas('%s', system.databases) databases
 			SETTINGS skip_unavailable_shards = 1
 		)
 		WHERE name IN (
