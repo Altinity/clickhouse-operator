@@ -408,7 +408,7 @@ def test_011_1(self):
                     "do_not_delete": 1,
                 }
             )
-            with Then("Default user password should be removed"):
+            with Then("Default user plain password should be removed"):
                 chi = kubectl.get("chi", "test-011-secured-default")
                 assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
                 assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == ""
