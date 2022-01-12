@@ -387,7 +387,7 @@ def test_011_1(self):
         with Then("Default user password should be '_removed_'"):
             chi = kubectl.get("chi", "test-011-secured-default")
             assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
-            assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == "_removed_"
+            assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == ""
 
         with And("Connection to localhost should succeed with default user"):
             out = clickhouse.query_with_error(
@@ -407,7 +407,7 @@ def test_011_1(self):
             with Then("Default user password should be '_removed_'"):
                 chi = kubectl.get("chi", "test-011-secured-default")
                 assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
-                assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == "_removed_"
+                assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == ""
 
         with When("Default user is assigned the different profile"):
             kubectl.create_and_check(
