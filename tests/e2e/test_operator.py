@@ -385,8 +385,13 @@ def test_011_1(self):
         )
 
         with Then("Default user plain password should be removed"):
+            chi = kubectl.get("chi", "test-011-secured-default")
+            assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
+            assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == ""
+
             cfm = kubectl.get("configmap", "chi-test-011-secured-default-common-usersd")
             assert "<password remove=\"1\"></password>" in cfm["data"]["chop-generated-users.xml"]
+
 
         with And("Connection to localhost should succeed with default user"):
             out = clickhouse.query_with_error(
@@ -403,7 +408,11 @@ def test_011_1(self):
                     "do_not_delete": 1,
                 }
             )
-            with Then("Default user password plain should be removed"):
+            with Then("Default user plain password should be removed"):
+                chi = kubectl.get("chi", "test-011-secured-default")
+                assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
+                assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == ""
+
                 cfm = kubectl.get("configmap", "chi-test-011-secured-default-common-usersd")
                 assert "<password remove=\"1\"></password>" in cfm["data"]["chop-generated-users.xml"]
 

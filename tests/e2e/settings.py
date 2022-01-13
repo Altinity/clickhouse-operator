@@ -41,7 +41,7 @@ operator_docker_repo = os.getenv('OPERATOR_DOCKER_REPO') \
     if 'OPERATOR_DOCKER_REPO' in os.environ \
     else "altinity/clickhouse-operator"
 metrics_exporter_docker_repo = "altinity/metrics-exporter"
-clickhouse_operator_install = os.getenv('CLICKHOUSE_OPERATOR_INSTALL_MANIFEST') \
+clickhouse_operator_install_manifest = os.getenv('CLICKHOUSE_OPERATOR_INSTALL_MANIFEST') \
     if 'CLICKHOUSE_OPERATOR_INSTALL_MANIFEST' in os.environ \
     else '../../deploy/operator/clickhouse-operator-install-template.yaml'
 
