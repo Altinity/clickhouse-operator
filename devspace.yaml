@@ -43,6 +43,12 @@ hooks:
       - "CLICKHOUSE_OPERATOR_TAG=${runtime.images.clickhouse-operator.tag} METRICS_EXPORTER_TAG=${runtime.images.metrics-exporter.tag} OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} deploy/devspace/yq_transform_clickhouse-operator-install.sh"
     events: ["before:deploy:*"]
 
+  - command: bash
+    args:
+      - -xec
+      - "OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} deploy/devspace/docker-clean.sh ${runtime.images.clickhouse-operator.image}:${runtime.images.clickhouse-operator.tag}; OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} deploy/devspace/docker-clean.sh ${runtime.images.metrics-exporter.image}:${runtime.images.metrics-exporter.tag}"
+    events: ["after:deploy:*"]
+
 dev:
   ports:
   - imageSelector: ${runtime.images.clickhouse-operator.image}:${runtime.images.clickhouse-operator.tag}

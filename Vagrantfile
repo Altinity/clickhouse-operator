@@ -242,9 +242,10 @@ EOF
     # docker build
     export COMPANY_REPO=${COMPANY_REPO:-altinity}
     go mod download -x
+    go mod tidy
     go mod vendor
-    time docker build -f dockerfile/operator/Dockerfile --target operator -t $COMPANY_REPO/clickhouse-operator:$OPERATOR_RELEASE .
-    time docker build -f dockerfile/metrics-exporter/Dockerfile --target metrics-exporter -t $COMPANY_REPO/metrics-exporter:$OPERATOR_RELEASE .
+    time docker buildx build -f dockerfile/operator/Dockerfile --platform=linux/amd64 --output=type=image,name=$COMPANY_REPO/clickhouse-operator:$OPERATOR_RELEASE .
+    time docker buildx build -f dockerfile/metrics-exporter/Dockerfile --platform=linux/amd64 --output=type=image,name=$COMPANY_REPO/metrics-exporter:$OPERATOR_RELEASE .
 
 
     # install clickhouse-operator

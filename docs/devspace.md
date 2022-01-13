@@ -17,6 +17,7 @@ docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 - Run typical minikube configuration
 ```bash
     minikube config set driver docker
+    minikube config set cpus $(nproc)
     minikube config set kubernetes-version 1.23.1
     minikube start
     minikube addons enable ingress
@@ -39,8 +40,8 @@ eval $(minikube docker-env)
 ```bash
 devspace dev --var=OPERATOR_NAMESPACE=kube-system --var=DEVSPACE_DEBUG=delve
 ```
-- open once `deploy/devspace/*.run.xml` (Run -> Edit configurations)
-- update go modules if needed
+- create Golang debug configuration, `Run -> Edit configurations`, look `deploy/devspace/*.run.xml` for details or use any IDE which support `delve` remote debugging 
+- update go modules if required
 ```bash
 go mod tidy
 go mod vendor

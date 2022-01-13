@@ -113,15 +113,23 @@ func (s *Schemer) getReplicatedObjectsSQLs(ctx context.Context, host *chop.ChiHo
 func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
-	sql := heredoc.Doc(`
+	sql := heredoc.Docf(`
+	    SELECT 
+	        DISTINCT name,
+	        concat('DROP DICTIONARY IF EXISTS "', database, '"."', name, '"') AS drop_table_query
+	    FROM
+	        system.dictionaries
+	    UNION ALL
 		SELECT
 			DISTINCT name, 
 			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
 		FROM
 			system.tables
 		WHERE
-			engine LIKE 'Replicated%'
+			database NOT IN (%s) AND 
+			(engine like 'Replicated%%' OR engine like '%%View%%')
 		`,
+		ignoredDBs,
 	)
 
 	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
@@ -220,7 +228,7 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 func (s *Schemer) HostDropTables(ctx context.Context, host *chop.ChiHost) error {
 	tableNames, dropTableSQLs, _ := s.getDropTablesSQLs(ctx, host)
 	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	return s.ExecHost(ctx, host, dropTableSQLs)
+	return s.ExecHost(ctx, host, dropTableSQLs, clickhouse.NewQueryOptions().SetRetry(true))
 }
 
 // IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
@@ -269,7 +277,7 @@ func createDatabaseDistributed(cluster string) string {
 			SELECT
 				* 
 			FROM
-				clusterAllReplicas('%s', system.databases) databases 
+				clusterAllReplicas('%s', system.databases) databases
 			SETTINGS skip_unavailable_shards = 1
 		)
 		WHERE name IN (

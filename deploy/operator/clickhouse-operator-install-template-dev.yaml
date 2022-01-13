@@ -2944,7 +2944,7 @@ spec:
 # Template Parameters:
 #
 # COMMENT=
-# NAMESPACE=dev
+# NAMESPACE=${OPERATOR_NAMESPACE}
 # NAME=clickhouse-operator
 #
 # Setup ServiceAccount
@@ -2952,24 +2952,24 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: clickhouse-operator
-  namespace: dev
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.18.0
 ---
 # Template Parameters:
 #
-# NAMESPACE=dev
+# NAMESPACE=${OPERATOR_NAMESPACE}
 # COMMENT=#
 # ROLE_KIND=ClusterRole
-# ROLE_NAME=clickhouse-operator-dev
+# ROLE_NAME=clickhouse-operator-${OPERATOR_NAMESPACE}
 # ROLE_BINDING_KIND=ClusterRoleBinding
-# ROLE_BINDING_NAME=clickhouse-operator-dev
+# ROLE_BINDING_NAME=clickhouse-operator-${OPERATOR_NAMESPACE}
 #
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: clickhouse-operator-dev
-  #namespace: dev
+  name: clickhouse-operator-${OPERATOR_NAMESPACE}
+  #namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.18.0
 rules:
@@ -3112,36 +3112,43 @@ rules:
   verbs:
     - get
     - list
+- apiGroups:
+    - apiextensions.k8s.io
+  resources:
+    - customresourcedefinitions
+  verbs:
+    - get
+    - list
 ---
 # Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
 # ClusterRoleBinding is namespace-less and must have unique name
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: clickhouse-operator-dev
-  #namespace: dev
+  name: clickhouse-operator-${OPERATOR_NAMESPACE}
+  #namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.18.0
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: clickhouse-operator-dev
+  name: clickhouse-operator-${OPERATOR_NAMESPACE}
 subjects:
 - kind: ServiceAccount
   name: clickhouse-operator
-  namespace: dev
+  namespace: ${OPERATOR_NAMESPACE}
 ---
 # Template Parameters:
 #
 # NAME=etc-clickhouse-operator-files
-# NAMESPACE=dev
+# NAMESPACE=${OPERATOR_NAMESPACE}
 # COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-files
-  namespace: dev
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.18.0
     app: clickhouse-operator
@@ -3353,14 +3360,14 @@ data:
 # Template Parameters:
 #
 # NAME=etc-clickhouse-operator-confd-files
-# NAMESPACE=dev
+# NAMESPACE=${OPERATOR_NAMESPACE}
 # COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-confd-files
-  namespace: dev
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.18.0
     app: clickhouse-operator
@@ -3369,14 +3376,14 @@ data:
 # Template Parameters:
 #
 # NAME=etc-clickhouse-operator-configd-files
-# NAMESPACE=dev
+# NAMESPACE=${OPERATOR_NAMESPACE}
 # COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-configd-files
-  namespace: dev
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.18.0
     app: clickhouse-operator
@@ -3428,14 +3435,14 @@ data:
 # Template Parameters:
 #
 # NAME=etc-clickhouse-operator-templatesd-files
-# NAMESPACE=dev
+# NAMESPACE=${OPERATOR_NAMESPACE}
 # COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-templatesd-files
-  namespace: dev
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.18.0
     app: clickhouse-operator
@@ -3528,14 +3535,14 @@ data:
 # Template Parameters:
 #
 # NAME=etc-clickhouse-operator-usersd-files
-# NAMESPACE=dev
+# NAMESPACE=${OPERATOR_NAMESPACE}
 # COMMENT=
 #
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: etc-clickhouse-operator-usersd-files
-  namespace: dev
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.18.0
     app: clickhouse-operator
@@ -3586,10 +3593,10 @@ data:
 ---
 # Template Parameters:
 #
-# NAMESPACE=dev
+# NAMESPACE=${OPERATOR_NAMESPACE}
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.18.0
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.18.0
+# OPERATOR_IMAGE=${OPERATOR_IMAGE}
+# METRICS_EXPORTER_IMAGE=${METRICS_EXPORTER_IMAGE}
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -3597,7 +3604,7 @@ kind: Deployment
 apiVersion: apps/v1
 metadata:
   name: clickhouse-operator
-  namespace: dev
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.18.0
     app: clickhouse-operator
@@ -3633,7 +3640,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.18.0
+          image: ${OPERATOR_IMAGE}
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3698,7 +3705,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.18.0
+          image: ${METRICS_EXPORTER_IMAGE}
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3717,7 +3724,7 @@ spec:
 ---
 # Template Parameters:
 #
-# NAMESPACE=dev
+# NAMESPACE=${OPERATOR_NAMESPACE}
 # COMMENT=
 #
 # Setup ClusterIP Service to provide monitoring metrics for Prometheus
@@ -3729,7 +3736,7 @@ kind: Service
 apiVersion: v1
 metadata:
   name: clickhouse-operator-metrics
-  namespace: dev
+  namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.18.0
     app: clickhouse-operator
@@ -3737,5 +3744,30 @@ spec:
   ports:
     - port: 8888
       name: clickhouse-operator-metrics
+  selector:
+    app: clickhouse-operator
+---
+# Template Parameters:
+#
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
+#
+# Setup ClusterIP Service to provide dev options
+# for remote debugging by external IDEs.
+# In order to get access outside of k8s it should be exposed as:
+# kubectl --namespace dev port-forward service/clickhouse-operator-dev 2345
+# and point browser to localhost:2345
+kind: Service
+apiVersion: v1
+metadata:
+  name: clickhouse-operator-dev
+  namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: 0.18.0
+    app: clickhouse-operator
+spec:
+  ports:
+    - port: 2345
+      targetPort: 2345
   selector:
     app: clickhouse-operator
