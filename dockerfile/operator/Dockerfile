@@ -66,7 +66,7 @@ FROM image-base AS image-debug
 RUN echo "Building DEBUG image"
 WORKDIR /
 COPY --from=delve-builder /go/bin/dlv /go/bin/dlv
-CMD ["/go/bin/dlv", "--listen=:40002", "--headless=true", "--api-version=2", "exec", "/clickhouse-operator","--","-logtostderr=true", "-v=5"]
+CMD ["/go/bin/dlv", "--listen=:40001", "--headless=true", "--api-version=2", "exec", "/clickhouse-operator","--","-logtostderr=true", "-v=5"]
 
 # ======================
 # ===== Image Prod =====
