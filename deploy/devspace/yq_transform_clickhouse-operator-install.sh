@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 set -xeo pipefail
 OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE:-kube-system}
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"

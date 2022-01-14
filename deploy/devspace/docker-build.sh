@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 set -xe
 DEVSPACE_DEBUG=$1
 DOCKER_IMAGE=$2
