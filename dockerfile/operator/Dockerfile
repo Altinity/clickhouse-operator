@@ -1,6 +1,8 @@
 ARG TARGETOS
 ARG TARGETARCH
-ARG BUILD_TYPE="prod"
+ARG VERSION
+ARG RELEASE
+ARG GCFLAGS
 
 # ===================
 # ===== Builder =====
@@ -9,22 +11,22 @@ ARG BUILD_TYPE="prod"
 FROM --platform=${BUILDPLATFORM} golang:1.17 AS builder
 
 # Install required packages
-RUN apt-get update && apt-get install -y apt-utils && apt-get install -y gettext-base curl
-RUN curl -o /usr/bin/yq -sL https://github.com/mikefarah/yq/releases/download/v4.16.2/yq_${TARGETOS}_${TARGETARCH} && \
-    chmod +x /usr/bin/yq
+RUN apt-get update && apt-get install -y apt-utils && apt-get install -y gettext-base wget
+RUN wget --progress=bar:force:noscroll "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64" -O /usr/bin/yq && chmod +x /usr/bin/yq
 
 # Reconstruct source tree inside docker
 WORKDIR /clickhouse-operator
 ADD . .
-
-# ./vendor is excluded in .dockerignore, reconstruct it with 'mod' tool
-RUN GO111MODULE=on go mod tidy
-RUN GO111MODULE=on go mod vendor
+ENV GCFLAGS=${GCFLAGS}
 
 # Build operator binary with explicitly specified output
-RUN OPERATOR_BIN=/tmp/clickhouse-operator GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" ./dev/go_build_operator.sh
+RUN OPERATOR_BIN=/tmp/clickhouse-operator GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" bash -xe ./dev/go_build_operator.sh
 
-RUN CGO_ENABLED=0 GO111MODULE=on GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv@latest
+# ===================
+# == Delve builder ==
+# ===================
+FROM --platform=${BUILDPLATFORM} golang:1.17 AS delve-builder
+RUN CGO_ENABLED=0 GO111MODULE=on GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go install -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv@latest && rm -rf /root/.cache/go-build/ /go/pkg/mod/
 
 # ======================
 # ===== Image Base =====
@@ -38,8 +40,8 @@ MAINTAINER "Altinity <support@altinity.com>"
 LABEL name="ClickHouse operator" \
       maintainer="support@altinity.com" \
       vendor="Altinity" \
-      version="0.18.0" \
-      release="1" \
+      version="${VERSION:-dev}" \
+      release="${RELEASE:-1}" \
       summary="ClickHouse operator" \
       description="ClickHouse operator operates ClickHouse clusters in kubernetes"
 
@@ -56,38 +58,28 @@ ADD config/users.d/*     /etc/clickhouse-operator/users.d/
 
 # Copy clickhouse-operator binary into operator image from builder
 COPY --from=builder /tmp/clickhouse-operator .
-COPY --from=builder /go/bin/dlv .
 
 # =======================
 # ===== Image Debug =====
 # =======================
 FROM image-base AS image-debug
 RUN echo "Building DEBUG image"
-
-ENTRYPOINT ["/dlv"]
-CMD ["--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/clickhouse-operator", "--", "-logtostderr=true", "-v=5"]
+WORKDIR /
+COPY --from=delve-builder /go/bin/dlv /go/bin/dlv
+CMD ["/go/bin/dlv", "--listen=:40001", "--headless=true", "--api-version=2", "exec", "/clickhouse-operator","--","-logtostderr=true", "-v=5"]
 
 # ======================
 # ===== Image Prod =====
 # ======================
 FROM image-base AS image-prod
 RUN echo "Building PROD image"
-
+WORKDIR /
 USER nobody
 
 # Run /clickhouse-operator -alsologtostderr=true -v=1
 # We can specify additional options, such as:
-#   --config=/path/to/confi g
+#   --config=/path/to/config
 #   --kube-config=/path/to/kubeconf
 ENTRYPOINT ["/clickhouse-operator"]
 CMD ["-logtostderr=true", "-v=1"]
 #CMD ["-alsologtostderr=true", "-v=1"]
-
-######################
-### Finalize image ###
-######################
-
-# Final image is based on what build type specified
-FROM image-${BUILD_TYPE} AS final
-ARG BUILD_TYPE
-RUN echo "Finalizing build AS ${BUILD_TYPE}"

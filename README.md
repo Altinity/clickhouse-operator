@@ -53,9 +53,10 @@ The ClickHouse Operator for Kubernetes currently provides the following:
 
 **How to contribute**
  * [How to contribute/submit a patch][contributing_manual]
+ * [How to easy development process with devspace.sh][devspace_manual]
  
 ---
-**All docs**
+**All clickhouse-operator guides**
  * [All available docs list][all_docs_list]
 ---
  
@@ -83,6 +84,6 @@ See [LICENSE](./LICENSE) for more details.
 [update_operator]: ./docs/operator_upgrade.md
 [schema_migration]: ./docs/schema_migration.md
 [operator_configuration]: ./docs/operator_configuration.md
-[all_docs_list]: ./docs/README.md
 [contributing_manual]: ./CONTRIBUTING.md
-
+[devspace_manual]: ./docs/devspace.md
+[all_docs_list]: ./docs/README.md

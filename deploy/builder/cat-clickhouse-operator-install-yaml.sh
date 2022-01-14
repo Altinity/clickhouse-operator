@@ -84,9 +84,6 @@ MANIFEST_PRINT_DEPLOYMENT="${MANIFEST_PRINT_DEPLOYMENT:-"yes"}"
 # Render operator's Service Metrics
 MANIFEST_PRINT_SERVICE_METRICS="${MANIFEST_PRINT_SERVICE_METRICS:-"yes"}"
 
-# Render operator's Service Debug
-MANIFEST_PRINT_SERVICE_DEBUG="${MANIFEST_PRINT_SERVICE_DEBUG:-"no"}"
-
 ##################################
 ##
 ##     Render .yaml manifest
@@ -341,19 +338,6 @@ fi
 # Render Service Metrics section
 if [[ "${MANIFEST_PRINT_SERVICE_METRICS}" == "yes" ]]; then
     SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-05-section-service-metrics.yaml"
-    ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
-    render_separator
-    cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
-        COMMENT="$(cut_namespace_for_kubectl "${OPERATOR_NAMESPACE}")" \
-        NAMESPACE="${OPERATOR_NAMESPACE}"       \
-        OPERATOR_IMAGE="${OPERATOR_IMAGE}"      \
-        OPERATOR_VERSION="${OPERATOR_VERSION}"  \
-        envsubst
-fi
-
-# Render Service Debug section
-if [[ "${MANIFEST_PRINT_SERVICE_DEBUG}" == "yes" ]]; then
-    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-06-section-service-dev.yaml"
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
     render_separator
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \

@@ -40,13 +40,6 @@ OPERATOR_NAMESPACE="\${OPERATOR_NAMESPACE}" \
 # Build v1beta1 bundle and template manifests
 "${CUR_DIR}"/build-clickhouse-operator-install-v1beta1-yaml.sh
 
-# Build debug installation .yaml manifest
-OPERATOR_IMAGE="\${OPERATOR_IMAGE}" \
-METRICS_EXPORTER_IMAGE="\${METRICS_EXPORTER_IMAGE}" \
-OPERATOR_NAMESPACE="\${OPERATOR_NAMESPACE}" \
-MANIFEST_PRINT_SERVICE_DEBUG="yes" \
-"${CUR_DIR}/cat-clickhouse-operator-install-yaml.s"h > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-template-dev.yaml"
-
 # Build terraform-templated installation .yaml manifest
 cat <<EOF > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-tf.yaml"
 #

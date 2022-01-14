@@ -12,7 +12,7 @@
 *.out
 
 # IDE folders
-.idea
+/.idea
 /.project
 /.pydevproject
 
@@ -25,7 +25,7 @@ __pycache__
 dev/bin
 dev/log
 
-.vagrant
+/.vagrant
 /.DS_Store
 
 # Skip vendor
@@ -44,3 +44,6 @@ tests/image/cache
 
 # Skip tmp folder
 /tmp/
+
+# Ignore DevSpace cache and log folder
+/.devspace

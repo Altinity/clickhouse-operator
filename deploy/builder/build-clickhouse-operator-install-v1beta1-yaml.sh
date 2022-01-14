@@ -1,7 +1,6 @@
 #!/bin/bash
 # Build clickhouse-operator-install-bundle-v1beta1.yaml, need install https://github.com/mikefarah/yq
-# curl -sL https://github.com/mikefarah/yq/releases/download/v4.13.2/yq_linux_amd64 -o /usr/bin/yq
-# chmod +x /usr/bin/yq
+# sudo wget "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64" -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 PROJECT_ROOT="$(realpath "${CUR_DIR}/../..")"
 MANIFEST_ROOT="$(realpath ${PROJECT_ROOT}/deploy)"
