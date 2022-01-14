@@ -1053,7 +1053,7 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 				chiv1.NewChiHostReconcileAttributes().SetAdd(),
 			),
 		)
-		// Add host to the cluster config (always) and wait for ClickHouse to pick-up the change
+	// Add host to the cluster config (always) and wait for ClickHouse to pick-up the change
 	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
 	if w.shouldWaitIncludeHost(host) {
 		_ = w.waitHostInCluster(ctx, host)

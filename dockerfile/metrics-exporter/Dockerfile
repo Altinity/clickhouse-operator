@@ -41,8 +41,8 @@ LABEL name="ClickHouse operator. Metrics exporter" \
       vendor="Altinity" \
       version="${VERSION:-dev}" \
       release="${RELEASE:-1}" \
-      summary="ClickHouse operator" \
-      description="ClickHouse operator operates ClickHouse clusters in kubernetes"
+      summary="Metrics exporter" \
+      description="Metrics exporter for Altinity ClickHouse operator"
 
 ADD LICENSE /licenses/
 
