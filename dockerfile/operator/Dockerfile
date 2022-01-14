@@ -17,10 +17,11 @@ RUN wget --progress=bar:force:noscroll "https://github.com/mikefarah/yq/releases
 # Reconstruct source tree inside docker
 WORKDIR /clickhouse-operator
 ADD . .
-ENV GCFLAGS=${GCFLAGS}
-
+ENV GCFLAGS="${GCFLAGS}"
+ENV GOOS="${TARGETOS}"
+ENV GOARCH="${TARGETARCH}"
 # Build operator binary with explicitly specified output
-RUN OPERATOR_BIN=/tmp/clickhouse-operator GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" bash -xe ./dev/go_build_operator.sh
+RUN OPERATOR_BIN=/tmp/clickhouse-operator bash -xe ./dev/go_build_operator.sh
 
 # ===================
 # == Delve builder ==
