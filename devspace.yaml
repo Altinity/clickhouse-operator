@@ -66,21 +66,16 @@ dev:
 
   autoReload:
     paths:
-      - config/*
-      - cmd/*
-      - dev/*
-      - deploy/*
-      - dockerfile/*
-      - pkg/*
+      - config/**
+      - cmd/**
+      - dev/**
+      - deploy/**
+      - dockerfile/**
+      - pkg/**
+      - .dockerignore
       - go.mod
     images:
       - metrics-exporter
       - clickhouse-operator
     deployments:
       - clickhouse-operator
-
-profiles:
-- name: production
-  patches:
-  - op: remove
-    path: images.app.injectRestartHelper

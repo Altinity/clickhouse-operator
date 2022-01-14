@@ -29,7 +29,7 @@ if ! docker run --rm --privileged multiarch/qemu-user-static --reset -p yes; the
   docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 fi
 
-if [[ "0" == $(docker buildx ls | grep -E 'linux.+\*' | grep -E 'running|inactive') ]]; then
+if [[ "0" == $(docker buildx ls | grep -E 'linux/arm.+\*' | grep -E 'running|inactive') ]]; then
   docker buildx create --use --name multi-platform --platform=linux/amd64,linux/arm64
 fi
 
