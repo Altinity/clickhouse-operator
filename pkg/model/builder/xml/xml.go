@@ -76,7 +76,7 @@ func GenerateXML(w io.Writer, settings *chiv1.Settings, prefix string) {
 		xmlTreeRoot.addBranch(tags, settings.Get(name))
 	}
 
-	// return XML
+	// build XML into writer
 	xmlTreeRoot.buildXML(w, 0, 4)
 }
 
@@ -164,6 +164,8 @@ func (n *xmlNode) writeTagNoValue(w io.Writer, attributes string, indent, tabsiz
 // and children are not printed
 // <tag>value</tag>
 func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string, indent, tabsize uint8) {
+	// TODO fix this properly
+	// Used in tests
 	if value == "_removed_" {
 		attributes=" remove=\"1\""
 		value=""
