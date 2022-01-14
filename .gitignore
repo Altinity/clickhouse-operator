@@ -11,12 +11,12 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# IDE folders
-/.idea
-/.project
-/.pydevproject
+# IDE folders - everywhere
+.idea
+.project
+.pydevproject
 
-# Skip log folder
+# Skip logs and caches
 log
 *.log
 __pycache__
