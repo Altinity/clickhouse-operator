@@ -167,8 +167,8 @@ func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string
 	// TODO fix this properly
 	// Used in tests
 	if value == "_removed_" {
-		attributes=" remove=\"1\""
-		value=""
+		attributes = " remove=\"1\""
+		value = ""
 	}
 	n.writeTagOpen(w, indent, attributes, noEol)
 	n.writeValue(w, value)
