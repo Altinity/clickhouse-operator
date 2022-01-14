@@ -119,6 +119,7 @@ func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]
 	        concat('DROP DICTIONARY IF EXISTS "', database, '"."', name, '"') AS drop_table_query
 	    FROM
 	        system.dictionaries
+	    WHERE database != ''
 	    UNION ALL
 		SELECT
 			DISTINCT name, 
