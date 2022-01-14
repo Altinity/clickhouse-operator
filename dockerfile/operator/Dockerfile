@@ -1,14 +1,13 @@
-ARG TARGETOS
-ARG TARGETARCH
-ARG VERSION
-ARG RELEASE
-ARG GCFLAGS
-
 # ===================
 # ===== Builder =====
 # ===================
 
 FROM --platform=${BUILDPLATFORM} golang:1.17 AS builder
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION
+ARG RELEASE
+ARG GCFLAGS
 
 # Install required packages
 RUN apt-get update && apt-get install -y apt-utils && apt-get install -y gettext-base wget
@@ -20,6 +19,7 @@ ADD . .
 ENV GCFLAGS="${GCFLAGS}"
 ENV GOOS="${TARGETOS}"
 ENV GOARCH="${TARGETARCH}"
+
 # Build operator binary with explicitly specified output
 RUN OPERATOR_BIN=/tmp/clickhouse-operator bash -xe ./dev/go_build_operator.sh
 
