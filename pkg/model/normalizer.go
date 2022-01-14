@@ -1018,14 +1018,14 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().ClickHouse.Config.User.Default.NetworksIP))
 		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)))
 
-		// Deal with password
+		// Deal with passwords
 
-		// Values from secret have higher priority
+		// Values from the secret have higher priority
 		n.substWithSecretField(users, username, "password", "k8s_secret_password")
 		n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
 		n.substWithSecretField(users, username, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
 
-		// Values from secret passed via ENV have higher priority
+		// Values from the secret passed via ENV have even higher priority
 		n.substWithSecretEnvField(users, username, "password", "k8s_secret_env_password")
 		n.substWithSecretEnvField(users, username, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
 		n.substWithSecretEnvField(users, username, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
@@ -1060,7 +1060,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 			passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
 		}
 
-		// NB `default` user may keep empty password in here.
+		// NB "default" user may keep empty password in here.
 
 		if passwordPlaintext != "" {
 			// Replace plaintext password with encrypted
@@ -1071,8 +1071,8 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 	}
 
 	if users.Has(defaultUsername+"/password_double_sha1_hex") || users.Has(defaultUsername+"/password_sha256_hex") {
-		// As `default` user has encrypted password provided, we need to delete existing pre-configured password.
-		// Set remove password flag for `default` user that is empty in stock ClickHouse users.xml
+		// As "default" user has encrypted password provided, we need to delete existing pre-configured password.
+		// Set remove password flag for "default" user that is empty in stock ClickHouse users.xml
 		users.Set(defaultUsername+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
 	}
 
