@@ -1,4 +1,4 @@
-# Howto easy setup development environment with devspace.sh
+# How to easy setup development environment with devspace.sh
 
 ## Install requirement components
 ### golang
@@ -29,8 +29,7 @@ docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 ### devspace.sh
 - https://devspace.sh/cli/docs/getting-started/installation
 
-
-## Typical development workflow JetBrains Goland
+## Typical development workflow with JetBrains Goland
 - open project in JetBrains Goland
 - switch docker into minikube
 ```bash
@@ -46,6 +45,6 @@ devspace dev --var=OPERATOR_NAMESPACE=kube-system --var=DEVSPACE_DEBUG=delve
 go mod tidy
 go mod vendor
 ```
-- change source files *.go/*.yaml etc., set breakpoints, look to .dockerignore to
-- devspace will rebuild docker images automatically and apply kubernetes manifest which install adopted to debug under delve binaries
+- change source files *.go/*.yaml etc., set breakpoints, look into .dockerignore
+- devspace will rebuild docker images automatically and apply kubernetes manifest which is adopted to debug with delve.
 - run Debug (SHIFT/CMD+F9) 
