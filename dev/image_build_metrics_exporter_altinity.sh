@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # Production docker image builder
 set -e
 

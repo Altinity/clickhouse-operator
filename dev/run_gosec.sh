@@ -12,11 +12,16 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
 if [[ ! $(command -v gosec) ]]; then
-  CGO_ENABLED=0 GO111MODULE=on go install -ldflags "-s -w -extldflags '-static'" github.com/securego/gosec/cmd/gosec@latest
-  sudo mv -fv ~/go/bin/gosec /usr/bin/
+    CGO_ENABLED=0 GO111MODULE=on go install -ldflags "-s -w -extldflags '-static'" github.com/securego/gosec/cmd/gosec@latest
+fi
+
+if [[ ! $(command -v gosec) ]]; then
+    echo "Unable to find gosec in \$PATH"
+    exit 1
 fi
 
 gosec -quiet "${CMD_ROOT}"/... "${PKG_ROOT}"/...
+
 #  gosec -exclude-dir=rules -exclude-dir=cmd ./...
 # gosec -tests ./...
 # gosec can ignore generated go files with default generated code comment.

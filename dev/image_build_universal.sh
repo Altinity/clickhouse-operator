@@ -1,5 +1,8 @@
-# Universal docker image builder
-# shuold call from image_build_operator_universal.sh or image_build_metrics_exporter_universal.sh
+#!/bin/bash
+
+# Universal docker image builder.
+# Should be called from image_build_operator_universal.sh or image_build_metrics_exporter_universal.sh
+
 set -e
 DOCKERFILE="${DOCKERFILE_DIR}/Dockerfile"
 
@@ -11,7 +14,6 @@ MINIKUBE="${MINIKUBE:-no}"
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 SRC_ROOT="$(realpath "${CUR_DIR}/..")"
 source "${CUR_DIR}/go_build_config.sh"
-
 
 # Build clickhouse-operator install .yaml manifest
 source "${MANIFESTS_ROOT}/builder/build-clickhouse-operator-configs.sh"
@@ -25,29 +27,29 @@ if [[ "${MINIKUBE}" == "yes" ]]; then
 fi
 
 if ! docker run --rm --privileged multiarch/qemu-user-static --reset -p yes; then
-  sudo apt-get install -y qemu binfmt-support qemu-user-static
-  docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+    sudo apt-get install -y qemu binfmt-support qemu-user-static
+    docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 fi
 
 if [[ "0" == $(docker buildx ls | grep -E 'linux/arm.+\*' | grep -E 'running|inactive') ]]; then
-  docker buildx create --use --name multi-platform --platform=linux/amd64,linux/arm64
+    docker buildx create --use --name multi-platform --platform=linux/amd64,linux/arm64
 fi
 
 DOCKER_CMD="docker buildx build --progress plain"
 if [[ "${DOCKER_IMAGE}" =~ ":dev" || "yes" == "${MINIKUBE}" ]]; then
- DOCKER_CMD="${DOCKER_CMD} --output type=image,name=${DOCKER_IMAGE} --platform=linux/amd64"
+    DOCKER_CMD="${DOCKER_CMD} --output type=image,name=${DOCKER_IMAGE} --platform=linux/amd64"
 else
- DOCKER_CMD="${DOCKER_CMD} --platform=linux/amd64,linux/arm64"
+    DOCKER_CMD="${DOCKER_CMD} --platform=linux/amd64,linux/arm64"
 fi
 
 DOCKER_CMD="${DOCKER_CMD} --build-arg VERSION=${VERSION:-dev} --build-arg RELEASE=${RELEASE:-1}"
 
 if [[ "" != "${GCFLAGS}" ]]; then
-  DOCKER_CMD="--build-arg GCFLAGS='${GCFLAGS}'"
+    DOCKER_CMD="--build-arg GCFLAGS='${GCFLAGS}'"
 fi
 
 if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
-  DOCKER_CMD="${DOCKER_CMD} --push"
+    DOCKER_CMD="${DOCKER_CMD} --push"
 fi
 
 DOCKER_CMD="${DOCKER_CMD} -t ${DOCKER_IMAGE} -f ${DOCKERFILE} ${SRC_ROOT}"
@@ -60,7 +62,7 @@ if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
 fi
 
 if ${DOCKER_CMD}; then
-    echo "ALL DONE docker image published."
+    echo "ALL DONE. Docker image published."
 else
     echo "FAILED docker build! Abort."
     exit 1

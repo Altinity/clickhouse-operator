@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # Dev docker image builder
 set -e
 

@@ -1,4 +1,6 @@
-# should call from go_build_operator.sh or go_build_metrics_exporter.sh
+#!/bin/bash
+
+# Should be called from go_build_operator.sh or go_build_metrics_exporter.sh
 
 # Build clickhouse-operator install .yaml manifest
 source "${MANIFESTS_ROOT}/builder/build-clickhouse-operator-configs.sh"
@@ -16,7 +18,7 @@ GOOS=${GOOS:-linux}
 GOARCH=${GOARCH:-amd64}
 
 if [[ "" != "${GCFLAGS:-}" ]]; then
- GCFLAGS=-gcflags "${GCFLAGS:-}"
+    GCFLAGS="-gcflags ${GCFLAGS:-}"
 fi
 
 if CGO_ENABLED=0 GO111MODULE=on GOOS="${GOOS}" GOARCH="${GOARCH}" go build \
