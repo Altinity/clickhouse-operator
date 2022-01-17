@@ -201,27 +201,24 @@ def test_operator_restart(manifest, version=settings.operator_version):
             })
         time.sleep(10)
         kubectl.wait_chi_status(chi, "Completed")
-        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-
-        with When("Restart operator"):
-            util.restart_operator()
-            time.sleep(10)
-            kubectl.wait_objects(
-                chi,
-                {
-                    "statefulset": 1,
-                    "pod": 1,
-                    "service": 2,
-                })
-            time.sleep(10)
-            kubectl.wait_chi_status(chi, "Completed")
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-
-            with Then("ClickHouse pods should not be restarted"):
-                assert start_time == new_start_time
+        
+        check_operator_restart(chi, {"statefulset": 1, "pod": 1, "service": 2}, f"chi-{chi}-{cluster}-0-0-0") 
 
         kubectl.delete_chi(chi)
 
+
+def check_operator_restart(chi, wait_objects, pod):
+    start_time = kubectl.get_field("pod", pod, ".status.startTime")
+    with When("Restart operator"):
+        util.restart_operator()
+        time.sleep(10)
+        kubectl.wait_objects(chi, wait_objects)
+        time.sleep(10)
+        kubectl.wait_chi_status(chi, "Completed")
+        new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
+
+        with Then("ClickHouse pods should not be restarted"):
+            assert start_time == new_start_time    
 
 @TestScenario
 @Name("test_008. Test operator restart")
@@ -1643,7 +1640,7 @@ def test_027(self):
 
 
 @TestScenario
-@Name("test_028. Test rolling restart")
+@Name("test_028. Test restart scenarios")
 def test_028(self):
     util.require_zookeeper()
 
@@ -1660,10 +1657,10 @@ def test_028(self):
     
     clickhouse.query(chi, "CREATE TABLE test_dist as system.one Engine = Distributed('default', system, one)")
 
-    sql = """select 
+    sql = """select getMacro('replica') as replica, uptime() as uptime,
      (select count() from system.clusters where cluster='all-sharded') as total_hosts,
      (select count() online_hosts from cluster('all-sharded', system.one) settings skip_unavailable_shards=1) as online_hosts
-     FORMAT CSV"""
+     FORMAT JSONEachRow"""
     note("Before restart")
     out = clickhouse.query_with_error(chi, sql)
     note(out)
@@ -1708,16 +1705,22 @@ def test_028(self):
             else:
                 note("Restart needs to be cleaned")
                 start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
-                with Then("Re-apply the original config. CHI should not be restarted"):
-                    kubectl.create_and_check(manifest=manifest, check={"do_not_delete": 1} )
-                    new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
-                    assert start_time == new_start_time
+                
+        with Then("Restart operator. CHI should not be restarted"):
+            check_operator_restart(chi, {"statefulset": 2, "pod": 2, "service": 3}, f"chi-{chi}-default-0-0-0") 
+            
+        with Then("Re-apply the original config. CHI should not be restarted"):
+            kubectl.create_and_check(manifest=manifest, check={"do_not_delete": 1} )
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            assert start_time == new_start_time
     
 
     with When("Stop installation"):
         cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"add\",\"path\":\"/spec/stop\",\"value\":\"yes\"}}]'"
         kubectl.launch(cmd)
         kubectl.wait_chi_status(chi, "Completed")
+        with Then("Stateful sets should be there but no running pods"):
+            kubectl.wait_objects(chi, {"statefulset": 2, "pod": 0, "service": 2})
 
     kubectl.delete_chi(chi)
 
