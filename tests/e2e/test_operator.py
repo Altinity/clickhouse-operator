@@ -1751,6 +1751,45 @@ def test_029(self):
 
     kubectl.delete_chi(chi)
 
+@TestScenario
+@Name("test_030. Test CRD deletion")
+def test_030(self):
+    manifest = "manifests/chi/test-001.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    object_counts = {"statefulset": 1, "pod": 1, "service": 2}
+    
+    kubectl.create_and_check(
+        manifest,
+        check = {
+            "object_counts": object_counts,
+            "do_not_delete": 1,
+        }
+    )
+    
+    with When("Delete CRD"):
+        kubectl.launch("delete crd clickhouseinstallations.clickhouse.altinity.com")
+        with Then("CHI should be deleted"):
+            kubectl.wait_object("chi", "test-001", count=0)
+            with And("CHI objects SHOULD NOT be deleted"):
+                assert kubectl.count_objects(label=f"-l clickhouse.altinity.com/chi={chi}") == object_counts
+    
+    pod = kubectl.get_pod_names(chi)[0]
+    start_time = kubectl.get_field("pod", pod, ".status.startTime")
+    
+    with When("Reinstall the operator"):
+        util.install_operator_if_not_exist(reinstall = True)
+        with Then("Re-create CHI"):
+            kubectl.create_and_check(
+                manifest,
+                check = {
+                    "object_counts": object_counts,
+                    "do_not_delete": 1,
+                    }
+                )
+        with Then("Pods should not be restarted"):
+            new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
+            assert start_time == new_start_time
+    kubectl.delete_chi(chi)
 
 @TestModule
 @Name("e2e.test_operator")
@@ -1794,6 +1833,7 @@ def test(self):
         test_027,
         test_028,
         test_029,
+        test_030,
     ]
     run_tests = all_tests
 
