@@ -20,6 +20,9 @@ spec:
       # restricted user with row-level security
       restricted/password: secret
       restricted/databases/system/numbers/filter: "number=1000"
+      # User with access control enabled
+      user4/password: secret
+      user4/access_management: 1
     clusters:
     - name: default
       layout:

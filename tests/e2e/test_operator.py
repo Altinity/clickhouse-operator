@@ -327,8 +327,7 @@ def test_011(self):
                 "test-011-insecured-cluster",
                 "select 'OK'",
                 host="chi-test-011-secured-cluster-default-1-0",
-                user="user1",
-                pwd="topsecret"
+                user="user1", pwd="topsecret"
             )
             assert out == 'OK'
 
@@ -342,8 +341,7 @@ def test_011(self):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "select 'OK'",
-                user="user2",
-                pwd="default"
+                user="user2", pwd="default"
             )
             assert out == 'OK'
 
@@ -351,8 +349,7 @@ def test_011(self):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "select 'OK'",
-                user="user3",
-                pwd="clickhouse_operator_password"
+                user="user3", pwd="clickhouse_operator_password"
             )
             assert out == 'OK'
 
@@ -360,10 +357,24 @@ def test_011(self):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "select * from system.numbers limit 1",
-                user="restricted",
-                pwd="secret"
+                user="restricted", pwd="secret"
             )
             assert out == '1000'
+        
+        with And("User with NO access management enabled CAN NOT run SHOW USERS"):
+            out = clickhouse.query_with_error(
+                "test-011-secured-cluster",
+                "SHOW USERS",
+            )
+            assert 'ACCESS_DENIED' in out
+        
+        with And("User with access management enabled CAN run SHOW USERS"):
+            out = clickhouse.query(
+                "test-011-secured-cluster",
+                "SHOW USERS",
+                user="user4", pwd="secret"
+            )
+            assert 'ACCESS_DENIED' not in out
 
         kubectl.delete_chi("test-011-secured-cluster")
         kubectl.delete_chi("test-011-insecured-cluster")
