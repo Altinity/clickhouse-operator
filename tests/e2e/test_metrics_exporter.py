@@ -69,7 +69,7 @@ def test_metrics_exporter_reboot(self):
                 })
             expected_chi = [{
                 "namespace": "test", "name": "simple-01",
-                "hostnames": ["chi-simple-01-shard1-repl1-0-0.test.svc.cluster.local"]
+                "hostnames": ["chi-simple-01-simple-0-0.test.svc.cluster.local"]
             }]
             check_monitoring_chi(operator_namespace, operator_pod, expected_chi)
             with When("reboot metrics exporter"):
@@ -87,7 +87,7 @@ def test_metrics_exporter_reboot(self):
 @Name("Check metrics server help with different clickhouse version")
 def test_metrics_exporter_with_multiple_clickhouse_version(self):
     def check_monitoring_metrics(operator_namespace, operator_pod, expect_result, max_retries=10):
-        with Then(f"metrics-exporter /metrics enpoint result should match with {expect_result}"):
+        with Then(f"metrics-exporter /metrics endpoint result should match with {expect_result}"):
             for i in range(1, max_retries):
                 url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/metrics")
                 out = kubectl.launch(
