@@ -98,9 +98,9 @@ func Run() {
 
 	exporter := metrics.StartMetricsREST(
 		metrics.NewCHAccessInfo(
-			chop.Config().CHUsername,
-			chop.Config().CHPassword,
-			chop.Config().CHPort,
+			chop.Config().ClickHouse.Access.Username,
+			chop.Config().ClickHouse.Access.Password,
+			chop.Config().ClickHouse.Access.Port,
 		),
 
 		metricsEP,
