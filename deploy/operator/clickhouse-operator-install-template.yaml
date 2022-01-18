@@ -3154,7 +3154,15 @@ metadata:
     app: clickhouse-operator
 data:
   config.yaml: |
-    # DO NOT EDIT! This file is auto-generated from deploy/builder/templates-config
+    # IMPORTANT
+    # This file is auto-generated from deploy/builder/templates-config.
+    # It will be overwritten upon next sources build.
+    #
+    # Template parameters available:
+    #   watchNamespaces
+    #   chUsername
+    #   chPassword
+    #   password_sha256_hex
     
     ################################################
     ##

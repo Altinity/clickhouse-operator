@@ -3161,7 +3161,15 @@ metadata:
     app: clickhouse-operator
 data:
   config.yaml: |
-    # DO NOT EDIT! This file is auto-generated from deploy/builder/templates-config
+    # IMPORTANT
+    # This file is auto-generated from deploy/builder/templates-config.
+    # It will be overwritten upon next sources build.
+    #
+    # Template parameters available:
+    #   watchNamespaces
+    #   chUsername
+    #   chPassword
+    #   password_sha256_hex
     
     ################################################
     ##
@@ -3172,7 +3180,7 @@ data:
       # List of namespaces where clickhouse-operator watches for events.
       # Concurrently running operators should watch on different namespaces
       #namespaces: ["dev", "test"]
-      namespaces: []
+      namespaces: [${namespace}]
     
     clickhouse:
       configuration:
@@ -3230,7 +3238,7 @@ data:
         # User with such credentials can be specified in additional ClickHouse .xml config files,
         # located in `chUsersConfigsPath` folder
         username: "clickhouse_operator"
-        password: "clickhouse_operator_password"
+        password: "${password}"
         secret:
           # Location of k8s Secret with username and password to be used by operator to connect to ClickHouse instances
           # Can be used instead of explicitly specified username and password
