@@ -81,8 +81,8 @@ fi
 # Render operator's Deployment section. May be not required in case of dev localhost run
 MANIFEST_PRINT_DEPLOYMENT="${MANIFEST_PRINT_DEPLOYMENT:-"yes"}"
 
-# Render operator's Service
-MANIFEST_PRINT_SERVICE="${MANIFEST_PRINT_SERVICE:-"yes"}"
+# Render operator's Service Metrics
+MANIFEST_PRINT_SERVICE_METRICS="${MANIFEST_PRINT_SERVICE_METRICS:-"yes"}"
 
 ##################################
 ##
@@ -335,9 +335,9 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
     fi
 fi
 
-# Render Service section
-if [[ "${MANIFEST_PRINT_SERVICE}" == "yes" ]]; then
-    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-05-section-service.yaml"
+# Render Service Metrics section
+if [[ "${MANIFEST_PRINT_SERVICE_METRICS}" == "yes" ]]; then
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-05-section-service-metrics.yaml"
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
     render_separator
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \

@@ -29,7 +29,7 @@ spec:
           type: string
           description: Operator version
           priority: 1 # show in wide view
-          jsonPath: .status.version
+          jsonPath: .status.chop-version
         - name: clusters
           type: integer
           description: Clusters count
@@ -105,9 +105,15 @@ spec:
               type: object
               description: "Current ClickHouseInstallation manifest status, contains many fields like a normalized configuration, clickhouse-operator version, current action and all applied action list, current taskID and all applied taskIDs and other"
               properties:
-                version:
+                chop-version:
                   type: string
-                  description: "Version"
+                  description: "ClickHouse operator version"
+                chop-commit:
+                  type: string
+                  description: "ClickHouse operator git commit SHA"
+                chop-date:
+                  type: string
+                  description: "ClickHouse operator build date"
                 clusters:
                   type: integer
                   minimum: 0
@@ -238,7 +244,7 @@ spec:
                     - "enabled"
                 restart:
                   type: string
-                  description: "restart policy for StatefulSets. When value `RollingUpdate` it allow graceful restart one by one instead of restart all StatefulSet simultaneously"
+                  description: "This is a 'soft restart' button. When set to 'RollingUpdate' operator will restart ClickHouse pods in a graceful way. Remove it after the use in order to avoid unneeded restarts"
                   enum:
                     - ""
                     - "RollingUpdate"
@@ -292,6 +298,7 @@ spec:
                   properties:
                     policy:
                       type: string
+                      description: DEPRECATED
                     configMapPropagationTimeout:
                       type: integer
                       description: |

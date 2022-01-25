@@ -32,14 +32,14 @@ func (c *Controller) appendLabelReady(ctx context.Context, host *chop.ChiHost) e
 
 	pod, err := c.getPod(host)
 	if err != nil {
-		log.M(host).A().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
+		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
 		return err
 	}
 
 	chopmodel.AppendLabelReady(&pod.ObjectMeta)
 	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
 	if err != nil {
-		log.M(host).A().Error("FAIL setting 'ready' label for host %s err:%v", host.Address.NamespaceNameString(), err)
+		log.M(host).F().Error("FAIL setting 'ready' label for host %s err:%v", host.Address.NamespaceNameString(), err)
 		return err
 	}
 	return err
@@ -74,7 +74,7 @@ func (c *Controller) deleteLabelReady(ctx context.Context, host *chop.ChiHost) e
 func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Container)) {
 	pod, err := c.getPod(host)
 	if err != nil {
-		log.M(host).A().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
+		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
 		return
 	}
 
@@ -87,7 +87,7 @@ func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Con
 func (c *Controller) walkContainerStatuses(host *chop.ChiHost, f func(status *v1.ContainerStatus)) {
 	pod, err := c.getPod(host)
 	if err != nil {
-		log.M(host).A().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
+		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
 		return
 	}
 

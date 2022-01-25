@@ -19,9 +19,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"sort"
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
-	"strings"
 
 	"github.com/google/uuid"
 	"k8s.io/api/core/v1"
@@ -59,12 +62,12 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 	}
 
 	// What base should be used to create CHI
-	if chop.Config().CHITemplate == nil {
+	if chop.Config().Template.CHI.Runtime.Template == nil {
 		// No template specified - start with clear page
 		n.chi = new(chiV1.ClickHouseInstallation)
 	} else {
 		// Template specified - start with template
-		n.chi = chop.Config().CHITemplate.DeepCopy()
+		n.chi = chop.Config().Template.CHI.Runtime.Template.DeepCopy()
 	}
 
 	// At this moment n.chi is either empty CHI or a system-wide template
@@ -101,7 +104,7 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		if template := chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
-			log.V(1).M(chi).A().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
+			log.V(1).M(chi).F().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			// Apply template
 			(&n.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
@@ -109,15 +112,15 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 				n.chi.Labels,
 				util.CopyMapFilter(
 					template.Labels,
-					chop.Config().IncludeIntoPropagationLabels,
-					chop.Config().ExcludeFromPropagationLabels,
+					chop.Config().Label.Include,
+					chop.Config().Label.Exclude,
 				),
 			)
 			n.chi.Annotations = util.MergeStringMapsOverwrite(
 				n.chi.Annotations, util.CopyMapFilter(
 					template.Annotations,
-					chop.Config().IncludeIntoPropagationAnnotations,
-					append(chop.Config().ExcludeFromPropagationAnnotations, util.ListSkippedAnnotations()...),
+					chop.Config().Annotation.Include,
+					append(chop.Config().Annotation.Exclude, util.ListSkippedAnnotations()...),
 				),
 			)
 			log.V(2).M(chi).F().Info("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
@@ -835,60 +838,131 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *chiV1.ChiZookeeperConfi
 }
 
 // substWithSecretField substitute users settings field with value from k8s secret
-func (n *Normalizer) substWithSecretField(users *chiV1.Settings, username string, userSettingsField, userSettingsK8SSecretField string) {
+func (n *Normalizer) substWithSecretField(users *chiV1.Settings, username string, userSettingsField, userSettingsK8SSecretField string) bool {
 	// Has to have source field specified
 	if !users.Has(username + "/" + userSettingsK8SSecretField) {
-		return
+		return false
 	}
 
-	// Anyway remove the field, it should not be included into final clickhouse config
+	// Anyway remove source field, it should not be included into final ClickHouse config,
+	// because these source fields are synthetic ones (clickhouse does not know them).
 	defer users.Delete(username + "/" + userSettingsK8SSecretField)
 
+	secretFieldValue, err := n.fetchSecretFieldValue(users, username, userSettingsK8SSecretField)
+	if err != nil {
+		return false
+	}
+
+	users.Set(username+"/"+userSettingsField, chiV1.NewSettingScalar(secretFieldValue))
+	return true
+}
+
+// substWithSecretEnvField substitute users settings field with value from k8s secret stored in ENV var
+func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username string, userSettingsField, userSettingsK8SSecretField string) bool {
+	// Fetch secret name and key within secret
+	_, secretName, key, err := parseSecretFieldAddress(users, username, userSettingsK8SSecretField)
+	if err != nil {
+		return false
+	}
+
+	// Subst plaintext field with secret field
+	if !n.substWithSecretField(users, username, userSettingsField, userSettingsK8SSecretField) {
+		return false
+	}
+
+	// ENV VAR name and value
+	envVarName := username + "_" + userSettingsField
+
+	for _, envVar := range n.chi.Attributes.ExchangeEnv {
+		if envVar.Name == envVarName {
+			// Such a variable already exists
+			return false
+		}
+	}
+
+	envVar := corev1.EnvVar{
+		Name: envVarName,
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &v1.SecretKeySelector{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: secretName,
+				},
+				Key: key,
+			},
+		},
+	}
+	n.chi.Attributes.ExchangeEnv = append(n.chi.Attributes.ExchangeEnv, envVar)
+
+	// Replace setting with empty value and reference to ENV VAR
+	users.Set(username+"/"+userSettingsField, chiV1.NewSettingScalar("").SetAttribute("from_env", envVarName))
+	return true
+}
+
+var (
+	// ErrSecretFieldNotFound specifies error when secret key is not found
+	ErrSecretFieldNotFound = fmt.Errorf("not found")
+)
+
+// parseSecretFieldAddress parses address into namespace, name, key triple
+func parseSecretFieldAddress(users *chiV1.Settings, username, userSettingsK8SSecretField string) (string, string, string, error) {
 	secretFieldAddress := users.Get(username + "/" + userSettingsK8SSecretField).String()
-	// Extract secret namespace, name and field by splitting namespace/name/field triple
-	var namespace, name, field string
+
+	// Extract secret's namespace and name and then field name within the secret,
+	// by splitting namespace/name/field (aka key) triple. Namespace can be omitted in the settings
+	var namespace, name, key string
 	switch tags := strings.Split(secretFieldAddress, "/"); len(tags) {
 	case 2:
-		namespace = chop.Config().Namespace
+		// Assume namespace is omitted
+		namespace = chop.Config().Runtime.Namespace
 		name = tags[0]
-		field = tags[1]
+		key = tags[1]
 	case 3:
+		// All components are in place
 		namespace = tags[0]
 		name = tags[1]
-		field = tags[2]
+		key = tags[2]
 	default:
 		// Skip incorrect entry
-		log.V(1).M(namespace, name).F().Warning("unable to parse secret field address: %s", secretFieldAddress)
-		return
+		log.V(1).Warning("unable to parse secret field address: %s", secretFieldAddress)
+		return "", "", "", ErrSecretFieldNotFound
 	}
 
 	// Sanity check
-	if (namespace == "") || (name == "") || (field == "") {
+	if (namespace == "") || (name == "") || (key == "") {
 		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: %s", secretFieldAddress)
-		return
+		return "", "", "", ErrSecretFieldNotFound
+	}
+
+	return namespace, name, key, nil
+}
+
+// fetchSecretFieldValue fetches the value of the specified field in the specified secret
+func (n *Normalizer) fetchSecretFieldValue(users *chiV1.Settings, username, userSettingsK8SSecretField string) (string, error) {
+	// Fetch address of the field
+	namespace, name, key, err := parseSecretFieldAddress(users, username, userSettingsK8SSecretField)
+	if err != nil {
+		return "", err
 	}
 
 	secret, err := n.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		log.V(1).M(namespace, name).F().Info("unable to read secret %v", err)
-		return
+		return "", ErrSecretFieldNotFound
 	}
 
-	found := false
-	for key, value := range secret.Data {
-		if key == field {
-			users.Set(username+"/"+userSettingsField, chiV1.NewSettingScalar(string(value)))
-			found = true
+	// Find the field within the secret
+	for k, value := range secret.Data {
+		if key == k {
+			return string(value), nil
 		}
 	}
 
-	if !found {
-		log.V(1).M(namespace, name).F().Info("unable to locate in specified secret field %s", field)
-	}
+	log.V(1).M(namespace, name).F().Info("unable to locate in specified address (namespace/name/key triple) from: %s/%s", username, userSettingsK8SSecretField)
+	return "", ErrSecretFieldNotFound
 }
 
 // normalizeUsersList extracts usernames from provided 'users' settings
-func (n *Normalizer) normalizeUsersList(users *chiV1.Settings) (usernames []string) {
+func (n *Normalizer) normalizeUsersList(users *chiV1.Settings, extra ...string) (usernames []string) {
 	// Extract username from path
 	usernameMap := make(map[string]bool)
 	users.Walk(func(path string, _ *chiV1.Setting) {
@@ -904,10 +978,18 @@ func (n *Normalizer) normalizeUsersList(users *chiV1.Settings) (usernames []stri
 		username := tags[0]
 		usernameMap[username] = true
 	})
-	// Make list of usernames
+
+	// Add extra users
+	for _, username := range extra {
+		usernameMap[username] = true
+	}
+
+	// Make sorted list of unique usernames
 	for username := range usernameMap {
 		usernames = append(usernames, username)
 	}
+	sort.Strings(usernames)
+
 	return usernames
 }
 
@@ -915,62 +997,85 @@ const defaultUsername = "default"
 
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.Settings {
+	// Ensure and normalize user settings
 	if users == nil {
 		users = chiV1.NewSettings()
 	}
 	users.Normalize()
-	// "default" user is required in order to secure host_regexp
-	usernames := append(n.normalizeUsersList(users), defaultUsername)
-	// Normalize each user
+
+	// Add special "default" user to the list of users, which is required in order to secure host_regexp
+	usernames := n.normalizeUsersList(users, defaultUsername)
+
+	// Normalize each user in the list of users
 	for _, username := range usernames {
-		// Ensure "must have" sections are in place
+		// Ensure each user has mandatory sections:
 		// 1. user/profile
 		// 2. user/quota
 		// 3. user/networks/ip
 		// 4. user/networks/host_regexp
-		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultProfile))
-		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(chop.Config().CHConfigUserDefaultQuota))
-		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().CHConfigUserDefaultNetworksIP))
-		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().CHConfigNetworksHostRegexpTemplate)))
+		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().ClickHouse.Config.User.Default.Profile))
+		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(chop.Config().ClickHouse.Config.User.Default.Quota))
+		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().ClickHouse.Config.User.Default.NetworksIP))
+		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)))
 
-		// Values from secret have higher priority
+		// Deal with passwords
+
+		// Values from the secret have higher priority
 		n.substWithSecretField(users, username, "password", "k8s_secret_password")
 		n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
 		n.substWithSecretField(users, username, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
 
-		passwordPlaintext := ""
+		// Values from the secret passed via ENV have even higher priority
+		n.substWithSecretEnvField(users, username, "password", "k8s_secret_env_password")
+		n.substWithSecretEnvField(users, username, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
+		n.substWithSecretEnvField(users, username, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
 
-		// Use explicitly specified plaintext password, if provided
-		if users.Has(username + "/password") {
-			passwordPlaintext = users.Get(username + "/password").String()
+		// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
+		if users.Has(username + "/password_double_sha1_hex") {
+			users.Delete(username + "/password_sha256_hex")
+			users.Delete(username + "/password")
+			continue // move to the next user
 		}
+
+		// Than goes password_sha256_hex, thus keep it only
+		if users.Has(username + "/password_sha256_hex") {
+			users.Delete(username + "/password")
+			continue // move to the next user
+		}
+
+		// From now on we either have a plaintext password specified, or no password at all
+
+		if users.Get(username + "/password").HasAttributes() {
+			// Have plaintext password explicitly specified via ENV vars
+			// This is still OK
+			continue // move to the next user
+		}
+
+		// From now on we either have plaintext password specified as an explicit string, or no password at all
+
+		passwordPlaintext := users.Get(username + "/password").String()
 
 		// Apply default password for password-less non-default users
 		if (passwordPlaintext == "") && (username != defaultUsername) {
-			passwordPlaintext = chop.Config().CHConfigUserDefaultPassword
+			passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
 		}
 
-		hasPasswordSHA256 := users.Has(username + "/password_sha256_hex")
-		hasPasswordDoubleSHA1 := users.Has(username + "/password_double_sha1_hex")
+		// NB "default" user may keep empty password in here.
 
-		// In case no encoded password provided - encode plaintext password (if it is available)
-		if !hasPasswordSHA256 && !hasPasswordDoubleSHA1 && (passwordPlaintext != "") {
+		if passwordPlaintext != "" {
+			// Replace plaintext password with encrypted
 			passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
 			users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
-			hasPasswordSHA256 = true
-		}
-
-		if hasPasswordSHA256 {
-			// ClickHouse does not start if both password and sha256 are defined
-			if username == "default" {
-				// Set remove password flag for default user that is empty in stock ClickHouse users.xml
-				// TODO fix it
-				users.Set(username+"/password", chiV1.NewSettingScalar("_removed_"))
-			} else {
-				users.Delete(username + "/password")
-			}
+			users.Delete(username + "/password")
 		}
 	}
+
+	if users.Has(defaultUsername+"/password_double_sha1_hex") || users.Has(defaultUsername+"/password_sha256_hex") {
+		// As "default" user has encrypted password provided, we need to delete existing pre-configured password.
+		// Set remove password flag for "default" user that is empty in stock ClickHouse users.xml
+		users.Set(defaultUsername+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
+	}
+
 	return users
 }
 

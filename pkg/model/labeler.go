@@ -36,6 +36,8 @@ const (
 	LabelAppName                      = clickhousealtinitycom.GroupName + "/app"
 	LabelAppValue                     = "chop"
 	LabelCHOP                         = clickhousealtinitycom.GroupName + "/chop"
+	LabelCHOPCommit                   = clickhousealtinitycom.GroupName + "/chop-commit"
+	LabelCHOPDate                     = clickhousealtinitycom.GroupName + "/chop-date"
 	LabelNamespace                    = clickhousealtinitycom.GroupName + "/namespace"
 	LabelCHIName                      = clickhousealtinitycom.GroupName + "/chi"
 	LabelClusterName                  = clickhousealtinitycom.GroupName + "/cluster"
@@ -219,7 +221,7 @@ func getSelectorShardScopeReady(shard *chiv1.ChiShard) map[string]string {
 func (l *Labeler) getHostScope(host *chiv1.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	labels := GetSelectorHostScope(host)
-	if chop.Config().AppendScopeLabels {
+	if chop.Config().Label.Runtime.AppendScope {
 		// Optional labels
 		labels[LabelShardScopeIndex] = getNamePartShardScopeIndex(host)
 		labels[LabelReplicaScopeIndex] = getNamePartReplicaScopeIndex(host)
@@ -298,7 +300,7 @@ func GetSelectorHostScope(host *chiv1.ChiHost) map[string]string {
 
 // appendCHIProvidedTo appends CHI-provided labels to labels set
 func (l *Labeler) appendCHIProvidedTo(dst map[string]string) map[string]string {
-	sourceLabels := util.CopyMapFilter(l.chi.Labels, chop.Config().IncludeIntoPropagationLabels, chop.Config().ExcludeFromPropagationLabels)
+	sourceLabels := util.CopyMapFilter(l.chi.Labels, chop.Config().Label.Include, chop.Config().Label.Exclude)
 	return util.MergeStringMapsOverwrite(dst, sourceLabels)
 }
 

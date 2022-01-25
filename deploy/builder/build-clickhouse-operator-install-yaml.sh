@@ -40,10 +40,6 @@ OPERATOR_NAMESPACE="\${OPERATOR_NAMESPACE}" \
 # Build v1beta1 bundle and template manifests
 "${CUR_DIR}"/build-clickhouse-operator-install-v1beta1-yaml.sh
 
-# Build namespace:dev installation .yaml manifest
-OPERATOR_NAMESPACE="dev" \
-"${CUR_DIR}/cat-clickhouse-operator-install-yaml.s"h > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-dev.yaml"
-
 # Build terraform-templated installation .yaml manifest
 cat <<EOF > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-tf.yaml"
 #
@@ -87,5 +83,5 @@ MANIFEST_PRINT_CRD="yes" \
 MANIFEST_PRINT_RBAC_CLUSTERED="no" \
 MANIFEST_PRINT_RBAC_NAMESPACED="no" \
 MANIFEST_PRINT_DEPLOYMENT="no" \
-MANIFEST_PRINT_SERVICE="no" \
+MANIFEST_PRINT_SERVICE_METRICS="no" \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/parts/crd.yaml"

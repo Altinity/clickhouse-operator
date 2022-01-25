@@ -43,11 +43,11 @@ func (c *Controller) discovery(ctx context.Context, chi *chop.ClickHouseInstalla
 func (c *Controller) discoveryStatefulSet(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
 	list, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).List(ctx, opts)
 	if err != nil {
-		log.M(chi).A().Error("FAIL list StatefulSet err:%v", err)
+		log.M(chi).F().Error("FAIL list StatefulSet err:%v", err)
 		return
 	}
 	if list == nil {
-		log.M(chi).A().Error("FAIL list StatefulSet list is nil")
+		log.M(chi).F().Error("FAIL list StatefulSet list is nil")
 		return
 	}
 	for _, obj := range list.Items {
@@ -58,11 +58,11 @@ func (c *Controller) discoveryStatefulSet(ctx context.Context, r *chopmodel.Regi
 func (c *Controller) discoveryConfigMap(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
 	list, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).List(ctx, opts)
 	if err != nil {
-		log.M(chi).A().Error("FAIL list ConfigMap err:%v", err)
+		log.M(chi).F().Error("FAIL list ConfigMap err:%v", err)
 		return
 	}
 	if list == nil {
-		log.M(chi).A().Error("FAIL list ConfigMap list is nil")
+		log.M(chi).F().Error("FAIL list ConfigMap list is nil")
 		return
 	}
 	for _, obj := range list.Items {
@@ -73,11 +73,11 @@ func (c *Controller) discoveryConfigMap(ctx context.Context, r *chopmodel.Regist
 func (c *Controller) discoveryService(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
 	list, err := c.kubeClient.CoreV1().Services(chi.Namespace).List(ctx, opts)
 	if err != nil {
-		log.M(chi).A().Error("FAIL list Service err:%v", err)
+		log.M(chi).F().Error("FAIL list Service err:%v", err)
 		return
 	}
 	if list == nil {
-		log.M(chi).A().Error("FAIL list Service list is nil")
+		log.M(chi).F().Error("FAIL list Service list is nil")
 		return
 	}
 	for _, obj := range list.Items {
@@ -88,11 +88,11 @@ func (c *Controller) discoveryService(ctx context.Context, r *chopmodel.Registry
 func (c *Controller) discoveryPVC(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
 	list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(chi.Namespace).List(ctx, opts)
 	if err != nil {
-		log.M(chi).A().Error("FAIL list PVC err:%v", err)
+		log.M(chi).F().Error("FAIL list PVC err:%v", err)
 		return
 	}
 	if list == nil {
-		log.M(chi).A().Error("FAIL list PVC list is nil")
+		log.M(chi).F().Error("FAIL list PVC list is nil")
 		return
 	}
 	for _, obj := range list.Items {
@@ -103,11 +103,11 @@ func (c *Controller) discoveryPVC(ctx context.Context, r *chopmodel.Registry, ch
 func (c *Controller) discoveryPV(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
 	list, err := c.kubeClient.CoreV1().PersistentVolumes().List(ctx, opts)
 	if err != nil {
-		log.M(chi).A().Error("FAIL list PV err:%v", err)
+		log.M(chi).F().Error("FAIL list PV err:%v", err)
 		return
 	}
 	if list == nil {
-		log.M(chi).A().Error("FAIL list PV list is nil")
+		log.M(chi).F().Error("FAIL list PV list is nil")
 		return
 	}
 	for _, obj := range list.Items {

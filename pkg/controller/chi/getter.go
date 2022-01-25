@@ -48,11 +48,13 @@ func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*c
 		return nil, err
 	}
 
-	// Object not found by name. Try to find by labels
+	// Object not found by name
 
 	if byNameOnly {
-		return nil, fmt.Errorf("object not found by name %s/%s and no label search allowed ", objMeta.Namespace, objMeta.Name)
+		return nil, err
 	}
+
+	// Try to find by labels
 
 	var selector kublabels.Selector
 	if selector, err = chopmodel.MakeSelectorFromObjectMeta(objMeta); err != nil {

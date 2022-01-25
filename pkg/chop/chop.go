@@ -29,6 +29,10 @@ import (
 type CHOp struct {
 	// Version specifies version of the operator
 	Version string
+	// Commit specifies git commit of the operator
+	Commit string
+	// Date specified date when operator was built
+	Date string
 	// ConfigManager specifies configuration manager in charge of operator's configuration
 	ConfigManager *ConfigManager
 }
@@ -36,12 +40,16 @@ type CHOp struct {
 // NewCHOp creates new CHOp
 func NewCHOp(
 	version string,
+	commit string,
+	date string,
 	kubeClient *kube.Clientset,
 	chopClient *chopclientset.Clientset,
 	initConfigFilePath string,
 ) *CHOp {
 	return &CHOp{
 		Version:       version,
+		Commit:        commit,
+		Date:          date,
 		ConfigManager: NewConfigManager(kubeClient, chopClient, initConfigFilePath),
 	}
 }
@@ -65,25 +73,25 @@ func (c *CHOp) Config() *v1.OperatorConfig {
 // SetupLog sets up loggging options
 func (c *CHOp) SetupLog() {
 	updated := false
-	if c.Config().LogToStderr != "" {
-		c.logUpdate("logtostderr", c.Config().LogToStderr)
+	if c.Config().Logger.LogToStderr != "" {
+		c.logUpdate("logtostderr", c.Config().Logger.LogToStderr)
 		updated = true
-		_ = flag.Set("logtostderr", c.Config().LogToStderr)
+		_ = flag.Set("logtostderr", c.Config().Logger.LogToStderr)
 	}
-	if c.Config().AlsoLogToStderr != "" {
-		c.logUpdate("alsologtostderr", c.Config().AlsoLogToStderr)
+	if c.Config().Logger.AlsoLogToStderr != "" {
+		c.logUpdate("alsologtostderr", c.Config().Logger.AlsoLogToStderr)
 		updated = true
-		_ = flag.Set("alsologtostderr", c.Config().AlsoLogToStderr)
+		_ = flag.Set("alsologtostderr", c.Config().Logger.AlsoLogToStderr)
 	}
-	if c.Config().StderrThreshold != "" {
-		c.logUpdate("stderrthreshold", c.Config().StderrThreshold)
+	if c.Config().Logger.StderrThreshold != "" {
+		c.logUpdate("stderrthreshold", c.Config().Logger.StderrThreshold)
 		updated = true
-		_ = flag.Set("stderrthreshold", c.Config().StderrThreshold)
+		_ = flag.Set("stderrthreshold", c.Config().Logger.StderrThreshold)
 	}
-	if c.Config().V != "" {
-		c.logUpdate("v", c.Config().V)
+	if c.Config().Logger.V != "" {
+		c.logUpdate("v", c.Config().Logger.V)
 		updated = true
-		_ = flag.Set("v", c.Config().V)
+		_ = flag.Set("v", c.Config().Logger.V)
 	}
 
 	if updated {

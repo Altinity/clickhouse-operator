@@ -8,7 +8,7 @@ spec:
   defaults:
     templates: 
       dataVolumeClaimTemplate: default
-      podTemplate: clickhouse:19.6
+      podTemplate: clickhouse:20.7
  
   configuration:
     zookeeper:
@@ -17,7 +17,7 @@ spec:
     clusters:
       - name: replicated
         layout:
-          shardsCount: 2
+          shardsCount: 1
           replicasCount: 2
 
   templates:
@@ -30,7 +30,7 @@ spec:
             requests:
               storage: 500Mi
     podTemplates:
-      - name: clickhouse:19.6
+      - name: clickhouse:20.7
         spec:
           containers:
             - name: clickhouse-pod

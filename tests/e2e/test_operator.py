@@ -201,27 +201,24 @@ def test_operator_restart(manifest, version=settings.operator_version):
             })
         time.sleep(10)
         kubectl.wait_chi_status(chi, "Completed")
-        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
-        with When("Restart operator"):
-            util.restart_operator()
-            time.sleep(10)
-            kubectl.wait_objects(
-                chi,
-                {
-                    "statefulset": 1,
-                    "pod": 1,
-                    "service": 2,
-                })
-            time.sleep(10)
-            kubectl.wait_chi_status(chi, "Completed")
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-
-            with Then("ClickHouse pods should not be restarted"):
-                assert start_time == new_start_time
+        check_operator_restart(chi, {"statefulset": 1, "pod": 1, "service": 2}, f"chi-{chi}-{cluster}-0-0-0")
 
         kubectl.delete_chi(chi)
 
+
+def check_operator_restart(chi, wait_objects, pod):
+    start_time = kubectl.get_field("pod", pod, ".status.startTime")
+    with When("Restart operator"):
+        util.restart_operator()
+        time.sleep(10)
+        kubectl.wait_objects(chi, wait_objects)
+        time.sleep(10)
+        kubectl.wait_chi_status(chi, "Completed")
+        new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
+
+        with Then("ClickHouse pods should not be restarted"):
+            assert start_time == new_start_time
 
 @TestScenario
 @Name("test_008. Test operator restart")
@@ -330,8 +327,7 @@ def test_011(self):
                 "test-011-insecured-cluster",
                 "select 'OK'",
                 host="chi-test-011-secured-cluster-default-1-0",
-                user="user1",
-                pwd="topsecret"
+                user="user1", pwd="topsecret"
             )
             assert out == 'OK'
 
@@ -345,8 +341,7 @@ def test_011(self):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "select 'OK'",
-                user="user2",
-                pwd="default"
+                user="user2", pwd="default"
             )
             assert out == 'OK'
 
@@ -354,8 +349,7 @@ def test_011(self):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "select 'OK'",
-                user="user3",
-                pwd="clickhouse_operator_password"
+                user="user3", pwd="clickhouse_operator_password"
             )
             assert out == 'OK'
 
@@ -363,10 +357,24 @@ def test_011(self):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "select * from system.numbers limit 1",
-                user="restricted",
-                pwd="secret"
+                user="restricted", pwd="secret"
             )
             assert out == '1000'
+
+        with And("User with NO access management enabled CAN NOT run SHOW USERS"):
+            out = clickhouse.query_with_error(
+                "test-011-secured-cluster",
+                "SHOW USERS",
+            )
+            assert 'ACCESS_DENIED' in out
+
+        with And("User with access management enabled CAN run SHOW USERS"):
+            out = clickhouse.query(
+                "test-011-secured-cluster",
+                "SHOW USERS",
+                user="user4", pwd="secret"
+            )
+            assert 'ACCESS_DENIED' not in out
 
         kubectl.delete_chi("test-011-secured-cluster")
         kubectl.delete_chi("test-011-insecured-cluster")
@@ -384,10 +392,14 @@ def test_011_1(self):
             }
         )
 
-        with Then("Default user password should be '_removed_'"):
+        with Then("Default user plain password should be removed"):
             chi = kubectl.get("chi", "test-011-secured-default")
             assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
-            assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == "_removed_"
+            assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == ""
+
+            cfm = kubectl.get("configmap", "chi-test-011-secured-default-common-usersd")
+            assert "<password remove=\"1\"></password>" in cfm["data"]["chop-generated-users.xml"]
+
 
         with And("Connection to localhost should succeed with default user"):
             out = clickhouse.query_with_error(
@@ -404,23 +416,22 @@ def test_011_1(self):
                     "do_not_delete": 1,
                 }
             )
-            with Then("Default user password should be '_removed_'"):
+            with Then("Default user plain password should be removed"):
                 chi = kubectl.get("chi", "test-011-secured-default")
                 assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
-                assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == "_removed_"
+                assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == ""
 
-        with When("Default user is assigned the different profile"):
+                cfm = kubectl.get("configmap", "chi-test-011-secured-default-common-usersd")
+                assert "<password remove=\"1\"></password>" in cfm["data"]["chop-generated-users.xml"]
+
+        with When("Default user password is removed"):
             kubectl.create_and_check(
                 manifest="manifests/chi/test-011-secured-default-3.yaml",
                 check={
                     "do_not_delete": 1,
                 }
             )
-            with Then("Wait until configmap is reloaded"):
-                # Need to wait to make sure configuration is reloaded. For some reason it takes long here
-                # Maybe we can restart the pod to speed it up
-                time.sleep(120)
-            with Then("Connection to localhost should succeed with default user"):
+            with Then("Connection to localhost should succeed with default user and no password"):
                 out = clickhouse.query_with_error(
                     "test-011-secured-default",
                     "select 'OK'"
@@ -746,11 +757,11 @@ def test_014(self):
                     host=f"chi-{chi}-{cluster}-0-1")
                 assert out == "1"
 
-    with When("Add 3 more replica"):
+    with When("Add more replicas"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-014-replication-2.yaml",
             check={
-                "pod_count": 5,
+                "pod_count": 4,
                 "do_not_delete": 1,
             },
             timeout=600,
@@ -762,7 +773,7 @@ def test_014(self):
         assert start_time == new_start_time
 
         with Then("Schema objects should be migrated to the new replicas"):
-            for replica in [2, 3, 4]:
+            for replica in [2, 3]:
                 host = f"chi-{chi}-{cluster}-0-{replica}"
                 print(f"Checking replica {host}")
                 print("Checking tables and views")
@@ -1686,7 +1697,7 @@ def test_027(self):
 
 
 @TestScenario
-@Name("test_028. Test rolling restart")
+@Name("test_028. Test restart scenarios")
 def test_028(self):
     util.require_zookeeper()
 
@@ -1703,10 +1714,10 @@ def test_028(self):
 
     clickhouse.query(chi, "CREATE TABLE test_dist as system.one Engine = Distributed('default', system, one)")
 
-    sql = """select
+    sql = """select getMacro('replica') as replica, uptime() as uptime,
      (select count() from system.clusters where cluster='all-sharded') as total_hosts,
      (select count() online_hosts from cluster('all-sharded', system.one) settings skip_unavailable_shards=1) as online_hosts
-     FORMAT CSV"""
+     FORMAT JSONEachRow"""
     note("Before restart")
     out = clickhouse.query_with_error(chi, sql)
     note(out)
@@ -1751,16 +1762,22 @@ def test_028(self):
             else:
                 note("Restart needs to be cleaned")
                 start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
-                with Then("Re-apply the original config. CHI should not be restarted"):
-                    kubectl.create_and_check(manifest=manifest, check={"do_not_delete": 1} )
-                    new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
-                    assert start_time == new_start_time
+
+        with Then("Restart operator. CHI should not be restarted"):
+            check_operator_restart(chi, {"statefulset": 2, "pod": 2, "service": 3}, f"chi-{chi}-default-0-0-0")
+
+        with Then("Re-apply the original config. CHI should not be restarted"):
+            kubectl.create_and_check(manifest=manifest, check={"do_not_delete": 1} )
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            assert start_time == new_start_time
 
 
     with When("Stop installation"):
         cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"add\",\"path\":\"/spec/stop\",\"value\":\"yes\"}}]'"
         kubectl.launch(cmd)
         kubectl.wait_chi_status(chi, "Completed")
+        with Then("Stateful sets should be there but no running pods"):
+            kubectl.wait_objects(chi, {"statefulset": 2, "pod": 0, "service": 2})
 
     kubectl.delete_chi(chi)
 
@@ -1791,6 +1808,45 @@ def test_029(self):
 
     kubectl.delete_chi(chi)
 
+@TestScenario
+@Name("test_030. Test CRD deletion")
+def test_030(self):
+    manifest = "manifests/chi/test-001.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    object_counts = {"statefulset": 1, "pod": 1, "service": 2}
+
+    kubectl.create_and_check(
+        manifest,
+        check = {
+            "object_counts": object_counts,
+            "do_not_delete": 1,
+        }
+    )
+
+    with When("Delete CRD"):
+        kubectl.launch("delete crd clickhouseinstallations.clickhouse.altinity.com")
+        with Then("CHI should be deleted"):
+            kubectl.wait_object("chi", "test-001", count=0)
+            with And("CHI objects SHOULD NOT be deleted"):
+                assert kubectl.count_objects(label=f"-l clickhouse.altinity.com/chi={chi}") == object_counts
+
+    pod = kubectl.get_pod_names(chi)[0]
+    start_time = kubectl.get_field("pod", pod, ".status.startTime")
+
+    with When("Reinstall the operator"):
+        util.install_operator_if_not_exist(reinstall = True)
+        with Then("Re-create CHI"):
+            kubectl.create_and_check(
+                manifest,
+                check = {
+                    "object_counts": object_counts,
+                    "do_not_delete": 1,
+                    }
+                )
+        with Then("Pods should not be restarted"):
+            new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
+            assert start_time == new_start_time
+    kubectl.delete_chi(chi)
 
 @TestModule
 @Name("e2e.test_operator")
@@ -1835,6 +1891,7 @@ def test(self):
         test_027,
         test_028,
         test_029,
+        test_030,
     ]
     run_tests = all_tests
 

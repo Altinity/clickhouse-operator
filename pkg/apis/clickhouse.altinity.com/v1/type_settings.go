@@ -61,9 +61,10 @@ var (
 
 // Setting represents one settings, which can be either a sting or a vector of strings
 type Setting struct {
-	isScalar bool
-	scalar   string
-	vector   []string
+	isScalar   bool
+	scalar     string
+	vector     []string
+	attributes map[string]string
 }
 
 // NewSettingScalar makes new scalar Setting
@@ -84,32 +85,79 @@ func NewSettingVector(vector []string) *Setting {
 
 // IsScalar checks whether setting is a scalar value
 func (s *Setting) IsScalar() bool {
+	if s == nil {
+		return false
+	}
 	return s.isScalar
 }
 
 // IsVector checks whether setting is a vector value
 func (s *Setting) IsVector() bool {
+	if s == nil {
+		return false
+	}
 	return !s.isScalar
 }
 
 // Scalar gets scalar value of a setting
 func (s *Setting) Scalar() string {
+	if s == nil {
+		return ""
+	}
 	return s.scalar
 }
 
 // Vector gets vector values of a setting
 func (s *Setting) Vector() []string {
+	if s == nil {
+		return nil
+	}
 	return s.vector
 }
 
 // AsVector gets value of a setting as vector. Scalar value is casted to vector
 func (s *Setting) AsVector() []string {
+	if s == nil {
+		return nil
+	}
 	if s.isScalar {
 		return []string{
 			s.scalar,
 		}
 	}
 	return s.vector
+}
+
+// SetAttribute sets attribute of the setting
+func (s *Setting) SetAttribute(name, value string) *Setting {
+	if s == nil {
+		return nil
+	}
+	if s.attributes == nil {
+		s.attributes = make(map[string]string)
+	}
+	s.attributes[name] = value
+	return s
+}
+
+// HasAttributes checks whether setting has attributes
+func (s *Setting) HasAttributes() bool {
+	if s == nil {
+		return false
+	}
+	return len(s.attributes) > 0
+}
+
+// Attributes returns string form of attributes - used to config tag creation
+func (s *Setting) Attributes() string {
+	if s == nil {
+		return ""
+	}
+	a := ""
+	for name, value := range s.attributes {
+		a += fmt.Sprintf(` %s="%s"`, name, value)
+	}
+	return a
 }
 
 // String gets string value of a setting. Vector is combined into one string
@@ -151,11 +199,17 @@ func (settings *Settings) Len() int {
 
 // IsZero checks whether settings is zero
 func (settings *Settings) IsZero() bool {
+	if settings == nil {
+		return true
+	}
 	return settings.Len() == 0
 }
 
 // Walk walks over settings
 func (settings *Settings) Walk(f func(name string, setting *Setting)) {
+	if settings == nil {
+		return
+	}
 	if settings.Len() == 0 {
 		return
 	}
@@ -166,6 +220,9 @@ func (settings *Settings) Walk(f func(name string, setting *Setting)) {
 
 // Has checks whether named setting exists
 func (settings *Settings) Has(name string) bool {
+	if settings == nil {
+		return false
+	}
 	if settings.Len() == 0 {
 		return false
 	}
@@ -175,6 +232,9 @@ func (settings *Settings) Has(name string) bool {
 
 // Get gets named setting
 func (settings *Settings) Get(name string) *Setting {
+	if settings == nil {
+		return nil
+	}
 	if settings.Len() == 0 {
 		return nil
 	}
@@ -183,6 +243,9 @@ func (settings *Settings) Get(name string) *Setting {
 
 // Set sets named setting
 func (settings *Settings) Set(name string, setting *Setting) {
+	if settings == nil {
+		return
+	}
 	if settings == nil {
 		return
 	}
@@ -195,6 +258,9 @@ func (settings *Settings) Set(name string, setting *Setting) {
 
 // SetIfNotExists sets named setting
 func (settings *Settings) SetIfNotExists(name string, setting *Setting) {
+	if settings == nil {
+		return
+	}
 	if !settings.Has(name) {
 		settings.Set(name, setting)
 	}
@@ -202,6 +268,9 @@ func (settings *Settings) SetIfNotExists(name string, setting *Setting) {
 
 // Delete deletes named setting
 func (settings *Settings) Delete(name string) {
+	if settings == nil {
+		return
+	}
 	if !settings.Has(name) {
 		return
 	}
@@ -210,6 +279,9 @@ func (settings *Settings) Delete(name string) {
 
 // UnmarshalJSON unmarshal JSON
 func (settings *Settings) UnmarshalJSON(data []byte) error {
+	if settings == nil {
+		return fmt.Errorf("unable to unmashal with nil")
+	}
 	type untypedMapType map[string]interface{}
 	var untypedMap untypedMapType
 	if err := json.Unmarshal(data, &untypedMap); err != nil {

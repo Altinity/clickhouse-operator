@@ -1,0 +1,12 @@
+name: grafana_push
+on: workflow_dispatch
+jobs:
+  run_tests:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: |
+          pip3 install -U -r ./tests/image/requirements.txt
+          python3 ./tests/regression.py --only "/regression/e2e.test_operator/*"
+          

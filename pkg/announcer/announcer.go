@@ -20,6 +20,7 @@ import (
 
 	log "github.com/golang/glog"
 
+	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util/runtime"
 )
 
@@ -175,6 +176,16 @@ func (a Announcer) M(m ...interface{}) Announcer {
 		switch typed := m[0].(type) {
 		case string:
 			b.meta = typed
+		case *v1.ClickHouseInstallation:
+			if typed == nil {
+				return a
+			}
+			b.meta = typed.Namespace + "/" + typed.Name
+			if typed.Spec.TaskID != nil {
+				if len(*typed.Spec.TaskID) > 0 {
+					b.meta += "/" + *typed.Spec.TaskID
+				}
+			}
 		default:
 			if meta, ok := a.findMeta(m[0]); ok {
 				b.meta = meta
@@ -384,21 +395,18 @@ func (a Announcer) findInCHI(m interface{}) (string, bool) {
 	if !chi.IsValid() || chi.IsZero() || ((chi.Kind() == reflect.Ptr) && chi.IsNil()) {
 		return "", false
 	}
-	var namespace, name reflect.Value
-	if chi.Kind() == reflect.Ptr {
-		namespace = chi.Elem().FieldByName("Namespace")
-		name = chi.Elem().FieldByName("Name")
-	} else {
-		namespace = chi.FieldByName("Namespace")
-		name = chi.FieldByName("Name")
-	}
-	if !namespace.IsValid() {
+
+	typed, ok := chi.Interface().(v1.ClickHouseInstallation)
+	if !ok {
 		return "", false
 	}
-	if !name.IsValid() {
-		return "", false
+	res := typed.Namespace + "/" + typed.Name
+	if typed.Spec.TaskID != nil {
+		if len(*typed.Spec.TaskID) > 0 {
+			res += "/" + *typed.Spec.TaskID
+		}
 	}
-	return namespace.String() + "/" + name.String(), true
+	return res, true
 }
 
 // findInAddress

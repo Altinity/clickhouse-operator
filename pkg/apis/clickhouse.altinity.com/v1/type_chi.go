@@ -27,7 +27,9 @@ import (
 
 // FillStatus fills .Status
 func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, normalized bool) {
-	chi.Status.Version = version.Version
+	chi.Status.CHOpVersion = version.Version
+	chi.Status.CHOpCommit = version.GitSHA
+	chi.Status.CHOpDate = version.BuiltAt
 	chi.Status.ClustersCount = chi.ClustersCount()
 	chi.Status.ShardsCount = chi.ShardsCount()
 	chi.Status.HostsCount = chi.HostsCount()
@@ -475,6 +477,9 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 
 	// Copy Status for now
 	chi.Status = from.Status
+
+	// Copy service attributes
+	chi.Attributes = from.Attributes
 }
 
 // MergeFrom merges from spec
@@ -676,7 +681,9 @@ func (chi *ClickHouseInstallation) IsStopped() bool {
 
 // Restart const presents possible values for .spec.restart
 const (
-	RestartAll           = "Restart"
+	RestartAll = "Restart"
+	// RestartRollingUpdate requires to roll over all hosts in the cluster and shutdown and reconcile each of it.
+	// This restart policy means that all hosts in the cluster would pass through shutdown/reconcile cycle.
 	RestartRollingUpdate = "RollingUpdate"
 )
 
@@ -685,8 +692,8 @@ func (chi *ClickHouseInstallation) IsRollingUpdate() bool {
 	return chi.Spec.Restart == RestartRollingUpdate
 }
 
-// IsNoRestart checks whether CHI has no restart request
-func (chi *ClickHouseInstallation) IsNoRestart() bool {
+// IsNoRestartSpecified checks whether CHI has no restart request
+func (chi *ClickHouseInstallation) IsNoRestartSpecified() bool {
 	return chi.Spec.Restart == ""
 }
 

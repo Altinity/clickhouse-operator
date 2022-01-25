@@ -23,6 +23,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	//"k8s.io/client-go/util/workqueue"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
 	"github.com/altinity/queue"
 
@@ -34,6 +35,7 @@ import (
 type Controller struct {
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 	kubeClient kube.Interface
+	extClient  apiextensions.Interface
 	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
 	chopClient chopclientset.Interface
 

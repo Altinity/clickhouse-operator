@@ -22,6 +22,8 @@ def get_full_path(test_file, lookup_in_host=True):
 
 
 def set_operator_version(version, ns=settings.operator_namespace, timeout=600):
+    if settings.operator_install != 'yes':
+        return
     operator_image = f"{settings.operator_docker_repo}:{version}"
     metrics_exporter_image = f"{settings.metrics_exporter_docker_repo}:{version}"
 
@@ -38,6 +40,8 @@ def set_metrics_exporter_version(version, ns=settings.operator_namespace):
 
 
 def restart_operator(ns=settings.operator_namespace, timeout=600):
+    if settings.operator_install != 'yes':
+        return
     pod_name = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]["metadata"]["name"]
     kubectl.launch(f"delete pod {pod_name}", ns=ns, timeout=timeout)
     kubectl.wait_object("pod", name="", ns=ns, label=operator_label)
@@ -149,10 +153,12 @@ def make_http_get_request(host, port, path):
     return f"bash -c '{cmd}'"
 
 
-def install_operator_if_not_exist():
+def install_operator_if_not_exist(reinstall = False):
+    if settings.operator_install != 'yes':
+        return
     with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
-        if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0:
-            manifest = get_full_path(settings.clickhouse_operator_install)
+        if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0 or reinstall == True:
+            manifest = get_full_path(settings.clickhouse_operator_install_manifest)
             kubectl.apply(
                 ns=settings.operator_namespace,
                 manifest=f"<(cat {manifest} | "

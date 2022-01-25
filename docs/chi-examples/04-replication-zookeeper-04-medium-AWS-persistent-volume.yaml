@@ -17,7 +17,7 @@ spec:
         templates:
           podTemplate: clickhouse-with-volume-template
         layout:
-          shardsCount: 3
+          shardsCount: 1
           replicasCount: 2
   templates:
     podTemplates:

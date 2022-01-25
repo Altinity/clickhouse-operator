@@ -85,7 +85,7 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupCommon(options *C
 	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings(nil))
 	util.MergeStringMapsOverwrite(commonConfigSections, c.chConfigGenerator.GetFiles(chi.SectionCommon, true, nil))
 	// Extra user-specified config files
-	util.MergeStringMapsOverwrite(commonConfigSections, c.chopConfig.CHCommonConfigs)
+	util.MergeStringMapsOverwrite(commonConfigSections, c.chopConfig.ClickHouse.Config.File.Runtime.CommonConfigFiles)
 
 	return commonConfigSections
 }
@@ -103,7 +103,7 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupUsers() map[strin
 	util.IncludeNonEmpty(commonUsersConfigSections, createConfigSectionFilename(configProfiles), c.chConfigGenerator.GetProfiles())
 	util.MergeStringMapsOverwrite(commonUsersConfigSections, c.chConfigGenerator.GetFiles(chi.SectionUsers, false, nil))
 	// Extra user-specified config files
-	util.MergeStringMapsOverwrite(commonUsersConfigSections, c.chopConfig.CHUsersConfigs)
+	util.MergeStringMapsOverwrite(commonUsersConfigSections, c.chopConfig.ClickHouse.Config.File.Runtime.UsersConfigFiles)
 
 	return commonUsersConfigSections
 }
@@ -118,7 +118,7 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *chi.Ch
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings(host))
 	util.MergeStringMapsOverwrite(hostConfigSections, c.chConfigGenerator.GetFiles(chi.SectionHost, true, host))
 	// Extra user-specified config files
-	util.MergeStringMapsOverwrite(hostConfigSections, c.chopConfig.CHHostConfigs)
+	util.MergeStringMapsOverwrite(hostConfigSections, c.chopConfig.ClickHouse.Config.File.Runtime.HostConfigFiles)
 
 	return hostConfigSections
 }
