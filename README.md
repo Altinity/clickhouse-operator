@@ -1,6 +1,6 @@
-# ClickHouse Operator
+# Altinity Operator for ClickHouse
 
-ClickHouse Operator creates, configures and manages ClickHouse clusters running on Kubernetes.
+Operator creates, configures and manages ClickHouse clusters running on Kubernetes.
 
 [![GitHub release](https://img.shields.io/github/v/release/altinity/clickhouse-operator?include_prereleases)](https://img.shields.io/github/v/release/altinity/clickhouse-operator?include_prereleases)
 [![CircleCI](https://circleci.com/gh/Altinity/clickhouse-operator.svg?style=svg)](https://circleci.com/gh/Altinity/clickhouse-operator)
@@ -12,14 +12,12 @@ ClickHouse Operator creates, configures and manages ClickHouse clusters running 
 
 ## Features
 
-The ClickHouse Operator for Kubernetes currently provides the following:
-
-- Creates ClickHouse clusters based on Custom Resource [specification][chi_max_yaml] provided
+- Creates ClickHouse clusters defined as custom resources
 - Customized storage provisioning (VolumeClaim templates)
 - Customized pod templates
 - Customized service templates for endpoints
-- ClickHouse configuration and settings (including Zookeeper integration)
-- Flexible templating
+- ClickHouse configuration management
+- ClickHouse users management
 - ClickHouse cluster scaling including automatic schema propagation
 - ClickHouse version upgrades
 - Exporting ClickHouse metrics to Prometheus
@@ -56,15 +54,14 @@ The ClickHouse Operator for Kubernetes currently provides the following:
  * [How to easy development process with devspace.sh][devspace_manual]
  
 ---
-**All clickhouse-operator guides**
- * [All available docs list][all_docs_list]
+ * [Documentation index][all_docs_list]
 ---
  
 ## License
 
 Copyright (c) 2019-2219, Altinity Ltd and/or its affiliates. All rights reserved.
 
-`clickhouse-operator` is licensed under the Apache License 2.0.
+Altinity Operator for ClickHouse is licensed under the Apache License 2.0.
 
 See [LICENSE](./LICENSE) for more details.
  
