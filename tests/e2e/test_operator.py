@@ -484,7 +484,7 @@ def test_011_2(self):
             assert out == 'OK'
 
         kubectl.delete_chi("test-011-secrets")
-        launch("delete secret test-011-secret", ns=settings.test_namespace, timeout=600, ok_to_fail=True)
+        kubectl.launch("delete secret test-011-secret", ns=settings.test_namespace, timeout=600, ok_to_fail=True)
 
 
 @TestScenario
