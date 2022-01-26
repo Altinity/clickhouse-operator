@@ -201,8 +201,8 @@ def test_operator_restart(manifest, version=settings.operator_version):
             })
         time.sleep(10)
         kubectl.wait_chi_status(chi, "Completed")
-        
-        check_operator_restart(chi, {"statefulset": 1, "pod": 1, "service": 2}, f"chi-{chi}-{cluster}-0-0-0") 
+
+        check_operator_restart(chi, {"statefulset": 1, "pod": 1, "service": 2}, f"chi-{chi}-{cluster}-0-0-0")
 
         kubectl.delete_chi(chi)
 
@@ -218,7 +218,7 @@ def check_operator_restart(chi, wait_objects, pod):
         new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
 
         with Then("ClickHouse pods should not be restarted"):
-            assert start_time == new_start_time    
+            assert start_time == new_start_time
 
 @TestScenario
 @Name("test_008. Test operator restart")
@@ -360,14 +360,14 @@ def test_011(self):
                 user="restricted", pwd="secret"
             )
             assert out == '1000'
-        
+
         with And("User with NO access management enabled CAN NOT run SHOW USERS"):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "SHOW USERS",
             )
             assert 'ACCESS_DENIED' in out
-        
+
         with And("User with access management enabled CAN run SHOW USERS"):
             out = clickhouse.query(
                 "test-011-secured-cluster",
@@ -439,6 +439,52 @@ def test_011_1(self):
                 assert out == 'OK'
 
         kubectl.delete_chi("test-011-secured-default")
+
+
+@TestScenario
+@Name("test_011_2. Test k8s secrets usage")
+def test_011_2(self):
+    with Given("test-011-secrets.yaml with secret storage"):
+        kubectl.apply(util.get_full_path("manifests/chi/test-011-secret.yaml", False),
+                      ns=settings.test_namespace, timeout=300)
+
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-011-secrets.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            }
+        )
+
+        with Then("Connection to localhost should succeed with user1"):
+            out = clickhouse.query_with_error(
+                "test-011-secrets",
+                "select 'OK'",
+                user="user1",
+                pwd="pwduser1"
+            )
+            assert out == 'OK'
+
+        with And("Connection to localhost should succeed with user2"):
+            out = clickhouse.query_with_error(
+                "test-011-secrets",
+                "select 'OK'",
+                user="user2",
+                pwd="pwduser2"
+            )
+            assert out == 'OK'
+
+        with And("Connection to localhost should succeed with user3"):
+            out = clickhouse.query_with_error(
+                "test-011-secrets",
+                "select 'OK'",
+                user="user3",
+                pwd="pwduser3"
+            )
+            assert out == 'OK'
+
+        kubectl.delete_chi("test-011-secrets")
+        kubectl.launch("delete secret test-011-secret", ns=settings.test_namespace, timeout=600, ok_to_fail=True)
 
 
 @TestScenario
@@ -621,9 +667,9 @@ def test_014(self):
     util.require_zookeeper()
 
     create_table = """
-    CREATE TABLE test_local(a Int8) 
+    CREATE TABLE test_local(a Int8)
     Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-    PARTITION BY tuple() 
+    PARTITION BY tuple()
     ORDER BY a
     """.replace('\r', '').replace('\n', '')
 
@@ -744,7 +790,7 @@ def test_014(self):
                     f"SELECT count() FROM system.dictionaries WHERE name = 'test_dict'",
                     host=host)
                 assert out == "1"
- 
+
                 print("Checking database engine")
                 out =  clickhouse.query(
                     chi,
@@ -1060,8 +1106,8 @@ def test_019(self):
 
     create_non_replicated_table = "drop table if exists t1; create table t1 Engine = Log as select 1 as a"
     create_replicated_table = """
-    drop table if exists t2; 
-    create table t2 
+    drop table if exists t2;
+    create table t2
     Engine = ReplicatedMergeTree('/clickhouse/{installation}/{cluster}/tables/{shard}/{database}/{table}', '{replica}')
     partition by tuple() order by a
     as select 1 as a""".replace('\r', '').replace('\n', '')
@@ -1395,10 +1441,10 @@ def test_022(self):
 def test_023(self):
     manifest = "manifests/chi/test-001.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
-    
+
     chit_data = yaml_manifest.get_manifest_data(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
     expected_image = chit_data['spec']['templates']['podTemplates'][0]['spec']['containers'][0]['image']
-    
+
     kubectl.create_and_check(
         manifest="manifests/chi/test-001.yaml",
         check={
@@ -1464,9 +1510,9 @@ def test_025(self):
     util.require_zookeeper()
 
     create_table = """
-    CREATE TABLE test_local(a UInt32) 
+    CREATE TABLE test_local(a UInt32)
     Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-    PARTITION BY tuple() 
+    PARTITION BY tuple()
     ORDER BY a
     """.replace('\r', '').replace('\n', '')
 
@@ -1665,7 +1711,7 @@ def test_028(self):
             "do_not_delete": 1,
         },
     )
-    
+
     clickhouse.query(chi, "CREATE TABLE test_dist as system.one Engine = Distributed('default', system, one)")
 
     sql = """select getMacro('replica') as replica, uptime() as uptime,
@@ -1695,7 +1741,7 @@ def test_028(self):
                     ch2 = clickhouse.query_with_error(chi, sql, host = "chi-test-014-replication-default-0-1-0")
                     print(ch1 + "   " + ch2)
                     if "error" in ch1 or "Exception" in ch1 or ch2.endswith("1"):
-                        ch1_downtime = ch1_downtime + 5 
+                        ch1_downtime = ch1_downtime + 5
                     if "error" in ch2 or "Exception" in ch2 or ch1.endswith("1"):
                         ch2_downtime = ch2_downtime + 5
                     if ("error" in ch1 or "Exception" in ch1) and ("error" in ch2 or "Exception" in ch2):
@@ -1716,15 +1762,15 @@ def test_028(self):
             else:
                 note("Restart needs to be cleaned")
                 start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
-                
+
         with Then("Restart operator. CHI should not be restarted"):
-            check_operator_restart(chi, {"statefulset": 2, "pod": 2, "service": 3}, f"chi-{chi}-default-0-0-0") 
-            
+            check_operator_restart(chi, {"statefulset": 2, "pod": 2, "service": 3}, f"chi-{chi}-default-0-0-0")
+
         with Then("Re-apply the original config. CHI should not be restarted"):
             kubectl.create_and_check(manifest=manifest, check={"do_not_delete": 1} )
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time == new_start_time
-    
+
 
     with When("Stop installation"):
         cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"add\",\"path\":\"/spec/stop\",\"value\":\"yes\"}}]'"
@@ -1768,7 +1814,7 @@ def test_030(self):
     manifest = "manifests/chi/test-001.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     object_counts = {"statefulset": 1, "pod": 1, "service": 2}
-    
+
     kubectl.create_and_check(
         manifest,
         check = {
@@ -1776,17 +1822,17 @@ def test_030(self):
             "do_not_delete": 1,
         }
     )
-    
+
     with When("Delete CRD"):
         kubectl.launch("delete crd clickhouseinstallations.clickhouse.altinity.com")
         with Then("CHI should be deleted"):
             kubectl.wait_object("chi", "test-001", count=0)
             with And("CHI objects SHOULD NOT be deleted"):
                 assert kubectl.count_objects(label=f"-l clickhouse.altinity.com/chi={chi}") == object_counts
-    
+
     pod = kubectl.get_pod_names(chi)[0]
     start_time = kubectl.get_field("pod", pod, ".status.startTime")
-    
+
     with When("Reinstall the operator"):
         util.install_operator_if_not_exist(reinstall = True)
         with Then("Re-create CHI"):
@@ -1826,6 +1872,7 @@ def test(self):
         test_010,
         test_011,
         test_011_1,
+        test_011_2,
         test_012,
         test_013,
         test_014,
