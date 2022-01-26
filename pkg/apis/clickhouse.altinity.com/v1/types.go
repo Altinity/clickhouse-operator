@@ -39,6 +39,14 @@ type ClickHouseInstallation struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Spec              ChiSpec   `json:"spec"     yaml:"spec"`
 	Status            ChiStatus `json:"status"   yaml:"status"`
+
+	Attributes ComparableAttributes `json:"-" yaml:"-"`
+}
+
+// ComparableAttributes specifies CHI attributes that are comparable
+type ComparableAttributes struct {
+	ExchangeEnv  []corev1.EnvVar `json:"-" yaml:"-"`
+	SkipOwnerRef bool            `json:"-" yaml:"-"`
 }
 
 // +genclient
@@ -207,7 +215,7 @@ func (c *ChiObjectsCleanup) GetStatefulSet() string {
 	return c.StatefulSet
 }
 
-// SetStatefulSet sets stetaful set
+// SetStatefulSet sets stateful set
 func (c *ChiObjectsCleanup) SetStatefulSet(v string) *ChiObjectsCleanup {
 	if c == nil {
 		return nil

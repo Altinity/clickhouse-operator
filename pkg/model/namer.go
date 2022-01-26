@@ -65,8 +65,11 @@ const (
 	// configMapCommonUsersNamePattern is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
 	configMapCommonUsersNamePattern = "chi-" + macrosChiName + "-common-usersd"
 
-	// configMapDeploymentNamePattern is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
-	configMapDeploymentNamePattern = "chi-" + macrosChiName + "-deploy-confd-" + macrosClusterName + "-" + macrosHostName
+	// configMapHostNamePattern is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
+	configMapHostNamePattern = "chi-" + macrosChiName + "-deploy-confd-" + macrosClusterName + "-" + macrosHostName
+
+	// configMapHostMigrationNamePattern is a template of macros ConfigMap. "chi-{chi}-migration-{cluster}-{shard}-{host}"
+	//configMapHostMigrationNamePattern = "chi-" + macrosChiName + "-migration-" + macrosClusterName + "-" + macrosHostName
 
 	// namespaceDomainPattern presents Domain Name pattern of a namespace
 	// In this pattern "%s" is substituted namespace name's value
@@ -363,10 +366,15 @@ func getNamePartReplicaScopeIndex(host *chop.ChiHost) string {
 	return strconv.Itoa(host.Address.ReplicaScopeIndex)
 }
 
-// CreateConfigMapPersonalName returns a name for a ConfigMap for replica's personal config
-func CreateConfigMapPersonalName(host *chop.ChiHost) string {
-	return macro(host).Line(configMapDeploymentNamePattern)
+// CreateConfigMapHostName returns a name for a ConfigMap for replica's personal config
+func CreateConfigMapHostName(host *chop.ChiHost) string {
+	return macro(host).Line(configMapHostNamePattern)
 }
+
+// CreateConfigMapHostMigrationName returns a name for a ConfigMap for replica's personal config
+//func CreateConfigMapHostMigrationName(host *chop.ChiHost) string {
+//	return macro(host).Line(configMapHostMigrationNamePattern)
+//}
 
 // CreateConfigMapCommonName returns a name for a ConfigMap for replica's common config
 func CreateConfigMapCommonName(chi *chop.ClickHouseInstallation) string {

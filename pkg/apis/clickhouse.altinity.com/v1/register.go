@@ -52,6 +52,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClickHouseInstallationList{},
 		&ClickHouseInstallationTemplate{},
 		&ClickHouseInstallationTemplateList{},
+		&ClickHouseOperatorConfiguration{},
+		&ClickHouseOperatorConfigurationList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

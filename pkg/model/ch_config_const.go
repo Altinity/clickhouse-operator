@@ -60,6 +60,10 @@ const (
 
 	// dirPathClickHouseLog  specifies full path of data folder where ClickHouse would place its log files
 	dirPathClickHouseLog = "/var/log/clickhouse-server"
+
+	// dirPathDockerEntrypointInit specified full path of docker-entrypoint-initdb.d
+	// For more details please check: https://github.com/ClickHouse/ClickHouse/issues/3319
+	dirPathDockerEntrypointInit = "/docker-entrypoint-initdb.d"
 )
 
 const (

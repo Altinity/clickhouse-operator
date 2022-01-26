@@ -72,6 +72,13 @@ Vagrant.configure(2) do |config|
     # alertmanager
     clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 9093, host_ip: "127.0.0.1", host: 9093
 
+    # devspace UI
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 8090, host_ip: "127.0.0.1", host: 8090
+
+    # delve for devspace
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 40001, host_ip: "127.0.0.1", host: 40001
+    clickhouse_operator.vm.network "forwarded_port", guest_ip: "172.16.2.99", guest: 40002, host_ip: "127.0.0.1", host: 40002
+
     clickhouse_operator.vm.host_name = "local-altinity-clickhouse-operator"
     # vagrant plugin install vagrant-disksize
     clickhouse_operator.disksize.size = '50GB'
@@ -155,9 +162,10 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.19.14}
 #    performance issue 1.20.x, 1.21.x
 #    https://github.com/kubernetes/kubeadm/issues/2395
-#    K8S_VERSION=${K8S_VERSION:-1.20.10}
-#    K8S_VERSION=${K8S_VERSION:-1.21.4}
-    K8S_VERSION=${K8S_VERSION:-1.22.2}
+#    K8S_VERSION=${K8S_VERSION:-1.20.14}
+#    K8S_VERSION=${K8S_VERSION:-1.21.8}
+#    K8S_VERSION=${K8S_VERSION:-1.22.5}
+    K8S_VERSION=${K8S_VERSION:-1.23.1}
     export VALIDATE_YAML=true
 
     killall kubectl || true
@@ -222,12 +230,32 @@ EOF
     export OPERATOR_IMAGE=altinity/clickhouse-operator:${OPERATOR_RELEASE}
     export METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:${OPERATOR_RELEASE}
 
+    # devspace
+    DEVSPACE_VERSION=$(curl -sL https://github.com/devspace-cloud/devspace/releases/latest -H "Accept: application/json" | jq -r .tag_name)
+    wget -c --progress=bar:force:noscroll -O /usr/local/bin/${DEVSPACE_VERSION}-devspace-linux-amd64 "https://github.com/devspace-cloud/devspace/releases/download/${DEVSPACE_VERSION}/devspace-linux-amd64"
+    wget -c --progress=bar:force:noscroll -O /usr/local/bin/${DEVSPACE_VERSION}-devspace-linux-amd64.sha256 "https://github.com/devspace-cloud/devspace/releases/download/${DEVSPACE_VERSION}/devspace-linux-amd64.sha256"
+    sed -i -E "s/\\/Users.+devspace\\-linux\\-amd64/\\/usr\\/local\\/bin\\/${DEVSPACE_VERSION}-devspace-linux-amd64/g" /usr/local/bin/${DEVSPACE_VERSION}-devspace-linux-amd64.sha256
+    sha256sum -c /usr/local/bin/${DEVSPACE_VERSION}-devspace-linux-amd64.sha256
+    cp -fv /usr/local/bin/${DEVSPACE_VERSION}-devspace-linux-amd64 /usr/local/bin/devspace
+    chmod +x /usr/local/bin/devspace
+
+    # docker build
+    export COMPANY_REPO=${COMPANY_REPO:-altinity}
+    go mod download -x
+    go mod tidy
+    go mod vendor
+    time docker buildx build -f dockerfile/operator/Dockerfile --platform=linux/amd64 --output=type=image,name=$COMPANY_REPO/clickhouse-operator:$OPERATOR_RELEASE .
+    time docker buildx build -f dockerfile/metrics-exporter/Dockerfile --platform=linux/amd64 --output=type=image,name=$COMPANY_REPO/metrics-exporter:$OPERATOR_RELEASE .
+
+
+    # install clickhouse-operator
     if ! kubectl get deployment clickhouse-operator -n "${OPERATOR_NAMESPACE}" 1>/dev/null 2>/dev/null; then
         cd /vagrant/deploy/operator/
         bash -x ./clickhouse-operator-install.sh
         cd /vagrant
     fi
 
+    # install prometheus-operator + prometheus instance + ServiceMonitor for clickhouse
     export PROMETHEUS_NAMESPACE=${PROMETHEUS_NAMESPACE:-prometheus}
     cd /vagrant/deploy/prometheus/
     kubectl delete ns ${PROMETHEUS_NAMESPACE} || true
@@ -245,6 +273,7 @@ EOF
 
     cd /vagrant/
 
+    # install grafana-operator + grafana instance + GrafanaDashboard, GrafanaDatasource for clickhouse
     export GRAFANA_NAMESPACE=${GRAFANA_NAMESPACE:-grafana}
     cd /vagrant/deploy/grafana/grafana-with-grafana-operator/
     kubectl delete ns ${GRAFANA_NAMESPACE} || true
@@ -271,7 +300,7 @@ EOF
     # open http://localhost:8888/chi and check exists clickhouse installations
     kubectl --namespace="${OPERATOR_NAMESPACE}" port-forward --address 0.0.0.0 service/clickhouse-operator-metrics 8888 </dev/null &>/dev/null &
 
-    for image in $(cat ./tests/configs/test-017-multi-version.yaml | yq r - "spec.templates.podTemplates[*].spec.containers[*].image"); do
+    for image in $(cat ./tests/configs/test-017-multi-version.yaml | yq eval -e ".spec.templates.podTemplates[].spec.containers[].image"); do
         docker pull ${image}
     done
 
@@ -285,5 +314,4 @@ EOF
     # cp -fv /tmp/audit2rbac.yaml /vagrant/deploy/dev/clickhouse-operator-install-yaml-template-02-section-rbac-restricted.yaml
 
   SHELL
-
 end

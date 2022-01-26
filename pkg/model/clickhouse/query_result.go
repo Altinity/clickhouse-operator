@@ -51,7 +51,7 @@ func (q *QueryResult) Close() {
 		err := q.Rows.Close()
 		q.Rows = nil
 		if err != nil {
-			log.A().Error("UNABLE to close rows. Err: %v", err)
+			log.F().Error("UNABLE to close rows. Err: %v", err)
 		}
 	}
 
@@ -80,7 +80,7 @@ func (q *QueryResult) UnzipColumnsAsStrings(columns ...*[]string) error {
 	// Scan rows
 	for q.Rows.Next() {
 		if err := q.Rows.Scan(pointers...); err != nil {
-			log.V(1).A().Error("UNABLE to scan row err: %v", err)
+			log.V(1).F().Error("UNABLE to scan row err: %v", err)
 			return err
 		}
 		for i := range columns {
@@ -102,7 +102,7 @@ func (q *QueryResult) Int() (int, error) {
 	var result int
 	for q.Rows.Next() {
 		if err := q.Rows.Scan(&result); err != nil {
-			log.V(1).A().Error("UNABLE to scan row err: %v", err)
+			log.V(1).F().Error("UNABLE to scan row err: %v", err)
 			return 0, err
 		}
 		return result, nil

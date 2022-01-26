@@ -69,7 +69,7 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chop.ClickHou
 	case apierrors.IsNotFound(err):
 		log.V(1).M(chi).Info("NEUTRAL not found ConfigMap %s/%s", chi.Namespace, configMapCommon)
 	default:
-		log.V(1).M(chi).A().Error("FAIL delete ConfigMap %s/%s err:%v", chi.Namespace, configMapCommon, err)
+		log.V(1).M(chi).F().Error("FAIL delete ConfigMap %s/%s err:%v", chi.Namespace, configMapCommon, err)
 	}
 
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(ctx, configMapCommonUsersName, newDeleteOptions())
@@ -80,7 +80,7 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chop.ClickHou
 		log.V(1).M(chi).Info("NEUTRAL not found ConfigMap %s/%s", chi.Namespace, configMapCommonUsersName)
 		err = nil
 	default:
-		log.V(1).M(chi).A().Error("FAIL delete ConfigMap %s/%s err:%v", chi.Namespace, configMapCommonUsersName, err)
+		log.V(1).M(chi).F().Error("FAIL delete ConfigMap %s/%s err:%v", chi.Namespace, configMapCommonUsersName, err)
 	}
 
 	return err
@@ -102,7 +102,7 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 		log.V(1).M(host).Info("NEUTRAL not found Pod %s/%s", statefulSet.Namespace, name)
 		err = nil
 	} else {
-		log.V(1).M(host).A().Error("FAIL delete ConfigMap %s/%s err:%v", statefulSet.Namespace, name, err)
+		log.V(1).M(host).F().Error("FAIL delete ConfigMap %s/%s err:%v", statefulSet.Namespace, name, err)
 	}
 
 	return err
@@ -132,7 +132,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) 
 		if apierrors.IsNotFound(err) {
 			log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
 		} else {
-			log.V(1).M(host).A().Error("FAIL get StatefulSet %s/%s err:%v", namespace, name, err)
+			log.V(1).M(host).F().Error("FAIL get StatefulSet %s/%s err:%v", namespace, name, err)
 		}
 		return err
 	}
@@ -156,7 +156,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) 
 	} else if apierrors.IsNotFound(err) {
 		log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
 	} else {
-		log.V(1).M(host).A().Error("FAIL delete StatefulSet %s/%s err: %v", namespace, name, err)
+		log.V(1).M(host).F().Error("FAIL delete StatefulSet %s/%s err: %v", namespace, name, err)
 	}
 
 	return nil
@@ -210,7 +210,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *chop.ChiHost) error {
 		} else if apierrors.IsNotFound(err) {
 			log.V(1).M(host).Info("NEUTRAL not found PVC %s/%s", namespace, pvc.Name)
 		} else {
-			log.M(host).A().Error("FAIL to delete PVC %s/%s err:%v", namespace, pvc.Name, err)
+			log.M(host).F().Error("FAIL to delete PVC %s/%s err:%v", namespace, pvc.Name, err)
 		}
 	})
 
@@ -224,7 +224,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) er
 		return nil
 	}
 
-	name := chopmodel.CreateConfigMapPersonalName(host)
+	name := chopmodel.CreateConfigMapHostName(host)
 	namespace := host.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
@@ -233,8 +233,20 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) er
 	} else if apierrors.IsNotFound(err) {
 		log.V(1).M(host).Info("NEUTRAL not found ConfigMap %s/%s", namespace, name)
 	} else {
-		log.V(1).M(host).A().Error("FAIL delete ConfigMap %s/%s err:%v", namespace, name, err)
+		log.V(1).M(host).F().Error("FAIL delete ConfigMap %s/%s err:%v", namespace, name, err)
 	}
+
+	//name = chopmodel.CreateConfigMapHostMigrationName(host)
+	//namespace = host.Address.Namespace
+	//log.V(1).M(host).F().Info("%s/%s", namespace, name)
+	//
+	//if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, newDeleteOptions()); err == nil {
+	//	log.V(1).M(host).Info("OK delete ConfigMap %s/%s", namespace, name)
+	//} else if apierrors.IsNotFound(err) {
+	//	log.V(1).M(host).Info("NEUTRAL not found ConfigMap %s/%s", namespace, name)
+	//} else {
+	//	log.V(1).M(host).F().Error("FAIL delete ConfigMap %s/%s err:%v", namespace, name, err)
+	//}
 
 	return nil
 }
@@ -311,7 +323,7 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 	if err == nil {
 		log.V(1).M(namespace, name).Info("OK delete Service %s/%s", namespace, name)
 	} else {
-		log.V(1).M(namespace, name).A().Error("FAIL delete Service %s/%s err:%v", namespace, name, err)
+		log.V(1).M(namespace, name).F().Error("FAIL delete Service %s/%s err:%v", namespace, name, err)
 	}
 
 	return err

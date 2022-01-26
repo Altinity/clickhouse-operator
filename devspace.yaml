@@ -1,0 +1,81 @@
+version: v1beta11
+
+vars:
+  - name: OPERATOR_NAMESPACE
+    question: Which kubenetes namespace do you want to use for clickhouse-operator deployment?
+    default: "kube-system"
+  - name: DEVSPACE_DEBUG
+    question: Should build docker images with debugger (please choose delve or none)?
+    default: "delve"
+
+images:
+  metrics-exporter:
+    image: altinity/metrics-exporter
+    tags:
+     - devspace-####
+    build:
+      custom:
+        command: deploy/devspace/docker-build.sh
+        args:
+          - "--debug=${DEVSPACE_DEBUG}"
+  clickhouse-operator:
+    image: altinity/clickhouse-operator
+    tags:
+      - devspace-####
+    build:
+      custom:
+        command: deploy/devspace/docker-build.sh
+        args:
+          - "--debug=${DEVSPACE_DEBUG}"
+
+deployments:
+- name: clickhouse-operator
+  namespace: ${OPERATOR_NAMESPACE}
+  kubectl:
+    manifests:
+      - deploy/devspace/clickhouse-operator-install.yaml
+
+hooks:
+  # transform yaml installation manifest to change images and namespace
+  - command: bash
+    args:
+      - -xec
+      - "CLICKHOUSE_OPERATOR_TAG=${runtime.images.clickhouse-operator.tag} METRICS_EXPORTER_TAG=${runtime.images.metrics-exporter.tag} OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} deploy/devspace/yq_transform_clickhouse-operator-install.sh"
+    events: ["before:deploy:*"]
+
+  - command: bash
+    args:
+      - -xec
+      - "OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} deploy/devspace/docker-clean.sh ${runtime.images.clickhouse-operator.image}:${runtime.images.clickhouse-operator.tag}; OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE} deploy/devspace/docker-clean.sh ${runtime.images.metrics-exporter.image}:${runtime.images.metrics-exporter.tag}"
+    events: ["after:deploy:*"]
+
+dev:
+  ports:
+  - imageSelector: ${runtime.images.clickhouse-operator.image}:${runtime.images.clickhouse-operator.tag}
+    namespace: ${OPERATOR_NAMESPACE}
+    forward:
+      - port: 40001
+        remotePort: 40001
+  - imageSelector: ${runtime.images.metrics-exporter.image}:${runtime.images.metrics-exporter.tag}
+    namespace: ${OPERATOR_NAMESPACE}
+    forward:
+      - port: 8888
+        remotePort: 8888
+      - port: 40002
+        remotePort: 40002
+
+  autoReload:
+    paths:
+      - config/**
+      - cmd/**
+      - dev/**
+      - deploy/**
+      - dockerfile/**
+      - pkg/**
+      - .dockerignore
+      - go.mod
+    images:
+      - metrics-exporter
+      - clickhouse-operator
+    deployments:
+      - clickhouse-operator

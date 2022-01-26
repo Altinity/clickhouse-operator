@@ -27,14 +27,14 @@ if [[ ! -x "${METRICS_EXPORTER_BIN}" ]]; then
     exit 2
 fi
 
-    echo "Starting ${METRICS_EXPORTER_BIN}..."
+echo "Starting ${METRICS_EXPORTER_BIN}..."
 
-    mkdir -p "${LOG_DIR}"
-    rm -f "${LOG_DIR}"/clickhouse-operator.*.log.*
-    "${METRICS_EXPORTER_BIN}" \
-    	-alsologtostderr=true \
-    	-log_dir=log \
-    	-v=1
+mkdir -p "${LOG_DIR}"
+rm -f "${LOG_DIR}"/clickhouse-operator.*.log.*
+"${METRICS_EXPORTER_BIN}" \
+    -alsologtostderr=true \
+    -log_dir=log \
+    -v=1
 #	-logtostderr=true \
 #	-stderrthreshold=FATAL \
 

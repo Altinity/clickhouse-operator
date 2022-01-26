@@ -19,6 +19,6 @@ if [[ ! -d "${CO_PATH}" ]]; then
 fi
 
 # Compare
-meld "${MANIFESTS_ROOT}"/dev/clickhouse-operator-install-yaml-template-01-section-crd-01-chi.yaml      "${CO_PATH}"/clickhouseinstallations.clickhouse.altinity.com.crd.yaml
-meld "${MANIFESTS_ROOT}"/dev/clickhouse-operator-install-yaml-template-01-section-crd-02-chit.yaml     "${CO_PATH}"/clickhouseinstallationtemplates.clickhouse.altinity.com.crd.yaml
-meld "${MANIFESTS_ROOT}"/dev/clickhouse-operator-install-yaml-template-01-section-crd-03-chopconf.yaml "${CO_PATH}"/clickhouseoperatorconfigurations.clickhouse.altinity.com.crd.yaml
+meld "${MANIFESTS_ROOT}"/builder/templates-install-bundle/clickhouse-operator-install-yaml-template-01-section-crd-01-chi-chit.yaml "${CO_PATH}"/clickhouseinstallations.clickhouse.altinity.com.crd.yaml
+meld "${MANIFESTS_ROOT}"/builder/templates-install-bundle/clickhouse-operator-install-yaml-template-01-section-crd-01-chi-chit.yaml "${CO_PATH}"/clickhouseinstallationtemplates.clickhouse.altinity.com.crd.yaml
+meld "${MANIFESTS_ROOT}"/builder/templates-install-bundle/clickhouse-operator-install-yaml-template-01-section-crd-02-chopconf.yaml "${CO_PATH}"/clickhouseoperatorconfigurations.clickhouse.altinity.com.crd.yaml

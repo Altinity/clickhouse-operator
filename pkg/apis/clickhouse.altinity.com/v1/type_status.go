@@ -16,7 +16,9 @@ package v1
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	Version           string                  `json:"version,omitempty"          yaml:"version,omitempty"`
+	CHOpVersion       string                  `json:"chop-version,omitempty"     yaml:"chop-version,omitempty"`
+	CHOpCommit        string                  `json:"chop-commit,omitempty"      yaml:"chop-commit,omitempty"`
+	CHOpDate          string                  `json:"chop-date,omitempty"        yaml:"chop-date,omitempty"`
 	ClustersCount     int                     `json:"clusters"                   yaml:"clusters"`
 	ShardsCount       int                     `json:"shards"                     yaml:"shards"`
 	ReplicasCount     int                     `json:"replicas"                   yaml:"replicas"`

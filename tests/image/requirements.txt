@@ -1,4 +1,4 @@
-testflows==1.7.4
+testflows==1.7.77
 urllib3
 PyYAML
 docker-compose>=1.29.1

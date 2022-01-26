@@ -20,6 +20,7 @@ import (
 	"os/user"
 	"path/filepath"
 
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	kube "k8s.io/client-go/kubernetes"
 	kuberest "k8s.io/client-go/rest"
 	kubeclientcmd "k8s.io/client-go/tools/clientcmd"
@@ -63,24 +64,33 @@ func getKubeConfig(kubeConfigFile, masterURL string) (*kuberest.Config, error) {
 }
 
 // GetClientset gets k8s API clients - both kube native client and our custom client
-func GetClientset(kubeConfigFile, masterURL string) (*kube.Clientset, *chopclientset.Clientset) {
+func GetClientset(kubeConfigFile, masterURL string) (
+	*kube.Clientset,
+	*apiextensions.Clientset,
+	*chopclientset.Clientset,
+) {
 	kubeConfig, err := getKubeConfig(kubeConfigFile, masterURL)
 	if err != nil {
-		log.A().Fatal("Unable to build kubeconf: %s", err.Error())
+		log.F().Fatal("Unable to build kubeconf: %s", err.Error())
 		os.Exit(1)
 	}
 
 	kubeClientset, err := kube.NewForConfig(kubeConfig)
 	if err != nil {
-		log.A().Fatal("Unable to initialize kubernetes API clientset: %s", err.Error())
+		log.F().Fatal("Unable to initialize kubernetes API clientset: %s", err.Error())
+	}
+
+	apiextensionsClientset, err := apiextensions.NewForConfig(kubeConfig)
+	if err != nil {
+		log.F().Fatal("Unable to initialize kubernetes API extensions clientset: %s", err.Error())
 	}
 
 	chopClientset, err := chopclientset.NewForConfig(kubeConfig)
 	if err != nil {
-		log.A().Fatal("Unable to initialize clickhouse-operator API clientset: %s", err.Error())
+		log.F().Fatal("Unable to initialize clickhouse-operator API clientset: %s", err.Error())
 	}
 
-	return kubeClientset, chopClientset
+	return kubeClientset, apiextensionsClientset, chopClientset
 }
 
 var chop *CHOp
@@ -89,9 +99,9 @@ var chop *CHOp
 // chopClient can be nil, in this case CHOp will not be able to use any ConfigMap(s) with configuration
 func New(kubeClient *kube.Clientset, chopClient *chopclientset.Clientset, initCHOpConfigFilePath string) {
 	// Create operator instance
-	chop = NewCHOp(version.Version, kubeClient, chopClient, initCHOpConfigFilePath)
+	chop = NewCHOp(version.Version, version.GitSHA, version.BuiltAt, kubeClient, chopClient, initCHOpConfigFilePath)
 	if err := chop.Init(); err != nil {
-		log.A().Fatal("Unable to init CHOP instance %v", err)
+		log.F().Fatal("Unable to init CHOP instance %v", err)
 		os.Exit(1)
 	}
 	chop.SetupLog()

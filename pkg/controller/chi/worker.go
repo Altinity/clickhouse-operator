@@ -70,9 +70,9 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		queue:      q,
 		normalizer: chopmodel.NewNormalizer(c.kubeClient),
 		schemer: chopmodel.NewSchemer(
-			chop.Config().CHUsername,
-			chop.Config().CHPassword,
-			chop.Config().CHPort,
+			chop.Config().ClickHouse.Access.Username,
+			chop.Config().ClickHouse.Access.Password,
+			chop.Config().ClickHouse.Access.Port,
 		),
 		creator: nil,
 		start:   start,
@@ -170,7 +170,7 @@ func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
 		_ = w.schemer.CHIDropDnsCache(ctx, chi)
 	} else {
-		w.a.M(cmd.initiator).A().Error("unable to find CHI by %v", cmd.initiator.Labels)
+		w.a.M(cmd.initiator).F().Error("unable to find CHI by %v", cmd.initiator.Labels)
 	}
 	return nil
 }
@@ -211,7 +211,7 @@ func (w *worker) normalize(c *chiv1.ClickHouseInstallation) *chiv1.ClickHouseIns
 	if err != nil {
 		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("FAILED to normalize CHI : %v", err)
 	}
 
@@ -230,7 +230,7 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *chiv1.ClickHouseInsta
 		return false
 	}
 
-	// Check whether finalizer is already listed in CHI
+	// Finalizer can already be listed in CHI, do nothing in this case
 	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
 		w.a.V(2).M(chi).F().Info("finalizer already installed")
 		return false
@@ -239,7 +239,7 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *chiv1.ClickHouseInsta
 	// No finalizer found - need to install it
 
 	if err := w.c.installFinalizer(ctx, chi); err != nil {
-		w.a.V(1).M(chi).A().Error("unable to install finalizer. err: %v", err)
+		w.a.V(1).M(chi).F().Error("unable to install finalizer. err: %v", err)
 		return false
 	}
 
@@ -274,19 +274,30 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		return nil
 	}
 
-	if w.deleteCHI(ctx, new) {
+	if w.deleteCHI(ctx, old, new) {
 		// CHI is being deleted
 		return nil
 	}
 
+	if (time.Since(w.start) < 1*time.Minute) && (new.Generation == new.Status.Generation) {
+		// First minute after restart do not reconcile already reconciled generations
+		w.a.V(1).M(new).F().Info("Will not reconcile known generation after restart. Generation %d", new.Generation)
+		return nil
+	}
+
+	// CHI is being reconciled
+	return w.reconcileCHI(ctx, old, new)
+}
+
+func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseInstallation) error {
 	old = w.normalize(old)
 	new = w.normalize(new)
 	actionPlan := chopmodel.NewActionPlan(old, new)
 	oldjson, _ := json.MarshalIndent(old, "", "  ")
 	newjson, _ := json.MarshalIndent(new, "", "  ")
-	w.a.V(3).M(new).A().Info("AP worker---------------------------------------------:\n%s\n", actionPlan)
-	w.a.V(3).M(new).A().Info("old worker--------------------------------------------:\n%s\n", string(oldjson))
-	w.a.V(3).M(new).A().Info("new worker--------------------------------------------:\n%s\n", string(newjson))
+	w.a.V(3).M(new).F().Info("AP worker---------------------------------------------:\n%s\n", actionPlan)
+	w.a.V(3).M(new).F().Info("old worker--------------------------------------------:\n%s\n", string(oldjson))
+	w.a.V(3).M(new).F().Info("new worker--------------------------------------------:\n%s\n", string(newjson))
 	if !actionPlan.HasActionsToDo() {
 		// Nothing to do - no changes found - no need to react
 		w.a.V(3).M(new).F().Info("ResourceVersion changed, but no actual changes found")
@@ -300,7 +311,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 	if err := w.reconcile(ctx, new); err != nil {
 		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(new).
-			M(new).A().
+			M(new).F().
 			Error("FAILED update: %v", err)
 		return nil
 	}
@@ -311,28 +322,6 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		WithStatusAction(new).
 		M(new).F().
 		Info("remove items scheduled for deletion")
-	actionPlan.WalkAdded(
-		func(cluster *chiv1.ChiCluster) {
-		},
-		func(shard *chiv1.ChiShard) {
-		},
-		func(host *chiv1.ChiHost) {
-			//
-			//if update {
-			//	w.a.V(1).
-			//		WithEvent(new, eventActionCreate, eventReasonCreateStarted).
-			//		WithStatusAction(new).
-			//		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
-			//	if err := w.schemer.HostCreateTables(host); err != nil {
-			//		w.a.Error("ERROR create tables on host %s. err: %v", host.Name, err)
-			//	}
-			//} else {
-			//	w.a.V(1).
-			//		Info("As CHI is just created, not need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-			//}
-		},
-	)
-
 	w.clear(ctx, new)
 	w.dropReplicas(ctx, new, actionPlan)
 	w.includeStopped(new)
@@ -629,11 +618,11 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 			),
 		)
 	if err := w.reconcileCHIConfigMapCommon(ctx, chi, options); err != nil {
-		w.a.A().Error("failed to reconcile config map common. err: %v", err)
+		w.a.F().Error("failed to reconcile config map common. err: %v", err)
 	}
 	// 3. CHI users ConfigMap
 	if err := w.reconcileCHIConfigMapUsers(ctx, chi); err != nil {
-		w.a.A().Error("failed to reconcile config map users. err: %v", err)
+		w.a.F().Error("failed to reconcile config map users. err: %v", err)
 	}
 
 	return nil
@@ -734,8 +723,24 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiv1.ChiHost
 		w.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
 	} else {
 		w.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
+		return err
 	}
-	return err
+
+	//replicatedObjectNames, replicatedCreateSQLs, distributedObjectNames, distributedCreateSQLs := w.schemer.HostCreateTablesSQLs(ctx, host)
+	//names := append(replicatedObjectNames, distributedObjectNames...)
+	//sql := append(replicatedCreateSQLs, distributedCreateSQLs...)
+	//
+	// ConfigMap for a host
+	//configMap = w.creator.CreateConfigMapHostMigration(host, w.creator.MakeConfigMapData(names, sql))
+	//err = w.reconcileConfigMap(ctx, host.CHI, configMap)
+	//if err == nil {
+	//	w.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
+	//} else {
+	//	w.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
+	//	return err
+	//}
+
+	return nil
 }
 
 // prepareHostStatefulSetWithStatus prepares host's StatefulSet status
@@ -757,13 +762,17 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiv1.ChiHo
 		return nil
 	}
 
+	// RollingUpdate is made with always shutting the host down.
+	// It is such an interesting policy.
+	// We'll do it via replicas: 0 in StatefulSet.
 	if host.CHI.IsRollingUpdate() {
-		// First stage of rolling update
 		w.prepareHostStatefulSetWithStatus(ctx, host, true)
 		_ = w.reconcileStatefulSet(ctx, host)
+		// At this moment StatefulSet has 0 replicas.
+		// First stage of RollingUpdate completed.
 	}
 
-	// Reconcile to desired configuration
+	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
 	err := w.reconcileStatefulSet(ctx, host)
 	if err == nil {
@@ -921,7 +930,7 @@ func (w *worker) migrateTables(ctx context.Context, host *chiv1.ChiHost) error {
 		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
 	err := w.schemer.HostCreateTables(ctx, host)
 	if err != nil {
-		w.a.M(host).A().Error("ERROR create tables on host %s. err: %v", host.Name, err)
+		w.a.M(host).F().Error("ERROR create tables on host %s. err: %v", host.Name, err)
 	}
 	return err
 }
@@ -1044,7 +1053,7 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 				chiv1.NewChiHostReconcileAttributes().SetAdd(),
 			),
 		)
-		// Add host to the cluster config (always) and wait for ClickHouse to pick-up the change
+	// Add host to the cluster config (always) and wait for ClickHouse to pick-up the change
 	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
 	if w.shouldWaitIncludeHost(host) {
 		_ = w.waitHostInCluster(ctx, host)
@@ -1085,7 +1094,7 @@ func (w *worker) shouldWaitExcludeHost(host *chiv1.ChiHost) bool {
 	}
 
 	// Fallback to operator's settings
-	return chop.Config().ReconcileWaitExclude
+	return chop.Config().Reconcile.Host.Wait.Exclude
 }
 
 // shouldWaitIncludeHost determines whether reconciler should wait for host to be included into cluster
@@ -1109,7 +1118,7 @@ func (w *worker) shouldWaitIncludeHost(host *chiv1.ChiHost) bool {
 	}
 
 	// Fallback to operator's settings
-	return chop.Config().ReconcileWaitInclude
+	return chop.Config().Reconcile.Host.Wait.Include
 }
 
 // waitHostInCluster
@@ -1148,41 +1157,72 @@ func (w *worker) deletePDB(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 }
 
 // deleteCHI
-func (w *worker) deleteCHI(ctx context.Context, chi *chiv1.ClickHouseInstallation) bool {
+func (w *worker) deleteCHI(ctx context.Context, old, new *chiv1.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return false
 	}
 
-	if chi.ObjectMeta.DeletionTimestamp.IsZero() {
-		// CHI is not being deleted
+	// Do we have pending request for CHI to be deleted?
+	if new.ObjectMeta.DeletionTimestamp.IsZero() {
+		// CHI is not being deleted and operator has not deleted anything.
 		return false
 	}
 
-	w.a.V(3).M(chi).S().P()
-	defer w.a.V(3).M(chi).E().P()
+	w.a.V(3).M(new).S().P()
+	defer w.a.V(3).M(new).E().P()
 
-	cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(ctx, chi.Name, newGetOptions())
-	if cur == nil {
-		return false
+	// Ok, we have pending request for CHI to be deleted.
+	// However, we need to decide, should CHI's child resources be deleted or not.
+	// There is a curious situation, when CRD is deleted and k8s starts to delete all resources of the type,
+	// described by CRD being deleted. This is may be unexpected and very painful situation,
+	// so in this case we should agree to delete CHI itself, but has to keep all CHI's child resources.
+
+	var clear bool
+	crd, err := w.c.extClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, "clickhouseinstallations.clickhouse.altinity.com", newGetOptions())
+	if err == nil {
+		if crd.ObjectMeta.DeletionTimestamp.IsZero() {
+			// CRD is not being deleted and operator can delete all child resources.
+			w.a.V(1).M(new).F().Info("CRD %s/%s is not being deleted, operator will delete child resources", crd.Namespace, crd.Name)
+			clear = true
+		} else {
+			// CRD is being deleted. This may be a mistake, operator should not delete data
+			w.a.V(1).M(new).F().Info("CRD %s/%s BEING DELETED, operator will NOT delete child resources", crd.Namespace, crd.Name)
+			clear = false
+		}
+	} else {
+		w.a.V(1).M(new).F().Error("unable to get CRD, got error: %v ", err)
+		w.a.V(1).M(new).F().Info("will delete chi %s/%s", new.Namespace, new.Name)
+		clear = true
 	}
-	if err != nil {
-		return false
+
+	if clear {
+		cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(ctx, new.Name, newGetOptions())
+		if cur == nil {
+			return false
+		}
+		if err != nil {
+			return false
+		}
+
+		if !util.InArray(FinalizerName, new.ObjectMeta.Finalizers) {
+			// No finalizer found, unexpected behavior
+			return false
+		}
+
+		_ = w.deleteCHIProtocol(ctx, new)
+	} else {
+		new.Attributes.SkipOwnerRef = true
+		_ = w.reconcileCHI(ctx, old, new)
 	}
 
-	if !util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
-		// No finalizer found, unexpected behavior
-		return false
+	// We need to uninstall finalizer in order to allow k8s to delete CHI resource
+	w.a.V(2).M(new).F().Info("uninstall finalizer")
+	if err := w.c.uninstallFinalizer(ctx, new); err != nil {
+		w.a.V(1).M(new).F().Error("unable to uninstall finalizer: err:%v", err)
 	}
 
-	_ = w.deleteCHIProtocol(ctx, chi)
-
-	// Uninstall finalizer
-	w.a.V(2).M(chi).F().Info("uninstall finalizer")
-	if err := w.c.uninstallFinalizer(ctx, chi); err != nil {
-		w.a.V(1).M(chi).A().Error("unable to uninstall finalizer: err:%v", err)
-	}
-
+	// CHI's child resources were deleted
 	return true
 }
 
@@ -1219,7 +1259,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 	if err != nil {
 		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("Delete CHI failed - unable to normalize: %q", err)
 		return err
 	}
@@ -1233,7 +1273,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 
 	(&chi.Status).DeleteStart()
 	if err := w.c.updateCHIObjectStatus(ctx, chi, true); err != nil {
-		w.a.V(1).M(chi).A().Error("UNABLE to write normalized CHI. err:%q", err)
+		w.a.V(1).M(chi).F().Error("UNABLE to write normalized CHI. err:%q", err)
 		return nil
 	}
 
@@ -1315,7 +1355,7 @@ func (w *worker) dropReplica(ctx context.Context, hostToRun, hostToDrop *chiv1.C
 	} else {
 		w.a.WithEvent(hostToRun.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(hostToRun.CHI).
-			M(hostToRun).A().
+			M(hostToRun).F().
 			Error("FAILED to drop replica on host %s with error %v", hostToDrop.Name, err)
 	}
 
@@ -1345,7 +1385,7 @@ func (w *worker) deleteTables(ctx context.Context, host *chiv1.ChiHost) error {
 	} else {
 		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(host.CHI).
-			M(host).A().
+			M(host).F().
 			Error("FAILED to delete tables on host %s with error %v", host.Name, err)
 	}
 
@@ -1539,7 +1579,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *chiv1.ClickHouseInsta
 		w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("Update ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
 	}
 
@@ -1564,7 +1604,7 @@ func (w *worker) createConfigMap(ctx context.Context, chi *chiv1.ClickHouseInsta
 		w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("Create ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
 	}
 
@@ -1586,7 +1626,7 @@ func (w *worker) reconcileConfigMap(
 	defer w.a.V(2).M(chi).E().P()
 
 	// Check whether this object already exists in k8s
-	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, false)
+	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, true)
 
 	if curConfigMap != nil {
 		// We have ConfigMap - try to update it
@@ -1602,7 +1642,7 @@ func (w *worker) reconcileConfigMap(
 		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("FAILED to reconcile ConfigMap: %s CHI: %s ", configMap.Name, chi.Name)
 	}
 
@@ -1686,7 +1726,7 @@ func (w *worker) updateService(
 		w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("Update Service %s/%s failed with error %v", newService.Namespace, newService.Name, err)
 	}
 
@@ -1711,7 +1751,7 @@ func (w *worker) createService(ctx context.Context, chi *chiv1.ClickHouseInstall
 		w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("Create Service %s/%s failed with error %v", service.Namespace, service.Name, err)
 	}
 
@@ -1746,7 +1786,7 @@ func (w *worker) reconcileService(ctx context.Context, chi *chiv1.ClickHouseInst
 		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
-			M(chi).A().
+			M(chi).F().
 			Error("FAILED to reconcile Service: %s CHI: %s ", service.Name, chi.Name)
 	}
 
@@ -1829,7 +1869,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiv1.ChiHost) 
 		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusAction(host.CHI).
 			WithStatusError(host.CHI).
-			M(host).A().
+			M(host).F().
 			Error("FAILED to reconcile StatefulSet: %s CHI: %s ", newStatefulSet.Name, host.CHI.Name)
 	}
 
@@ -1868,13 +1908,13 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 	} else if err == errIgnore {
 		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
 			WithStatusAction(host.CHI).
-			M(host).A().
+			M(host).F().
 			Warning("Create StatefulSet %s/%s - error ignored", statefulSet.Namespace, statefulSet.Name)
 	} else {
 		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
 			WithStatusAction(host.CHI).
 			WithStatusError(host.CHI).
-			M(host).A().
+			M(host).F().
 			Error("Create StatefulSet %s/%s - failed with error %v", statefulSet.Namespace, statefulSet.Name, err)
 	}
 
@@ -1966,7 +2006,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
 			WithStatusAction(host.CHI).
 			WithStatusError(host.CHI).
-			M(host).A().
+			M(host).F().
 			Error("Update StatefulSet(%s/%s) - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
 
 		diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, newStatefulSet.Spec)
@@ -2033,14 +2073,14 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiv1.ChiHost) error {
 			if apierrors.IsNotFound(err) {
 				// This is not an error per se, means PVC is not created (yet)?
 			} else {
-				w.a.M(host).A().Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
+				w.a.M(host).F().Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
 			}
 			return
 		}
 
 		pvc, err = w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
 		if err != nil {
-			w.a.M(host).A().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvcName, err)
+			w.a.M(host).F().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvcName, err)
 			w.registryFailed.RegisterPVC(pvc.ObjectMeta)
 			return
 		}

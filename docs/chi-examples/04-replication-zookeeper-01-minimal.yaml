@@ -10,5 +10,5 @@ spec:
     clusters:
       - name: replcluster
         layout:
-          shardsCount: 3
+          shardsCount: 1
           replicasCount: 2

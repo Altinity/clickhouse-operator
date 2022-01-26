@@ -24,6 +24,7 @@ import (
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -50,6 +51,7 @@ import (
 // NewController creates instance of Controller
 func NewController(
 	chopClient chopclientset.Interface,
+	extClient apiextensions.Interface,
 	kubeClient kube.Interface,
 	chopInformerFactory chopinformers.SharedInformerFactory,
 	kubeInformerFactory kubeinformers.SharedInformerFactory,
@@ -76,6 +78,7 @@ func NewController(
 	// Create Controller instance
 	controller := &Controller{
 		kubeClient:              kubeClient,
+		extClient:               extClient,
 		chopClient:              chopClient,
 		chiLister:               chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Lister(),
 		chiListerSynced:         chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().HasSynced,
@@ -101,7 +104,7 @@ func NewController(
 
 // initQueues
 func (c *Controller) initQueues() {
-	for i := 0; i < chop.Config().ReconcileThreadsNumber+chi.DefaultReconcileSystemThreadsNumber; i++ {
+	for i := 0; i < chop.Config().Reconcile.Runtime.ThreadsNumber+chi.DefaultReconcileSystemThreadsNumber; i++ {
 		c.queues = append(
 			c.queues,
 			queue.New(),
@@ -257,14 +260,14 @@ func (c *Controller) addEventHandlersEndpoint(
 
 			diff, equal := messagediff.DeepDiff(oldEndpoints, newEndpoints)
 			if equal {
-				log.V(2).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: no changes found")
+				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: no changes found")
 				// No need to react
 				return
 			}
 
 			added := false
 			for path := range diff.Added {
-				log.V(2).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: added %v", path)
+				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: added %v", path)
 				for _, pathnode := range *path {
 					s := pathnode.String()
 					if s == ".Addresses" {
@@ -273,10 +276,10 @@ func (c *Controller) addEventHandlersEndpoint(
 				}
 			}
 			for path := range diff.Removed {
-				log.V(2).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: removed %v", path)
+				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: removed %v", path)
 			}
 			for path := range diff.Modified {
-				log.V(2).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: modified %v", path)
+				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: modified %v", path)
 			}
 
 			if added {
@@ -289,7 +292,7 @@ func (c *Controller) addEventHandlersEndpoint(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			log.V(2).M(endpoints).Info("endpointsInformer.DeleteFunc")
+			log.V(3).M(endpoints).Info("endpointsInformer.DeleteFunc")
 		},
 	})
 }
@@ -424,11 +427,16 @@ func (c *Controller) Run(ctx context.Context) {
 	}
 
 	// Label controller runtime objects with proper labels
-	for cnt := 0; cnt < 10; cnt++ {
-		if err := c.labelMyObjectsTree(ctx); err == nil {
-			break
-		} else {
-			log.V(1).A().Error("ERROR label objects, will retry. Err: %v", err)
+	max := 10
+	for cnt := 0; cnt < max; cnt++ {
+		switch err := c.labelMyObjectsTree(ctx); err {
+		case nil:
+			cnt = max
+		case ErrOperatorPodNotSpecified:
+			log.V(1).F().Error("Since operator pod is not specified, will not perform labeling")
+			cnt = max
+		default:
+			log.V(1).F().Error("ERROR label objects, will retry. Err: %v", err)
 			util.WaitContextDoneOrTimeout(ctx, 5*time.Second)
 		}
 	}
@@ -437,9 +445,9 @@ func (c *Controller) Run(ctx context.Context) {
 	// Start threads
 	//
 	workersNum := len(c.queues)
-	log.V(1).A().Info("ClickHouseInstallation controller: starting workers number: %d", workersNum)
+	log.V(1).F().Info("ClickHouseInstallation controller: starting workers number: %d", workersNum)
 	for i := 0; i < workersNum; i++ {
-		log.V(1).A().Info("ClickHouseInstallation controller: starting worker %d out of %d", i+1, workersNum)
+		log.V(1).F().Info("ClickHouseInstallation controller: starting worker %d out of %d", i+1, workersNum)
 		sys := false
 		if i < chi.DefaultReconcileSystemThreadsNumber {
 			sys = true
@@ -447,9 +455,9 @@ func (c *Controller) Run(ctx context.Context) {
 		worker := c.newWorker(c.queues[i], sys)
 		go wait.Until(worker.run, runWorkerPeriod, ctx.Done())
 	}
-	defer log.V(1).A().Info("ClickHouseInstallation controller: shutting down workers")
+	defer log.V(1).F().Info("ClickHouseInstallation controller: shutting down workers")
 
-	log.V(1).A().Info("ClickHouseInstallation controller: workers started")
+	log.V(1).F().Info("ClickHouseInstallation controller: workers started")
 	<-ctx.Done()
 }
 
@@ -546,7 +554,7 @@ func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
 // updateWatchAsync
 func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string) {
 	if err := metrics.InformMetricsExporterAboutWatchedCHI(namespace, name, hostnames); err != nil {
-		log.V(1).A().Info("FAIL update watch (%s/%s): %q", namespace, name, err)
+		log.V(1).F().Info("FAIL update watch (%s/%s): %q", namespace, name, err)
 	} else {
 		log.V(2).Info("OK update watch (%s/%s)", namespace, name)
 	}
@@ -560,7 +568,7 @@ func (c *Controller) deleteWatch(namespace, name string) {
 // deleteWatchAsync
 func (c *Controller) deleteWatchAsync(namespace, name string) {
 	if err := metrics.InformMetricsExporterToDeleteWatchedCHI(namespace, name); err != nil {
-		log.V(1).A().Info("FAIL delete watch (%s/%s): %q", namespace, name, err)
+		log.V(1).F().Info("FAIL delete watch (%s/%s): %q", namespace, name, err)
 	} else {
 		log.V(2).Info("OK delete watch (%s/%s)", namespace, name)
 	}
@@ -650,7 +658,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chi.ClickHouse
 	// Start Debug object
 	//js, err := json.MarshalIndent(chi, "", "  ")
 	//if err != nil {
-	//	log.V(1).M(chi).A().Error("%q", err)
+	//	log.V(1).M(chi).F().Error("%q", err)
 	//}
 	//log.V(3).M(chi).F().Info("\n%s\n", js)
 	// End Debug object
@@ -664,7 +672,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chi.ClickHouse
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Patch(ctx, chi.Name, types.JSONPatchType, payload, newPatchOptions())
 	if err != nil {
 		// Error update
-		log.V(1).M(chi).A().Error("%q", err)
+		log.V(1).M(chi).F().Error("%q", err)
 		return err
 	}
 
@@ -695,14 +703,14 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 		if tolerateAbsence {
 			return nil
 		}
-		log.V(1).M(chi).A().Error("%q", err)
+		log.V(1).M(chi).F().Error("%q", err)
 		return err
 	}
 	if cur == nil {
 		if tolerateAbsence {
 			return nil
 		}
-		log.V(1).M(chi).A().Error("NULL returned")
+		log.V(1).M(chi).F().Error("NULL returned")
 		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
 	}
 
@@ -714,7 +722,7 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 	// Start Debug object
 	//js, err := json.MarshalIndent(chi, "", "  ")
 	//if err != nil {
-	//	log.V(1).M(chi).A().Error("%q", err)
+	//	log.V(1).M(chi).F().Error("%q", err)
 	//}
 	//log.V(3).M(chi).F().Info("\n%s\n", js)
 	// End Debug object
@@ -722,7 +730,7 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).UpdateStatus(ctx, cur, newUpdateOptions())
 	if err != nil {
 		// Error update
-		log.V(1).M(chi).A().Error("%q", err)
+		log.V(1).M(chi).F().Error("%q", err)
 		return err
 	}
 

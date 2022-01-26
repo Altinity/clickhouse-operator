@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	v13 "k8s.io/api/apps/v1"
 	v12 "k8s.io/api/core/v1"
@@ -27,6 +28,11 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+)
+
+var (
+	// ErrOperatorPodNotSpecified specifies error when there is not namespace/name pair provided pointing to operator pod
+	ErrOperatorPodNotSpecified = fmt.Errorf("operator pod not specfied")
 )
 
 func (c *Controller) labelMyObjectsTree(ctx context.Context) error {
@@ -67,8 +73,13 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) error {
 
 	if !ok1 || !ok2 {
 		str := fmt.Sprintf("ERROR read env vars: %s/%s ", chiv1.OPERATOR_POD_NAME, chiv1.OPERATOR_POD_NAMESPACE)
-		log.V(1).M(namespace, name).A().Error(str)
+		log.V(1).M(namespace, name).F().Error(str)
 		return errors.New(str)
+	}
+
+	log.V(1).Info("OPERATOR_POD_NAMESPACE=%s OPERATOR_POD_NAME=%s", namespace, name)
+	if len(namespace) == 0 || len(name) == 0 {
+		return ErrOperatorPodNotSpecified
 	}
 
 	// Put labels on the pod
@@ -101,12 +112,12 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) error {
 func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*v12.Pod, error) {
 	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, newGetOptions())
 	if err != nil {
-		log.V(1).M(namespace, name).A().Error("ERROR get Pod %s/%s %v", namespace, name, err)
+		log.V(1).M(namespace, name).F().Error("ERROR get Pod %s/%s %v", namespace, name, err)
 		return nil, err
 	}
 	if pod == nil {
 		str := fmt.Sprintf("ERROR get Pod is nil %s/%s ", namespace, name)
-		log.V(1).M(namespace, name).A().Error(str)
+		log.V(1).M(namespace, name).F().Error(str)
 		return nil, errors.New(str)
 	}
 
@@ -114,12 +125,12 @@ func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*v12
 	pod.Labels = c.addLabels(pod.Labels)
 	pod, err = c.kubeClient.CoreV1().Pods(namespace).Update(ctx, pod, newUpdateOptions())
 	if err != nil {
-		log.V(1).M(namespace, name).A().Error("ERROR put label on Pod %s/%s %v", namespace, name, err)
+		log.V(1).M(namespace, name).F().Error("ERROR put label on Pod %s/%s %v", namespace, name, err)
 		return nil, err
 	}
 	if pod == nil {
 		str := fmt.Sprintf("ERROR update Pod is nil %s/%s ", namespace, name)
-		log.V(1).M(namespace, name).A().Error(str)
+		log.V(1).M(namespace, name).F().Error(str)
 		return nil, errors.New(str)
 	}
 
@@ -141,19 +152,19 @@ func (c *Controller) labelReplicaSet(ctx context.Context, pod *v12.Pod) (*v13.Re
 	if replicaSetName == "" {
 		// ReplicaSet not found
 		str := fmt.Sprintf("ERROR ReplicaSet for Pod %s/%s not found", pod.Namespace, pod.Name)
-		log.V(1).M(pod.Namespace, pod.Name).A().Error(str)
+		log.V(1).M(pod.Namespace, pod.Name).F().Error(str)
 		return nil, errors.New(str)
 	}
 
 	// ReplicaSet namespaced name found, fetch the ReplicaSet
 	replicaSet, err := c.kubeClient.AppsV1().ReplicaSets(pod.Namespace).Get(ctx, replicaSetName, newGetOptions())
 	if err != nil {
-		log.V(1).M(pod.Namespace, replicaSetName).A().Error("ERROR get ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
+		log.V(1).M(pod.Namespace, replicaSetName).F().Error("ERROR get ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
 		return nil, err
 	}
 	if replicaSet == nil {
 		str := fmt.Sprintf("ERROR get ReplicaSet is nil %s/%s ", pod.Namespace, replicaSetName)
-		log.V(1).M(pod.Namespace, replicaSetName).A().Error(str)
+		log.V(1).M(pod.Namespace, replicaSetName).F().Error(str)
 		return nil, errors.New(str)
 	}
 
@@ -161,12 +172,12 @@ func (c *Controller) labelReplicaSet(ctx context.Context, pod *v12.Pod) (*v13.Re
 	replicaSet.Labels = c.addLabels(replicaSet.Labels)
 	replicaSet, err = c.kubeClient.AppsV1().ReplicaSets(pod.Namespace).Update(ctx, replicaSet, newUpdateOptions())
 	if err != nil {
-		log.V(1).M(pod.Namespace, replicaSetName).A().Error("ERROR put label on ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
+		log.V(1).M(pod.Namespace, replicaSetName).F().Error("ERROR put label on ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
 		return nil, err
 	}
 	if replicaSet == nil {
 		str := fmt.Sprintf("ERROR update ReplicaSet is nil %s/%s ", pod.Namespace, replicaSetName)
-		log.V(1).M(pod.Namespace, replicaSetName).A().Error(str)
+		log.V(1).M(pod.Namespace, replicaSetName).F().Error(str)
 		return nil, errors.New(str)
 	}
 
@@ -188,19 +199,19 @@ func (c *Controller) labelDeployment(ctx context.Context, rs *v13.ReplicaSet) er
 	if deploymentName == "" {
 		// Deployment not found
 		str := fmt.Sprintf("ERROR find Deployment for ReplicaSet %s/%s not found", rs.Namespace, rs.Name)
-		log.V(1).M(rs.Namespace, rs.Name).A().Error(str)
+		log.V(1).M(rs.Namespace, rs.Name).F().Error(str)
 		return errors.New(str)
 	}
 
 	// Deployment namespaced name found, fetch the Deployment
 	deployment, err := c.kubeClient.AppsV1().Deployments(rs.Namespace).Get(ctx, deploymentName, newGetOptions())
 	if err != nil {
-		log.V(1).M(rs.Namespace, deploymentName).A().Error("ERROR get Deployment %s/%s", rs.Namespace, deploymentName)
+		log.V(1).M(rs.Namespace, deploymentName).F().Error("ERROR get Deployment %s/%s", rs.Namespace, deploymentName)
 		return err
 	}
 	if deployment == nil {
 		str := fmt.Sprintf("ERROR get Deployment is nil %s/%s ", rs.Namespace, deploymentName)
-		log.V(1).M(rs.Namespace, deploymentName).A().Error(str)
+		log.V(1).M(rs.Namespace, deploymentName).F().Error(str)
 		return errors.New(str)
 	}
 
@@ -208,12 +219,12 @@ func (c *Controller) labelDeployment(ctx context.Context, rs *v13.ReplicaSet) er
 	deployment.Labels = c.addLabels(deployment.Labels)
 	deployment, err = c.kubeClient.AppsV1().Deployments(rs.Namespace).Update(ctx, deployment, newUpdateOptions())
 	if err != nil {
-		log.V(1).M(rs.Namespace, deploymentName).A().Error("ERROR put label on Deployment %s/%s %v", rs.Namespace, deploymentName, err)
+		log.V(1).M(rs.Namespace, deploymentName).F().Error("ERROR put label on Deployment %s/%s %v", rs.Namespace, deploymentName, err)
 		return err
 	}
 	if deployment == nil {
 		str := fmt.Sprintf("ERROR update Deployment is nil %s/%s ", rs.Namespace, deploymentName)
-		log.V(1).M(rs.Namespace, deploymentName).A().Error(str)
+		log.V(1).M(rs.Namespace, deploymentName).F().Error(str)
 		return errors.New(str)
 	}
 
@@ -226,8 +237,10 @@ func (c *Controller) addLabels(labels map[string]string) map[string]string {
 		labels,
 		// Add the following labels
 		map[string]string{
-			model.LabelAppName: model.LabelAppValue,
-			model.LabelCHOP:    chop.Get().Version,
+			model.LabelAppName:    model.LabelAppValue,
+			model.LabelCHOP:       chop.Get().Version,
+			model.LabelCHOPCommit: chop.Get().Commit,
+			model.LabelCHOPDate:   strings.ReplaceAll(chop.Get().Date, ":", "."),
 		},
 	)
 }
