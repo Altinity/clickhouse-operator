@@ -53,6 +53,7 @@ def test_zookeeper_rescale(self):
     CH 2 -> 1 wait complete + ZK 3 -> 1 nowait
     CH 1 -> 2 wait complete + ZK 1 -> 3 nowait
     """
+
     def insert_replicated_data(chi, create_tables, insert_tables):
         with When(f'create if not exists replicated tables {create_tables}'):
             for table in create_tables:
@@ -111,7 +112,7 @@ def test_zookeeper_rescale(self):
         wait_clickhouse_no_readonly_replicas(chi)
         insert_replicated_data(chi, create_tables=['test_repl1'], insert_tables=['test_repl1'])
 
-    total_iterations = 5
+    total_iterations = 3
     for iteration in range(total_iterations):
         with When(f"ITERATION {iteration}"):
             with Then("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
@@ -120,6 +121,7 @@ def test_zookeeper_rescale(self):
                 check_zk_root_znode(chi, pod_count=3)
 
                 util.wait_clickhouse_cluster_ready(chi)
+                wait_clickhouse_no_readonly_replicas(chi)
                 insert_replicated_data(chi, create_tables=['test_repl2'], insert_tables=['test_repl1', 'test_repl2'])
 
             with Then("CH 2 -> 1 wait complete + ZK 3 -> 1 nowait"):
@@ -128,6 +130,7 @@ def test_zookeeper_rescale(self):
                 check_zk_root_znode(chi, pod_count=1)
 
                 util.wait_clickhouse_cluster_ready(chi)
+                wait_clickhouse_no_readonly_replicas(chi)
                 insert_replicated_data(chi, create_tables=['test_repl3'], insert_tables=['test_repl1', 'test_repl2', 'test_repl3'])
 
     with When("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
