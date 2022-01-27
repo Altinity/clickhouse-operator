@@ -171,7 +171,7 @@ func (f *ClickHouseFetcher) getClickHouseSystemParts() ([][]string, error) {
 				metricDiskDataBytes, metricMemoryPrimaryKeyBytesAllocated string
 			if err := rows.Scan(
 				&database, &table, &active, &partitions, &parts, &bytes, &uncompressed, &_rows,
-				&metricDiskDataBytes, metricMemoryPrimaryKeyBytesAllocated,
+				&metricDiskDataBytes, &metricMemoryPrimaryKeyBytesAllocated,
 			); err == nil {
 				*data = append(*data, []string{
 					database, table, active, partitions, parts, bytes, uncompressed, _rows,
