@@ -37,7 +37,7 @@ if ! [ -s "${CUR_DIR}/cache" ]; then
 fi
 
 if ! [ -f "${CUR_DIR}/cache/${MINIKUBE_PRELOADED_TARBALL}" ]; then
-    wget "https://storage.googleapis.com/minikube-preloaded-volume-tarballs/${MINIKUBE_PRELOADED_TARBALL}" -P "${CUR_DIR}/cache"
+    wget --progress=bar:force:noscroll "https://storage.googleapis.com/minikube-preloaded-volume-tarballs/${MINIKUBE_PRELOADED_TARBALL}" -P "${CUR_DIR}/cache"
 fi
 
 echo "Pre-pull images and save"
