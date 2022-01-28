@@ -11,7 +11,7 @@ CLICKHOUSE_BACKUP_IMAGE="altinity/clickhouse-backup:1.2.2"
 CLICKHOUSE_IMAGE=${CLICKHOUSE_IMAGE:="yandex/clickhouse-server:21.8"}
 CLICKHOUSE_IMAGE_OLD=${CLICKHOUSE_IMAGE_OLD:="yandex/clickhouse-server:21.3"}
 CLICKHOUSE_IMAGE_LATEST=${CLICKHOUSE_IMAGE_LATEST:="yandex/clickhouse-server:latest"}
-CLICKHOUSE_OPERATOR_TESTS_IMAGE=${CLICKHOUSE_OPERATOR_TESTS_IMAGE:="registry.gitlab.com/altinity-qa/clickhouse/cicd/clickhouse-operator:latest"}
+CLICKHOUSE_OPERATOR_TESTS_IMAGE=${CLICKHOUSE_OPERATOR_TESTS_IMAGE:="registry.gitlab.com/altinity-public/container-images/clickhouse-operator-test-runner:latest"}
 ZOOKEEPER_IMAGE=${ZOOKEEPER_IMAGE:="zookeeper:3.7.0"}
 
 K8S_VERSION=${K8S_VERSION:=1.21.6}

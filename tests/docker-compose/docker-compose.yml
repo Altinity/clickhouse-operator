@@ -2,7 +2,7 @@ version: '2.3'
 
 services:
   runner:
-    image: ${CLICKHOUSE_OPERATOR_TESTS_IMAGE:-registry.gitlab.com/altinity-qa/clickhouse/cicd/clickhouse-operator}:${CLICKHOUSE_OPERATOR_TESTS_VERSION:-latest}
+    image: ${CLICKHOUSE_OPERATOR_TESTS_IMAGE:-registry.gitlab.com/altinity-public/container-images/clickhouse-operator-test-runner}:${CLICKHOUSE_OPERATOR_TESTS_VERSION:-latest}
     build:
       context: "../image/"
       dockerfile: "../image/Dockerfile"
