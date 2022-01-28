@@ -14,7 +14,7 @@ CLICKHOUSE_IMAGE_LATEST=${CLICKHOUSE_IMAGE_LATEST:="yandex/clickhouse-server:lat
 CLICKHOUSE_OPERATOR_TESTS_IMAGE=${CLICKHOUSE_OPERATOR_TESTS_IMAGE:="registry.gitlab.com/altinity-qa/clickhouse/cicd/clickhouse-operator:latest"}
 ZOOKEEPER_IMAGE=${ZOOKEEPER_IMAGE:="zookeeper:3.7.0"}
 
-K8S_VERSION=${K8S_VERSION:=1.23.1}
+K8S_VERSION=${K8S_VERSION:=1.21.6}
 MINIKUBE_PRELOADED_TARBALL="preloaded-images-k8s-v13-v${K8S_VERSION}-docker-overlay2-amd64.tar.lz4"
 MINIKUBE_KICBASE_IMAGE=${MINIKUBE_KICBASE_IMAGE:-"gcr.io/k8s-minikube/kicbase:v0.0.27"}
 MINIKUBE_STORAGE_IMAGE=${MINIKUBE_STORAGE_IMAGE:="gcr.io/k8s-minikube/storage-provisioner:v5"}
