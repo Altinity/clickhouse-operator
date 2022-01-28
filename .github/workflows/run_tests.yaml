@@ -1,4 +1,4 @@
-name: grafana_push
+name: run_tests
 on: workflow_dispatch
 jobs:
   run_tests:

@@ -322,8 +322,9 @@ def test_longest_running_query(self, prometheus_operator_spec, clickhouse_operat
     clickhouse.query(chi["metadata"]["name"], "SELECT now(),sleepEachRow(1),number FROM system.numbers LIMIT 660",
                      host=long_running_svc, timeout=670)
     with Then("check ClickHouseLongestRunningQuery firing"):
-        fired = alerts.wait_alert_state("ClickHouseLongestRunningQuery", "firing", True, labels={"hostname": long_running_svc},
-                                 time_range='30s')
+        fired = alerts.wait_alert_state(
+            "ClickHouseLongestRunningQuery", "firing", True, labels={"hostname": long_running_svc},
+            time_range='30s')
         assert fired, error("can't get ClickHouseLongestRunningQuery alert in firing state")
     with Then("check ClickHouseLongestRunningQuery gone away"):
         resolved = alerts.wait_alert_state("ClickHouseLongestRunningQuery", "firing", False, labels={"hostname": long_running_svc})
@@ -470,7 +471,7 @@ def test_too_many_connections(self, prometheus_operator_spec, clickhouse_operato
             port = random.choice(["8123", "3306", "3306", "3306", "9000"])
             if port == "8123":
                 # HTTPConnection metric increase after full parsing of HTTP Request, we can't provide pause between CONNECT and QUERY running
-                # long_cmd += f"nc -vv 127.0.0.1 {port} <( printf \"POST / HTTP/1.1\\r\\nHost: 127.0.0.1:8123\\r\\nContent-Length: 34\\r\\n\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\");"
+                # long_cmd += f"nc -vv 127.0.0.1 {port} <( printf \"POST / HTTP/1.1\\r\\nHost: 127.0.0.1:8123\\r\\nContent-Length: 34\\r\\n\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\");"
                 long_cmd += 'wget -qO- "http://127.0.0.1:8123?query=SELECT sleepEachRow(1),number,now() FROM numbers(30)";'
             elif port == "9000":
                 long_cmd += 'clickhouse-client --send_logs_level information --idle_connection_timeout 70 --receive_timeout 70 -q "SELECT sleepEachRow(1),number,now() FROM numbers(30)";'
@@ -542,7 +543,7 @@ def test_too_much_running_queries(self, prometheus_operator_spec, clickhouse_ope
             "ClickHouseTooManyRunningQueries", "firing", True, labels={"hostname": too_many_queries_svc},
             callback=make_too_many_queries, time_range="30s"
         )
-        assert fired, error("can't get ClickHouseTooManyConnections alert in firing state")
+        assert fired, error("can't get ClickHouseTooManyRunningQueries alert in firing state")
 
     with Then("check ClickHouseTooManyConnections gone away"):
         resolved = alerts.wait_alert_state("ClickHouseTooManyRunningQueries", "firing", False, labels={"hostname": too_many_queries_svc},
@@ -573,8 +574,9 @@ def test_system_settings_changed(self, prometheus_operator_spec, clickhouse_oper
         )
 
     with Then("check ClickHouseSystemSettingsChanged firing"):
-        fired = alerts.wait_alert_state("ClickHouseSystemSettingsChanged", "firing", True, labels={"hostname": changed_svc},
-                                 time_range="30s")
+        fired = alerts.wait_alert_state(
+            "ClickHouseSystemSettingsChanged", "firing", True, labels={"hostname": changed_svc},
+            time_range="30s")
         assert fired, error("can't get ClickHouseTooManyConnections alert in firing state")
 
     with When("rollback changed settings"):
@@ -703,17 +705,19 @@ def test_distributed_sync_insertion_timeout(self, prometheus_operator_spec, clic
             assert 'Code: 159' in error
 
     with When("check ClickHouseDistributedSyncInsertionTimeoutExceeded firing"):
-        fired = alerts.wait_alert_state("ClickHouseDistributedSyncInsertionTimeoutExceeded", "firing", True,
-                                 labels={"hostname": sync_svc, "chi": chi["metadata"]["name"]}, time_range='30s',
-                                 callback=insert_distributed_sync)
+        fired = alerts.wait_alert_state(
+            "ClickHouseDistributedSyncInsertionTimeoutExceeded", "firing", True,
+            labels={"hostname": sync_svc, "chi": chi["metadata"]["name"]}, time_range='30s',
+            callback=insert_distributed_sync)
         assert fired, error("can't get ClickHouseDistributedSyncInsertionTimeoutExceeded alert in firing state")
 
     with Then("check ClickHouseDistributedSyncInsertionTimeoutExceeded gone away"):
-        resolved = alerts.wait_alert_state("ClickHouseDistributedSyncInsertionTimeoutExceeded", "firing", False,
-                                    labels={"hostname": sync_svc})
+        resolved = alerts.wait_alert_state(
+            "ClickHouseDistributedSyncInsertionTimeoutExceeded", "firing", False, labels={"hostname": sync_svc})
         assert resolved, error("can't check ClickHouseDistributedSyncInsertionTimeoutExceeded alert is gone away")
 
     clickhouse.drop_distributed_table_on_cluster(chi)
+
 
 @TestScenario
 @Name("test_detached_parts. Check ClickHouseDetachedParts")
@@ -739,17 +743,20 @@ def test_detached_parts(self, prometheus_operator_spec, clickhouse_operator_spec
             clickhouse.query(chi["metadata"]["name"], all_parts, pod=detached_pod)
 
     with When("check ClickHouseDetachedParts firing"):
-        fired = alerts.wait_alert_state("ClickHouseDetachedParts", "firing", True,
-                                 labels={"hostname": detached_svc, "chi": chi["metadata"]["name"]}, time_range='30s',
-                                 callback=create_part_and_detach)
+        fired = alerts.wait_alert_state(
+            "ClickHouseDetachedParts", "firing", True,
+            labels={"hostname": detached_svc, "chi": chi["metadata"]["name"]}, time_range='30s',
+            callback=create_part_and_detach)
         assert fired, error("can't get ClickHouseDetachedParts alert in firing state")
 
     with Then("check ClickHouseDetachedParts gone away"):
-        resolved = alerts.wait_alert_state("ClickHouseDetachedParts", "firing", False,
-                                    labels={"hostname": detached_svc}, callback=attach_all_parts)
+        resolved = alerts.wait_alert_state(
+            "ClickHouseDetachedParts", "firing", False,
+            labels={"hostname": detached_svc}, callback=attach_all_parts)
         assert resolved, error("can't check ClickHouseDetachedParts alert is gone away")
 
     clickhouse.drop_table_on_cluster(chi)
+
 
 @TestScenario
 @Name("test_zookeeper_alerts. Check ZookeeperDown, ZookeeperRestartRecently")
@@ -765,8 +772,7 @@ def test_zookeeper_alerts(self, prometheus_operator_spec, clickhouse_operator_sp
 
     def wait_when_zookeeper_up():
         kubectl.wait_pod_status(zookeeper_pod, "Running", ns=kubectl.namespace)
-        kubectl.wait_jsonpath("pod", zookeeper_pod, "{.status.containerStatuses[0].ready}", "true",
-                                   ns=kubectl.namespace)
+        kubectl.wait_jsonpath("pod", zookeeper_pod, "{.status.containerStatuses[0].ready}", "true", ns=kubectl.namespace)
 
     with Then("check ZookeeperDown firing"):
         fired = alerts.wait_alert_state("ZookeeperDown", "firing", True, labels={"pod_name": zookeeper_pod},
@@ -778,7 +784,6 @@ def test_zookeeper_alerts(self, prometheus_operator_spec, clickhouse_operator_sp
     with Then("check ZookeeperDown gone away"):
         resolved = alerts.wait_alert_state("ZookeeperDown", "firing", False, labels={"pod_name": zookeeper_pod})
         assert resolved, error("can't check ZookeeperDown alert is gone away")
-
 
     restart_zookeeper()
 
@@ -807,7 +812,6 @@ def test(self):
         test_read_only_replica,
         test_replicas_max_absolute_delay,
         test_metrics_exporter_down,
-        test_clickhouse_server_reboot,
         test_clickhouse_dns_errors,
         test_distributed_connection_exceptions,
         test_insert_related_alerts,
@@ -819,9 +823,9 @@ def test(self):
         test_zookeeper_hardware_exceptions,
         test_distributed_sync_insertion_timeout,
         test_distributed_files_to_insert,
-        test_clickhouse_server_reboot,
         test_detached_parts,
         test_zookeeper_alerts,
+        test_clickhouse_server_reboot,
     ]
     for t in test_cases:
         Scenario(test=t)(prometheus_operator_spec=prometheus_operator_spec, clickhouse_operator_spec=clickhouse_operator_spec, chi=chi)
