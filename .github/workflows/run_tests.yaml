@@ -6,6 +6,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - run: |
+          apt-get update
+          apt-get install -y conntrack
       - uses: medyagh/setup-minikube@master
         with:
           driver: none
