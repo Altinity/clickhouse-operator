@@ -79,7 +79,7 @@ EXPOSE 2375
 
 ENV MINIKUBE_HOME /home/master/.minikube
 
-ENV K8S_VERSION=${K8S_VERSION:-1.21.6}
+ENV K8S_VERSION=${K8S_VERSION:-1.21.9}
 
 RUN wget -c --progress=bar:force:noscroll -O /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl \
    && chmod +x /usr/local/bin/kubectl
