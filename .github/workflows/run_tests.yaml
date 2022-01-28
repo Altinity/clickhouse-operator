@@ -15,9 +15,9 @@ jobs:
           container-runtime: containerd
           kubernetes-version: v1.21.9
       - run: |
-          bash -xe ./deploy/prometheus/create-prometheus.sh
-          bash -xe ./deploy/minio/install-minio-operator.sh
-          bash -xe ./deploy/minio/install-minio-tenant.sh
+          # bash -xe ./deploy/prometheus/create-prometheus.sh
+          # bash -xe ./deploy/minio/install-minio-operator.sh
+          # bash -xe ./deploy/minio/install-minio-tenant.sh
 
           # bash -xe /deploy/grafana/grafana-with-grafana-operator/install-grafana-operator.sh
           # bash -xe /deploy/grafana/grafana-with-grafana-operator/install-grafana-with-operator.sh
@@ -26,5 +26,5 @@ jobs:
           pip3 install -U -r ./tests/image/requirements.txt
           # docker-compose -f ./tests/docker-compose/docker-compose.yml pull runner
           # bash -xe ./tests/image/build_docker.sh
-          python3 ./tests/regression.py --only "/regression/*" --native
+          python3 ./tests/regression.py --only "/regression/e2e.test_operator/*" --native
           
