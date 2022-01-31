@@ -10,7 +10,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.0
+    clickhouse.altinity.com/chop: 0.18.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1339,7 +1339,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.0
+    clickhouse.altinity.com/chop: 0.18.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2665,7 +2665,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.0
+    clickhouse.altinity.com/chop: 0.18.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
