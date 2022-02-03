@@ -299,9 +299,8 @@ func GetSelectorHostScope(host *chiv1.ChiHost) map[string]string {
 }
 
 // filterOutPredefined filters out predefined values
-func (l *Labeler) filterOutPredefined(m map[string]string) map[string]string{
-	return util.CopyMapFilter(m, nil, []string{
-	})
+func (l *Labeler) filterOutPredefined(m map[string]string) map[string]string {
+	return util.CopyMapFilter(m, nil, []string{})
 }
 
 // appendCHIProvidedTo appends CHI-provided labels to labels set
