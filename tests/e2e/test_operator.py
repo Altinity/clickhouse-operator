@@ -8,10 +8,14 @@ import e2e.util as util
 
 from testflows.core import *
 from testflows.asserts import error
+from requirements.requirements import *
 
 
 @TestScenario
 @Name("test_001. 1 node")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Create("1.0")
+)
 def test_001(self):
     kubectl.create_and_check(
         manifest="manifests/chi/test-001.yaml",
@@ -28,6 +32,10 @@ def test_001(self):
 
 @TestScenario
 @Name("test_002. useTemplates for pod, volume templates, and distribution")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates_Name("1.0")
+)
 def test_002(self):
     kubectl.create_and_check(
         manifest="manifests/chi/test-002-tpl.yaml",
@@ -49,6 +57,12 @@ def test_002(self):
 
 @TestScenario
 @Name("test_003. 4 nodes with custom layout definition")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Name("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Name("1.0"),
+)
 def test_003(self):
     kubectl.create_and_check(
         manifest="manifests/chi/test-003-complex-layout.yaml",
@@ -64,6 +78,11 @@ def test_003(self):
 
 @TestScenario
 @Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Name("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Spec("1.0")
+)
 def test_004(self):
     kubectl.create_and_check(
         manifest="manifests/chi/test-004-tpl.yaml",
@@ -78,6 +97,9 @@ def test_004(self):
 
 @TestScenario
 @Name("test_005. Test manifest created by ACM")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_ACM("1.0")
+)
 def test_005(self):
     kubectl.create_and_check(
         manifest="manifests/chi/test-005-acm.yaml",
@@ -93,6 +115,9 @@ def test_005(self):
 
 @TestScenario
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades("1.0")
+)
 def test_006(self):
     old_version = "yandex/clickhouse-server:21.3"
     new_version = "yandex/clickhouse-server:21.8"
@@ -126,6 +151,11 @@ def test_006(self):
 
 @TestScenario
 @Name("test_007. Test template with custom clickhouse ports")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_InterServerHttpPort("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_TcpPort("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_HttpPort("1.0")
+)
 def test_007(self):
     kubectl.create_and_check(
         manifest="manifests/chi/test-007-custom-ports.yaml",
@@ -136,7 +166,8 @@ def test_007(self):
     )
 
 
-def test_operator_upgrade(manifest, version_from, version_to=settings.operator_version):
+@TestStep
+def test_operator_upgrade(self, manifest, version_from, version_to=settings.operator_version):
     with Given(f"clickhouse-operator FROM {version_from}"):
         util.set_operator_version(version_from)
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest, True))
@@ -183,7 +214,8 @@ def test_operator_upgrade(manifest, version_from, version_to=settings.operator_v
         kubectl.delete_chi(chi)
 
 
-def test_operator_restart(manifest, version=settings.operator_version):
+@TestStep
+def test_operator_restart(self, manifest, version=settings.operator_version):
     with Given(f"clickhouse-operator {version}"):
         util.set_operator_version(version)
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -207,7 +239,8 @@ def test_operator_restart(manifest, version=settings.operator_version):
         kubectl.delete_chi(chi)
 
 
-def check_operator_restart(chi, wait_objects, pod):
+@TestStep
+def check_operator_restart(self, chi, wait_objects, pod):
     start_time = kubectl.get_field("pod", pod, ".status.startTime")
     with When("Restart operator"):
         util.restart_operator()
@@ -222,6 +255,9 @@ def check_operator_restart(chi, wait_objects, pod):
 
 @TestScenario
 @Name("test_008. Test operator restart")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0")
+)
 def test_008(self):
     with Then("Test simple chi for operator restart"):
         test_operator_restart("manifests/chi/test-008-operator-restart-1.yaml")
@@ -231,15 +267,26 @@ def test_008(self):
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
-def test_009(self, version_from="0.16.0", version_to=settings.operator_version):
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0")
+)
+def test_009(self):
+    version_from = self.context.test_009_version_from
+    version_to = self.context.test_009_version_to
+
     with Then("Test simple chi for operator upgrade"):
-        test_operator_upgrade("manifests/chi/test-009-operator-upgrade-1.yaml", version_from, version_to)
+        test_operator_upgrade(manifest="manifests/chi/test-009-operator-upgrade-1.yaml", version_from=version_from,
+                              version_to=version_to)
     with Then("Test advanced chi for operator upgrade"):
-        test_operator_upgrade("manifests/chi/test-009-operator-upgrade-2.yaml", version_from, version_to)
+        test_operator_upgrade(manifest="manifests/chi/test-009-operator-upgrade-2.yaml", version_from=version_from,
+                              version_to=version_to)
 
 
 @TestScenario
 @Name("test_010. Test zookeeper initialization")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper("1.0")
+)
 def test_010(self):
     util.set_operator_version(settings.operator_version)
     util.require_zookeeper()
@@ -264,6 +311,9 @@ def test_010(self):
 
 @TestScenario
 @Name("test_011. Test user security and network isolation")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0")
+)
 def test_011(self):
     with Given("test-011-secured-cluster.yaml and test-011-insecured-cluster.yaml"):
         kubectl.create_and_check(
@@ -382,6 +432,9 @@ def test_011(self):
 
 @TestScenario
 @Name("test_011_1. Test default user security")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0")
+)
 def test_011_1(self):
     with Given("test-011-secured-default-1.yaml with password_sha256_hex for default user"):
         kubectl.create_and_check(
@@ -443,6 +496,9 @@ def test_011_1(self):
 
 @TestScenario
 @Name("test_011_2. Test k8s secrets usage")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Secrets("1.0")
+)
 def test_011_2(self):
     with Given("test-011-secrets.yaml with secret storage"):
         kubectl.apply(util.get_full_path("manifests/chi/test-011-secret.yaml", False),
@@ -489,6 +545,12 @@ def test_011_2(self):
 
 @TestScenario
 @Name("test_012. Test service templates")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_ServiceTemplates("1.0"),
+    RQ_SRS_026_ClickHouseOperator_ServiceTemplates_NameGeneration("1.0"),
+    RQ_SRS_026_ClickHouseOperator_ServiceTemplates_LoadBalancer("1.0"),
+    RQ_SRS_026_ClickHouseOperator_ServiceTemplates_Annotations("1.0")
+)
 def test_012(self):
     kubectl.create_and_check(
         manifest="manifests/chi/test-012-service-template.yaml",
@@ -535,6 +597,10 @@ def test_012(self):
 
 @TestScenario
 @Name("test_013. Test adding shards and creating local and distributed tables automatically")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingShards("1.0"),
+    RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_SchemaPropagation("1.0")
+)
 def test_013(self):
     manifest = "manifests/chi/test-013-add-shards-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -663,6 +729,10 @@ def test_013(self):
 
 @TestScenario
 @Name("test_014. Test that replication works")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_ZooKeeper("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0")
+)
 def test_014(self):
     util.require_zookeeper()
 
@@ -863,6 +933,9 @@ def test_014(self):
 
 @TestScenario
 @Name("test_015. Test circular replication with hostNetwork")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Deployments_CircularReplication("1.0")
+)
 def test_015(self):
     kubectl.create_and_check(
         manifest="manifests/chi/test-015-host-network.yaml",
@@ -901,6 +974,10 @@ def test_015(self):
 
 @TestScenario
 @Name("test_016. Test advanced settings options")
+@Requirements(
+RQ_SRS_026_ClickHouseOperator_ConfigurationFileControl_EmbeddedXML("1.0"),
+RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0")
+)
 def test_016(self):
     chi = "test-016-settings"
     kubectl.create_and_check(
@@ -1020,6 +1097,9 @@ def test_016(self):
 
 @TestScenario
 @Name("test_017. Test deployment of multiple versions in a cluster")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Deployments_DifferentClickHouseVersionsOnReplicasAndShards("1.0")
+)
 def test_017(self):
     pod_count = 2
     kubectl.create_and_check(
@@ -1092,6 +1172,9 @@ def test_018(self):
 
 @TestScenario
 @Name("test_019. Test that volume is correctly retained and can be re-attached")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0")
+)
 def test_019(self):
     util.require_zookeeper()
     manifest = "manifests/chi/test-019-retain-volume-1.yaml"
@@ -1254,6 +1337,9 @@ def test_019(self):
 
 @TestScenario
 @Name("test_020. Test multi-volume configuration")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
+)
 def test_020(self):
     manifest = "manifests/chi/test-020-multi-volume.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -1289,6 +1375,9 @@ def test_020(self):
 
 @TestScenario
 @Name("test_021. Test rescaling storage")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0")
+)
 def test_021(self):
     manifest = "manifests/chi/test-021-rescale-volume-01.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -1413,6 +1502,9 @@ def test_021(self):
 
 @TestScenario
 @Name("test_022. Test that chi with broken image can be deleted")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_DeleteBroken("1.0")
+)
 def test_022(self):
     manifest = "manifests/chi/test-022-broken-image.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -1438,6 +1530,9 @@ def test_022(self):
 
 @TestScenario
 @Name("test_023. Test auto templates")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templating("1.0")
+)
 def test_023(self):
     manifest = "manifests/chi/test-001.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -1471,6 +1566,9 @@ def test_023(self):
 
 @TestScenario
 @Name("test_024. Test annotations for various template types")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_AnnotationsInTemplates("1.0")
+)
 def test_024(self):
     manifest = "manifests/chi/test-024-template-annotations.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -1500,12 +1598,14 @@ def test_024(self):
         assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.servicetemplate/macro-test") == "test-024.example.com"
         assert kubectl.get_field("service", "service-test-024-0-0", ".metadata.annotations.servicetemplate/macro-test") == "test-024-0-0.example.com"
 
-
     kubectl.delete_chi(chi)
 
 
 @TestScenario
-@Name("test_025. Test that service is available during re-scalaling, upgades etc.")
+@Name("test_025. Test that service is available during re-scaling, upgrades etc.")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingReplicas("1.0")
+)
 def test_025(self):
     util.require_zookeeper()
 
@@ -1596,6 +1696,9 @@ def test_025(self):
 
 @TestScenario
 @Name("test_026. Test mixed single and multi-volume configuration in one cluster")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout("1.0")
+)
 def test_026(self):
     util.require_zookeeper()
 
@@ -1652,6 +1755,9 @@ def test_026(self):
 
 @TestScenario
 @Name("test_027. Test troubleshooting mode")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Troubleshoot("1.0")
+)
 def test_027(self):
     # TODO: Add a case for a custom endpoint
     manifest = "manifests/chi/test-027-troubleshooting-1-bad-config.yaml"
@@ -1698,12 +1804,15 @@ def test_027(self):
 
 @TestScenario
 @Name("test_028. Test restart scenarios")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0")
+)
 def test_028(self):
     util.require_zookeeper()
 
     manifest = "manifests/chi/test-014-replication-1.yaml"
-
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+
     kubectl.create_and_check(
         manifest=manifest,
         check={
@@ -1781,8 +1890,15 @@ def test_028(self):
 
     kubectl.delete_chi(chi)
 
+
 @TestScenario
 @Name("test_029. Test different distribution settings")
+@Requirements(
+RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution("1.0"),
+RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Type("1.0"),
+RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Scope("1.0"),
+RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_TopologyKey("1.0")
+)
 def test_029(self):
     # TODO: this test needs to be extended in order to handle more distribution types
     manifest = "manifests/chi/test-029-distribution.yaml"
@@ -1807,6 +1923,7 @@ def test_029(self):
                     topologyKey = "kubernetes.io/os")
 
     kubectl.delete_chi(chi)
+
 
 @TestScenario
 @Name("test_030. Test CRD deletion")
@@ -1848,8 +1965,12 @@ def test_030(self):
             assert start_time == new_start_time
     kubectl.delete_chi(chi)
 
+
 @TestModule
 @Name("e2e.test_operator")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0")
+)
 def test(self):
     util.clean_namespace(delete_chi=True)
     util.install_operator_if_not_exist()
@@ -1859,48 +1980,56 @@ def test(self):
     with Given(f"ClickHouse version {settings.clickhouse_version}"):
         pass
 
-    all_tests = [
-        test_001,
-        test_002,
-        test_003,
-        test_004,
-        test_005,
-        test_006,
-        test_007,
-        test_008,
-        (test_009, {"version_from": "0.16.1"}),
-        test_010,
-        test_011,
-        test_011_1,
-        test_011_2,
-        test_012,
-        test_013,
-        test_014,
-        test_015,
-        test_016,
-        test_017,
-        test_018,
-        test_019,
-        test_020,
-        test_021,
-        test_022,
-        test_023,
-        test_024,
-        test_025,
-        test_026,
-        test_027,
-        test_028,
-        test_029,
-        test_030,
-    ]
-    run_tests = all_tests
+    # all_tests = [
+    #     test_001,
+    #     test_002,
+    #     test_003,
+    #     test_004,
+    #     test_005,
+    #     test_006,
+    #     test_007,
+    #     test_008,
+    #     (test_009, {"version_from": "0.16.1"}),
+    #     test_010,
+    #     test_011,
+    #     test_011_1,
+    #     test_011_2,
+    #     test_012,
+    #     test_013,
+    #     test_014,
+    #     test_015,
+    #     test_016,
+    #     test_017,
+    #     test_018,
+    #     test_019,
+    #     test_020,
+    #     test_021,
+    #     test_022,
+    #     test_023,
+    #     test_024,
+    #     test_025,
+    #     test_026,
+    #     test_027,
+    #     test_028,
+    #     test_029,
+    #     test_030,
+    # ]
+    # run_tests = all_tests
 
     # placeholder for selective test running
     # run_tests = [test_008, (test_009, {"version_from": "0.9.10"})]
     # run_tests = [test_002]
 
-    for t in run_tests:
-        if callable(t):
-            Scenario(test=t)()
-        else:
-            Scenario(test=t[0], args=t[1])()
+
+    # for t in run_tests:
+    #     if callable(t):
+    #         Scenario(test=t)()
+    #     else:
+    #         Scenario(test=t[0], args=t[1])()
+
+    # define values for Operator upgrade test
+    self.context.test_009_version_from = "0.16.1"
+    self.context.test_009_version_to = settings.operator_version
+
+    for scenario in loads(current_module(), Scenario, Suite):
+        Scenario(run=scenario)

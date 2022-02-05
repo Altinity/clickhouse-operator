@@ -2,10 +2,10 @@ from testflows.core import *
 
 from helpers.cluster import Cluster
 from helpers.argparser import argparser
+from requirements.requirements import *
 
 xfails = {
         # test_operator.py
-        "/regression/e2e.test_operator/test_008*": [(Fail, "???")],
         "/regression/e2e.test_operator/test_023*": [(Fail, "Template annotations do not work")],
 
         # test_clickhouse.py
@@ -19,6 +19,9 @@ xfails = {
 @TestSuite
 @XFails(xfails)
 @ArgumentParser(argparser)
+@Specifications(
+    QA_SRS026_ClickHouse_Operator
+)
 def regression(self, native):
     """ClickHouse Operator test regression suite.
     """
