@@ -215,6 +215,21 @@ def test_operator_upgrade(self, manifest, version_from, version_to=settings.oper
 
 
 @TestStep
+def check_operator_restart(self, chi, wait_objects, pod):
+    start_time = kubectl.get_field("pod", pod, ".status.startTime")
+    with When("Restart operator"):
+        util.restart_operator()
+        time.sleep(10)
+        kubectl.wait_objects(chi, wait_objects)
+        time.sleep(10)
+        kubectl.wait_chi_status(chi, "Completed")
+        new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
+
+        with Then("ClickHouse pods should not be restarted"):
+            assert start_time == new_start_time
+
+
+@TestStep
 def test_operator_restart(self, manifest, version=settings.operator_version):
     with Given(f"clickhouse-operator {version}"):
         util.set_operator_version(version)
@@ -234,24 +249,10 @@ def test_operator_restart(self, manifest, version=settings.operator_version):
         time.sleep(10)
         kubectl.wait_chi_status(chi, "Completed")
 
-        check_operator_restart(chi, {"statefulset": 1, "pod": 1, "service": 2}, f"chi-{chi}-{cluster}-0-0-0")
+        check_operator_restart(chi=chi, wait_objects={"statefulset": 1, "pod": 1, "service": 2}, pod=f"chi-{chi}-{cluster}-0-0-0")
 
         kubectl.delete_chi(chi)
 
-
-@TestStep
-def check_operator_restart(self, chi, wait_objects, pod):
-    start_time = kubectl.get_field("pod", pod, ".status.startTime")
-    with When("Restart operator"):
-        util.restart_operator()
-        time.sleep(10)
-        kubectl.wait_objects(chi, wait_objects)
-        time.sleep(10)
-        kubectl.wait_chi_status(chi, "Completed")
-        new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
-
-        with Then("ClickHouse pods should not be restarted"):
-            assert start_time == new_start_time
 
 @TestScenario
 @Name("test_008. Test operator restart")
@@ -260,9 +261,9 @@ def check_operator_restart(self, chi, wait_objects, pod):
 )
 def test_008(self):
     with Then("Test simple chi for operator restart"):
-        test_operator_restart("manifests/chi/test-008-operator-restart-1.yaml")
+        test_operator_restart(manifest="manifests/chi/test-008-operator-restart-1.yaml")
     with Then("Test advanced chi for operator restart"):
-        test_operator_restart("manifests/chi/test-008-operator-restart-2.yaml")
+        test_operator_restart(manifest="manifests/chi/test-008-operator-restart-2.yaml")
 
 
 @TestScenario
@@ -1873,7 +1874,7 @@ def test_028(self):
                 start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
 
         with Then("Restart operator. CHI should not be restarted"):
-            check_operator_restart(chi, {"statefulset": 2, "pod": 2, "service": 3}, f"chi-{chi}-default-0-0-0")
+            check_operator_restart(chi=chi, wait_objects={"statefulset": 2, "pod": 2, "service": 3}, pod=f"chi-{chi}-default-0-0-0")
 
         with Then("Re-apply the original config. CHI should not be restarted"):
             kubectl.create_and_check(manifest=manifest, check={"do_not_delete": 1} )
