@@ -2006,14 +2006,11 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateInProgress).
 			WithStatusAction(host.CHI).
 			M(host).F().
-			Info("Update StatefulSet(%s/%s) switching from Update to Recreate", namespace, name)
+			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
 
-		w.a.V(2).WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateFailed).
-			WithStatusAction(host.CHI).
-			WithStatusError(host.CHI).
+		w.a.V(2).
 			M(host).F().
 			Error("Update StatefulSet(%s/%s) - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
-
 		diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, newStatefulSet.Spec)
 		w.a.V(2).M(host).Info("StatefulSet.Spec diff:")
 		w.a.V(2).M(host).Info(util.MessageDiffString(diff, equal))
