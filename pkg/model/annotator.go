@@ -93,24 +93,29 @@ func (a *Annotator) getServiceHost(host *chiv1.ChiHost) map[string]string {
 // getCHIScope gets annotations for CHI-scoped object
 func (a *Annotator) getCHIScope() map[string]string {
 	// Combine generated annotations and CHI-provided annotations
-	return a.appendCHIProvidedTo(nil)
+	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
 
 // getClusterScope gets annotations for Cluster-scoped object
 func (a *Annotator) getClusterScope(cluster *chiv1.ChiCluster) map[string]string {
 	// Combine generated annotations and CHI-provided annotations
-	return a.appendCHIProvidedTo(nil)
+	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
 
 // getShardScope gets annotations for Shard-scoped object
 func (a *Annotator) getShardScope(shard *chiv1.ChiShard) map[string]string {
 	// Combine generated annotations and CHI-provided annotations
-	return a.appendCHIProvidedTo(nil)
+	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
 
 // getHostScope gets annotations for Host-scoped object
 func (a *Annotator) getHostScope(host *chiv1.ChiHost) map[string]string {
-	return a.appendCHIProvidedTo(host.GetAnnotations())
+	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
+}
+
+// filterOutPredefined filters out predefined values
+func (a *Annotator) filterOutPredefined(m map[string]string) map[string]string {
+	return util.CopyMapFilter(m, nil, util.AnnotationsTobeSkipped)
 }
 
 // appendCHIProvidedTo appends CHI-provided annotations to specified annotations

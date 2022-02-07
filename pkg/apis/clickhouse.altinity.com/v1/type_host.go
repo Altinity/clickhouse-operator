@@ -17,8 +17,6 @@ package v1
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
@@ -215,16 +213,4 @@ func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *corev1.VolumeMount)) {
 			f(volumeMount)
 		}
 	}
-}
-
-// GetAnnotations returns chi annotations and excludes
-func (host *ChiHost) GetAnnotations() map[string]string {
-	annotations := make(map[string]string, 0)
-	for key, value := range host.CHI.Annotations {
-		if util.IsAnnotationToBeSkipped(key) {
-			continue
-		}
-		annotations[key] = value
-	}
-	return annotations
 }

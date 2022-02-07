@@ -1,13 +1,13 @@
 #!/bin/bash
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-OPERATOR_VERSION=${OPERATOR_VERSION:=0.18.0}
+OPERATOR_VERSION=${OPERATOR_VERSION:=0.18.2}
 OPERATOR_VERSION_OLD=${OPERATOR_VERSION_OLD:=0.17.0}
 OPERATOR_IMAGE="altinity/clickhouse-operator:${OPERATOR_VERSION}"
 OPERATOR_IMAGE_OLD="altinity/clickhouse-operator:${OPERATOR_VERSION_OLD}"
 METRICS_EXPORTER_IMAGE="altinity/metrics-exporter:${OPERATOR_VERSION}"
 METRICS_EXPORTER_IMAGE_OLD="altinity/metrics-exporter:${OPERATOR_VERSION_OLD}"
-CLICKHOUSE_BACKUP_IMAGE="altinity/clickhouse-backup:1.2.2"
+CLICKHOUSE_BACKUP_IMAGE="altinity/clickhouse-backup:1.3.0"
 CLICKHOUSE_IMAGE=${CLICKHOUSE_IMAGE:="yandex/clickhouse-server:21.8"}
 CLICKHOUSE_IMAGE_OLD=${CLICKHOUSE_IMAGE_OLD:="yandex/clickhouse-server:21.3"}
 CLICKHOUSE_IMAGE_LATEST=${CLICKHOUSE_IMAGE_LATEST:="yandex/clickhouse-server:latest"}

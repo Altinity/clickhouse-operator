@@ -26,11 +26,17 @@ func NamespaceNameString(meta v1.ObjectMeta) string {
 	return meta.Namespace + "/" + meta.Name
 }
 
+// AnnotationsTobeSkipped kubectl service annotation that we'd like to skip
+var AnnotationsTobeSkipped = []string{
+	"kubectl.kubernetes.io/last-applied-configuration",
+}
+
 // IsAnnotationToBeSkipped checks whether an annotation should be skipped
 func IsAnnotationToBeSkipped(annotation string) bool {
-	switch annotation {
-	case "kubectl.kubernetes.io/last-applied-configuration":
-		return true
+	for _, a := range AnnotationsTobeSkipped {
+		if a == annotation {
+			return true
+		}
 	}
 	return false
 }
