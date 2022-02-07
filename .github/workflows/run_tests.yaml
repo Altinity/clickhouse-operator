@@ -47,7 +47,7 @@ jobs:
           # bash -xe ./tests/image/build_docker.sh
 
           sudo ln -snvf ~/venv/qa/bin/tfs /bin/tfs
-          ~/venv/qa/python3 ./tests/regression.py --only "/regression/e2e.test_operator/*" --native --log ./tests/raw.log 
+          ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/*" --native --log ./tests/raw.log 
           ~/venv/qa/bin/tfs --debug --no-colors transform compact ./test/testflows/raw.log ./tests/compact.log
           ~/venv/qa/bin/tfs --debug --no-colors transform nice ./test/testflows/raw.log ./tests/nice.log.txt
           ~/venv/qa/bin/tfs --debug --no-colors transform short ./test/testflows/raw.log ./tests/short.log.txt
