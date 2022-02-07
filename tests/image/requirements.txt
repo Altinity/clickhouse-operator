@@ -1,7 +1,5 @@
 testflows==1.7.77
-urllib3
-PyYAML
+requests
 docker-compose>=1.29.1
 docker>=5.0.0
 dicttoxml
-setuptools
