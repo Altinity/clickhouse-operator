@@ -21,22 +21,51 @@ jobs:
         if: |
           steps.cache-python.outputs.cache-hit != 'true'
 
+      - name: Setup conntrack for minikube
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y conntrack
+
+      - uses: medyagh/setup-minikube@latest
+        with:
+          driver: docker
+          container-runtime: containerd
+          kubernetes-version: v1.21.9
+
       - name: Run Tests
         run: |
           set -x
+
+          # bash -xe ./deploy/prometheus/create-prometheus.sh
+          # bash -xe ./deploy/minio/install-minio-operator.sh
+          # bash -xe ./deploy/minio/install-minio-tenant.sh
+
+          # bash -xe /deploy/grafana/grafana-with-grafana-operator/install-grafana-operator.sh
+          # bash -xe /deploy/grafana/grafana-with-grafana-operator/install-grafana-with-operator.sh
+          
+          # docker-compose -f ./tests/docker-compose/docker-compose.yml pull runner
+          # bash -xe ./tests/image/build_docker.sh
+
           sudo ln -snvf ~/venv/qa/bin/tfs /bin/tfs
-          ~/venv/qa/python3 ./tests/regression.py --only "/regression/e2e.test_operator/*" --log ./tests/raw.log
-          ~/venv/qa/bin/tfs --debug --no-colors transform compact ./test/testflows/raw.log ./tests/compact.log
-          ~/venv/qa/bin/tfs --debug --no-colors transform nice ./test/testflows/raw.log ./tests/nice.log.txt
-          ~/venv/qa/bin/tfs --debug --no-colors transform short ./test/testflows/raw.log ./tests/short.log.txt
-          ~/venv/qa/bin/tfs --debug --no-colors report results -a "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/" ./tests/raw.log - --confidential --copyright "Altinity LTD" --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./test/report.html
+          ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/*" --native --log ./tests/raw.log 
+          ~/venv/qa/bin/tfs --debug --no-colors transform compact ./tests/raw.log ./tests/compact.log
+          ~/venv/qa/bin/tfs --debug --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
+          ~/venv/qa/bin/tfs --debug --no-colors transform short ./tests/raw.log ./tests/short.log.txt
+          ~/venv/qa/bin/tfs --debug --no-colors report results -a "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/" ./tests/raw.log - --confidential --copyright "Altinity LTD" --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./tests/report.html
 
       - uses: actions/upload-artifact@v2
         with:
           name: testflows-logs
           path: |
-            test/*.log
-            test/*.log.txt
+            tests/*.log
+            tests/*.log.txt
           if-no-files-found: error
           retention-days: 7
 
+      - uses: actions/upload-artifact@v2
+        with:
+          name: testflows-report
+          path: |
+            tests/report.html
+          if-no-files-found: error
+          retention-days: 7
