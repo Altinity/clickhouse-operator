@@ -13,7 +13,7 @@ from testflows.asserts import error
 @TestScenario
 @Name("test_ch_001. Insert quorum")
 def test_ch_001(self):
-    util.require_zookeeper()
+    util.require_keeper(keeper_type=self.context.keeper_type)
     quorum_template = "manifests/chit/tpl-clickhouse-21.8.yaml"
     chit_data = yaml_manifest.get_manifest_data(util.get_full_path(quorum_template))
 

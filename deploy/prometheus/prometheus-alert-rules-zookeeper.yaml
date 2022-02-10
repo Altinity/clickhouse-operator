@@ -13,7 +13,7 @@ spec:
     - name: ZookeeperRules
       rules:
         - alert: ZookeeperDown
-          expr: up{app=~'zookeeper.*'} == 0
+          expr: up{app=~'.+keeper.*'} == 0
           labels:
             severity: critical
           annotations:
@@ -25,7 +25,7 @@ spec:
               ```kubectl logs -n {{ $labels.namespace }} {{ $labels.pod_name }} -f```
 
         - alert: ZookeeperRestartRecently
-          expr: uptime{app=~'zookeeper.*'} > 1 < 180000
+          expr: uptime{app=~'.+keeper.*'} > 1 < 180000
           annotations:
             identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
             summary: "Amount of time since the server was started."
@@ -38,7 +38,7 @@ spec:
               ```
 
         - alert: ZookeeperHighLatency
-          expr: avg_latency{app=~'zookeeper.*'} > 500
+          expr: avg_latency{app=~'.+keeper.*'} > 500
           for: 15m
           labels:
             severity: warning
@@ -76,7 +76,7 @@ spec:
               ```
 
         - alert: ZookeeperOutstandingRequests
-          expr: outstanding_requests{app=~'zookeeper.*'} > 10
+          expr: outstanding_requests{app=~'.+keeper.*'} > 10
           for: 10m
           labels:
             severity: high

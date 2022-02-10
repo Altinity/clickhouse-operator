@@ -81,7 +81,7 @@ def get_prometheus_and_alertmanager_spec():
 
 def initialize(chi_file, chi_template_file, chi_name):
     prometheus_operator_spec, prometheus_spec, alertmanager_spec = get_prometheus_and_alertmanager_spec()
-    clickhouse_operator_spec, chi = util.install_clickhouse_and_zookeeper(chi_file, chi_template_file, chi_name)
+    clickhouse_operator_spec, chi = util.install_clickhouse_and_keeper(chi_file, chi_template_file, chi_name)
     util.wait_clickhouse_cluster_ready(chi)
 
     return prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi

@@ -369,16 +369,16 @@ def test_read_only_replica(self, prometheus_operator_spec, clickhouse_operator_s
         'ENGINE ReplicatedMergeTree(\'/clickhouse/tables/{installation}-{shard}/test_repl\', \'{replica}\') ORDER BY tuple()'
     )
 
-    def restart_zookeeper():
+    def restart_keeper():
         kubectl.launch(
-            f"exec -n {kubectl.namespace} zookeeper-0 -- sh -c \"kill 1\"",
+            f"exec -n {kubectl.namespace} {self.context.keeper_type}-0 -- sh -c \"kill 1\"",
             ok_to_fail=True,
         )
         clickhouse.query_with_error(chi_name, "INSERT INTO default.test_repl VALUES(now(),rand())", host=read_only_svc)
 
     with Then("check ClickHouseReadonlyReplica firing"):
         fired = alerts.wait_alert_state("ClickHouseReadonlyReplica", "firing", True, labels={"hostname": read_only_svc},
-                                        time_range='30s', sleep_time=settings.prometheus_scrape_interval, callback=restart_zookeeper)
+                                        time_range='30s', sleep_time=settings.prometheus_scrape_interval, callback=restart_keeper)
         assert fired, error("can't get ClickHouseReadonlyReplica alert in firing state")
     with Then("check ClickHouseReadonlyReplica gone away"):
         resolved = alerts.wait_alert_state("ClickHouseReadonlyReplica", "firing", False, labels={"hostname": read_only_svc})
@@ -389,14 +389,14 @@ def test_read_only_replica(self, prometheus_operator_spec, clickhouse_operator_s
                           ns=kubectl.namespace)
 
     for i in range(11):
-        zookeeper_status = kubectl.launch(
-            f"exec -n {kubectl.namespace} zookeeper-0 -- sh -c \"echo ruok | nc 127.0.0.1 2181\"", ok_to_fail=True
+        keeper_status = kubectl.launch(
+            f"exec -n {kubectl.namespace} {self.context.keeper_type}-0 -- sh -c 'exec 3<>/dev/tcp/127.0.0.1/2181 && printf \"ruok\" >&3 && cat <&3'", ok_to_fail=True
         )
-        if "imok" in zookeeper_status:
+        if "imok" in keeper_status:
             break
         elif i == 10:
             fail(f"invalid zookeeper status after {i} retries")
-        with Then("zookeper is not ready, wait 2 seconds"):
+        with Then(f"{self.context.keeper_type} is not ready, wait 2 seconds"):
             time.sleep(2)
 
     clickhouse.query_with_error(
@@ -662,9 +662,9 @@ def test_zookeeper_hardware_exceptions(self, prometheus_operator_spec, clickhous
     pod1, svc1, pod2, svc2 = alerts.random_pod_choice_for_callbacks(chi)
     chi_name = chi["metadata"]["name"]
 
-    def restart_zookeeper():
+    def restart_keeper():
         kubectl.launch(
-            f"exec -n {kubectl.namespace} zookeeper-0 -- sh -c \"kill 1\"",
+            f"exec -n {kubectl.namespace} {self.context.keeper_type}-0 -- sh -c \"kill 1\"",
             ok_to_fail=True,
         )
         clickhouse.query_with_error(chi_name, "SELECT name, path FROM system.zookeeper WHERE path='/'", host=svc1)
@@ -673,7 +673,7 @@ def test_zookeeper_hardware_exceptions(self, prometheus_operator_spec, clickhous
     with Then("check ClickHouseZooKeeperHardwareExceptions firing"):
         for svc in (svc1, svc2):
             fired = alerts.wait_alert_state("ClickHouseZooKeeperHardwareExceptions", "firing", True, labels={"hostname": svc},
-                                            time_range='40s', sleep_time=settings.prometheus_scrape_interval, callback=restart_zookeeper)
+                                            time_range='40s', sleep_time=settings.prometheus_scrape_interval, callback=restart_keeper)
             assert fired, error("can't get ClickHouseZooKeeperHardwareExceptions alert in firing state")
 
     kubectl.wait_pod_status("zookeeper-0", "Running", ns=kubectl.namespace)
@@ -761,40 +761,40 @@ def test_detached_parts(self, prometheus_operator_spec, clickhouse_operator_spec
 @TestScenario
 @Name("test_zookeeper_alerts. Check ZookeeperDown, ZookeeperRestartRecently")
 def test_zookeeper_alerts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
-    zookeeper_spec = kubectl.get("endpoints", "zookeeper")
-    zookeeper_pod = random.choice(zookeeper_spec["subsets"][0]["addresses"])["targetRef"]["name"]
+    keeper_spec = kubectl.get("endpoints", self.context.keeper_type)
+    keeper_spec = random.choice(keeper_spec["subsets"][0]["addresses"])["targetRef"]["name"]
 
-    def restart_zookeeper():
+    def restart_keeper():
         kubectl.launch(
-            f"exec -n {kubectl.namespace} {zookeeper_pod} -- sh -c \"kill 1\"",
+            f"exec -n {kubectl.namespace} {keeper_spec} -- sh -c \"kill 1\"",
             ok_to_fail=True,
         )
 
-    def wait_when_zookeeper_up():
-        kubectl.wait_pod_status(zookeeper_pod, "Running", ns=kubectl.namespace)
-        kubectl.wait_jsonpath("pod", zookeeper_pod, "{.status.containerStatuses[0].ready}", "true", ns=kubectl.namespace)
+    def wait_when_keeper_up():
+        kubectl.wait_pod_status(keeper_spec, "Running", ns=kubectl.namespace)
+        kubectl.wait_jsonpath("pod", keeper_spec, "{.status.containerStatuses[0].ready}", "true", ns=kubectl.namespace)
 
     with Then("check ZookeeperDown firing"):
-        fired = alerts.wait_alert_state("ZookeeperDown", "firing", True, labels={"pod_name": zookeeper_pod},
-                                        time_range='1m', sleep_time=settings.prometheus_scrape_interval, callback=restart_zookeeper)
+        fired = alerts.wait_alert_state("ZookeeperDown", "firing", True, labels={"pod_name": keeper_spec},
+                                        time_range='1m', sleep_time=settings.prometheus_scrape_interval, callback=restart_keeper)
         assert fired, error("can't get ZookeeperDown alert in firing state")
 
-    wait_when_zookeeper_up()
+    wait_when_keeper_up()
 
     with Then("check ZookeeperDown gone away"):
-        resolved = alerts.wait_alert_state("ZookeeperDown", "firing", False, labels={"pod_name": zookeeper_pod})
+        resolved = alerts.wait_alert_state("ZookeeperDown", "firing", False, labels={"pod_name": keeper_spec})
         assert resolved, error("can't check ZookeeperDown alert is gone away")
 
-    restart_zookeeper()
+    restart_keeper()
 
     with Then("check ZookeeperRestartRecently firing"):
-        fired = alerts.wait_alert_state("ZookeeperRestartRecently", "firing", True, labels={"pod_name": zookeeper_pod}, time_range='30s')
+        fired = alerts.wait_alert_state("ZookeeperRestartRecently", "firing", True, labels={"pod_name": keeper_spec}, time_range='30s')
         assert fired, error("can't get ZookeeperRestartRecently alert in firing state")
 
-    wait_when_zookeeper_up()
+    wait_when_keeper_up()
 
     with Then("check ZookeeperRestartRecently gone away"):
-        resolved = alerts.wait_alert_state("ZookeeperRestartRecently", "firing", False, labels={"pod_name": zookeeper_pod}, max_try=30)
+        resolved = alerts.wait_alert_state("ZookeeperRestartRecently", "firing", False, labels={"pod_name": keeper_spec}, max_try=30)
         assert resolved, error("can't check ZookeeperRestartRecently alert is gone away")
 
 
