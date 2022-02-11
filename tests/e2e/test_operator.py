@@ -1983,9 +1983,9 @@ def test_031(self):
             config_yaml["annotation"]["exclude"] = ["excl", ]
             config_contents = yaml.dump(config_yaml, default_flow_style=False)
 
-            for i in manifest_yaml:
-                if i["metadata"]["name"] == "etc-clickhouse-operator-files":
-                    i["data"]["config.yaml"] = config_contents
+            for doc in manifest_yaml:
+                if doc["metadata"]["name"] == "etc-clickhouse-operator-files":
+                    doc["data"]["config.yaml"] = config_contents
                     debug(config_contents)
                     break
 
@@ -2006,9 +2006,9 @@ def test_031(self):
         while not len(kubectl.get_pod_names(chi_name='test-031')):
             time.sleep(1)
         chi_name = kubectl.get_pod_names(chi_name='test-031')[0]
-        r = kubectl.launch(command=f"get pod -n test {chi_name} -o jsonpath='{{.metadata.annotations}}'")
-        assert "incl" in r, error()
-        assert "excl" not in r, error()
+        annotations = kubectl.launch(command=f"get pod -n test {chi_name} -o jsonpath='{{.metadata.annotations}}'")
+        assert "incl" in annotations, error()
+        assert "excl" not in annotations, error()
 
     with Finally("I restore original operator state"):
         kubectl.delete_chi('test-031')
