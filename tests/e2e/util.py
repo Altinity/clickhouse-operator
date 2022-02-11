@@ -163,12 +163,11 @@ def make_http_get_request(host, port, path):
     return f"bash -c '{cmd}'"
 
 
-def install_operator_if_not_exist(reinstall = False):
+def install_operator_if_not_exist(reinstall=False, manifest=get_full_path(settings.clickhouse_operator_install_manifest)):
     if settings.operator_install != 'yes':
         return
     with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
-        if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0 or reinstall == True:
-            manifest = get_full_path(settings.clickhouse_operator_install_manifest)
+        if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0 or reinstall:
             kubectl.apply(
                 ns=settings.operator_namespace,
                 manifest=f"<(cat {manifest} | "

@@ -1,4 +1,6 @@
+import os
 import time
+import yaml
 
 import e2e.clickhouse as clickhouse
 import e2e.kubectl as kubectl
@@ -1967,6 +1969,58 @@ def test_030(self):
     kubectl.delete_chi(chi)
 
 
+@TestScenario
+@Name("test_031. Test excludeFromPropagationAnnotations work")
+def test_031(self):
+    cho_install_manifest = "manifests/cho/test-031-operator-install-template.yaml"
+
+    with Given("I generate CHO deploy manifest"):
+        with open(util.get_full_path(settings.clickhouse_operator_install_manifest)) as base_template,\
+                open(util.get_full_path("../../config/config.yaml")) as config_file:
+            manifest_yaml = list(yaml.safe_load_all(base_template.read()))
+
+            config_yaml = yaml.safe_load(config_file.read())
+            config_yaml["annotation"]["exclude"] = ["excl", ]
+            config_contents = yaml.dump(config_yaml, default_flow_style=False)
+
+            for doc in manifest_yaml:
+                if doc["metadata"]["name"] == "etc-clickhouse-operator-files":
+                    doc["data"]["config.yaml"] = config_contents
+                    debug(config_contents)
+                    break
+
+            with open(util.get_full_path(cho_install_manifest), "w") as f:
+                f.write(yaml.dump_all(manifest_yaml))
+
+    with And("I apply new config.yaml"):
+        util.install_operator_if_not_exist(reinstall=True, manifest=util.get_full_path(cho_install_manifest, False))
+        util.restart_operator(ns=settings.operator_namespace)
+
+    with When("I apply template with annotations and chi"):
+        kubectl.apply(manifest=util.get_full_path("manifests/chit/tpl-test-031.yaml", False), ns=settings.test_namespace)
+        time.sleep(5)
+        kubectl.apply(ns=settings.test_namespace, manifest=util.get_full_path("manifests/chi/test-031.yaml", False))
+        time.sleep(5)
+
+    with Then("I check only allowed annotations are propagated"):
+        while not len(kubectl.get_pod_names(chi_name='test-031')):
+            time.sleep(1)
+        chi_name = kubectl.get_pod_names(chi_name='test-031')[0]
+        annotations = kubectl.launch(command=f"get pod -n test {chi_name} -o jsonpath='{{.metadata.annotations}}'")
+        assert "incl" in annotations, error()
+        assert "excl" not in annotations, error()
+
+    with Finally("I restore original operator state"):
+        kubectl.delete_chi('test-031')
+        util.install_operator_if_not_exist(reinstall=True, manifest=util.get_full_path(settings.clickhouse_operator_install_manifest, False))
+        util.restart_operator(ns=settings.operator_namespace)
+        os.remove(util.get_full_path(cho_install_manifest, False))
+
+
+
+
+
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(
@@ -1981,54 +2035,15 @@ def test(self):
     with Given(f"ClickHouse version {settings.clickhouse_version}"):
         pass
 
-    # all_tests = [
-    #     test_001,
-    #     test_002,
-    #     test_003,
-    #     test_004,
-    #     test_005,
-    #     test_006,
-    #     test_007,
-    #     test_008,
-    #     (test_009, {"version_from": "0.16.1"}),
-    #     test_010,
-    #     test_011,
-    #     test_011_1,
-    #     test_011_2,
-    #     test_012,
-    #     test_013,
-    #     test_014,
-    #     test_015,
-    #     test_016,
-    #     test_017,
-    #     test_018,
-    #     test_019,
-    #     test_020,
-    #     test_021,
-    #     test_022,
-    #     test_023,
-    #     test_024,
-    #     test_025,
-    #     test_026,
-    #     test_027,
-    #     test_028,
-    #     test_029,
-    #     test_030,
-    # ]
-    # run_tests = all_tests
-
     # placeholder for selective test running
-    # run_tests = [test_008, (test_009, {"version_from": "0.9.10"})]
-    # run_tests = [test_002]
-
-
+    # run_tests = [test_008, test_009]
     # for t in run_tests:
     #     if callable(t):
     #         Scenario(test=t)()
     #     else:
     #         Scenario(test=t[0], args=t[1])()
 
-    # define values for Operator upgrade test
+    # define values for Operator upgrade test (test_009)
     self.context.test_009_version_from = "0.16.1"
     self.context.test_009_version_to = settings.operator_version
 
