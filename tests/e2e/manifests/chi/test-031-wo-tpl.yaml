@@ -1,0 +1,36 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-031-wo-tpl"
+  annotations:
+    excl: excluded
+    incl: included
+spec:
+  configuration:
+    clusters:
+      - name: single
+  templates:
+    volumeClaimTemplates:
+      - name: default
+        reclaimPolicy: Retain
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Mi
+    serviceTemplates:
+      - name: default-service-template
+        generateName: clickhouse-{chi}
+        metadata:
+          annotations:
+            servicetemplate/test: "test"
+            servicetemplate/macro-test: "{chi}.example.com"
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: tcp
+              port: 9000
+          type: ClusterIP
+          clusterIP: None
