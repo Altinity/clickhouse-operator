@@ -1996,29 +1996,45 @@ def test_031(self):
         util.install_operator_if_not_exist(reinstall=True, manifest=util.get_full_path(cho_install_manifest, False))
         util.restart_operator(ns=settings.operator_namespace)
 
-    with When("I apply template with annotations and chi"):
-        kubectl.apply(manifest=util.get_full_path("manifests/chit/tpl-test-031.yaml", False), ns=settings.test_namespace)
-        time.sleep(5)
-        kubectl.apply(ns=settings.test_namespace, manifest=util.get_full_path("manifests/chi/test-031.yaml", False))
+    with When("I apply chi"):
+        kubectl.apply(ns=settings.test_namespace, manifest=util.get_full_path("manifests/chi/test-031-wo-tpl.yaml", False))
         time.sleep(5)
 
     with Then("I check only allowed annotations are propagated"):
-        while not len(kubectl.get_pod_names(chi_name='test-031')):
+        while len(kubectl.get_pod_names(chi_name='test-031-wo-tpl')) == 0:
             time.sleep(1)
-        chi_name = kubectl.get_pod_names(chi_name='test-031')[0]
-        annotations = kubectl.launch(command=f"get pod -n test {chi_name} -o jsonpath='{{.metadata.annotations}}'")
-        assert "incl" in annotations, error()
-        assert "excl" not in annotations, error()
+
+        with By("I check propagation from chi to StatefulSets, ConfigMaps, PVCs, Services"):
+            statefulsets_wo_tpl_name = kubectl.get_obj_names(chi_name='test-031-wo-tpl', obj_type="statefulsets")
+            for ss in statefulsets_wo_tpl_name:
+                annotations = kubectl.launch(command=f"get statefulset -n test {ss} -o jsonpath='{{.metadata.annotations}}'")
+                assert "incl" in annotations, error()
+                assert "excl" not in annotations, error()
+
+            configmaps_wo_tpl_name = kubectl.get_obj_names(chi_name='test-031-wo-tpl', obj_type="configmaps")
+            for cm in configmaps_wo_tpl_name:
+                annotations = kubectl.launch(command=f"get configmap -n test {cm} -o jsonpath='{{.metadata.annotations}}'")
+                assert "incl" in annotations, error()
+                assert "excl" not in annotations, error()
+
+            pvcs_wo_tpl_name = kubectl.get_obj_names(chi_name='test-031-wo-tpl', obj_type="pvc")
+            for pvc in pvcs_wo_tpl_name:
+                annotations = kubectl.launch(command=f"get pvc -n test {pvc} -o jsonpath='{{.metadata.annotations}}'")
+                assert "incl" in annotations, error()
+                assert "excl" not in annotations, error()
+
+            services_wo_tpl_name = kubectl.get_obj_names(chi_name='test-031-wo-tpl', obj_type="services")
+            for srv in services_wo_tpl_name:
+                annotations = kubectl.launch(command=f"get service -n test {srv} -o jsonpath='{{.metadata.annotations}}'")
+                assert "incl" in annotations, error()
+                assert "excl" not in annotations, error()
+
 
     with Finally("I restore original operator state"):
-        kubectl.delete_chi('test-031')
+        kubectl.delete_chi('test-031-wo-tpl')
         util.install_operator_if_not_exist(reinstall=True, manifest=util.get_full_path(settings.clickhouse_operator_install_manifest, False))
         util.restart_operator(ns=settings.operator_namespace)
         os.remove(util.get_full_path(cho_install_manifest, False))
-
-
-
-
 
 
 @TestModule

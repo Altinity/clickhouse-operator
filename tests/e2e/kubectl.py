@@ -308,6 +308,14 @@ def get_pod_names(chi_name, ns=namespace):
     return pod_names[1:]
 
 
+def get_obj_names(chi_name, obj_type="pods", ns=namespace):
+    pod_names = launch(
+        f"get {obj_type} -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
+        ns=ns,
+    ).splitlines()
+    return pod_names[1:]
+
+
 def get_pod_volumes(chi_name, pod_name="",  ns=namespace):
     volume_mounts = get_pod_spec(chi_name, pod_name, ns)["containers"][0]["volumeMounts"]
     return volume_mounts
