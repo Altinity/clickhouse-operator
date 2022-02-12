@@ -390,7 +390,7 @@ def test_read_only_replica(self, prometheus_operator_spec, clickhouse_operator_s
 
     for i in range(11):
         keeper_status = kubectl.launch(
-            f"exec -n {kubectl.namespace} {self.context.keeper_type}-0 -- sh -c 'exec 3<>/dev/tcp/127.0.0.1/2181 && printf \"ruok\" >&3 && cat <&3'", ok_to_fail=True
+            f"exec -n {kubectl.namespace} {self.context.keeper_type}-0 -- bash -c 'exec 3<>/dev/tcp/127.0.0.1/2181 && printf \"ruok\" >&3 && cat <&3'", ok_to_fail=True
         )
         if "imok" in keeper_status:
             break
@@ -759,10 +759,30 @@ def test_detached_parts(self, prometheus_operator_spec, clickhouse_operator_spec
 
 
 @TestScenario
+@Name("test_clickhouse_keeper_alerts. Check ClickHouseKeeperDown")
+def test_clickhouse_keeper_alerts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
+    test_keeper_alerts_outline(keeper_type='clickhouse-keeper')
+
+@TestScenario
 @Name("test_zookeeper_alerts. Check ZookeeperDown, ZookeeperRestartRecently")
 def test_zookeeper_alerts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
-    keeper_spec = kubectl.get("endpoints", self.context.keeper_type)
+    test_keeper_alerts_outline(keeper_type='zookeeper')
+
+@TestOutline
+def test_keeper_alerts_outline(self, keeper_type):
+    keeper_spec = kubectl.get("endpoints", keeper_type)
     keeper_spec = random.choice(keeper_spec["subsets"][0]["addresses"])["targetRef"]["name"]
+
+    expected_alerts = {
+        "zookeeper": {
+            "down": "ZookeeperDown",
+            "restartRecently":"ZookeeperRestartRecently",
+        },
+        "clickhouse-keeper": {
+            "down": "ClickHouseKeeperDown",
+        },
+
+    }
 
     def restart_keeper():
         kubectl.launch(
@@ -774,28 +794,32 @@ def test_zookeeper_alerts(self, prometheus_operator_spec, clickhouse_operator_sp
         kubectl.wait_pod_status(keeper_spec, "Running", ns=kubectl.namespace)
         kubectl.wait_jsonpath("pod", keeper_spec, "{.status.containerStatuses[0].ready}", "true", ns=kubectl.namespace)
 
-    with Then("check ZookeeperDown firing"):
-        fired = alerts.wait_alert_state("ZookeeperDown", "firing", True, labels={"pod_name": keeper_spec},
-                                        time_range='1m', sleep_time=settings.prometheus_scrape_interval, callback=restart_keeper)
-        assert fired, error("can't get ZookeeperDown alert in firing state")
+    if "down" in expected_alerts[keeper_type]:
+        with Then(f"check {expected_alerts[keeper_type]['down']} firing"):
+            fired = alerts.wait_alert_state(expected_alerts[keeper_type]['down'], "firing", True, labels={"pod_name": keeper_spec},
+                                            time_range='1m', sleep_time=settings.prometheus_scrape_interval, callback=restart_keeper)
+            assert fired, error(f"can't get {expected_alerts[keeper_type]['down']} alert in firing state")
 
     wait_when_keeper_up()
 
-    with Then("check ZookeeperDown gone away"):
-        resolved = alerts.wait_alert_state("ZookeeperDown", "firing", False, labels={"pod_name": keeper_spec})
-        assert resolved, error("can't check ZookeeperDown alert is gone away")
+    if "down" in expected_alerts[keeper_type]:
+        with Then(f"check {expected_alerts[keeper_type]['down']} gone away"):
+            resolved = alerts.wait_alert_state(expected_alerts[keeper_type]['down'], "firing", False, labels={"pod_name": keeper_spec})
+            assert resolved, error(f"can't check {expected_alerts[keeper_type]['down']} alert is gone away")
 
     restart_keeper()
 
-    with Then("check ZookeeperRestartRecently firing"):
-        fired = alerts.wait_alert_state("ZookeeperRestartRecently", "firing", True, labels={"pod_name": keeper_spec}, time_range='30s')
-        assert fired, error("can't get ZookeeperRestartRecently alert in firing state")
+    if "restart" in expected_alerts[keeper_type]:
+        with Then(f"check {expected_alerts[keeper_type]['restart']} firing"):
+            fired = alerts.wait_alert_state(expected_alerts[keeper_type]['restart'], "firing", True, labels={"pod_name": keeper_spec}, time_range='30s')
+            assert fired, error(f"can't get {expected_alerts[keeper_type]['restart']} alert in firing state")
 
     wait_when_keeper_up()
 
-    with Then("check ZookeeperRestartRecently gone away"):
-        resolved = alerts.wait_alert_state("ZookeeperRestartRecently", "firing", False, labels={"pod_name": keeper_spec}, max_try=30)
-        assert resolved, error("can't check ZookeeperRestartRecently alert is gone away")
+    if "restart" in expected_alerts[keeper_type]:
+        with Then(f"check {expected_alerts[keeper_type]['restart']} gone away"):
+            resolved = alerts.wait_alert_state("expected_alerts[keeper_type]['restart']", "firing", False, labels={"pod_name": keeper_spec}, max_try=30)
+            assert resolved, error(f"can't check {expected_alerts[keeper_type]['restart']} alert is gone away")
 
 
 @TestFeature
@@ -805,6 +829,23 @@ def test(self):
         chi_file='manifests/chi/test-cluster-for-alerts.yaml',
         chi_template_file='manifests/chit/tpl-clickhouse-alerts.yaml',
         chi_name='test-cluster-for-alerts',
+        keeper_type='clickhouse-keeper'
+    )
+    Scenario(test=test_clickhouse_keeper_alerts)(prometheus_operator_spec=prometheus_operator_spec, clickhouse_operator_spec=clickhouse_operator_spec, chi=chi)
+
+    prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi = alerts.initialize(
+        chi_file='manifests/chi/test-cluster-for-alerts.yaml',
+        chi_template_file='manifests/chit/tpl-clickhouse-alerts.yaml',
+        chi_name='test-cluster-for-alerts',
+        keeper_type='zookeeper'
+    )
+    Scenario(test=test_zookeeper_alerts)(prometheus_operator_spec=prometheus_operator_spec, clickhouse_operator_spec=clickhouse_operator_spec, chi=chi)
+
+    prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi = alerts.initialize(
+        chi_file='manifests/chi/test-cluster-for-alerts.yaml',
+        chi_template_file='manifests/chit/tpl-clickhouse-alerts.yaml',
+        chi_name='test-cluster-for-alerts',
+        keeper_type=self.context.keeper_type
     )
 
     test_cases = [
@@ -824,7 +865,6 @@ def test(self):
         test_distributed_sync_insertion_timeout,
         test_distributed_files_to_insert,
         test_detached_parts,
-        test_zookeeper_alerts,
         test_clickhouse_server_reboot,
     ]
     for t in test_cases:

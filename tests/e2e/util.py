@@ -99,8 +99,10 @@ def wait_clickhouse_cluster_ready(chi):
 
 
 def install_clickhouse_and_keeper(chi_file, chi_template_file, chi_name,
-                                  keeper_type='zookeeper', keeper_manifest='zookeeper-1-node-1GB-for-tests-only.yaml', force_keeper_install=False, clean_ns=True, keeper_install_first=True,
+                                  keeper_type='zookeeper', keeper_manifest='', force_keeper_install=False, clean_ns=True, keeper_install_first=True,
                                   make_object_count=True):
+    if keeper_manifest == '':
+        keeper_manifest = 'zookeeper-1-node-1GB-for-tests-only.yaml' if keeper_type == 'zookeeper' else 'clickhouse-keeper-1-node-256M-for-test-only.yaml'
     with Given("install zookeeper/clickhouse-keeper + clickhouse"):
         if clean_ns:
             kubectl.delete_ns(settings.test_namespace, ok_to_fail=True, timeout=600)

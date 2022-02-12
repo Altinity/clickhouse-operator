@@ -143,23 +143,21 @@ spec:
             limits:
               memory: "4Gi"
               cpu: "2"
-          ports:
-            - containerPort: 2181
-              name: zookeeper
-            - containerPort: 9234
-              name: raft
           volumeMounts:
             - name: clickhouse-keeper-settings
               mountPath: /etc/clickhouse-keeper/
             - name: clickhouse-keeper-datadir-volume
               mountPath: /var/lib/clickhouse-keeper
+          env:
+            - name: SERVERS
+              value: "3"
+            - name: RAFT_PORT
+              value: "9234"
           command:
             - bash
             - -x
             - -c
             - |
-              SERVERS=3 &&
-              RAFT_PORT=9234
               HOST=`hostname -s` &&
               DOMAIN=`hostname -d` &&
               if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
@@ -212,14 +210,6 @@ spec:
                     fi"
             initialDelaySeconds: 15
             timeoutSeconds: 15
-          livenessProbe:
-            exec:
-              command:
-                - bash
-                - -c
-                - "OK=$(bash -c 'exec 3<>/dev/tcp/127.0.0.1/2181 && printf \"ruok\" >&3 && cat <&3'); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
-            initialDelaySeconds: 10
-            timeoutSeconds: 5
         - name: zookeeper-exporter
           imagePullPolicy: IfNotPresent
           image: dabealu/zookeeper-exporter:latest
@@ -236,6 +226,12 @@ spec:
             - 0.0.0.0:7000
             - "-zk-hosts"
             - 127.0.0.1:2181
+          livenessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - "OK=$(bash -c 'exec 3<>/dev/tcp/127.0.0.1/2181 && printf \"ruok\" >&3 && cat <&3'); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
           ports:
             - containerPort: 7000
               name: prometheus
