@@ -1972,7 +1972,7 @@ def test_030(self):
 @TestScenario
 @Name("test_031. Test excludeFromPropagationAnnotations work")
 def test_031(self):
-    cho_install_manifest = "manifests/cho/test-031-operator-install-template.yaml"
+    chi_manifest = "manifests/chi/test-031-wo-tpl.yaml"
     chi = "test-031-wo-tpl"
 
     with Given("I generate CHO deploy manifest"):
@@ -1990,15 +1990,16 @@ def test_031(self):
                     debug(config_contents)
                     break
 
-            with open(util.get_full_path(cho_install_manifest), "w") as f:
-                f.write(yaml.dump_all(manifest_yaml))
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=".yaml") as f:
+                f.write(yaml.dump_all(manifest_yaml).encode())
+                util.install_operator_if_not_exist(reinstall=True, manifest=f.name)
 
-    with And("I apply new config.yaml"):
-        util.install_operator_if_not_exist(reinstall=True, manifest=util.get_full_path(cho_install_manifest, False))
+    with And("Restart operator"):
         util.restart_operator(ns=settings.operator_namespace)
 
     with When("I apply chi"):
-        kubectl.create_and_check("manifests/chi/test-031-wo-tpl.yaml", check = { "do_not_delete": 1})
+        kubectl.create_and_check(chi_manifest, check = { "do_not_delete": 1})
 
     with Then("I check only allowed annotations are propagated"):
         obj_types = {"statefulset", "configmap", "persistentvolumeclaim", "service"}
@@ -2015,8 +2016,6 @@ def test_031(self):
     with Finally("I restore original operator state"):
         util.install_operator_if_not_exist(reinstall=True, manifest=util.get_full_path(settings.clickhouse_operator_install_manifest, False))
         util.restart_operator(ns=settings.operator_namespace)
-        os.remove(util.get_full_path(cho_install_manifest, False))
-
 
 @TestModule
 @Name("e2e.test_operator")
