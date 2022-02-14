@@ -1,4 +1,4 @@
-# docker build -t registry.gitlab.com/altinity-qa/clickhouse/cicd/clickhouse-operator .
+# docker build -t registry.gitlab.com/altinity-public/container-images/clickhouse-operator-test-runner:latest .
 FROM ubuntu:20.04
 
 RUN apt-get update \
@@ -79,7 +79,7 @@ EXPOSE 2375
 
 ENV MINIKUBE_HOME /home/master/.minikube
 
-ENV K8S_VERSION=${K8S_VERSION:-1.22.2}
+ENV K8S_VERSION=${K8S_VERSION:-1.21.6}
 
 RUN wget -c --progress=bar:force:noscroll -O /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl \
    && chmod +x /usr/local/bin/kubectl

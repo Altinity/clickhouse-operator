@@ -1,20 +1,20 @@
 #!/bin/bash
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-OPERATOR_VERSION=${OPERATOR_VERSION:=0.18.0}
+OPERATOR_VERSION=${OPERATOR_VERSION:=0.18.2}
 OPERATOR_VERSION_OLD=${OPERATOR_VERSION_OLD:=0.17.0}
 OPERATOR_IMAGE="altinity/clickhouse-operator:${OPERATOR_VERSION}"
 OPERATOR_IMAGE_OLD="altinity/clickhouse-operator:${OPERATOR_VERSION_OLD}"
 METRICS_EXPORTER_IMAGE="altinity/metrics-exporter:${OPERATOR_VERSION}"
 METRICS_EXPORTER_IMAGE_OLD="altinity/metrics-exporter:${OPERATOR_VERSION_OLD}"
-CLICKHOUSE_BACKUP_IMAGE="altinity/clickhouse-backup:1.2.2"
+CLICKHOUSE_BACKUP_IMAGE="altinity/clickhouse-backup:1.3.0"
 CLICKHOUSE_IMAGE=${CLICKHOUSE_IMAGE:="yandex/clickhouse-server:21.8"}
 CLICKHOUSE_IMAGE_OLD=${CLICKHOUSE_IMAGE_OLD:="yandex/clickhouse-server:21.3"}
 CLICKHOUSE_IMAGE_LATEST=${CLICKHOUSE_IMAGE_LATEST:="yandex/clickhouse-server:latest"}
-CLICKHOUSE_OPERATOR_TESTS_IMAGE=${CLICKHOUSE_OPERATOR_TESTS_IMAGE:="registry.gitlab.com/altinity-qa/clickhouse/cicd/clickhouse-operator:latest"}
+CLICKHOUSE_OPERATOR_TESTS_IMAGE=${CLICKHOUSE_OPERATOR_TESTS_IMAGE:="registry.gitlab.com/altinity-public/container-images/clickhouse-operator-test-runner:latest"}
 ZOOKEEPER_IMAGE=${ZOOKEEPER_IMAGE:="zookeeper:3.7.0"}
 
-K8S_VERSION=${K8S_VERSION:=1.23.1}
+K8S_VERSION=${K8S_VERSION:=1.21.6}
 MINIKUBE_PRELOADED_TARBALL="preloaded-images-k8s-v13-v${K8S_VERSION}-docker-overlay2-amd64.tar.lz4"
 MINIKUBE_KICBASE_IMAGE=${MINIKUBE_KICBASE_IMAGE:-"gcr.io/k8s-minikube/kicbase:v0.0.27"}
 MINIKUBE_STORAGE_IMAGE=${MINIKUBE_STORAGE_IMAGE:="gcr.io/k8s-minikube/storage-provisioner:v5"}
@@ -37,7 +37,7 @@ if ! [ -s "${CUR_DIR}/cache" ]; then
 fi
 
 if ! [ -f "${CUR_DIR}/cache/${MINIKUBE_PRELOADED_TARBALL}" ]; then
-    wget "https://storage.googleapis.com/minikube-preloaded-volume-tarballs/${MINIKUBE_PRELOADED_TARBALL}" -P "${CUR_DIR}/cache"
+    wget --progress=bar:force:noscroll "https://storage.googleapis.com/minikube-preloaded-volume-tarballs/${MINIKUBE_PRELOADED_TARBALL}" -P "${CUR_DIR}/cache"
 fi
 
 echo "Pre-pull images and save"

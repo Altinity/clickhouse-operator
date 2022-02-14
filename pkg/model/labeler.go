@@ -152,7 +152,7 @@ func (l *Labeler) getServiceHost(host *chiv1.ChiHost) map[string]string {
 // getCHIScope gets labels for CHI-scoped object
 func (l *Labeler) getCHIScope() map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.appendCHIProvidedTo(l.GetSelectorCHIScope())
+	return l.filterOutPredefined(l.appendCHIProvidedTo(l.GetSelectorCHIScope()))
 }
 
 var labelsNamer = newNamer(namerContextLabels)
@@ -175,7 +175,7 @@ func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
 // getClusterScope gets labels for Cluster-scoped object
 func (l *Labeler) getClusterScope(cluster *chiv1.ChiCluster) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.appendCHIProvidedTo(getSelectorClusterScope(cluster))
+	return l.filterOutPredefined(l.appendCHIProvidedTo(getSelectorClusterScope(cluster)))
 }
 
 // getSelectorClusterScope gets labels to select a Cluster-scoped object
@@ -197,7 +197,7 @@ func getSelectorClusterScopeReady(cluster *chiv1.ChiCluster) map[string]string {
 // getLabelsShardScope gets labels for Shard-scoped object
 func (l *Labeler) getShardScope(shard *chiv1.ChiShard) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.appendCHIProvidedTo(getSelectorShardScope(shard))
+	return l.filterOutPredefined(l.appendCHIProvidedTo(getSelectorShardScope(shard)))
 }
 
 // getSelectorShardScope gets labels to select a Shard-scoped object
@@ -241,7 +241,7 @@ func (l *Labeler) getHostScope(host *chiv1.ChiHost, applySupplementaryServiceLab
 		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
 		labels[LabelSettingsConfigVersion] = util.Fingerprint(host.Config.SettingsFingerprint + host.Config.FilesFingerprint)
 	}
-	return l.appendCHIProvidedTo(labels)
+	return l.filterOutPredefined(l.appendCHIProvidedTo(labels))
 }
 
 // getHostScopeReady gets labels for Host-scoped object including Ready label
@@ -296,6 +296,11 @@ func GetSelectorHostScope(host *chiv1.ChiHost) map[string]string {
 		LabelShardName:   labelsNamer.getNamePartShardName(host),
 		LabelReplicaName: labelsNamer.getNamePartReplicaName(host),
 	}
+}
+
+// filterOutPredefined filters out predefined values
+func (l *Labeler) filterOutPredefined(m map[string]string) map[string]string {
+	return util.CopyMapFilter(m, nil, []string{})
 }
 
 // appendCHIProvidedTo appends CHI-provided labels to labels set
