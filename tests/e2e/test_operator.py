@@ -1972,7 +1972,8 @@ def test_030(self):
 @TestScenario
 @Name("test_031. Test excludeFromPropagationAnnotations work")
 def test_031(self):
-    cho_install_manifest = "manifests/cho/test-031-operator-install-template.yaml"
+    chi_manifest = "manifests/chi/test-031-wo-tpl.yaml"
+    chi = "test-031-wo-tpl"
 
     with Given("I generate CHO deploy manifest"):
         with open(util.get_full_path(settings.clickhouse_operator_install_manifest)) as base_template,\
@@ -1989,53 +1990,32 @@ def test_031(self):
                     debug(config_contents)
                     break
 
-            with open(util.get_full_path(cho_install_manifest), "w") as f:
-                f.write(yaml.dump_all(manifest_yaml))
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix=".yaml") as f:
+                f.write(yaml.dump_all(manifest_yaml).encode())
+                util.install_operator_if_not_exist(reinstall=True, manifest=f.name)
 
-    with And("I apply new config.yaml"):
-        util.install_operator_if_not_exist(reinstall=True, manifest=util.get_full_path(cho_install_manifest, False))
+    with And("Restart operator"):
         util.restart_operator(ns=settings.operator_namespace)
 
     with When("I apply chi"):
-        kubectl.apply(ns=settings.test_namespace, manifest=util.get_full_path("manifests/chi/test-031-wo-tpl.yaml", False))
-        time.sleep(5)
+        kubectl.create_and_check(chi_manifest, check = { "do_not_delete": 1})
 
     with Then("I check only allowed annotations are propagated"):
-        while len(kubectl.get_pod_names(chi_name='test-031-wo-tpl')) == 0:
-            time.sleep(1)
+        obj_types = {"statefulset", "configmap", "persistentvolumeclaim", "service"}
+        for obj_type in obj_types:
+            with By(f"Check that {obj_type}s annotations are correct"):
+                objs = kubectl.get_obj_names(chi_name=chi, obj_type=obj_type + "s")
+                for o in objs:
+                    annotations = kubectl.launch(command=f"get {obj_type} {o} -o jsonpath='{{.metadata.annotations}}'")
+                    assert "incl" in annotations, error()
+                    assert "excl" not in annotations, error()
 
-        with By("I check propagation from chi to StatefulSets, ConfigMaps, PVCs, Services"):
-            statefulsets_wo_tpl_name = kubectl.get_obj_names(chi_name='test-031-wo-tpl', obj_type="statefulsets")
-            for ss in statefulsets_wo_tpl_name:
-                annotations = kubectl.launch(command=f"get statefulset -n test {ss} -o jsonpath='{{.metadata.annotations}}'")
-                assert "incl" in annotations, error()
-                assert "excl" not in annotations, error()
-
-            configmaps_wo_tpl_name = kubectl.get_obj_names(chi_name='test-031-wo-tpl', obj_type="configmaps")
-            for cm in configmaps_wo_tpl_name:
-                annotations = kubectl.launch(command=f"get configmap -n test {cm} -o jsonpath='{{.metadata.annotations}}'")
-                assert "incl" in annotations, error()
-                assert "excl" not in annotations, error()
-
-            pvcs_wo_tpl_name = kubectl.get_obj_names(chi_name='test-031-wo-tpl', obj_type="pvc")
-            for pvc in pvcs_wo_tpl_name:
-                annotations = kubectl.launch(command=f"get pvc -n test {pvc} -o jsonpath='{{.metadata.annotations}}'")
-                assert "incl" in annotations, error()
-                assert "excl" not in annotations, error()
-
-            services_wo_tpl_name = kubectl.get_obj_names(chi_name='test-031-wo-tpl', obj_type="services")
-            for srv in services_wo_tpl_name:
-                annotations = kubectl.launch(command=f"get service -n test {srv} -o jsonpath='{{.metadata.annotations}}'")
-                assert "incl" in annotations, error()
-                assert "excl" not in annotations, error()
-
-
+    kubectl.delete_chi(chi)
+    
     with Finally("I restore original operator state"):
-        kubectl.delete_chi('test-031-wo-tpl')
         util.install_operator_if_not_exist(reinstall=True, manifest=util.get_full_path(settings.clickhouse_operator_install_manifest, False))
         util.restart_operator(ns=settings.operator_namespace)
-        os.remove(util.get_full_path(cho_install_manifest, False))
-
 
 @TestModule
 @Name("e2e.test_operator")
