@@ -1156,6 +1156,6 @@
   },
   "timezone": "browser",
   "title": "ClickHouse in Kubernetes Queries",
-  "uid": "b8e9954cd5ba171f60416ac0d8467fe3",
-  "version": 3
+  "uid": "clickhouse-queries",
+  "version": 20220214
 }

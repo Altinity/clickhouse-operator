@@ -210,9 +210,9 @@ spec:
           livenessProbe:
             exec:
               command:
-                - bash
+                - sh
                 - -c
-                - "OK=$(bash -c 'exec 3<>/dev/tcp/127.0.0.1/2181 && printf \"ruok\" >&3 && cat <&3'); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
+                - "OK=$(echo ruok | nc 127.0.0.1 2181); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
           ports:
             - containerPort: 7000
               name: prometheus
