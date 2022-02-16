@@ -292,7 +292,7 @@ def test_009(self):
 )
 def test_010(self):
     util.set_operator_version(settings.operator_version)
-    util.require_zookeeper()
+    util.require_keeper(keeper_type=self.context.keeper_type)
 
     kubectl.create_and_check(
         manifest="manifests/chi/test-010-zkroot.yaml",
@@ -737,7 +737,7 @@ def test_013(self):
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0")
 )
 def test_014(self):
-    util.require_zookeeper()
+    util.require_keeper(keeper_type=self.context.keeper_type)
 
     create_table = """
     CREATE TABLE test_local(a Int8)
@@ -889,36 +889,36 @@ def test_014(self):
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
 
-        with Then("Replica needs to be removed from the ZooKeeper as well"):
+        with Then("Replica needs to be removed from the Keeper as well"):
             out = clickhouse.query(
                 chi,
                 "SELECT total_replicas FROM system.replicas WHERE table='test_local'")
             note(f"Found {out} total replicas")
             assert out == "2"
 
-    with When("Restart Zookeeper pod"):
+    with When("Restart keeper pod"):
         with Then("Delete Zookeeper pod"):
-            kubectl.launch("delete pod zookeeper-0")
+            kubectl.launch(f"delete pod {self.context.keeper_type}-0")
             time.sleep(1)
 
-        with Then("Insert into the table while there is no Zookeeper -- table should be in readonly mode"):
-            out = clickhouse.query_with_error(chi, "INSERT INTO test_local values(2)")
+        with Then(f"try insert into the table while {self.context.keeper_type} offline table should be in readonly mode"):
+            out = clickhouse.query_with_error(chi, "INSERT INTO test_local VALUES(2)")
             assert "Table is in readonly mode" in out
 
-        with Then("Wait for Zookeeper pod to come back"):
-            kubectl.wait_object("pod", "zookeeper-0")
-            kubectl.wait_pod_status("zookeeper-0", "Running")
+        with Then(f"Wait for {self.context.keeper_type} pod to come back"):
+            kubectl.wait_object("pod", f"{self.context.keeper_type}-0")
+            kubectl.wait_pod_status(f"{self.context.keeper_type}-0", "Running")
 
-        with Then("Wait for ClickHouse to reconnect to Zookeeper and switch to read-write mode"):
+        with Then(f"Wait for ClickHouse to reconnect to {self.context.keeper_type} and switch to read-write mode"):
             time.sleep(30)
 
         with Then("Table should be back to normal"):
-            clickhouse.query(chi, "INSERT INTO test_local values(3)")
+            clickhouse.query(chi, "INSERT INTO test_local VALUES(3)")
 
     with When("Delete chi"):
         kubectl.delete_chi("test-014-replication")
 
-        with Then("Tables should be deleted. We can test it re-creating the chi and checking ZooKeeper contents"):
+        with Then(f"Tables should be deleted. We can test it re-creating the chi and checking {self.context.keeper_type} contents"):
             kubectl.create_and_check(
                 manifest=manifest,
                 check={
@@ -927,7 +927,7 @@ def test_014(self):
                 })
             out = clickhouse.query(
                 chi,
-                f"select count() from system.zookeeper where path ='/clickhouse/{chi}/tables/0/default'")
+                f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{chi}/tables/0/default'")
             note(f"Found {out} replicated tables in ZooKeeper")
             assert out == "0"
 
@@ -1179,7 +1179,7 @@ def test_018(self):
     RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0")
 )
 def test_019(self):
-    util.require_zookeeper()
+    util.require_keeper(keeper_type=self.context.keeper_type)
     manifest = "manifests/chi/test-019-retain-volume-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
@@ -1610,7 +1610,7 @@ def test_024(self):
     RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingReplicas("1.0")
 )
 def test_025(self):
-    util.require_zookeeper()
+    util.require_keeper(keeper_type=self.context.keeper_type)
 
     create_table = """
     CREATE TABLE test_local(a UInt32)
@@ -1703,7 +1703,7 @@ def test_025(self):
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout("1.0")
 )
 def test_026(self):
-    util.require_zookeeper()
+    util.require_keeper(keeper_type=self.context.keeper_type)
 
     manifest = "manifests/chi/test-026-mixed-replicas.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -1811,7 +1811,7 @@ def test_027(self):
     RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0")
 )
 def test_028(self):
-    util.require_zookeeper()
+    util.require_keeper(keeper_type=self.context.keeper_type)
 
     manifest = "manifests/chi/test-014-replication-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
