@@ -22,14 +22,14 @@ xfails = {
 @Specifications(
     QA_SRS026_ClickHouse_Operator
 )
-def regression(self, native):
+def regression(self, native, keeper_type):
     """ClickHouse Operator test regression suite.
     """
     def run_features():
         features = [
             "e2e.test_metrics_exporter",
             "e2e.test_metrics_alerts",
-            "e2e.test_zookeeper",
+            "e2e.test_keeper",
             "e2e.test_backup_alerts",
             "e2e.test_operator",
             "e2e.test_clickhouse",
@@ -39,6 +39,7 @@ def regression(self, native):
             Feature(run=load(feature_name, "test"))
 
     self.context.native = native
+    self.context.keeper_type = keeper_type
     if native:
         run_features()
     else:

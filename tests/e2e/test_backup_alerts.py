@@ -374,6 +374,7 @@ def test(self):
         chi_file='manifests/chi/test-cluster-for-backups.yaml',
         chi_template_file='manifests/chit/tpl-clickhouse-backups.yaml',
         chi_name='test-cluster-for-backups',
+        keeper_type=self.context.keeper_type
     )
     minio_spec = get_minio_spec()
 

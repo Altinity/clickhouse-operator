@@ -74,10 +74,10 @@ def delete_all_chi(ns=namespace):
                 delete_chi(chi["metadata"]["name"], ns)
 
 
-def delete_all_zookeeper(ns=namespace):
+def delete_all_keeper(keeper_type="zookeeper", ns=namespace):
     for resource_type in ("sts", "pvc"):
         try:
-            zks = get(resource_type, "", label="-l app=zookeeper", ns=ns, ok_to_fail=True)
+            zks = get(resource_type, "", label=f"-l app={keeper_type}", ns=ns, ok_to_fail=True)
         except Exception as e:
             zks = {}
         if "items" in zks:

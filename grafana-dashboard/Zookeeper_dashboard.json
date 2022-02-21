@@ -10244,6 +10244,6 @@
   },
   "timezone": "",
   "title": "ZooKeeper Dashboard",
-  "uid": "309a682046bad930887fdb05de642f51",
-  "version": 6
+  "uid": "zookeeper",
+  "version": 20220214
 }

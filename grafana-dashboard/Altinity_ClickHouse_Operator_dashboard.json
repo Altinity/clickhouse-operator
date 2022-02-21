@@ -4172,6 +4172,6 @@
   },
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
-  "uid": "80bd73d2a243583a9ec0d1b3fdf86e98",
-  "version": 20210618
+  "uid": "clickhouse-operator",
+  "version": 20220214
 }

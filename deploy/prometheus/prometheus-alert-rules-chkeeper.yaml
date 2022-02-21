@@ -1,0 +1,119 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    prometheus: prometheus
+    role: alert-rules
+  name: prometheus-clickhouse-keeper-rules
+spec:
+  groups:
+    - name: ClickHouseKeeperRules
+      rules:
+        - alert: ClickHouseKeeperDown
+          expr: up{app=~'clickhouse-keeper.*'} == 0 or zk_ruok{app=~'clickhouse-keeeper.*'} == 0
+          labels:
+            severity: critical
+          annotations:
+            identifier: "{{ $labels.pod_name }}"
+            summary: "zookeeper possible down"
+            description: |-
+              `zookeeper` can't be scraped via prometheus.
+              Please check instance status
+              ```kubectl logs -n {{ $labels.namespace }} {{ $labels.pod_name }} -f```
+
+        - alert: ClickHouseKeeperHighLatency
+          expr: zk_max_latency{app=~'clickhouse-keeper.*'} > 500
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Average amount of time it takes for the server to respond to each client request (since the server was started)."
+            description: |-
+              `avg_latency{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "avg_latency{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} ticks{{ end }}
+
+              reset server statistics
+              ```
+              kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- bash -c 'exec 3<>/dev/tcp/127.0.0.1/2181 && printf \"stats_reset\" >&3 && timeout 5 cat <&3'
+              ```
+
+              Look to CPU/Memory node/pod utilization
+              ```
+              kubectl top -n {{ $labels.namespace }} pod {{ $labels.pod_name }}
+              kubectl top node {{ $labels.node }}
+              ```
+
+              Look to ClickHouseKeeper Disk free space
+              ```
+              kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- df -h
+              ```
+
+              Look to clickhouse-keeper read\write
+              ```
+              readBegin=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^rchar" | cut -d " " -f 2)
+              writeBegin=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^wchar" | cut -d " " -f 2)
+              sleep 5
+              readEnd=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^rchar" | cut -d " " -f 2)
+              writeEnd=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^wchar" | cut -d " " -f 2)
+              echo "ClickHouseKeeper Read $((($readEnd - $readBegin) / 5)) b/s"
+              echo "ClickHouseKeeper Write $((($writeEnd - $writeBegin) / 5)) b/s"
+              ```
+
+        - alert: ClickHouseKeeperOutstandingRequests
+          expr: zk_outstanding_requests{app=~'clickhouse-keeper.*'} > 10
+          for: 10m
+          labels:
+            severity: high
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "ClickHouseKeeper receives more requests than it can process."
+            description: |-
+              `outstanding_requests{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "outstanding_requests{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
+
+              Look to CPU/Memory node/pod utilization
+              ```
+              kubectl top -n {{ $labels.namespace }} pod {{ $labels.pod_name }}
+              kubectl top node {{ $labels.node }}
+              ```
+
+              Look to ClickHouseKeeper Disk free space
+              ```
+              kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- df -h
+              ```
+
+              Look to zookeeper read\write
+              ```
+              readBegin=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^rchar" | cut -d " " -f 2)
+              writeBegin=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^wchar" | cut -d " " -f 2)
+              sleep 5
+              readEnd=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^rchar" | cut -d " " -f 2)
+              writeEnd=$(kubectl exec -n {{ $labels.namespace }} {{ $labels.pod_name }} -- cat /proc/1/io | grep -E "^wchar" | cut -d " " -f 2)
+              echo "ClickHouseKeeper Read $((($readEnd - $readBegin) / 5)) b/s"
+              echo "ClickHouseKeeper Write $((($writeEnd - $writeBegin) / 5)) b/s"
+              ```
+
+        - alert: ClickHouseKeeperHighFileDescriptors
+          expr: zk_open_file_descriptor_count{app=~'clickhouse-keeper.*'}  > 4096
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "Number of file descriptors used over the limit."
+            description: |-
+              `zk_open_file_descriptor_count{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "zk_open_file_descriptor_count{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} descriptors{{ end }}
+
+
+        - alert: ClickHouseKeeperHighEphemeralNodes
+          expr: zk_ephemerals_count{app=~'clickhouse-keeper.*'} > 100
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            identifier: "{{ $labels.pod_name }}.{{ $labels.namespace }}"
+            summary: "ClickHouseKeeper have too high ephemeral znodes count."
+            description: |-
+              `zk_ephemerals_count{pod_name="{{ $labels.pod_name }}",namespace="{{ $labels.namespace }}"}` = {{ with printf "ephemerals_count{pod_name='%s',namespace='%s'}" .Labels.pod_name .Labels.namespace | query }}{{ . | first | value | printf "%.2f" }} nodes{{ end }}
+              Look to documentation:
+              https://zookeeper.apache.org/doc/current/zookeeperOver.html#Nodes+and+ephemeral+nodes
