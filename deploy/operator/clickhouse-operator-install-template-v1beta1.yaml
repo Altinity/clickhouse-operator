@@ -3259,6 +3259,10 @@ data:
           onFailure: rollback
 
       host:
+        # Whether reconciler should wait for host:
+        # to be excluded from cluster OR
+        # to be included into cluster
+        # respectfully
         wait:
           exclude: true
           include: false
