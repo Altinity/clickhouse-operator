@@ -221,9 +221,7 @@ def check_operator_restart(self, chi, wait_objects, pod):
     start_time = kubectl.get_field("pod", pod, ".status.startTime")
     with When("Restart operator"):
         util.restart_operator()
-        time.sleep(10)
         kubectl.wait_objects(chi, wait_objects)
-        time.sleep(10)
         kubectl.wait_chi_status(chi, "Completed")
         new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
 
@@ -248,8 +246,6 @@ def test_operator_restart(self, manifest, version=settings.operator_version):
                 },
                 "do_not_delete": 1,
             })
-        time.sleep(10)
-        kubectl.wait_chi_status(chi, "Completed")
 
         check_operator_restart(chi=chi, wait_objects={"statefulset": 1, "pod": 1, "service": 2}, pod=f"chi-{chi}-{cluster}-0-0-0")
 
@@ -267,6 +263,34 @@ def test_008(self):
     with Then("Test advanced chi for operator restart"):
         test_operator_restart(manifest="manifests/chi/test-008-operator-restart-2.yaml")
 
+@TestScenario
+@Name("test_008_2. Test operator restart in the middle of reconcile")
+def test_008_2(self):
+    manifest="manifests/chi/test-003-complex-layout.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    
+    full_cluster = {"statefulset": 4, "pod": 4, "service": 5}
+    # half_cluster = {"statefulset": 2, "pod": 2, "service": 3}
+
+    
+    with Given("4-node CHI creation started"):
+        with Then("Wait for a half of the cluster to start"):
+            kubectl.create_and_check(manifest, 
+                check = {
+                    "pod_count": 2,
+                    "do_not_delete": 1,
+                    "chi_status": "InProgress"
+            })
+        with When("Restart operator"):
+           util.restart_operator()
+           with Then("Cluster creation should continue after a restart"):
+               # Fail faster
+               kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=3, retries=5)
+               kubectl.wait_objects(chi, full_cluster)
+               kubectl.wait_chi_status(chi, "Completed")
+    
+    kubectl.delete_chi(chi)
+        
 
 @TestScenario
 @Name("test_009. Test operator upgrade")
