@@ -2668,6 +2668,10 @@ spec:
       description: Watch namespaces
       priority: 0 # show in standard view
       JSONPath: .status
+    - name: age
+      type: date
+      description: Age of the resource
+      JSONPath: .metadata.creationTimestamp
   validation:
     openAPIV3Schema:
       type: object
