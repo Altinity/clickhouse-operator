@@ -80,6 +80,11 @@ spec:
           description: Client access endpoint
           priority: 1 # show in wide view
           jsonPath: .status.endpoint
+        - name: age
+          type: date
+          description: Age of the resource
+          # Displayed in all priorities
+          jsonPath: .metadata.creationTimestamp
       subresources:
         status: {}
       schema:
@@ -1409,6 +1414,11 @@ spec:
           description: Client access endpoint
           priority: 1 # show in wide view
           jsonPath: .status.endpoint
+        - name: age
+          type: date
+          description: Age of the resource
+          # Displayed in all priorities
+          jsonPath: .metadata.creationTimestamp
       subresources:
         status: {}
       schema:
