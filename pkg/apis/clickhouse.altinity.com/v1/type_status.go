@@ -92,10 +92,11 @@ func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
 }
 
 // ReconcileComplete marks reconcile completion
-func (s *ChiStatus) ReconcileComplete() {
+func (s *ChiStatus) ReconcileComplete(chi *ClickHouseInstallation) {
 	s.Status = StatusCompleted
 	s.Action = ""
 	s.PushTaskIDCompleted()
+	s.Generation = chi.Generation
 }
 
 // DeleteStart marks deletion start
