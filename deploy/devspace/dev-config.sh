@@ -20,5 +20,6 @@ case "${DEPLOY_OPERATOR}" in
         METRICS_EXPORTER_IMAGE="sunsingerus/metrics-exporter:dev"
         ;;
     *)
+        echo "No Operator would be installed"
         ;;
 esac
