@@ -203,7 +203,7 @@ def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries
             cur_count = get_count(kind, ns=ns, name=name, label=label)
             if cur_count >= count:
                 break
-            with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
+            with Then(f"Not ready yet. {cur_count}/{count}. Wait for {i * backoff} seconds"):
                 time.sleep(i * backoff)
         assert cur_count >= count, error()
 
