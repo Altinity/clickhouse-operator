@@ -50,7 +50,7 @@ clickhouse_operator_install_manifest = os.getenv('CLICKHOUSE_OPERATOR_INSTALL_MA
 # clickhouse_template = "manifests/chit/tpl-clickhouse-20.3.yaml"
 # clickhouse_template = "manifests/chit/tpl-clickhouse-20.8.yaml"
 # clickhouse_template = "manifests/chit/tpl-clickhouse-21.3.yaml"
-clickhouse_template = "manifests/chit/tpl-clickhouse-22.1.yaml"
+clickhouse_template = "manifests/chit/tpl-clickhouse-22.2.yaml"
 clickhouse_template_old = "manifests/chit/tpl-clickhouse-21.8.yaml"
 
 clickhouse_version = get_ch_version(clickhouse_template)
