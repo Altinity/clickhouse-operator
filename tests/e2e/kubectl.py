@@ -74,10 +74,10 @@ def delete_all_chi(ns=namespace):
                 delete_chi(chi["metadata"]["name"], ns)
 
 
-def delete_all_zookeeper(ns=namespace):
+def delete_all_keeper(keeper_type="zookeeper", ns=namespace):
     for resource_type in ("sts", "pvc"):
         try:
-            zks = get(resource_type, "", label="-l app=zookeeper", ns=ns, ok_to_fail=True)
+            zks = get(resource_type, "", label=f"-l app={keeper_type}", ns=ns, ok_to_fail=True)
         except Exception as e:
             zks = {}
         if "items" in zks:
@@ -203,7 +203,7 @@ def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries
             cur_count = get_count(kind, ns=ns, name=name, label=label)
             if cur_count >= count:
                 break
-            with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
+            with Then(f"Not ready yet. {cur_count}/{count}. Wait for {i * backoff} seconds"):
                 time.sleep(i * backoff)
         assert cur_count >= count, error()
 

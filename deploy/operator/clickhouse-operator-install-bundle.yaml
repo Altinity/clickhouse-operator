@@ -10,7 +10,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -80,6 +80,11 @@ spec:
           description: Client access endpoint
           priority: 1 # show in wide view
           jsonPath: .status.endpoint
+        - name: age
+          type: date
+          description: Age of the resource
+          # Displayed in all priorities
+          jsonPath: .metadata.creationTimestamp
       subresources:
         status: {}
       schema:
@@ -1339,7 +1344,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1409,6 +1414,11 @@ spec:
           description: Client access endpoint
           priority: 1 # show in wide view
           jsonPath: .status.endpoint
+        - name: age
+          type: date
+          description: Age of the resource
+          # Displayed in all priorities
+          jsonPath: .metadata.creationTimestamp
       subresources:
         status: {}
       schema:
@@ -2665,7 +2675,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2685,6 +2695,11 @@ spec:
           description: Watch namespaces
           priority: 0 # show in standard view
           jsonPath: .status
+        - name: age
+          type: date
+          description: Age of the resource
+          # Displayed in all priorities
+          jsonPath: .metadata.creationTimestamp
       schema:
         openAPIV3Schema:
           type: object
@@ -2954,7 +2969,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
 ---
 # Template Parameters:
 #
@@ -2971,7 +2986,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
 rules:
 - apiGroups:
     - ""
@@ -3128,7 +3143,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -3150,7 +3165,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -3284,6 +3299,10 @@ data:
           onFailure: rollback
     
       host:
+        # Whether reconciler should wait for host:
+        # to be excluded from cluster OR
+        # to be included into cluster
+        # respectfully
         wait:
           exclude: true
           include: false
@@ -3377,7 +3396,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
     app: clickhouse-operator
 data:
 ---
@@ -3393,7 +3412,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3452,7 +3471,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -3552,7 +3571,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
     app: clickhouse-operator
 data:
   01-clickhouse-user.xml: |
@@ -3603,8 +3622,8 @@ data:
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.18.2
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.18.2
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.18.3
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.18.3
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -3614,7 +3633,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -3648,7 +3667,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.18.2
+          image: altinity/clickhouse-operator:0.18.3
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3713,7 +3732,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.18.2
+          image: altinity/metrics-exporter:0.18.3
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3746,7 +3765,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
     app: clickhouse-operator
 spec:
   ports:

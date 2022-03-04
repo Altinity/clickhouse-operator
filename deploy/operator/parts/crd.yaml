@@ -10,7 +10,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -80,6 +80,11 @@ spec:
           description: Client access endpoint
           priority: 1 # show in wide view
           jsonPath: .status.endpoint
+        - name: age
+          type: date
+          description: Age of the resource
+          # Displayed in all priorities
+          jsonPath: .metadata.creationTimestamp
       subresources:
         status: {}
       schema:
@@ -1339,7 +1344,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1409,6 +1414,11 @@ spec:
           description: Client access endpoint
           priority: 1 # show in wide view
           jsonPath: .status.endpoint
+        - name: age
+          type: date
+          description: Age of the resource
+          # Displayed in all priorities
+          jsonPath: .metadata.creationTimestamp
       subresources:
         status: {}
       schema:
@@ -2665,7 +2675,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.2
+    clickhouse.altinity.com/chop: 0.18.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2685,6 +2695,11 @@ spec:
           description: Watch namespaces
           priority: 0 # show in standard view
           jsonPath: .status
+        - name: age
+          type: date
+          description: Age of the resource
+          # Displayed in all priorities
+          jsonPath: .metadata.creationTimestamp
       schema:
         openAPIV3Schema:
           type: object

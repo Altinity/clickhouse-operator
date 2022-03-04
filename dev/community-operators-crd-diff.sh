@@ -17,9 +17,21 @@ if [[ ! -d "${CO_PATH}" ]]; then
     exit 1
 fi
 
-PREVIOUS_VERSION="${PREVIOUS_VERSION:-0.18.0}" ${SRC_ROOT}/deploy/builder/operatorhub.sh
+if [[ -z "${PREVIOUS_VERSION}" ]]; then
+    echo "PREVIOUS_VERSION=${PREVIOUS_VERSION}"
+    echo "Please specify PREVIOUS_VERSION published on operatorhub, like"
+    echo "PREVIOUS_VERSION=0.18.1"
+    exit 1
+fi
+
+PREVIOUS_VERSION="${PREVIOUS_VERSION}" ${SRC_ROOT}/deploy/builder/operatorhub.sh
 
 cp -r "${SRC_ROOT}/deploy/operatorhub/${VERSION}" "${CO_PATH}"
 cp -r "${SRC_ROOT}/deploy/operatorhub/clickhouse.package.yaml" "${CO_PATH}"
 
 echo "DONE"
+
+# git remote add upstream https://github.com/k8s-operatorhub/community-operators
+# git pull --rebase upstream main
+# git rebase --skip  (if the conflicts are not true, skip the patches)
+# git push --force-with-lease origin main

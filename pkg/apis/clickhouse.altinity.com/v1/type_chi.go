@@ -40,7 +40,7 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.Status.Pods = pods
 	chi.Status.FQDNs = fqdns
 	chi.Status.Endpoint = endpoint
-	chi.Status.Generation = chi.Generation
+	chi.Status.Generation = 0
 	if normalized {
 		chi.Status.NormalizedCHI = &ClickHouseInstallation{
 			TypeMeta:   chi.TypeMeta,

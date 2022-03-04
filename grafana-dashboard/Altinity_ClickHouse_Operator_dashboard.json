@@ -762,15 +762,20 @@
         },
         {
           "expr": "chi_clickhouse_metric_DistributedFilesToInsert{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "delayed distributed files {{ hostname }}",
+          "legendFormat": "pending distributed files {{ hostname }}",
           "refId": "D"
+        },
+        {
+          "expr": "chi_clickhouse_metric_BrokenDistributedFilesToInsert{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "broken distributed files {{ hostname }}",
+          "refId": "E"
         }
       ],
       "thresholds": [],
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Delayed/Rejected Inserts",
+      "title": "Delayed/Rejected/Pending Inserts",
       "tooltip": {
         "msResolution": false,
         "shared": true,
@@ -4172,6 +4177,6 @@
   },
   "timezone": "browser",
   "title": "Altinity ClickHouse Operator Dashboard",
-  "uid": "80bd73d2a243583a9ec0d1b3fdf86e98",
-  "version": 20210618
+  "uid": "clickhouse-operator",
+  "version": 20220214
 }

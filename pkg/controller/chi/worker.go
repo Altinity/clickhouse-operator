@@ -413,7 +413,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseIn
 
 func (w *worker) markReconcileComplete(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
 	// Update CHI object
-	(&chi.Status).ReconcileComplete()
+	(&chi.Status).ReconcileComplete(chi)
 	_ = w.c.updateCHIObjectStatus(ctx, chi, false)
 
 	w.a.V(1).

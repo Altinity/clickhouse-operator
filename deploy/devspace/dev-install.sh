@@ -38,7 +38,7 @@ kubectl -n "${OPERATOR_NAMESPACE}" apply -f <( \
 #
 case "${DEPLOY_OPERATOR}" in
     "yes" | "release" | "prod" | "latest" | "dev")
-        # Install operator from Docker Registry (dockerhub or whatever)
+        echo "Install operator from Docker Registry (dockerhub or whatever)"
         kubectl -n "${OPERATOR_NAMESPACE}" apply -f <( \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
             OPERATOR_VERSION="${OPERATOR_VERSION}" \
