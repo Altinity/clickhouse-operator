@@ -131,7 +131,7 @@ spec:
               mountPath: /var/lib/clickhouse-keeper
           env:
             - name: SERVERS
-              value: "1"
+              value: "3"
             - name: RAFT_PORT
               value: "9234"
           command:
