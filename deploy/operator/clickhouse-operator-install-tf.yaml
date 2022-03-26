@@ -3513,7 +3513,7 @@ data:
                 "containers" : [
                   {
                     "name": "clickhouse",
-                    "image": "yandex/clickhouse-server:21.3",
+                    "image": "clickhouse/clickhouse-server:22.3",
                     "ports": [
                       {
                         "name": "http",

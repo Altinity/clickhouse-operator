@@ -198,5 +198,6 @@ def test(self):
         test_zookeeper_rescale,
     ]
 
+    util.install_operator_if_not_exist()
     for t in all_tests:
         Scenario(test=t)()

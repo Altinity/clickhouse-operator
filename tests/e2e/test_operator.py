@@ -121,8 +121,8 @@ def test_005(self):
     RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades("1.0")
 )
 def test_006(self):
-    old_version = "yandex/clickhouse-server:21.3"
-    new_version = "yandex/clickhouse-server:21.8"
+    old_version = "clickhouse/clickhouse-server:21.8"
+    new_version = "clickhouse/clickhouse-server:22.3"
     with Then("Create initial position"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-1.yaml",

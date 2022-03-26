@@ -7,12 +7,12 @@ OPERATOR_IMAGE="altinity/clickhouse-operator:${OPERATOR_VERSION}"
 OPERATOR_IMAGE_OLD="altinity/clickhouse-operator:${OPERATOR_VERSION_OLD}"
 METRICS_EXPORTER_IMAGE="altinity/metrics-exporter:${OPERATOR_VERSION}"
 METRICS_EXPORTER_IMAGE_OLD="altinity/metrics-exporter:${OPERATOR_VERSION_OLD}"
-CLICKHOUSE_BACKUP_IMAGE="altinity/clickhouse-backup:1.3.0"
-CLICKHOUSE_IMAGE=${CLICKHOUSE_IMAGE:="yandex/clickhouse-server:21.8"}
-CLICKHOUSE_IMAGE_OLD=${CLICKHOUSE_IMAGE_OLD:="yandex/clickhouse-server:21.3"}
-CLICKHOUSE_IMAGE_LATEST=${CLICKHOUSE_IMAGE_LATEST:="yandex/clickhouse-server:latest"}
+CLICKHOUSE_BACKUP_IMAGE="altinity/clickhouse-backup:1.3.1"
+CLICKHOUSE_IMAGE=${CLICKHOUSE_IMAGE:="clickhouse/clickhouse-server:22.3"}
+CLICKHOUSE_IMAGE_OLD=${CLICKHOUSE_IMAGE_OLD:="clickhouse/clickhouse-server:21.8"}
+CLICKHOUSE_IMAGE_LATEST=${CLICKHOUSE_IMAGE_LATEST:="clickhouse/clickhouse-server:latest"}
 CLICKHOUSE_OPERATOR_TESTS_IMAGE=${CLICKHOUSE_OPERATOR_TESTS_IMAGE:="registry.gitlab.com/altinity-public/container-images/clickhouse-operator-test-runner:latest"}
-ZOOKEEPER_IMAGE=${ZOOKEEPER_IMAGE:="zookeeper:3.7.0"}
+ZOOKEEPER_IMAGE=${ZOOKEEPER_IMAGE:="zookeeper:3.8.0"}
 
 K8S_VERSION=${K8S_VERSION:=1.21.6}
 MINIKUBE_PRELOADED_TARBALL="preloaded-images-k8s-v13-v${K8S_VERSION}-docker-overlay2-amd64.tar.lz4"

@@ -5,25 +5,25 @@ metadata:
 spec:
   templates:
     podTemplates:
-    - name: v21.3
+    - name: v22.3
       spec:
         containers:
         - name: clickhouse-pod
-          image: yandex/clickhouse-server:21.3
-    - name: v21.8
+          image: clickhouse/clickhouse-server:21.8
+    - name: v22.8
       spec:
         containers:
         - name: clickhouse-pod
-          image: yandex/clickhouse-server:21.8
+          image: clickhouse/clickhouse-server:22.3
   configuration:
     clusters:
     - name: default
       layout:
         shards:
          - templates:
-             podTemplate: v21.3
+             podTemplate: v22.3
          - templates:
-             podTemplate: v21.8
+             podTemplate: v22.8
     files:
       users.d/remove_database_ordinary.xml: |
         <yandex>

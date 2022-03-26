@@ -21,13 +21,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  # DNS would be like keeper-0.clickhouse-keepers.namespace.svc
+  # DNS would be like clickhouse-keeper-0.clickhouse-keepers.namespace.svc
   name: clickhouse-keepers
   labels:
     app: clickhouse-keeper
 spec:
   ports:
-    - port: 9234
+    - port: 9444
       name: raft
   clusterIP: None
   selector:
@@ -62,9 +62,10 @@ data:
         <keeper_server incl="keeper_server">
             <path>/var/lib/clickhouse-keeper</path>
             <tcp_port>2181</tcp_port>
+            <four_letter_word_white_list>*</four_letter_word_white_list>
             <coordination_settings>
                 <!-- <raft_logs_level>trace</raft_logs_level> -->
-                <raft_logs_level>debug</raft_logs_level>
+                <raft_logs_level>information</raft_logs_level>
             </coordination_settings>
         </keeper_server>
     </yandex>
@@ -133,7 +134,7 @@ spec:
             - name: SERVERS
               value: "1"
             - name: RAFT_PORT
-              value: "9234"
+              value: "9444"
           command:
             - bash
             - -x
@@ -159,38 +160,20 @@ spec:
                 done
                 echo "</raft_configuration>"
                 echo "</keeper_server></yandex>"
-              } >> /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml &&
+              } > /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml &&
               cat /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml && 
               clickhouse keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml
           readinessProbe:
-            exec:
-              command:
-                - bash
-                - -xc
-                - "OK=$(bash -c 'exec 3<>/dev/tcp/127.0.0.1/2181 && printf \"ruok\" >&3 && timeout 5 cat <&3');
-                   if [[ \"$OK\" == \"imok\" ]];
-                   then
-                      STATE=$(bash -c 'exec 3<>/dev/tcp/127.0.0.1/2181 && printf \"mntr\" >&3 && timeout 5 cat <&3' | grep zk_server_state | cut -d \" \" -f 2);
-                      if [[ \"$STATE\" == \"leader\" ]]; then
-                        SYNCED_FOLLOWERS=$(bash -c 'exec 3<>/dev/tcp/127.0.0.1/2181 && printf \"mntr\" >&3 && timeout 5 cat <&3' | grep zk_synced_followers | cut -d \" \" -f 2 | cut -d \".\" -f 1);
-                        if [[ $SYNCED_FOLLOWERS == $(( $SERVERS - 1 )) ]]; then
-                          exit 0;
-                        else
-                          exit 1;
-                        fi;
-                      elif [[ \"$STATE\" == \"follower\" ]]; then
-                        PEER_STATE=$(bash -c 'exec 3<>/dev/tcp/127.0.0.1/2181 && printf \"mntr\" >&3 && timeout 5 cat <&3' | grep zk_peer_state);
-                        if [[ \"$PEER_STATE\" == \"following - broadcast\" ]]; then
-                          exit 0;
-                        else
-                          exit 1;
-                        fi;
-                      fi;
-                    else
-                      exit 1;
-                    fi"
-            initialDelaySeconds: 15
-            timeoutSeconds: 15
+            tcpSocket:
+              port: 9444
+            timeoutSeconds: 5
+            periodSeconds: 60
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: 2181
+            timeoutSeconds: 5
+            periodSeconds: 30
         - name: zookeeper-exporter
           imagePullPolicy: IfNotPresent
           image: dabealu/zookeeper-exporter:latest
@@ -213,6 +196,7 @@ spec:
                 - sh
                 - -c
                 - "OK=$(echo ruok | nc 127.0.0.1 2181); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
+            periodSeconds: 5
           ports:
             - containerPort: 7000
               name: prometheus
