@@ -12,12 +12,12 @@ spec:
                 - templates:
                     podTemplate: t1
                 - templates:
-                    podTemplate: t1
+                    podTemplate: t2
             - replicas:
                 - templates:
                     podTemplate: t1
                 - templates:
-                    podTemplate: t1
+                    podTemplate: t2
             - replicas:
                 - templates:
                     podTemplate: t1
@@ -31,33 +31,33 @@ spec:
                 - templates:
                     podTemplate: t1
                 - templates:
-                    podTemplate: t1
+                    podTemplate: t2
                 - templates:
-                    podTemplate: t1
+                    podTemplate: t3
             - replicas:
                 - templates:
                     podTemplate: t1
                 - templates:
-                    podTemplate: t1
+                    podTemplate: t2
                 - templates:
-                    podTemplate: t1
+                    podTemplate: t3
 
   templates:
     podTemplates:
-      - name: clickhouse:20.5
+      - name: t1
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:20.5
+              image: clickhouse/clickhouse-server:22.1
 
-      - name: clickhouse:20.6
+      - name: t2
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:20.6
+              image: clickhouse/clickhouse-server:22.2
 
-      - name: clickhouse:20.7
+      - name: t3
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:20.7
+              image: clickhouse/clickhouse-server:22.3

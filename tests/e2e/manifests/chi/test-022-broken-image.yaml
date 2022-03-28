@@ -12,7 +12,7 @@ spec:
       spec:
         containers:
         - name: clickhouse-pod
-          image: yandex/clickhouse-server:20.3.13.127-broken
+          image: clickhouse/clickhouse-server:22.3-broken
   configuration:
     clusters:
     - name: default

@@ -68,7 +68,7 @@ const (
 
 const (
 	// defaultClickHouseDockerImage specifies default ClickHouse docker image to be used
-	defaultClickHouseDockerImage = "yandex/clickhouse-server:latest"
+	defaultClickHouseDockerImage = "clickhouse/clickhouse-server:latest"
 
 	// defaultBusyBoxDockerImage specifies default BusyBox docker image to be used
 	defaultBusyBoxDockerImage = "busybox"

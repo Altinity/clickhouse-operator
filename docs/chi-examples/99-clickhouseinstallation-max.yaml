@@ -52,7 +52,7 @@ spec:
       profile: default
     templates:
       hostTemplate: host-template-custom-ports
-      podTemplate: clickhouse-v20.6
+      podTemplate: clickhouse-v22.2
       dataVolumeClaimTemplate: default-volume-claim
       logVolumeClaimTemplate: default-volume-claim
       serviceTemplate: chi-service-template
@@ -132,7 +132,7 @@ spec:
 
       - name: all-counts
         templates:
-          podTemplate: clickhouse-v20.6
+          podTemplate: clickhouse-v22.2
           dataVolumeClaimTemplate: default-volume-claim
           logVolumeClaimTemplate: default-volume-claim
         layout:
@@ -141,7 +141,7 @@ spec:
 
       - name: shards-only
         templates:
-          podTemplate: clickhouse-v20.6
+          podTemplate: clickhouse-v22.2
           dataVolumeClaimTemplate: default-volume-claim
           logVolumeClaimTemplate: default-volume-claim
         layout:
@@ -150,7 +150,7 @@ spec:
 
       - name: replicas-only
         templates:
-          podTemplate: clickhouse-v20.6
+          podTemplate: clickhouse-v22.2
           dataVolumeClaimTemplate: default-volume-claim
           logVolumeClaimTemplate: default-volume-claim
         layout:
@@ -159,7 +159,7 @@ spec:
 
       - name: customized
         templates:
-          podTemplate: clickhouse-v20.6
+          podTemplate: clickhouse-v22.2
           dataVolumeClaimTemplate: default-volume-claim
           logVolumeClaimTemplate: default-volume-claim
         layout:
@@ -169,13 +169,13 @@ spec:
               weight: 1
               internalReplication: Disabled
               templates:
-                podTemplate: clickhouse-v20.6
+                podTemplate: clickhouse-v22.2
                 dataVolumeClaimTemplate: default-volume-claim
                 logVolumeClaimTemplate: default-volume-claim
 
             - name: shard1
               templates:
-                podTemplate: clickhouse-v20.6
+                podTemplate: clickhouse-v22.2
                 dataVolumeClaimTemplate: default-volume-claim
                 logVolumeClaimTemplate: default-volume-claim
               replicas:
@@ -186,7 +186,7 @@ spec:
             - name: shard2
               replicasCount: 3
               templates:
-                podTemplate: clickhouse-v20.6
+                podTemplate: clickhouse-v22.2
                 dataVolumeClaimTemplate: default-volume-claim
                 logVolumeClaimTemplate: default-volume-claim
                 replicaServiceTemplate: replica-service-template
@@ -196,7 +196,7 @@ spec:
                   httpPort: 8123
                   interserverHTTPPort: 9009
                   templates:
-                    podTemplate: clickhouse-v20.7
+                    podTemplate: clickhouse-v22.3
                     dataVolumeClaimTemplate: default-volume-claim
                     logVolumeClaimTemplate: default-volume-claim
                     replicaServiceTemplate: replica-service-template
@@ -347,7 +347,7 @@ spec:
     podTemplates:
       # multiple pod templates makes possible to update version smoothly
       # pod template for ClickHouse v18.16.1
-      - name: clickhouse-v20.7
+      - name: clickhouse-v22.3
         # We may need to label nodes with clickhouse=allow label for this example to run
         # See ./label_nodes.sh for this purpose
         zone:
@@ -426,7 +426,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:20.7
+              image: clickhouse/clickhouse-server:22.3
               volumeMounts:
                 - name: default-volume-claim
                   mountPath: /var/lib/clickhouse
@@ -438,13 +438,13 @@ spec:
                   memory: "64Mi"
                   cpu: "100m"
 
-      # pod template for ClickHouse v19.11.3.11
-      - name: clickhouse-v20.6
+      # pod template for ClickHouse v22.2
+      - name: clickhouse-v22.2
         # type PodSpec struct {} from k8s.io/core/v1
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:20.6
+              image: clickhouse/clickhouse-server:22.2
               volumeMounts:
                 - name: default-volume-claim
                   mountPath: /var/lib/clickhouse

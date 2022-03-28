@@ -577,7 +577,7 @@ def test_system_settings_changed(self, prometheus_operator_spec, clickhouse_oper
         fired = alerts.wait_alert_state(
             "ClickHouseSystemSettingsChanged", "firing", True, labels={"hostname": changed_svc},
             time_range="30s")
-        assert fired, error("can't get ClickHouseTooManyConnections alert in firing state")
+        assert fired, error("can't get ClickHouseSystemSettingsChanged alert in firing state")
 
     with When("rollback changed settings"):
         kubectl.create_and_check(
@@ -599,7 +599,7 @@ def test_system_settings_changed(self, prometheus_operator_spec, clickhouse_oper
 
     with Then("check ClickHouseSystemSettingsChanged gone away"):
         resolved = alerts.wait_alert_state("ClickHouseSystemSettingsChanged", "firing", False, labels={"hostname": changed_svc}, sleep_time=30)
-        assert resolved, error("can't check ClickHouseTooManyConnections alert is gone away")
+        assert resolved, error("can't check ClickHouseSystemSettingsChanged alert is gone away")
 
 
 @TestScenario
@@ -776,7 +776,7 @@ def test_keeper_alerts_outline(self, keeper_type):
     expected_alerts = {
         "zookeeper": {
             "down": "ZookeeperDown",
-            "restartRecently":"ZookeeperRestartRecently",
+            "restartRecently": "ZookeeperRestartRecently",
         },
         "clickhouse-keeper": {
             "down": "ClickHouseKeeperDown",

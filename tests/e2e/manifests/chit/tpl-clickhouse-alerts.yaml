@@ -17,4 +17,4 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:21.11 # @TODO replace to :latest after resolve https://github.com/ClickHouse/ClickHouse/issues/34014
+              image: clickhouse/clickhouse-server:22.3

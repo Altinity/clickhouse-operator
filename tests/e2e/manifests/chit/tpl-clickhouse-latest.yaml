@@ -13,4 +13,4 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:latest
+              image: clickhouse/clickhouse-server:latest

@@ -15,7 +15,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:21.3
+              image: clickhouse/clickhouse-server:22.3
           #    command:
           #      - "/bin/bash"
           #      - "-c"
