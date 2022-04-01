@@ -21,7 +21,7 @@ import (
 
 const (
 	// http://user:password@host:8123/
-	chDsnUrlPattern = "http://%s%s:%s/"
+	chDsnUrlPattern = "%s://%s%s:%s/"
 
 	usernameReplacer = "***"
 	passwordReplacer = "***"
@@ -33,6 +33,7 @@ const (
 // EndpointCredentials specifies credentials to access specified endpoint
 type EndpointCredentials struct {
 	// External data
+	scheme   string
 	hostname string
 	username string
 	password string
@@ -44,8 +45,9 @@ type EndpointCredentials struct {
 }
 
 // NewEndpointCredentials creates new EndpointCredentials object
-func NewEndpointCredentials(hostname, username, password string, port int) *EndpointCredentials {
+func NewEndpointCredentials(scheme, hostname, username, password string, port int) *EndpointCredentials {
 	params := &EndpointCredentials{
+		scheme:   scheme,
 		hostname: hostname,
 		username: username,
 		password: password,
@@ -84,6 +86,7 @@ func (c *EndpointCredentials) makeUsernamePassword(hidden bool) string {
 func (c *EndpointCredentials) makeDSN(hideCredentials bool) string {
 	return fmt.Sprintf(
 		chDsnUrlPattern,
+		c.scheme,
 		c.makeUsernamePassword(hideCredentials),
 		c.hostname,
 		strconv.Itoa(c.port),

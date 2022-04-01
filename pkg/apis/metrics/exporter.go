@@ -163,6 +163,7 @@ func (e *Exporter) updateWatched(chi *WatchedCHI) {
 // newFetcher returns new Metrics Fetcher for specified host
 func (e *Exporter) newFetcher(hostname string) *ClickHouseFetcher {
 	return NewClickHouseFetcher(
+		e.chAccessInfo.Scheme,
 		hostname,
 		e.chAccessInfo.Username,
 		e.chAccessInfo.Password,

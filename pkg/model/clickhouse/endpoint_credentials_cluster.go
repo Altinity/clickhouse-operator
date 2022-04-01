@@ -16,6 +16,7 @@ package clickhouse
 
 // ClusterEndpointCredentials specifies cluster endpoint credentials
 type ClusterEndpointCredentials struct {
+	Scheme   string
 	Username string
 	Password string
 	Port     int
