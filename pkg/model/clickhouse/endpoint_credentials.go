@@ -28,6 +28,9 @@ const (
 
 	dsnUsernamePasswordPairPattern             = "%s:%s@"
 	dsnUsernamePasswordPairUsernameOnlyPattern = "%s@"
+
+	httpsScheme = "https"
+	tlsSettings = "tls-settings"
 )
 
 // EndpointCredentials specifies credentials to access specified endpoint
@@ -84,13 +87,17 @@ func (c *EndpointCredentials) makeUsernamePassword(hidden bool) string {
 
 // makeDSN makes ClickHouse DSN
 func (c *EndpointCredentials) makeDSN(hideCredentials bool) string {
-	return fmt.Sprintf(
+	baseUrl := fmt.Sprintf(
 		chDsnUrlPattern,
 		c.scheme,
 		c.makeUsernamePassword(hideCredentials),
 		c.hostname,
 		strconv.Itoa(c.port),
 	)
+	if c.scheme == httpsScheme {
+		baseUrl += "?tls_config=" + tlsSettings
+	}
+	return baseUrl
 }
 
 // GetDSN gets DSN

@@ -29,7 +29,7 @@ import (
 )
 
 func init(){
-	goch.RegisterTLSConfig("tls-settings", &tls.Config{InsecureSkipVerify: true})
+	goch.RegisterTLSConfig(tlsSettings, &tls.Config{InsecureSkipVerify: true})
 }
 
 // Connection specifies clickhouse database connection object
@@ -69,7 +69,7 @@ func (c *Connection) SetLog(l log.Announcer) *Connection {
 // connect performs connect
 func (c *Connection) connect(ctx context.Context) {
 	c.l.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
-	dbConnection, err := databasesql.Open("clickhouse", c.params.GetDSN()+"?tls_config=tls-settings")
+	dbConnection, err := databasesql.Open("clickhouse", c.params.GetDSN())
 	if err != nil {
 		c.l.V(1).F().Error("FAILED Open(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
 		return
