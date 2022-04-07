@@ -16,6 +16,7 @@ package clickhouse
 
 import (
 	"context"
+	"crypto/tls"
 	databasesql "database/sql"
 	"fmt"
 	"time"
@@ -24,8 +25,12 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 
 	// go-clickhouse is explicitly required in order to setup connection to clickhouse db
-	_ "github.com/mailru/go-clickhouse"
+	goch "github.com/mailru/go-clickhouse"
 )
+
+func init(){
+	goch.RegisterTLSConfig(tlsSettings, &tls.Config{InsecureSkipVerify: true})
+}
 
 // Connection specifies clickhouse database connection object
 type Connection struct {
@@ -41,6 +46,7 @@ func NewConnection(params *ConnectionParams) *Connection {
 		params: params,
 		l:      log.New(),
 	}
+
 }
 
 // Params gets connection params

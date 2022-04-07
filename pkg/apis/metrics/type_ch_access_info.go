@@ -16,14 +16,16 @@ package metrics
 
 // CHAccessInfo specifies ClickHouse access info
 type CHAccessInfo struct {
+	Scheme   string
 	Username string
 	Password string
 	Port     int
 }
 
 // NewCHAccessInfo creates new CHAccessInfo from specified access info
-func NewCHAccessInfo(username, password string, port int) *CHAccessInfo {
+func NewCHAccessInfo(scheme, username, password string, port int) *CHAccessInfo {
 	return &CHAccessInfo{
+		Scheme:   scheme,
 		Username: username,
 		Password: password,
 		Port:     port,

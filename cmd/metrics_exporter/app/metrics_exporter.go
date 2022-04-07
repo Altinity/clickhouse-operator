@@ -98,6 +98,7 @@ func Run() {
 
 	exporter := metrics.StartMetricsREST(
 		metrics.NewCHAccessInfo(
+			chop.Config().ClickHouse.Access.Scheme,
 			chop.Config().ClickHouse.Access.Username,
 			chop.Config().ClickHouse.Access.Password,
 			chop.Config().ClickHouse.Access.Port,
