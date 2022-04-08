@@ -123,6 +123,7 @@ spec:
                 echo 'initLimit=300'
                 echo 'syncLimit=10'
                 echo 'maxClientCnxns=2000'
+                echo 'maxTimeToWaitForEpoch=2000'
                 echo 'maxSessionTimeout=60000000'
                 echo "dataDir=${ZOO_DATA_DIR}"
                 echo "dataLogDir=${ZOO_DATA_LOG_DIR}"

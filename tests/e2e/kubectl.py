@@ -74,16 +74,18 @@ def delete_all_chi(ns=namespace):
                 delete_chi(chi["metadata"]["name"], ns)
 
 
-def delete_all_keeper(keeper_type="zookeeper", ns=namespace):
-    for resource_type in ("sts", "pvc"):
-        try:
-            zks = get(resource_type, "", label=f"-l app={keeper_type}", ns=ns, ok_to_fail=True)
-        except Exception as e:
-            zks = {}
-        if "items" in zks:
-            for item in zks["items"]:
-                name = item['metadata']['name']
-                launch(f"delete {resource_type} -n {ns} {name}")
+def delete_all_keeper(ns=namespace):
+    for keeper_type in ('zookeeper-operator', 'zookeeper', 'clickhouse-keeper'):
+        expected_resource_types = ("zookeepercluster", ) if keeper_type == "zookeeper-operator" else ("sts", "pvc", "cm", "svc")
+        for resource_type in expected_resource_types:
+            try:
+                item_list = get(resource_type, "", label=f"-l app={keeper_type}", ns=ns, ok_to_fail=True)
+            except Exception as e:
+                item_list = {}
+            if "items" in item_list:
+                for item in item_list["items"]:
+                    name = item['metadata']['name']
+                    launch(f"delete {resource_type} -n {ns} {name}", ok_to_fail=True)
 
 
 def create_and_check(manifest, check, ns=namespace, timeout=900):
