@@ -28,7 +28,7 @@ import (
 	goch "github.com/mailru/go-clickhouse"
 )
 
-func init(){
+func init() {
 	goch.RegisterTLSConfig(tlsSettings, &tls.Config{InsecureSkipVerify: true})
 }
 
