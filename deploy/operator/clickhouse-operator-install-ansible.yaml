@@ -2782,6 +2782,9 @@ spec:
                     access:
                       type: object
                       properties:
+                        scheme:
+                          type: string
+                          description: "The scheme to user for connecting to ClickHouse. One of http or https"
                         username:
                           type: string
                           description: "ClickHouse username to be used by operator to connect to ClickHouse instances, deprecated, use chCredentialsSecretName"
