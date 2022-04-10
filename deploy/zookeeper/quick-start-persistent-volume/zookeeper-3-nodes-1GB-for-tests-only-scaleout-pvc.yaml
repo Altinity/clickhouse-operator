@@ -80,14 +80,15 @@ metadata:
 data:
   env.sh: |
     #!/usr/bin/env bash
-    DOMAIN=`hostname -d`
-    QUORUM_PORT=2888
-    LEADER_PORT=3888
-    CLIENT_HOST=zookeeper
-    CLIENT_PORT=2181
-    ADMIN_SERVER_HOST=zookeeper-admin-server
-    ADMIN_SERVER_PORT=8080
-    CLUSTER_NAME=zookeeper
+    export DOMAIN=`hostname -d`
+    export QUORUM_PORT=2888
+    export LEADER_PORT=3888
+    export CLIENT_HOST=zookeeper
+    export CLIENT_PORT=2181
+    export ADMIN_SERVER_HOST=zookeeper-admin-server
+    export ADMIN_SERVER_PORT=8080
+    export CLUSTER_NAME=zookeeper
+    export ZOO_LOG4J_PROP="WARN, CONSOLE"
   log4j-quiet.properties: |
     log4j.rootLogger=CONSOLE
     log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
@@ -96,12 +97,28 @@ data:
     log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n
   log4j.properties: |
     zookeeper.root.logger=CONSOLE
-    zookeeper.console.threshold=WARN
+    zookeeper.console.threshold=INFO
     log4j.rootLogger=${zookeeper.root.logger}
     log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
     log4j.appender.CONSOLE.Threshold=${zookeeper.console.threshold}
     log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
     log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n
+  logback.xml: |
+    <configuration>
+        <property name="zookeeper.console.threshold" value="INFO"/>
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n</pattern>
+            </encoder>
+            <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+                <level>${zookeeper.console.threshold}</level>
+            </filter>
+        </appender>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE" />
+        </root>        
+    </configuration>    
+
   zoo.cfg: |
     4lw.commands.whitelist=*
     dataDir=/data
@@ -305,6 +322,7 @@ data:
     fi
     cp -f /conf/log4j.properties $ZOOCFGDIR
     cp -f /conf/log4j-quiet.properties $ZOOCFGDIR
+    cp -f /conf/logback.xml $ZOOCFGDIR
     cp -f /conf/env.sh $ZOOCFGDIR
 
     if [ -f $DYNCONFIG ]; then
@@ -352,11 +370,11 @@ data:
     ZKURL=$(zkConnectionString)
     set -e
     MYID=`cat $MYID_FILE`
-
+    CLUSTER_SIZE=$(zkCli.sh -server ${ZKURL} config | grep -c -E '^server\.[0-9]+=') 
     echo "CLUSTER_SIZE=$CLUSTER_SIZE, MyId=$MYID"
-    if [[ -n "$CLUSTER_SIZE" && "$CLUSTER_SIZE" -lt "$MYID" ]]; then
+    if [[ "$MYID" -gt "1" ]]; then
       # If ClusterSize < MyId, this server is being permanantly removed.
-      zkCli.sh  -server ${ZKURL} reconfig -remove $MYID | grep -E '^server\.\d+='  > $DYNCONFIG 
+      zkCli.sh  -server ${ZKURL} reconfig -remove $MYID | grep -E '^server\.[0-9]+='  > $DYNCONFIG 
       echo $?
     fi
 
